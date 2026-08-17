@@ -220,7 +220,7 @@ pub fn init_target(explicit: Option<&Path>) -> Result<PathBuf> {
 }
 
 /// Prints the init report and next steps.
-pub fn print_init(report: &init::InitReport, root: &Path) {
+pub fn print_init(report: &init::InitReport, root: &Path, language: init::Language) {
     println!("Initialized do-harness workspace in {}", root.display());
     for path in &report.written {
         println!("  wrote {path}");
@@ -233,7 +233,18 @@ pub fn print_init(report: &init::InitReport, root: &Path) {
     println!("Next steps:");
     println!("  do-harness hook install   # wire git hooks");
     println!("  do-harness list           # show the configured sensors");
-    println!("  do-harness verify         # run the configured sensors");
+    match language {
+        init::Language::Rust => {
+            println!(
+                "  do-harness verify         # full rust suite; a fresh init scaffolded the crate to verify"
+            );
+        }
+        init::Language::Generic => {
+            println!(
+                "  do-harness verify         # NOTE: zero sensors — a pass is vacuous until you add [[sensors]]"
+            );
+        }
+    }
 }
 
 /// Describes where the `do-harness` binary resolves from.

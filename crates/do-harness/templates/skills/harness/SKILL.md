@@ -43,6 +43,16 @@ Sensors are defined in `do-harness.toml`; run `do-harness list` to see them.
 If the same subtask fails a sensor 3 consecutive times, halt, record the error
 signature in `.do-harness/agent_state.db`, and surface a diagnostic.
 
+## New-Repo Adoption (Dogfood Rule)
+- `do-harness init` (rust pack) scaffolds a minimal crate when no
+  `Cargo.toml` exists, so `init && verify` exits 0 on an empty tree;
+  existing crates are never touched, not even with `--force`.
+- The generic pack ships zero sensors: its `verify` pass is vacuous until
+  real `[[sensors]]` are configured — not evidence.
+- Never assume the harness works in this repo: re-prove with
+  `do-harness verify --format json` and read the per-sensor exit codes.
+
 ## Gotchas
 - Never trust LLM self-assessment over a computational sensor's exit code.
 - Fix the sensor that fired; do not refactor unrelated code in the same pass.
+- An empty sensor suite passes vacuously; that is not evidence.

@@ -80,6 +80,20 @@ Handoffs between parallel swarm agents are accepted only on computational eviden
 - Parallel swarm agents must own non-overlapping file sets to avoid edit conflicts.
 - Distill the failure pattern back into this skill so the sensor (empty-result handoff) fires less in the future.
 
+## New-Repo Adoption (Dogfood Rule)
+
+Using the harness in another codebase is proven, never assumed:
+
+- `do-harness init` (rust pack) scaffolds a minimal cargo crate when no
+  `Cargo.toml` exists, so `init && verify` exits 0 on a truly empty tree;
+  existing crates are never touched, not even with `--force`.
+- The generic pack ships zero sensors: its `verify` pass is vacuous until
+  real `[[sensors]]` are configured — do not report it as evidence.
+- The green/red paths are dogfooded by `crates/do-harness/tests/dogfood.rs`
+  and CI (`init && verify` on a fresh temp workspace every push); re-prove
+  with `do-harness verify --format json` in the consumer repo.
+
 ## Gotchas
 - Never trust LLM self-assessment over a computational sensor's exit code.
 - Fix the sensor that fired; do not refactor unrelated code in the same pass.
+- An empty sensor suite passes vacuously; that is not evidence.

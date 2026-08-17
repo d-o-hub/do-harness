@@ -15,3 +15,13 @@ jobs:
         run: cargo build --release -p do-harness
       - name: Run sensors
         run: ./target/release/do-harness verify --format json
+      - name: Dogfood greenfield rust init + verify
+        run: |
+          tmp="$(mktemp -d)"
+          ./target/release/do-harness --root "$tmp" init
+          ./target/release/do-harness --root "$tmp" verify --format json
+      - name: Dogfood generic init (vacuous verify, documented)
+        run: |
+          tmp="$(mktemp -d)"
+          ./target/release/do-harness --root "$tmp" init --language generic
+          ./target/release/do-harness --root "$tmp" verify --format json

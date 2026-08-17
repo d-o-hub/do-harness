@@ -32,11 +32,16 @@ The harness is designed to be adopted by any codebase, Rust or not:
    This writes `do-harness.toml`, `AGENTS.md`, `plans/invariants.json`,
    `.agents/skills/`, and `.gitignore` entries, then initializes the local
    libSQL state and seeds the invariants. Existing files are left untouched
-   unless you pass `--force`.
+   unless you pass `--force`. When no `Cargo.toml` exists, the rust pack also
+   scaffolds a minimal crate (`Cargo.toml` + `src/lib.rs`) so `init && verify`
+   is green on a truly empty tree; existing crates are never touched, not
+   even with `--force`.
 
 2. Configure sensors for your stack in `do-harness.toml`. Language packs:
-   `rust` (fmt/check/clippy/test/loc) and `generic` (ships no sensors — add
-   your own `[[sensors]]` entries).
+   `rust` (fmt/check/clippy/test/loc/commitlint) and `generic` (ships no
+   sensors — add your own `[[sensors]]` entries). With zero sensors
+   `verify` exits 0 without running any command: a vacuous pass, not
+   evidence. Define real sensors before treating verify output as proof.
 
 3. Wire the git hooks:
 
@@ -52,6 +57,12 @@ The harness is designed to be adopted by any codebase, Rust or not:
    ```bash
    do-harness verify
    ```
+
+The green path is dogfooded, not assumed: `crates/do-harness/tests/dogfood.rs`
+runs the real binary on fresh temp workspaces and asserts the rust pack goes
+green after `init`, goes red once the crate is removed, and that the generic
+pack's pass is vacuous. CI repeats `init && verify` on every push (see
+`.github/workflows/verify.yml`).
 
 For CI, invoke `do-harness verify --format json` (exit 0/1/2) with the CLI on
 `PATH` — no build step required.

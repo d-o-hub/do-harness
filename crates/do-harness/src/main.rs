@@ -292,7 +292,7 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
             let report = init::init_workspace(&root, &opts)
                 .await
                 .map_err(CliError::Usage)?;
-            commands::print_init(&report, &root);
+            commands::print_init(&report, &root, language);
             Ok(())
         }
         Command::Verify {

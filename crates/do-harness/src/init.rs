@@ -49,6 +49,8 @@ const INVARIANTS_RUST: &str = include_str!("../templates/plans/invariants.json.r
 const INVARIANTS_GENERIC: &str = include_str!("../templates/plans/invariants.json.generic");
 const CHECK_LOC: &str = include_str!("../templates/scripts/check-loc.sh");
 const CHECK_COMMITLINT: &str = include_str!("../templates/scripts/check-commitlint.sh");
+const CRATE_MANIFEST: &str = include_str!("../templates/crate/Cargo.toml");
+const CRATE_LIB: &str = include_str!("../templates/crate/src/lib.rs");
 
 /// Portable skill templates written into `.agents/skills/<name>/SKILL.md`.
 struct SkillSpec {
@@ -157,6 +159,7 @@ pub async fn init_workspace(root: &Path, opts: &InitOpts) -> Result<InitReport> 
             &mut report,
         )?;
         make_executable(&root.join("scripts/check-commitlint.sh"))?;
+        scaffold_crate(root, &mut report)?;
     }
     for spec in SKILLS {
         let skill_dir = format!(".agents/skills/{}", spec.name);
@@ -248,6 +251,23 @@ fn write_if_absent(
     Ok(())
 }
 
+/// Writes a minimal cargo crate when no `Cargo.toml` exists so a greenfield
+/// workspace passes the rust sensor pack immediately (`init && verify` is
+/// green on an empty tree).
+///
+/// Existing crates are never touched — not even with `--force` — because
+/// overwriting a real manifest would be destructive; the crate files are
+/// greenfield-only scaffolding.
+fn scaffold_crate(root: &Path, report: &mut InitReport) -> Result<()> {
+    if root.join("Cargo.toml").exists() {
+        report.skipped.push("Cargo.toml".to_owned());
+        return Ok(());
+    }
+    write_if_absent(root, "Cargo.toml", CRATE_MANIFEST, false, report)?;
+    write_if_absent(root, "src/lib.rs", CRATE_LIB, false, report)?;
+    Ok(())
+}
+
 /// Appends the harness `.gitignore` entries when missing; creates the file
 /// when it does not exist yet.
 fn append_gitignore(root: &Path, report: &mut InitReport) -> Result<()> {
@@ -298,114 +318,4 @@ fn make_executable(_path: &Path) -> Result<()> {
 }
 
 #[cfg(test)]
-mod tests {
-    #![allow(clippy::unwrap_used)]
-
-    use super::*;
-
-    #[tokio::test(flavor = "current_thread")]
-    async fn init_rust_scaffolds_full_workspace() {
-        let dir = tempfile::tempdir().unwrap();
-        let opts = InitOpts {
-            language: Language::Rust,
-            force: false,
-        };
-
-        let report = init_workspace(dir.path(), &opts).await.unwrap();
-
-        assert!(report.written.contains(&"AGENTS.md".to_owned()));
-        assert!(report.written.contains(&"do-harness.toml".to_owned()));
-        assert!(report.written.contains(&"plans/invariants.json".to_owned()));
-        assert!(report.written.contains(&"scripts/check-loc.sh".to_owned()));
-        assert!(
-            report
-                .written
-                .contains(&".agents/skills/harness/SKILL.md".to_owned())
-        );
-        assert_eq!(report.seeded, 3);
-        let config = fs::read_to_string(dir.path().join("do-harness.toml")).unwrap();
-        assert!(config.contains("language = \"rust\""));
-        assert!(dir.path().join(".do-harness/agent_state.db").exists());
-    }
-
-    #[tokio::test(flavor = "current_thread")]
-    async fn init_generic_has_no_loc_script() {
-        let dir = tempfile::tempdir().unwrap();
-        let opts = InitOpts {
-            language: Language::Generic,
-            force: false,
-        };
-
-        let report = init_workspace(dir.path(), &opts).await.unwrap();
-
-        assert!(!report.written.iter().any(|p| p == "scripts/check-loc.sh"));
-        let config = fs::read_to_string(dir.path().join("do-harness.toml")).unwrap();
-        assert!(config.contains("language = \"generic\""));
-        assert_eq!(report.seeded, 2);
-    }
-
-    #[tokio::test(flavor = "current_thread")]
-    async fn init_is_idempotent_without_force() {
-        let dir = tempfile::tempdir().unwrap();
-        let opts = InitOpts {
-            language: Language::Rust,
-            force: false,
-        };
-        init_workspace(dir.path(), &opts).await.unwrap();
-
-        let report = init_workspace(dir.path(), &opts).await.unwrap();
-
-        assert!(report.written.is_empty());
-        assert!(report.skipped.contains(&"do-harness.toml".to_owned()));
-    }
-
-    #[tokio::test(flavor = "current_thread")]
-    async fn init_rust_scaffolds_skill_creator_and_evals() {
-        let dir = tempfile::tempdir().unwrap();
-        let opts = InitOpts {
-            language: Language::Rust,
-            force: false,
-        };
-
-        let report = init_workspace(dir.path(), &opts).await.unwrap();
-
-        assert_eq!(report.skills, SKILLS.len());
-        for spec in SKILLS {
-            let name = spec.name;
-            let skill_dir = dir.path().join(".agents/skills").join(name);
-            assert!(skill_dir.join("SKILL.md").is_file(), "{name} SKILL.md");
-            assert!(
-                skill_dir.join("evals/evals.json").is_file(),
-                "{name} evals.json"
-            );
-        }
-        let creator_dir = dir.path().join(".agents/skills/skill-creator");
-        assert!(creator_dir.join("SKILL.md").is_file());
-        assert!(creator_dir.join("scripts/init_skill.py").is_file());
-        let quick = creator_dir.join("scripts/quick_validate.py");
-        assert!(quick.is_file());
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            let mode = fs::metadata(&quick).unwrap().permissions().mode();
-            assert!(mode & 0o111 != 0, "quick_validate.py must be executable");
-        }
-    }
-
-    #[tokio::test(flavor = "current_thread")]
-    async fn init_appends_gitignore_entries() {
-        let dir = tempfile::tempdir().unwrap();
-        fs::write(dir.path().join(".gitignore"), "# existing\n").unwrap();
-        let opts = InitOpts {
-            language: Language::Generic,
-            force: false,
-        };
-
-        init_workspace(dir.path(), &opts).await.unwrap();
-
-        let text = fs::read_to_string(dir.path().join(".gitignore")).unwrap();
-        assert!(text.contains(".do-harness/"));
-        assert!(text.contains(".agents/events/"));
-        assert!(text.contains("# existing"));
-    }
-}
+mod tests;

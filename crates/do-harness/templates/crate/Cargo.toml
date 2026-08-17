@@ -1,0 +1,9 @@
+# Cargo.toml — minimal crate scaffolded by `do-harness init` (rust pack).
+# Written only when no Cargo.toml exists, so `init && verify` is green on a
+# truly empty tree. Existing crates are never touched.
+[package]
+name = "app"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT"

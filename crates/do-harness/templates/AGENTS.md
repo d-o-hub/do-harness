@@ -11,6 +11,15 @@ and CI must pass the computational sensors before declaring work complete.
   (`.do-harness/agent_state.db`).
 - All skills reside in `.agents/skills/`; task tracking resides in `plans/`.
 
+## Greenfield Adoption (No Assumptions)
+- `do-harness init` (rust pack) also scaffolds a minimal cargo crate when no
+  `Cargo.toml` exists, so `init && verify` is green on an empty tree;
+  existing crates are never touched, not even with `--force`.
+- The generic pack ships no sensors: `verify` exits 0 without running any
+  command — a vacuous pass. Add `[[sensors]]` before treating it as evidence.
+- Never assume the harness works in this repo: re-prove it with
+  `do-harness verify --format json` and read the per-sensor exit codes.
+
 ## 6-Phase Coding Workflow
 1. **HTN planning** — decompose the request into ordered subtasks
    (`.agents/skills/htn-planner`).

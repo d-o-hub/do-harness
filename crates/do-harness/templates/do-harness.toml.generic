@@ -6,6 +6,8 @@ pre-commit = []
 pre-push = []
 
 # Define your sensors here; `do-harness verify` runs them in order.
+# NOTE: with zero sensors `do-harness verify` exits 0 without running any
+# command — a vacuous pass, not evidence. Define real sensors first.
 # Example (Node):
 # [[sensors]]
 # name = "lint"
