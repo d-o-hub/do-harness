@@ -39,6 +39,11 @@ const MIGRATIONS: &[Migration] = &[
         name: "beat_sensor",
         sql: include_str!("../migrations/0005_beat_sensor.sql"),
     },
+    Migration {
+        version: 6,
+        name: "eval_latest",
+        sql: include_str!("../migrations/0006_eval_latest.sql"),
+    },
 ];
 
 /// Opens (creating if necessary) the local libSQL database at `path`.

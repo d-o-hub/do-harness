@@ -43,9 +43,7 @@ pub struct NewSkillEval<'a> {
     pub prompt: Option<&'a str>,
     /// The expected outcome of the prompt.
     pub expected_outcome: Option<&'a str>,
-    /// Token efficiency measured by a live run, when available.
-    pub token_efficiency: Option<f64>,
-    /// Pass rate (fraction of structurally valid cases), 0.0 to 1.0.
+    /// Pass rate (fraction of graded assertions that passed), 0.0 to 1.0.
     pub pass_rate: Option<f64>,
 }
 
@@ -175,26 +173,46 @@ pub async fn list_heuristics(conn: &Connection, skill_name: &str) -> Result<Vec<
     Ok(heuristics)
 }
 
-/// Inserts a skill evaluation row and returns its id.
+/// Inserts or upserts a skill evaluation row and returns its id.
+///
+/// `skill_name` is unique; a later evaluation for the same skill overwrites the
+/// previous one (latest wins), so the table holds one row per skill.
 ///
 /// # Errors
 ///
 /// Returns an error when the insert statement fails.
 pub async fn insert_skill_eval(conn: &Connection, eval: &NewSkillEval<'_>) -> Result<i64> {
     conn.execute(
-        "INSERT INTO skill_evals (skill_name, prompt, expected_outcome, token_efficiency, pass_rate, created_at) \
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        "INSERT INTO skill_evals (skill_name, prompt, expected_outcome, pass_rate, created_at) \
+         VALUES (?1, ?2, ?3, ?4, ?5) \
+         ON CONFLICT(skill_name) DO UPDATE SET \
+           prompt = excluded.prompt, \
+           expected_outcome = excluded.expected_outcome, \
+           pass_rate = excluded.pass_rate, \
+           created_at = excluded.created_at",
         params!(
             eval.skill_name,
             eval.prompt,
             eval.expected_outcome,
-            eval.token_efficiency,
             eval.pass_rate,
             unix_now()
         ),
     )
     .await?;
-    Ok(conn.last_insert_rowid())
+    let mut rows = conn
+        .query(
+            "SELECT id FROM skill_evals WHERE skill_name = ?1",
+            params!(eval.skill_name),
+        )
+        .await?;
+    let row = rows
+        .next()
+        .await?
+        .ok_or(crate::error::DbError::NotFound(format!(
+            "skill eval for '{}'",
+            eval.skill_name
+        )))?;
+    Ok(row.get(0)?)
 }
 
 /// Lists skill evaluations for a skill in insertion order.
@@ -205,7 +223,7 @@ pub async fn insert_skill_eval(conn: &Connection, eval: &NewSkillEval<'_>) -> Re
 pub async fn list_skill_evals(conn: &Connection, skill_name: &str) -> Result<Vec<SkillEval>> {
     let mut rows = conn
         .query(
-            "SELECT id, skill_name, prompt, expected_outcome, token_efficiency, pass_rate, created_at \
+            "SELECT id, skill_name, prompt, expected_outcome, pass_rate, created_at \
              FROM skill_evals WHERE skill_name = ?1 ORDER BY id",
             params!(skill_name),
         )
@@ -217,9 +235,8 @@ pub async fn list_skill_evals(conn: &Connection, skill_name: &str) -> Result<Vec
             skill_name: row.get(1)?,
             prompt: row.get(2)?,
             expected_outcome: row.get(3)?,
-            token_efficiency: row.get(4)?,
-            pass_rate: row.get(5)?,
-            created_at: row.get(6)?,
+            pass_rate: row.get(4)?,
+            created_at: row.get(5)?,
         });
     }
     Ok(evals)
@@ -343,7 +360,6 @@ mod tests {
                 skill_name: "harness",
                 prompt: Some("clippy fired; protocol?"),
                 expected_outcome: Some("self-correction steps"),
-                token_efficiency: None,
                 pass_rate: Some(1.0),
             },
         )
@@ -353,7 +369,23 @@ mod tests {
         let evals = list_skill_evals(&conn, "harness").await.unwrap();
         assert_eq!(evals.len(), 1);
         assert_eq!(evals[0].prompt.as_deref(), Some("clippy fired; protocol?"));
-        assert_eq!(evals[0].token_efficiency, None);
         assert_eq!(evals[0].pass_rate, Some(1.0));
+
+        // A later eval for the same skill overwrites rather than appending.
+        insert_skill_eval(
+            &conn,
+            &NewSkillEval {
+                skill_name: "harness",
+                prompt: Some("later eval"),
+                expected_outcome: Some("out"),
+                pass_rate: Some(0.5),
+            },
+        )
+        .await
+        .unwrap();
+        let evals = list_skill_evals(&conn, "harness").await.unwrap();
+        assert_eq!(evals.len(), 1);
+        assert_eq!(evals[0].prompt.as_deref(), Some("later eval"));
+        assert_eq!(evals[0].pass_rate, Some(0.5));
     }
 }

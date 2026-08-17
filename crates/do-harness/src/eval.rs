@@ -122,7 +122,6 @@ pub async fn run_eval(root: &Path, skill: Option<&str>) -> Result<()> {
                     skill_name: &name,
                     prompt: report.prompt.as_deref(),
                     expected_outcome: report.expected_outcome.as_deref(),
-                    token_efficiency: None,
                     pass_rate: Some(pass_rate),
                 },
             )

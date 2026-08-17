@@ -58,5 +58,11 @@
     "rationale": "The canonical gate keeps the skill corpus structurally sound; evals use the existing evals/evals.json schema",
     "sensor": "do-harness eval",
     "category": "workflow"
+  },
+  {
+    "invariant": "Every persisted column is written by at least one non-test INSERT/UPDATE, or it is dropped; skill_evals stays one row per skill",
+    "rationale": "Prevents re-introducing dead columns and unbounded eval history",
+    "sensor": "cargo test --test schema_usage (crates/db) / verify --only test",
+    "category": "storage"
   }
 ]
