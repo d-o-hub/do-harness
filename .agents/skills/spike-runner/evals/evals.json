@@ -1,0 +1,28 @@
+{
+  "skill_name": "spike-runner",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "We're unsure whether libsql works with the tokio current_thread runtime. Run a spike.",
+      "expected_output": "A scratchpad in tests/spikes/ with the minimal prototype, exit-code-0 verification via cargo check/test, findings recorded to .do-harness/agent_state.db, scratch cleaned, and a transition to a vertical slice.",
+      "files": [],
+      "assertions": [
+        "Spike code lives in tests/spikes/",
+        "Success is defined by exit code 0, not LLM assessment",
+        "Findings are recorded before cleanup",
+        "Ephemeral files are removed"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "A spike failed twice with the same error signature. Should we keep trying variations?",
+      "expected_output": "Apply the fail-fast policy: after 3 consecutive failures, halt, record the error signature, and surface a diagnostic instead of continuing variations.",
+      "files": [],
+      "assertions": [
+        "Halt threshold is 3 consecutive failures",
+        "Error signature is persisted",
+        "A diagnostic is surfaced to the developer"
+      ]
+    }
+  ]
+}

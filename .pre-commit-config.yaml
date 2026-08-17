@@ -1,0 +1,9 @@
+repos:
+  - repo: local
+    hooks:
+      - id: do-harness-verify
+        name: do-harness (fmt, loc)
+        entry: ./target/release/do-harness verify --fail-fast --only fmt --only loc
+        language: system
+        pass_filenames: false
+        always_run: true

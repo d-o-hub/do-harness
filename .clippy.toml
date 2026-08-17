@@ -1,0 +1,5 @@
+# Lint policy for the do-harness workspace.
+# Workspace-level lints live in Cargo.toml ([workspace.lints]).
+# This file tunes clippy metadata and allowed identifiers.
+
+doc-valid-idents = ["libSQL", "HTN", "ATDD", "TDD", "SQL", "CLI", "JSON"]

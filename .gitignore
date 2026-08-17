@@ -1,0 +1,21 @@
+# Build output
+/target
+**/*.rs.bk
+
+# Local harness state (libSQL database, per-workspace telemetry)
+.do-harness/
+.agents/events/
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log

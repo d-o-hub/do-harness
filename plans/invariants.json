@@ -1,0 +1,50 @@
+[
+  {
+    "invariant": "Maximum 500 LOC per source file; decompose when nearing 450",
+    "rationale": "Bounds per-file complexity so any slice stays reviewable and token-efficient",
+    "sensor": "scripts/check-loc.sh",
+    "category": "architecture"
+  },
+  {
+    "invariant": "Persistence via local libSQL at .do-harness/agent_state.db",
+    "rationale": "Single local store for beats, traces, heuristics, and invariants",
+    "sensor": "cargo run -p do-harness-db --bin init_db",
+    "category": "storage"
+  },
+  {
+    "invariant": "Computational sensors strictly supersede LLM self-assessment",
+    "rationale": "Automated exit codes are the only proof a subtask is complete",
+    "sensor": "cargo check && cargo test && cargo clippy -- -D warnings",
+    "category": "verification"
+  },
+  {
+    "invariant": "No unsafe code in workspace or crate roots",
+    "rationale": "Eliminates undefined behavior classes from the harness",
+    "sensor": "cargo check (rustc lint unsafe_code = forbid)",
+    "category": "safety"
+  },
+  {
+    "invariant": "thiserror enums in libraries, anyhow in binaries; no unwrap in libs",
+    "rationale": "Typed, recoverable errors at boundaries and ergonomic errors in entrypoints",
+    "sensor": "cargo clippy -- -D warnings",
+    "category": "errors"
+  },
+  {
+    "invariant": "Config and event structs deny unknown fields",
+    "rationale": "Rejects stale or unexpected payloads at the type boundary",
+    "sensor": "cargo test (serde deserialization fixtures)",
+    "category": "contracts"
+  },
+  {
+    "invariant": "Conventional commits with lowercase subject lines",
+    "rationale": "Machine-parseable history for the distillation loop",
+    "sensor": "not implemented (future: commitlint)",
+    "category": "workflow"
+  },
+  {
+    "invariant": "do-harness-types must not depend on storage or adapters",
+    "rationale": "Keeps schema contracts dependency-free and reusable",
+    "sensor": "scripts/check-deps.sh",
+    "category": "architecture"
+  }
+]

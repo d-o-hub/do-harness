@@ -1,0 +1,14 @@
+[package]
+name = "do-harness-types"
+description = "Schema contracts and executable invariants for the do-harness agent execution harness"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+serde = { workspace = true, features = ["derive"] }
+thiserror.workspace = true

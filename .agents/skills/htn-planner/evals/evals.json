@@ -1,0 +1,27 @@
+{
+  "skill_name": "htn-planner",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Plan the implementation of user registration with email verification as a feature request.",
+      "expected_output": "A method choice (Vertical Event Slice or Spike & Resolve) with ordered subtasks, preconditions, and sensor gates per subtask, persisted to plans/tasks.json or libSQL.",
+      "files": [],
+      "assertions": [
+        "The plan names a method from the method catalog",
+        "Each subtask lists a precondition or a sensor gate (cargo check/test/clippy)",
+        "The plan records method state and subtask index"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "We need to integrate the redb crate for key-value storage but nobody knows its API. How should we proceed?",
+      "expected_output": "Selection of the Spike & Resolve method: create a scratchpad in tests/spikes/, execute with an exit-code-0 gate, record findings to .do-harness/agent_state.db, clean scratch, then transition to a vertical slice.",
+      "files": [],
+      "assertions": [
+        "Selects Spike & Resolve, not Vertical Event Slice",
+        "Includes the exit-code-0 sensor gate",
+        "Includes the transition-to-slice subtask"
+      ]
+    }
+  ]
+}

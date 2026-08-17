@@ -1,0 +1,26 @@
+{
+  "skill_name": "skill-distiller",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "A slice passed all sensors. Distill the learnings from the session trace into a skill.",
+      "expected_output": "Trace extracted from .do-harness/agent_state.db, a generalized heuristic with project-specific identifiers stripped, and an updated or new skill in .agents/skills/ with evals/evals.json, evaluated with a PASS/NEEDS_WORK/FAIL verdict and evidence.",
+      "files": [],
+      "assertions": [
+        "The heuristic strips project-specific identifiers",
+        "The skill directory includes evals/evals.json",
+        "The evaluation ends with a verdict and evidence"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "cargo clippy fired three times this sprint on the same pattern. What should we do?",
+      "expected_output": "Steering-loop action: treat >2 sensor fires in a sprint as a signal, update the matching feedforward guide (AGENTS.md or the relevant skill) instead of patching symptoms, and if no guide exists create one via the distillation steps.",
+      "files": [],
+      "assertions": [
+        "Identifies the steering-loop trigger (>2 fires)",
+        "Action targets a feedforward guide, not only the symptom"
+      ]
+    }
+  ]
+}

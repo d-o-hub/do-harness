@@ -1,0 +1,28 @@
+[package]
+name = "do-harness-db"
+description = "Local libSQL persistence for the do-harness agent execution harness"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+libsql = { workspace = true, features = ["core"] }
+tokio.workspace = true
+anyhow.workspace = true
+serde_json.workspace = true
+do-harness-types = { path = "../types", version = "0.1.0" }
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[[bin]]
+name = "init_db"
+path = "src/bin/init_db.rs"
+
+[[bin]]
+name = "seed_invariants"
+path = "src/bin/seed_invariants.rs"

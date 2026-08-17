@@ -1,0 +1,31 @@
+# deny.toml — cargo-deny policy for the do-harness workspace.
+#
+# Dependency direction invariant:
+#   do-harness-types must NOT depend on do-harness-db or adapters.
+#   Enforced by scripts/check-deps.sh (cargo-deny cannot express per-crate
+#   direction rules).
+
+[advisories]
+yanked = "deny"
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+deny = []
+skip = []
+skip-tree = []
+
+[licenses]
+allow = [
+  "MIT",
+  "Apache-2.0",
+  "BSD-3-Clause",
+  "ISC",
+  "Unicode-3.0",
+]
+confidence-threshold = 0.8
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-git = []
