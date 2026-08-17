@@ -11,6 +11,10 @@ metadata:
   version: "0.1.0"
   tags: distillation dreaming skills heuristics eval steering
 ---
+## Guides
+
+See references/heuristics.md for distilled heuristics.
+
 
 # Skill Distiller & Dreaming Skill
 
