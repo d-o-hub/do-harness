@@ -66,9 +66,15 @@ fn single_case_json(assertions: &[&str]) -> String {
 async fn exists_assertion_passes_and_persists_rich_data() {
     let dir = fixture_root(
         VALID_SKILL_MD,
-        Some(&single_case_json(&["exists:artifact.md"])),
+        Some(&single_case_json(&[
+            "exists:.agents/skills/test-skill/artifact.md",
+        ])),
     );
-    fs::write(dir.path().join("artifact.md"), "# artifact\n").unwrap();
+    fs::write(
+        dir.path().join(".agents/skills/test-skill/artifact.md"),
+        "# artifact\n",
+    )
+    .unwrap();
 
     run_eval(dir.path(), None).await.unwrap();
     let rows = persisted(dir.path()).await;
@@ -83,12 +89,12 @@ async fn contains_assertion_passes() {
     let dir = fixture_root(
         VALID_SKILL_MD,
         Some(&single_case_json(&[
-            "exists:report.md",
-            "contains:report.md|Graded by assertions",
+            "exists:.agents/skills/test-skill/report.md",
+            "contains:.agents/skills/test-skill/report.md|Graded by assertions",
         ])),
     );
     fs::write(
-        dir.path().join("report.md"),
+        dir.path().join(".agents/skills/test-skill/report.md"),
         "Summary\nGraded by assertions, not JSON counting.\n",
     )
     .unwrap();
@@ -117,12 +123,16 @@ async fn unprefixed_assertions_are_documentation_excluded_from_pass_rate() {
     let dir = fixture_root(
         VALID_SKILL_MD,
         Some(&single_case_json(&[
-            "exists:readme.md",
+            "exists:.agents/skills/test-skill/readme.md",
             "Uses a typed Command struct",
             "Follows the self-correction protocol",
         ])),
     );
-    fs::write(dir.path().join("readme.md"), "readme body\n").unwrap();
+    fs::write(
+        dir.path().join(".agents/skills/test-skill/readme.md"),
+        "readme body\n",
+    )
+    .unwrap();
 
     run_eval(dir.path(), None).await.unwrap();
     let rows = persisted(dir.path()).await;
@@ -206,10 +216,10 @@ async fn missing_gate_script_is_not_a_structure_failure() {
     fs::write(skill_dir.join("SKILL.md"), VALID_SKILL_MD).unwrap();
     fs::write(
         skill_dir.join("evals/evals.json"),
-        single_case_json(&["exists:alpha.txt"]),
+        single_case_json(&["exists:.agents/skills/alpha/alpha.txt"]),
     )
     .unwrap();
-    fs::write(dir.path().join("alpha.txt"), "x").unwrap();
+    fs::write(skill_dir.join("alpha.txt"), "x").unwrap();
 
     run_eval(dir.path(), Some("alpha")).await.unwrap();
 

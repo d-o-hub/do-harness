@@ -84,7 +84,6 @@ struct SkillReport {
 /// evaluated skill fails the structure gate.
 pub async fn run_eval(root: &Path, skill: Option<&str>) -> Result<()> {
     let skills_root = root.join(".agents/skills");
-    let gate_script = skills_root.join("skill-creator/scripts/quick_validate.py");
     let entries = match skill {
         Some(name) => {
             let dir = skills_root.join(name);
@@ -104,7 +103,17 @@ pub async fn run_eval(root: &Path, skill: Option<&str>) -> Result<()> {
             .and_then(|name| name.to_str())
             .with_context(|| format!("invalid skill directory name: {}", entry.display()))?
             .to_owned();
-        let report = check_skill(root, &entry, &name, &gate_script).await?;
+        // Evaluate the skill in a hermetic temp root so walkthroughs and
+        // assertions cannot dirty the caller's repository tree.
+        let sandbox = Sandbox::for_skill(root, &entry, &name)?;
+        let report = check_skill(
+            sandbox.root(),
+            sandbox.root().join(".agents/skills").join(&name).as_path(),
+            &name,
+            &sandbox.gate_script(),
+        )
+        .await?;
+        drop(sandbox);
         println!("{}", report.line);
         if let Some(pass_rate) = report.pass_rate {
             do_harness_db::insert_skill_eval(
@@ -129,6 +138,81 @@ pub async fn run_eval(root: &Path, skill: Option<&str>) -> Result<()> {
     } else {
         bail!("structure gate failed for skill(s): {}", invalid.join(", "))
     }
+}
+
+/// A hermetic sandbox that mirrors a skill plus skill-creator into a temp dir.
+///
+/// The temp root becomes the workspace root for the walkthrough and every
+/// graded assertion, so residue lands under the temp dir and the caller's
+/// repository stays untouched.
+struct Sandbox {
+    _dir: tempfile::TempDir,
+    root: PathBuf,
+}
+
+impl Sandbox {
+    /// Copies `skill_dir` (SKILL.md + evals) and skill-creator scripts into a
+    /// fresh temp root shaped like a harness workspace.
+    fn for_skill(real_root: &Path, skill_dir: &Path, name: &str) -> Result<Sandbox> {
+        let dir = tempfile::tempdir().context("failed to create eval sandbox")?;
+        let root = dir.path().to_path_buf();
+        let skills_root = root.join(".agents").join("skills");
+        let dest_skill = skills_root.join(name);
+        let gate_src = real_root
+            .join(".agents")
+            .join("skills")
+            .join("skill-creator")
+            .join("scripts");
+        if gate_src.is_dir() {
+            let dest_scripts = skills_root.join("skill-creator").join("scripts");
+            fs::create_dir_all(&dest_scripts)
+                .with_context(|| format!("failed to create {}", dest_scripts.display()))?;
+            for entry in fs::read_dir(&gate_src)
+                .with_context(|| format!("failed to read {}", gate_src.display()))?
+            {
+                let entry = entry?;
+                let name = entry.file_name();
+                fs::copy(entry.path(), dest_scripts.join(&name)).with_context(|| {
+                    format!("failed to copy {} into sandbox", entry.path().display())
+                })?;
+            }
+        }
+        copy_dir(skill_dir, &dest_skill)?;
+        Ok(Sandbox { _dir: dir, root })
+    }
+
+    /// Path of the hermetic workspace root.
+    fn root(&self) -> &Path {
+        &self.root
+    }
+
+    /// Path of the copied skill-creator gate script within the sandbox.
+    fn gate_script(&self) -> PathBuf {
+        self.root
+            .join(".agents")
+            .join("skills")
+            .join("skill-creator")
+            .join("scripts")
+            .join("quick_validate.py")
+    }
+}
+
+/// Recursively copies `src` into `dest`.
+fn copy_dir(src: &Path, dest: &Path) -> Result<()> {
+    fs::create_dir_all(dest).with_context(|| format!("failed to create {}", dest.display()))?;
+    for entry in fs::read_dir(src).with_context(|| format!("failed to read {}", src.display()))? {
+        let entry = entry?;
+        let from = entry.path();
+        let to = dest.join(entry.file_name());
+        if from.is_dir() {
+            copy_dir(&from, &to)?;
+        } else {
+            fs::copy(&from, &to).with_context(|| {
+                format!("failed to copy {} -> {}", from.display(), to.display())
+            })?;
+        }
+    }
+    Ok(())
 }
 
 /// Lists skill directories under `skills_root` that contain a `SKILL.md`,

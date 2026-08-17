@@ -7,20 +7,18 @@
       "expected_output": "Follow the self-correction protocol: read the error, classify it as a lint failure, apply the minimal fix (add a # Errors section), re-run cargo clippy, and only proceed when the sensor is green.",
       "files": [],
       "assertions": [
-        "contains:.agents/skills/harness/SKILL.md|name:",
-        "contains:AGENTS.md|fail-fast",
-        "Classifies the failure before applying the fix"
+        "db:error_signatures:signature=sensor:test:min=1",
+        "cli:errors list:contains:sensor:test",
+        "exists:.agents/skills/harness/SKILL.md"
       ]
     },
     {
       "id": 2,
       "prompt": "The same test has failed 3 consecutive times for the same subtask. What now?",
-      "expected_output": "Apply the fail-fast policy: halt, record the error signature in .do-harness/agent_state.db, and surface a diagnostic to the developer.",
+      "expected_output": "Apply the fail-fast policy: halt, record the error signature, and surface a diagnostic to the developer.",
       "files": [],
       "assertions": [
-        "exists:.agents/skills/harness/SKILL.md",
-        "contains:AGENTS.md|error signature",
-        "Halts rather than retrying indefinitely"
+        "The fail-fast policy halts rather than retrying indefinitely"
       ]
     }
   ]

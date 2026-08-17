@@ -57,9 +57,9 @@ pub fn is_graded(spec: &str) -> bool {
 
 /// Grades a single prefixed assertion against the workspace root.
 ///
-/// `walk` is the (already-run) walkthrough outcome for the owning skill; it is
-/// consulted by the `walk:` assertion and, when a present walkthrough failed,
-/// every graded assertion fails as well.
+/// `root` is the eval sandbox root: `exists`/`contains`/`db` resolve there and
+/// `cli:` runs the harness binary with `--root <root>` so residue and queries
+/// stay inside the sandbox. `walk` is the (already-run) walkthrough outcome.
 ///
 /// # Errors
 ///
@@ -76,7 +76,7 @@ pub async fn grade(root: &Path, spec: &str, walk: &WalkRun) -> Result<AssertionG
         return grade_db(root, rest).await;
     }
     if let Some(rest) = spec.strip_prefix("cli:") {
-        return Ok(grade_cli(rest));
+        return Ok(grade_cli(root, rest));
     }
     if spec.starts_with("walk:") {
         return Ok(walk_success(*walk, spec));
@@ -154,7 +154,11 @@ async fn grade_db(root: &Path, rest: &str) -> Result<AssertionGrade> {
 }
 
 /// The `cli:ARGV:contains:TEXT` grader.
-fn grade_cli(rest: &str) -> AssertionGrade {
+///
+/// Runs the harness binary with `--root root` then ARGV, so the command
+/// operates against the eval sandbox, and requires exit 0 plus stdout
+/// containing TEXT.
+fn grade_cli(root: &Path, rest: &str) -> AssertionGrade {
     let Some((argv, text)) = rest.split_once(":contains:") else {
         return fail("cli: expected cli:ARGV:contains:TEXT".to_owned());
     };
@@ -162,18 +166,23 @@ fn grade_cli(rest: &str) -> AssertionGrade {
     if cmd_parts.is_empty() {
         return fail("cli: ARGV is empty".to_owned());
     }
-    let output = match Command::new("do-harness").args(&cmd_parts).output() {
+    let bin = binary_for_eval();
+    let mut cmd = Command::new(&bin);
+    cmd.arg("--root")
+        .arg(root)
+        .args(&cmd_parts)
+        .env("DO_HARNESS_ROOT", root);
+    let output = match cmd.output() {
         Ok(out) => out,
         Err(err) => {
-            return fail(format!(
-                "cli: could not run 'do-harness {argv}' on PATH: {err}"
-            ));
+            return fail(format!("cli: could not run harness binary {bin}: {err}"));
         }
     };
     let stdout = String::from_utf8_lossy(&output.stdout);
     if output.status.success() && stdout.contains(text) {
         pass(format!(
-            "cli: 'do-harness {argv}' exited 0 and printed '{text}'"
+            "cli: '{bin} --root {} {argv}' exited 0 and printed '{text}'",
+            root.display()
         ))
     } else if !output.status.success() {
         fail(format!(
@@ -183,6 +192,21 @@ fn grade_cli(rest: &str) -> AssertionGrade {
     } else {
         fail(format!("cli: 'do-harness {argv}' stdout lacks '{text}'"))
     }
+}
+
+/// Resolves the harness binary to run for `cli:` assertions.
+///
+/// Prefers the currently-executing `do-harness` binary (so evals drive the
+/// binary under test), falling back to `CARGO_BIN_EXE_do-harness` when set by
+/// the build, then `do-harness` on `PATH`.
+fn binary_for_eval() -> String {
+    if let Ok(exe) = std::env::current_exe() {
+        return exe.display().to_string();
+    }
+    if let Some(exe) = option_env!("CARGO_BIN_EXE_do-harness") {
+        return exe.to_owned();
+    }
+    "do-harness".to_owned()
 }
 
 /// The `walk:` grader: consult the already-run skill walkthrough.

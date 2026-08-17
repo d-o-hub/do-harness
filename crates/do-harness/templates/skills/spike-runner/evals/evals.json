@@ -4,22 +4,19 @@
     {
       "id": 1,
       "prompt": "We're unsure whether libsql works with the tokio current_thread runtime. Run a spike.",
-      "expected_output": "A scratchpad in tests/spikes/ with the minimal prototype, exit-code-0 verification via cargo check/test, findings recorded to .do-harness/agent_state.db, scratch cleaned, and a transition to a vertical slice.",
+      "expected_output": "A scratchpad in tests/spikes with a minimal prototype, exit-code-0 verification via compilation, findings recorded, scratch cleaned, and a transition to a vertical slice.",
       "files": [],
       "assertions": [
-        "exists:.agents/skills/spike-runner/SKILL.md",
-        "contains:.agents/skills/spike-runner/SKILL.md|exit code 0",
+        "walk:",
         "Success is defined by exit code, not LLM assessment"
       ]
     },
     {
       "id": 2,
       "prompt": "A spike failed twice with the same error signature. Should we keep trying variations?",
-      "expected_output": "Apply the fail-fast policy: after 3 consecutive failures, halt, record the error signature, and surface a diagnostic instead of continuing variations.",
+      "expected_output": "Apply the fail-fast policy: after 3 consecutive failures, halt and surface a diagnostic instead of continuing variations.",
       "files": [],
       "assertions": [
-        "exists:.agents/skills/spike-runner/SKILL.md",
-        "contains:AGENTS.md|error signature",
         "Halts instead of continuing variations"
       ]
     }

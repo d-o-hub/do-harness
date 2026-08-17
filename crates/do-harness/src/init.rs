@@ -55,6 +55,7 @@ struct SkillSpec {
     name: &'static str,
     skill_md: &'static str,
     evals: &'static str,
+    walkthrough: Option<&'static str>,
 }
 
 const SKILLS: &[SkillSpec] = &[
@@ -62,26 +63,41 @@ const SKILLS: &[SkillSpec] = &[
         name: "harness",
         skill_md: include_str!("../templates/skills/harness/SKILL.md"),
         evals: include_str!("../templates/skills/harness/evals/evals.json"),
+        walkthrough: Some(include_str!(
+            "../templates/skills/harness/evals/walkthrough.sh"
+        )),
     },
     SkillSpec {
         name: "htn-planner",
         skill_md: include_str!("../templates/skills/htn-planner/SKILL.md"),
         evals: include_str!("../templates/skills/htn-planner/evals/evals.json"),
+        walkthrough: Some(include_str!(
+            "../templates/skills/htn-planner/evals/walkthrough.sh"
+        )),
     },
     SkillSpec {
         name: "spike-runner",
         skill_md: include_str!("../templates/skills/spike-runner/SKILL.md"),
         evals: include_str!("../templates/skills/spike-runner/evals/evals.json"),
+        walkthrough: Some(include_str!(
+            "../templates/skills/spike-runner/evals/walkthrough.sh"
+        )),
     },
     SkillSpec {
         name: "skill-distiller",
         skill_md: include_str!("../templates/skills/skill-distiller/SKILL.md"),
         evals: include_str!("../templates/skills/skill-distiller/evals/evals.json"),
+        walkthrough: Some(include_str!(
+            "../templates/skills/skill-distiller/evals/walkthrough.sh"
+        )),
     },
     SkillSpec {
         name: "event-modeler",
         skill_md: include_str!("../templates/skills/event-modeler/SKILL.md"),
         evals: include_str!("../templates/skills/event-modeler/evals/evals.json"),
+        walkthrough: Some(include_str!(
+            "../templates/skills/event-modeler/evals/walkthrough.sh"
+        )),
     },
 ];
 
@@ -159,6 +175,16 @@ pub async fn init_workspace(root: &Path, opts: &InitOpts) -> Result<InitReport> 
             opts.force,
             &mut report,
         )?;
+        if let Some(walkthrough) = spec.walkthrough {
+            write_if_absent(
+                root,
+                &format!("{skill_dir}/evals/walkthrough.sh"),
+                walkthrough,
+                opts.force,
+                &mut report,
+            )?;
+            make_executable(&root.join(format!("{skill_dir}/evals/walkthrough.sh")))?;
+        }
     }
 
     write_if_absent(

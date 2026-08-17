@@ -22,7 +22,9 @@ pub struct WalkRun {
 ///
 /// A missing or non-executable script is skipped and counts as a success (the
 /// walkthrough is purely optional). When present, the script runs with the
-/// workspace root as its working directory and `DO_HARNESS_ROOT` set.
+/// workspace root as its working directory, `DO_HARNESS_ROOT` set, and
+/// `DO_HARNESS_BIN` set to the currently-executing harness binary so `cli:`
+/// residue and walkthrough steps drive the same binary under test.
 #[must_use]
 pub fn run_walkthrough(skill_dir: &Path, root: &Path) -> WalkRun {
     let script = skill_dir.join("evals/walkthrough.sh");
@@ -33,9 +35,16 @@ pub fn run_walkthrough(skill_dir: &Path, root: &Path) -> WalkRun {
             success: true,
         };
     }
+    let Ok(bin) = std::env::current_exe() else {
+        return WalkRun {
+            present,
+            success: true,
+        };
+    };
     let status = Command::new(&script)
         .current_dir(root)
         .env("DO_HARNESS_ROOT", root)
+        .env("DO_HARNESS_BIN", bin)
         .env("PYTHONUNBUFFERED", "1")
         .status();
     match status {

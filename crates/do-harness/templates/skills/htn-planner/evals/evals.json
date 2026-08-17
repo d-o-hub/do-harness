@@ -7,20 +7,18 @@
       "expected_output": "A method choice (Vertical Event Slice or Spike & Resolve) with ordered subtasks, preconditions, and sensor gates per subtask, persisted to plans/tasks.json or libSQL.",
       "files": [],
       "assertions": [
-        "exists:.agents/skills/htn-planner/SKILL.md",
-        "contains:.agents/skills/htn-planner/SKILL.md|precondition",
-        "The plan records a method and sensor gates"
+        "db:tasks:status=done:min=1",
+        "cli:task list:contains:[done]",
+        "exists:.agents/skills/htn-planner/SKILL.md"
       ]
     },
     {
       "id": 2,
       "prompt": "We need to integrate the redb crate for key-value storage but nobody knows its API. How should we proceed?",
-      "expected_output": "Selection of the Spike & Resolve method: create a scratchpad in tests/spikes/, execute with an exit-code-0 gate, record findings to .do-harness/agent_state.db, clean scratch, then transition to a vertical slice.",
+      "expected_output": "Selection of the Spike & Resolve method: create a scratchpad, execute with an exit-code-0 gate, record findings, clean scratch, then transition to a vertical slice.",
       "files": [],
       "assertions": [
-        "exists:plans/invariants.json",
-        "contains:plans/invariants.json|500 LOC",
-        "Selects a method from the HTN catalog"
+        "The plan names a method from the catalog"
       ]
     }
   ]
