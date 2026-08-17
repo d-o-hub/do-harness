@@ -27,7 +27,7 @@ pub async fn task_cmd(root: &Path, action: TaskAction) -> Result<()> {
             parent,
             precondition,
         } => {
-            let id = task::add_task(
+            let (id, _event) = task::add_task(
                 root,
                 &title,
                 method.as_deref(),
@@ -39,7 +39,7 @@ pub async fn task_cmd(root: &Path, action: TaskAction) -> Result<()> {
             Ok(())
         }
         TaskAction::Advance { id } => {
-            let index = task::advance_task(root, id).await?;
+            let (index, _event) = task::advance_task(root, id).await?;
             println!("Advanced task {id} to subtask_index={index}");
             Ok(())
         }
@@ -115,7 +115,7 @@ pub fn hook(root: &Path, config_path: Option<&Path>, action: crate::HookAction) 
             let cfg = config::load(root, config_path)?;
             hooks::install(&git_dir, &cfg.hooks.pre_commit, &cfg.hooks.pre_push, force)?;
             println!(
-                "Installed pre-commit and pre-push hooks in {}",
+                "Installed pre-commit, pre-push, and commit-msg hooks in {}",
                 git_dir.display()
             );
         }
@@ -126,13 +126,18 @@ pub fn hook(root: &Path, config_path: Option<&Path>, action: crate::HookAction) 
         crate::HookAction::Status => {
             let status = hooks::status(&git_dir, root);
             println!(
-                "pre-commit: {}  pre-push: {}  binary: {} ({})",
+                "pre-commit: {}  pre-push: {}  commit-msg: {}  binary: {} ({})",
                 if status.pre_commit {
                     "installed"
                 } else {
                     "absent"
                 },
                 if status.pre_push {
+                    "installed"
+                } else {
+                    "absent"
+                },
+                if status.commit_msg {
                     "installed"
                 } else {
                     "absent"
@@ -192,7 +197,7 @@ pub fn resolve_root(explicit: Option<&Path>) -> Result<PathBuf> {
         Ok(path.to_path_buf())
     } else {
         let cwd = std::env::current_dir().context("failed to read current directory")?;
-        do_harness_db::find_harness_root(&cwd)
+        Ok(do_harness_db::find_harness_root(&cwd)?)
     }
 }
 

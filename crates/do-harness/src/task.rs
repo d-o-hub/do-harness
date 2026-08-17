@@ -4,7 +4,10 @@ use std::fs;
 use std::path::Path;
 
 use anyhow::{Context, Result};
-use do_harness_types::{Beat, TaskRecord, TaskState};
+use do_harness_types::{
+    AddTask, AdvanceTask, Beat, Command, CompleteTask, FailTask, Projection, TaskAdded,
+    TaskAdvanced, TaskBoard, TaskCompleted, TaskFailed, TaskRecord, TaskState, WorkflowEvent,
+};
 use serde::Serialize;
 
 use crate::report::Format;
@@ -66,6 +69,17 @@ pub async fn list_tasks(root: &Path, format: Format) -> Result<()> {
                     task.subtask_index
                 );
             }
+            let mut board = TaskBoard::new();
+            for task in &tasks {
+                let event = status_event(task);
+                board
+                    .apply(&event)
+                    .context("task status is not part of the workflow stream")?;
+            }
+            println!(
+                "summary: pending={} in_progress={} done={} failed={}",
+                board.pending, board.in_progress, board.done, board.failed
+            );
         }
         Format::Json => {
             println!(
@@ -94,7 +108,14 @@ pub async fn add_task(
     method: Option<&str>,
     parent_id: Option<i64>,
     precondition: Option<&str>,
-) -> Result<i64> {
+) -> Result<(i64, WorkflowEvent)> {
+    let command = AddTask {
+        title: title.to_owned(),
+        method: method.map(ToOwned::to_owned),
+        parent_id,
+        precondition: precondition.map(ToOwned::to_owned),
+    };
+    debug_assert_eq!(command.name(), "AddTask");
     let conn = do_harness_db::connect_and_migrate(root).await?;
     if let Some(method_name) = method {
         let methods = crate::methods::load_methods(root)?;
@@ -118,7 +139,12 @@ pub async fn add_task(
         },
     )
     .await?;
-    Ok(id)
+    let event = WorkflowEvent::TaskAdded(TaskAdded {
+        id,
+        title: command.title,
+        method: command.method,
+    });
+    Ok((id, event))
 }
 
 /// Advances the subtask pointer of a task and returns the new index.
@@ -135,7 +161,9 @@ pub async fn add_task(
 /// with the given id exists, when the task is `done`/`failed`, when there are
 /// no more subtasks, when the sensor gate has not passed, or when the advance
 /// fails.
-pub async fn advance_task(root: &Path, id: i64) -> Result<i64> {
+pub async fn advance_task(root: &Path, id: i64) -> Result<(i64, WorkflowEvent)> {
+    let command = AdvanceTask { task_id: id };
+    debug_assert_eq!(command.name(), "AdvanceTask");
     let conn = do_harness_db::connect_and_migrate(root).await?;
     let task = do_harness_db::get_task(&conn, id)
         .await?
@@ -162,7 +190,14 @@ pub async fn advance_task(root: &Path, id: i64) -> Result<i64> {
             }
         }
     }
-    do_harness_db::advance_subtask(&conn, id).await
+    let index = do_harness_db::advance_subtask(&conn, id).await?;
+    Ok((
+        index,
+        WorkflowEvent::TaskAdvanced(TaskAdvanced {
+            id,
+            subtask_index: index,
+        }),
+    ))
 }
 
 /// Returns whether the most recent `sensor` beat for this task that matches the
@@ -190,7 +225,9 @@ fn latest_sensor_beat_ok(beats: &[Beat], sensor: &str) -> bool {
 /// Returns an error when the state database cannot be opened, when no task
 /// with the given id exists, when the task has no method, when subtasks
 /// remain, or when the status update fails.
-pub async fn done_task(root: &Path, id: i64) -> Result<()> {
+pub async fn done_task(root: &Path, id: i64) -> Result<WorkflowEvent> {
+    let command = CompleteTask { task_id: id };
+    debug_assert_eq!(command.name(), "CompleteTask");
     let conn = do_harness_db::connect_and_migrate(root).await?;
     let task = do_harness_db::get_task(&conn, id)
         .await?
@@ -213,7 +250,8 @@ pub async fn done_task(root: &Path, id: i64) -> Result<()> {
             method.subtasks.len()
         );
     }
-    do_harness_db::update_task_status(&conn, id, TaskState::Done).await
+    do_harness_db::update_task_status(&conn, id, TaskState::Done).await?;
+    Ok(WorkflowEvent::TaskCompleted(TaskCompleted { id }))
 }
 
 /// Marks a task as failed.
@@ -224,13 +262,40 @@ pub async fn done_task(root: &Path, id: i64) -> Result<()> {
 ///
 /// Returns an error when the state database cannot be opened, when no task
 /// with the given id exists, or when the status update fails.
-pub async fn fail_task(root: &Path, id: i64) -> Result<()> {
+pub async fn fail_task(root: &Path, id: i64) -> Result<WorkflowEvent> {
+    let command = FailTask { task_id: id };
+    debug_assert_eq!(command.name(), "FailTask");
     let conn = do_harness_db::connect_and_migrate(root).await?;
     if do_harness_db::get_task(&conn, id).await?.is_none() {
         anyhow::bail!("task {id} not found");
     }
-    do_harness_db::update_task_status(&conn, id, do_harness_types::TaskState::Failed).await
+    do_harness_db::update_task_status(&conn, id, do_harness_types::TaskState::Failed).await?;
+    Ok(WorkflowEvent::TaskFailed(TaskFailed { id }))
+}
+
+/// Maps a task's persisted state onto the event that yields it on the board.
+///
+/// The board is a fold over the workflow stream; reconstructing a single event
+/// per snapshot lets the read-model projection stay the single place that
+/// translates state into counts without a historical event store.
+fn status_event(task: &TaskRecord) -> WorkflowEvent {
+    match task.status {
+        TaskState::Pending => WorkflowEvent::TaskAdded(TaskAdded {
+            id: task.id,
+            title: task.title.clone(),
+            method: task.method.clone(),
+        }),
+        TaskState::InProgress => WorkflowEvent::TaskAdvanced(TaskAdvanced {
+            id: task.id,
+            subtask_index: task.subtask_index,
+        }),
+        TaskState::Done => WorkflowEvent::TaskCompleted(TaskCompleted { id: task.id }),
+        TaskState::Failed => WorkflowEvent::TaskFailed(TaskFailed { id: task.id }),
+    }
 }
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod workflow_tests;

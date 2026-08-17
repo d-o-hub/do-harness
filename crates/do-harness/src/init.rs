@@ -197,7 +197,7 @@ async fn seed_invariants(root: &Path) -> Result<usize> {
     let headers: Vec<do_harness_types::DecisionHeader> = serde_json::from_str(&json)
         .context("invalid plans/invariants.json: does not match DecisionHeader schema")?;
     let conn = do_harness_db::connect_and_migrate(root).await?;
-    do_harness_db::seed_invariants(&conn, &headers).await
+    Ok(do_harness_db::seed_invariants(&conn, &headers).await?)
 }
 
 /// Writes `body` to `root/relative`, skipping existing files unless `force`.

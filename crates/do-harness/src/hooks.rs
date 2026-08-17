@@ -7,7 +7,9 @@ use std::process::Command;
 
 use anyhow::{Context, Result, bail};
 
-use crate::hook_script::{BinSource, MARKER, only_args, resolve_binary, script_body};
+use crate::hook_script::{
+    BinSource, MARKER, commit_msg_body, only_args, resolve_binary, script_body,
+};
 
 /// Executable bits (owner read/write/execute) applied to installed hook files.
 const OWNER_EXEC_MASK: u32 = 0o111;
@@ -52,12 +54,14 @@ pub fn find_git_dir(cwd: &Path) -> Result<PathBuf> {
     })
 }
 
-/// Installs the pre-commit and pre-push hooks into `git_dir/hooks/`.
+/// Installs the pre-commit, pre-push, and commit-msg hooks into
+/// `git_dir/hooks/`.
 ///
 /// `pre_commit` and `pre_push` are sensor name lists; an empty list means the
-/// full suite (no `--only` flags). A hook file that already exists without
-/// the [`MARKER`] is refused unless `force` is `true`; files carrying the
-/// [`MARKER`] are always overwritten.
+/// full suite (no `--only` flags). The `commit-msg` hook needs no sensor
+/// arguments and runs the commitlint script against each prepared message. A
+/// hook file that already exists without the [`MARKER`] is refused unless
+/// `force` is `true`; files carrying the [`MARKER`] are always overwritten.
 ///
 /// # Errors
 ///
@@ -86,6 +90,7 @@ pub fn install(
         &script_body(&only_args(pre_push)),
         force,
     )?;
+    write_hook_checked(&hooks_dir.join("commit-msg"), &commit_msg_body(), force)?;
     Ok(())
 }
 
@@ -99,7 +104,7 @@ pub fn install(
 /// Returns an error when a managed hook file cannot be removed.
 pub fn uninstall(git_dir: &Path) -> Result<()> {
     let hooks_dir = git_dir.join("hooks");
-    for name in ["pre-commit", "pre-push"] {
+    for name in ["pre-commit", "pre-push", "commit-msg"] {
         let path = hooks_dir.join(name);
         if let Ok(content) = fs::read_to_string(&path)
             && content.contains(MARKER)
@@ -118,6 +123,8 @@ pub struct HookStatus {
     pub pre_commit: bool,
     /// Whether the managed pre-push hook file is present and carries the marker.
     pub pre_push: bool,
+    /// Whether the managed commit-msg hook file is present and carries the marker.
+    pub commit_msg: bool,
     /// Where the `do-harness` binary resolves from.
     pub binary: BinSource,
 }
@@ -128,6 +135,7 @@ pub fn status(git_dir: &Path, repo_root: &Path) -> HookStatus {
     HookStatus {
         pre_commit: is_managed(&git_dir.join("hooks/pre-commit")),
         pre_push: is_managed(&git_dir.join("hooks/pre-push")),
+        commit_msg: is_managed(&git_dir.join("hooks/commit-msg")),
         binary: resolve_binary(repo_root),
     }
 }
@@ -217,6 +225,12 @@ mod tests {
         assert!(pre_push_body.contains(MARKER));
         assert!(pre_push_body.contains("verify --fail-fast --record"));
         assert!(!pre_push_body.contains("--only"));
+
+        let commit_msg_body_text = read(&hook_path(&git_dir, "commit-msg"));
+        assert!(commit_msg_body_text.contains(MARKER));
+        assert!(commit_msg_body_text.contains("scripts/check-commitlint.sh"));
+        assert!(commit_msg_body_text.contains("--message \"$1\""));
+        assert!(!commit_msg_body_text.contains("verify --fail-fast"));
     }
 
     #[cfg(unix)]
@@ -254,6 +268,7 @@ mod tests {
 
         assert!(read(&hook_path(&git_dir, "pre-commit")).contains(MARKER));
         assert!(read(&hook_path(&git_dir, "pre-push")).contains(MARKER));
+        assert!(read(&hook_path(&git_dir, "commit-msg")).contains(MARKER));
     }
 
     #[test]
@@ -285,6 +300,7 @@ mod tests {
         uninstall(&git_dir).unwrap();
 
         assert!(!hook_path(&git_dir, "pre-commit").exists());
+        assert!(!hook_path(&git_dir, "commit-msg").exists());
         assert_eq!(read(&hook_path(&git_dir, "pre-push")), foreign);
         uninstall(&git_dir).unwrap();
     }
@@ -331,6 +347,7 @@ mod tests {
 
         assert!(!state.pre_commit);
         assert!(!state.pre_push);
+        assert!(!state.commit_msg);
     }
 
     #[test]
@@ -344,6 +361,7 @@ mod tests {
 
         assert!(state.pre_commit);
         assert!(state.pre_push);
+        assert!(state.commit_msg);
     }
 
     #[test]

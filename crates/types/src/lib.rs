@@ -16,6 +16,7 @@ pub mod htn;
 pub mod skill_eval;
 pub mod task;
 pub mod trace;
+pub mod workflow;
 
 pub use beat::Beat;
 pub use decision::DecisionHeader;
@@ -26,3 +27,7 @@ pub use htn::{Method, Precondition, Subtask, TaskState};
 pub use skill_eval::SkillEval;
 pub use task::TaskRecord;
 pub use trace::Trace;
+pub use workflow::{
+    AddTask, AdvanceTask, CompleteTask, FailTask, TaskAdded, TaskAdvanced, TaskBoard,
+    TaskCompleted, TaskFailed, WorkflowEvent,
+};

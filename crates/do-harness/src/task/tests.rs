@@ -3,7 +3,7 @@
 use super::*;
 
 /// Writes a minimal frozen method catalog for tests that gate on it.
-fn write_catalog(root: &Path) {
+pub(super) fn write_catalog(root: &Path) {
     let dir = root.join("plans");
     fs::create_dir_all(&dir).unwrap();
     fs::write(
@@ -24,7 +24,7 @@ fn write_catalog(root: &Path) {
 }
 
 /// Inserts an `"ok"` sensor beat scoped to `task_id` for the named sensor.
-async fn insert_ok_beat(root: &Path, task_id: i64, sensor: &str) {
+pub(super) async fn insert_ok_beat(root: &Path, task_id: i64, sensor: &str) {
     let conn = do_harness_db::connect_and_migrate(root).await.unwrap();
     let now = do_harness_db::unix_now();
     do_harness_db::insert_beat(
@@ -87,7 +87,7 @@ async fn export_writes_empty_snapshot_without_tasks() {
 async fn add_task_inserts_pending_task() {
     let dir = tempfile::tempdir().unwrap();
     write_catalog(dir.path());
-    let id = add_task(
+    let (id, _event) = add_task(
         dir.path(),
         "implement workflow runtime",
         Some("vertical-event-slice"),
@@ -111,10 +111,10 @@ async fn add_task_inserts_pending_task() {
 #[tokio::test(flavor = "current_thread")]
 async fn add_task_stores_parent_link() {
     let dir = tempfile::tempdir().unwrap();
-    let parent = add_task(dir.path(), "parent", None, None, None)
+    let (parent, _parent_event) = add_task(dir.path(), "parent", None, None, None)
         .await
         .unwrap();
-    let child = add_task(dir.path(), "child", None, Some(parent), None)
+    let (child, _child_event) = add_task(dir.path(), "child", None, Some(parent), None)
         .await
         .unwrap();
 
@@ -131,11 +131,11 @@ async fn add_task_stores_parent_link() {
 #[tokio::test(flavor = "current_thread")]
 async fn advance_task_increments_index_and_marks_in_progress() {
     let dir = tempfile::tempdir().unwrap();
-    let id = add_task(dir.path(), "slice", None, None, None)
+    let (id, _event) = add_task(dir.path(), "slice", None, None, None)
         .await
         .unwrap();
 
-    let index = advance_task(dir.path(), id).await.unwrap();
+    let (index, _event) = advance_task(dir.path(), id).await.unwrap();
 
     assert_eq!(index, 1);
     let conn = do_harness_db::connect_and_migrate(dir.path())
@@ -156,7 +156,7 @@ async fn advance_task_errors_for_missing_task() {
 #[tokio::test(flavor = "current_thread")]
 async fn fail_task_marks_task_failed() {
     let dir = tempfile::tempdir().unwrap();
-    let id = add_task(dir.path(), "slice", None, None, None)
+    let (id, _event) = add_task(dir.path(), "slice", None, None, None)
         .await
         .unwrap();
 
@@ -204,7 +204,7 @@ async fn add_task_rejects_orphan_parent() {
 async fn advance_rejects_without_ok_beat() {
     let dir = tempfile::tempdir().unwrap();
     write_catalog(dir.path());
-    let id = add_task(
+    let (id, _event) = add_task(
         dir.path(),
         "slice",
         Some("vertical-event-slice"),
@@ -226,7 +226,7 @@ async fn advance_rejects_without_ok_beat() {
 async fn advance_allows_after_verify_record_beat() {
     let dir = tempfile::tempdir().unwrap();
     write_catalog(dir.path());
-    let id = add_task(
+    let (id, _event) = add_task(
         dir.path(),
         "slice",
         Some("vertical-event-slice"),
@@ -237,7 +237,7 @@ async fn advance_allows_after_verify_record_beat() {
     .unwrap();
     insert_ok_beat(dir.path(), id, "test").await;
 
-    let index = advance_task(dir.path(), id).await.unwrap();
+    let (index, _event) = advance_task(dir.path(), id).await.unwrap();
     assert_eq!(index, 1);
 }
 
@@ -246,7 +246,7 @@ async fn advance_allows_after_verify_record_beat() {
 async fn done_rejects_before_last_subtask() {
     let dir = tempfile::tempdir().unwrap();
     write_catalog(dir.path());
-    let id = add_task(dir.path(), "slice", Some("mini"), None, None)
+    let (id, _event) = add_task(dir.path(), "slice", Some("mini"), None, None)
         .await
         .unwrap();
 
@@ -262,7 +262,7 @@ async fn done_rejects_before_last_subtask() {
 async fn done_allows_after_advancing() {
     let dir = tempfile::tempdir().unwrap();
     write_catalog(dir.path());
-    let id = add_task(dir.path(), "slice", Some("mini"), None, None)
+    let (id, _event) = add_task(dir.path(), "slice", Some("mini"), None, None)
         .await
         .unwrap();
     insert_ok_beat(dir.path(), id, "test").await;
@@ -283,7 +283,7 @@ async fn done_allows_after_advancing() {
 async fn advance_rejects_when_done_or_failed() {
     let dir = tempfile::tempdir().unwrap();
     write_catalog(dir.path());
-    let done = add_task(dir.path(), "done", Some("mini"), None, None)
+    let (done, _done_event) = add_task(dir.path(), "done", Some("mini"), None, None)
         .await
         .unwrap();
     insert_ok_beat(dir.path(), done, "test").await;
@@ -298,7 +298,7 @@ async fn advance_rejects_when_done_or_failed() {
         "unexpected error: {err}",
     );
 
-    let failed = add_task(dir.path(), "failed", Some("mini"), None, None)
+    let (failed, _failed_event) = add_task(dir.path(), "failed", Some("mini"), None, None)
         .await
         .unwrap();
     fail_task(dir.path(), failed).await.unwrap();
@@ -316,7 +316,7 @@ async fn advance_rejects_when_done_or_failed() {
 async fn done_rejects_task_without_method() {
     let dir = tempfile::tempdir().unwrap();
     write_catalog(dir.path());
-    let id = add_task(dir.path(), "orphan", None, None, None)
+    let (id, _event) = add_task(dir.path(), "orphan", None, None, None)
         .await
         .unwrap();
 
@@ -335,7 +335,7 @@ async fn done_rejects_task_without_method() {
 async fn advance_requires_the_named_sensor_beat() {
     let dir = tempfile::tempdir().unwrap();
     write_catalog(dir.path());
-    let id = add_task(
+    let (id, _event) = add_task(
         dir.path(),
         "slice",
         Some("vertical-event-slice"),
@@ -363,7 +363,7 @@ async fn advance_requires_the_named_sensor_beat() {
 async fn check_gate_is_not_satisfied_by_a_test_beat() {
     let dir = tempfile::tempdir().unwrap();
     write_catalog(dir.path());
-    let id = add_task(
+    let (id, _event) = add_task(
         dir.path(),
         "slice",
         Some("vertical-event-slice"),
