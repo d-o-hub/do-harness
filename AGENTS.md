@@ -3,7 +3,7 @@
 ## 1. System Operating Invariants (Hard Constraints)
 - **Modularity Cap**: Maximum 500 Lines of Code (LOC) per source file. Decompose when nearing 450 LOC.
 - **Persistence Engine**: Local libSQL instance (`.do-harness/agent_state.db`) for tracking beats, task execution traces, and learned heuristics.
-- **Roadmap**: beats/traces/distillation writers in the DB schema are planned, not yet implemented.
+- **Persistence & Roadmap**: the do-harness-db repo layer implements persistence writers for tasks/beats/traces/heuristics/error_signatures/skill_evals (`verify --record` persists beats and bumps error signatures; `task list`/`task export` read task state). The workflow runtime (`task add/advance/fail`), the skill-eval runner (`do-harness eval`, gated by skill-creator's quick_validate.py), and the distill CLI (`distill` + `trace add/list`) are implemented; the remaining roadmap is commitlint enforcement (see plans/invariants.json "Conventional commits" invariant).
 - **Verification Priority**: Computational sensors (`cargo test`, `cargo check`, linters) strictly supersede LLM self-assessment.
 - **Workspace Cleanliness**: All skills reside in `.agents/skills/`. Task tracking resides in `plans/`. Architecture rules are **executable invariants**, not prose ADRs (see §7).
 
@@ -87,6 +87,7 @@
 - **No Hallucinated Success**: A subtask is complete only when verified by automated exit codes.
 - **Hooks**: `do-harness hook install` writes .git/hooks/pre-commit (fmt + loc) and pre-push (full verify); uninstall/status remove/inspect managed hooks.
 - **Workflow gates**: pre-commit = `do-harness verify --fail-fast --only fmt --only loc`; pre-push = `do-harness verify --fail-fast`; CI = `do-harness verify --format json` (exit 0/1/2).
+- **Persistence commands**: `do-harness task list`/`task export` surface task state (libSQL is the source of truth; export writes `plans/tasks.json`); `verify --record` persists beats and bumps error signatures for failing sensors; `task add/advance/fail`, `trace add/list`, `distill`, `eval` are implemented.
 - **Root discovery**: the CLI walks up from cwd for do-harness.toml, or AGENTS.md with .do-harness/ or plans/invariants.json; override with --root.
 
 ---

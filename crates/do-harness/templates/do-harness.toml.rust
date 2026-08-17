@@ -1,0 +1,26 @@
+# do-harness.toml — sensor pack for this workspace.
+language = "rust"
+
+[hooks]
+pre-commit = ["fmt", "loc"]
+pre-push = []
+
+[[sensors]]
+name = "fmt"
+argv = ["cargo", "fmt", "--all", "--", "--check"]
+
+[[sensors]]
+name = "check"
+argv = ["cargo", "check", "--workspace"]
+
+[[sensors]]
+name = "clippy"
+argv = ["cargo", "clippy", "--workspace", "--", "-D", "warnings"]
+
+[[sensors]]
+name = "test"
+argv = ["cargo", "test", "--workspace"]
+
+[[sensors]]
+name = "loc"
+argv = ["bash", "scripts/check-loc.sh"]

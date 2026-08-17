@@ -12,14 +12,66 @@ cargo build --release -p do-harness
 
 The binary lands at `target/release/do-harness`.
 
+To install it on `PATH` (for use in other repositories):
+
+```bash
+cargo install --path crates/do-harness
+```
+
+## Use in another repo
+
+The harness is designed to be adopted by any codebase, Rust or not:
+
+1. Install the CLI (see above), then from the target repository root run:
+
+   ```bash
+   do-harness init                 # Rust sensor pack
+   do-harness init --language generic   # no built-in sensors
+   ```
+
+   This writes `do-harness.toml`, `AGENTS.md`, `plans/invariants.json`,
+   `.agents/skills/`, and `.gitignore` entries, then initializes the local
+   libSQL state and seeds the invariants. Existing files are left untouched
+   unless you pass `--force`.
+
+2. Configure sensors for your stack in `do-harness.toml`. Language packs:
+   `rust` (fmt/check/clippy/test/loc) and `generic` (ships no sensors — add
+   your own `[[sensors]]` entries).
+
+3. Wire the git hooks:
+
+   ```bash
+   do-harness hook install
+   ```
+
+   Hooks locate the binary at runtime: `$DO_HARNESS_BIN`, then `do-harness`
+   on `PATH`, then `<repo>/target/release/do-harness`.
+
+4. Run the suite:
+
+   ```bash
+   do-harness verify
+   ```
+
+For CI, invoke `do-harness verify --format json` (exit 0/1/2) with the CLI on
+`PATH` — no build step required.
+
 ## Commands
 
 | Command | Description |
 |---------|-------------|
-| `verify` | Run all sensors (flags: `--fail-fast`, `--format text\|json`, `--only NAME` repeatable) |
+| `verify` | Run all sensors (flags: `--fail-fast`, `--format text\|json`, `--only NAME` repeatable; `--record` persists beats + error signatures) |
 | `list` | Print sensor names (`--format text\|json`) |
 | `init-db` | Apply migrations to `.do-harness/agent_state.db` |
 | `seed` | Upsert `plans/invariants.json` into the DB |
+| `task list [--format text\|json]` / `task export` | Read task state from the local database; export writes `plans/tasks.json` |
+| `task add <title> [--method NAME] [--parent ID] [--precondition TEXT]` | Add a pending task to the workflow runtime |
+| `task advance <ID>` | Advance the subtask pointer |
+| `task fail <ID>` | Mark a task failed |
+| `trace add --session S [--task ID] [--command C] [--error-diff D] [--resolution-steps R]` / `trace list --session S [--format text\|json]` | Record and read execution traces per session |
+| `distill --skill NAME --pattern P [--description D] [--from-trace ID]` | Distill a resolved trace into a skill (refuses without resolution steps) |
+| `eval [--skill NAME]` | Validate skills via skill-creator's quick_validate.py and persist skill_evals (pass_rate = valid/total) |
+| `init [--language rust\|generic] [--force]` | Scaffold a harness workspace in the current directory |
 | `hook install [--force]` / `hook uninstall` / `hook status` | Manage `.git/hooks/pre-commit` + `pre-push` |
 
 Global flags: `--root <path>`, `--config <path>`.
@@ -50,6 +102,18 @@ Global flags: `--root <path>`, `--config <path>`.
 
 Failure output tails are printed to stderr so stdout stays parseable.
 
+## Persistence
+
+`verify --record` persists each sensor result as a beat into
+`.do-harness/agent_state.db` and bumps an error signature
+(`sensor:<name>`) for every failing sensor. Once a sensor's error
+signature reaches 3 consecutive failures, it is halted: it is not
+executed and is reported failed with a "halted" diagnostic until the
+underlying issue is resolved (strikes do not grow while halted). `task list` reads task state
+from the same store (`--format text|json`); `task export` writes
+`plans/tasks.json` as an agent-readable snapshot — libSQL remains the
+source of truth.
+
 ## Hooks
 
 `do-harness hook install` writes both hooks into `.git/hooks/`:
@@ -79,7 +143,8 @@ verify:
 
 `do-harness.toml` at the workspace root configures the harness:
 
-- `language` — the language pack (`"rust"`).
+- `language` — the language pack (`"rust"` or `"generic"`; the generic pack
+  ships no sensors).
 - `[hooks]` — `pre-commit` / `pre-push` lists naming the sensors each hook runs; an empty `pre-push` list means the full suite.
 - `[[sensors]]` — each sensor has a `name` and an `argv` (the command to execute).
 

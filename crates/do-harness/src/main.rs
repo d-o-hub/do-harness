@@ -1,21 +1,30 @@
 //! Unified CLI for the do-harness agent execution harness.
 //!
 //! Entrypoints: `verify` (computational sensors), `list` (sensor names),
-//! `init-db` (migrations), and `seed` (architecture invariants from
-//! `plans/invariants.json`).
+//! `init-db` (migrations), `seed` (architecture invariants from
+//! `plans/invariants.json`), `init` (workspace scaffold), `task` (task
+//! state), `trace` (interaction traces), `distill` (heuristic extraction),
+//! `eval` (skill-eval runner), and `hook` (git hook management).
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::ExitCode;
 
-use anyhow::{Context, Result};
 use clap::{ArgAction, Parser, Subcommand};
 
 use crate::report::Format;
 
+mod commands;
 mod config;
+mod distill;
+mod eval;
+mod hook_script;
 mod hooks;
+mod init;
 mod report;
 mod sensors;
+mod task;
+mod telemetry;
+mod trace;
 
 /// Unified entrypoint for harness sensors and database maintenance.
 #[derive(Debug, Parser)]
@@ -45,6 +54,9 @@ enum Command {
         /// Run only the named sensor (repeatable).
         #[arg(long = "only", action = ArgAction::Append)]
         only: Vec<String>,
+        /// Persist beats and error signatures into the state database.
+        #[arg(long)]
+        record: bool,
     },
     /// List sensor names.
     List {
@@ -56,10 +68,119 @@ enum Command {
     InitDb,
     /// Seed invariants from plans/invariants.json.
     Seed,
+    /// Scaffold a harness workspace in a target directory.
+    Init {
+        /// Language pack to scaffold.
+        #[arg(long, value_enum, default_value_t = init::Language::Rust)]
+        language: init::Language,
+        /// Overwrite existing files.
+        #[arg(long)]
+        force: bool,
+    },
+    /// Inspect and export task state.
+    Task {
+        #[command(subcommand)]
+        action: TaskAction,
+    },
+    /// Record and list interaction traces.
+    Trace {
+        #[command(subcommand)]
+        action: TraceAction,
+    },
+    /// Extract a heuristic from a resolved trace.
+    Distill {
+        /// Skill the heuristic belongs to.
+        #[arg(long)]
+        skill: String,
+        /// Generalized pattern to record.
+        #[arg(long)]
+        pattern: String,
+        /// When the pattern applies.
+        #[arg(long)]
+        description: Option<String>,
+        /// Source trace id; required as evidence of a resolved fix.
+        #[arg(long = "from-trace")]
+        from_trace: Option<i64>,
+    },
+    /// Validate skill structure and benchmark skill evals.
+    Eval {
+        /// Restrict evaluation to this skill directory name.
+        #[arg(long)]
+        skill: Option<String>,
+    },
     /// Manage git hooks that run `do-harness verify`.
     Hook {
         #[command(subcommand)]
         action: HookAction,
+    },
+}
+
+/// Available task-state actions.
+#[derive(Debug, Subcommand)]
+enum TaskAction {
+    /// Write the task list to plans/tasks.json.
+    Export,
+    /// Print tasks from the state database.
+    List {
+        /// Output format.
+        #[arg(long, value_enum, default_value_t = Format::Text)]
+        format: Format,
+    },
+    /// Add a task in `pending` state.
+    Add {
+        /// Human-readable task title.
+        title: String,
+        /// Name of the HTN method this task follows.
+        #[arg(long)]
+        method: Option<String>,
+        /// Parent task id.
+        #[arg(long)]
+        parent: Option<i64>,
+        /// Recorded precondition guard.
+        #[arg(long)]
+        precondition: Option<String>,
+    },
+    /// Advance the task's subtask pointer.
+    Advance {
+        /// Task id.
+        id: i64,
+    },
+    /// Mark a task failed.
+    Fail {
+        /// Task id.
+        id: i64,
+    },
+}
+
+/// Available trace actions.
+#[derive(Debug, Subcommand)]
+enum TraceAction {
+    /// Record a trace of an executed command and its resolution.
+    Add {
+        /// Session identifier grouping related traces.
+        #[arg(long)]
+        session: String,
+        /// Owning task id.
+        #[arg(long)]
+        task: Option<i64>,
+        /// The command that was executed.
+        #[arg(long)]
+        command: Option<String>,
+        /// Error diff or failure output captured.
+        #[arg(long = "error-diff")]
+        error_diff: Option<String>,
+        /// Steps taken to resolve the failure.
+        #[arg(long = "resolution-steps")]
+        resolution_steps: Option<String>,
+    },
+    /// Print traces for a session.
+    List {
+        /// Session identifier.
+        #[arg(long)]
+        session: String,
+        /// Output format.
+        #[arg(long, value_enum, default_value_t = Format::Text)]
+        format: Format,
     },
 }
 
@@ -118,17 +239,47 @@ async fn main() -> ExitCode {
 
 /// Dispatches the parsed CLI and classifies failures.
 async fn run(cli: Cli) -> std::result::Result<(), CliError> {
-    let root = resolve_root(cli.root.as_deref()).map_err(CliError::Usage)?;
+    let root = match &cli.command {
+        Command::Init { .. } => {
+            commands::init_target(cli.root.as_deref()).map_err(CliError::Usage)?
+        }
+        _ => commands::resolve_root(cli.root.as_deref()).map_err(CliError::Usage)?,
+    };
     match cli.command {
+        Command::Init { language, force } => {
+            let opts = init::InitOpts { language, force };
+            let report = init::init_workspace(&root, &opts)
+                .await
+                .map_err(CliError::Usage)?;
+            commands::print_init(&report, &root);
+            Ok(())
+        }
         Command::Verify {
             fail_fast,
             format,
             only,
+            record,
         } => {
             let cfg = config::load(&root, cli.config.as_deref()).map_err(CliError::Usage)?;
-            let opts = sensors::VerifyOpts { fail_fast, only };
+            let blocked = if record {
+                telemetry::blocked_sensors(&root, &cfg.sensor_names())
+                    .await
+                    .map_err(CliError::Usage)?
+            } else {
+                Vec::new()
+            };
+            let opts = sensors::VerifyOpts {
+                fail_fast,
+                only,
+                blocked,
+            };
             match sensors::verify(&cfg, &root, &opts) {
                 Ok(report) => {
+                    if record {
+                        telemetry::record_verify(&root, &report, &opts.blocked)
+                            .await
+                            .map_err(CliError::Usage)?;
+                    }
                     report::print_report(&report, format);
                     if report.ok {
                         Ok(())
@@ -147,104 +298,27 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
             report::print_names(&cfg.sensor_names(), format);
             Ok(())
         }
-        Command::InitDb => init_db(&root).await.map_err(CliError::Usage),
-        Command::Seed => seed(&root).await.map_err(CliError::Usage),
+        Command::InitDb => commands::init_db(&root).await.map_err(CliError::Usage),
+        Command::Seed => commands::seed(&root).await.map_err(CliError::Usage),
+        Command::Task { action } => commands::task_cmd(&root, action)
+            .await
+            .map_err(CliError::Usage),
+        Command::Trace { action } => commands::trace_cmd(&root, action)
+            .await
+            .map_err(CliError::Usage),
+        Command::Distill {
+            skill,
+            pattern,
+            description,
+            from_trace,
+        } => distill::distill(&root, &skill, &pattern, description.as_deref(), from_trace)
+            .await
+            .map_err(CliError::Usage),
+        Command::Eval { skill } => eval::run_eval(&root, skill.as_deref())
+            .await
+            .map_err(CliError::Verify),
         Command::Hook { action } => {
-            hook(&root, cli.config.as_deref(), action).map_err(CliError::Usage)
+            commands::hook(&root, cli.config.as_deref(), action).map_err(CliError::Usage)
         }
-    }
-}
-
-/// Dispatches hook management using the configured sensor split.
-///
-/// # Errors
-///
-/// Returns an error when no git repository is found or a hook file cannot be
-/// written or removed.
-fn hook(root: &Path, config_path: Option<&Path>, action: HookAction) -> Result<()> {
-    let cwd = std::env::current_dir().context("failed to read current directory")?;
-    let git_dir = hooks::find_git_dir(&cwd)?;
-    match action {
-        HookAction::Install { force } => {
-            let cfg = config::load(root, config_path)?;
-            hooks::install(&git_dir, &cfg.hooks.pre_commit, &cfg.hooks.pre_push, force)?;
-            println!(
-                "Installed pre-commit and pre-push hooks in {}",
-                git_dir.display()
-            );
-        }
-        HookAction::Uninstall => {
-            hooks::uninstall(&git_dir)?;
-            println!("Removed managed hooks from {}", git_dir.display());
-        }
-        HookAction::Status => {
-            let status = hooks::status(&git_dir, root);
-            println!(
-                "pre-commit: {}  pre-push: {}  release binary: {}",
-                if status.pre_commit {
-                    "installed"
-                } else {
-                    "absent"
-                },
-                if status.pre_push {
-                    "installed"
-                } else {
-                    "absent"
-                },
-                if status.binary_exists {
-                    "present"
-                } else {
-                    "missing"
-                }
-            );
-        }
-    }
-    Ok(())
-}
-
-/// Applies pending migrations and reports the number applied.
-async fn init_db(root: &Path) -> Result<()> {
-    let conn = do_harness_db::connect_and_migrate(root).await?;
-    let mut rows = conn
-        .query("SELECT COUNT(*) FROM schema_migrations", ())
-        .await?;
-    let count = match rows.next().await? {
-        Some(row) => row.get::<i64>(0)?,
-        None => anyhow::bail!("schema_migrations is unexpectedly empty"),
-    };
-    println!("Done. Applied schema migrations: {count}");
-    Ok(())
-}
-
-/// Seeds the `invariants` table from `plans/invariants.json`.
-async fn seed(root: &Path) -> Result<()> {
-    let json_path = root.join("plans/invariants.json");
-    let json = std::fs::read_to_string(&json_path)
-        .with_context(|| format!("failed to read {}", json_path.display()))?;
-    let headers: Vec<do_harness_types::DecisionHeader> = serde_json::from_str(&json)
-        .context("invalid invariants.json: does not match DecisionHeader schema")?;
-
-    let conn = do_harness_db::connect_and_migrate(root).await?;
-    let written = do_harness_db::seed_invariants(&conn, &headers).await?;
-
-    println!("Seeded {written} invariants from {}", json_path.display());
-    Ok(())
-}
-
-/// Resolves the workspace root: explicit override or walk up from cwd.
-///
-/// # Errors
-///
-/// Returns an error when the explicit root is not a directory or no harness
-/// root can be discovered from the current directory.
-fn resolve_root(explicit: Option<&Path>) -> Result<PathBuf> {
-    if let Some(path) = explicit {
-        if !path.is_dir() {
-            anyhow::bail!("root is not a directory: {}", path.display());
-        }
-        Ok(path.to_path_buf())
-    } else {
-        let cwd = std::env::current_dir().context("failed to read current directory")?;
-        do_harness_db::find_harness_root(&cwd)
     }
 }

@@ -8,6 +8,7 @@ use anyhow::{Result, anyhow};
 
 use crate::config::{Config, SensorSpec};
 use crate::report::{SensorResult, VerifyReport};
+use crate::telemetry::FAIL_FAST_STRIKES;
 
 /// Options controlling a verify run.
 pub struct VerifyOpts {
@@ -15,6 +16,8 @@ pub struct VerifyOpts {
     pub fail_fast: bool,
     /// Restrict execution to these sensor names; empty = all.
     pub only: Vec<String>,
+    /// Sensor names halted by the fail-fast policy (not executed).
+    pub blocked: Vec<String>,
 }
 
 /// Runs the selected sensors from `root` and returns the aggregate report.
@@ -38,12 +41,34 @@ pub fn verify(cfg: &Config, root: &Path, opts: &VerifyOpts) -> Result<VerifyRepo
         ));
     }
 
+    if sensors.is_empty() {
+        return Ok(VerifyReport {
+            ok: true,
+            root: root.display().to_string(),
+            failed: vec![],
+            sensors: vec![],
+        });
+    }
+
     let mut results: Vec<SensorResult> = Vec::new();
     for spec in sensors {
         if !opts.only.is_empty() && !opts.only.contains(&spec.name) {
             continue;
         }
-        let result = run_sensor(spec, root);
+        let result = if opts.blocked.contains(&spec.name) {
+            SensorResult {
+                name: spec.name.clone(),
+                ok: false,
+                exit_code: None,
+                duration_ms: 0,
+                output: format!(
+                    "halted: sensor '{}' has failed {} consecutive times; resolve the underlying issue before re-running",
+                    spec.name, FAIL_FAST_STRIKES
+                ),
+            }
+        } else {
+            run_sensor(spec, root)
+        };
         let failed = !result.ok;
         results.push(result);
         if failed && opts.fail_fast {
@@ -134,6 +159,7 @@ mod tests {
             &VerifyOpts {
                 fail_fast: false,
                 only: vec![],
+                blocked: vec![],
             },
         )
         .expect("verify");
@@ -156,6 +182,7 @@ mod tests {
             &VerifyOpts {
                 fail_fast: false,
                 only: vec!["pass".to_owned()],
+                blocked: vec![],
             },
         )
         .expect("verify");
@@ -175,6 +202,7 @@ mod tests {
             &VerifyOpts {
                 fail_fast: false,
                 only: vec!["nope".to_owned()],
+                blocked: vec![],
             },
         )
         .expect_err("verify must fail");
@@ -193,6 +221,7 @@ mod tests {
             &VerifyOpts {
                 fail_fast: true,
                 only: vec![],
+                blocked: vec![],
             },
         )
         .expect("verify");
@@ -200,5 +229,98 @@ mod tests {
         assert_eq!(report.sensors.len(), 1);
         assert_eq!(report.sensors[0].name, "fail");
         assert_eq!(report.failed, vec!["fail".to_owned()]);
+    }
+
+    /// A generic pack with no sensors verifies trivially.
+    #[test]
+    fn verify_with_no_effective_sensors_succeeds() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let cfg = Config {
+            language: Some("generic".to_owned()),
+            hooks: HooksConfig {
+                pre_commit: vec![],
+                pre_push: vec![],
+            },
+            sensors: vec![],
+        };
+        let report = verify(
+            &cfg,
+            dir.path(),
+            &VerifyOpts {
+                fail_fast: false,
+                only: vec![],
+                blocked: vec![],
+            },
+        )
+        .expect("verify");
+        assert!(report.ok);
+        assert!(report.sensors.is_empty());
+        assert!(report.failed.is_empty());
+    }
+
+    /// A blocked sensor is not executed: no marker file appears.
+    #[test]
+    fn blocked_sensor_is_not_executed() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let cfg = config_with(&[("mark", &["sh", "-c", "touch marker"])]);
+        let report = verify(
+            &cfg,
+            dir.path(),
+            &VerifyOpts {
+                fail_fast: false,
+                only: vec![],
+                blocked: vec!["mark".to_owned()],
+            },
+        )
+        .expect("verify");
+        assert!(!report.sensors[0].ok);
+        assert_eq!(report.sensors[0].exit_code, None);
+        assert_eq!(report.sensors[0].duration_ms, 0);
+        assert!(report.sensors[0].output.contains("halted"));
+        assert!(!dir.path().join("marker").exists());
+    }
+
+    /// A blocked sensor fails the report while unblocked sensors still run.
+    #[test]
+    fn blocked_sensor_counts_as_failed() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let cfg = config_with(&[("ok", &["true"]), ("halt", &["true"])]);
+        let report = verify(
+            &cfg,
+            dir.path(),
+            &VerifyOpts {
+                fail_fast: false,
+                only: vec![],
+                blocked: vec!["halt".to_owned()],
+            },
+        )
+        .expect("verify");
+        assert!(!report.ok);
+        assert_eq!(report.failed, vec!["halt".to_owned()]);
+        assert!(report.sensors[0].ok);
+        assert_eq!(report.sensors[0].name, "ok");
+        assert!(!report.sensors[1].ok);
+    }
+
+    /// With fail_fast, a blocked sensor halts the run like any failure.
+    #[test]
+    fn fail_fast_stops_at_first_blocked_sensor() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let cfg = config_with(&[("halt", &["true"]), ("after", &["true"])]);
+        let report = verify(
+            &cfg,
+            dir.path(),
+            &VerifyOpts {
+                fail_fast: true,
+                only: vec![],
+                blocked: vec!["halt".to_owned()],
+            },
+        )
+        .expect("verify");
+        assert!(!report.ok);
+        assert_eq!(report.sensors.len(), 1);
+        assert_eq!(report.sensors[0].name, "halt");
+        assert!(!report.sensors[0].ok);
+        assert_eq!(report.failed, vec!["halt".to_owned()]);
     }
 }

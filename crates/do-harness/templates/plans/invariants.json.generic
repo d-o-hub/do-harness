@@ -1,0 +1,14 @@
+[
+  {
+    "invariant": "Computational sensors strictly supersede LLM self-assessment",
+    "rationale": "Automated exit codes are the only proof a subtask is complete",
+    "sensor": "do-harness verify",
+    "category": "verification"
+  },
+  {
+    "invariant": "Conventional commits with lowercase subject lines",
+    "rationale": "Machine-parseable history for the distillation loop",
+    "sensor": "not implemented (future: commitlint)",
+    "category": "workflow"
+  }
+]

@@ -42,6 +42,9 @@ pub struct SensorSpec {
     pub argv: Vec<String>,
 }
 
+/// Language pack identifiers accepted in `Config.language`.
+pub const SUPPORTED_LANGUAGES: &[&str] = &["rust", "generic"];
+
 /// The built-in Rust sensor pack, in canonical order.
 static RUST_SENSORS: std::sync::LazyLock<Vec<SensorSpec>> = std::sync::LazyLock::new(rust_pack);
 
@@ -117,7 +120,25 @@ pub fn load(root: &Path, explicit: Option<&Path>) -> Result<Config> {
     }
     let text = std::fs::read_to_string(&path)
         .with_context(|| format!("failed to read config file {}", path.display()))?;
-    toml::from_str(&text).with_context(|| format!("invalid config file {}", path.display()))
+    let cfg: Config =
+        toml::from_str(&text).with_context(|| format!("invalid config file {}", path.display()))?;
+    cfg.validate()?;
+    Ok(cfg)
+}
+
+impl Config {
+    /// Rejects unsupported language pack identifiers.
+    fn validate(&self) -> Result<()> {
+        if let Some(language) = &self.language {
+            if !SUPPORTED_LANGUAGES.contains(&language.as_str()) {
+                anyhow::bail!(
+                    "unsupported language pack '{language}' (supported: {})",
+                    SUPPORTED_LANGUAGES.join(", ")
+                );
+            }
+        }
+        Ok(())
+    }
 }
 
 /// Returns the built-in Rust configuration with the six-pack of sensors.
@@ -133,13 +154,16 @@ pub fn rust_default() -> Config {
 }
 
 impl Config {
-    /// Returns the effective sensor list: configured, or the built-in pack.
+    /// Returns the effective sensor list: configured, the generic pack's
+    /// empty list, or the built-in Rust pack.
     pub fn effective_sensors(&self) -> &[SensorSpec] {
-        if self.sensors.is_empty() {
-            &RUST_SENSORS
-        } else {
-            &self.sensors
+        if !self.sensors.is_empty() {
+            return &self.sensors;
         }
+        if self.language.as_deref() == Some("generic") {
+            return &[];
+        }
+        &RUST_SENSORS
     }
 
     /// Names of the effective sensors, in order.
@@ -211,5 +235,37 @@ mod tests {
         assert_eq!(cfg.sensors.len(), 6);
         assert_eq!(cfg.sensor_names().len(), 6);
         assert_eq!(cfg.effective_sensors().len(), 6);
+    }
+
+    /// An unknown language pack identifier is rejected at load time.
+    #[test]
+    fn rejects_unknown_language_pack() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("do-harness.toml");
+        std::fs::write(&path, "language = \"python\"\n").expect("write config");
+        let err = load(dir.path(), Some(&path)).expect_err("load must fail");
+        assert!(format!("{err:#}").contains("unsupported language pack 'python'"));
+    }
+
+    /// The generic pack with no sensors yields an empty sensor list.
+    #[test]
+    fn generic_language_yields_no_effective_sensors() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("do-harness.toml");
+        std::fs::write(&path, "language = \"generic\"\n").expect("write config");
+        let cfg = load(dir.path(), Some(&path)).expect("load config");
+        assert!(cfg.effective_sensors().is_empty());
+        assert!(cfg.sensor_names().is_empty());
+    }
+
+    /// The rust pack with no sensors falls back to the built-in Rust sensors.
+    #[test]
+    fn rust_language_without_sensors_uses_builtin_pack() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("do-harness.toml");
+        std::fs::write(&path, "language = \"rust\"\n").expect("write config");
+        let cfg = load(dir.path(), Some(&path)).expect("load config");
+        assert_eq!(cfg.effective_sensors().len(), 6);
+        assert!(cfg.sensor_names().contains(&"clippy".to_owned()));
     }
 }

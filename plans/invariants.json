@@ -46,5 +46,17 @@
     "rationale": "Keeps schema contracts dependency-free and reusable",
     "sensor": "scripts/check-deps.sh",
     "category": "architecture"
+  },
+  {
+    "invariant": "A sensor halted by the fail-fast policy (3 consecutive strikes) requires developer resolution before re-running",
+    "rationale": "Prevents blind re-runs of a sensor that has failed 3 consecutive times on the same subtask",
+    "sensor": "do-harness verify --record",
+    "category": "workflow"
+  },
+  {
+    "invariant": "Skill structure is validated by skill-creator's quick_validate.py before evaluation",
+    "rationale": "The canonical gate keeps the skill corpus structurally sound; evals use the existing evals/evals.json schema",
+    "sensor": "do-harness eval",
+    "category": "workflow"
   }
 ]

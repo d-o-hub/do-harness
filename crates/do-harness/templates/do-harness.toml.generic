@@ -1,0 +1,16 @@
+# do-harness.toml — sensor pack for this workspace.
+language = "generic"
+
+[hooks]
+pre-commit = []
+pre-push = []
+
+# Define your sensors here; `do-harness verify` runs them in order.
+# Example (Node):
+# [[sensors]]
+# name = "lint"
+# argv = ["npm", "run", "lint"]
+#
+# [[sensors]]
+# name = "test"
+# argv = ["npm", "test"]
