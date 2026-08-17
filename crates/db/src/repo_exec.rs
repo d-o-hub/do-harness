@@ -84,10 +84,12 @@ pub async fn list_beats(conn: &Connection, task_id: Option<i64>) -> Result<Vec<B
     Ok(beats)
 }
 
-/// Records a new error-signature attempt or increments an existing one.
+/// Records a new error-signature attempt or increments an existing one,
+/// scoped by `(signature, task_id)`.
 ///
-/// `signature` is unique; a fresh signature starts at 1, subsequent calls
-/// increment it. Returns the new attempt count.
+/// The pair is unique; a fresh pair starts at 1, subsequent calls increment
+/// it. `task_id = None` scopes the signature to the whole workspace. Returns
+/// the new attempt count.
 ///
 /// # Errors
 ///
@@ -102,10 +104,9 @@ pub async fn bump_error_signature(
         .execute(
             "UPDATE error_signatures \
              SET attempt_count = attempt_count + 1, \
-                 task_id = COALESCE(?1, task_id), \
-                 message = COALESCE(?2, message) \
-             WHERE signature = ?3",
-            params!(task_id, message, signature),
+                 message = COALESCE(?1, message) \
+             WHERE signature = ?2 AND task_id IS ?3",
+            params!(message, signature, task_id),
         )
         .await?;
     if updated == 0 {
@@ -118,8 +119,8 @@ pub async fn bump_error_signature(
     }
     let mut rows = conn
         .query(
-            "SELECT attempt_count FROM error_signatures WHERE signature = ?1",
-            params!(signature),
+            "SELECT attempt_count FROM error_signatures WHERE signature = ?1 AND task_id IS ?2",
+            params!(signature, task_id),
         )
         .await?;
     let row = rows
@@ -129,7 +130,7 @@ pub async fn bump_error_signature(
     Ok(row.get(0)?)
 }
 
-/// Fetches an error signature by its unique key.
+/// Fetches an error signature by its `(signature, task_id)` key.
 ///
 /// # Errors
 ///
@@ -137,12 +138,13 @@ pub async fn bump_error_signature(
 pub async fn get_error_signature(
     conn: &Connection,
     signature: &str,
+    task_id: Option<i64>,
 ) -> Result<Option<ErrorSignature>> {
     let mut rows = conn
         .query(
             "SELECT id, signature, task_id, attempt_count, message, created_at \
-             FROM error_signatures WHERE signature = ?1",
-            params!(signature),
+             FROM error_signatures WHERE signature = ?1 AND task_id IS ?2",
+            params!(signature, task_id),
         )
         .await?;
     match rows.next().await? {
@@ -238,7 +240,7 @@ mod tests {
             3
         );
 
-        let sig = get_error_signature(&conn, "sensor:clippy")
+        let sig = get_error_signature(&conn, "sensor:clippy", None)
             .await
             .unwrap()
             .unwrap();

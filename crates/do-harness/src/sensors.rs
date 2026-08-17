@@ -210,7 +210,7 @@ mod tests {
         assert!(err.to_string().contains("pass"));
     }
 
-    /// With fail_fast, execution stops at the first failing sensor.
+    /// With `fail_fast`, execution stops at the first failing sensor.
     #[test]
     fn fail_fast_stops_at_first_failure() {
         let dir = tempfile::tempdir().expect("tempdir");
@@ -302,7 +302,7 @@ mod tests {
         assert!(!report.sensors[1].ok);
     }
 
-    /// With fail_fast, a blocked sensor halts the run like any failure.
+    /// With `fail_fast`, a blocked sensor halts the run like any failure.
     #[test]
     fn fail_fast_stops_at_first_blocked_sensor() {
         let dir = tempfile::tempdir().expect("tempdir");

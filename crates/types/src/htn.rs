@@ -84,7 +84,7 @@ impl TryFrom<&str> for TaskState {
 mod tests {
     use super::*;
 
-    /// The snake_case serde shape matches the database status values.
+    /// The `snake_case` serde shape matches the database status values.
     #[test]
     fn task_state_serializes_snake_case() {
         let json = serde_json::to_string(&TaskState::InProgress).expect("serialize");

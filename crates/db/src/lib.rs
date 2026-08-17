@@ -13,6 +13,7 @@ pub mod migrate;
 pub mod repo;
 pub mod repo_exec;
 pub mod repo_learn;
+pub mod repo_scope;
 pub mod root;
 
 pub use migrate::{connect, connect_and_migrate, migrate, unix_now};
@@ -25,4 +26,5 @@ pub use repo_learn::{
     NewHeuristic, NewSkillEval, NewTrace, get_trace, insert_heuristic, insert_skill_eval,
     insert_trace, list_heuristics, list_skill_evals, list_traces,
 };
+pub use repo_scope::{clear_error_signatures, list_error_signatures, reset_error_signature};
 pub use root::{db_path, find_harness_root};

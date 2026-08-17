@@ -211,7 +211,7 @@ mod tests {
         );
     }
 
-    /// Unknown top-level keys are rejected by deny_unknown_fields.
+    /// Unknown top-level keys are rejected by `deny_unknown_fields`.
     #[test]
     fn rejects_unknown_fields() {
         let dir = tempfile::tempdir().expect("tempdir");

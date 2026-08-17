@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result};
 
 use crate::hook_script::BinSource;
-use crate::{TaskAction, TraceAction, config, hooks, init, task, trace};
+use crate::{ErrorsAction, TaskAction, TraceAction, config, errors, hooks, init, task, trace};
 
 /// Dispatches task-state actions.
 ///
@@ -77,6 +77,22 @@ pub async fn trace_cmd(root: &Path, action: TraceAction) -> Result<()> {
             Ok(())
         }
         TraceAction::List { session, format } => trace::list_traces(root, &session, format).await,
+    }
+}
+
+/// Dispatches error-signature actions.
+///
+/// # Errors
+///
+/// Returns an error when the state database cannot be opened.
+pub async fn errors_cmd(root: &Path, action: ErrorsAction) -> Result<()> {
+    match action {
+        ErrorsAction::List { task, format } => errors::list(root, task, format).await,
+        ErrorsAction::Clear { sensor, task } => {
+            let removed = errors::clear(root, task, sensor.as_deref()).await?;
+            println!("Cleared {removed} error signature(s)");
+            Ok(())
+        }
     }
 }
 

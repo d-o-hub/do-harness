@@ -210,12 +210,12 @@ mod tests {
         let pre_commit_body = read(&hook_path(&git_dir, "pre-commit"));
         assert!(pre_commit_body.contains(MARKER));
         assert!(pre_commit_body.contains("#!/usr/bin/env bash"));
-        assert!(pre_commit_body.contains("verify --fail-fast --only fmt --only loc"));
+        assert!(pre_commit_body.contains("verify --fail-fast --record --only fmt --only loc"));
         assert!(pre_commit_body.contains("cargo build --release -p do-harness"));
 
         let pre_push_body = read(&hook_path(&git_dir, "pre-push"));
         assert!(pre_push_body.contains(MARKER));
-        assert!(pre_push_body.contains("verify --fail-fast"));
+        assert!(pre_push_body.contains("verify --fail-fast --record"));
         assert!(!pre_push_body.contains("--only"));
     }
 
@@ -269,7 +269,7 @@ mod tests {
         install(&git_dir, &pre_commit, &pre_push, false).unwrap();
 
         let body = read(&hook_path(&git_dir, "pre-commit"));
-        assert!(body.contains("verify --fail-fast --only fmt"));
+        assert!(body.contains("verify --fail-fast --record --only fmt"));
         assert!(!body.contains("stale"));
     }
 

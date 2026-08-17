@@ -16,6 +16,7 @@ use crate::report::Format;
 mod commands;
 mod config;
 mod distill;
+mod errors;
 mod eval;
 mod hook_script;
 mod hooks;
@@ -57,6 +58,9 @@ enum Command {
         /// Persist beats and error signatures into the state database.
         #[arg(long)]
         record: bool,
+        /// Scope records and fail-fast strikes to this task id.
+        #[arg(long)]
+        task: Option<i64>,
     },
     /// List sensor names.
     List {
@@ -101,6 +105,11 @@ enum Command {
         /// Source trace id; required as evidence of a resolved fix.
         #[arg(long = "from-trace")]
         from_trace: Option<i64>,
+    },
+    /// Inspect and clear fail-fast error signatures.
+    Errors {
+        #[command(subcommand)]
+        action: ErrorsAction,
     },
     /// Validate skill structure and benchmark skill evals.
     Eval {
@@ -149,6 +158,29 @@ enum TaskAction {
     Fail {
         /// Task id.
         id: i64,
+    },
+}
+
+/// Available error-signature actions.
+#[derive(Debug, Subcommand)]
+enum ErrorsAction {
+    /// List fail-fast error signatures.
+    List {
+        /// Scope to one task id.
+        #[arg(long)]
+        task: Option<i64>,
+        /// Output format.
+        #[arg(long, value_enum, default_value_t = Format::Text)]
+        format: Format,
+    },
+    /// Clear fail-fast error signatures (optionally for one sensor/task).
+    Clear {
+        /// Only clear this signature key.
+        #[arg(long)]
+        sensor: Option<String>,
+        /// Only clear signatures for this task id.
+        #[arg(long)]
+        task: Option<i64>,
     },
 }
 
@@ -259,10 +291,11 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
             format,
             only,
             record,
+            task,
         } => {
             let cfg = config::load(&root, cli.config.as_deref()).map_err(CliError::Usage)?;
             let blocked = if record {
-                telemetry::blocked_sensors(&root, &cfg.sensor_names())
+                telemetry::blocked_sensors(&root, &cfg.sensor_names(), task)
                     .await
                     .map_err(CliError::Usage)?
             } else {
@@ -276,7 +309,7 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
             match sensors::verify(&cfg, &root, &opts) {
                 Ok(report) => {
                     if record {
-                        telemetry::record_verify(&root, &report, &opts.blocked)
+                        telemetry::record_verify(&root, &report, &opts.blocked, task)
                             .await
                             .map_err(CliError::Usage)?;
                     }
@@ -312,6 +345,9 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
             description,
             from_trace,
         } => distill::distill(&root, &skill, &pattern, description.as_deref(), from_trace)
+            .await
+            .map_err(CliError::Usage),
+        Command::Errors { action } => commands::errors_cmd(&root, action)
             .await
             .map_err(CliError::Usage),
         Command::Eval { skill } => eval::run_eval(&root, skill.as_deref())

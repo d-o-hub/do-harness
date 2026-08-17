@@ -29,6 +29,11 @@ const MIGRATIONS: &[Migration] = &[
         name: "persist",
         sql: include_str!("../migrations/0003_persist.sql"),
     },
+    Migration {
+        version: 4,
+        name: "scope",
+        sql: include_str!("../migrations/0004_scope.sql"),
+    },
 ];
 
 /// Opens (creating if necessary) the local libSQL database at `path`.

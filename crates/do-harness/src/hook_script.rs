@@ -29,7 +29,7 @@ else
     exit 2
   fi
 fi
-exec "$BIN" --root "$ROOT" verify --fail-fast"#;
+exec "$BIN" --root "$ROOT" verify --fail-fast --record"#;
 
 /// Builds a complete hook script body for the given sensor argument string.
 #[must_use]
@@ -201,6 +201,6 @@ mod tests {
         assert!(body.contains("DO_HARNESS_BIN"));
         assert!(body.contains("command -v do-harness"));
         assert!(body.contains("target/release/do-harness"));
-        assert!(body.contains("verify --fail-fast --only fmt"));
+        assert!(body.contains("verify --fail-fast --record --only fmt"));
     }
 }
