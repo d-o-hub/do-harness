@@ -8,7 +8,7 @@ description: >
   state to plans/tasks.json or libSQL.
 license: MIT
 metadata:
-  version: "1.1"
+  version: "0.1.0"
   tags: htn planning decomposition spike tasks
 ---
 

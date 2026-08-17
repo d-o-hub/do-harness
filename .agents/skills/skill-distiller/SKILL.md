@@ -8,7 +8,7 @@ description: >
   creating or updating a skill in .agents/skills/.
 license: MIT
 metadata:
-  version: "1.1"
+  version: "0.1.0"
   tags: distillation dreaming skills heuristics eval steering
 ---
 

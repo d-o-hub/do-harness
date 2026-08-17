@@ -8,7 +8,7 @@ description: >
   fire", "CI failure", "self-correction", "swarm".
 license: MIT
 metadata:
-  version: "1.1"
+  version: "0.1.0"
   tags: harness sensors feedback feedforward self-correction quality
 ---
 

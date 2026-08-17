@@ -9,7 +9,7 @@ description: >
   "de-risk", "unknown API".
 license: MIT
 metadata:
-  version: "1.0"
+  version: "0.1.0"
   tags: spike prototype uncertainty de-risk scratchpad libsql
 ---
 
