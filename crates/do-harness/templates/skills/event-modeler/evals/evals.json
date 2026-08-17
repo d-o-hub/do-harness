@@ -1,0 +1,26 @@
+{
+  "skill_name": "event-modeler",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Model a state-change slice for creating a user with an email.",
+      "expected_output": "A Command struct, an Event enum with serde derives and #[serde(deny_unknown_fields)], and a typed thiserror error enum, split across commands.rs, events.rs, and errors.rs.",
+      "files": [],
+      "assertions": [
+        "exists:.agents/skills/event-modeler/SKILL.md",
+        "contains:.agents/skills/event-modeler/SKILL.md|name:",
+        "Uses typed Command and Event structs with deny_unknown_fields"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Design the read-side projection for a user summary view.",
+      "expected_output": "A UserSummaryView struct with an apply(&mut self, event) method that updates total_users and last_registered_user from UserCreated events.",
+      "files": [],
+      "assertions": [
+        "contains:AGENTS.md|forbid(unsafe_code)",
+        "Projection struct fields match the requested view"
+      ]
+    }
+  ]
+}

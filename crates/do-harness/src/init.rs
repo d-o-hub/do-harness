@@ -38,6 +38,8 @@ pub struct InitReport {
     pub skipped: Vec<String>,
     /// Invariants upserted into the state database.
     pub seeded: usize,
+    /// Number of skills scaffolded (SKILL.md written).
+    pub skills: usize,
 }
 
 const AGENTS_TEMPLATE: &str = include_str!("../templates/AGENTS.md");
@@ -48,28 +50,47 @@ const INVARIANTS_GENERIC: &str = include_str!("../templates/plans/invariants.jso
 const CHECK_LOC: &str = include_str!("../templates/scripts/check-loc.sh");
 
 /// Portable skill templates written into `.agents/skills/<name>/SKILL.md`.
-const SKILLS: &[(&str, &str)] = &[
-    (
-        "harness",
-        include_str!("../templates/skills/harness/SKILL.md"),
-    ),
-    (
-        "htn-planner",
-        include_str!("../templates/skills/htn-planner/SKILL.md"),
-    ),
-    (
-        "spike-runner",
-        include_str!("../templates/skills/spike-runner/SKILL.md"),
-    ),
-    (
-        "skill-distiller",
-        include_str!("../templates/skills/skill-distiller/SKILL.md"),
-    ),
-    (
-        "event-modeler",
-        include_str!("../templates/skills/event-modeler/SKILL.md"),
-    ),
+struct SkillSpec {
+    name: &'static str,
+    skill_md: &'static str,
+    evals: &'static str,
+}
+
+const SKILLS: &[SkillSpec] = &[
+    SkillSpec {
+        name: "harness",
+        skill_md: include_str!("../templates/skills/harness/SKILL.md"),
+        evals: include_str!("../templates/skills/harness/evals/evals.json"),
+    },
+    SkillSpec {
+        name: "htn-planner",
+        skill_md: include_str!("../templates/skills/htn-planner/SKILL.md"),
+        evals: include_str!("../templates/skills/htn-planner/evals/evals.json"),
+    },
+    SkillSpec {
+        name: "spike-runner",
+        skill_md: include_str!("../templates/skills/spike-runner/SKILL.md"),
+        evals: include_str!("../templates/skills/spike-runner/evals/evals.json"),
+    },
+    SkillSpec {
+        name: "skill-distiller",
+        skill_md: include_str!("../templates/skills/skill-distiller/SKILL.md"),
+        evals: include_str!("../templates/skills/skill-distiller/evals/evals.json"),
+    },
+    SkillSpec {
+        name: "event-modeler",
+        skill_md: include_str!("../templates/skills/event-modeler/SKILL.md"),
+        evals: include_str!("../templates/skills/event-modeler/evals/evals.json"),
+    },
 ];
+
+/// skill-creator ships its scaffolding script and the structure gate so that a
+/// consumer's `do-harness eval` can run the real `quick_validate.py`.
+const SKILL_CREATOR_MD: &str = include_str!("../templates/skills/skill-creator/SKILL.md");
+const SKILL_CREATOR_INIT: &str =
+    include_str!("../templates/skills/skill-creator/scripts/init_skill.py");
+const SKILL_CREATOR_QUICK_VALIDATE: &str =
+    include_str!("../templates/skills/skill-creator/scripts/quick_validate.py");
 
 /// Scaffolds a harness workspace in `root`, then initializes the state
 /// database and seeds the invariants.
@@ -112,10 +133,47 @@ pub async fn init_workspace(root: &Path, opts: &InitOpts) -> Result<InitReport> 
         )?;
         make_executable(&root.join("scripts/check-loc.sh"))?;
     }
-    for (name, body) in SKILLS {
-        let relative = format!(".agents/skills/{name}/SKILL.md");
-        write_if_absent(root, &relative, body, opts.force, &mut report)?;
+    for spec in SKILLS {
+        let skill_dir = format!(".agents/skills/{}", spec.name);
+        write_if_absent(
+            root,
+            &format!("{skill_dir}/SKILL.md"),
+            spec.skill_md,
+            opts.force,
+            &mut report,
+        )?;
+        report.skills += 1;
+        write_if_absent(
+            root,
+            &format!("{skill_dir}/evals/evals.json"),
+            spec.evals,
+            opts.force,
+            &mut report,
+        )?;
     }
+
+    write_if_absent(
+        root,
+        ".agents/skills/skill-creator/SKILL.md",
+        SKILL_CREATOR_MD,
+        opts.force,
+        &mut report,
+    )?;
+    write_if_absent(
+        root,
+        ".agents/skills/skill-creator/scripts/init_skill.py",
+        SKILL_CREATOR_INIT,
+        opts.force,
+        &mut report,
+    )?;
+    write_if_absent(
+        root,
+        ".agents/skills/skill-creator/scripts/quick_validate.py",
+        SKILL_CREATOR_QUICK_VALIDATE,
+        opts.force,
+        &mut report,
+    )?;
+    make_executable(&root.join(".agents/skills/skill-creator/scripts/quick_validate.py"))?;
     append_gitignore(root, &mut report)?;
 
     report.seeded = seed_invariants(root).await?;
@@ -264,6 +322,39 @@ mod tests {
 
         assert!(report.written.is_empty());
         assert!(report.skipped.contains(&"do-harness.toml".to_owned()));
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn init_rust_scaffolds_skill_creator_and_evals() {
+        let dir = tempfile::tempdir().unwrap();
+        let opts = InitOpts {
+            language: Language::Rust,
+            force: false,
+        };
+
+        let report = init_workspace(dir.path(), &opts).await.unwrap();
+
+        assert_eq!(report.skills, SKILLS.len());
+        for spec in SKILLS {
+            let name = spec.name;
+            let skill_dir = dir.path().join(".agents/skills").join(name);
+            assert!(skill_dir.join("SKILL.md").is_file(), "{name} SKILL.md");
+            assert!(
+                skill_dir.join("evals/evals.json").is_file(),
+                "{name} evals.json"
+            );
+        }
+        let creator_dir = dir.path().join(".agents/skills/skill-creator");
+        assert!(creator_dir.join("SKILL.md").is_file());
+        assert!(creator_dir.join("scripts/init_skill.py").is_file());
+        let quick = creator_dir.join("scripts/quick_validate.py");
+        assert!(quick.is_file());
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mode = fs::metadata(&quick).unwrap().permissions().mode();
+            assert!(mode & 0o111 != 0, "quick_validate.py must be executable");
+        }
     }
 
     #[tokio::test(flavor = "current_thread")]

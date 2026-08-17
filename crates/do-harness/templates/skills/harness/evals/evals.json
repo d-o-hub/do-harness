@@ -1,0 +1,27 @@
+{
+  "skill_name": "harness",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "cargo clippy failed with a missing_errors_doc warning. What is the protocol?",
+      "expected_output": "Follow the self-correction protocol: read the error, classify it as a lint failure, apply the minimal fix (add a # Errors section), re-run cargo clippy, and only proceed when the sensor is green.",
+      "files": [],
+      "assertions": [
+        "contains:.agents/skills/harness/SKILL.md|name:",
+        "contains:AGENTS.md|fail-fast",
+        "Classifies the failure before applying the fix"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "The same test has failed 3 consecutive times for the same subtask. What now?",
+      "expected_output": "Apply the fail-fast policy: halt, record the error signature in .do-harness/agent_state.db, and surface a diagnostic to the developer.",
+      "files": [],
+      "assertions": [
+        "exists:.agents/skills/harness/SKILL.md",
+        "contains:AGENTS.md|error signature",
+        "Halts rather than retrying indefinitely"
+      ]
+    }
+  ]
+}

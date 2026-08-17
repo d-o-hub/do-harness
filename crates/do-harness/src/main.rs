@@ -26,6 +26,7 @@ mod init;
 mod methods;
 mod report;
 mod sensors;
+mod skill_write;
 mod task;
 mod telemetry;
 mod trace;
