@@ -38,8 +38,10 @@ pub struct Precondition {
 }
 
 /// Lifecycle state of a task or subtask in the execution trace.
+///
+/// Serializes in `snake_case` to match the `tasks.status` column values.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, rename_all = "snake_case")]
 pub enum TaskState {
     /// Planned but not yet started.
     Pending,
@@ -49,4 +51,60 @@ pub enum TaskState {
     Done,
     /// Sensor failed repeatedly; halted by the fail-fast policy.
     Failed,
+}
+
+impl TaskState {
+    /// The `snake_case` database representation of this state.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Pending => "pending",
+            Self::InProgress => "in_progress",
+            Self::Done => "done",
+            Self::Failed => "failed",
+        }
+    }
+}
+
+impl TryFrom<&str> for TaskState {
+    type Error = String;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "pending" => Ok(Self::Pending),
+            "in_progress" => Ok(Self::InProgress),
+            "done" => Ok(Self::Done),
+            "failed" => Ok(Self::Failed),
+            other => Err(format!("unknown task state '{other}'")),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The snake_case serde shape matches the database status values.
+    #[test]
+    fn task_state_serializes_snake_case() {
+        let json = serde_json::to_string(&TaskState::InProgress).expect("serialize");
+        assert_eq!(json, "\"in_progress\"");
+        let parsed: TaskState = serde_json::from_str(&json).expect("parse");
+        assert_eq!(parsed, TaskState::InProgress);
+    }
+
+    /// Every database value maps to exactly one state.
+    #[test]
+    fn task_state_roundtrips_through_db_strings() {
+        for state in [
+            TaskState::Pending,
+            TaskState::InProgress,
+            TaskState::Done,
+            TaskState::Failed,
+        ] {
+            let from_db = TaskState::try_from(state.as_str()).expect("known state");
+            assert_eq!(from_db, state);
+        }
+        assert!(TaskState::try_from("exploded").is_err());
+    }
 }
