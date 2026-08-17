@@ -27,3 +27,7 @@ argv = ["bash", "scripts/check-loc.sh"]
 [[sensors]]
 name = "deps"
 argv = ["bash", "scripts/check-deps.sh"]
+
+[[sensors]]
+name = "commitlint"
+argv = ["bash", "scripts/check-commitlint.sh"]

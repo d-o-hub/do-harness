@@ -24,3 +24,7 @@ argv = ["cargo", "test", "--workspace"]
 [[sensors]]
 name = "loc"
 argv = ["bash", "scripts/check-loc.sh"]
+
+[[sensors]]
+name = "commitlint"
+argv = ["bash", "scripts/check-commitlint.sh"]

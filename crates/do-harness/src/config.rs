@@ -96,6 +96,10 @@ fn rust_pack() -> Vec<SensorSpec> {
             name: "deps".to_owned(),
             argv: vec!["bash".to_owned(), "scripts/check-deps.sh".to_owned()],
         },
+        SensorSpec {
+            name: "commitlint".to_owned(),
+            argv: vec!["bash".to_owned(), "scripts/check-commitlint.sh".to_owned()],
+        },
     ]
 }
 
@@ -141,7 +145,7 @@ impl Config {
     }
 }
 
-/// Returns the built-in Rust configuration with the six-pack of sensors.
+/// Returns the built-in Rust configuration with the seven-pack of sensors.
 pub fn rust_default() -> Config {
     Config {
         language: None,
@@ -232,9 +236,9 @@ mod tests {
             vec!["fmt".to_owned(), "loc".to_owned()]
         );
         assert!(cfg.hooks.pre_push.is_empty());
-        assert_eq!(cfg.sensors.len(), 6);
-        assert_eq!(cfg.sensor_names().len(), 6);
-        assert_eq!(cfg.effective_sensors().len(), 6);
+        assert_eq!(cfg.sensors.len(), 7);
+        assert_eq!(cfg.sensor_names().len(), 7);
+        assert_eq!(cfg.effective_sensors().len(), 7);
     }
 
     /// An unknown language pack identifier is rejected at load time.
@@ -265,7 +269,7 @@ mod tests {
         let path = dir.path().join("do-harness.toml");
         std::fs::write(&path, "language = \"rust\"\n").expect("write config");
         let cfg = load(dir.path(), Some(&path)).expect("load config");
-        assert_eq!(cfg.effective_sensors().len(), 6);
+        assert_eq!(cfg.effective_sensors().len(), 7);
         assert!(cfg.sensor_names().contains(&"clippy".to_owned()));
     }
 }

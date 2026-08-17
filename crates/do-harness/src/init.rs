@@ -48,6 +48,7 @@ const CONFIG_GENERIC: &str = include_str!("../templates/do-harness.toml.generic"
 const INVARIANTS_RUST: &str = include_str!("../templates/plans/invariants.json.rust");
 const INVARIANTS_GENERIC: &str = include_str!("../templates/plans/invariants.json.generic");
 const CHECK_LOC: &str = include_str!("../templates/scripts/check-loc.sh");
+const CHECK_COMMITLINT: &str = include_str!("../templates/scripts/check-commitlint.sh");
 
 /// Portable skill templates written into `.agents/skills/<name>/SKILL.md`.
 struct SkillSpec {
@@ -132,6 +133,14 @@ pub async fn init_workspace(root: &Path, opts: &InitOpts) -> Result<InitReport> 
             &mut report,
         )?;
         make_executable(&root.join("scripts/check-loc.sh"))?;
+        write_if_absent(
+            root,
+            "scripts/check-commitlint.sh",
+            CHECK_COMMITLINT,
+            opts.force,
+            &mut report,
+        )?;
+        make_executable(&root.join("scripts/check-commitlint.sh"))?;
     }
     for spec in SKILLS {
         let skill_dir = format!(".agents/skills/{}", spec.name);

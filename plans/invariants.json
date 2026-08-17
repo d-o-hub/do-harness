@@ -38,7 +38,7 @@
   {
     "invariant": "Conventional commits with lowercase subject lines",
     "rationale": "Machine-parseable history for the distillation loop",
-    "sensor": "not implemented (future: commitlint)",
+    "sensor": "scripts/check-commitlint.sh (commitlint sensor)",
     "category": "workflow"
   },
   {
