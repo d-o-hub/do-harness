@@ -1,10 +1,9 @@
 //! Repository layer for execution telemetry: beats and error signatures.
 
-use anyhow::{Context, Result};
+use crate::error::{DbError, Result};
+use crate::migrate::unix_now;
 use do_harness_types::{Beat, ErrorSignature};
 use libsql::{Connection, params, params::Params};
-
-use crate::migrate::unix_now;
 
 /// Insert parameters for a new beat.
 #[derive(Debug, Clone)]
@@ -131,7 +130,7 @@ pub async fn bump_error_signature(
     let row = rows
         .next()
         .await?
-        .context("error signature vanished after bump")?;
+        .ok_or_else(|| DbError::NotFound("error signature vanished after bump".to_string()))?;
     Ok(row.get(0)?)
 }
 

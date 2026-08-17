@@ -19,7 +19,7 @@ fn resolve_root(arg: Option<&str>) -> Result<PathBuf> {
         return Ok(PathBuf::from(root));
     }
     let cwd = std::env::current_dir().context("failed to read current directory")?;
-    find_harness_root(&cwd)
+    Ok(find_harness_root(&cwd)?)
 }
 
 #[tokio::main(flavor = "current_thread")]

@@ -1,6 +1,6 @@
 //! Repository layer for fail-fast signature lifecycle (reset, list, clear).
 
-use anyhow::Result;
+use crate::error::Result;
 use do_harness_types::ErrorSignature;
 use libsql::{Connection, params, params::Params};
 

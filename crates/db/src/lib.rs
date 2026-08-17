@@ -9,12 +9,15 @@
 
 #![forbid(unsafe_code)]
 
+pub mod error;
 pub mod migrate;
 pub mod repo;
 pub mod repo_exec;
 pub mod repo_learn;
 pub mod repo_scope;
 pub mod root;
+
+pub use error::{DbError, Result};
 
 pub use migrate::{connect, connect_and_migrate, migrate, unix_now};
 pub use repo::{

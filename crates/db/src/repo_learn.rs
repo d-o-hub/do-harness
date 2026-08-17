@@ -1,11 +1,10 @@
 //! Repository layer for the learning tables: traces, heuristics, and skill
 //! evaluations.
 
-use anyhow::Result;
+use crate::error::Result;
+use crate::migrate::unix_now;
 use do_harness_types::{Heuristic, SkillEval, Trace};
 use libsql::{Connection, params};
-
-use crate::migrate::unix_now;
 
 /// Insert parameters for a new trace.
 #[derive(Debug, Clone)]

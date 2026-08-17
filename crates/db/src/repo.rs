@@ -1,10 +1,9 @@
 //! Repository layer for the task table and the invariants seed.
 
-use anyhow::{Context, Result};
+use crate::error::{DbError, Result};
+use crate::migrate::unix_now;
 use do_harness_types::{DecisionHeader, TaskRecord, TaskState};
 use libsql::{Connection, params, params::Params};
-
-use crate::migrate::unix_now;
 
 /// Insert parameters for a new task.
 #[derive(Debug, Clone)]
@@ -119,7 +118,7 @@ pub async fn advance_subtask(conn: &Connection, id: i64) -> Result<i64> {
     let row = rows
         .next()
         .await?
-        .context("task vanished after advancing subtask")?;
+        .ok_or_else(|| DbError::NotFound("task vanished after advancing subtask".to_string()))?;
     Ok(row.get(0)?)
 }
 
@@ -133,7 +132,7 @@ fn task_from_row(row: &libsql::Row) -> Result<TaskRecord> {
         method: row.get(3)?,
         subtask_index: row.get(4)?,
         status: TaskState::try_from(status.as_str())
-            .map_err(|err| anyhow::anyhow!("invalid task status '{status}': {err}"))?,
+            .map_err(|err| DbError::InvalidTaskStatus(format!("{status}: {err}")))?,
         precondition: row.get(6)?,
         created_at: row.get(7)?,
         updated_at: row.get(8)?,

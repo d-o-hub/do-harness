@@ -2,7 +2,7 @@
 
 use std::path::{Path, PathBuf};
 
-use anyhow::Result;
+use crate::error::{DbError, Result};
 
 /// Name of the harness config file that marks a workspace root.
 pub const CONFIG_FILENAME: &str = "do-harness.toml";
@@ -31,11 +31,10 @@ pub fn find_harness_root(start: &Path) -> Result<PathBuf> {
             return Ok(dir.to_path_buf());
         }
     }
-    anyhow::bail!(
-        "harness root not found: no {CONFIG_FILENAME} (or {AGENTS_FILENAME} with plans/invariants.json) \
-         under {}",
+    Err(DbError::RootNotFound(format!(
+        "no {CONFIG_FILENAME} (or {AGENTS_FILENAME} with plans/invariants.json) under {}",
         start.display()
-    );
+    )))
 }
 
 /// Whether `dir` carries a harness root marker.

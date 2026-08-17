@@ -2,7 +2,7 @@
 
 use std::path::Path;
 
-use anyhow::Result;
+use crate::error::{DbError, Result};
 use libsql::{Builder, Connection, params::Params};
 
 /// A single versioned schema migration.
@@ -52,10 +52,22 @@ const MIGRATIONS: &[Migration] = &[
 pub async fn connect(path: impl AsRef<Path>) -> Result<Connection> {
     let path = path.as_ref();
     if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent)?;
+        std::fs::create_dir_all(parent).map_err(|source| DbError::Io {
+            path: parent.to_path_buf(),
+            source,
+        })?;
     }
-    let db = Builder::new_local(path).build().await?;
-    Ok(db.connect()?)
+    let db = Builder::new_local(path)
+        .build()
+        .await
+        .map_err(|source| DbError::Connect {
+            path: path.to_path_buf(),
+            source,
+        })?;
+    db.connect().map_err(|source| DbError::Connect {
+        path: path.to_path_buf(),
+        source,
+    })
 }
 
 /// Applies all pending embedded migrations to `conn` in ascending version order.
