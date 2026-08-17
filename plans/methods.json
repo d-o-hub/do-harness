@@ -1,0 +1,30 @@
+{
+  "methods": [
+    {
+      "name": "vertical-event-slice",
+      "subtasks": [
+        { "name": "define-event-schema", "sensor": null, "spike_candidate": false },
+        { "name": "write-acceptance-test", "sensor": "test", "spike_candidate": false },
+        { "name": "implement-slice", "sensor": "test", "spike_candidate": false },
+        { "name": "verify-sensors", "sensor": "check", "spike_candidate": false },
+        { "name": "distill-learning", "sensor": "clippy", "spike_candidate": false }
+      ],
+      "preconditions": [
+        { "description": "The domain behavior is understood well enough to model events without a prototype." }
+      ]
+    },
+    {
+      "name": "spike-and-resolve",
+      "subtasks": [
+        { "name": "create-spike", "sensor": null, "spike_candidate": false },
+        { "name": "execute-spike", "sensor": "check", "spike_candidate": false },
+        { "name": "record-findings", "sensor": null, "spike_candidate": false },
+        { "name": "clean-spike", "sensor": "test", "spike_candidate": false },
+        { "name": "transition-to-slice", "sensor": "clippy", "spike_candidate": false }
+      ],
+      "preconditions": [
+        { "description": "A third-party API, crate integration, or performance boundary is uncertain and needs de-risking." }
+      ]
+    }
+  ]
+}
