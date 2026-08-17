@@ -18,9 +18,12 @@ mod config;
 mod distill;
 mod errors;
 mod eval;
+mod eval_assert;
+mod eval_walk;
 mod hook_script;
 mod hooks;
 mod init;
+mod methods;
 mod report;
 mod sensors;
 mod task;
@@ -151,6 +154,11 @@ enum TaskAction {
     },
     /// Advance the task's subtask pointer.
     Advance {
+        /// Task id.
+        id: i64,
+    },
+    /// Mark a task done once its sensor-gated subtasks have passed.
+    Done {
         /// Task id.
         id: i64,
     },

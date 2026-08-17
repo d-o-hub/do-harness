@@ -1,0 +1,210 @@
+//! Deterministic assertion grader for `do-harness eval`.
+//!
+//! # Assertion DSL
+//!
+//! Inside each fixture case's `assertions` array, only strings with one of the
+//! following prefixes are *graded*; every other string is documentation and is
+//! excluded from `pass_rate`. The `:` prefix marker was chosen because the
+//! fixture files are JSON and colons are unambiguous there; within fields that
+//! carry free text (needs/values) a secondary separator is used.
+//!
+//! ```text
+//! exists:PATH                    PATH exists, relative to the workspace root.
+//! contains:PATH|NEEDLE           PATH exists and its text contains NEEDLE.
+//!                                ('|' separates path/needle; paths cannot
+//!                                contain '|' on POSIX.)
+//! db:TABLE:COLUMN=VALUE:min=CNT  agent_state.db has >= CNT rows in TABLE where
+//!                                COLUMN = VALUE.
+//! cli:ARGV:contains:TEXT         `do-harness ARGV` (split on spaces) exits 0
+//!                                and its stdout contains TEXT.
+//! walk:                          the skill's evals/walkthrough.sh (run once
+//!                                per skill) passed; skipped when absent.
+//! ```
+//!
+//! Unprefixed strings are treated as human-readable expectations/docs and never
+//! counted in the numerator or denominator of `pass_rate`.
+
+use std::path::Path;
+use std::process::Command;
+
+use anyhow::Result;
+use libsql::params;
+
+use crate::eval_walk::WalkRun;
+
+/// Result of grading a single prefixed assertion.
+#[derive(Debug, Clone)]
+pub struct AssertionGrade {
+    /// Whether the assertion passed.
+    pub passed: bool,
+    /// Human-readable reason for pass/fail.
+    // Retained for callers that render grade messages; not read by the runner.
+    #[expect(dead_code)]
+    pub reason: String,
+}
+
+/// Whether `spec` is a graded (prefixed) assertion rather than documentation.
+///
+/// Prefixed assertions start with one of the reserved `key:` markers.
+#[must_use]
+pub fn is_graded(spec: &str) -> bool {
+    spec.starts_with("exists:")
+        || spec.starts_with("contains:")
+        || spec.starts_with("db:")
+        || spec.starts_with("cli:")
+        || spec.starts_with("walk:")
+}
+
+/// Grades a single prefixed assertion against the workspace root.
+///
+/// `walk` is the (already-run) walkthrough outcome for the owning skill; it is
+/// consulted by the `walk:` assertion and, when a present walkthrough failed,
+/// every graded assertion fails as well.
+///
+/// # Errors
+///
+/// Returns an error when a `db:` assertion cannot reach or query the local
+/// agent-state database.
+pub async fn grade(root: &Path, spec: &str, walk: &WalkRun) -> Result<AssertionGrade> {
+    if let Some(path) = spec.strip_prefix("exists:") {
+        return Ok(grade_exists(root, path));
+    }
+    if let Some(rest) = spec.strip_prefix("contains:") {
+        return Ok(grade_contains(root, rest));
+    }
+    if let Some(rest) = spec.strip_prefix("db:") {
+        return grade_db(root, rest).await;
+    }
+    if let Some(rest) = spec.strip_prefix("cli:") {
+        return Ok(grade_cli(rest));
+    }
+    if spec.starts_with("walk:") {
+        return Ok(walk_success(*walk, spec));
+    }
+    Ok(fail(format!("unknown assertion prefix: '{spec}'")))
+}
+
+/// The `exists:PATH` grader.
+fn grade_exists(root: &Path, path: &str) -> AssertionGrade {
+    let path = root.join(path);
+    if path.is_file() || path.is_dir() {
+        pass(format!("exists: {} found", path.display()))
+    } else {
+        fail(format!("exists: missing at {}", path.display()))
+    }
+}
+
+/// The `contains:PATH|NEEDLE` grader.
+fn grade_contains(root: &Path, rest: &str) -> AssertionGrade {
+    let Some((path, needle)) = rest.split_once('|') else {
+        return fail("contains: expected contains:PATH|NEEDLE".to_owned());
+    };
+    let abs = root.join(path);
+    match std::fs::read_to_string(&abs) {
+        Ok(contents) => {
+            if contents.contains(needle) {
+                pass(format!("contains: {} has '{}'", abs.display(), needle))
+            } else {
+                fail(format!(
+                    "contains: '{}' not found in {}",
+                    needle,
+                    abs.display()
+                ))
+            }
+        }
+        Err(err) => fail(format!("contains: cannot read {}: {err}", abs.display())),
+    }
+}
+
+/// The `db:TABLE:COLUMN=VALUE:min=CNT` grader.
+async fn grade_db(root: &Path, rest: &str) -> Result<AssertionGrade> {
+    let (head, min_part) = rest.split_once(":min=").unwrap_or((rest, "1"));
+    let min: i64 = min_part.parse().unwrap_or(1);
+    let Some((table, cond)) = head.split_once(':') else {
+        return Ok(fail(
+            "db: expected db:TABLE:COLUMN=VALUE:min=COUNT".to_owned(),
+        ));
+    };
+    let Some((column, value)) = cond.split_once('=') else {
+        return Ok(fail(
+            "db: expected db:TABLE:COLUMN=VALUE:min=COUNT".to_owned(),
+        ));
+    };
+
+    let db = do_harness_db::connect_and_migrate(root).await?;
+    let sql = format!("SELECT COUNT(*) FROM \"{table}\" WHERE \"{column}\" = ?1");
+    let count = match db.query(&sql, params![value]).await {
+        Ok(mut rows) => match rows.next().await? {
+            Some(row) => row.get::<i64>(0)?,
+            None => 0,
+        },
+        Err(err) => {
+            return Ok(fail(format!("db: could not query {table}: {err}")));
+        }
+    };
+    if count >= min {
+        Ok(pass(format!(
+            "db: {table}.{column}={value} has {count} row(s) >= {min}"
+        )))
+    } else {
+        Ok(fail(format!(
+            "db: {table}.{column}={value} has {count} < {min} required"
+        )))
+    }
+}
+
+/// The `cli:ARGV:contains:TEXT` grader.
+fn grade_cli(rest: &str) -> AssertionGrade {
+    let Some((argv, text)) = rest.split_once(":contains:") else {
+        return fail("cli: expected cli:ARGV:contains:TEXT".to_owned());
+    };
+    let cmd_parts: Vec<&str> = argv.split_whitespace().collect();
+    if cmd_parts.is_empty() {
+        return fail("cli: ARGV is empty".to_owned());
+    }
+    let output = match Command::new("do-harness").args(&cmd_parts).output() {
+        Ok(out) => out,
+        Err(err) => {
+            return fail(format!(
+                "cli: could not run 'do-harness {argv}' on PATH: {err}"
+            ));
+        }
+    };
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    if output.status.success() && stdout.contains(text) {
+        pass(format!(
+            "cli: 'do-harness {argv}' exited 0 and printed '{text}'"
+        ))
+    } else if !output.status.success() {
+        fail(format!(
+            "cli: 'do-harness {argv}' exited {:?}",
+            output.status.code()
+        ))
+    } else {
+        fail(format!("cli: 'do-harness {argv}' stdout lacks '{text}'"))
+    }
+}
+
+/// The `walk:` grader: consult the already-run skill walkthrough.
+fn walk_success(walk: WalkRun, spec: &str) -> AssertionGrade {
+    if walk.success {
+        pass(format!("{spec} walkthrough passed"))
+    } else {
+        fail("walk: walkthrough.sh exited non-zero".to_owned())
+    }
+}
+
+/// Convenience constructor for a passing grade.
+fn pass(reason: String) -> AssertionGrade {
+    AssertionGrade {
+        passed: true,
+        reason,
+    }
+}
+
+fn fail(reason: String) -> AssertionGrade {
+    AssertionGrade {
+        passed: false,
+        reason,
+    }
+}

@@ -43,6 +43,11 @@ pub async fn task_cmd(root: &Path, action: TaskAction) -> Result<()> {
             println!("Advanced task {id} to subtask_index={index}");
             Ok(())
         }
+        TaskAction::Done { id } => {
+            task::done_task(root, id).await?;
+            println!("Done task {id}");
+            Ok(())
+        }
         TaskAction::Fail { id } => {
             task::fail_task(root, id).await?;
             println!("Failed task {id}");

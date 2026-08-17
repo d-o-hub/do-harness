@@ -221,6 +221,7 @@ dependencies = [
  "clap",
  "do-harness-db",
  "do-harness-types",
+ "libsql",
  "serde",
  "serde_json",
  "tempfile",

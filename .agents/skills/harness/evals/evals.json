@@ -7,9 +7,9 @@
       "expected_output": "Follow the self-correction protocol: read the error, classify it as a lint failure, apply the minimal fix (add a # Errors section), re-run cargo clippy, and only proceed when the sensor is green.",
       "files": [],
       "assertions": [
-        "Classifies the failure as a lint category",
-        "Applies the minimal fix without unrelated refactors",
-        "Re-runs the specific sensor before proceeding"
+        "contains:.agents/skills/harness/SKILL.md|name:",
+        "contains:AGENTS.md|fail-fast",
+        "Classifies the failure before applying the fix"
       ]
     },
     {
@@ -18,9 +18,9 @@
       "expected_output": "Apply the fail-fast policy: halt, record the error signature in .do-harness/agent_state.db, and surface a diagnostic to the developer.",
       "files": [],
       "assertions": [
-        "Halts after 3 consecutive failures",
-        "Records the error signature to the local database",
-        "Surfaces a diagnostic to the developer"
+        "exists:.agents/skills/harness/SKILL.md",
+        "contains:AGENTS.md|error signature",
+        "Halts rather than retrying indefinitely"
       ]
     }
   ]

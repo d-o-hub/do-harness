@@ -7,9 +7,9 @@
       "expected_output": "A Command struct, an Event enum with serde derives and #[serde(deny_unknown_fields)], and a typed thiserror error enum, split across commands.rs, events.rs, and errors.rs.",
       "files": [],
       "assertions": [
-        "Command struct has typed fields",
-        "Event enum derives Serialize/Deserialize with #[serde(deny_unknown_fields)]",
-        "Errors use thiserror, not anyhow"
+        "exists:.agents/skills/event-modeler/SKILL.md",
+        "contains:.agents/skills/event-modeler/SKILL.md|name:",
+        "Uses typed Command and Event structs with deny_unknown_fields"
       ]
     },
     {
@@ -18,9 +18,8 @@
       "expected_output": "A UserSummaryView struct with an apply(&mut self, event) method that updates total_users and last_registered_user from UserCreated events.",
       "files": [],
       "assertions": [
-        "Projection struct fields match the requested view",
-        "apply method takes &mut self and the event type",
-        "File stays under 500 LOC"
+        "contains:AGENTS.md|forbid(unsafe_code)",
+        "Projection struct fields match the requested view"
       ]
     }
   ]

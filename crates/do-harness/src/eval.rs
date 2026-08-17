@@ -2,9 +2,17 @@
 //!
 //! The structure gate is delegated to skill-creator's `quick_validate.py` —
 //! the canonical check is never duplicated in Rust. Skills passing the gate
-//! have their `evals/evals.json` fixtures parsed; one `skill_evals` row is
-//! persisted per skill with `pass_rate` = fraction of structurally valid
-//! cases and `token_efficiency` = `None`.
+//! have their `evals/evals.json` fixtures parsed, their optional
+//! `evals/walkthrough.sh` executed once, and their prefixed (graded)
+//! assertions executed deterministically against the workspace root. One
+//! `skill_evals` row is persisted per skill carrying the fraction of graded
+//! assertions that passed (`pass_rate`), plus the first graded case's prompt
+//! and expected outcome.
+
+#[cfg(test)]
+mod eval_tests;
+#[cfg(test)]
+mod tests;
 
 use std::fs;
 use std::io;
@@ -12,10 +20,12 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use anyhow::{Context, Result, bail};
-use serde::Deserialize;
+
+use crate::eval_assert::AssertionGrade;
+use crate::eval_walk::WalkRun;
 
 /// Canonical `evals/evals.json` fixture schema.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 struct SkillEvals {
     /// Fixture skill name; the persisted row uses the directory name.
@@ -26,7 +36,7 @@ struct SkillEvals {
 }
 
 /// A single evaluation fixture case.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 struct EvalCase {
     /// Stable fixture identifier.
@@ -39,7 +49,7 @@ struct EvalCase {
     /// Files the case reads or writes.
     #[allow(dead_code)] // schema-required key, not consumed by the runner
     files: Vec<String>,
-    /// Assertions the case must satisfy.
+    /// Assertions the case must satisfy (prefixed ones are graded).
     assertions: Vec<String>,
 }
 
@@ -51,23 +61,27 @@ struct SkillReport {
     line: String,
     /// `pass_rate` to persist; `None` when nothing should be persisted.
     pass_rate: Option<f64>,
+    /// Prompt of the first graded case, for richer persistence.
+    prompt: Option<String>,
+    /// Expected outcome of the first graded case.
+    expected_outcome: Option<String>,
 }
 
 /// Runs the skill-eval benchmark for every skill under `root/.agents/skills`.
 ///
 /// Each skill directory containing a `SKILL.md` is validated with
 /// skill-creator's `quick_validate.py`. When the gate passes and the skill
-/// ships `evals/evals.json`, valid fixture cases are counted and a single
-/// `skill_evals` row is persisted with `pass_rate` = valid / total. When
-/// `skill` is set, only that skill is evaluated; a missing `SKILL.md` is an
-/// error.
+/// ships `evals/evals.json`, its graded (prefixed) assertions are executed
+/// and a single `skill_evals` row is persisted with `pass_rate` = passed
+/// graded assertions / graded assertions. When `skill` is set, only that
+/// skill is evaluated; a missing `SKILL.md` is an error.
 ///
 /// # Errors
 ///
 /// Returns an error when a requested skill is not found under
 /// `.agents/skills`, when the state database cannot be initialized or
-/// written, or when any evaluated skill fails the structure gate (the
-/// message lists the failing skill(s)).
+/// written, when a `db:` assertion cannot reach the database, or when any
+/// evaluated skill fails the structure gate.
 pub async fn run_eval(root: &Path, skill: Option<&str>) -> Result<()> {
     let skills_root = root.join(".agents/skills");
     let gate_script = skills_root.join("skill-creator/scripts/quick_validate.py");
@@ -90,15 +104,15 @@ pub async fn run_eval(root: &Path, skill: Option<&str>) -> Result<()> {
             .and_then(|name| name.to_str())
             .with_context(|| format!("invalid skill directory name: {}", entry.display()))?
             .to_owned();
-        let report = check_skill(&entry, &name, &gate_script)?;
+        let report = check_skill(root, &entry, &name, &gate_script).await?;
         println!("{}", report.line);
         if let Some(pass_rate) = report.pass_rate {
             do_harness_db::insert_skill_eval(
                 &conn,
                 &do_harness_db::NewSkillEval {
                     skill_name: &name,
-                    prompt: None,
-                    expected_outcome: None,
+                    prompt: report.prompt.as_deref(),
+                    expected_outcome: report.expected_outcome.as_deref(),
                     token_efficiency: None,
                     pass_rate: Some(pass_rate),
                 },
@@ -180,14 +194,29 @@ fn run_structure_gate(dir: &Path, gate_script: &Path) -> (GateVerdict, String) {
 }
 
 /// Validates the structure gate and, when it does not fail, parses and scores
-/// the skill's `evals/evals.json` fixtures.
-fn check_skill(dir: &Path, name: &str, gate_script: &Path) -> Result<SkillReport> {
+/// the skill's `evals/evals.json` fixtures with deterministic assertions.
+async fn check_skill(
+    root: &Path,
+    dir: &Path,
+    name: &str,
+    gate_script: &Path,
+) -> Result<SkillReport> {
+    let empty = || SkillReport {
+        gate_failed: false,
+        line: String::new(),
+        pass_rate: None,
+        prompt: None,
+        expected_outcome: None,
+    };
+
     let (verdict, gate_msg) = run_structure_gate(dir, gate_script);
     if verdict == GateVerdict::Fail {
         return Ok(SkillReport {
             gate_failed: true,
             line: format!("{name}: structure=invalid: {gate_msg} evals=skipped"),
             pass_rate: None,
+            prompt: None,
+            expected_outcome: None,
         });
     }
     let structure = match verdict {
@@ -200,11 +229,9 @@ fn check_skill(dir: &Path, name: &str, gate_script: &Path) -> Result<SkillReport
     let content = match fs::read_to_string(&evals_path) {
         Ok(content) => content,
         Err(err) if err.kind() == io::ErrorKind::NotFound => {
-            return Ok(SkillReport {
-                gate_failed: false,
-                line: format!("{name}: structure={structure} evals=none"),
-                pass_rate: None,
-            });
+            let mut report = empty();
+            report.line = format!("{name}: structure={structure} evals=none");
+            return Ok(report);
         }
         Err(err) => {
             return Err(err).with_context(|| format!("failed to read {}", evals_path.display()));
@@ -214,200 +241,85 @@ fn check_skill(dir: &Path, name: &str, gate_script: &Path) -> Result<SkillReport
     let parsed = match serde_json::from_str::<SkillEvals>(&content) {
         Ok(parsed) => parsed,
         Err(err) => {
-            return Ok(SkillReport {
-                gate_failed: false,
-                line: format!("{name}: structure={structure} evals-invalid: {err}"),
-                pass_rate: None,
-            });
+            let mut report = empty();
+            report.line = format!("{name}: structure={structure} evals-invalid: {err}");
+            return Ok(report);
         }
     };
 
-    let total = u32::try_from(parsed.evals.len()).unwrap_or(u32::MAX);
-    let valid = u32::try_from(
-        parsed
-            .evals
-            .iter()
-            .filter(|case| is_valid_case(case))
-            .count(),
-    )
-    .unwrap_or(u32::MAX);
-    let pass_rate = (total > 0).then(|| f64::from(valid) / f64::from(total));
-    let line = match pass_rate {
-        Some(rate) => {
-            format!("{name}: structure={structure} evals={valid}/{total} pass_rate={rate:.2}")
-        }
-        None => format!("{name}: structure={structure} evals={valid}/{total}"),
+    let walk = crate::eval_walk::run_walkthrough(dir, root);
+    let outcome = grade_skill(&parsed, root, &walk).await?;
+
+    let line = match outcome.pass_rate {
+        Some(rate) => format!(
+            "{name}: structure={structure} evals={}/{} pass_rate={rate:.2}",
+            outcome.passed, outcome.graded
+        ),
+        None => format!(
+            "{name}: structure={structure} evals={}/{}",
+            outcome.passed, outcome.graded
+        ),
     };
     Ok(SkillReport {
         gate_failed: false,
         line,
-        pass_rate,
+        pass_rate: outcome.pass_rate,
+        prompt: outcome.prompt,
+        expected_outcome: outcome.expected_outcome,
     })
 }
 
-/// A fixture case is valid when its prompt, expected output, and assertions
-/// are all non-empty.
-fn is_valid_case(case: &EvalCase) -> bool {
-    !case.prompt.is_empty() && !case.expected_output.is_empty() && !case.assertions.is_empty()
+/// Grading summary returned by [`grade_skill`].
+struct GradeOutcome {
+    /// Number of graded (prefixed) assertions that passed.
+    passed: u32,
+    /// Total number of graded (prefixed) assertions.
+    graded: u32,
+    /// `passed / graded`, or `None` when there is nothing to grade.
+    pass_rate: Option<f64>,
+    /// Prompt of the first case contributing a graded assertion.
+    prompt: Option<String>,
+    /// Expected outcome of the first case contributing a graded assertion.
+    expected_outcome: Option<String>,
 }
 
-#[cfg(test)]
-mod tests {
-    #![allow(clippy::unwrap_used)]
+/// Executes every prefixed assertion in `evals` against `root`.
+async fn grade_skill(evals: &SkillEvals, root: &Path, walk: &WalkRun) -> Result<GradeOutcome> {
+    let mut passed = 0u32;
+    let mut graded = 0u32;
+    let mut prompt = None;
+    let mut expected_outcome = None;
 
-    use super::*;
-
-    const VALID_SKILL_MD: &str = "---\nname: test-skill\ndescription: A fixture skill used by the eval-runner tests.\nlicense: MIT\n---\n\n# Test Skill\n";
-
-    const NO_FRONTMATTER_MD: &str = "# No frontmatter here\n";
-
-    const TWO_VALID_ONE_INVALID_EVALS: &str = r#"{
-      "skill_name": "test-skill",
-      "evals": [
-        {"id": 1, "prompt": "prompt one", "expected_output": "out one", "files": [], "assertions": ["a1", "a2"]},
-        {"id": 2, "prompt": "prompt two", "expected_output": "out two", "files": ["f.txt"], "assertions": ["b1"]},
-        {"id": 3, "prompt": "", "expected_output": "", "files": [], "assertions": []}
-      ]
-    }"#;
-
-    const ONE_VALID_EVAL: &str = r#"{
-      "skill_name": "alpha",
-      "evals": [
-        {"id": 1, "prompt": "p", "expected_output": "e", "files": [], "assertions": ["a"]}
-      ]
-    }"#;
-
-    /// Locates the real `quick_validate.py` at the repository root.
-    fn gate_script_path() -> PathBuf {
-        let repo_root = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .parent()
-            .unwrap()
-            .parent()
-            .unwrap();
-        repo_root.join(".agents/skills/skill-creator/scripts/quick_validate.py")
-    }
-
-    /// Builds a tempdir fixture: `.agents/skills/<name>/SKILL.md` plus an
-    /// optional `evals/evals.json`, and a copy of the real gate script.
-    fn fixture_root(skills: &[(&str, &str, Option<&str>)]) -> tempfile::TempDir {
-        let dir = tempfile::tempdir().unwrap();
-        let skills_root = dir.path().join(".agents/skills");
-        let scripts = skills_root.join("skill-creator/scripts");
-        fs::create_dir_all(&scripts).unwrap();
-        fs::copy(gate_script_path(), scripts.join("quick_validate.py")).unwrap();
-        for (name, skill_md, evals) in skills {
-            let skill_dir = skills_root.join(name);
-            fs::create_dir_all(&skill_dir).unwrap();
-            fs::write(skill_dir.join("SKILL.md"), skill_md).unwrap();
-            if let Some(json) = evals {
-                fs::create_dir_all(skill_dir.join("evals")).unwrap();
-                fs::write(skill_dir.join("evals/evals.json"), json).unwrap();
+    for case in &evals.evals {
+        for spec in &case.assertions {
+            if !crate::eval_assert::is_graded(spec) {
+                continue; // documentation, excluded from pass_rate
+            }
+            if prompt.is_none() {
+                prompt = Some(case.prompt.clone());
+                expected_outcome = Some(case.expected_output.clone());
+            }
+            graded = graded.saturating_add(1);
+            let grade: AssertionGrade = if walk.present && !walk.success {
+                AssertionGrade {
+                    passed: false,
+                    reason: "walkthrough.sh exited non-zero".to_owned(),
+                }
+            } else {
+                crate::eval_assert::grade(root, spec, walk).await?
+            };
+            if grade.passed {
+                passed += 1;
             }
         }
-        dir
     }
 
-    #[tokio::test(flavor = "current_thread")]
-    async fn valid_skill_with_partially_invalid_evals_persists_pass_rate() {
-        let dir = fixture_root(&[(
-            "test-skill",
-            VALID_SKILL_MD,
-            Some(TWO_VALID_ONE_INVALID_EVALS),
-        )]);
-        run_eval(dir.path(), None).await.unwrap();
-
-        let conn = do_harness_db::connect_and_migrate(dir.path())
-            .await
-            .unwrap();
-        let rows = do_harness_db::list_skill_evals(&conn, "test-skill")
-            .await
-            .unwrap();
-        assert_eq!(rows.len(), 1);
-        assert_eq!(rows[0].skill_name, "test-skill");
-        assert_eq!(rows[0].prompt, None);
-        assert_eq!(rows[0].expected_outcome, None);
-        assert_eq!(rows[0].token_efficiency, None);
-        let pass_rate = rows[0].pass_rate.unwrap();
-        assert!((pass_rate - 2.0 / 3.0).abs() < 1e-9);
-    }
-
-    #[tokio::test(flavor = "current_thread")]
-    async fn skill_without_evals_skips_persistence() {
-        let dir = fixture_root(&[("bare-skill", VALID_SKILL_MD, None)]);
-        run_eval(dir.path(), None).await.unwrap();
-
-        let conn = do_harness_db::connect_and_migrate(dir.path())
-            .await
-            .unwrap();
-        let rows = do_harness_db::list_skill_evals(&conn, "bare-skill")
-            .await
-            .unwrap();
-        assert!(rows.is_empty());
-    }
-
-    #[tokio::test(flavor = "current_thread")]
-    async fn skill_failing_structure_gate_errors() {
-        let dir = fixture_root(&[("broken-skill", NO_FRONTMATTER_MD, None)]);
-        let err = run_eval(dir.path(), None).await.unwrap_err();
-        assert!(err.to_string().contains("broken-skill"));
-    }
-
-    /// A consumer workspace without skill-creator has no gate script; the
-    /// skills are still evaluated structurally and must not hard-fail.
-    #[tokio::test(flavor = "current_thread")]
-    async fn missing_gate_script_is_not_a_structure_failure() {
-        let dir = tempfile::tempdir().unwrap();
-        let skills_root = dir.path().join(".agents/skills");
-        let skill_dir = skills_root.join("alpha");
-        fs::create_dir_all(skill_dir.join("evals")).unwrap();
-        fs::write(skill_dir.join("SKILL.md"), VALID_SKILL_MD).unwrap();
-        fs::write(skill_dir.join("evals/evals.json"), ONE_VALID_EVAL).unwrap();
-
-        run_eval(dir.path(), None).await.unwrap();
-
-        let conn = do_harness_db::connect_and_migrate(dir.path())
-            .await
-            .unwrap();
-        let rows = do_harness_db::list_skill_evals(&conn, "alpha")
-            .await
-            .unwrap();
-        assert_eq!(rows.len(), 1);
-        assert_eq!(rows[0].pass_rate, Some(1.0));
-    }
-
-    #[tokio::test(flavor = "current_thread")]
-    async fn skill_filter_selects_only_matching_skill() {
-        let dir = fixture_root(&[
-            ("alpha", VALID_SKILL_MD, Some(ONE_VALID_EVAL)),
-            ("beta", VALID_SKILL_MD, None),
-        ]);
-        run_eval(dir.path(), Some("alpha")).await.unwrap();
-
-        let conn = do_harness_db::connect_and_migrate(dir.path())
-            .await
-            .unwrap();
-        assert_eq!(
-            do_harness_db::list_skill_evals(&conn, "alpha")
-                .await
-                .unwrap()
-                .len(),
-            1
-        );
-        assert!(
-            do_harness_db::list_skill_evals(&conn, "beta")
-                .await
-                .unwrap()
-                .is_empty()
-        );
-    }
-
-    #[tokio::test(flavor = "current_thread")]
-    async fn unknown_skill_filter_errors() {
-        let dir = fixture_root(&[("alpha", VALID_SKILL_MD, None)]);
-        let err = run_eval(dir.path(), Some("ghost")).await.unwrap_err();
-        assert!(
-            err.to_string()
-                .contains("skill 'ghost' not found under .agents/skills")
-        );
-    }
+    let pass_rate = (graded > 0).then(|| f64::from(passed) / f64::from(graded));
+    Ok(GradeOutcome {
+        passed,
+        graded,
+        pass_rate,
+        prompt,
+        expected_outcome,
+    })
 }
