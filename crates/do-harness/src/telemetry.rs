@@ -63,6 +63,7 @@ pub async fn record_verify(
                 beat_type: "sensor",
                 status: if sensor.ok { "ok" } else { "failed" },
                 sensor_exit_code: sensor.exit_code,
+                sensor_name: Some(&sensor.name),
                 started_at: now,
                 completed_at: Some(now),
             },

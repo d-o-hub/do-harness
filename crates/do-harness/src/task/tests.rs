@@ -23,8 +23,8 @@ fn write_catalog(root: &Path) {
     .unwrap();
 }
 
-/// Inserts an `"ok"` sensor beat scoped to `task_id`.
-async fn insert_ok_beat(root: &Path, task_id: i64) {
+/// Inserts an `"ok"` sensor beat scoped to `task_id` for the named sensor.
+async fn insert_ok_beat(root: &Path, task_id: i64, sensor: &str) {
     let conn = do_harness_db::connect_and_migrate(root).await.unwrap();
     let now = do_harness_db::unix_now();
     do_harness_db::insert_beat(
@@ -34,6 +34,7 @@ async fn insert_ok_beat(root: &Path, task_id: i64) {
             beat_type: "sensor",
             status: "ok",
             sensor_exit_code: Some(0),
+            sensor_name: Some(sensor),
             started_at: now,
             completed_at: Some(now),
         },
@@ -234,7 +235,7 @@ async fn advance_allows_after_verify_record_beat() {
     )
     .await
     .unwrap();
-    insert_ok_beat(dir.path(), id).await;
+    insert_ok_beat(dir.path(), id, "test").await;
 
     let index = advance_task(dir.path(), id).await.unwrap();
     assert_eq!(index, 1);
@@ -264,7 +265,7 @@ async fn done_allows_after_advancing() {
     let id = add_task(dir.path(), "slice", Some("mini"), None, None)
         .await
         .unwrap();
-    insert_ok_beat(dir.path(), id).await;
+    insert_ok_beat(dir.path(), id, "test").await;
     let _ = advance_task(dir.path(), id).await.unwrap();
     let _ = advance_task(dir.path(), id).await.unwrap();
 
@@ -285,7 +286,7 @@ async fn advance_rejects_when_done_or_failed() {
     let done = add_task(dir.path(), "done", Some("mini"), None, None)
         .await
         .unwrap();
-    insert_ok_beat(dir.path(), done).await;
+    insert_ok_beat(dir.path(), done, "test").await;
     let _ = advance_task(dir.path(), done).await.unwrap();
     let _ = advance_task(dir.path(), done).await.unwrap();
     done_task(dir.path(), done).await.unwrap();
@@ -324,4 +325,68 @@ async fn done_rejects_task_without_method() {
         err.to_string(),
         format!("task {id} has no method; cannot mark done")
     );
+}
+
+/// A passing beat for one sensor does not unlock a different sensor's gate.
+///
+/// Regression for the roast: `latest_sensor_beat_ok` previously accepted any
+/// recent `"ok"` sensor beat, so a `fmt` pass could unlock a `check` gate.
+#[tokio::test(flavor = "current_thread")]
+async fn advance_requires_the_named_sensor_beat() {
+    let dir = tempfile::tempdir().unwrap();
+    write_catalog(dir.path());
+    let id = add_task(
+        dir.path(),
+        "slice",
+        Some("vertical-event-slice"),
+        None,
+        None,
+    )
+    .await
+    .unwrap();
+
+    // An ok beat for the WRONG sensor must not satisfy the `test` gate.
+    insert_ok_beat(dir.path(), id, "fmt").await;
+    let err = advance_task(dir.path(), id).await.unwrap_err();
+    assert!(
+        err.to_string().contains("requires sensor 'test' to pass"),
+        "expected test-gate error, got: {err}"
+    );
+
+    // The right sensor's ok beat unlocks the gate.
+    insert_ok_beat(dir.path(), id, "test").await;
+    advance_task(dir.path(), id).await.unwrap();
+}
+
+/// Advancing the `check`-gated subtask requires a `check` beat, not a `test` one.
+#[tokio::test(flavor = "current_thread")]
+async fn check_gate_is_not_satisfied_by_a_test_beat() {
+    let dir = tempfile::tempdir().unwrap();
+    write_catalog(dir.path());
+    let id = add_task(
+        dir.path(),
+        "slice",
+        Some("vertical-event-slice"),
+        None,
+        None,
+    )
+    .await
+    .unwrap();
+
+    // Pass both `test` gates to reach index 2 (the `check`-gated subtask).
+    insert_ok_beat(dir.path(), id, "test").await;
+    advance_task(dir.path(), id).await.unwrap();
+    insert_ok_beat(dir.path(), id, "test").await;
+    advance_task(dir.path(), id).await.unwrap();
+
+    // index=2 -> verify-sensors gates on `check`; a `test` beat is not enough.
+    insert_ok_beat(dir.path(), id, "test").await;
+    let err = advance_task(dir.path(), id).await.unwrap_err();
+    assert!(
+        err.to_string().contains("requires sensor 'check' to pass"),
+        "expected check-gate error, got: {err}"
+    );
+
+    insert_ok_beat(dir.path(), id, "check").await;
+    advance_task(dir.path(), id).await.unwrap();
 }

@@ -106,6 +106,7 @@ mod tests {
                 beat_type: "sensor",
                 status: "ok",
                 sensor_exit_code: Some(0),
+                sensor_name: Some("check"),
                 started_at: 1,
                 completed_at: Some(1),
             },

@@ -5,7 +5,8 @@ use serde::{Deserialize, Serialize};
 /// A single execution beat (heartbeat or step) recorded for a task.
 ///
 /// Mirrors the `beats` table; `status` and `beat_type` are free-form labels
-/// (e.g. `sensor` / `ok`).
+/// (e.g. `sensor` / `ok`), and `sensor_name` names the sensor that produced a
+/// sensor beat so advance gates can check the specific sensor.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Beat {
@@ -19,6 +20,8 @@ pub struct Beat {
     pub status: String,
     /// Exit code of the sensor that produced this beat.
     pub sensor_exit_code: Option<i32>,
+    /// Name of the sensor that produced this beat, when it is a sensor beat.
+    pub sensor_name: Option<String>,
     /// Unix timestamp when the beat started.
     pub started_at: i64,
     /// Unix timestamp when the beat completed, when known.

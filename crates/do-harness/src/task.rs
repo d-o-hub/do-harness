@@ -154,7 +154,7 @@ pub async fn advance_task(root: &Path, id: i64) -> Result<i64> {
         }
         if let Some(sensor) = &method.subtasks[idx].sensor {
             let beats = do_harness_db::list_beats(&conn, Some(id)).await?;
-            if !latest_sensor_beat_ok(&beats) {
+            if !latest_sensor_beat_ok(&beats, sensor) {
                 anyhow::bail!(
                     "cannot advance task {id}: subtask '{}' requires sensor '{sensor}' to pass (run: do-harness verify --record --task {id})",
                     method.subtasks[idx].name
@@ -165,14 +165,17 @@ pub async fn advance_task(root: &Path, id: i64) -> Result<i64> {
     do_harness_db::advance_subtask(&conn, id).await
 }
 
-/// Returns whether the most recent `sensor` beat in `beats` is `"ok"`.
+/// Returns whether the most recent `sensor` beat for this task that matches the
+/// named sensor has `status == "ok"`.
 ///
-/// Beats do not record the sensor name, so the gate resolves to the newest
-/// sensor beat for the task, mirroring the last `verify --record --task <id>`.
-fn latest_sensor_beat_ok(beats: &[Beat]) -> bool {
+/// Beats carry `sensor_name` (see migration 0005), so a gate on `check` cannot
+/// be satisfied by a passing `fmt` beat. When no `ok` beat is recorded for the
+/// named sensor, the gate closes (fails), even if another sensor passed.
+fn latest_sensor_beat_ok(beats: &[Beat], sensor: &str) -> bool {
     beats
         .iter()
-        .rfind(|beat| beat.beat_type == "sensor")
+        .rev()
+        .find(|beat| beat.beat_type == "sensor" && beat.sensor_name.as_deref() == Some(sensor))
         .is_some_and(|beat| beat.status == "ok")
 }
 

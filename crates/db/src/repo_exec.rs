@@ -17,6 +17,8 @@ pub struct NewBeat<'a> {
     pub status: &'a str,
     /// Exit code of the sensor that produced this beat.
     pub sensor_exit_code: Option<i32>,
+    /// Name of the sensor that produced this beat, when it is a sensor beat.
+    pub sensor_name: Option<&'a str>,
     /// Unix timestamp when the beat started.
     pub started_at: i64,
     /// Unix timestamp when the beat completed.
@@ -30,13 +32,15 @@ pub struct NewBeat<'a> {
 /// Returns an error when the insert statement fails.
 pub async fn insert_beat(conn: &Connection, beat: &NewBeat<'_>) -> Result<i64> {
     conn.execute(
-        "INSERT INTO beats (task_id, beat_type, status, sensor_exit_code, started_at, completed_at) \
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        "INSERT INTO beats (task_id, beat_type, status, sensor_exit_code, sensor_name, \
+         started_at, completed_at) \
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
         params!(
             beat.task_id,
             beat.beat_type,
             beat.status,
             beat.sensor_exit_code,
+            beat.sensor_name,
             beat.started_at,
             beat.completed_at
         ),
@@ -54,16 +58,16 @@ pub async fn list_beats(conn: &Connection, task_id: Option<i64>) -> Result<Vec<B
     let mut rows = match task_id {
         Some(id) => {
             conn.query(
-                "SELECT id, task_id, beat_type, status, sensor_exit_code, started_at, completed_at \
-                 FROM beats WHERE task_id = ?1 ORDER BY id",
+                "SELECT id, task_id, beat_type, status, sensor_exit_code, sensor_name, \
+                 started_at, completed_at FROM beats WHERE task_id = ?1 ORDER BY id",
                 params!(id),
             )
             .await?
         }
         None => {
             conn.query(
-                "SELECT id, task_id, beat_type, status, sensor_exit_code, started_at, completed_at \
-                 FROM beats ORDER BY id",
+                "SELECT id, task_id, beat_type, status, sensor_exit_code, sensor_name, \
+                 started_at, completed_at FROM beats ORDER BY id",
                 Params::None,
             )
             .await?
@@ -77,8 +81,9 @@ pub async fn list_beats(conn: &Connection, task_id: Option<i64>) -> Result<Vec<B
             beat_type: row.get(2)?,
             status: row.get(3)?,
             sensor_exit_code: row.get(4)?,
-            started_at: row.get(5)?,
-            completed_at: row.get(6)?,
+            sensor_name: row.get(5)?,
+            started_at: row.get(6)?,
+            completed_at: row.get(7)?,
         });
     }
     Ok(beats)
@@ -192,6 +197,7 @@ mod tests {
                 beat_type: "sensor",
                 status: "failed",
                 sensor_exit_code: Some(1),
+                sensor_name: Some("check"),
                 started_at: 1,
                 completed_at: Some(2),
             },

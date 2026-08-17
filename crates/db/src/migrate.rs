@@ -34,6 +34,11 @@ const MIGRATIONS: &[Migration] = &[
         name: "scope",
         sql: include_str!("../migrations/0004_scope.sql"),
     },
+    Migration {
+        version: 5,
+        name: "beat_sensor",
+        sql: include_str!("../migrations/0005_beat_sensor.sql"),
+    },
 ];
 
 /// Opens (creating if necessary) the local libSQL database at `path`.
