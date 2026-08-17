@@ -41,16 +41,16 @@ pub fn run_walkthrough(skill_dir: &Path, root: &Path) -> WalkRun {
             success: true,
         };
     };
-    let status = Command::new(&script)
+    let output = Command::new(&script)
         .current_dir(root)
         .env("DO_HARNESS_ROOT", root)
         .env("DO_HARNESS_BIN", bin)
         .env("PYTHONUNBUFFERED", "1")
-        .status();
-    match status {
-        Ok(status) => WalkRun {
+        .output();
+    match output {
+        Ok(output) => WalkRun {
             present,
-            success: status.success(),
+            success: output.status.success(),
         },
         // Executable bit missing or spawn error: treat as a skipped walkthrough.
         Err(_) => WalkRun {
@@ -112,5 +112,80 @@ mod tests {
         assert!(run.present);
         assert!(run.success);
         assert!(dir.path().join("artifact.txt").is_file());
+    }
+
+    #[test]
+    fn noisy_stdout_and_stderr_success_walkthrough_still_succeeds() {
+        let dir = tempfile::tempdir().unwrap();
+        let evals = dir.path().join("evals");
+        fs::create_dir_all(&evals).unwrap();
+        let script = evals.join("walkthrough.sh");
+        fs::write(&script, "#!/bin/sh\necho leaked; echo err >&2; exit 0\n").unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            fs::set_permissions(&script, fs::Permissions::from_mode(0o755)).unwrap();
+        }
+        let run = run_walkthrough(dir.path(), dir.path());
+        assert!(run.present);
+        // The run succeeds even though the child wrote to both streams; with
+        // `.output()` the child's stdout/stderr are captured via pipes and
+        // dropped, never inherited by (or leaked to) the parent's terminal.
+        assert!(run.success);
+    }
+
+    #[test]
+    fn noisy_stdout_nonzero_exit_is_reported_failing() {
+        let dir = tempfile::tempdir().unwrap();
+        let evals = dir.path().join("evals");
+        fs::create_dir_all(&evals).unwrap();
+        let script = evals.join("walkthrough.sh");
+        fs::write(
+            &script,
+            "#!/bin/sh\necho leaked stdout; echo leaked stderr >&2; exit 7\n",
+        )
+        .unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            fs::set_permissions(&script, fs::Permissions::from_mode(0o755)).unwrap();
+        }
+        let run = run_walkthrough(dir.path(), dir.path());
+        assert!(run.present);
+        assert!(!run.success);
+    }
+
+    #[test]
+    fn walkthrough_env_vars_are_set() {
+        let dir = tempfile::tempdir().unwrap();
+        let evals = dir.path().join("evals");
+        fs::create_dir_all(&evals).unwrap();
+        let script = evals.join("walkthrough.sh");
+        // Persist the env values so the test can assert they are set to the
+        // expected root and the running harness binary. cwd is the root.
+        fs::write(
+            &script,
+            "#!/bin/sh\n\
+             printf '%s' \"$DO_HARNESS_ROOT\" > root.txt\n\
+             printf '%s' \"$DO_HARNESS_BIN\" > bin.txt\n",
+        )
+        .unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            fs::set_permissions(&script, fs::Permissions::from_mode(0o755)).unwrap();
+        }
+        let run = run_walkthrough(dir.path(), dir.path());
+        assert!(run.present);
+        assert!(run.success);
+        let root = dir.path().to_str().unwrap();
+        assert_eq!(
+            fs::read_to_string(dir.path().join("root.txt")).unwrap(),
+            root
+        );
+        let bin = fs::read_to_string(dir.path().join("bin.txt")).unwrap();
+        assert_eq!(bin, std::env::current_exe().unwrap().to_str().unwrap());
+        // The bin path is non-empty and resolves back to the harness binary.
+        assert!(!bin.is_empty());
     }
 }

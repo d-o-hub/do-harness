@@ -149,18 +149,20 @@ pub async fn add_task(
 
 /// Advances the subtask pointer of a task and returns the new index.
 ///
-/// Advancing is gated by the HTN method catalog: when the current subtask
-/// declares a computational sensor, a latest `"ok"` sensor beat scoped to
-/// this task must exist (`verify --record --task <id>`), and a task that is
-/// already `done` or `failed` cannot advance. `advance_subtask` also sets the
-/// status to `in_progress`.
+/// A task must have a method to advance at all (a methodless task is stuck in
+/// `pending` and can never be advanced or done). Advancing is gated by the HTN
+/// method catalog: when the current subtask declares a computational sensor, a
+/// latest `"ok"` sensor beat scoped to this task must exist
+/// (`verify --record --task <id>`), and a task that is already `done` or
+/// `failed` cannot advance. `advance_subtask` also sets the status to
+/// `in_progress`.
 ///
 /// # Errors
 ///
 /// Returns an error when the state database cannot be opened, when no task
-/// with the given id exists, when the task is `done`/`failed`, when there are
-/// no more subtasks, when the sensor gate has not passed, or when the advance
-/// fails.
+/// with the given id exists, when the task has no method, when the task is
+/// `done`/`failed`, when there are no more subtasks, when the sensor gate has
+/// not passed, or when the advance fails.
 pub async fn advance_task(root: &Path, id: i64) -> Result<(i64, WorkflowEvent)> {
     let command = AdvanceTask { task_id: id };
     debug_assert_eq!(command.name(), "AdvanceTask");
@@ -171,23 +173,24 @@ pub async fn advance_task(root: &Path, id: i64) -> Result<(i64, WorkflowEvent)> 
     if matches!(task.status, TaskState::Done | TaskState::Failed) {
         anyhow::bail!("task {id} is {}; cannot advance", task.status.as_str());
     }
-    if let Some(method_name) = task.method {
-        let idx = usize::try_from(task.subtask_index)
-            .with_context(|| format!("task {id} has an invalid subtask_index"))?;
-        let methods = crate::methods::load_methods(root)?;
-        let method = crate::methods::find_method(&methods, &method_name)
-            .with_context(|| format!("task {id} references unknown method '{method_name}'"))?;
-        if idx >= method.subtasks.len() {
-            anyhow::bail!("task {id} has no more subtasks to advance");
-        }
-        if let Some(sensor) = &method.subtasks[idx].sensor {
-            let beats = do_harness_db::list_beats(&conn, Some(id)).await?;
-            if !latest_sensor_beat_ok(&beats, sensor) {
-                anyhow::bail!(
-                    "cannot advance task {id}: subtask '{}' requires sensor '{sensor}' to pass (run: do-harness verify --record --task {id})",
-                    method.subtasks[idx].name
-                );
-            }
+    let Some(method_name) = task.method else {
+        anyhow::bail!("task {id} has no method; cannot advance");
+    };
+    let idx = usize::try_from(task.subtask_index)
+        .with_context(|| format!("task {id} has an invalid subtask_index"))?;
+    let methods = crate::methods::load_methods(root)?;
+    let method = crate::methods::find_method(&methods, &method_name)
+        .with_context(|| format!("task {id} references unknown method '{method_name}'"))?;
+    if idx >= method.subtasks.len() {
+        anyhow::bail!("task {id} has no more subtasks to advance");
+    }
+    if let Some(sensor) = &method.subtasks[idx].sensor {
+        let beats = do_harness_db::list_beats(&conn, Some(id)).await?;
+        if !latest_sensor_beat_ok(&beats, sensor) {
+            anyhow::bail!(
+                "cannot advance task {id}: subtask '{}' requires sensor '{sensor}' to pass (run: do-harness verify --record --task {id})",
+                method.subtasks[idx].name
+            );
         }
     }
     let index = do_harness_db::advance_subtask(&conn, id).await?;
@@ -299,3 +302,6 @@ mod tests;
 
 #[cfg(test)]
 mod workflow_tests;
+
+#[cfg(test)]
+mod gate_tests;

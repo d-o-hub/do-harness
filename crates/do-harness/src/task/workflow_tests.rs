@@ -38,7 +38,8 @@ async fn add_task_returns_task_added_event() {
 #[tokio::test(flavor = "current_thread")]
 async fn advance_task_returns_task_advanced_event() {
     let dir = tempfile::tempdir().unwrap();
-    let (id, _added) = add_task(dir.path(), "slice", None, None, None)
+    write_catalog(dir.path());
+    let (id, _added) = add_task(dir.path(), "slice", Some("mini"), None, None)
         .await
         .unwrap();
 

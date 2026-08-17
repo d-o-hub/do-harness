@@ -37,9 +37,8 @@ use crate::eval_walk::WalkRun;
 pub struct AssertionGrade {
     /// Whether the assertion passed.
     pub passed: bool,
-    /// Human-readable reason for pass/fail.
-    // Retained for callers that render grade messages; not read by the runner.
-    #[expect(dead_code)]
+    /// Human-readable reason for pass/fail (read by tests and future callers).
+    #[allow(dead_code)]
     pub reason: String,
 }
 
@@ -130,6 +129,11 @@ async fn grade_db(root: &Path, rest: &str) -> Result<AssertionGrade> {
             "db: expected db:TABLE:COLUMN=VALUE:min=COUNT".to_owned(),
         ));
     };
+    if !is_identifier(table) || !is_identifier(column) {
+        return Ok(fail(format!(
+            "db: invalid table/column identifier: {table}.{column}"
+        )));
+    }
 
     let db = do_harness_db::connect_and_migrate(root).await?;
     let sql = format!("SELECT COUNT(*) FROM \"{table}\" WHERE \"{column}\" = ?1");
@@ -151,6 +155,17 @@ async fn grade_db(root: &Path, rest: &str) -> Result<AssertionGrade> {
             "db: {table}.{column}={value} has {count} < {min} required"
         )))
     }
+}
+
+/// Whether `ident` is a safe SQL identifier (allowlist) so `db:` assertion
+/// table/column names cannot break out of the quoted identifier and inject SQL.
+fn is_identifier(ident: &str) -> bool {
+    let mut chars = ident.chars();
+    let Some(first) = chars.next() else {
+        return false;
+    };
+    (first.is_ascii_alphabetic() || first == '_')
+        && ident.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
 }
 
 /// The `cli:ARGV:contains:TEXT` grader.
@@ -230,5 +245,130 @@ fn fail(reason: String) -> AssertionGrade {
     AssertionGrade {
         passed: false,
         reason,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::unwrap_used)]
+
+    use super::*;
+
+    #[test]
+    fn identifier_allowlist_accepts_valid_and_rejects_injection() {
+        assert!(is_identifier("tasks"));
+        assert!(is_identifier("_beats"));
+        assert!(is_identifier("col_1"));
+        assert!(!is_identifier(""));
+        assert!(!is_identifier("1tasks"));
+        assert!(!is_identifier("tasks\""));
+        assert!(!is_identifier("tasks; DROP"));
+        assert!(!is_identifier("a-b"));
+    }
+
+    /// A malicious table identifier closes the gate as a failed assertion, not
+    /// by reaching the SQL string that would inject.
+    #[tokio::test(flavor = "current_thread")]
+    async fn db_assertion_rejects_sql_injection_identifier() {
+        let dir = tempfile::tempdir().unwrap();
+        let walk = WalkRun {
+            present: false,
+            success: true,
+        };
+        let grade = grade(
+            dir.path(),
+            "db:tasks\"; DROP TABLE beats; --:status=done:min=1",
+            &walk,
+        )
+        .await
+        .unwrap();
+        assert!(!grade.passed);
+        assert!(grade.reason.contains("invalid table/column identifier"));
+    }
+
+    /// A malicious column identifier closes the gate the same way the table
+    /// identifier does, even when it embeds a quote, semicolon, and comment.
+    #[tokio::test(flavor = "current_thread")]
+    async fn db_assertion_rejects_column_injection_payload() {
+        let dir = tempfile::tempdir().unwrap();
+        let walk = WalkRun {
+            present: false,
+            success: true,
+        };
+        for spec in [
+            r#"db:tasks:status"; DROP -- =done:min=1"#,
+            "db:tasks:=done:min=1",
+        ] {
+            let grade = grade(dir.path(), spec, &walk).await.unwrap();
+            assert!(!grade.passed, "unexpected pass for {spec}");
+            assert!(
+                grade.reason.contains("invalid table/column identifier"),
+                "expected allowlist rejection for {spec}: {}",
+                grade.reason
+            );
+        }
+    }
+
+    /// Empty table and empty column names are rejected by the allowlist as a
+    /// clean failed grade, never a panic or a reach into the database.
+    #[tokio::test(flavor = "current_thread")]
+    async fn db_assertion_empty_identifiers_fail_cleanly() {
+        let dir = tempfile::tempdir().unwrap();
+        let walk = WalkRun {
+            present: false,
+            success: true,
+        };
+        for spec in ["db::status=done:min=1", "db:tasks:=done:min=1"] {
+            let grade = grade(dir.path(), spec, &walk).await.unwrap();
+            assert!(!grade.passed, "unexpected pass for {spec}");
+            assert!(grade.reason.contains("invalid table/column identifier"));
+        }
+    }
+
+    /// Valid, allowlisted `db:` identifiers grade against a real temp database,
+    /// and a non-numeric `:min=` degrades gracefully to the default of 1.
+    #[tokio::test(flavor = "current_thread")]
+    async fn db_assertion_valid_identifiers_grade_against_real_db() {
+        let dir = tempfile::tempdir().unwrap();
+        let conn = do_harness_db::connect_and_migrate(dir.path())
+            .await
+            .unwrap();
+        do_harness_db::insert_beat(
+            &conn,
+            &do_harness_db::NewBeat {
+                task_id: None,
+                beat_type: "sensor",
+                status: "ok",
+                sensor_exit_code: Some(0),
+                sensor_name: Some("hardening-test"),
+                started_at: 0,
+                completed_at: Some(1),
+            },
+        )
+        .await
+        .unwrap();
+        let walk = WalkRun {
+            present: false,
+            success: true,
+        };
+
+        let matched = grade(dir.path(), "db:beats:beat_type=sensor:min=1", &walk)
+            .await
+            .unwrap();
+        assert!(matched.passed, "{}", matched.reason);
+
+        let non_numeric_min = grade(dir.path(), "db:beats:beat_type=sensor:min=abc", &walk)
+            .await
+            .unwrap();
+        assert!(
+            non_numeric_min.passed,
+            "non-numeric min must fall back to 1: {}",
+            non_numeric_min.reason
+        );
+
+        let absent = grade(dir.path(), "db:beats:beat_type=missing:min=1", &walk)
+            .await
+            .unwrap();
+        assert!(!absent.passed, "{}", absent.reason);
     }
 }

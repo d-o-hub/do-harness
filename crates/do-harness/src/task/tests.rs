@@ -131,7 +131,8 @@ async fn add_task_stores_parent_link() {
 #[tokio::test(flavor = "current_thread")]
 async fn advance_task_increments_index_and_marks_in_progress() {
     let dir = tempfile::tempdir().unwrap();
-    let (id, _event) = add_task(dir.path(), "slice", None, None, None)
+    write_catalog(dir.path());
+    let (id, _event) = add_task(dir.path(), "slice", Some("mini"), None, None)
         .await
         .unwrap();
 
@@ -324,6 +325,23 @@ async fn done_rejects_task_without_method() {
     assert_eq!(
         err.to_string(),
         format!("task {id} has no method; cannot mark done")
+    );
+}
+
+/// A task with no method cannot advance at all (it is stuck pending).
+#[tokio::test(flavor = "current_thread")]
+async fn advance_rejects_task_without_method() {
+    let dir = tempfile::tempdir().unwrap();
+    write_catalog(dir.path());
+    let (id, _event) = add_task(dir.path(), "orphan", None, None, None)
+        .await
+        .unwrap();
+
+    let err = advance_task(dir.path(), id).await.unwrap_err();
+    assert_eq!(
+        err.to_string(),
+        format!("task {id} has no method; cannot advance"),
+        "unexpected error: {err}"
     );
 }
 
