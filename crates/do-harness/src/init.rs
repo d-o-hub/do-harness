@@ -125,6 +125,8 @@ const SKILL_CREATOR_QUICK_VALIDATE: &str =
 pub async fn init_workspace(root: &Path, opts: &InitOpts) -> Result<InitReport> {
     let mut report = InitReport::default();
 
+    validate_existing_invariants(root, opts)?;
+
     write_if_absent(root, "AGENTS.md", AGENTS_TEMPLATE, opts.force, &mut report)?;
     let config = match opts.language {
         Language::Rust => CONFIG_RUST,
@@ -163,14 +165,14 @@ pub async fn init_workspace(root: &Path, opts: &InitOpts) -> Result<InitReport> 
     }
     for spec in SKILLS {
         let skill_dir = format!(".agents/skills/{}", spec.name);
-        write_if_absent(
-            root,
-            &format!("{skill_dir}/SKILL.md"),
-            spec.skill_md,
-            opts.force,
-            &mut report,
-        )?;
-        report.skills += 1;
+        let skill_md = format!("{skill_dir}/SKILL.md");
+        // Count a skill as scaffolded only when its SKILL.md is actually
+        // written (fresh, or overwritten via --force) — not when skipped.
+        let skill_md_written = opts.force || !root.join(&skill_md).exists();
+        write_if_absent(root, &skill_md, spec.skill_md, opts.force, &mut report)?;
+        if skill_md_written {
+            report.skills += 1;
+        }
         write_if_absent(
             root,
             &format!("{skill_dir}/evals/evals.json"),
@@ -216,6 +218,25 @@ pub async fn init_workspace(root: &Path, opts: &InitOpts) -> Result<InitReport> 
 
     report.seeded = seed_invariants(root).await?;
     Ok(report)
+}
+
+/// Validates a pre-existing `plans/invariants.json` BEFORE touching the
+/// tree: a stale file would otherwise fail the seed step after ~20 files
+/// have already been scaffolded.
+fn validate_existing_invariants(root: &Path, opts: &InitOpts) -> Result<()> {
+    if opts.force {
+        return Ok(());
+    }
+    let path = root.join("plans/invariants.json");
+    let Ok(existing) = fs::read_to_string(&path) else {
+        return Ok(());
+    };
+    serde_json::from_str::<Vec<do_harness_types::DecisionHeader>>(&existing).context(format!(
+        "pre-existing {} does not match the DecisionHeader schema; fix or remove it before \
+         running init",
+        path.display()
+    ))?;
+    Ok(())
 }
 
 /// Upserts `plans/invariants.json` into the state database.
@@ -278,9 +299,12 @@ fn append_gitignore(root: &Path, report: &mut InitReport) -> Result<()> {
         report.written.push(".gitignore".to_owned());
         return Ok(());
     };
+    let existing_lines: std::collections::HashSet<&str> = existing.lines().collect();
+    // Exact-line matching: a substring hit (e.g. `.do-harness-old/` or a
+    // comment mentioning the dir) must not suppress the real entry.
     let missing: Vec<&str> = GITIGNORE_ENTRIES
         .lines()
-        .filter(|line| !line.is_empty() && !existing.contains(line))
+        .filter(|line| !line.is_empty() && !existing_lines.contains(line))
         .collect();
     if missing.is_empty() {
         report.skipped.push(".gitignore".to_owned());

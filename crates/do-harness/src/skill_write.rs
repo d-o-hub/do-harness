@@ -5,10 +5,11 @@
 //!   * append a bullet to `<skill>/references/heuristics.md`
 //!   * ensure a `## Guides` pointer in `<skill>/SKILL.md` links to that file.
 
-use std::fs;
+use std::fs::{self, OpenOptions};
+use std::io::{ErrorKind, Write};
 use std::path::Path;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 
 const GUIDES_HEADER: &str = "## Guides\n";
 const POINTER_LINE: &str = "See references/heuristics.md for distilled heuristics.\n";
@@ -26,9 +27,16 @@ fn heuristics_path(root: &Path, skill: &str) -> std::path::PathBuf {
 /// Appends a bullet for `pattern` to the skill's `references/heuristics.md`,
 /// creating the file plus a header when it does not exist yet.
 ///
+/// The bullet is written in append mode (`O_APPEND`) so concurrent distills
+/// never clobber each other and a crash mid-write cannot truncate previously
+/// distilled content. A missing file is seeded with the header; any other read
+/// error (permissions, wrong file type) propagates instead of being treated as
+/// "absent" and overwriting the file.
+///
 /// # Errors
 ///
-/// Returns an error when the file cannot be created or appended to.
+/// Returns an error when the file cannot be created or appended to, or when
+/// its existence cannot be determined.
 pub fn append_heuristic(
     root: &Path,
     skill: &str,
@@ -44,11 +52,26 @@ pub fn append_heuristic(
         "- **{pattern}**: {} (from trace {trace_id})\n",
         description.unwrap_or("no description")
     );
-    let existing = match fs::read_to_string(&path) {
-        Ok(content) => content,
-        Err(_) => HEURISTICS_HEADER.to_string(),
-    };
-    fs::write(&path, format!("{existing}{bullet}"))?;
+    match fs::read_to_string(&path) {
+        Ok(existing) => {
+            let mut file = OpenOptions::new()
+                .append(true)
+                .open(&path)
+                .with_context(|| format!("failed to open {}", path.display()))?;
+            if existing.is_empty() {
+                write!(file, "{HEURISTICS_HEADER}")
+                    .with_context(|| format!("failed to append header to {}", path.display()))?;
+            }
+            write!(file, "{bullet}")
+                .with_context(|| format!("failed to append bullet to {}", path.display()))?;
+        }
+        Err(err) if err.kind() == ErrorKind::NotFound => {
+            fs::write(&path, format!("{HEURISTICS_HEADER}{bullet}"))?;
+        }
+        Err(err) => {
+            return Err(err).context(format!("failed to read {}", path.display()));
+        }
+    }
     Ok(())
 }
 
@@ -80,7 +103,12 @@ pub fn ensure_skill_pointer(root: &Path, skill: &str) -> Result<()> {
         }
         None => format!("{insertion}{original}"),
     };
-    fs::write(&skill_md, updated)?;
+    // Write to a sibling temp file and rename so a crash mid-write cannot
+    // leave a truncated SKILL.md; rename is atomic on POSIX.
+    let tmp = skill_md.with_extension("md.tmp");
+    fs::write(&tmp, updated).with_context(|| format!("failed to write {}", tmp.display()))?;
+    fs::rename(&tmp, &skill_md)
+        .with_context(|| format!("failed to replace {}", skill_md.display()))?;
     Ok(())
 }
 
@@ -95,7 +123,7 @@ fn frontmatter_end(content: &str) -> Option<usize> {
 
 #[cfg(test)]
 mod tests {
-    #![allow(clippy::unwrap_used)]
+    #![allow(clippy::unwrap_used, clippy::expect_used)]
 
     use std::fs;
 
@@ -146,5 +174,65 @@ mod tests {
 
         let body = fs::read_to_string(&path).unwrap();
         assert_eq!(body.matches(POINTER_LINE).count(), 1);
+    }
+
+    #[test]
+    fn append_seeds_header_only_when_creating() {
+        let dir = tempfile::tempdir().unwrap();
+        append_heuristic(dir.path(), "harness", "p1", Some("d1"), 7).unwrap();
+        let path = dir
+            .path()
+            .join(".agents/skills/harness/references/heuristics.md");
+        assert_eq!(
+            fs::read_to_string(&path).unwrap(),
+            "# Heuristics\n- **p1**: d1 (from trace 7)\n"
+        );
+    }
+
+    /// Appends never rewrite existing content: a second distill adds a line
+    /// and keeps the first bullet intact, and no temp files linger.
+    #[test]
+    fn append_preserves_earlier_bullets() {
+        let dir = tempfile::tempdir().unwrap();
+        append_heuristic(dir.path(), "harness", "p1", None, 7).unwrap();
+        append_heuristic(dir.path(), "harness", "p2", Some("d2"), 8).unwrap();
+        let path = dir
+            .path()
+            .join(".agents/skills/harness/references/heuristics.md");
+        let body = fs::read_to_string(&path).unwrap();
+        assert!(body.contains("- **p1**: no description (from trace 7)\n"));
+        assert!(body.contains("- **p2**: d2 (from trace 8)\n"));
+        assert_eq!(body.matches("# Heuristics\n").count(), 1);
+        let references = path.parent().unwrap();
+        assert_eq!(fs::read_dir(references).unwrap().count(), 1);
+    }
+
+    /// An empty existing file gets the header before the first bullet.
+    #[test]
+    fn append_to_empty_existing_file_seeds_header() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir
+            .path()
+            .join(".agents/skills/harness/references/heuristics.md");
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(&path, "").unwrap();
+        append_heuristic(dir.path(), "harness", "p1", None, 3).unwrap();
+        assert_eq!(
+            fs::read_to_string(&path).unwrap(),
+            "# Heuristics\n- **p1**: no description (from trace 3)\n"
+        );
+    }
+
+    /// The SKILL.md pointer write leaves no `.md.tmp` sibling behind.
+    #[test]
+    fn pointer_write_leaves_no_temp_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let skill_dir = dir.path().join(".agents/skills/harness");
+        fs::create_dir_all(&skill_dir).unwrap();
+        fs::write(skill_dir.join("SKILL.md"), FRONTMATTER_MD).unwrap();
+
+        ensure_skill_pointer(dir.path(), "harness").unwrap();
+
+        assert_eq!(fs::read_dir(&skill_dir).unwrap().count(), 1);
     }
 }

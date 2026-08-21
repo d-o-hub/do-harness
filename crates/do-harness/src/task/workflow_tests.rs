@@ -1,4 +1,4 @@
-#![allow(clippy::unwrap_used)]
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use super::*;
 use do_harness_types::DomainEvent;
@@ -115,7 +115,10 @@ async fn list_tasks_folds_board_and_summary() {
     assert_eq!(
         format!(
             "summary: pending={} in_progress={} done={} failed={}",
-            board.pending, board.in_progress, board.done, board.failed
+            board.pending(),
+            board.in_progress(),
+            board.done(),
+            board.failed()
         ),
         "summary: pending=0 in_progress=0 done=1 failed=1"
     );

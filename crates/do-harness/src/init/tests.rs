@@ -1,5 +1,5 @@
 //! Unit tests for `do-harness init` (`init.rs`).
-#![allow(clippy::unwrap_used)]
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use super::*;
 

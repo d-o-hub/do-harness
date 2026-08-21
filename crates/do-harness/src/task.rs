@@ -78,7 +78,10 @@ pub async fn list_tasks(root: &Path, format: Format) -> Result<()> {
             }
             println!(
                 "summary: pending={} in_progress={} done={} failed={}",
-                board.pending, board.in_progress, board.done, board.failed
+                board.pending(),
+                board.in_progress(),
+                board.done(),
+                board.failed()
             );
         }
         Format::Json => {
