@@ -4,7 +4,8 @@
 //! `init-db` (migrations), `seed` (architecture invariants from
 //! `plans/invariants.json`), `init` (workspace scaffold), `task` (task
 //! state), `trace` (interaction traces), `distill` (heuristic extraction),
-//! `eval` (skill-eval runner), and `hook` (git hook management).
+//! `eval` (skill-eval runner), `hook` (git hook management), and `version`
+//! (version information).
 
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -30,10 +31,15 @@ mod skill_write;
 mod task;
 mod telemetry;
 mod trace;
+mod version;
 
 /// Unified entrypoint for harness sensors and database maintenance.
 #[derive(Debug, Parser)]
-#[command(name = "do-harness", about = "do-harness agent execution harness CLI")]
+#[command(
+    name = "do-harness",
+    about = "do-harness agent execution harness CLI",
+    version = version::version_str()
+)]
 struct Cli {
     /// Workspace root override (default: walk up from cwd).
     #[arg(long, global = true)]
@@ -48,6 +54,12 @@ struct Cli {
 /// Available subcommands.
 #[derive(Debug, Subcommand)]
 enum Command {
+    /// Print CLI version information.
+    Version {
+        /// Output format.
+        #[arg(long, value_enum, default_value_t = Format::Text)]
+        format: Format,
+    },
     /// Run computational sensors.
     Verify {
         /// Halt at the first failing sensor.
@@ -282,6 +294,11 @@ async fn main() -> ExitCode {
 
 /// Dispatches the parsed CLI and classifies failures.
 async fn run(cli: Cli) -> std::result::Result<(), CliError> {
+    if let Command::Version { format } = cli.command {
+        commands::print_version(format);
+        return Ok(());
+    }
+
     let root = match &cli.command {
         Command::Init { .. } => {
             commands::init_target(cli.root.as_deref()).map_err(CliError::Usage)?
@@ -289,6 +306,7 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
         _ => commands::resolve_root(cli.root.as_deref()).map_err(CliError::Usage)?,
     };
     match cli.command {
+        Command::Version { .. } => unreachable!(),
         Command::Init { language, force } => {
             let opts = init::InitOpts { language, force };
             let report = init::init_workspace(&root, &opts)
