@@ -266,10 +266,14 @@ mod tests {
 
     #[test]
     fn is_target_dir_path_detects_target_component() {
-        assert!(is_target_dir_path(Path::new("/home/user/project/target/release/do-harness")));
+        assert!(is_target_dir_path(Path::new(
+            "/home/user/project/target/release/do-harness"
+        )));
         assert!(is_target_dir_path(Path::new("target/release/do-harness")));
         assert!(!is_target_dir_path(Path::new("/usr/local/bin/do-harness")));
-        assert!(!is_target_dir_path(Path::new("/home/user/.cargo/bin/do-harness")));
+        assert!(!is_target_dir_path(Path::new(
+            "/home/user/.cargo/bin/do-harness"
+        )));
     }
 
     #[test]

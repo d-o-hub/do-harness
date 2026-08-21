@@ -276,9 +276,15 @@ pub fn doctor(root: &Path) -> Result<()> {
     let bin_source_desc = describe_binary(&status.binary);
 
     if bin_present {
-        println!("  [OK] Binary resolution: {bin_source_desc} ({})", bin_path.display());
+        println!(
+            "  [OK] Binary resolution: {bin_source_desc} ({})",
+            bin_path.display()
+        );
     } else {
-        println!("  [FAIL] Binary resolution: {bin_source_desc} ({}) - file missing", bin_path.display());
+        println!(
+            "  [FAIL] Binary resolution: {bin_source_desc} ({}) - file missing",
+            bin_path.display()
+        );
         ok = false;
     }
 
@@ -294,17 +300,29 @@ pub fn doctor(root: &Path) -> Result<()> {
     println!(
         "  [{}] pre-commit hook: {}",
         if status.pre_commit { "OK" } else { "WARN" },
-        if status.pre_commit { "installed" } else { "absent" }
+        if status.pre_commit {
+            "installed"
+        } else {
+            "absent"
+        }
     );
     println!(
         "  [{}] pre-push hook: {}",
         if status.pre_push { "OK" } else { "WARN" },
-        if status.pre_push { "installed" } else { "absent" }
+        if status.pre_push {
+            "installed"
+        } else {
+            "absent"
+        }
     );
     println!(
         "  [{}] commit-msg hook: {}",
         if status.commit_msg { "OK" } else { "WARN" },
-        if status.commit_msg { "installed" } else { "absent" }
+        if status.commit_msg {
+            "installed"
+        } else {
+            "absent"
+        }
     );
 
     if ok {
@@ -342,22 +360,21 @@ mod tests {
     #[test]
     fn doctor_fails_when_binary_missing() {
         let (_temp, root) = fake_repo_with_git();
-        // Cwd should be root for find_git_dir to find .git
-        let orig_dir = std::env::current_dir().unwrap();
-        std::env::set_current_dir(&root).unwrap();
 
         let result = doctor(&root);
 
-        std::env::set_current_dir(orig_dir).unwrap();
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("doctor check failed"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("doctor check failed")
+        );
     }
 
     #[test]
     fn doctor_succeeds_when_binary_present() {
         let (_temp, root) = fake_repo_with_git();
-        let orig_dir = std::env::current_dir().unwrap();
-        std::env::set_current_dir(&root).unwrap();
 
         // Create binary in target/release/do-harness
         let bin_path = root.join("target/release/do-harness");
@@ -366,7 +383,6 @@ mod tests {
 
         let result = doctor(&root);
 
-        std::env::set_current_dir(orig_dir).unwrap();
         assert!(result.is_ok());
     }
 }
