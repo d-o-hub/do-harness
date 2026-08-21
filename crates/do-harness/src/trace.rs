@@ -75,7 +75,7 @@ pub async fn list_traces(root: &Path, session: &str, format: Format) -> Result<(
 
 #[cfg(test)]
 mod tests {
-    #![allow(clippy::unwrap_used)]
+    #![allow(clippy::unwrap_used, clippy::expect_used)]
 
     use super::*;
 

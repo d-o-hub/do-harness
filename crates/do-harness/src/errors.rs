@@ -55,7 +55,7 @@ pub async fn clear(root: &Path, task_id: Option<i64>, sensor: Option<&str>) -> R
 
 #[cfg(test)]
 mod tests {
-    #![allow(clippy::unwrap_used)]
+    #![allow(clippy::unwrap_used, clippy::expect_used)]
 
     use super::*;
 

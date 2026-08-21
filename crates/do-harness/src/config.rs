@@ -221,6 +221,8 @@ impl Config {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used)]
+
     use super::*;
 
     /// Writes a config file into a tempdir and loads it explicitly.
@@ -265,7 +267,7 @@ mod tests {
         assert!(format!("{err:#}").contains("bogus_key"));
     }
 
-    /// Parses new per-sensor fields: retry, timeout, allow_failure, transient_exit_codes.
+    /// Parses new per-sensor fields: retry, timeout, `allow_failure`, `transient_exit_codes`.
     #[test]
     fn parses_transient_failure_sensor_options() {
         let dir = tempfile::tempdir().expect("tempdir");

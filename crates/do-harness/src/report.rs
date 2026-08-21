@@ -1,7 +1,5 @@
 //! Report types and printers for `do-harness verify` and `do-harness list`.
 
-use std::io::Write;
-
 use clap::ValueEnum;
 use serde::Serialize;
 
@@ -96,22 +94,23 @@ pub fn print_report(report: &VerifyReport, format: Format) {
 
 /// Prints a list of sensor names in the requested format.
 pub fn print_names(names: &[String], format: Format) {
-    let mut stdout = std::io::stdout().lock();
     match format {
         Format::Text => {
             for name in names {
-                writeln!(stdout, "{name}").expect("stdout write");
+                println!("{name}");
             }
         }
-        Format::Json => {
-            let json = serde_json::to_string(names).expect("names serialize");
-            writeln!(stdout, "{json}").expect("stdout write");
-        }
+        Format::Json => match serde_json::to_string(names) {
+            Ok(json) => println!("{json}"),
+            Err(err) => eprintln!("error: failed to serialize names: {err}"),
+        },
     }
 }
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used)]
+
     use super::*;
 
     /// The JSON contract exposes verdict fields but never the raw output.

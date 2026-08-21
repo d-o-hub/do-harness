@@ -3,7 +3,9 @@ repos:
     hooks:
       - id: do-harness-verify
         name: do-harness (fmt, loc)
-        entry: ./target/release/do-harness verify --fail-fast --only fmt --only loc
+        # Build the binary first so a fresh clone passes without a manual
+        # release build, mirroring the managed git hook.
+        entry: cargo build --release -p do-harness && ./target/release/do-harness verify --fail-fast --only fmt --only loc
         language: system
         pass_filenames: false
         always_run: true

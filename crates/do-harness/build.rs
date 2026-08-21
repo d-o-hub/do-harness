@@ -4,7 +4,9 @@ use std::path::Path;
 use std::process::Command;
 
 fn main() {
-    let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
+    // Cargo always sets this for build scripts; a missing value means cargo
+    // itself is misconfigured, which the empty-path fallback surfaces.
+    let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_default();
     let root_git_dir = Path::new(&manifest_dir).join("../../.git");
 
     if root_git_dir.exists() {

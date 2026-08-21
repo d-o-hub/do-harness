@@ -62,17 +62,43 @@ if [[ ! -d "$ROOT/.git" ]]; then
     exit 0
 fi
 
-COUNT="${1:-}"
-COUNT="${COUNT:-${DO_HARNESS_COMMITLINT_COUNT:-10}}"
+# History window: --count <N> flag overrides the env default of 10.
+COUNT="${DO_HARNESS_COMMITLINT_COUNT:-10}"
+while (( $# )); do
+    case "$1" in
+        --count)
+            if [[ $# -lt 2 ]]; then
+                echo "check-commitlint: --count requires a positive integer" >&2
+                exit 2
+            fi
+            COUNT="$2"
+            shift 2
+            ;;
+        --count=*)
+            COUNT="${1#--count=}"
+            shift
+            ;;
+        *)
+            echo "check-commitlint: unknown argument: $1" >&2
+            exit 2
+            ;;
+    esac
+done
+if ! [[ "$COUNT" =~ ^[1-9][0-9]*$ ]]; then
+    echo "check-commitlint: count must be a positive integer, got: $COUNT" >&2
+    exit 2
+fi
 
 FAIL=0
-mapfile -t subjects < <(git -C "$ROOT" log --no-merges -n "$COUNT" --pretty=format:%s)
-
-for subject in "${subjects[@]}"; do
+LINTED=0
+# Read the subjects through a while loop (not mapfile) so this also runs on
+# bash 3.2 / macOS, and so an empty history simply lints nothing.
+while IFS= read -r subject; do
+    LINTED=$((LINTED + 1))
     if ! lint_subject "$subject"; then
         FAIL=1
     fi
-done
+done < <(git -C "$ROOT" log --no-merges -n "$COUNT" --pretty=format:%s)
 
 if (( FAIL )); then
     echo "Conventional-commit invariant violated in the last $COUNT commit(s)."
@@ -80,4 +106,4 @@ if (( FAIL )); then
     exit 1
 fi
 
-echo "check-commitlint OK: last $COUNT commit(s) use conventional lowercase subjects."
+echo "check-commitlint OK: last $LINTED commit(s) use conventional lowercase subjects."

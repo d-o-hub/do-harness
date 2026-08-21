@@ -3,7 +3,7 @@
 ## 1. System Operating Invariants (Hard Constraints)
 - **Modularity Cap**: Maximum 500 Lines of Code (LOC) per source file. Decompose when nearing 450 LOC.
 - **Persistence Engine**: Local libSQL instance (`.do-harness/agent_state.db`) for tracking beats, task execution traces, and learned heuristics.
-- **Persistence & Roadmap**: the do-harness-db repo layer implements persistence writers for tasks/beats/traces/heuristics/error_signatures/skill_evals (`verify --record` persists beats scoped to `--task` with the sensor name, resetting a sensor's strikes on pass; `task list`/`task export` read task state). The workflow runtime (`task add/advance/done/fail`, gated on the `plans/methods.json` catalog and the **named** sensor's ok beat, with typed Commands/Events and a `TaskBoard` projection), fail-fast recovery (`errors list/clear`, per-task strike counters), the skill-eval runner (`do-harness eval` grades hermetic walkthrough residue in an isolated sandbox, gated by skill-creator's quick_validate.py, and persists the latest pass rate per skill), the distill CLI (`distill` writes into the skill corpus + `trace add/list`), and commit enforcement (`check-commitlint.sh` as both a `commitlint` sensor and a managed `commit-msg` git hook) are all implemented. Known remaining hardening is tracked as follow-ups, not hidden behind a roadmap claim.
+- **Persistence & Roadmap**: the do-harness-db repo layer implements persistence writers for tasks/beats/traces/heuristics/error_signatures/skill_evals (`verify --record` persists beats scoped to `--task` with the sensor name, resetting a sensor's strikes on pass; `task list`/`task export` read task state). The workflow runtime (`task add/advance/done/fail`, gated on the `plans/methods.json` catalog and the **named** sensor's ok beat, with typed Commands/Events and a `TaskBoard` projection), fail-fast recovery (`errors list/clear`, per-task strike counters), the skill-eval runner (`do-harness eval` grades hermetic walkthrough residue in an isolated sandbox — walkthroughs execute directly so their shebang picks the interpreter, and failures surface their stderr tail; gated by skill-creator's quick_validate.py; persists the latest pass rate per skill **plus** append-only `skill_eval_runs` history), grader tamper-evidence (`eval --bless` pins SHA-256 baselines of `walkthrough.sh`/`evals.json`; drift fails eval until re-blessed) with a pass-rate bar ratchet (floor = best-ever − tolerance, blessed-only raises; `distill --to-fixture` raises it after a recovered failure), the `metrics` command (sensor stats, strikes, skill trends), the distill CLI (`distill` writes into the skill corpus + `trace add/list`), and commit enforcement (`check-commitlint.sh` as both a `commitlint` sensor and a managed `commit-msg` git hook) are all implemented. Known remaining hardening is tracked as follow-ups, not hidden behind a roadmap claim.
 - **Verification Priority**: Computational sensors (`cargo test`, `cargo check`, linters) strictly supersede LLM self-assessment.
 - **Workspace Cleanliness**: All skills reside in `.agents/skills/`. Task tracking resides in `plans/`. Architecture rules are **executable invariants**, not prose ADRs (see §7).
 
@@ -62,7 +62,7 @@
 
 ### Phase 5: Implementation & Computational Sensors (Green & Refactor)
 - Implement the minimal handler logic to satisfy the test (`Green`).
-- Run the full verification suite via the unified entrypoint (`do-harness verify` runs all six computational sensors):
+- Run the full verification suite via the unified entrypoint (`do-harness verify` runs every configured sensor — see `[[sensors]]` in `do-harness.toml`):
   ```bash
   do-harness verify
   ```
@@ -85,9 +85,9 @@
 - **File Edits**: Inspect AST / types before rewriting files.
 - **Fail-Fast Policy**: If a computational sensor fails 3 consecutive times on the same subtask, halt, record the error signature in libSQL, and surface a diagnostic to the developer.
 - **No Hallucinated Success**: A subtask is complete only when verified by automated exit codes.
-- **Hooks**: `do-harness hook install` writes .git/hooks/pre-commit (fmt + loc) and pre-push (full verify); uninstall/status remove/inspect managed hooks.
+- **Hooks**: `do-harness hook install` writes .git/hooks/pre-commit (fmt + loc, run with `--record` so beats persist) and pre-push (full verify); uninstall/status remove/inspect managed hooks.
 - **Workflow gates**: pre-commit = `do-harness verify --fail-fast --only fmt --only loc`; pre-push = `do-harness verify --fail-fast`; CI = `do-harness verify --format json` (exit 0/1/2).
-- **Persistence commands**: `do-harness task list`/`task export` surface task state (libSQL is the source of truth; export writes `plans/tasks.json`); `verify --record` persists beats and bumps error signatures for failing sensors; `task add/advance/fail`, `trace add/list`, `distill`, `eval` are implemented.
+- **Persistence commands**: `do-harness task list`/`task export` surface task state (libSQL is the source of truth; export writes `plans/tasks.json`); `verify --record` persists beats and bumps error signatures for failing sensors; `task add/advance/fail`, `trace add/list`, `distill`, `eval`, `metrics` are implemented.
 - **Root discovery**: the CLI walks up from cwd for do-harness.toml, or AGENTS.md with .do-harness/ or plans/invariants.json; override with --root.
 
 ---
