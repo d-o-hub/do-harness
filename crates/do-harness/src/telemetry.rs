@@ -36,9 +36,9 @@ pub async fn blocked_sensors(
     Ok(blocked)
 }
 
-/// Records each sensor result as a beat scoped to `task_id` and bumps or
-/// resets the matching error signature: failing sensors increment the strike
-/// counter, passing sensors reset it, and halted sensors are skipped.
+/// Records each sensor result atomically, scoped to `task_id`: the beat and
+/// its error-signature update (bump on failure, reset on pass) commit in one
+/// transaction. Halted sensors are skipped.
 ///
 /// # Errors
 ///
@@ -55,8 +55,7 @@ pub async fn record_verify(
         if blocked.contains(&sensor.name) {
             continue;
         }
-        let signature = format!("sensor:{}", sensor.name);
-        do_harness_db::insert_beat(
+        do_harness_db::record_sensor_outcome(
             &conn,
             &do_harness_db::NewBeat {
                 task_id,
@@ -67,19 +66,10 @@ pub async fn record_verify(
                 started_at: now,
                 completed_at: Some(now),
             },
+            sensor.ok,
+            Some(&truncate_message(&sensor.output)),
         )
         .await?;
-        if sensor.ok {
-            do_harness_db::reset_error_signature(&conn, &signature, task_id).await?;
-        } else {
-            do_harness_db::bump_error_signature(
-                &conn,
-                &signature,
-                task_id,
-                Some(&truncate_message(&sensor.output)),
-            )
-            .await?;
-        }
     }
     Ok(())
 }
@@ -95,7 +85,7 @@ fn truncate_message(output: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    #![allow(clippy::unwrap_used)]
+    #![allow(clippy::unwrap_used, clippy::expect_used)]
 
     use super::*;
     use crate::report::SensorResult;

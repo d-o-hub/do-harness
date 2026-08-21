@@ -7,7 +7,7 @@
 //! `eval` (skill-eval runner), `hook` (git hook management), and `version`
 //! (version information).
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use clap::{ArgAction, Parser, Subcommand};
@@ -20,11 +20,14 @@ mod distill;
 mod errors;
 mod eval;
 mod eval_assert;
+mod eval_integrity;
+mod eval_sandbox;
 mod eval_walk;
 mod hook_script;
 mod hooks;
 mod init;
 mod methods;
+mod metrics;
 mod report;
 mod sensors;
 mod skill_write;
@@ -121,6 +124,9 @@ enum Command {
         /// Source trace id; required as evidence of a resolved fix.
         #[arg(long = "from-trace")]
         from_trace: Option<i64>,
+        /// Raise the skill's pass-rate bar after this recovery.
+        #[arg(long = "to-fixture")]
+        to_fixture: bool,
     },
     /// Inspect and clear fail-fast error signatures.
     Errors {
@@ -132,6 +138,9 @@ enum Command {
         /// Restrict evaluation to this skill directory name.
         #[arg(long)]
         skill: Option<String>,
+        /// Bless a fully green run: re-baseline graders and raise the bar.
+        #[arg(long)]
+        bless: bool,
     },
     /// Manage git hooks that run `do-harness verify`.
     Hook {
@@ -140,6 +149,12 @@ enum Command {
     },
     /// Run diagnostic checks on binary resolution and git hook health.
     Doctor,
+    /// Report harness trends: sensor stats, strikes, eval pass-rate history.
+    Metrics {
+        /// Output format.
+        #[arg(long, value_enum, default_value_t = Format::Text)]
+        format: Format,
+    },
 }
 
 /// Available task-state actions.
@@ -322,38 +337,16 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
             record,
             task,
         } => {
-            let cfg = config::load(&root, cli.config.as_deref()).map_err(CliError::Usage)?;
-            let blocked = if record {
-                telemetry::blocked_sensors(&root, &cfg.sensor_names(), task)
-                    .await
-                    .map_err(CliError::Usage)?
-            } else {
-                Vec::new()
-            };
-            let opts = sensors::VerifyOpts {
+            run_verify(
+                &root,
+                cli.config.as_deref(),
                 fail_fast,
+                format,
                 only,
-                blocked,
-            };
-            match sensors::verify(&cfg, &root, &opts) {
-                Ok(report) => {
-                    if record {
-                        telemetry::record_verify(&root, &report, &opts.blocked, task)
-                            .await
-                            .map_err(CliError::Usage)?;
-                    }
-                    report::print_report(&report, format);
-                    if report.ok {
-                        Ok(())
-                    } else {
-                        Err(CliError::Verify(anyhow::anyhow!(
-                            "{} sensor(s) failed",
-                            report.failed.len()
-                        )))
-                    }
-                }
-                Err(err) => Err(CliError::Usage(err)),
-            }
+                record,
+                task,
+            )
+            .await
         }
         Command::List { format } => {
             let cfg = config::load(&root, cli.config.as_deref()).map_err(CliError::Usage)?;
@@ -373,18 +366,74 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
             pattern,
             description,
             from_trace,
-        } => distill::distill(&root, &skill, &pattern, description.as_deref(), from_trace)
-            .await
-            .map_err(CliError::Usage),
+            to_fixture,
+        } => distill::distill(
+            &root,
+            &skill,
+            &pattern,
+            description.as_deref(),
+            from_trace,
+            to_fixture,
+        )
+        .await
+        .map_err(CliError::Usage),
         Command::Errors { action } => commands::errors_cmd(&root, action)
             .await
             .map_err(CliError::Usage),
-        Command::Eval { skill } => eval::run_eval(&root, skill.as_deref())
+        Command::Eval { skill, bless } => eval::run_eval(&root, skill.as_deref(), bless)
             .await
             .map_err(CliError::Verify),
         Command::Hook { action } => {
             commands::hook(&root, cli.config.as_deref(), action).map_err(CliError::Usage)
         }
         Command::Doctor => commands::doctor(&root).map_err(CliError::Verify),
+        Command::Metrics { format } => metrics::run_metrics(&root, format)
+            .await
+            .map_err(CliError::Usage),
+    }
+}
+
+/// Runs the `verify` subcommand: sensors, optional beat recording, report.
+#[allow(clippy::too_many_arguments)]
+async fn run_verify(
+    root: &Path,
+    config: Option<&Path>,
+    fail_fast: bool,
+    format: Format,
+    only: Vec<String>,
+    record: bool,
+    task: Option<i64>,
+) -> std::result::Result<(), CliError> {
+    let cfg = config::load(root, config).map_err(CliError::Usage)?;
+    let blocked = if record {
+        telemetry::blocked_sensors(root, &cfg.sensor_names(), task)
+            .await
+            .map_err(CliError::Usage)?
+    } else {
+        Vec::new()
+    };
+    let opts = sensors::VerifyOpts {
+        fail_fast,
+        only,
+        blocked,
+    };
+    match sensors::verify(&cfg, root, &opts) {
+        Ok(report) => {
+            if record {
+                telemetry::record_verify(root, &report, &opts.blocked, task)
+                    .await
+                    .map_err(CliError::Usage)?;
+            }
+            report::print_report(&report, format);
+            if report.ok {
+                Ok(())
+            } else {
+                Err(CliError::Verify(anyhow::anyhow!(
+                    "{} sensor(s) failed",
+                    report.failed.len()
+                )))
+            }
+        }
+        Err(err) => Err(CliError::Usage(err)),
     }
 }

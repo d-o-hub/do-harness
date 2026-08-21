@@ -1,5 +1,5 @@
 #![cfg(test)]
-#![allow(clippy::unwrap_used)]
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use super::*;
 use crate::eval_walk::WalkRun;
@@ -48,10 +48,7 @@ async fn documentation_only_assertions_are_not_graded() {
         }],
     };
     let dir = tempfile::tempdir().unwrap();
-    let walk = WalkRun {
-        present: false,
-        success: true,
-    };
+    let walk = WalkRun::absent();
 
     let outcome = grade_skill(&evals, dir.path(), &walk).await.unwrap();
 

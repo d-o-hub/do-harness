@@ -352,7 +352,7 @@ fn describe_binary(source: &BinSource) -> String {
 
 #[cfg(test)]
 mod tests {
-    #![allow(clippy::unwrap_used)]
+    #![allow(clippy::unwrap_used, clippy::expect_used)]
 
     use super::*;
     use std::fs;

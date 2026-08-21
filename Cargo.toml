@@ -16,13 +16,29 @@ serde = "1"
 serde_json = "1"
 thiserror = "1"
 clap = { version = "4", features = ["derive"] }
+sha2 = "0.10"
 toml = "0.9"
 tempfile = "3"
+
+# Dev-profile tuning lives here (Cargo only honors [profile.*] in manifests,
+# never in .cargo/config.toml).
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+debug = false
+
+[profile.dev.build-override]
+opt-level = 3
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
 missing_docs = "warn"
 
 [workspace.lints.clippy]
-all = "warn"
-pedantic = "warn"
+# Groups run at lower priority so the deny-level panicking lints below win.
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+# Library code must not panic; test modules opt out locally.
+unwrap_used = "deny"
+expect_used = "deny"

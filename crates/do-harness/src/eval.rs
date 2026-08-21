@@ -9,6 +9,8 @@
 //! assertions that passed (`pass_rate`), plus the first graded case's prompt
 //! and expected outcome.
 
+use crate::eval_sandbox::Sandbox;
+
 #[cfg(test)]
 mod eval_tests;
 #[cfg(test)]
@@ -61,6 +63,10 @@ struct SkillReport {
     line: String,
     /// `pass_rate` to persist; `None` when nothing should be persisted.
     pass_rate: Option<f64>,
+    /// Number of graded (prefixed) assertions evaluated.
+    graded: u32,
+    /// Number of graded assertions that passed.
+    passed: u32,
     /// Prompt of the first graded case, for richer persistence.
     prompt: Option<String>,
     /// Expected outcome of the first graded case.
@@ -72,17 +78,26 @@ struct SkillReport {
 /// Each skill directory containing a `SKILL.md` is validated with
 /// skill-creator's `quick_validate.py`. When the gate passes and the skill
 /// ships `evals/evals.json`, its graded (prefixed) assertions are executed
-/// and a single `skill_evals` row is persisted with `pass_rate` = passed
-/// graded assertions / graded assertions. When `skill` is set, only that
-/// skill is evaluated; a missing `SKILL.md` is an error.
+/// and persisted: one latest-row `skill_evals` entry plus an append-only
+/// `skill_eval_runs` record (the improvement trend).
+///
+/// Graders are tamper-evident: when a blessed baseline exists and the
+/// on-disk `walkthrough.sh` / `evals.json` hashes drift, the skill fails
+/// until reviewed and re-blessed. A skill's blessed bar floor also fails it
+/// when the pass rate drops below `best_ever - tolerance`, even with green
+/// assertions.
+///
+/// With `bless`, a fully green run re-baselines the graders and raises the
+/// bar floor to `best_ever - tolerance`.
 ///
 /// # Errors
 ///
 /// Returns an error when a requested skill is not found under
 /// `.agents/skills`, when the state database cannot be initialized or
 /// written, when a `db:` assertion cannot reach the database, or when any
-/// evaluated skill fails the structure gate.
-pub async fn run_eval(root: &Path, skill: Option<&str>) -> Result<()> {
+/// evaluated skill fails the structure gate, grader-drifts, or misses its
+/// blessed bar.
+pub async fn run_eval(root: &Path, skill: Option<&str>, bless: bool) -> Result<()> {
     let skills_root = root.join(".agents/skills");
     let entries = match skill {
         Some(name) => {
@@ -103,6 +118,21 @@ pub async fn run_eval(root: &Path, skill: Option<&str>) -> Result<()> {
             .and_then(|name| name.to_str())
             .with_context(|| format!("invalid skill directory name: {}", entry.display()))?
             .to_owned();
+
+        let hashes = crate::eval_integrity::grader_hashes(&skills_root.join(&name))
+            .context(format!("failed to hash graders for skill '{name}'"))?;
+        let baseline = do_harness_db::get_grader_baseline(&conn, &name).await?;
+        if let Some(baseline) = &baseline {
+            if !hashes.matches_baseline(baseline) {
+                println!(
+                    "{name}: grader-DRIFT: graders changed since last bless; review the diff \
+                     then run `do-harness eval --bless --skill {name}`"
+                );
+                invalid.push(name);
+                continue;
+            }
+        }
+
         // Evaluate the skill in a hermetic temp root so walkthroughs and
         // assertions cannot dirty the caller's repository tree.
         let sandbox = Sandbox::for_skill(root, &entry, &name)?;
@@ -126,8 +156,32 @@ pub async fn run_eval(root: &Path, skill: Option<&str>) -> Result<()> {
                 },
             )
             .await?;
+            do_harness_db::insert_skill_eval_run(
+                &conn,
+                &do_harness_db::NewSkillEvalRun {
+                    skill_name: &name,
+                    graded: i64::from(report.graded),
+                    passed: i64::from(report.passed),
+                    pass_rate: Some(pass_rate),
+                },
+            )
+            .await?;
         }
-        if report.gate_failed {
+
+        if bless {
+            bless_skill(&conn, &name, &report, &hashes).await?;
+        } else if let Some(floor) = do_harness_db::get_skill_bar(&conn, &name).await? {
+            if let Some(rate) = report.pass_rate {
+                if rate < floor {
+                    println!(
+                        "{name}: BAR-MISS: pass_rate {rate:.2} below blessed floor {floor:.2}"
+                    );
+                    invalid.push(name.clone());
+                }
+            }
+        }
+
+        if report.gate_failed && !invalid.contains(&name) {
             invalid.push(name);
         }
     }
@@ -135,81 +189,48 @@ pub async fn run_eval(root: &Path, skill: Option<&str>) -> Result<()> {
     if invalid.is_empty() {
         Ok(())
     } else {
-        bail!("structure gate failed for skill(s): {}", invalid.join(", "))
+        bail!("eval failed for skill(s): {}", invalid.join(", "))
     }
 }
 
-/// A hermetic sandbox that mirrors a skill plus skill-creator into a temp dir.
-///
-/// The temp root becomes the workspace root for the walkthrough and every
-/// graded assertion, so residue lands under the temp dir and the caller's
-/// repository stays untouched.
-struct Sandbox {
-    _dir: tempfile::TempDir,
-    root: PathBuf,
-}
-
-impl Sandbox {
-    /// Copies `skill_dir` (SKILL.md + evals) and skill-creator scripts into a
-    /// fresh temp root shaped like a harness workspace.
-    fn for_skill(real_root: &Path, skill_dir: &Path, name: &str) -> Result<Sandbox> {
-        let dir = tempfile::tempdir().context("failed to create eval sandbox")?;
-        let root = dir.path().to_path_buf();
-        let skills_root = root.join(".agents").join("skills");
-        let dest_skill = skills_root.join(name);
-        let gate_src = real_root
-            .join(".agents")
-            .join("skills")
-            .join("skill-creator")
-            .join("scripts");
-        if gate_src.is_dir() {
-            let dest_scripts = skills_root.join("skill-creator").join("scripts");
-            fs::create_dir_all(&dest_scripts)
-                .with_context(|| format!("failed to create {}", dest_scripts.display()))?;
-            for entry in fs::read_dir(&gate_src)
-                .with_context(|| format!("failed to read {}", gate_src.display()))?
-            {
-                let entry = entry?;
-                let name = entry.file_name();
-                fs::copy(entry.path(), dest_scripts.join(&name)).with_context(|| {
-                    format!("failed to copy {} into sandbox", entry.path().display())
-                })?;
+/// Blesses a fully green run: re-baselines the graders' hashes and raises the
+/// bar floor to `best_ever - tolerance`. A run that is not fully green is not
+/// blessable — blessing is the human sign-off that the current graders and
+/// results are honest.
+async fn bless_skill(
+    conn: &do_harness_db::Connection,
+    name: &str,
+    report: &SkillReport,
+    hashes: &crate::eval_integrity::GraderHashes,
+) -> Result<()> {
+    if report.gate_failed {
+        bail!("cannot bless skill '{name}': structure gate failed; fix it and rerun with --bless");
+    }
+    match (report.graded, report.passed) {
+        (0, _) => {
+            // No graded assertions: baselining graders is still meaningful
+            // (it pins walkthrough.sh + evals.json), but no bar is set.
+        }
+        (graded, passed) if passed < graded => {
+            bail!(
+                "cannot bless skill '{name}': {passed}/{graded} assertions green; only fully green runs are blessable"
+            );
+        }
+        _ => {}
+    }
+    do_harness_db::bless_grader_baseline(conn, name, &hashes.walkthrough_sha, &hashes.specs_sha)
+        .await?;
+    if report.graded > 0 {
+        let best = do_harness_db::max_pass_rate(conn, name).await?;
+        if let Some(floor) = crate::eval_integrity::GraderHashes::bar_floor(best) {
+            if do_harness_db::raise_skill_bar(conn, name, floor).await? {
+                println!("{name}: blessed; bar floor raised to {floor:.2}");
+            } else {
+                println!("{name}: blessed; bar floor unchanged");
             }
         }
-        copy_dir(skill_dir, &dest_skill)?;
-        Ok(Sandbox { _dir: dir, root })
-    }
-
-    /// Path of the hermetic workspace root.
-    fn root(&self) -> &Path {
-        &self.root
-    }
-
-    /// Path of the copied skill-creator gate script within the sandbox.
-    fn gate_script(&self) -> PathBuf {
-        self.root
-            .join(".agents")
-            .join("skills")
-            .join("skill-creator")
-            .join("scripts")
-            .join("quick_validate.py")
-    }
-}
-
-/// Recursively copies `src` into `dest`.
-fn copy_dir(src: &Path, dest: &Path) -> Result<()> {
-    fs::create_dir_all(dest).with_context(|| format!("failed to create {}", dest.display()))?;
-    for entry in fs::read_dir(src).with_context(|| format!("failed to read {}", src.display()))? {
-        let entry = entry?;
-        let from = entry.path();
-        let to = dest.join(entry.file_name());
-        if from.is_dir() {
-            copy_dir(&from, &to)?;
-        } else {
-            fs::copy(&from, &to).with_context(|| {
-                format!("failed to copy {} -> {}", from.display(), to.display())
-            })?;
-        }
+    } else {
+        println!("{name}: blessed; no graded assertions so no bar was set");
     }
     Ok(())
 }
@@ -288,6 +309,8 @@ async fn check_skill(
         gate_failed: false,
         line: String::new(),
         pass_rate: None,
+        graded: 0,
+        passed: 0,
         prompt: None,
         expected_outcome: None,
     };
@@ -298,6 +321,8 @@ async fn check_skill(
             gate_failed: true,
             line: format!("{name}: structure=invalid: {gate_msg} evals=skipped"),
             pass_rate: None,
+            graded: 0,
+            passed: 0,
             prompt: None,
             expected_outcome: None,
         });
@@ -347,6 +372,8 @@ async fn check_skill(
         gate_failed: false,
         line,
         pass_rate: outcome.pass_rate,
+        graded: outcome.graded,
+        passed: outcome.passed,
         prompt: outcome.prompt,
         expected_outcome: outcome.expected_outcome,
     })
@@ -382,11 +409,15 @@ async fn grade_skill(evals: &SkillEvals, root: &Path, walk: &WalkRun) -> Result<
                 prompt = Some(case.prompt.clone());
                 expected_outcome = Some(case.expected_output.clone());
             }
-            graded = graded.saturating_add(1);
+            graded += 1;
             let grade: AssertionGrade = if walk.present && !walk.success {
+                let reason = walk
+                    .detail
+                    .clone()
+                    .unwrap_or_else(|| "walkthrough.sh exited non-zero".to_owned());
                 AssertionGrade {
                     passed: false,
-                    reason: "walkthrough.sh exited non-zero".to_owned(),
+                    reason,
                 }
             } else {
                 crate::eval_assert::grade(root, spec, walk).await?

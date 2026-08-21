@@ -1,5 +1,7 @@
 //! Unit tests for the `do-harness eval` runner (`eval.rs`).
 
+#![allow(clippy::unwrap_used, clippy::expect_used)]
+
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -76,12 +78,64 @@ async fn exists_assertion_passes_and_persists_rich_data() {
     )
     .unwrap();
 
-    run_eval(dir.path(), None).await.unwrap();
+    run_eval(dir.path(), None, false).await.unwrap();
     let rows = persisted(dir.path()).await;
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0].prompt.as_deref(), Some("prompt one"));
     assert_eq!(rows[0].expected_outcome.as_deref(), Some("out one"));
     assert_eq!(rows[0].pass_rate, Some(1.0));
+}
+
+/// The full verifier-separation loop: a green run is blessable (pinning the
+/// graders and raising the bar), grader tampering then fails the eval with
+/// drift, and after re-blessing, a degraded pass rate misses the bar.
+#[tokio::test(flavor = "current_thread")]
+async fn bless_then_drift_then_bar_miss() {
+    let dir = fixture_root(VALID_SKILL_MD, Some(&single_case_json(&["exists:."])));
+    let evals_path = dir
+        .path()
+        .join(".agents/skills/test-skill/evals/evals.json");
+
+    // 1. Green run + bless pins the graders and sets a bar at 0.95.
+    run_eval(dir.path(), None, true).await.unwrap();
+    let conn = do_harness_db::connect_and_migrate(dir.path())
+        .await
+        .unwrap();
+    assert!(
+        do_harness_db::get_grader_baseline(&conn, "test-skill")
+            .await
+            .unwrap()
+            .is_some()
+    );
+    assert_eq!(
+        do_harness_db::get_skill_bar(&conn, "test-skill")
+            .await
+            .unwrap(),
+        Some(0.95)
+    );
+    drop(conn);
+
+    // 2. Tampering with the grader fails the eval until reviewed.
+    fs::write(
+        &evals_path,
+        fs::read_to_string(&evals_path).unwrap().replace('1', "9"),
+    )
+    .unwrap();
+    let err = run_eval(dir.path(), None, false).await.unwrap_err();
+    assert!(err.to_string().contains("test-skill"), "{err:#}");
+
+    // 3. Restore the graders and re-bless; then degrade the suite to a 0.5
+    //    rate by adding a failing assertion. The bar (0.95) must fail it even
+    //    though the run itself "passes" half its assertions.
+    fs::write(&evals_path, single_case_json(&["exists:."])).unwrap();
+    run_eval(dir.path(), None, true).await.unwrap();
+    let degraded = single_case_json(&[
+        "exists:.",
+        "contains:.agents/skills/test-skill/SKILL.md|absent-needle",
+    ]);
+    fs::write(&evals_path, degraded).unwrap();
+    let err = run_eval(dir.path(), None, false).await.unwrap_err();
+    assert!(err.to_string().contains("test-skill"), "{err:#}");
 }
 
 #[tokio::test(flavor = "current_thread")]
@@ -99,7 +153,7 @@ async fn contains_assertion_passes() {
     )
     .unwrap();
 
-    run_eval(dir.path(), None).await.unwrap();
+    run_eval(dir.path(), None, false).await.unwrap();
     let rows = persisted(dir.path()).await;
     assert_eq!(rows[0].pass_rate, Some(1.0));
 }
@@ -113,7 +167,9 @@ async fn failing_db_assertion_drives_pass_rate_to_zero() {
         ])),
     );
 
-    run_eval(dir.path(), Some("test-skill")).await.unwrap();
+    run_eval(dir.path(), Some("test-skill"), false)
+        .await
+        .unwrap();
     let rows = persisted(dir.path()).await;
     assert_eq!(rows[0].pass_rate, Some(0.0));
 }
@@ -134,7 +190,7 @@ async fn unprefixed_assertions_are_documentation_excluded_from_pass_rate() {
     )
     .unwrap();
 
-    run_eval(dir.path(), None).await.unwrap();
+    run_eval(dir.path(), None, false).await.unwrap();
     let rows = persisted(dir.path()).await;
     assert_eq!(rows[0].pass_rate, Some(1.0));
 }
@@ -165,7 +221,7 @@ async fn walkthrough_artifact_then_exists_passes() {
         fs::set_permissions(&script, fs::Permissions::from_mode(0o755)).unwrap();
     }
 
-    run_eval(dir.path(), None).await.unwrap();
+    run_eval(dir.path(), None, false).await.unwrap();
     let rows = persisted(dir.path()).await;
     assert_eq!(rows[0].pass_rate, Some(1.0));
 }
@@ -186,7 +242,7 @@ async fn failing_walkthrough_fails_all_graded_assertions() {
         fs::set_permissions(&script, fs::Permissions::from_mode(0o755)).unwrap();
     }
 
-    run_eval(dir.path(), None).await.unwrap();
+    run_eval(dir.path(), None, false).await.unwrap();
     let rows = persisted(dir.path()).await;
     assert_eq!(rows[0].pass_rate, Some(0.0));
 }
@@ -194,7 +250,7 @@ async fn failing_walkthrough_fails_all_graded_assertions() {
 #[tokio::test(flavor = "current_thread")]
 async fn skill_without_evals_skips_persistence() {
     let dir = fixture_root(VALID_SKILL_MD, None);
-    run_eval(dir.path(), None).await.unwrap();
+    run_eval(dir.path(), None, false).await.unwrap();
     assert!(persisted(dir.path()).await.is_empty());
 }
 
@@ -202,7 +258,7 @@ async fn skill_without_evals_skips_persistence() {
 async fn skill_failing_structure_gate_errors() {
     let md = "# No frontmatter here\n";
     let dir = fixture_root(md, None);
-    let err = run_eval(dir.path(), None).await.unwrap_err();
+    let err = run_eval(dir.path(), None, false).await.unwrap_err();
     assert!(err.to_string().contains("test-skill"));
 }
 
@@ -221,7 +277,7 @@ async fn missing_gate_script_is_not_a_structure_failure() {
     .unwrap();
     fs::write(skill_dir.join("alpha.txt"), "x").unwrap();
 
-    run_eval(dir.path(), Some("alpha")).await.unwrap();
+    run_eval(dir.path(), Some("alpha"), false).await.unwrap();
 
     let conn = do_harness_db::connect_and_migrate(dir.path())
         .await
@@ -236,7 +292,9 @@ async fn missing_gate_script_is_not_a_structure_failure() {
 #[tokio::test(flavor = "current_thread")]
 async fn unknown_skill_filter_errors() {
     let dir = fixture_root(VALID_SKILL_MD, None);
-    let err = run_eval(dir.path(), Some("ghost")).await.unwrap_err();
+    let err = run_eval(dir.path(), Some("ghost"), false)
+        .await
+        .unwrap_err();
     assert!(
         err.to_string()
             .contains("skill 'ghost' not found under .agents/skills")
