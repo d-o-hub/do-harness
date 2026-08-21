@@ -5,7 +5,15 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result};
 
 use crate::hook_script::BinSource;
+
+use crate::report::Format;
 use crate::{ErrorsAction, TaskAction, TraceAction, config, errors, hooks, init, task, trace};
+
+/// Prints CLI version information in the requested format.
+pub fn print_version(format: Format) {
+    let info = crate::version::VersionInfo::current();
+    println!("{}", info.format(format));
+}
 
 /// Dispatches task-state actions.
 ///
