@@ -16,7 +16,9 @@
 //! db:TABLE:COLUMN=VALUE:min=CNT  agent_state.db has >= CNT rows in TABLE where
 //!                                COLUMN = VALUE.
 //! cli:ARGV:contains:TEXT         `do-harness ARGV` (split on spaces) exits 0
-//!                                and its stdout contains TEXT.
+//!                                and its stdout contains TEXT. ARGV must not
+//!                                contain --root/--config: the sandbox root is
+//!                                injected by the grader and cannot be moved.
 //! walk:                          the skill's evals/walkthrough.sh (run once
 //!                                per skill) passed; skipped when absent.
 //! ```
@@ -78,7 +80,7 @@ pub async fn grade(root: &Path, spec: &str, walk: &WalkRun) -> Result<AssertionG
         return Ok(grade_cli(root, rest));
     }
     if spec.starts_with("walk:") {
-        return Ok(walk_success(*walk, spec));
+        return Ok(walk_success(walk, spec));
     }
     Ok(fail(format!("unknown assertion prefix: '{spec}'")))
 }
@@ -173,6 +175,10 @@ fn is_identifier(ident: &str) -> bool {
 /// Runs the harness binary with `--root root` then ARGV, so the command
 /// operates against the eval sandbox, and requires exit 0 plus stdout
 /// containing TEXT.
+///
+/// Fixture-supplied `--root`/`--config` arguments are rejected: clap's global
+/// args are last-wins, so letting a fixture move the root would let the
+/// fixture under test redirect the grader at the caller's real workspace.
 fn grade_cli(root: &Path, rest: &str) -> AssertionGrade {
     let Some((argv, text)) = rest.split_once(":contains:") else {
         return fail("cli: expected cli:ARGV:contains:TEXT".to_owned());
@@ -180,6 +186,11 @@ fn grade_cli(root: &Path, rest: &str) -> AssertionGrade {
     let cmd_parts: Vec<&str> = argv.split_whitespace().collect();
     if cmd_parts.is_empty() {
         return fail("cli: ARGV is empty".to_owned());
+    }
+    if let Some(flag) = cmd_parts.iter().find(|part| is_reserved_flag(part)) {
+        return fail(format!(
+            "cli: fixture argv may not override {flag}; the eval sandbox root is fixed by the grader"
+        ));
     }
     let bin = binary_for_eval();
     let mut cmd = Command::new(&bin);
@@ -209,6 +220,15 @@ fn grade_cli(root: &Path, rest: &str) -> AssertionGrade {
     }
 }
 
+/// Whether `part` is a CLI flag that would move the grader's fixed sandbox
+/// root or config path (both are clap global args where last occurrence wins).
+fn is_reserved_flag(part: &str) -> bool {
+    part == "--root"
+        || part == "--config"
+        || part.starts_with("--root=")
+        || part.starts_with("--config=")
+}
+
 /// Resolves the harness binary to run for `cli:` assertions.
 ///
 /// Prefers the currently-executing `do-harness` binary (so evals drive the
@@ -225,9 +245,11 @@ fn binary_for_eval() -> String {
 }
 
 /// The `walk:` grader: consult the already-run skill walkthrough.
-fn walk_success(walk: WalkRun, spec: &str) -> AssertionGrade {
+fn walk_success(walk: &WalkRun, spec: &str) -> AssertionGrade {
     if walk.success {
         pass(format!("{spec} walkthrough passed"))
+    } else if let Some(detail) = &walk.detail {
+        fail(format!("{spec} walkthrough failed: {detail}"))
     } else {
         fail("walk: walkthrough.sh exited non-zero".to_owned())
     }
@@ -250,7 +272,7 @@ fn fail(reason: String) -> AssertionGrade {
 
 #[cfg(test)]
 mod tests {
-    #![allow(clippy::unwrap_used)]
+    #![allow(clippy::unwrap_used, clippy::expect_used)]
 
     use super::*;
 
@@ -271,10 +293,7 @@ mod tests {
     #[tokio::test(flavor = "current_thread")]
     async fn db_assertion_rejects_sql_injection_identifier() {
         let dir = tempfile::tempdir().unwrap();
-        let walk = WalkRun {
-            present: false,
-            success: true,
-        };
+        let walk = WalkRun::absent();
         let grade = grade(
             dir.path(),
             "db:tasks\"; DROP TABLE beats; --:status=done:min=1",
@@ -291,10 +310,7 @@ mod tests {
     #[tokio::test(flavor = "current_thread")]
     async fn db_assertion_rejects_column_injection_payload() {
         let dir = tempfile::tempdir().unwrap();
-        let walk = WalkRun {
-            present: false,
-            success: true,
-        };
+        let walk = WalkRun::absent();
         for spec in [
             r#"db:tasks:status"; DROP -- =done:min=1"#,
             "db:tasks:=done:min=1",
@@ -314,15 +330,54 @@ mod tests {
     #[tokio::test(flavor = "current_thread")]
     async fn db_assertion_empty_identifiers_fail_cleanly() {
         let dir = tempfile::tempdir().unwrap();
-        let walk = WalkRun {
-            present: false,
-            success: true,
-        };
+        let walk = WalkRun::absent();
         for spec in ["db::status=done:min=1", "db:tasks:=done:min=1"] {
             let grade = grade(dir.path(), spec, &walk).await.unwrap();
             assert!(!grade.passed, "unexpected pass for {spec}");
             assert!(grade.reason.contains("invalid table/column identifier"));
         }
+    }
+
+    /// A fixture spec trying to move the sandbox `--root` (or `--config`) is
+    /// rejected as a failed grade instead of redirecting the child harness at
+    /// the caller's real workspace.
+    #[tokio::test(flavor = "current_thread")]
+    async fn cli_assertion_rejects_root_override() {
+        let dir = tempfile::tempdir().unwrap();
+        for argv in [
+            "--root /tmp/elsewhere list",
+            "--root=/tmp/elsewhere list",
+            "list --root /tmp/elsewhere",
+            "--config /tmp/evil.toml list",
+            "--config=/tmp/evil.toml list",
+        ] {
+            let spec = format!("cli:{argv}:contains:anything");
+            let grade = grade(dir.path(), &spec, &WalkRun::absent()).await.unwrap();
+            assert!(!grade.passed, "unexpected pass for {spec}");
+            assert!(
+                grade.reason.contains("may not override"),
+                "expected sandbox rejection for {spec}: {}",
+                grade.reason
+            );
+        }
+    }
+
+    /// A walkthrough that was present but could not be launched fails its
+    /// `walk:` assertions with the cause surfaced, never a silent success.
+    #[tokio::test(flavor = "current_thread")]
+    async fn walk_assertion_surfaces_launch_failure_detail() {
+        let walk = WalkRun {
+            present: true,
+            success: false,
+            detail: Some("could not spawn sh: no /bin/sh".to_owned()),
+        };
+        let grade = grade(Path::new("/tmp"), "walk:", &walk).await.unwrap();
+        assert!(!grade.passed);
+        assert!(
+            grade.reason.contains("could not spawn sh"),
+            "expected launch detail in reason: {}",
+            grade.reason
+        );
     }
 
     /// Valid, allowlisted `db:` identifiers grade against a real temp database,
@@ -347,10 +402,7 @@ mod tests {
         )
         .await
         .unwrap();
-        let walk = WalkRun {
-            present: false,
-            success: true,
-        };
+        let walk = WalkRun::absent();
 
         let matched = grade(dir.path(), "db:beats:beat_type=sensor:min=1", &walk)
             .await
