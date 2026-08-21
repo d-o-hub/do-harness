@@ -4,6 +4,16 @@
 //! can be persisted and validated as data instead of prose.
 
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
+
+/// Error returned when a stored or provided task-state string is not one of
+/// the four lifecycle values.
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[error("unknown task state '{value}'")]
+pub struct TaskStateParseError {
+    /// The unrecognized value.
+    pub value: String,
+}
 
 /// A named HTN decomposition method (e.g., `vertical-event-slice`).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -67,7 +77,7 @@ impl TaskState {
 }
 
 impl TryFrom<&str> for TaskState {
-    type Error = String;
+    type Error = TaskStateParseError;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         match value {
@@ -75,13 +85,17 @@ impl TryFrom<&str> for TaskState {
             "in_progress" => Ok(Self::InProgress),
             "done" => Ok(Self::Done),
             "failed" => Ok(Self::Failed),
-            other => Err(format!("unknown task state '{other}'")),
+            other => Err(TaskStateParseError {
+                value: other.to_owned(),
+            }),
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used)]
+
     use super::*;
 
     /// The `snake_case` serde shape matches the database status values.

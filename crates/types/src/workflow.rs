@@ -162,35 +162,76 @@ impl DomainEvent for WorkflowEvent {
     }
 }
 
+/// Lifecycle state a task can occupy on the board, derived from the last
+/// event observed for its id.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum BoardState {
+    Pending,
+    InProgress,
+    Done,
+    Failed,
+}
+
 /// Read-side projection folding [`WorkflowEvent`]s into board counts.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+///
+/// State is keyed by task id: each task's entry reflects the latest event
+/// seen for it, so replaying a stream is idempotent (duplicate events do not
+/// double-count) and folding order across different tasks does not matter.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct TaskBoard {
-    /// Number of tasks in `pending` state.
-    pub pending: i64,
-    /// Number of tasks in `in_progress` state.
-    pub in_progress: i64,
-    /// Number of tasks in `done` state.
-    pub done: i64,
-    /// Number of tasks in `failed` state.
-    pub failed: i64,
+    states: std::collections::BTreeMap<i64, BoardState>,
 }
 
 impl TaskBoard {
-    /// A freshly reset board with every counter at zero.
+    /// A freshly reset board with no tasks.
     #[must_use]
-    pub const fn new() -> Self {
-        Self {
-            pending: 0,
-            in_progress: 0,
-            done: 0,
-            failed: 0,
-        }
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Number of tasks currently in `pending` state.
+    #[must_use]
+    pub fn pending(&self) -> i64 {
+        self.count(BoardState::Pending)
+    }
+
+    /// Number of tasks currently in `in_progress` state.
+    #[must_use]
+    pub fn in_progress(&self) -> i64 {
+        self.count(BoardState::InProgress)
+    }
+
+    /// Number of tasks currently in `done` state.
+    #[must_use]
+    pub fn done(&self) -> i64 {
+        self.count(BoardState::Done)
+    }
+
+    /// Number of tasks currently in `failed` state.
+    #[must_use]
+    pub fn failed(&self) -> i64 {
+        self.count(BoardState::Failed)
     }
 
     /// The four board counts in `(pending, in_progress, done, failed)` order.
     #[must_use]
-    pub const fn to_counts(self) -> (i64, i64, i64, i64) {
-        (self.pending, self.in_progress, self.done, self.failed)
+    pub fn to_counts(&self) -> (i64, i64, i64, i64) {
+        (
+            self.pending(),
+            self.in_progress(),
+            self.done(),
+            self.failed(),
+        )
+    }
+
+    fn count(&self, state: BoardState) -> i64 {
+        i64::try_from(
+            self.states
+                .values()
+                .filter(|entry| **entry == state)
+                .count(),
+        )
+        .unwrap_or(i64::MAX)
     }
 }
 
@@ -198,145 +239,15 @@ impl Projection for TaskBoard {
     type Event = WorkflowEvent;
 
     fn apply(&mut self, event: &Self::Event) -> Result<(), ProjectionError> {
-        match event {
-            Self::Event::TaskAdded(_) => self.pending += 1,
-            Self::Event::TaskAdvanced(_) => self.in_progress += 1,
-            Self::Event::TaskCompleted(_) => self.done += 1,
-            Self::Event::TaskFailed(_) => self.failed += 1,
-        }
+        let (id, state) = match event {
+            Self::Event::TaskAdded(inner) => (inner.id, BoardState::Pending),
+            Self::Event::TaskAdvanced(inner) => (inner.id, BoardState::InProgress),
+            Self::Event::TaskCompleted(inner) => (inner.id, BoardState::Done),
+            Self::Event::TaskFailed(inner) => (inner.id, BoardState::Failed),
+        };
+        self.states.insert(id, state);
         Ok(())
     }
 }
-
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    /// A fresh board starts with every counter at zero.
-    #[test]
-    fn task_board_starts_empty() {
-        assert_eq!(TaskBoard::new().to_counts(), (0, 0, 0, 0));
-    }
-
-    /// Folding a stream updates each counter once per matching event.
-    #[test]
-    fn task_board_folds_events() {
-        let mut board = TaskBoard::new();
-        board
-            .apply(&WorkflowEvent::TaskAdded(TaskAdded {
-                id: 1,
-                title: "a".to_owned(),
-                method: None,
-            }))
-            .unwrap();
-        board
-            .apply(&WorkflowEvent::TaskAdded(TaskAdded {
-                id: 2,
-                title: "b".to_owned(),
-                method: None,
-            }))
-            .unwrap();
-        board
-            .apply(&WorkflowEvent::TaskAdvanced(TaskAdvanced {
-                id: 2,
-                subtask_index: 1,
-            }))
-            .unwrap();
-        board
-            .apply(&WorkflowEvent::TaskCompleted(TaskCompleted { id: 1 }))
-            .unwrap();
-        board
-            .apply(&WorkflowEvent::TaskFailed(TaskFailed { id: 3 }))
-            .unwrap();
-
-        assert_eq!(board.to_counts(), (2, 1, 1, 1));
-    }
-
-    /// Commands expose their stable names.
-    #[test]
-    fn command_names() {
-        assert_eq!(
-            AddTask {
-                title: "t".to_owned(),
-                method: None,
-                parent_id: None,
-                precondition: None,
-            }
-            .name(),
-            "AddTask"
-        );
-        assert_eq!(AdvanceTask { task_id: 1 }.name(), "AdvanceTask");
-        assert_eq!(CompleteTask { task_id: 1 }.name(), "CompleteTask");
-        assert_eq!(FailTask { task_id: 1 }.name(), "FailTask");
-    }
-
-    /// The wrapper event delegates its name to the inner event.
-    #[test]
-    fn wrapped_event_delegates_name() {
-        let event = WorkflowEvent::TaskAdded(TaskAdded {
-            id: 1,
-            title: "t".to_owned(),
-            method: None,
-        });
-        assert_eq!(event.name(), "TaskAdded");
-    }
-
-    /// Concrete events round-trip through JSON.
-    #[test]
-    fn events_roundtrip_json() {
-        let event = WorkflowEvent::TaskAdvanced(TaskAdvanced {
-            id: 7,
-            subtask_index: 2,
-        });
-        let json = serde_json::to_string(&event).unwrap();
-        let parsed: WorkflowEvent = serde_json::from_str(&json).unwrap();
-        assert_eq!(parsed, event);
-    }
-
-    /// A projection rejects an event outside its stream with `UnsupportedEvent`.
-    #[test]
-    fn projection_rejects_unmatched_event() {
-        /// Counter restricted to `TaskAdded` events only.
-        #[derive(Debug, Default)]
-        struct AddedCount {
-            n: i64,
-        }
-
-        impl Projection for AddedCount {
-            type Event = WorkflowEvent;
-
-            fn apply(&mut self, event: &Self::Event) -> Result<(), ProjectionError> {
-                match event {
-                    Self::Event::TaskAdded(_) => {
-                        self.n += 1;
-                        Ok(())
-                    }
-                    other => Err(ProjectionError::UnsupportedEvent(other.name())),
-                }
-            }
-        }
-
-        let mut board = AddedCount::default();
-        board
-            .apply(&WorkflowEvent::TaskAdded(TaskAdded {
-                id: 1,
-                title: "t".to_owned(),
-                method: None,
-            }))
-            .unwrap();
-        let err = board
-            .apply(&WorkflowEvent::TaskAdvanced(TaskAdvanced {
-                id: 1,
-                subtask_index: 1,
-            }))
-            .unwrap_err();
-        assert!(matches!(
-            err,
-            ProjectionError::UnsupportedEvent("TaskAdvanced")
-        ));
-        assert_eq!(
-            err.to_string(),
-            "event TaskAdvanced cannot be applied to this projection"
-        );
-    }
-}
+mod tests;
