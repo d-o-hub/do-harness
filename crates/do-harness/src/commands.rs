@@ -149,6 +149,12 @@ pub fn hook(root: &Path, config_path: Option<&Path>, action: crate::HookAction) 
                     "missing"
                 }
             );
+            if status.binary.is_in_target_dir() {
+                eprintln!(
+                    "warning: resolved do-harness binary is under Cargo target/; cargo clean will remove it: {}",
+                    status.binary.path().display()
+                );
+            }
         }
     }
     Ok(())
@@ -247,11 +253,136 @@ pub fn print_init(report: &init::InitReport, root: &Path, language: init::Langua
     }
 }
 
+/// Runs diagnostic checks covering binary resolution and git hook status.
+///
+/// Returns an error if any required health check fails (e.g., binary missing or
+/// not executable). Target directory warnings do not cause doctor to fail.
+///
+/// # Errors
+///
+/// Returns an error when a required check fails or git repo discovery fails.
+pub fn doctor(root: &Path) -> Result<()> {
+    let git_dir = hooks::find_git_dir(root)?;
+    let status = hooks::status(&git_dir, root);
+
+    let mut ok = true;
+
+    println!("Doctor Summary:");
+    println!("===============");
+
+    // 1. Binary Resolution Check
+    let bin_path = status.binary.path();
+    let bin_present = status.binary.present();
+    let bin_source_desc = describe_binary(&status.binary);
+
+    if bin_present {
+        println!(
+            "  [OK] Binary resolution: {bin_source_desc} ({})",
+            bin_path.display()
+        );
+    } else {
+        println!(
+            "  [FAIL] Binary resolution: {bin_source_desc} ({}) - file missing",
+            bin_path.display()
+        );
+        ok = false;
+    }
+
+    // Target directory warning (not a failure condition)
+    if status.binary.is_in_target_dir() {
+        eprintln!(
+            "warning: resolved do-harness binary is under Cargo target/; cargo clean will remove it: {}",
+            bin_path.display()
+        );
+    }
+
+    // 2. Git Hooks Check
+    println!(
+        "  [{}] pre-commit hook: {}",
+        if status.pre_commit { "OK" } else { "WARN" },
+        if status.pre_commit {
+            "installed"
+        } else {
+            "absent"
+        }
+    );
+    println!(
+        "  [{}] pre-push hook: {}",
+        if status.pre_push { "OK" } else { "WARN" },
+        if status.pre_push {
+            "installed"
+        } else {
+            "absent"
+        }
+    );
+    println!(
+        "  [{}] commit-msg hook: {}",
+        if status.commit_msg { "OK" } else { "WARN" },
+        if status.commit_msg {
+            "installed"
+        } else {
+            "absent"
+        }
+    );
+
+    if ok {
+        println!("\nDoctor checks passed.");
+        Ok(())
+    } else {
+        anyhow::bail!("doctor check failed: required components missing or broken");
+    }
+}
+
 /// Describes where the `do-harness` binary resolves from.
 fn describe_binary(source: &BinSource) -> String {
     match source {
         BinSource::Env(path) => format!("env:{}", path.display()),
         BinSource::Path(path) => format!("path:{}", path.display()),
         BinSource::Repo(path) => format!("repo:{}", path.display()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::unwrap_used)]
+
+    use super::*;
+    use std::fs;
+
+    fn fake_repo_with_git() -> (tempfile::TempDir, PathBuf) {
+        let temp = tempfile::tempdir().unwrap();
+        let root = temp.path().to_path_buf();
+        let git_dir = root.join(".git");
+        fs::create_dir_all(git_dir.join("hooks")).unwrap();
+        (temp, root)
+    }
+
+    #[test]
+    fn doctor_fails_when_binary_missing() {
+        let (_temp, root) = fake_repo_with_git();
+
+        let result = doctor(&root);
+
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("doctor check failed")
+        );
+    }
+
+    #[test]
+    fn doctor_succeeds_when_binary_present() {
+        let (_temp, root) = fake_repo_with_git();
+
+        // Create binary in target/release/do-harness
+        let bin_path = root.join("target/release/do-harness");
+        fs::create_dir_all(bin_path.parent().unwrap()).unwrap();
+        fs::write(&bin_path, "stub").unwrap();
+
+        let result = doctor(&root);
+
+        assert!(result.is_ok());
     }
 }

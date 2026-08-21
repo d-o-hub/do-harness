@@ -19,6 +19,9 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # Returns nonzero (and prints a FAIL line) when the subject is invalid.
 lint_subject() {
     local subject="$1"
+    if [[ "$subject" =~ ^Merge[[:space:]] ]]; then
+        return 0
+    fi
     if ! [[ "$subject" =~ ^(feat|fix|docs|chore|refactor|test|build|ci|perf|revert)(\([a-z0-9._/-]+\))?:\ ?.+$ ]]; then
         echo "FAIL: non-conventional commit subject: $subject"
         return 1
@@ -63,7 +66,7 @@ COUNT="${1:-}"
 COUNT="${COUNT:-${DO_HARNESS_COMMITLINT_COUNT:-10}}"
 
 FAIL=0
-mapfile -t subjects < <(git -C "$ROOT" log -n "$COUNT" --pretty=format:%s)
+mapfile -t subjects < <(git -C "$ROOT" log --no-merges -n "$COUNT" --pretty=format:%s)
 
 for subject in "${subjects[@]}"; do
     if ! lint_subject "$subject"; then

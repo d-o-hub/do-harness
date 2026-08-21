@@ -22,7 +22,18 @@ cargo install --path crates/do-harness
 
 The harness is designed to be adopted by any codebase, Rust or not:
 
-1. Install the CLI (see above), then from the target repository root run:
+1. Install the CLI onto `PATH` as the primary adoption flow:
+
+   ```bash
+   # From do-harness source or vendored path:
+   cargo install --path crates/do-harness
+   # or when vendored inside an adopting repository:
+   cargo install --path vendor/do-harness/crates/do-harness
+   ```
+
+   > **Warning**: Do NOT build `do-harness` into the adopting repository's shared `target/` directory (e.g. `cargo build --manifest-path vendor/do-harness/Cargo.toml -p do-harness --target-dir target`). Running `cargo clean` in the adopting workspace will delete the binary and silently break installed git hooks!
+
+   Then from the target repository root run:
 
    ```bash
    do-harness init                 # Rust sensor pack
@@ -52,11 +63,29 @@ The harness is designed to be adopted by any codebase, Rust or not:
    Hooks locate the binary at runtime: `$DO_HARNESS_BIN`, then `do-harness`
    on `PATH`, then `<repo>/target/release/do-harness`.
 
-4. Run the suite:
+4. Run diagnostics and the suite:
 
    ```bash
-   do-harness verify
+   do-harness doctor               # verify binary resolution & git hook status
+   do-harness verify               # run sensor suite
    ```
+
+### Dev setup & CI snippet
+
+For local developer setup scripts or CI workflows in adopting repositories:
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Install CLI to Cargo bin path (outside workspace target/)
+cargo install --path vendor/do-harness/crates/do-harness
+
+# Initialize and verify harness setup
+do-harness hook install
+do-harness doctor
+do-harness verify
+```
 
 The green path is dogfooded, not assumed: `crates/do-harness/tests/dogfood.rs`
 runs the real binary on fresh temp workspaces and asserts the rust pack goes
@@ -84,6 +113,7 @@ For CI, invoke `do-harness verify --format json` (exit 0/1/2) with the CLI on
 | `eval [--skill NAME]` | Validate skills via skill-creator's quick_validate.py and persist skill_evals (pass_rate = valid/total) |
 | `init [--language rust\|generic] [--force]` | Scaffold a harness workspace in the current directory |
 | `hook install [--force]` / `hook uninstall` / `hook status` | Manage `.git/hooks/pre-commit` + `pre-push` |
+| `doctor` | Run diagnostic checks on binary resolution and git hook health |
 
 Global flags: `--root <path>`, `--config <path>`.
 
