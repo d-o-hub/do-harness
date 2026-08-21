@@ -138,6 +138,8 @@ enum Command {
         #[command(subcommand)]
         action: HookAction,
     },
+    /// Run diagnostic checks on binary resolution and git hook health.
+    Doctor,
 }
 
 /// Available task-state actions.
@@ -383,5 +385,6 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
         Command::Hook { action } => {
             commands::hook(&root, cli.config.as_deref(), action).map_err(CliError::Usage)
         }
+        Command::Doctor => commands::doctor(&root).map_err(CliError::Verify),
     }
 }

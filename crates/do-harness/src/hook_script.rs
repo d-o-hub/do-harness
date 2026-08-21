@@ -89,6 +89,14 @@ pub enum BinSource {
 }
 
 impl BinSource {
+    /// Returns the underlying path for the binary source.
+    #[must_use]
+    pub fn path(&self) -> &Path {
+        match self {
+            BinSource::Env(p) | BinSource::Path(p) | BinSource::Repo(p) => p,
+        }
+    }
+
     /// Whether the resolved path currently exists on disk.
     #[must_use]
     pub fn present(&self) -> bool {
@@ -97,6 +105,19 @@ impl BinSource {
             BinSource::Repo(path) => path.is_file(),
         }
     }
+
+    /// Returns true if the resolved binary path lives inside a Cargo-managed `target` directory.
+    #[must_use]
+    pub fn is_in_target_dir(&self) -> bool {
+        is_target_dir_path(self.path())
+    }
+}
+
+/// Checks whether `path` (or its canonicalized path) contains a component named "target".
+#[must_use]
+pub fn is_target_dir_path(path: &Path) -> bool {
+    let p = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
+    p.components().any(|comp| comp.as_os_str() == "target")
 }
 
 /// Resolves the `do-harness` binary for `hook status` using the process
@@ -241,6 +262,29 @@ mod tests {
             BinSource::Repo(root.join("target/release/do-harness"))
         );
         assert!(!source.present());
+    }
+
+    #[test]
+    fn is_target_dir_path_detects_target_component() {
+        assert!(is_target_dir_path(Path::new(
+            "/home/user/project/target/release/do-harness"
+        )));
+        assert!(is_target_dir_path(Path::new("target/release/do-harness")));
+        assert!(!is_target_dir_path(Path::new("/usr/local/bin/do-harness")));
+        assert!(!is_target_dir_path(Path::new(
+            "/home/user/.cargo/bin/do-harness"
+        )));
+    }
+
+    #[test]
+    fn bin_source_is_in_target_dir() {
+        let bin = PathBuf::from("/repo/target/release/do-harness");
+        assert!(BinSource::Repo(bin.clone()).is_in_target_dir());
+        assert!(BinSource::Env(bin.clone()).is_in_target_dir());
+        assert!(BinSource::Path(bin).is_in_target_dir());
+
+        let cargo_bin = PathBuf::from("/home/user/.cargo/bin/do-harness");
+        assert!(!BinSource::Path(cargo_bin).is_in_target_dir());
     }
 
     #[test]
