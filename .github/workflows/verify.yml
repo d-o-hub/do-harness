@@ -3,17 +3,48 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   verify:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      # actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
+          # Full history so the commitlint sensor can inspect recent subjects.
+          fetch-depth: 0
+      - name: Resolve pinned toolchain
+        id: toolchain
+        run: |
+          channel="$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)"
+          echo "channel=$channel" >> "$GITHUB_OUTPUT"
+      # dtolnay/rust-toolchain@master (SHA within master history per action docs)
+      - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772
+        with:
+          # The @rev default ignores rust-toolchain.toml; pass the pinned
+          # channel so rust-toolchain.toml stays the single source of truth.
+          toolchain: ${{ steps.toolchain.outputs.channel }}
           components: rustfmt, clippy
+      # Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
+      # taiki-e/install-action@v2
+      - uses: taiki-e/install-action@ba47c86ac325773530516bb756137ac718732518
+        with:
+          tool: cargo-deny,cargo-audit
+      - name: Lint shell sensors
+        run: shellcheck scripts/*.sh crates/do-harness/templates/scripts/*.sh
       - name: Build harness CLI
         run: cargo build --release -p do-harness
       - name: Run sensors
+        env:
+          # check-audit.sh fails closed when CI=true; cargo-audit is installed above.
+          CI: "true"
         run: ./target/release/do-harness verify --format json
       - name: Dogfood greenfield rust init + verify
         run: |
@@ -25,3 +56,27 @@ jobs:
           tmp="$(mktemp -d)"
           ./target/release/do-harness --root "$tmp" init --language generic
           ./target/release/do-harness --root "$tmp" verify --format json
+      - name: Dogfood skill eval runner (shebang execution, graded residue)
+        run: ./target/release/do-harness eval --skill spike-runner
+
+  msrv:
+    runs-on: ubuntu-latest
+    steps:
+      # actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Resolve MSRV
+        id: msrv
+        run: |
+          msrv="$(sed -n '/^\[workspace.package\]/,/^\[/ s/^rust-version *= *"\(.*\)"/\1/p' Cargo.toml)"
+          echo "msrv=$msrv" >> "$GITHUB_OUTPUT"
+      # dtolnay/rust-toolchain@master
+      - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772
+        with:
+          # Explicit input overrides any local rust-toolchain.toml pin.
+          toolchain: ${{ steps.msrv.outputs.msrv }}
+      # Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
+        with:
+          key: msrv
+      - name: Check workspace on MSRV
+        run: cargo check --workspace
