@@ -30,21 +30,28 @@ const TASK_COLUMNS: &str = "id, parent_id, title, method, subtask_index, status,
 /// Returns an error when the insert statement fails.
 pub async fn insert_task(conn: &Connection, task: &NewTask<'_>) -> Result<i64> {
     let now = unix_now();
-    conn.execute(
-        "INSERT INTO tasks (parent_id, title, method, subtask_index, status, \
-         precondition, created_at, updated_at) \
-         VALUES (?1, ?2, ?3, ?4, 'pending', ?5, ?6, ?6)",
-        params!(
-            task.parent_id,
-            task.title,
-            task.method,
-            task.subtask_index,
-            task.precondition,
-            now
-        ),
-    )
-    .await?;
-    Ok(conn.last_insert_rowid())
+    let mut rows = conn
+        .query(
+            "INSERT INTO tasks (parent_id, title, method, subtask_index, status, \
+             precondition, created_at, updated_at) \
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?7) \
+             RETURNING id",
+            params!(
+                task.parent_id,
+                task.title,
+                task.method,
+                task.subtask_index,
+                TaskState::Pending.as_str(),
+                task.precondition,
+                now
+            ),
+        )
+        .await?;
+    let row = rows
+        .next()
+        .await?
+        .ok_or_else(|| DbError::NotFound("task id vanished after insert".to_string()))?;
+    Ok(row.get(0)?)
 }
 
 /// Fetches a task by id.
@@ -100,25 +107,26 @@ pub async fn update_task_status(conn: &Connection, id: i64, status: TaskState) -
 
 /// Advances a task's subtask pointer by one and marks it in progress.
 ///
-/// Returns the new subtask index.
+/// Returns the new subtask index. The update returns the new index via
+/// `RETURNING`, so a missing task id is reported directly instead of failing
+/// on a follow-up query.
 ///
 /// # Errors
 ///
-/// Returns an error when the update or follow-up query fails.
+/// Returns an error when the update fails or the task does not exist.
 pub async fn advance_subtask(conn: &Connection, id: i64) -> Result<i64> {
-    conn.execute(
-        "UPDATE tasks SET subtask_index = subtask_index + 1, status = 'in_progress', \
-         updated_at = ?1 WHERE id = ?2",
-        params!(unix_now(), id),
-    )
-    .await?;
     let mut rows = conn
-        .query("SELECT subtask_index FROM tasks WHERE id = ?1", params!(id))
+        .query(
+            "UPDATE tasks SET subtask_index = subtask_index + 1, status = ?1, \
+             updated_at = ?2 WHERE id = ?3 \
+             RETURNING subtask_index",
+            params!(TaskState::InProgress.as_str(), unix_now(), id),
+        )
         .await?;
     let row = rows
         .next()
         .await?
-        .ok_or_else(|| DbError::NotFound("task vanished after advancing subtask".to_string()))?;
+        .ok_or_else(|| DbError::NotFound(format!("task {id} not found")))?;
     Ok(row.get(0)?)
 }
 
@@ -142,16 +150,17 @@ fn task_from_row(row: &libsql::Row) -> Result<TaskRecord> {
 /// Upserts a collection of decision headers into the `invariants` table.
 ///
 /// Existing invariants are matched on their `invariant` text and updated;
-/// new ones are inserted. Returns the number of invariants written.
+/// new ones are inserted. Returns the number of invariants written. The whole
+/// batch commits atomically: a failure leaves the table untouched.
 ///
 /// # Errors
 ///
 /// Returns an error if any upsert statement fails.
 pub async fn seed_invariants(conn: &Connection, headers: &[DecisionHeader]) -> Result<usize> {
     let now = unix_now();
-    let mut written = 0;
+    let tx = conn.transaction().await?;
     for header in headers {
-        conn.execute(
+        tx.execute(
             "INSERT INTO invariants (invariant, rationale, sensor, category, created_at) \
              VALUES (?1, ?2, ?3, ?4, ?5) \
              ON CONFLICT(invariant) DO UPDATE SET \
@@ -167,14 +176,14 @@ pub async fn seed_invariants(conn: &Connection, headers: &[DecisionHeader]) -> R
             ),
         )
         .await?;
-        written += 1;
     }
-    Ok(written)
+    tx.commit().await?;
+    Ok(headers.len())
 }
 
 #[cfg(test)]
 mod tests {
-    #![allow(clippy::unwrap_used)]
+    #![allow(clippy::unwrap_used, clippy::expect_used)]
 
     use super::*;
 

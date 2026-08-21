@@ -57,6 +57,8 @@ pub fn db_path(root: &Path) -> PathBuf {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used)]
+
     use super::*;
     use std::fs;
 

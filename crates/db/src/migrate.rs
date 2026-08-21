@@ -44,11 +44,22 @@ const MIGRATIONS: &[Migration] = &[
         name: "eval_latest",
         sql: include_str!("../migrations/0006_eval_latest.sql"),
     },
+    Migration {
+        version: 7,
+        name: "fk_strike_index",
+        sql: include_str!("../migrations/0007_fk_strike_index.sql"),
+    },
+    Migration {
+        version: 8,
+        name: "eval_history_and_baselines",
+        sql: include_str!("../migrations/0008_eval_history_and_baselines.sql"),
+    },
 ];
 
 /// Opens (creating if necessary) the local libSQL database at `path`.
 ///
-/// Creates missing parent directories and returns an open [`Connection`].
+/// Creates missing parent directories, enables foreign-key enforcement for
+/// the connection, and returns an open [`Connection`].
 ///
 /// # Errors
 ///
@@ -69,10 +80,15 @@ pub async fn connect(path: impl AsRef<Path>) -> Result<Connection> {
             path: path.to_path_buf(),
             source,
         })?;
-    db.connect().map_err(|source| DbError::Connect {
+    let conn = db.connect().map_err(|source| DbError::Connect {
         path: path.to_path_buf(),
         source,
-    })
+    })?;
+    // Foreign keys are off by default in every SQLite session; without this
+    // the REFERENCES clauses in the schema are never enforced.
+    conn.execute("PRAGMA foreign_keys = ON", Params::None)
+        .await?;
+    Ok(conn)
 }
 
 /// Applies all pending embedded migrations to `conn` in ascending version order.
@@ -82,8 +98,9 @@ pub async fn connect(path: impl AsRef<Path>) -> Result<Connection> {
 ///
 /// # Errors
 ///
-/// Returns an error if the tracking table cannot be created or any pending
-/// migration fails to apply.
+/// Returns an error if the tracking table cannot be created, the database was
+/// written by a newer binary (fail-fast instead of silently diverging), or
+/// any pending migration fails to apply.
 pub async fn migrate(conn: &Connection) -> Result<()> {
     conn.execute(
         "CREATE TABLE IF NOT EXISTS schema_migrations (\
@@ -96,6 +113,17 @@ pub async fn migrate(conn: &Connection) -> Result<()> {
     .await?;
 
     let applied = applied_versions(conn).await?;
+    let newest_catalog = MIGRATIONS
+        .iter()
+        .map(|migration| migration.version)
+        .max()
+        .unwrap_or(0);
+    if let Some(future) = applied.iter().filter(|v| **v > newest_catalog).max() {
+        return Err(DbError::FutureDatabase {
+            applied: *future,
+            known_max: newest_catalog,
+        });
+    }
     for migration in MIGRATIONS {
         if !applied.contains(&migration.version) {
             apply_migration(conn, migration).await?;
@@ -142,41 +170,69 @@ async fn apply_migration(conn: &Connection, migration: &Migration) -> Result<()>
 
 /// Current unix time in seconds.
 ///
-/// # Panics
-///
-/// Panics if the system clock is before the unix epoch or the value does not
-/// fit in `i64`.
+/// Never panics: a pre-epoch system clock or an out-of-range value degrades
+/// to `0` rather than aborting a verify run that is only trying to record a
+/// timestamp.
 #[must_use]
 pub fn unix_now() -> i64 {
-    i64::try_from(
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .expect("system clock before unix epoch")
-            .as_secs(),
-    )
-    .expect("unix time fits in i64")
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |duration| i64::try_from(duration.as_secs()).unwrap_or(0))
 }
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used)]
+
     use super::*;
+
+    #[test]
+    fn migration_catalog_is_strictly_ascending() {
+        assert!(!MIGRATIONS.is_empty());
+        for pair in MIGRATIONS.windows(2) {
+            assert!(
+                pair[0].version < pair[1].version,
+                "catalog out of order: {} ({}) then {} ({})",
+                pair[0].version,
+                pair[0].name,
+                pair[1].version,
+                pair[1].name
+            );
+        }
+    }
 
     #[tokio::test(flavor = "current_thread")]
     async fn migrate_is_idempotent() {
-        let dir = tempfile::tempdir().expect("tempdir");
-        let conn = connect(dir.path().join("state.db")).await.expect("connect");
-        migrate(&conn).await.expect("first migrate");
-        migrate(&conn).await.expect("second migrate");
-        let versions = applied_versions(&conn).await.expect("versions");
+        let dir = tempfile::tempdir().unwrap();
+        let conn = connect(dir.path().join("state.db")).await.unwrap();
+        migrate(&conn).await.unwrap();
+        migrate(&conn).await.unwrap();
+        let versions = applied_versions(&conn).await.unwrap();
         assert_eq!(versions.len(), MIGRATIONS.len());
+    }
+
+    /// A database written by a newer harness fails fast instead of silently
+    /// running with a diverged schema.
+    #[tokio::test(flavor = "current_thread")]
+    async fn migrate_rejects_database_from_newer_binary() {
+        let dir = tempfile::tempdir().unwrap();
+        let conn = connect(dir.path().join("state.db")).await.unwrap();
+        migrate(&conn).await.unwrap();
+        conn.execute(
+            "INSERT INTO schema_migrations (version, name, applied_at) VALUES (9999, 'future', 0)",
+            Params::None,
+        )
+        .await
+        .unwrap();
+
+        let err = migrate(&conn).await.unwrap_err();
+        assert!(matches!(err, DbError::FutureDatabase { applied: 9999, .. }));
     }
 
     #[tokio::test(flavor = "current_thread")]
     async fn connect_and_migrate_creates_state_db() {
-        let dir = tempfile::tempdir().expect("tempdir");
-        let conn = connect_and_migrate(dir.path())
-            .await
-            .expect("connect+migrate");
+        let dir = tempfile::tempdir().unwrap();
+        let conn = connect_and_migrate(dir.path()).await.unwrap();
         assert!(crate::root::db_path(dir.path()).exists());
         drop(conn);
     }

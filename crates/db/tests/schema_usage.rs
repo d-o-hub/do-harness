@@ -13,7 +13,7 @@
 //! adds a column with no matching writer code yields a column absent from the
 //! production source and the test fails.
 #![deny(unsafe_code)]
-#![allow(clippy::unwrap_used)]
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use std::path::Path;
 
@@ -26,6 +26,7 @@ use libsql::{Connection, params::Params};
 /// actual source.
 const PROD_SOURCES: &[&str] = &[
     "/src/repo.rs",
+    "/src/repo_eval.rs",
     "/src/repo_exec.rs",
     "/src/repo_learn.rs",
     "/src/repo_scope.rs",

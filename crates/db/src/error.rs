@@ -5,11 +5,16 @@ use std::path::PathBuf;
 /// Result alias for operations that can fail with a [`DbError`].
 pub type Result<T> = std::result::Result<T, DbError>;
 
+/// `SQLite` primary result code for constraint violations; extended codes
+/// fold into their primary code, hence the mask in [`DbError::from`].
+const SQLITE_CONSTRAINT: std::ffi::c_int = 19;
+
 /// Errors produced by the do-harness persistence layer.
 ///
 /// All `libsql` failures (execute, query, row access, transactions) funnel
-/// through [`DbError::Migrate`] because libSQL surfaces them as a single
-/// [`libsql::Error`] type.
+/// through [`DbError::Sql`] because libSQL surfaces them as a single
+/// [`libsql::Error`] type; constraint violations are detected and surfaced as
+/// [`DbError::Constraint`] so callers can match on them.
 #[derive(Debug, thiserror::Error)]
 pub enum DbError {
     /// Failed to create the state database's parent directory.
@@ -30,14 +35,14 @@ pub enum DbError {
         #[source]
         source: libsql::Error,
     },
-    /// A SQL statement or migration failed.
-    #[error("schema migration failed: {0}")]
-    Migrate(#[from] libsql::Error),
+    /// A SQL statement, query, or transaction failed.
+    #[error("sql failed: {0}")]
+    Sql(libsql::Error),
     /// A stored task row carried an unrecognized status value.
     #[error("invalid stored task status '{0}'")]
     InvalidTaskStatus(String),
     /// A foreign-key or unique constraint was violated.
-    #[error("{0}")]
+    #[error("constraint violated: {0}")]
     Constraint(String),
     /// A record expected to exist was missing.
     #[error("not found: {0}")]
@@ -48,7 +53,55 @@ pub enum DbError {
     /// A row count could not be converted.
     #[error("count conversion failed: {0}")]
     IntConversion(#[from] std::num::TryFromIntError),
-    /// A fallback for otherwise-untyped failures.
-    #[error("{0}")]
-    Other(String),
+    /// The state database was written by a newer harness; this binary's
+    /// migration catalog does not cover it (downgrade guard).
+    #[error(
+        "state database has migration {applied}, newer than this binary knows (max {known_max})"
+    )]
+    FutureDatabase {
+        /// The applied migration version this binary does not know.
+        applied: i64,
+        /// The highest version in this binary's embedded catalog.
+        known_max: i64,
+    },
+}
+
+impl From<libsql::Error> for DbError {
+    fn from(err: libsql::Error) -> Self {
+        if let libsql::Error::SqliteFailure(code, message) = &err {
+            if (code & 0xFF) == SQLITE_CONSTRAINT {
+                return DbError::Constraint(message.clone());
+            }
+        }
+        DbError::Sql(err)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Constraint failures surface as `Constraint`, everything else as `Sql`.
+    #[test]
+    fn libsql_errors_map_by_constraint_code() {
+        let constraint = DbError::from(libsql::Error::SqliteFailure(
+            SQLITE_CONSTRAINT,
+            "UNIQUE constraint failed".to_owned(),
+        ));
+        assert!(matches!(constraint, DbError::Constraint(_)));
+
+        // An extended constraint code (19 | 0x100 << 8) still maps to
+        // `Constraint` after masking to the primary code.
+        let extended = DbError::from(libsql::Error::SqliteFailure(
+            SQLITE_CONSTRAINT | (1 << 8),
+            "constraint failed".to_owned(),
+        ));
+        assert!(matches!(extended, DbError::Constraint(_)));
+
+        let other = DbError::from(libsql::Error::SqliteFailure(
+            1,
+            "generic failure".to_owned(),
+        ));
+        assert!(matches!(other, DbError::Sql(_)));
+    }
 }

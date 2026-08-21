@@ -2,6 +2,7 @@
 
 use crate::error::{DbError, Result};
 use crate::migrate::unix_now;
+use crate::repo_scope::reset_error_signature;
 use do_harness_types::{Beat, ErrorSignature};
 use libsql::{Connection, params, params::Params};
 
@@ -30,22 +31,28 @@ pub struct NewBeat<'a> {
 ///
 /// Returns an error when the insert statement fails.
 pub async fn insert_beat(conn: &Connection, beat: &NewBeat<'_>) -> Result<i64> {
-    conn.execute(
-        "INSERT INTO beats (task_id, beat_type, status, sensor_exit_code, sensor_name, \
-         started_at, completed_at) \
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-        params!(
-            beat.task_id,
-            beat.beat_type,
-            beat.status,
-            beat.sensor_exit_code,
-            beat.sensor_name,
-            beat.started_at,
-            beat.completed_at
-        ),
-    )
-    .await?;
-    Ok(conn.last_insert_rowid())
+    let mut rows = conn
+        .query(
+            "INSERT INTO beats (task_id, beat_type, status, sensor_exit_code, sensor_name, \
+             started_at, completed_at) \
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7) \
+             RETURNING id",
+            params!(
+                beat.task_id,
+                beat.beat_type,
+                beat.status,
+                beat.sensor_exit_code,
+                beat.sensor_name,
+                beat.started_at,
+                beat.completed_at
+            ),
+        )
+        .await?;
+    let row = rows
+        .next()
+        .await?
+        .ok_or_else(|| DbError::NotFound("beat id vanished after insert".to_string()))?;
+    Ok(row.get(0)?)
 }
 
 /// Lists beats, optionally filtered to one task.
@@ -93,12 +100,27 @@ pub async fn list_beats(conn: &Connection, task_id: Option<i64>) -> Result<Vec<B
 ///
 /// The pair is unique; a fresh pair starts at 1, subsequent calls increment
 /// it. `task_id = None` scopes the signature to the whole workspace. Returns
-/// the new attempt count.
+/// the new attempt count. The update-or-insert sequence runs in a transaction
+/// so concurrent bumps cannot race between the `UPDATE` and the `INSERT`.
 ///
 /// # Errors
 ///
 /// Returns an error when the update, insert, or follow-up query fails.
 pub async fn bump_error_signature(
+    conn: &Connection,
+    signature: &str,
+    task_id: Option<i64>,
+    message: Option<&str>,
+) -> Result<i64> {
+    let tx = conn.transaction().await?;
+    let count = bump_error_signature_on(&tx, signature, task_id, message).await?;
+    tx.commit().await?;
+    Ok(count)
+}
+
+/// [`bump_error_signature`] without transaction management, for composing
+/// into a larger transaction (see [`record_sensor_outcome`]).
+async fn bump_error_signature_on(
     conn: &Connection,
     signature: &str,
     task_id: Option<i64>,
@@ -134,6 +156,35 @@ pub async fn bump_error_signature(
     Ok(row.get(0)?)
 }
 
+/// Records one sensor outcome atomically: inserts the beat and resets (on
+/// success) or bumps (on failure) the matching `sensor:<name>` signature in a
+/// single transaction, so a crash or interleaved writer can never persist a
+/// beat whose strike counter did not move with it.
+///
+/// Returns the resulting strike count for the sensor's signature.
+///
+/// # Errors
+///
+/// Returns an error when the state database cannot be written.
+pub async fn record_sensor_outcome(
+    conn: &Connection,
+    beat: &NewBeat<'_>,
+    ok: bool,
+    message: Option<&str>,
+) -> Result<i64> {
+    let signature = format!("sensor:{}", beat.sensor_name.unwrap_or("unknown"));
+    let tx = conn.transaction().await?;
+    insert_beat(&tx, beat).await?;
+    let count = if ok {
+        reset_error_signature(&tx, &signature, beat.task_id).await?;
+        0
+    } else {
+        bump_error_signature_on(&tx, &signature, beat.task_id, message).await?
+    };
+    tx.commit().await?;
+    Ok(count)
+}
+
 /// Fetches an error signature by its `(signature, task_id)` key.
 ///
 /// # Errors
@@ -166,7 +217,7 @@ pub async fn get_error_signature(
 
 #[cfg(test)]
 mod tests {
-    #![allow(clippy::unwrap_used)]
+    #![allow(clippy::unwrap_used, clippy::expect_used)]
 
     use super::*;
     use crate::repo::NewTask;
@@ -210,13 +261,101 @@ mod tests {
         assert_eq!(beats[0].status, "failed");
         assert_eq!(beats[0].sensor_exit_code, Some(1));
         assert_eq!(beats[0].started_at, 1);
-        assert!(list_beats(&conn, None).await.unwrap().len() == 1);
+        assert_eq!(list_beats(&conn, None).await.unwrap().len(), 1);
         assert!(
             list_beats(&conn, Some(task_id + 1))
                 .await
                 .unwrap()
                 .is_empty()
         );
+    }
+
+    /// Foreign keys are enforced: a beat referencing a missing task is
+    /// rejected instead of silently orphaned.
+    #[tokio::test(flavor = "current_thread")]
+    async fn insert_beat_rejects_missing_task_fk() {
+        let dir = tempfile::tempdir().unwrap();
+        let conn = crate::migrate::connect_and_migrate(dir.path())
+            .await
+            .unwrap();
+        let result = insert_beat(
+            &conn,
+            &NewBeat {
+                task_id: Some(9999),
+                beat_type: "sensor",
+                status: "ok",
+                sensor_exit_code: Some(0),
+                sensor_name: Some("check"),
+                started_at: 1,
+                completed_at: Some(2),
+            },
+        )
+        .await;
+        assert!(result.is_err(), "FK violation must surface as an error");
+    }
+
+    /// Workspace-global strikes (NULL `task_id`) are unique per signature: a
+    /// raw duplicate insert violates the partial unique index.
+    #[tokio::test(flavor = "current_thread")]
+    async fn duplicate_global_signature_insert_is_rejected() {
+        let dir = tempfile::tempdir().unwrap();
+        let conn = crate::migrate::connect_and_migrate(dir.path())
+            .await
+            .unwrap();
+        bump_error_signature(&conn, "sensor:clippy", None, Some("m1"))
+            .await
+            .unwrap();
+        let dupe = conn
+            .execute(
+                "INSERT INTO error_signatures (signature, task_id, attempt_count, message, \
+                 created_at) VALUES ('sensor:clippy', NULL, 1, NULL, 0)",
+                Params::None,
+            )
+            .await;
+        assert!(dupe.is_err(), "duplicate global strike must be rejected");
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn record_sensor_outcome_is_atomic_beat_plus_strike() {
+        let dir = tempfile::tempdir().unwrap();
+        let conn = crate::migrate::connect_and_migrate(dir.path())
+            .await
+            .unwrap();
+
+        let beat = |status: &'static str| NewBeat {
+            task_id: None,
+            beat_type: "sensor",
+            status,
+            sensor_exit_code: Some(0),
+            sensor_name: Some("atomic"),
+            started_at: 1,
+            completed_at: Some(2),
+        };
+        record_sensor_outcome(&conn, &beat("failed"), false, Some("boom"))
+            .await
+            .unwrap();
+        record_sensor_outcome(&conn, &beat("failed"), false, Some("boom2"))
+            .await
+            .unwrap();
+        assert_eq!(
+            get_error_signature(&conn, "sensor:atomic", None)
+                .await
+                .unwrap()
+                .unwrap()
+                .attempt_count,
+            2
+        );
+        record_sensor_outcome(&conn, &beat("ok"), true, None)
+            .await
+            .unwrap();
+        assert!(
+            get_error_signature(&conn, "sensor:atomic", None)
+                .await
+                .unwrap()
+                .is_none(),
+            "passing outcome must reset the strike inside the same transaction"
+        );
+        assert_eq!(list_beats(&conn, None).await.unwrap().len(), 3);
     }
 
     #[tokio::test(flavor = "current_thread")]

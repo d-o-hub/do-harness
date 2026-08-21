@@ -1,10 +1,10 @@
 //! Repository layer for the learning tables: traces, heuristics, and skill
 //! evaluations.
 
-use crate::error::Result;
+use crate::error::{DbError, Result};
 use crate::migrate::unix_now;
 use do_harness_types::{Heuristic, SkillEval, Trace};
-use libsql::{Connection, params};
+use libsql::{Connection, params, params::Params};
 
 /// Insert parameters for a new trace.
 #[derive(Debug, Clone)]
@@ -53,20 +53,26 @@ pub struct NewSkillEval<'a> {
 ///
 /// Returns an error when the insert statement fails.
 pub async fn insert_trace(conn: &Connection, trace: &NewTrace<'_>) -> Result<i64> {
-    conn.execute(
-        "INSERT INTO traces (task_id, session_id, command, error_diff, resolution_steps, created_at) \
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-        params!(
-            trace.task_id,
-            trace.session_id,
-            trace.command,
-            trace.error_diff,
-            trace.resolution_steps,
-            unix_now()
-        ),
-    )
-    .await?;
-    Ok(conn.last_insert_rowid())
+    let mut rows = conn
+        .query(
+            "INSERT INTO traces (task_id, session_id, command, error_diff, resolution_steps, created_at) \
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6) \
+             RETURNING id",
+            params!(
+                trace.task_id,
+                trace.session_id,
+                trace.command,
+                trace.error_diff,
+                trace.resolution_steps,
+                unix_now()
+            ),
+        )
+        .await?;
+    let row = rows
+        .next()
+        .await?
+        .ok_or_else(|| DbError::NotFound("trace id vanished after insert".to_string()))?;
+    Ok(row.get(0)?)
 }
 
 /// Lists traces for a session in insertion order.
@@ -131,19 +137,25 @@ pub async fn get_trace(conn: &Connection, id: i64) -> Result<Option<Trace>> {
 ///
 /// Returns an error when the insert statement fails.
 pub async fn insert_heuristic(conn: &Connection, heuristic: &NewHeuristic<'_>) -> Result<i64> {
-    conn.execute(
-        "INSERT INTO heuristics (skill_name, pattern, description, source_trace_id, created_at) \
-         VALUES (?1, ?2, ?3, ?4, ?5)",
-        params!(
-            heuristic.skill_name,
-            heuristic.pattern,
-            heuristic.description,
-            heuristic.source_trace_id,
-            unix_now()
-        ),
-    )
-    .await?;
-    Ok(conn.last_insert_rowid())
+    let mut rows = conn
+        .query(
+            "INSERT INTO heuristics (skill_name, pattern, description, source_trace_id, created_at) \
+             VALUES (?1, ?2, ?3, ?4, ?5) \
+             RETURNING id",
+            params!(
+                heuristic.skill_name,
+                heuristic.pattern,
+                heuristic.description,
+                heuristic.source_trace_id,
+                unix_now()
+            ),
+        )
+        .await?;
+    let row = rows
+        .next()
+        .await?
+        .ok_or_else(|| DbError::NotFound("heuristic id vanished after insert".to_string()))?;
+    Ok(row.get(0)?)
 }
 
 /// Lists heuristics for a skill in insertion order.
@@ -182,36 +194,29 @@ pub async fn list_heuristics(conn: &Connection, skill_name: &str) -> Result<Vec<
 ///
 /// Returns an error when the insert statement fails.
 pub async fn insert_skill_eval(conn: &Connection, eval: &NewSkillEval<'_>) -> Result<i64> {
-    conn.execute(
-        "INSERT INTO skill_evals (skill_name, prompt, expected_outcome, pass_rate, created_at) \
-         VALUES (?1, ?2, ?3, ?4, ?5) \
-         ON CONFLICT(skill_name) DO UPDATE SET \
-           prompt = excluded.prompt, \
-           expected_outcome = excluded.expected_outcome, \
-           pass_rate = excluded.pass_rate, \
-           created_at = excluded.created_at",
-        params!(
-            eval.skill_name,
-            eval.prompt,
-            eval.expected_outcome,
-            eval.pass_rate,
-            unix_now()
-        ),
-    )
-    .await?;
     let mut rows = conn
         .query(
-            "SELECT id FROM skill_evals WHERE skill_name = ?1",
-            params!(eval.skill_name),
+            "INSERT INTO skill_evals (skill_name, prompt, expected_outcome, pass_rate, created_at) \
+             VALUES (?1, ?2, ?3, ?4, ?5) \
+             ON CONFLICT(skill_name) DO UPDATE SET \
+               prompt = excluded.prompt, \
+               expected_outcome = excluded.expected_outcome, \
+               pass_rate = excluded.pass_rate, \
+               created_at = excluded.created_at \
+             RETURNING id",
+            params!(
+                eval.skill_name,
+                eval.prompt,
+                eval.expected_outcome,
+                eval.pass_rate,
+                unix_now()
+            ),
         )
         .await?;
-    let row = rows
-        .next()
-        .await?
-        .ok_or(crate::error::DbError::NotFound(format!(
-            "skill eval for '{}'",
-            eval.skill_name
-        )))?;
+    let row = rows.next().await?.ok_or(DbError::NotFound(format!(
+        "skill eval for '{}'",
+        eval.skill_name
+    )))?;
     Ok(row.get(0)?)
 }
 
@@ -242,9 +247,36 @@ pub async fn list_skill_evals(conn: &Connection, skill_name: &str) -> Result<Vec
     Ok(evals)
 }
 
+/// Lists every persisted skill evaluation, one row per skill.
+///
+/// # Errors
+///
+/// Returns an error when the query fails.
+pub async fn list_all_skill_evals(conn: &Connection) -> Result<Vec<SkillEval>> {
+    let mut rows = conn
+        .query(
+            "SELECT id, skill_name, prompt, expected_outcome, pass_rate, created_at \
+             FROM skill_evals ORDER BY skill_name",
+            Params::None,
+        )
+        .await?;
+    let mut evals = Vec::new();
+    while let Some(row) = rows.next().await? {
+        evals.push(SkillEval {
+            id: row.get(0)?,
+            skill_name: row.get(1)?,
+            prompt: row.get(2)?,
+            expected_outcome: row.get(3)?,
+            pass_rate: row.get(4)?,
+            created_at: row.get(5)?,
+        });
+    }
+    Ok(evals)
+}
+
 #[cfg(test)]
 mod tests {
-    #![allow(clippy::unwrap_used)]
+    #![allow(clippy::unwrap_used, clippy::expect_used)]
 
     use super::*;
 

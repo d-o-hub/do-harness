@@ -14,6 +14,7 @@ libsql = { workspace = true, features = ["core"] }
 tokio.workspace = true
 anyhow.workspace = true
 thiserror.workspace = true
+serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 do-harness-types = { path = "../types", version = "0.1.0" }
 

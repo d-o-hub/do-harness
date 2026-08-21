@@ -111,7 +111,7 @@ pub async fn clear_error_signatures(
 
 #[cfg(test)]
 mod tests {
-    #![allow(clippy::unwrap_used)]
+    #![allow(clippy::unwrap_used, clippy::expect_used)]
 
     use super::*;
     use crate::repo::NewTask;
