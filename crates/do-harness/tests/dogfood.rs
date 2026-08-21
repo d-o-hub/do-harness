@@ -3,6 +3,8 @@
 //!
 //! - rust: `init` scaffolds a minimal crate, so the full sensor suite runs and
 //!   exits 0 on a truly empty tree.
+
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //! - red: removing the crate must flip `verify` to a non-zero exit with named
 //!   failing sensors (proves the sensors actually execute).
 //! - generic: zero sensors means `verify` exits 0 without running any command
