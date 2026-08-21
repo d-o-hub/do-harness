@@ -40,6 +40,18 @@ pub struct SensorSpec {
     pub name: String,
     /// Command line, program first (e.g. `["cargo", "fmt", "--all", "--", "--check"]`).
     pub argv: Vec<String>,
+    /// Optional number of retry attempts on failure.
+    #[serde(default)]
+    pub retry: Option<u32>,
+    /// Optional process execution timeout budget in seconds.
+    #[serde(default)]
+    pub timeout: Option<u64>,
+    /// Whether failure of this sensor is advisory/warn-only and should not fail the verify gate.
+    #[serde(default, rename = "allow_failure")]
+    pub allow_failure: bool,
+    /// Reserved exit codes that signal transient failures eligible for retry/warn handling.
+    #[serde(default, rename = "transient_exit_codes")]
+    pub transient_exit_codes: Vec<i32>,
 }
 
 /// Language pack identifiers accepted in `Config.language`.
@@ -60,6 +72,10 @@ fn rust_pack() -> Vec<SensorSpec> {
                 "--".to_owned(),
                 "--check".to_owned(),
             ],
+            retry: None,
+            timeout: None,
+            allow_failure: false,
+            transient_exit_codes: vec![],
         },
         SensorSpec {
             name: "check".to_owned(),
@@ -68,6 +84,10 @@ fn rust_pack() -> Vec<SensorSpec> {
                 "check".to_owned(),
                 "--workspace".to_owned(),
             ],
+            retry: None,
+            timeout: None,
+            allow_failure: false,
+            transient_exit_codes: vec![],
         },
         SensorSpec {
             name: "clippy".to_owned(),
@@ -79,6 +99,10 @@ fn rust_pack() -> Vec<SensorSpec> {
                 "-D".to_owned(),
                 "warnings".to_owned(),
             ],
+            retry: None,
+            timeout: None,
+            allow_failure: false,
+            transient_exit_codes: vec![],
         },
         SensorSpec {
             name: "test".to_owned(),
@@ -87,18 +111,34 @@ fn rust_pack() -> Vec<SensorSpec> {
                 "test".to_owned(),
                 "--workspace".to_owned(),
             ],
+            retry: None,
+            timeout: None,
+            allow_failure: false,
+            transient_exit_codes: vec![],
         },
         SensorSpec {
             name: "loc".to_owned(),
             argv: vec!["bash".to_owned(), "scripts/check-loc.sh".to_owned()],
+            retry: None,
+            timeout: None,
+            allow_failure: false,
+            transient_exit_codes: vec![],
         },
         SensorSpec {
             name: "deps".to_owned(),
             argv: vec!["bash".to_owned(), "scripts/check-deps.sh".to_owned()],
+            retry: None,
+            timeout: None,
+            allow_failure: false,
+            transient_exit_codes: vec![],
         },
         SensorSpec {
             name: "commitlint".to_owned(),
             argv: vec!["bash".to_owned(), "scripts/check-commitlint.sh".to_owned()],
+            retry: None,
+            timeout: None,
+            allow_failure: false,
+            transient_exit_codes: vec![],
         },
     ]
 }
@@ -223,6 +263,47 @@ mod tests {
         std::fs::write(&path, "bogus_key = 1\n").expect("write config");
         let err = load(dir.path(), Some(&path)).expect_err("load must fail");
         assert!(format!("{err:#}").contains("bogus_key"));
+    }
+
+    /// Parses new per-sensor fields: retry, timeout, allow_failure, transient_exit_codes.
+    #[test]
+    fn parses_transient_failure_sensor_options() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("do-harness.toml");
+        let text = r#"
+            [[sensors]]
+            name = "links"
+            argv = ["bash", "check-links.sh"]
+            retry = 3
+            timeout = 10
+            allow_failure = true
+            transient_exit_codes = [75, 429]
+        "#;
+        std::fs::write(&path, text).expect("write config");
+        let cfg = load(dir.path(), Some(&path)).expect("load config");
+        assert_eq!(cfg.sensors.len(), 1);
+        let sensor = &cfg.sensors[0];
+        assert_eq!(sensor.name, "links");
+        assert_eq!(sensor.retry, Some(3));
+        assert_eq!(sensor.timeout, Some(10));
+        assert!(sensor.allow_failure);
+        assert_eq!(sensor.transient_exit_codes, vec![75, 429]);
+    }
+
+    /// Unknown fields in [[sensors]] are rejected by `deny_unknown_fields`.
+    #[test]
+    fn rejects_unknown_sensor_fields() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("do-harness.toml");
+        let text = r#"
+            [[sensors]]
+            name = "fmt"
+            argv = ["cargo", "fmt"]
+            unknown_sensor_option = true
+        "#;
+        std::fs::write(&path, text).expect("write config");
+        let err = load(dir.path(), Some(&path)).expect_err("load must fail");
+        assert!(format!("{err:#}").contains("unknown_sensor_option"));
     }
 
     /// A missing default config falls back to the built-in Rust pack.
