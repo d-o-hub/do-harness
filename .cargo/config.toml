@@ -1,0 +1,10 @@
+# .cargo/config.toml — cargo aliases.
+#
+# NOTE: [profile.*] tables are intentionally NOT here; Cargo only honors
+# profile definitions in the workspace-root Cargo.toml. See AGENTS.md §5.
+
+[alias]
+# Quick quality check (mirrors the check/clippy sensors).
+check-all = "check --workspace --all-targets"
+fmt-check = "fmt --all -- --check"
+lint = "clippy --workspace --all-targets -- -D warnings"

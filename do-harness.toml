@@ -29,5 +29,9 @@ name = "deps"
 argv = ["bash", "scripts/check-deps.sh"]
 
 [[sensors]]
+name = "audit"
+argv = ["bash", "scripts/check-audit.sh"]
+
+[[sensors]]
 name = "commitlint"
 argv = ["bash", "scripts/check-commitlint.sh"]

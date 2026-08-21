@@ -1,0 +1,8 @@
+# Pinned toolchain: CI and local builds use the exact same compiler.
+#
+# Bumping this file is a deliberate act: update the version, run
+# `do-harness verify` locally, and let the MSRV job guard `rust-version`.
+[toolchain]
+channel = "1.98.0"
+profile = "minimal"
+components = ["rustfmt", "clippy"]
