@@ -1,8 +1,10 @@
 //! Computational sensor runner for `do-harness verify`.
 
+use std::io::Read;
 use std::path::Path;
-use std::process::Command;
-use std::time::Instant;
+use std::process::{Command, Stdio};
+use std::thread;
+use std::time::{Duration, Instant};
 
 use anyhow::{Result, anyhow};
 
@@ -61,6 +63,7 @@ pub fn verify(cfg: &Config, root: &Path, opts: &VerifyOpts) -> Result<VerifyRepo
                 ok: false,
                 exit_code: None,
                 duration_ms: 0,
+                allow_failure: spec.allow_failure,
                 output: format!(
                     "halted: sensor '{}' has failed {} consecutive times; resolve the underlying issue before re-running",
                     spec.name, FAIL_FAST_STRIKES
@@ -69,16 +72,16 @@ pub fn verify(cfg: &Config, root: &Path, opts: &VerifyOpts) -> Result<VerifyRepo
         } else {
             run_sensor(spec, root)
         };
-        let failed = !result.ok;
+        let hard_failed = !result.ok && !result.allow_failure;
         results.push(result);
-        if failed && opts.fail_fast {
+        if hard_failed && opts.fail_fast {
             break;
         }
     }
 
     let failed: Vec<String> = results
         .iter()
-        .filter(|r| !r.ok)
+        .filter(|r| !r.ok && !r.allow_failure)
         .map(|r| r.name.clone())
         .collect();
     Ok(VerifyReport {
@@ -89,8 +92,8 @@ pub fn verify(cfg: &Config, root: &Path, opts: &VerifyOpts) -> Result<VerifyRepo
     })
 }
 
-/// Runs a single sensor command from `root`, capturing combined output.
-fn run_sensor(spec: &SensorSpec, root: &Path) -> SensorResult {
+/// Runs a single sensor attempt from `root`, enforcing timeouts if configured.
+fn run_sensor_attempt(spec: &SensorSpec, root: &Path) -> SensorResult {
     let start = Instant::now();
     let Some((program, rest)) = spec.argv.split_first() else {
         return SensorResult {
@@ -98,31 +101,173 @@ fn run_sensor(spec: &SensorSpec, root: &Path) -> SensorResult {
             ok: false,
             exit_code: None,
             duration_ms: 0,
+            allow_failure: spec.allow_failure,
             output: format!("sensor '{}' has an empty argv", spec.name),
         };
     };
-    let output = Command::new(program).args(rest).current_dir(root).output();
-    let duration_ms = u64::try_from(start.elapsed().as_millis()).unwrap_or(u64::MAX);
 
-    match output {
-        Ok(output) => SensorResult {
-            name: spec.name.clone(),
-            ok: output.status.success(),
-            exit_code: output.status.code(),
-            duration_ms,
-            output: format!(
-                "{}\n{}",
-                String::from_utf8_lossy(&output.stdout),
-                String::from_utf8_lossy(&output.stderr)
-            ),
-        },
-        Err(err) => SensorResult {
-            name: spec.name.clone(),
-            ok: false,
-            exit_code: None,
-            duration_ms,
-            output: format!("failed to spawn {program}: {err}"),
-        },
+    let timeout_duration = spec.timeout.map(Duration::from_secs);
+
+    if let Some(timeout) = timeout_duration {
+        let mut child = match Command::new(program)
+            .args(rest)
+            .current_dir(root)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+        {
+            Ok(child) => child,
+            Err(err) => {
+                let duration_ms = u64::try_from(start.elapsed().as_millis()).unwrap_or(u64::MAX);
+                return SensorResult {
+                    name: spec.name.clone(),
+                    ok: false,
+                    exit_code: None,
+                    duration_ms,
+                    allow_failure: spec.allow_failure,
+                    output: format!("failed to spawn {program}: {err}"),
+                };
+            }
+        };
+
+        let stdout_handle = child.stdout.take().map(|mut out| {
+            thread::spawn(move || {
+                let mut buf = Vec::new();
+                let _ = out.read_to_end(&mut buf);
+                buf
+            })
+        });
+
+        let stderr_handle = child.stderr.take().map(|mut err| {
+            thread::spawn(move || {
+                let mut buf = Vec::new();
+                let _ = err.read_to_end(&mut buf);
+                buf
+            })
+        });
+
+        loop {
+            match child.try_wait() {
+                Ok(Some(status)) => {
+                    let duration_ms =
+                        u64::try_from(start.elapsed().as_millis()).unwrap_or(u64::MAX);
+                    let stdout = stdout_handle
+                        .and_then(|h| h.join().ok())
+                        .unwrap_or_default();
+                    let stderr = stderr_handle
+                        .and_then(|h| h.join().ok())
+                        .unwrap_or_default();
+                    return SensorResult {
+                        name: spec.name.clone(),
+                        ok: status.success(),
+                        exit_code: status.code(),
+                        duration_ms,
+                        allow_failure: spec.allow_failure,
+                        output: format!(
+                            "{}\n{}",
+                            String::from_utf8_lossy(&stdout),
+                            String::from_utf8_lossy(&stderr)
+                        ),
+                    };
+                }
+                Ok(None) => {
+                    if start.elapsed() >= timeout {
+                        let _ = child.kill();
+                        let _ = child.wait();
+                        let duration_ms =
+                            u64::try_from(start.elapsed().as_millis()).unwrap_or(u64::MAX);
+                        return SensorResult {
+                            name: spec.name.clone(),
+                            ok: false,
+                            exit_code: None,
+                            duration_ms,
+                            allow_failure: spec.allow_failure,
+                            output: format!(
+                                "sensor '{}' timed out after {}s",
+                                spec.name,
+                                timeout.as_secs()
+                            ),
+                        };
+                    }
+                    thread::sleep(Duration::from_millis(10));
+                }
+                Err(err) => {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    let duration_ms =
+                        u64::try_from(start.elapsed().as_millis()).unwrap_or(u64::MAX);
+                    return SensorResult {
+                        name: spec.name.clone(),
+                        ok: false,
+                        exit_code: None,
+                        duration_ms,
+                        allow_failure: spec.allow_failure,
+                        output: format!("error waiting for child {program}: {err}"),
+                    };
+                }
+            }
+        }
+    } else {
+        let output = Command::new(program).args(rest).current_dir(root).output();
+        let duration_ms = u64::try_from(start.elapsed().as_millis()).unwrap_or(u64::MAX);
+
+        match output {
+            Ok(output) => SensorResult {
+                name: spec.name.clone(),
+                ok: output.status.success(),
+                exit_code: output.status.code(),
+                duration_ms,
+                allow_failure: spec.allow_failure,
+                output: format!(
+                    "{}\n{}",
+                    String::from_utf8_lossy(&output.stdout),
+                    String::from_utf8_lossy(&output.stderr)
+                ),
+            },
+            Err(err) => SensorResult {
+                name: spec.name.clone(),
+                ok: false,
+                exit_code: None,
+                duration_ms,
+                allow_failure: spec.allow_failure,
+                output: format!("failed to spawn {program}: {err}"),
+            },
+        }
+    }
+}
+
+/// Runs a single sensor command from `root`, retrying on transient failures.
+fn run_sensor(spec: &SensorSpec, root: &Path) -> SensorResult {
+    let max_retries = spec
+        .retry
+        .unwrap_or(if !spec.transient_exit_codes.is_empty() {
+            3
+        } else {
+            0
+        });
+
+    let mut attempts = 0;
+    loop {
+        let result = run_sensor_attempt(spec, root);
+        if result.ok {
+            return result;
+        }
+
+        if attempts >= max_retries {
+            return result;
+        }
+
+        if !spec.transient_exit_codes.is_empty() {
+            let is_transient = result
+                .exit_code
+                .map_or(false, |code| spec.transient_exit_codes.contains(&code));
+            if !is_transient {
+                return result;
+            }
+        }
+
+        attempts += 1;
+        thread::sleep(Duration::from_millis(50));
     }
 }
 
@@ -143,6 +288,10 @@ mod tests {
                 .map(|(name, argv)| SensorSpec {
                     name: (*name).to_owned(),
                     argv: argv.iter().map(|a| (*a).to_owned()).collect(),
+                    retry: None,
+                    timeout: None,
+                    allow_failure: false,
+                    transient_exit_codes: vec![],
                 })
                 .collect(),
         }
@@ -322,5 +471,162 @@ mod tests {
         assert_eq!(report.sensors[0].name, "halt");
         assert!(!report.sensors[0].ok);
         assert_eq!(report.failed, vec!["halt".to_owned()]);
+    }
+
+    /// A sensor configured to retry retries upon failure until it succeeds.
+    #[test]
+    fn retries_failing_sensor_until_success() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let counter_file = dir.path().join("counter.txt");
+        let script = format!(
+            "count=$(cat '{}' 2>/dev/null || echo 0)\ncount=$((count + 1))\necho $count > '{}'\nif [ $count -lt 3 ]; then exit 1; fi",
+            counter_file.display(),
+            counter_file.display()
+        );
+        let cfg = Config {
+            language: None,
+            hooks: HooksConfig::default(),
+            sensors: vec![SensorSpec {
+                name: "flaky".to_owned(),
+                argv: vec!["sh".to_owned(), "-c".to_owned(), script],
+                retry: Some(3),
+                timeout: None,
+                allow_failure: false,
+                transient_exit_codes: vec![],
+            }],
+        };
+
+        let report = verify(
+            &cfg,
+            dir.path(),
+            &VerifyOpts {
+                fail_fast: false,
+                only: vec![],
+                blocked: vec![],
+            },
+        )
+        .expect("verify");
+
+        assert!(report.ok);
+        assert!(report.failed.is_empty());
+        assert!(report.sensors[0].ok);
+        assert_eq!(
+            std::fs::read_to_string(&counter_file).expect("read counter").trim(),
+            "3"
+        );
+    }
+
+    /// A sensor configured with a timeout budget is aborted when it hangs.
+    #[test]
+    fn times_out_hanging_sensor() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let cfg = Config {
+            language: None,
+            hooks: HooksConfig::default(),
+            sensors: vec![SensorSpec {
+                name: "hang".to_owned(),
+                argv: vec!["sleep".to_owned(), "10".to_owned()],
+                retry: None,
+                timeout: Some(1),
+                allow_failure: false,
+                transient_exit_codes: vec![],
+            }],
+        };
+
+        let start = Instant::now();
+        let report = verify(
+            &cfg,
+            dir.path(),
+            &VerifyOpts {
+                fail_fast: false,
+                only: vec![],
+                blocked: vec![],
+            },
+        )
+        .expect("verify");
+
+        let duration = start.elapsed();
+        assert!(duration < Duration::from_secs(5));
+        assert!(!report.ok);
+        assert_eq!(report.failed, vec!["hang".to_owned()]);
+        assert!(!report.sensors[0].ok);
+        assert!(report.sensors[0].output.contains("timed out after 1s"));
+    }
+
+    /// An `allow_failure` sensor never flips the gate to fail, but failure is recorded.
+    #[test]
+    fn allow_failure_sensor_does_not_fail_gate_but_surfaces_output() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let cfg = Config {
+            language: None,
+            hooks: HooksConfig::default(),
+            sensors: vec![SensorSpec {
+                name: "advisory".to_owned(),
+                argv: vec!["sh".to_owned(), "-c".to_owned(), "echo 'something wrong'; exit 1".to_owned()],
+                retry: None,
+                timeout: None,
+                allow_failure: true,
+                transient_exit_codes: vec![],
+            }],
+        };
+
+        let report = verify(
+            &cfg,
+            dir.path(),
+            &VerifyOpts {
+                fail_fast: false,
+                only: vec![],
+                blocked: vec![],
+            },
+        )
+        .expect("verify");
+
+        assert!(report.ok);
+        assert!(report.failed.is_empty());
+        assert!(!report.sensors[0].ok);
+        assert!(report.sensors[0].allow_failure);
+        assert!(report.sensors[0].output.contains("something wrong"));
+    }
+
+    /// Restricting retries to `transient_exit_codes` does not retry non-transient exit codes.
+    #[test]
+    fn transient_exit_codes_restricts_retries() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let counter_file = dir.path().join("transient_counter.txt");
+        let script = format!(
+            "count=$(cat '{}' 2>/dev/null || echo 0)\ncount=$((count + 1))\necho $count > '{}'\nexit 1",
+            counter_file.display(),
+            counter_file.display()
+        );
+        let cfg = Config {
+            language: None,
+            hooks: HooksConfig::default(),
+            sensors: vec![SensorSpec {
+                name: "transient_check".to_owned(),
+                argv: vec!["sh".to_owned(), "-c".to_owned(), script],
+                retry: Some(3),
+                timeout: None,
+                allow_failure: false,
+                transient_exit_codes: vec![75],
+            }],
+        };
+
+        let report = verify(
+            &cfg,
+            dir.path(),
+            &VerifyOpts {
+                fail_fast: false,
+                only: vec![],
+                blocked: vec![],
+            },
+        )
+        .expect("verify");
+
+        assert!(!report.ok);
+        assert_eq!(report.failed, vec!["transient_check".to_owned()]);
+        assert_eq!(
+            std::fs::read_to_string(&counter_file).expect("read counter").trim(),
+            "1"
+        );
     }
 }

@@ -112,6 +112,7 @@ mod tests {
                 ok: false,
                 exit_code: Some(1),
                 duration_ms: 1,
+                allow_failure: false,
                 output: "boom".to_owned(),
             }],
         };
@@ -146,6 +147,7 @@ mod tests {
                 ok: true,
                 exit_code: Some(0),
                 duration_ms: 1,
+                allow_failure: false,
                 output: String::new(),
             }],
         };
@@ -179,6 +181,7 @@ mod tests {
                 ok: false,
                 exit_code: None,
                 duration_ms: 0,
+                allow_failure: false,
                 output: "halted: ...".to_owned(),
             }],
         };
@@ -262,6 +265,7 @@ mod tests {
                 ok: true,
                 exit_code: Some(0),
                 duration_ms: 1,
+                allow_failure: false,
                 output: String::new(),
             }],
         };
@@ -314,6 +318,7 @@ mod tests {
                 ok: false,
                 exit_code: Some(1),
                 duration_ms: 1,
+                allow_failure: false,
                 output: "E0308".to_owned(),
             }],
         };

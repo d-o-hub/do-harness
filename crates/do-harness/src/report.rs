@@ -26,6 +26,9 @@ pub struct SensorResult {
     pub exit_code: Option<i32>,
     /// Wall-clock duration of the run in milliseconds.
     pub duration_ms: u64,
+    /// Whether this sensor failure was allowed/advisory (soft failure).
+    #[serde(default)]
+    pub allow_failure: bool,
     /// Captured combined output; excluded from serialization.
     #[serde(skip)]
     pub output: String,
@@ -54,7 +57,13 @@ const OUTPUT_TAIL_LINES: usize = 80;
 /// go to stderr, prefixed with six spaces.
 pub fn print_report(report: &VerifyReport, format: Format) {
     for sensor in &report.sensors {
-        let verdict = if sensor.ok { "PASS" } else { "FAIL" };
+        let verdict = if sensor.ok {
+            "PASS"
+        } else if sensor.allow_failure {
+            "WARN"
+        } else {
+            "FAIL"
+        };
         if format == Format::Json {
             eprintln!("{verdict}  {}", sensor.name);
         } else {
@@ -117,6 +126,7 @@ mod tests {
                 ok: false,
                 exit_code: Some(1),
                 duration_ms: 42,
+                allow_failure: false,
                 output: "hidden".to_owned(),
             }],
         };
