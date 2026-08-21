@@ -18,13 +18,13 @@ pub struct WalkRun {
     pub success: bool,
 }
 
-/// Runs `skill_dir/evals/walkthrough.sh` when it exists and is executable.
+/// Runs `skill_dir/evals/walkthrough.sh` when it exists.
 ///
-/// A missing or non-executable script is skipped and counts as a success (the
-/// walkthrough is purely optional). When present, the script runs with the
-/// workspace root as its working directory, `DO_HARNESS_ROOT` set, and
-/// `DO_HARNESS_BIN` set to the currently-executing harness binary so `cli:`
-/// residue and walkthrough steps drive the same binary under test.
+/// A missing script is skipped and counts as a success (the walkthrough is
+/// purely optional). When present, the script runs with the workspace root as
+/// its working directory, `DO_HARNESS_ROOT` set, and `DO_HARNESS_BIN` set to
+/// the currently-executing harness binary so `cli:` residue and walkthrough
+/// steps drive the same binary under test.
 #[must_use]
 pub fn run_walkthrough(skill_dir: &Path, root: &Path) -> WalkRun {
     let script = skill_dir.join("evals/walkthrough.sh");
@@ -41,7 +41,8 @@ pub fn run_walkthrough(skill_dir: &Path, root: &Path) -> WalkRun {
             success: true,
         };
     };
-    let output = Command::new(&script)
+    let output = Command::new("sh")
+        .arg(&script)
         .current_dir(root)
         .env("DO_HARNESS_ROOT", root)
         .env("DO_HARNESS_BIN", bin)
@@ -49,10 +50,10 @@ pub fn run_walkthrough(skill_dir: &Path, root: &Path) -> WalkRun {
         .output();
     match output {
         Ok(output) => WalkRun {
-            present,
+            present: true,
             success: output.status.success(),
         },
-        // Executable bit missing or spawn error: treat as a skipped walkthrough.
+        // Spawn error: treat as a skipped walkthrough.
         Err(_) => WalkRun {
             present: false,
             success: true,
