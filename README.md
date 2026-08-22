@@ -66,7 +66,7 @@ The harness is designed to be adopted by any codebase, Rust or not:
 4. Run diagnostics and the suite:
 
    ```bash
-   do-harness doctor               # verify binary resolution & git hook status
+   do-harness doctor               # verify binary resolution, git hooks & state-db migration skew
    do-harness verify               # run sensor suite
    ```
 
@@ -116,7 +116,7 @@ For CI, invoke `do-harness verify --format json` (exit 0/1/2) with the CLI on
 | `metrics [--format text\|json]` | Report sensor stats, strike counts, and eval pass-rate history |
 | `init [--language rust\|generic] [--force]` | Scaffold a harness workspace in the current directory |
 | `hook install [--force]` / `hook uninstall` / `hook status` | Manage `.git/hooks/pre-commit` + `pre-push` |
-| `doctor` | Run diagnostic checks on binary resolution and git hook health |
+| `doctor` | Run diagnostic checks on binary resolution, git hook health, and state-database migration skew (fails when the database outruns the binary) |
 
 Global flags: `--root <path>`, `--config <path>`.
 

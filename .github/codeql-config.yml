@@ -1,0 +1,30 @@
+name: "CodeQL Configuration"
+disable-default-queries: false
+
+queries:
+  - uses: security-and-quality
+  - uses: security-extended
+
+paths:
+  - src
+  - crates
+  - tests
+  - build.rs
+
+paths-ignore:
+  - target
+  - '**/*.md'
+  - '.github'
+  - scripts
+
+# Threat modeling configuration
+threat-models:
+  - local
+
+# Database options
+db-creation-timeout-in-seconds: 3600
+max-disk-cache-size-mb: 1000
+
+# Advanced analysis settings
+log-lines: 25000
+sarif-category: /language:rust

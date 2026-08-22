@@ -16,7 +16,9 @@ use crate::report::Format;
 
 mod commands;
 mod config;
+mod dbcheck;
 mod distill;
+mod doctor;
 mod errors;
 mod eval;
 mod eval_assert;
@@ -386,7 +388,7 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
         Command::Hook { action } => {
             commands::hook(&root, cli.config.as_deref(), action).map_err(CliError::Usage)
         }
-        Command::Doctor => commands::doctor(&root).map_err(CliError::Verify),
+        Command::Doctor => doctor::run(&root).await.map_err(CliError::Verify),
         Command::Metrics { format } => metrics::run_metrics(&root, format)
             .await
             .map_err(CliError::Usage),
