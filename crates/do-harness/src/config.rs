@@ -60,86 +60,32 @@ pub const SUPPORTED_LANGUAGES: &[&str] = &["rust", "generic"];
 /// The built-in Rust sensor pack, in canonical order.
 static RUST_SENSORS: std::sync::LazyLock<Vec<SensorSpec>> = std::sync::LazyLock::new(rust_pack);
 
+/// Builds a built-in sensor spec with the pack-default execution policy
+/// (no retries, no timeout, mandatory pass).
+fn spec(name: &str, argv: &[&str]) -> SensorSpec {
+    SensorSpec {
+        name: name.to_owned(),
+        argv: argv.iter().map(|arg| (*arg).to_owned()).collect(),
+        retry: None,
+        timeout: None,
+        allow_failure: false,
+        transient_exit_codes: Vec::new(),
+    }
+}
+
 /// Builds the built-in Rust sensor pack.
 fn rust_pack() -> Vec<SensorSpec> {
     vec![
-        SensorSpec {
-            name: "fmt".to_owned(),
-            argv: vec![
-                "cargo".to_owned(),
-                "fmt".to_owned(),
-                "--all".to_owned(),
-                "--".to_owned(),
-                "--check".to_owned(),
-            ],
-            retry: None,
-            timeout: None,
-            allow_failure: false,
-            transient_exit_codes: vec![],
-        },
-        SensorSpec {
-            name: "check".to_owned(),
-            argv: vec![
-                "cargo".to_owned(),
-                "check".to_owned(),
-                "--workspace".to_owned(),
-            ],
-            retry: None,
-            timeout: None,
-            allow_failure: false,
-            transient_exit_codes: vec![],
-        },
-        SensorSpec {
-            name: "clippy".to_owned(),
-            argv: vec![
-                "cargo".to_owned(),
-                "clippy".to_owned(),
-                "--workspace".to_owned(),
-                "--".to_owned(),
-                "-D".to_owned(),
-                "warnings".to_owned(),
-            ],
-            retry: None,
-            timeout: None,
-            allow_failure: false,
-            transient_exit_codes: vec![],
-        },
-        SensorSpec {
-            name: "test".to_owned(),
-            argv: vec![
-                "cargo".to_owned(),
-                "test".to_owned(),
-                "--workspace".to_owned(),
-            ],
-            retry: None,
-            timeout: None,
-            allow_failure: false,
-            transient_exit_codes: vec![],
-        },
-        SensorSpec {
-            name: "loc".to_owned(),
-            argv: vec!["bash".to_owned(), "scripts/check-loc.sh".to_owned()],
-            retry: None,
-            timeout: None,
-            allow_failure: false,
-            transient_exit_codes: vec![],
-        },
-        SensorSpec {
-            name: "deps".to_owned(),
-            argv: vec!["bash".to_owned(), "scripts/check-deps.sh".to_owned()],
-            retry: None,
-            timeout: None,
-            allow_failure: false,
-            transient_exit_codes: vec![],
-        },
-        SensorSpec {
-            name: "commitlint".to_owned(),
-            argv: vec!["bash".to_owned(), "scripts/check-commitlint.sh".to_owned()],
-            retry: None,
-            timeout: None,
-            allow_failure: false,
-            transient_exit_codes: vec![],
-        },
+        spec("fmt", &["cargo", "fmt", "--all", "--", "--check"]),
+        spec("check", &["cargo", "check", "--workspace"]),
+        spec(
+            "clippy",
+            &["cargo", "clippy", "--workspace", "--", "-D", "warnings"],
+        ),
+        spec("test", &["cargo", "test", "--workspace"]),
+        spec("loc", &["bash", "scripts/check-loc.sh"]),
+        spec("deps", &["bash", "scripts/check-deps.sh"]),
+        spec("commitlint", &["bash", "scripts/check-commitlint.sh"]),
     ]
 }
 
