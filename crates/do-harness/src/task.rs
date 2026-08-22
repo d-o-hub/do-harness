@@ -4,10 +4,7 @@ use std::fs;
 use std::path::Path;
 
 use anyhow::{Context, Result};
-use do_harness_types::{
-    AddTask, AdvanceTask, Beat, Command, CompleteTask, FailTask, Projection, TaskAdded,
-    TaskAdvanced, TaskBoard, TaskCompleted, TaskFailed, TaskRecord, TaskState, WorkflowEvent,
-};
+use do_harness_types::{Beat, Projection, TaskBoard, TaskRecord, TaskState, WorkflowEvent};
 use serde::Serialize;
 
 use crate::report::Format;
@@ -69,12 +66,13 @@ pub async fn list_tasks(root: &Path, format: Format) -> Result<()> {
                     task.subtask_index
                 );
             }
+            // Fold the persisted event stream into the read model; the board
+            // reflects real history, not events reconstructed from row state.
             let mut board = TaskBoard::new();
-            for task in &tasks {
-                let event = status_event(task);
+            for (_, event) in do_harness_db::list_all_events(&conn).await? {
                 board
                     .apply(&event)
-                    .context("task status is not part of the workflow stream")?;
+                    .context("persisted workflow event is not part of the workflow stream")?;
             }
             println!(
                 "summary: pending={} in_progress={} done={} failed={}",
@@ -94,12 +92,13 @@ pub async fn list_tasks(root: &Path, format: Format) -> Result<()> {
     Ok(())
 }
 
-/// Inserts a new task in `pending` state with `subtask_index = 0`.
+/// Inserts a new task in `pending` state with `subtask_index = 0` and
+/// persists its `TaskAdded` event.
 ///
 /// The method name, when given, must exist in the frozen method catalog; the
 /// parent link is persisted when `parent_id` is given, keeping the
 /// hierarchical task network intact for later workflow runs. Returns the new
-/// task id.
+/// task id and the persisted event.
 ///
 /// # Errors
 ///
@@ -112,13 +111,6 @@ pub async fn add_task(
     parent_id: Option<i64>,
     precondition: Option<&str>,
 ) -> Result<(i64, WorkflowEvent)> {
-    let command = AddTask {
-        title: title.to_owned(),
-        method: method.map(ToOwned::to_owned),
-        parent_id,
-        precondition: precondition.map(ToOwned::to_owned),
-    };
-    debug_assert_eq!(command.name(), "AddTask");
     let conn = do_harness_db::connect_and_migrate(root).await?;
     if let Some(method_name) = method {
         let methods = crate::methods::load_methods(root)?;
@@ -131,7 +123,7 @@ pub async fn add_task(
             anyhow::bail!("parent task {parent} not found");
         }
     }
-    let id = do_harness_db::insert_task(
+    do_harness_db::insert_task_with_event(
         &conn,
         &do_harness_db::NewTask {
             title,
@@ -141,13 +133,8 @@ pub async fn add_task(
             parent_id,
         },
     )
-    .await?;
-    let event = WorkflowEvent::TaskAdded(TaskAdded {
-        id,
-        title: command.title,
-        method: command.method,
-    });
-    Ok((id, event))
+    .await
+    .map_err(anyhow::Error::from)
 }
 
 /// Advances the subtask pointer of a task and returns the new index.
@@ -157,8 +144,8 @@ pub async fn add_task(
 /// method catalog: when the current subtask declares a computational sensor, a
 /// latest `"ok"` sensor beat scoped to this task must exist
 /// (`verify --record --task <id>`), and a task that is already `done` or
-/// `failed` cannot advance. `advance_subtask` also sets the status to
-/// `in_progress`.
+/// `failed` cannot advance. The advance also persists a `TaskAdvanced` event
+/// atomically with the pointer update and sets the status to `in_progress`.
 ///
 /// # Errors
 ///
@@ -167,8 +154,6 @@ pub async fn add_task(
 /// `done`/`failed`, when there are no more subtasks, when the sensor gate has
 /// not passed, or when the advance fails.
 pub async fn advance_task(root: &Path, id: i64) -> Result<(i64, WorkflowEvent)> {
-    let command = AdvanceTask { task_id: id };
-    debug_assert_eq!(command.name(), "AdvanceTask");
     let conn = do_harness_db::connect_and_migrate(root).await?;
     let task = do_harness_db::get_task(&conn, id)
         .await?
@@ -196,14 +181,9 @@ pub async fn advance_task(root: &Path, id: i64) -> Result<(i64, WorkflowEvent)> 
             );
         }
     }
-    let index = do_harness_db::advance_subtask(&conn, id).await?;
-    Ok((
-        index,
-        WorkflowEvent::TaskAdvanced(TaskAdvanced {
-            id,
-            subtask_index: index,
-        }),
-    ))
+    do_harness_db::advance_subtask_with_event(&conn, id)
+        .await
+        .map_err(anyhow::Error::from)
 }
 
 /// Returns whether the most recent `sensor` beat for this task that matches the
@@ -220,7 +200,8 @@ fn latest_sensor_beat_ok(beats: &[Beat], sensor: &str) -> bool {
         .is_some_and(|beat| beat.status == "ok")
 }
 
-/// Marks a task as done once all sensor-gated subtasks have passed.
+/// Marks a task as done once all sensor-gated subtasks have passed, persisting
+/// its `TaskCompleted` event atomically with the status update.
 ///
 /// The task must have a method, and it must have advanced past every
 /// sensor-gated subtask (or past the end of the subtask list) before it may
@@ -232,8 +213,6 @@ fn latest_sensor_beat_ok(beats: &[Beat], sensor: &str) -> bool {
 /// with the given id exists, when the task has no method, when subtasks
 /// remain, or when the status update fails.
 pub async fn done_task(root: &Path, id: i64) -> Result<WorkflowEvent> {
-    let command = CompleteTask { task_id: id };
-    debug_assert_eq!(command.name(), "CompleteTask");
     let conn = do_harness_db::connect_and_migrate(root).await?;
     let task = do_harness_db::get_task(&conn, id)
         .await?
@@ -256,11 +235,13 @@ pub async fn done_task(root: &Path, id: i64) -> Result<WorkflowEvent> {
             method.subtasks.len()
         );
     }
-    do_harness_db::update_task_status(&conn, id, TaskState::Done).await?;
-    Ok(WorkflowEvent::TaskCompleted(TaskCompleted { id }))
+    do_harness_db::update_task_status_with_event(&conn, id, TaskState::Done)
+        .await
+        .map_err(anyhow::Error::from)
 }
 
-/// Marks a task as failed.
+/// Marks a task as failed, persisting its `TaskFailed` event atomically with
+/// the status update.
 ///
 /// The task must exist.
 ///
@@ -269,35 +250,13 @@ pub async fn done_task(root: &Path, id: i64) -> Result<WorkflowEvent> {
 /// Returns an error when the state database cannot be opened, when no task
 /// with the given id exists, or when the status update fails.
 pub async fn fail_task(root: &Path, id: i64) -> Result<WorkflowEvent> {
-    let command = FailTask { task_id: id };
-    debug_assert_eq!(command.name(), "FailTask");
     let conn = do_harness_db::connect_and_migrate(root).await?;
     if do_harness_db::get_task(&conn, id).await?.is_none() {
         anyhow::bail!("task {id} not found");
     }
-    do_harness_db::update_task_status(&conn, id, do_harness_types::TaskState::Failed).await?;
-    Ok(WorkflowEvent::TaskFailed(TaskFailed { id }))
-}
-
-/// Maps a task's persisted state onto the event that yields it on the board.
-///
-/// The board is a fold over the workflow stream; reconstructing a single event
-/// per snapshot lets the read-model projection stay the single place that
-/// translates state into counts without a historical event store.
-fn status_event(task: &TaskRecord) -> WorkflowEvent {
-    match task.status {
-        TaskState::Pending => WorkflowEvent::TaskAdded(TaskAdded {
-            id: task.id,
-            title: task.title.clone(),
-            method: task.method.clone(),
-        }),
-        TaskState::InProgress => WorkflowEvent::TaskAdvanced(TaskAdvanced {
-            id: task.id,
-            subtask_index: task.subtask_index,
-        }),
-        TaskState::Done => WorkflowEvent::TaskCompleted(TaskCompleted { id: task.id }),
-        TaskState::Failed => WorkflowEvent::TaskFailed(TaskFailed { id: task.id }),
-    }
+    do_harness_db::update_task_status_with_event(&conn, id, TaskState::Failed)
+        .await
+        .map_err(anyhow::Error::from)
 }
 
 #[cfg(test)]

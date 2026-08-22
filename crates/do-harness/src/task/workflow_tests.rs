@@ -1,7 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use super::*;
-use do_harness_types::DomainEvent;
+use do_harness_types::{DomainEvent, TaskAdded, TaskAdvanced, TaskCompleted, TaskFailed};
 
 use super::tests::{insert_ok_beat, write_catalog};
 
@@ -103,13 +103,13 @@ async fn list_tasks_folds_board_and_summary() {
     done_task(dir.path(), alpha).await.unwrap();
     fail_task(dir.path(), beta).await.unwrap();
 
+    // The board folds the PERSISTED event stream, not fabricated events.
     let conn = do_harness_db::connect_and_migrate(dir.path())
         .await
         .unwrap();
-    let tasks = do_harness_db::list_tasks(&conn).await.unwrap();
     let mut board = TaskBoard::new();
-    for task in &tasks {
-        board.apply(&status_event(task)).unwrap();
+    for (_, event) in do_harness_db::list_all_events(&conn).await.unwrap() {
+        board.apply(&event).unwrap();
     }
     assert_eq!(board.to_counts(), (0, 0, 1, 1));
     assert_eq!(
@@ -122,4 +122,30 @@ async fn list_tasks_folds_board_and_summary() {
         ),
         "summary: pending=0 in_progress=0 done=1 failed=1"
     );
+}
+
+/// Every lifecycle transition lands in the event log in order: the persisted
+/// stream covers each task's full history (add -> advance* -> terminal).
+#[tokio::test(flavor = "current_thread")]
+async fn event_log_covers_every_lifecycle_transition() {
+    let dir = tempfile::tempdir().unwrap();
+    write_catalog(dir.path());
+    let (alpha, _a) = add_task(dir.path(), "alpha", Some("mini"), None, None)
+        .await
+        .unwrap();
+    insert_ok_beat(dir.path(), alpha, "test").await;
+    let _ = advance_task(dir.path(), alpha).await.unwrap();
+    let _ = advance_task(dir.path(), alpha).await.unwrap();
+    done_task(dir.path(), alpha).await.unwrap();
+
+    let conn = do_harness_db::connect_and_migrate(dir.path())
+        .await
+        .unwrap();
+    let events = do_harness_db::list_all_events(&conn).await.unwrap();
+    let kinds: Vec<&'static str> = events.iter().map(|(_, e)| e.name()).collect();
+    assert_eq!(
+        kinds,
+        vec!["TaskAdded", "TaskAdvanced", "TaskAdvanced", "TaskCompleted"]
+    );
+    assert!(events.iter().all(|(task_id, _)| *task_id == alpha));
 }
