@@ -11,6 +11,8 @@ metadata:
   version: "0.1.0"
   tags: harness sensors feedback feedforward self-correction quality
 ---
+## Guides
+See references/heuristics.md for distilled heuristics.
 
 # Harness Skill
 
