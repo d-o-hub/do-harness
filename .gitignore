@@ -5,6 +5,10 @@
 # Local harness state (libSQL database, per-workspace telemetry)
 .do-harness/
 .agents/events/
+# Task-board export is a per-clone projection of the libSQL source of truth;
+# autoincrement ids and mutable status churn make it unmergeable across
+# branches. Read it locally via `do-harness task export`.
+/plans/tasks.json
 
 # Editors
 .vscode/
