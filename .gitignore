@@ -13,6 +13,9 @@
 *.swo
 *~
 
+# Local agent session state
+.opencode/
+
 # OS
 .DS_Store
 Thumbs.db
