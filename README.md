@@ -107,10 +107,13 @@ For CI, invoke `do-harness verify --format json` (exit 0/1/2) with the CLI on
 | `task list [--format text\|json]` / `task export` | Read task state from the local database; export writes `plans/tasks.json` |
 | `task add <title> [--method NAME] [--parent ID] [--precondition TEXT]` | Add a pending task to the workflow runtime |
 | `task advance <ID>` | Advance the subtask pointer |
+| `task done <ID>` | Mark a task done once all sensor-gated subtasks have passed |
 | `task fail <ID>` | Mark a task failed |
+| `errors list [--task ID] [--format text\|json]` / `errors clear [--sensor NAME] [--task ID]` | Inspect and clear fail-fast error signatures |
 | `trace add --session S [--task ID] [--command C] [--error-diff D] [--resolution-steps R]` / `trace list --session S [--format text\|json]` | Record and read execution traces per session |
-| `distill --skill NAME --pattern P [--description D] [--from-trace ID]` | Distill a resolved trace into a skill (refuses without resolution steps) |
-| `eval [--skill NAME]` | Validate skills via skill-creator's quick_validate.py and persist skill_evals (pass_rate = valid/total) |
+| `distill --skill NAME --pattern P [--description D] [--from-trace ID] [--to-fixture]` | Distill a resolved trace into a skill (refuses without resolution steps); `--to-fixture` raises the skill's pass-rate bar |
+| `eval [--skill NAME] [--bless]` | Validate skills via skill-creator's quick_validate.py and persist skill_evals; `--bless` re-baselines graders and raises the pass-rate bar after a fully green run |
+| `metrics [--format text\|json]` | Report sensor stats, strike counts, and eval pass-rate history |
 | `init [--language rust\|generic] [--force]` | Scaffold a harness workspace in the current directory |
 | `hook install [--force]` / `hook uninstall` / `hook status` | Manage `.git/hooks/pre-commit` + `pre-push` |
 | `doctor` | Run diagnostic checks on binary resolution and git hook health |
@@ -144,6 +147,11 @@ Global flags: `--root <path>`, `--config <path>`.
 Failure output tails are printed to stderr so stdout stays parseable.
 
 ## Persistence
+
+Task lifecycle commands (`task add`/`advance`/`done`/`fail`) append each
+emitted workflow event to an append-only `workflow_events` log in the same
+transaction as the task-row mutation; `task list` folds that real event
+stream into its board summary.
 
 `verify --record` persists each sensor result as a beat into
 `.do-harness/agent_state.db` and bumps an error signature
