@@ -29,7 +29,9 @@ pub use error::{DbError, Result};
 /// Re-exported so downstream crates can name connection types without
 /// depending on `libsql` directly.
 pub use libsql::Connection;
-pub use migrate::{connect, connect_and_migrate, migrate, unix_now};
+pub use migrate::{
+    MigrationSkew, connect, connect_and_migrate, inspect_migrations, migrate, unix_now,
+};
 pub use repo::{
     NewTask, advance_subtask, get_task, insert_task, list_tasks, seed_invariants,
     update_task_status,

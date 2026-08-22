@@ -96,6 +96,77 @@ pub async fn connect(path: impl AsRef<Path>) -> Result<Connection> {
     Ok(conn)
 }
 
+/// Snapshot of migration alignment between a state database and this binary's
+/// embedded catalog.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MigrationSkew {
+    /// Highest migration version recorded in the database; [`None`] when the
+    /// database exists but has never been migrated (no tracking table).
+    pub applied_max: Option<i64>,
+    /// Highest version in this binary's embedded catalog.
+    pub known_max: i64,
+}
+
+impl MigrationSkew {
+    /// The database was written by a newer harness than this binary; the
+    /// downgrade guard will refuse to touch it.
+    #[must_use]
+    pub fn is_future(&self) -> bool {
+        self.applied_max
+            .is_some_and(|applied| applied > self.known_max)
+    }
+
+    /// This binary ships migrations the database has not yet applied.
+    #[must_use]
+    pub fn is_pending(&self) -> bool {
+        self.applied_max
+            .is_none_or(|applied| applied < self.known_max)
+    }
+}
+
+/// Highest version in the embedded migration catalog.
+fn known_max_version() -> i64 {
+    MIGRATIONS
+        .iter()
+        .map(|migration| migration.version)
+        .max()
+        .unwrap_or(0)
+}
+
+/// Reads applied vs. known migration versions without mutating anything.
+///
+/// Unlike [`migrate`], this never writes and never fails on a database from a
+/// newer binary; it returns the raw versions so diagnostics (e.g. `doctor`)
+/// can classify skew before any persistence command hits the downgrade guard.
+///
+/// # Errors
+///
+/// Returns an error when the tracking-table probe or version query fails.
+pub async fn inspect_migrations(conn: &Connection) -> Result<MigrationSkew> {
+    let mut rows = conn
+        .query(
+            "SELECT COUNT(*) FROM sqlite_master \
+             WHERE type = 'table' AND name = 'schema_migrations'",
+            Params::None,
+        )
+        .await?;
+    let tracked = match rows.next().await? {
+        Some(row) => row.get::<i64>(0)? > 0,
+        None => false,
+    };
+    if !tracked {
+        return Ok(MigrationSkew {
+            applied_max: None,
+            known_max: known_max_version(),
+        });
+    }
+    let applied = applied_versions(conn).await?;
+    Ok(MigrationSkew {
+        applied_max: applied.iter().copied().max(),
+        known_max: known_max_version(),
+    })
+}
+
 /// Applies all pending embedded migrations to `conn` in ascending version order.
 ///
 /// Tracked via a `schema_migrations(version, name, applied_at)` table so each
@@ -118,11 +189,7 @@ pub async fn migrate(conn: &Connection) -> Result<()> {
     .await?;
 
     let applied = applied_versions(conn).await?;
-    let newest_catalog = MIGRATIONS
-        .iter()
-        .map(|migration| migration.version)
-        .max()
-        .unwrap_or(0);
+    let newest_catalog = known_max_version();
     if let Some(future) = applied.iter().filter(|v| **v > newest_catalog).max() {
         return Err(DbError::FutureDatabase {
             applied: *future,
@@ -232,6 +299,46 @@ mod tests {
 
         let err = migrate(&conn).await.unwrap_err();
         assert!(matches!(err, DbError::FutureDatabase { applied: 9999, .. }));
+    }
+
+    /// A fresh connection has no tracking table, so inspection reports an
+    /// uninitialized database instead of erroring.
+    #[tokio::test(flavor = "current_thread")]
+    async fn inspect_reports_uninitialized_database() {
+        let dir = tempfile::tempdir().unwrap();
+        let conn = connect(dir.path().join("state.db")).await.unwrap();
+
+        let skew = inspect_migrations(&conn).await.unwrap();
+
+        assert_eq!(skew.applied_max, None);
+        assert!(!skew.is_future());
+        assert!(skew.is_pending());
+    }
+
+    /// Inspection is read-only: it classifies a future database without the
+    /// downgrade guard aborting, so diagnostics can explain the skew.
+    #[tokio::test(flavor = "current_thread")]
+    async fn inspect_classifies_future_and_current_databases() {
+        let dir = tempfile::tempdir().unwrap();
+        let conn = connect(dir.path().join("state.db")).await.unwrap();
+        migrate(&conn).await.unwrap();
+
+        let current = inspect_migrations(&conn).await.unwrap();
+        assert_eq!(current.applied_max, Some(known_max_version()));
+        assert!(!current.is_future());
+        assert!(!current.is_pending());
+
+        conn.execute(
+            "INSERT INTO schema_migrations (version, name, applied_at) VALUES (9999, 'future', 0)",
+            Params::None,
+        )
+        .await
+        .unwrap();
+
+        let future = inspect_migrations(&conn).await.unwrap();
+        assert_eq!(future.applied_max, Some(9999));
+        assert!(future.is_future());
+        assert!(!future.is_pending());
     }
 
     #[tokio::test(flavor = "current_thread")]
