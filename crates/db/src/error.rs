@@ -41,6 +41,14 @@ pub enum DbError {
     /// A stored task row carried an unrecognized status value.
     #[error("invalid stored task status '{0}'")]
     InvalidTaskStatus(String),
+    /// A stored workflow-event payload failed to deserialize into a
+    /// [`do_harness_types::WorkflowEvent`].
+    #[error("invalid stored workflow event payload: {0}")]
+    InvalidEventPayload(String),
+    /// A terminal-status writer was called with a non-terminal
+    /// [`do_harness_types::TaskState`] (only `done`/`failed` map to events).
+    #[error("terminal-status writer requires 'done' or 'failed', got '{0}'")]
+    InvalidTerminalState(String),
     /// A foreign-key or unique constraint was violated.
     #[error("constraint violated: {0}")]
     Constraint(String),

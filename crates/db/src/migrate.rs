@@ -54,6 +54,11 @@ const MIGRATIONS: &[Migration] = &[
         name: "eval_history_and_baselines",
         sql: include_str!("../migrations/0008_eval_history_and_baselines.sql"),
     },
+    Migration {
+        version: 9,
+        name: "workflow_events",
+        sql: include_str!("../migrations/0009_workflow_events.sql"),
+    },
 ];
 
 /// Opens (creating if necessary) the local libSQL database at `path`.

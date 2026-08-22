@@ -30,6 +30,7 @@ const PROD_SOURCES: &[&str] = &[
     "/src/repo_exec.rs",
     "/src/repo_learn.rs",
     "/src/repo_scope.rs",
+    "/src/repo_workflow.rs",
 ];
 
 /// Opens a fresh, fully-migrated database under a tempdir and returns the
