@@ -226,7 +226,7 @@ mod tests {
         }
         let run = run_walkthrough(dir.path(), dir.path());
         assert!(run.present);
-        assert!(run.success);
+        assert!(run.success, "detail: {:?}", run.detail);
         assert!(dir.path().join("artifact.txt").is_file());
     }
 
@@ -247,7 +247,7 @@ mod tests {
         // The run succeeds even though the child wrote to both streams; with
         // `.output()` the child's stdout/stderr are captured via pipes and
         // dropped, never inherited by (or leaked to) the parent's terminal.
-        assert!(run.success);
+        assert!(run.success, "detail: {:?}", run.detail);
     }
 
     #[test]
@@ -293,7 +293,7 @@ mod tests {
         }
         let run = run_walkthrough(dir.path(), dir.path());
         assert!(run.present);
-        assert!(run.success);
+        assert!(run.success, "detail: {:?}", run.detail);
         let root = dir.path().to_str().unwrap();
         assert_eq!(
             fs::read_to_string(dir.path().join("root.txt")).unwrap(),
