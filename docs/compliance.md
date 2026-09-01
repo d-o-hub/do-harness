@@ -1,24 +1,24 @@
 # Compliance mapping
 
-`do-harness` enforces deterministic, computational controls over the agent development loop. This document maps those controls to recognized AI assurance frameworks: the **OWASP Agentic Top 10 (2026)**, the **NIST AI Risk Management Framework (AI RMF 1.0)**, and the **EU AI Act**.
+`do-harness` enforces deterministic, computational controls over the agent development loop. This document maps those controls to recognized AI assurance frameworks: the **OWASP Agentic Top 10 (2026)**, the **NIST AI Risk Management Framework (AI RMF 1.0)**, the **EU AI Act**, and **SOC 2 (AICPA Trust Services Criteria)**.
 
 ## Scope & Positioning
 
 `do-harness` is a **dev-loop verification harness** (feedforward guides + feedback sensors, workflow gates, tamper-evident logs, and evidence artifacts). It is **not** a runtime policy engine or inline proxy (such as Microsoft Agent Governance Toolkit / AGT).
 
-Accordingly, `do-harness` claims compliance coverage strictly for **build-time, workflow-level, and dev-loop verification controls**.
+Accordingly, `do-harness` claims compliance coverage strictly for **build-time, workflow-level, and dev-loop verification controls**. Crosswalk cells marked `verify` reflect mechanisms implemented by the harness that provide verifiable audit evidence.
 
 ---
 
 ## High-Level Control Matrix
 
-| do-harness Control | Mechanism | OWASP Agentic Top 10 | NIST AI RMF | EU AI Act |
-|---|---|---|---|---|
-| **Computational sensors** (`verify`) | Deterministic checks strictly supersede LLM self-assessment | ASI04, ASI05, ASI09, Traceability | MEASURE 1, MEASURE 2 | Art. 15 (Accuracy & Robustness) |
-| **Task-completion gate** (`task done`) | Refuses task completion until `verify --record` passes named sensor | ASI02, ASI08, ASI09, ASI10 | MANAGE 1, MANAGE 4 | Art. 14 (Human Oversight) |
-| **Evidence artifact** (`verify --format json`, `task export`) | Machine-readable, reproducible run record | ASI09, Traceability | MEASURE 1, MEASURE 3 | Art. 12 (Record-keeping) |
-| **Hash-chained event log** (`.do-harness/agent_state.db`) | Tamper-evident append-only audit trail of workflow events | ASI06, Traceability | GOVERN 2, MEASURE 3 | Art. 12 (Technical Documentation & Record-keeping) |
-| **Fail-closed semantics** | Deny-by-default on unmet preconditions or sensor failures | ASI08, ASI10 | GOVERN 1, MANAGE 1 | Art. 9 (Risk Management System) |
+| do-harness Control | Mechanism | OWASP Agentic Top 10 | NIST AI RMF | EU AI Act | SOC 2 (TSC) |
+|---|---|---|---|---|---|
+| **Computational sensors** (`verify`) | Deterministic checks strictly supersede LLM self-assessment | verify | MEASURE | quality-management-duties (verify) | CC8.1 change management (verify) |
+| **Task-completion gate** (`task done`) | Workflow verification gate refusing task done until `verify --record` passes | verify | MANAGE | Art. 14 Human Oversight (verify) | CC8.1 change management (verify) |
+| **Evidence artifact** (`verify --format json`, `task export`) | Machine-readable run record | verify | MEASURE | record-keeping (verify) | CC7.2 / audit evidence (verify) |
+| **Hash-chained event log** (`.do-harness/agent_state.db`) | Tamper-evident audit trail of workflow events | verify | GOVERN | record-keeping (verify) | logging criteria / CC7.2 (verify) |
+| **Fail-closed semantics** | Deny-by-default on unmet preconditions or sensor failures | verify | MANAGE | Art. 9 Risk Management (verify) | CC6.1 / CC8.1 (verify) |
 
 ---
 
@@ -75,3 +75,15 @@ Verified against official EU AI Act regulatory requirements for high-risk AI sys
 | **Article 12** | Technical documentation & Record-keeping | Automatic generation of machine-readable evidence artifacts (`verify --format json`, `task export`) and hash-chained event logs (`workflow_events`). |
 | **Article 14** | Human oversight | `task done` gate refuses agent self-certification; human/system verification requires passing computational sensor beats before task completion. |
 | **Article 15** | Accuracy, robustness and cybersecurity | Automated feedback sensors (`cargo check`, `cargo test`, `clippy -D warnings`, `#![forbid(unsafe_code)]`, LOC caps) enforce deterministic quality standards. |
+
+---
+
+## SOC 2 (AICPA Trust Services Criteria) Alignment
+
+Mapping to relevant Trust Services Criteria for security and change management:
+
+| Criteria ID | Description | do-harness Implementation & Evidence |
+|---|---|---|
+| **CC6.1** | Logical Access Controls | Fail-closed workflow gates deny unverified or unauthorized state transitions. |
+| **CC7.2** | System Operations & Monitoring | Tamper-evident event log (`workflow_events`) and machine-readable run records (`verify --format json`) provide verifiable system audit trails. |
+| **CC8.1** | Change Management | Automated computational sensors (`cargo check`, `cargo test`, `clippy`, `fmt`) and task completion gates strictly enforce pre-release verification rules. |
