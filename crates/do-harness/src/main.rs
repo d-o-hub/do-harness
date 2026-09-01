@@ -164,6 +164,12 @@ enum Command {
         #[arg(long, value_enum, default_value_t = Format::Text)]
         format: Format,
     },
+    /// Print compliance mapping to OWASP Agentic Top 10, NIST AI RMF, and EU AI Act.
+    Compliance {
+        /// Output format.
+        #[arg(long, value_enum, default_value_t = Format::Text)]
+        format: Format,
+    },
 }
 
 /// Available task-state actions.
@@ -322,6 +328,10 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
         commands::print_version(format);
         return Ok(());
     }
+    if let Command::Compliance { format } = cli.command {
+        commands::print_compliance(format);
+        return Ok(());
+    }
 
     let root = match &cli.command {
         Command::Init { .. } => {
@@ -330,7 +340,7 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
         _ => commands::resolve_root(cli.root.as_deref()).map_err(CliError::Usage)?,
     };
     match cli.command {
-        Command::Version { .. } => unreachable!(),
+        Command::Version { .. } | Command::Compliance { .. } => unreachable!(),
         Command::Init { language, force } => {
             let opts = init::InitOpts { language, force };
             let report = init::init_workspace(&root, &opts)
