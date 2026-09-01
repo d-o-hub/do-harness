@@ -86,7 +86,7 @@
 - **Fail-Fast Policy**: If a computational sensor fails 3 consecutive times on the same subtask, halt, record the error signature in libSQL, and surface a diagnostic to the developer.
 - **No Hallucinated Success**: A subtask is complete only when verified by automated exit codes.
 - **Hooks**: `do-harness hook install` writes .git/hooks/pre-commit (fmt + loc, run with `--record` so beats persist) and pre-push (full verify); uninstall/status remove/inspect managed hooks.
-- **Workflow gates**: pre-commit = `do-harness verify --fail-fast --only fmt --only loc`; pre-push = `do-harness verify --fail-fast`; CI = `do-harness verify --format json` (exit 0/1/2).
+- **Workflow gates**: pre-commit = `do-harness verify --fail-fast --only fmt --only loc`; pre-push = `do-harness verify --fail-fast`; CI = `do-harness verify --evidence .do-harness/evidence.json --strict` (exit 0/1/2).
 - **Persistence commands**: `do-harness task list`/`task export` surface task state (libSQL is the source of truth; export writes `plans/tasks.json`); `verify --record` persists beats and bumps error signatures for failing sensors; `task add/advance/fail`, `trace add/list`, `distill`, `eval`, `metrics` are implemented.
 - **Root discovery**: the CLI walks up from cwd for do-harness.toml, or AGENTS.md with .do-harness/ or plans/invariants.json; override with --root.
 
