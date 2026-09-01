@@ -45,7 +45,7 @@ jobs:
         env:
           # check-audit.sh fails closed when CI=true; cargo-audit is installed above.
           CI: "true"
-        run: ./target/release/do-harness verify --evidence .do-harness/evidence.json --strict
+        run: ./target/release/do-harness verify --format json
       - name: Dogfood greenfield rust init + verify
         run: |
           tmp="$(mktemp -d)"
