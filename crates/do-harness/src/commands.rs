@@ -8,6 +8,43 @@ use crate::doctor::describe_binary;
 use crate::report::Format;
 use crate::{ErrorsAction, TaskAction, TraceAction, config, errors, hooks, init, task, trace};
 
+/// Dispatches audit-chain check and prints report.
+///
+/// # Errors
+///
+/// Returns an error if the hash chain is tampered or the database cannot be read.
+pub async fn audit_chain_cmd(root: &Path, format: Format) -> Result<()> {
+    let report = crate::audit::audit_chain(root).await?;
+    match format {
+        Format::Text => match report {
+            crate::audit::ChainReport::Intact { count } => {
+                println!("OK: Hash chain intact ({count} event(s) verified).");
+                Ok(())
+            }
+            crate::audit::ChainReport::Tampered { seq } => {
+                println!("FAIL: Hash chain tampered at event seq {seq}.");
+                anyhow::bail!("Hash chain tampered at event seq {seq}");
+            }
+        },
+        Format::Json => {
+            let json = match report {
+                crate::audit::ChainReport::Intact { count } => {
+                    serde_json::json!({ "status": "intact", "count": count })
+                }
+                crate::audit::ChainReport::Tampered { seq } => {
+                    serde_json::json!({ "status": "tampered", "seq": seq })
+                }
+            };
+            println!("{json}");
+            if report.is_intact() {
+                Ok(())
+            } else {
+                anyhow::bail!("Hash chain tampered");
+            }
+        }
+    }
+}
+
 /// Embedded compliance document (`docs/compliance.md`).
 const COMPLIANCE_DOC: &str = include_str!("../../../docs/compliance.md");
 

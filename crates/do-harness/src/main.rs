@@ -14,6 +14,7 @@ use clap::{ArgAction, Parser, Subcommand};
 
 use crate::report::Format;
 
+mod audit;
 mod commands;
 mod config;
 mod dbcheck;
@@ -159,6 +160,12 @@ enum Command {
     },
     /// Print compliance mapping to OWASP Agentic Top 10, NIST AI RMF, and EU AI Act.
     Compliance {
+        /// Output format.
+        #[arg(long, value_enum, default_value_t = Format::Text)]
+        format: Format,
+    },
+    /// Recompute workflow event hash chain and report first divergence.
+    AuditChain {
         /// Output format.
         #[arg(long, value_enum, default_value_t = Format::Text)]
         format: Format,
@@ -399,6 +406,9 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
             commands::hook(&root, cli.config.as_deref(), action).map_err(CliError::Usage)
         }
         Command::Doctor => doctor::run(&root).await.map_err(CliError::Verify),
+        Command::AuditChain { format } => commands::audit_chain_cmd(&root, format)
+            .await
+            .map_err(CliError::Verify),
         Command::Metrics { format } => metrics::run_metrics(&root, format)
             .await
             .map_err(CliError::Usage),

@@ -107,6 +107,36 @@ fn rust_verify_fails_without_a_crate() {
 }
 
 #[test]
+fn audit_chain_cli_reports_intact_and_detects_tampering() {
+    let dir = tempfile::tempdir().unwrap();
+    let (ok, out) = run(harness(dir.path()).arg("task").arg("add").arg("test task"));
+    assert!(ok, "task add failed:\n{out}");
+
+    let (ok, stdout) = run(harness(dir.path()).arg("audit-chain"));
+    assert!(ok, "audit-chain failed on intact log:\n{stdout}");
+    assert!(stdout.contains("OK: Hash chain intact"));
+
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    rt.block_on(async {
+        let db_path = dir.path().join(".do-harness/agent_state.db");
+        let conn = do_harness_db::connect(&db_path).await.unwrap();
+        conn.execute(
+            "UPDATE workflow_events SET chain_hash = 'badhash' WHERE seq = 1",
+            (),
+        )
+        .await
+        .unwrap();
+    });
+
+    let (ok, out_tampered) = run(harness(dir.path()).arg("audit-chain"));
+    assert!(!ok, "audit-chain must fail on tampered log");
+    assert!(out_tampered.contains("tampered at event seq 1"));
+}
+
+#[test]
 fn generic_init_verify_is_vacuously_green() {
     let dir = tempfile::tempdir().unwrap();
     let (ok, out) = run(harness(dir.path())
