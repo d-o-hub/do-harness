@@ -32,6 +32,7 @@ mod hooks;
 mod init;
 mod methods;
 mod metrics;
+pub mod policy;
 mod report;
 mod sensors;
 mod skill_write;
