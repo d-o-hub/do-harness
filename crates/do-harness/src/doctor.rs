@@ -82,6 +82,23 @@ pub async fn run(root: &Path) -> Result<()> {
         }
     }
 
+    // 4. Workflow Event Hash Chain Integrity Check
+    match crate::audit_chain::audit_chain(root).await {
+        Ok(report) if report.intact => {
+            println!(
+                "  [OK] event log hash chain: intact ({} event(s) verified)",
+                report.count
+            );
+        }
+        Ok(report) => {
+            let seq = report.tampered_seq.unwrap_or(0);
+            println!("  [WARN] event log hash chain: tampered at sequence {seq}");
+        }
+        Err(err) => {
+            println!("  [WARN] event log hash chain: unreadable ({err:#})");
+        }
+    }
+
     if failures.is_empty() {
         println!("\nDoctor checks passed.");
         Ok(())

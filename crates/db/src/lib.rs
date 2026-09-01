@@ -51,7 +51,7 @@ pub use repo_learn::{
 pub use repo_metrics::{SensorStat, has_ok_beat, sensor_stats};
 pub use repo_scope::{clear_error_signatures, list_error_signatures, reset_error_signature};
 pub use repo_workflow::{
-    advance_subtask_with_event, insert_task_with_event, list_all_events,
-    update_task_status_with_event,
+    WorkflowEventRow, advance_subtask_with_event, canonical_payload, chain_hash,
+    insert_task_with_event, list_all_events, list_events_ascending, update_task_status_with_event,
 };
 pub use root::{db_path, find_harness_root};

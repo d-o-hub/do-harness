@@ -12,6 +12,52 @@ use do_harness_types::{
     DomainEvent, TaskAdded, TaskAdvanced, TaskCompleted, TaskFailed, TaskState, WorkflowEvent,
 };
 use libsql::{Connection, params, params::Params};
+use sha2::{Digest, Sha256};
+
+/// Structured database row from `workflow_events` with sequence and hash chain.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WorkflowEventRow {
+    /// Row primary key.
+    pub id: i64,
+    /// Foreign key to task.
+    pub task_id: i64,
+    /// Event kind.
+    pub kind: String,
+    /// Raw stored payload.
+    pub payload: String,
+    /// Canonicalized payload string.
+    pub canonical_payload: String,
+    /// Creation timestamp.
+    pub created_at: i64,
+    /// Monotonic sequence number in the chain.
+    pub seq: i64,
+    /// SHA-256 chain hash for this row.
+    pub chain_hash: Option<String>,
+}
+
+/// Canonicalizes a JSON string by parsing into `serde_json::Value` and re-serializing,
+/// ensuring object keys are sorted deterministically.
+///
+/// # Errors
+///
+/// Returns an error if the payload is not valid JSON or re-serialization fails.
+pub fn canonical_payload(payload_json: &str) -> Result<String> {
+    let value: serde_json::Value = serde_json::from_str(payload_json)
+        .map_err(|err| DbError::InvalidEventPayload(err.to_string()))?;
+    serde_json::to_string(&value).map_err(|err| DbError::InvalidEventPayload(err.to_string()))
+}
+
+/// Computes SHA-256 chain hash: `SHA-256(prev || "|" || payload_json)`.
+///
+/// If `prev` is [`None`], defaults to `"GENESIS"`.
+#[must_use]
+pub fn chain_hash(prev: Option<&str>, payload_json: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(prev.unwrap_or("GENESIS").as_bytes());
+    hasher.update(b"|");
+    hasher.update(payload_json.as_bytes());
+    hex::encode(hasher.finalize())
+}
 
 /// Inserts a task in `pending` state and persists its `TaskAdded` event in
 /// one transaction. Returns the new id and the persisted event.
@@ -112,15 +158,72 @@ pub async fn list_all_events(conn: &Connection) -> Result<Vec<(i64, WorkflowEven
     Ok(events)
 }
 
+/// Loads all workflow event rows in ascending insertion order with chain metadata.
+///
+/// # Errors
+///
+/// Returns an error when the database query fails or a payload cannot be canonicalized.
+pub async fn list_events_ascending(conn: &Connection) -> Result<Vec<WorkflowEventRow>> {
+    let mut rows = conn
+        .query(
+            "SELECT id, task_id, kind, payload, created_at, seq, chain_hash \
+             FROM workflow_events ORDER BY id ASC",
+            Params::None,
+        )
+        .await?;
+    let mut events = Vec::new();
+    while let Some(row) = rows.next().await? {
+        let payload: String = row.get(3)?;
+        let canonical = canonical_payload(&payload)?;
+        events.push(WorkflowEventRow {
+            id: row.get(0)?,
+            task_id: row.get(1)?,
+            kind: row.get(2)?,
+            payload: payload.clone(),
+            canonical_payload: canonical,
+            created_at: row.get(4)?,
+            seq: row.get::<i64>(5).unwrap_or(0),
+            chain_hash: row.get(6)?,
+        });
+    }
+    Ok(events)
+}
+
 /// Appends one event to the log without transaction management, for composing
 /// into a larger transaction.
 async fn append_event_on(conn: &Connection, task_id: i64, event: &WorkflowEvent) -> Result<()> {
-    let payload = serde_json::to_string(event)
+    let raw_payload = serde_json::to_string(event)
         .map_err(|err| DbError::InvalidEventPayload(err.to_string()))?;
+    let payload = canonical_payload(&raw_payload)?;
+
+    let mut rows = conn
+        .query(
+            "SELECT seq, chain_hash FROM workflow_events WHERE seq IS NOT NULL ORDER BY seq DESC LIMIT 1",
+            Params::None,
+        )
+        .await?;
+    let (last_seq, prev_hash) = match rows.next().await? {
+        Some(row) => {
+            let s: i64 = row.get(0)?;
+            let h: Option<String> = row.get(1)?;
+            (s, h)
+        }
+        None => (0, None),
+    };
+    let seq = last_seq + 1;
+    let hash = chain_hash(prev_hash.as_deref(), &payload);
+
     conn.execute(
-        "INSERT INTO workflow_events (task_id, kind, payload, created_at) \
-         VALUES (?1, ?2, ?3, ?4)",
-        params!(task_id, event.name(), payload, unix_now()),
+        "INSERT INTO workflow_events (task_id, kind, payload, created_at, seq, chain_hash) \
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        params!(
+            task_id,
+            event.name(),
+            payload,
+            unix_now(),
+            seq,
+            hash.as_str()
+        ),
     )
     .await?;
     Ok(())
@@ -245,5 +348,41 @@ mod tests {
         .await
         .unwrap_err();
         assert!(matches!(err, DbError::Constraint(_)));
+    }
+
+    #[test]
+    fn chain_hash_genesis_and_canonicalization() {
+        let raw = r#"{"z":1,"a":2}"#;
+        let canonical = canonical_payload(raw).unwrap();
+        assert_eq!(canonical, r#"{"a":2,"z":1}"#);
+
+        let h1 = chain_hash(None, &canonical);
+        let h2 = chain_hash(Some("GENESIS"), &canonical);
+        assert_eq!(h1, h2);
+
+        let h_next = chain_hash(Some(&h1), &canonical);
+        assert_ne!(h1, h_next);
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn event_chain_assigns_sequential_seq_and_hashes() {
+        let dir = tempfile::tempdir().unwrap();
+        let conn = connect_and_migrate(dir.path()).await.unwrap();
+
+        let (id, _) = insert_task_with_event(&conn, &new_task("slice 1"))
+            .await
+            .unwrap();
+        advance_subtask_with_event(&conn, id).await.unwrap();
+
+        let rows = list_events_ascending(&conn).await.unwrap();
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[0].seq, 1);
+        assert_eq!(rows[1].seq, 2);
+
+        let expected_h1 = chain_hash(None, &rows[0].canonical_payload);
+        assert_eq!(rows[0].chain_hash.as_deref(), Some(expected_h1.as_str()));
+
+        let expected_h2 = chain_hash(Some(&expected_h1), &rows[1].canonical_payload);
+        assert_eq!(rows[1].chain_hash.as_deref(), Some(expected_h2.as_str()));
     }
 }

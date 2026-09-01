@@ -7,13 +7,15 @@
 //! `eval` (skill-eval runner), `hook` (git hook management), and `version`
 //! (version information).
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::ExitCode;
 
 use clap::{ArgAction, Parser, Subcommand};
 
+use crate::commands::{CliError, run_verify};
 use crate::report::Format;
 
+mod audit_chain;
 mod commands;
 mod config;
 mod dbcheck;
@@ -158,6 +160,8 @@ enum Command {
     },
     /// Run diagnostic checks on binary resolution and git hook health.
     Doctor,
+    /// Audit the workflow event log hash chain for tampering.
+    AuditChain,
     /// Report harness trends: sensor stats, strikes, eval pass-rate history.
     Metrics {
         /// Output format.
@@ -278,32 +282,6 @@ enum HookAction {
     Status,
 }
 
-/// Classified CLI failure carrying its process exit code.
-enum CliError {
-    /// Usage, config, or discovery problems: exit 2.
-    Usage(anyhow::Error),
-    /// Sensor verification failed: exit 1.
-    Verify(anyhow::Error),
-}
-
-impl CliError {
-    /// The process exit code for this error class.
-    fn exit_code(&self) -> u8 {
-        match self {
-            CliError::Usage(_) => 2,
-            CliError::Verify(_) => 1,
-        }
-    }
-}
-
-impl std::fmt::Display for CliError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            CliError::Usage(err) | CliError::Verify(err) => write!(f, "{err:#}"),
-        }
-    }
-}
-
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> ExitCode {
     let cli = Cli::parse();
@@ -317,6 +295,7 @@ async fn main() -> ExitCode {
 }
 
 /// Dispatches the parsed CLI and classifies failures.
+#[allow(clippy::too_many_lines)]
 async fn run(cli: Cli) -> std::result::Result<(), CliError> {
     if let Command::Version { format } = cli.command {
         commands::print_version(format);
@@ -400,96 +379,23 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
             commands::hook(&root, cli.config.as_deref(), action).map_err(CliError::Usage)
         }
         Command::Doctor => doctor::run(&root).await.map_err(CliError::Verify),
-        Command::Metrics { format } => metrics::run_metrics(&root, format)
-            .await
-            .map_err(CliError::Usage),
-    }
-}
-
-/// Runs the `verify` subcommand: sensors, optional beat recording, report.
-#[allow(clippy::too_many_arguments)]
-async fn run_verify(
-    root: &Path,
-    config: Option<&Path>,
-    fail_fast: bool,
-    format: Format,
-    only: Vec<String>,
-    record: bool,
-    task: Option<i64>,
-    evidence: Option<PathBuf>,
-    strict: bool,
-) -> std::result::Result<(), CliError> {
-    let started_at = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_or(0, |d| i64::try_from(d.as_secs()).unwrap_or(i64::MAX));
-    let cfg = config::load(root, config).map_err(CliError::Usage)?;
-    let blocked = if record {
-        telemetry::blocked_sensors(root, &cfg.sensor_names(), task)
-            .await
-            .map_err(CliError::Usage)?
-    } else {
-        Vec::new()
-    };
-    let opts = sensors::VerifyOpts {
-        fail_fast,
-        only,
-        blocked,
-    };
-    let verify_res = sensors::verify(&cfg, root, &opts);
-    let finished_at = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_or(0, |d| i64::try_from(d.as_secs()).unwrap_or(i64::MAX));
-
-    match verify_res {
-        Ok(report) => {
-            if record {
-                telemetry::record_verify(root, &report, &opts.blocked, task)
-                    .await
-                    .map_err(CliError::Usage)?;
-            }
-            report::print_report(&report, format);
-
-            let evidence_path = evidence
-                .or_else(|| strict.then(|| PathBuf::from(".do-harness/evidence.json")))
-                .map(|p| if p.is_relative() { root.join(p) } else { p });
-
-            if let Some(path) = evidence_path {
-                let doc = evidence::EvidenceDocument::from_run(
-                    &cfg,
-                    root,
-                    &report,
-                    &opts.only,
-                    task,
-                    started_at,
-                    finished_at,
-                );
-                if let Some(parent) = path.parent() {
-                    if !parent.as_os_str().is_empty() {
-                        let _ = std::fs::create_dir_all(parent);
-                    }
-                }
-                let json =
-                    serde_json::to_vec_pretty(&doc).map_err(|e| CliError::Usage(e.into()))?;
-                std::fs::write(&path, json).map_err(|e| CliError::Usage(e.into()))?;
-
-                if strict && !doc.is_strict_clean() {
-                    eprintln!(
-                        "strict evidence check failed; artifact at {}",
-                        path.display()
-                    );
-                    return Err(CliError::Verify(anyhow::anyhow!("weak evidence")));
-                }
-            }
-
-            if report.ok {
+        Command::AuditChain => {
+            let report = audit_chain::audit_chain(&root)
+                .await
+                .map_err(CliError::Usage)?;
+            if report.intact {
+                println!("chain intact ({} event(s) verified)", report.count);
                 Ok(())
             } else {
+                let seq = report.tampered_seq.unwrap_or(0);
+                eprintln!("chain tampered at sequence {seq}");
                 Err(CliError::Verify(anyhow::anyhow!(
-                    "{} sensor(s) failed",
-                    report.failed.len()
+                    "chain tampered at sequence {seq}"
                 )))
             }
         }
-        Err(err) => Err(CliError::Usage(err)),
+        Command::Metrics { format } => metrics::run_metrics(&root, format)
+            .await
+            .map_err(CliError::Usage),
     }
 }

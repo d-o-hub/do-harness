@@ -59,6 +59,11 @@ const MIGRATIONS: &[Migration] = &[
         name: "workflow_events",
         sql: include_str!("../migrations/0009_workflow_events.sql"),
     },
+    Migration {
+        version: 10,
+        name: "workflow_event_chain",
+        sql: include_str!("../migrations/0010_workflow_event_chain.sql"),
+    },
 ];
 
 /// Opens (creating if necessary) the local libSQL database at `path`.
@@ -231,12 +236,45 @@ async fn applied_versions(conn: &Connection) -> Result<Vec<i64>> {
 async fn apply_migration(conn: &Connection, migration: &Migration) -> Result<()> {
     let tx = conn.transaction().await?;
     tx.execute_batch(migration.sql).await?;
+    if migration.version == 10 {
+        backfill_workflow_event_chain(&tx).await?;
+    }
     tx.execute(
         "INSERT INTO schema_migrations (version, name, applied_at) VALUES (?1, ?2, ?3)",
         libsql::params!(migration.version, migration.name, unix_now()),
     )
     .await?;
     tx.commit().await?;
+    Ok(())
+}
+
+/// Backfills `seq` and `chain_hash` for existing rows in `workflow_events`.
+async fn backfill_workflow_event_chain(conn: &Connection) -> Result<()> {
+    let mut rows = conn
+        .query(
+            "SELECT id, payload FROM workflow_events WHERE seq IS NULL ORDER BY id ASC",
+            Params::None,
+        )
+        .await?;
+    let mut unchained = Vec::new();
+    while let Some(row) = rows.next().await? {
+        let id: i64 = row.get(0)?;
+        let payload: String = row.get(1)?;
+        unchained.push((id, payload));
+    }
+    drop(rows);
+
+    let mut prev: Option<String> = None;
+    for (seq, (id, payload)) in (1i64..).zip(unchained) {
+        let canonical = crate::repo_workflow::canonical_payload(&payload)?;
+        let hash = crate::repo_workflow::chain_hash(prev.as_deref(), &canonical);
+        conn.execute(
+            "UPDATE workflow_events SET seq = ?1, chain_hash = ?2, payload = ?3 WHERE id = ?4",
+            libsql::params!(seq, hash.as_str(), canonical.as_str(), id),
+        )
+        .await?;
+        prev = Some(hash);
+    }
     Ok(())
 }
 
