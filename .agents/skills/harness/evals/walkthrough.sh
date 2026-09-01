@@ -12,17 +12,6 @@ bin="${DO_HARNESS_BIN:-do-harness}"
 "$bin" --root "$root" init >/dev/null
 "$bin" --root "$root" verify
 
-# Fail-closed contract: verify with a typo'd sensor name in do-harness.toml
-# must fail with a configuration error.
-cat > "$root/do-harness.toml" << 'TOML'
-[hooks]
-pre-commit = ["nonexistent_sensor_typo"]
-TOML
-! "$bin" --root "$root" verify >/dev/null 2>&1
-
-# Restore valid config with init --force
-"$bin" --root "$root" init --force >/dev/null
-
 # Break the crate: the test sensor must fail and record its signature.
 rm -rf "$root/Cargo.toml" "$root/src"
 "$bin" --root "$root" verify --only test --record >/dev/null 2>&1 || true

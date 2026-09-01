@@ -61,8 +61,8 @@ const MIGRATIONS: &[Migration] = &[
     },
     Migration {
         version: 10,
-        name: "workflow_event_hash_chain",
-        sql: include_str!("../migrations/0010_workflow_event_hash_chain.sql"),
+        name: "workflow_event_chain",
+        sql: include_str!("../migrations/0010_workflow_event_chain.sql"),
     },
 ];
 
@@ -237,7 +237,7 @@ async fn apply_migration(conn: &Connection, migration: &Migration) -> Result<()>
     let tx = conn.transaction().await?;
     tx.execute_batch(migration.sql).await?;
     if migration.version == 10 {
-        backfill_workflow_events_hash_chain(&tx).await?;
+        backfill_workflow_event_chain(&tx).await?;
     }
     tx.execute(
         "INSERT INTO schema_migrations (version, name, applied_at) VALUES (?1, ?2, ?3)",
@@ -248,9 +248,9 @@ async fn apply_migration(conn: &Connection, migration: &Migration) -> Result<()>
     Ok(())
 }
 
-/// Backfills `seq` and `chain_hash` for any unchained rows in `workflow_events`.
-async fn backfill_workflow_events_hash_chain(tx: &libsql::Transaction) -> Result<()> {
-    let mut rows = tx
+/// Backfills `seq` and `chain_hash` for existing unchained rows in `workflow_events`.
+async fn backfill_workflow_event_chain(conn: &Connection) -> Result<()> {
+    let mut rows = conn
         .query(
             "SELECT seq, chain_hash FROM workflow_events WHERE seq IS NOT NULL ORDER BY seq DESC LIMIT 1",
             Params::None,
@@ -260,33 +260,33 @@ async fn backfill_workflow_events_hash_chain(tx: &libsql::Transaction) -> Result
         Some(row) => (row.get(0)?, row.get(1)?),
         None => (0, None),
     };
+    drop(rows);
 
-    let mut unchained = tx
+    let mut unchained_rows = conn
         .query(
             "SELECT id, payload FROM workflow_events WHERE seq IS NULL ORDER BY id ASC",
             Params::None,
         )
         .await?;
-
-    let mut pending_updates = Vec::new();
-    while let Some(row) = unchained.next().await? {
+    let mut unchained = Vec::new();
+    while let Some(row) = unchained_rows.next().await? {
         let id: i64 = row.get(0)?;
-        let raw_payload: String = row.get(1)?;
-        let canonical_payload = crate::repo_workflow::canonicalize_json(&raw_payload)?;
-        last_seq += 1;
-        let hash = crate::repo_workflow::chain_hash(prev_hash.as_deref(), &canonical_payload);
-        prev_hash = Some(hash.clone());
-        pending_updates.push((id, last_seq, hash, canonical_payload));
+        let payload: String = row.get(1)?;
+        unchained.push((id, payload));
     }
+    drop(unchained_rows);
 
-    for (id, seq, hash, canonical_payload) in pending_updates {
-        tx.execute(
+    for (id, payload) in unchained {
+        let canonical = crate::repo_workflow::canonical_payload(&payload)?;
+        last_seq += 1;
+        let hash = crate::repo_workflow::chain_hash(prev_hash.as_deref(), &canonical);
+        conn.execute(
             "UPDATE workflow_events SET seq = ?1, chain_hash = ?2, payload = ?3 WHERE id = ?4",
-            libsql::params!(seq, hash, canonical_payload, id),
+            libsql::params!(last_seq, hash.as_str(), canonical.as_str(), id),
         )
         .await?;
+        prev_hash = Some(hash);
     }
-
     Ok(())
 }
 
