@@ -49,17 +49,44 @@ pub async fn audit_chain_cmd(root: &Path, format: Format) -> Result<()> {
 const COMPLIANCE_DOC: &str = include_str!("../../../docs/compliance.md");
 
 /// Prints compliance mapping information in text or JSON format.
-pub fn print_compliance(format: Format) {
-    match format {
-        Format::Text => println!("{COMPLIANCE_DOC}"),
+///
+/// # Errors
+///
+/// Returns an error if catalog filtering or JSON serialization fails.
+pub fn print_compliance(opts: &crate::ComplianceOpts) -> Result<()> {
+    let catalog = crate::compliance::filter_catalog(opts.framework)?;
+    match opts.format {
+        Format::Text => {
+            if opts.framework.is_none() {
+                println!("{COMPLIANCE_DOC}");
+            } else {
+                println!(
+                    "do-harness compliance crosswalk (catalog v{}, framework: {})",
+                    catalog.catalog_version,
+                    opts.framework.map_or("all", |f| f.slug())
+                );
+                println!();
+                for control in &catalog.controls {
+                    println!("[{}] {}", control.id, control.name);
+                    println!("  Mechanism: {}", control.mechanism);
+                    for mapping in &control.frameworks {
+                        if opts.framework.is_none_or(|f| mapping.framework == f.slug()) {
+                            println!(
+                                "  Framework mapping ({}): {}",
+                                mapping.framework, mapping.category
+                            );
+                        }
+                    }
+                    println!();
+                }
+            }
+        }
         Format::Json => {
-            let json = serde_json::json!({
-                "doc": COMPLIANCE_DOC,
-                "frameworks": ["OWASP Agentic Top 10", "NIST AI RMF 1.0", "EU AI Act"]
-            });
+            let json = serde_json::to_string_pretty(&catalog)?;
             println!("{json}");
         }
     }
+    Ok(())
 }
 
 /// Prints CLI version information in the requested format.
