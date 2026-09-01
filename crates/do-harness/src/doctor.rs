@@ -82,6 +82,23 @@ pub async fn run(root: &Path) -> Result<()> {
         }
     }
 
+    // 4. Workflow Event Hash Chain Integrity Check (informational)
+    if do_harness_db::db_path(root).exists() {
+        match crate::audit::audit_chain(root).await {
+            Ok(report) => match report {
+                crate::audit::ChainReport::Intact { count } => {
+                    println!("  [OK] event chain: intact ({count} event(s))");
+                }
+                crate::audit::ChainReport::Tampered { seq } => {
+                    println!("  [WARN] event chain: tampered at seq {seq}");
+                }
+            },
+            Err(err) => {
+                println!("  [WARN] event chain: unreadable ({err:#})");
+            }
+        }
+    }
+
     if failures.is_empty() {
         println!("\nDoctor checks passed.");
         Ok(())

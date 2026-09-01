@@ -59,6 +59,11 @@ const MIGRATIONS: &[Migration] = &[
         name: "workflow_events",
         sql: include_str!("../migrations/0009_workflow_events.sql"),
     },
+    Migration {
+        version: 10,
+        name: "workflow_event_hash_chain",
+        sql: include_str!("../migrations/0010_workflow_event_hash_chain.sql"),
+    },
 ];
 
 /// Opens (creating if necessary) the local libSQL database at `path`.
@@ -231,12 +236,57 @@ async fn applied_versions(conn: &Connection) -> Result<Vec<i64>> {
 async fn apply_migration(conn: &Connection, migration: &Migration) -> Result<()> {
     let tx = conn.transaction().await?;
     tx.execute_batch(migration.sql).await?;
+    if migration.version == 10 {
+        backfill_workflow_events_hash_chain(&tx).await?;
+    }
     tx.execute(
         "INSERT INTO schema_migrations (version, name, applied_at) VALUES (?1, ?2, ?3)",
         libsql::params!(migration.version, migration.name, unix_now()),
     )
     .await?;
     tx.commit().await?;
+    Ok(())
+}
+
+/// Backfills `seq` and `chain_hash` for any unchained rows in `workflow_events`.
+async fn backfill_workflow_events_hash_chain(tx: &libsql::Transaction) -> Result<()> {
+    let mut rows = tx
+        .query(
+            "SELECT seq, chain_hash FROM workflow_events WHERE seq IS NOT NULL ORDER BY seq DESC LIMIT 1",
+            Params::None,
+        )
+        .await?;
+    let (mut last_seq, mut prev_hash): (i64, Option<String>) = match rows.next().await? {
+        Some(row) => (row.get(0)?, row.get(1)?),
+        None => (0, None),
+    };
+
+    let mut unchained = tx
+        .query(
+            "SELECT id, payload FROM workflow_events WHERE seq IS NULL ORDER BY id ASC",
+            Params::None,
+        )
+        .await?;
+
+    let mut pending_updates = Vec::new();
+    while let Some(row) = unchained.next().await? {
+        let id: i64 = row.get(0)?;
+        let raw_payload: String = row.get(1)?;
+        let canonical_payload = crate::repo_workflow::canonicalize_json(&raw_payload)?;
+        last_seq += 1;
+        let hash = crate::repo_workflow::chain_hash(prev_hash.as_deref(), &canonical_payload);
+        prev_hash = Some(hash.clone());
+        pending_updates.push((id, last_seq, hash, canonical_payload));
+    }
+
+    for (id, seq, hash, canonical_payload) in pending_updates {
+        tx.execute(
+            "UPDATE workflow_events SET seq = ?1, chain_hash = ?2, payload = ?3 WHERE id = ?4",
+            libsql::params!(seq, hash, canonical_payload, id),
+        )
+        .await?;
+    }
+
     Ok(())
 }
 
@@ -347,5 +397,56 @@ mod tests {
         let conn = connect_and_migrate(dir.path()).await.unwrap();
         assert!(crate::root::db_path(dir.path()).exists());
         drop(conn);
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn migration_backfills_existing_unchained_events() {
+        let dir = tempfile::tempdir().unwrap();
+        let conn = connect(crate::root::db_path(dir.path())).await.unwrap();
+
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at INTEGER NOT NULL)",
+            Params::None,
+        )
+        .await
+        .unwrap();
+
+        for v in 1..=9 {
+            let m = MIGRATIONS.iter().find(|m| m.version == v).unwrap();
+            let tx = conn.transaction().await.unwrap();
+            tx.execute_batch(m.sql).await.unwrap();
+            tx.execute(
+                "INSERT INTO schema_migrations (version, name, applied_at) VALUES (?1, ?2, 0)",
+                libsql::params!(m.version, m.name),
+            )
+            .await
+            .unwrap();
+            tx.commit().await.unwrap();
+        }
+
+        conn.execute(
+            "INSERT INTO tasks (id, title, status, subtask_index, created_at, updated_at) VALUES (1, 't', 'pending', 0, 100, 100)",
+            Params::None,
+        )
+        .await
+        .unwrap();
+
+        conn.execute(
+            "INSERT INTO workflow_events (task_id, kind, payload, created_at) VALUES (1, 'TaskAdded', '{\"b\":2,\"a\":1}', 100)",
+            Params::None,
+        )
+        .await
+        .unwrap();
+
+        migrate(&conn).await.unwrap();
+
+        let rows = crate::repo_workflow::list_events_ascending(&conn)
+            .await
+            .unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].seq, 1);
+        assert_eq!(rows[0].canonical_payload, "{\"a\":1,\"b\":2}");
+        let expected_hash = crate::repo_workflow::chain_hash(None, "{\"a\":1,\"b\":2}");
+        assert_eq!(rows[0].chain_hash.as_deref(), Some(expected_hash.as_str()));
     }
 }
