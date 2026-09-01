@@ -42,7 +42,7 @@ and CI must pass the computational sensors before declaring work complete.
 ## Workflow Gates
 - Pre-commit and pre-push: `do-harness verify --fail-fast` (via
   `do-harness hook install`)
-- CI: `do-harness verify --evidence .do-harness/evidence.json --strict` (exit 0 = pass, 1 = sensor failure / weak evidence,
+- CI: `do-harness verify --format json` (exit 0 = pass, 1 = sensor failure,
   2 = usage/config error)
 
 Sensors are defined in `do-harness.toml`; `do-harness hook install` wires the

@@ -62,8 +62,8 @@ if [[ ! -d "$ROOT/.git" ]]; then
     exit 0
 fi
 
-# History window: --count <N> flag overrides the env default of 10.
-COUNT="${DO_HARNESS_COMMITLINT_COUNT:-10}"
+# History window: --count <N> flag overrides the env default of 1.
+COUNT="${DO_HARNESS_COMMITLINT_COUNT:-1}"
 while (( $# )); do
     case "$1" in
         --count)

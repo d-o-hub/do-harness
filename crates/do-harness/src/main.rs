@@ -25,7 +25,6 @@ mod eval_assert;
 mod eval_integrity;
 mod eval_sandbox;
 mod eval_walk;
-mod evidence;
 mod hook_script;
 mod hooks;
 mod init;
@@ -83,12 +82,6 @@ enum Command {
         /// Scope records and fail-fast strikes to this task id.
         #[arg(long)]
         task: Option<i64>,
-        /// Write a machine-readable evidence artifact to path.
-        #[arg(long)]
-        evidence: Option<PathBuf>,
-        /// Enforce strong evidence: exit non-zero on skips or missing timing/exit codes.
-        #[arg(long)]
-        strict: bool,
     },
     /// List sensor names.
     List {
@@ -355,8 +348,6 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
             only,
             record,
             task,
-            evidence,
-            strict,
         } => {
             run_verify(
                 &root,
@@ -366,8 +357,6 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
                 only,
                 record,
                 task,
-                evidence,
-                strict,
             )
             .await
         }
@@ -426,12 +415,7 @@ async fn run_verify(
     only: Vec<String>,
     record: bool,
     task: Option<i64>,
-    evidence: Option<PathBuf>,
-    strict: bool,
 ) -> std::result::Result<(), CliError> {
-    let started_at = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_or(0, |d| i64::try_from(d.as_secs()).unwrap_or(i64::MAX));
     let cfg = config::load(root, config).map_err(CliError::Usage)?;
     let blocked = if record {
         telemetry::blocked_sensors(root, &cfg.sensor_names(), task)
@@ -445,12 +429,7 @@ async fn run_verify(
         only,
         blocked,
     };
-    let verify_res = sensors::verify(&cfg, root, &opts);
-    let finished_at = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_or(0, |d| i64::try_from(d.as_secs()).unwrap_or(i64::MAX));
-
-    match verify_res {
+    match sensors::verify(&cfg, root, &opts) {
         Ok(report) => {
             if record {
                 telemetry::record_verify(root, &report, &opts.blocked, task)
@@ -458,39 +437,6 @@ async fn run_verify(
                     .map_err(CliError::Usage)?;
             }
             report::print_report(&report, format);
-
-            let evidence_path = evidence
-                .or_else(|| strict.then(|| PathBuf::from(".do-harness/evidence.json")))
-                .map(|p| if p.is_relative() { root.join(p) } else { p });
-
-            if let Some(path) = evidence_path {
-                let doc = evidence::EvidenceDocument::from_run(
-                    &cfg,
-                    root,
-                    &report,
-                    &opts.only,
-                    task,
-                    started_at,
-                    finished_at,
-                );
-                if let Some(parent) = path.parent() {
-                    if !parent.as_os_str().is_empty() {
-                        let _ = std::fs::create_dir_all(parent);
-                    }
-                }
-                let json =
-                    serde_json::to_vec_pretty(&doc).map_err(|e| CliError::Usage(e.into()))?;
-                std::fs::write(&path, json).map_err(|e| CliError::Usage(e.into()))?;
-
-                if strict && !doc.is_strict_clean() {
-                    eprintln!(
-                        "strict evidence check failed; artifact at {}",
-                        path.display()
-                    );
-                    return Err(CliError::Verify(anyhow::anyhow!("weak evidence")));
-                }
-            }
-
             if report.ok {
                 Ok(())
             } else {
