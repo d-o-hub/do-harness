@@ -14,47 +14,49 @@ use do_harness_types::{
 use libsql::{Connection, params, params::Params};
 use sha2::{Digest, Sha256};
 
-/// A row from the workflow event log with hash-chain metadata.
+/// Structured database row from `workflow_events` with sequence and hash chain.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct EventChainRow {
-    /// Sequential event number in insertion order (1-indexed).
-    pub seq: i64,
-    /// The computed hash chain value for this event row.
-    pub chain_hash: Option<String>,
-    /// The canonical JSON payload of the event.
+pub struct WorkflowEventRow {
+    /// Row primary key.
+    pub id: i64,
+    /// Foreign key to task.
+    pub task_id: i64,
+    /// Event kind.
+    pub kind: String,
+    /// Raw stored payload.
+    pub payload: String,
+    /// Canonicalized payload string.
     pub canonical_payload: String,
+    /// Creation timestamp.
+    pub created_at: i64,
+    /// Monotonic sequence number in the chain.
+    pub seq: i64,
+    /// SHA-256 chain hash for this row.
+    pub chain_hash: Option<String>,
 }
 
-const HEX: &[u8; 16] = b"0123456789abcdef";
-
-/// Computes the SHA-256 hash chain value for an event payload given the previous chain hash.
+/// Canonicalizes a JSON string by parsing into `serde_json::Value` and re-serializing,
+/// ensuring object keys are sorted deterministically.
 ///
-/// `chain_hash_n = SHA-256(chain_hash_(n-1) || "|" || canonical_json(payload_n))`
+/// # Errors
+///
+/// Returns an error if the payload is not valid JSON or re-serialization fails.
+pub fn canonical_payload(payload_json: &str) -> Result<String> {
+    let value: serde_json::Value = serde_json::from_str(payload_json)
+        .map_err(|err| DbError::InvalidEventPayload(err.to_string()))?;
+    serde_json::to_string(&value).map_err(|err| DbError::InvalidEventPayload(err.to_string()))
+}
+
+/// Computes SHA-256 chain hash: `SHA-256(prev || "|" || payload_json)`.
+///
+/// If `prev` is [`None`], defaults to `"GENESIS"`.
 #[must_use]
 pub fn chain_hash(prev: Option<&str>, payload_json: &str) -> String {
     let mut hasher = Sha256::new();
     hasher.update(prev.unwrap_or("GENESIS").as_bytes());
     hasher.update(b"|");
     hasher.update(payload_json.as_bytes());
-    let result = hasher.finalize();
-    let mut hex_str = String::with_capacity(64);
-    for byte in result {
-        hex_str.push(HEX[usize::from(byte >> 4)] as char);
-        hex_str.push(HEX[usize::from(byte & 0x0F)] as char);
-    }
-    hex_str
-}
-
-/// Canonicalizes a JSON string by parsing and re-serializing it with sorted key ordering.
-///
-/// # Errors
-///
-/// Returns a [`DbError::InvalidEventPayload`] if the JSON string is invalid.
-pub fn canonicalize_json(payload_json: &str) -> Result<String> {
-    let value: serde_json::Value = serde_json::from_str(payload_json)
-        .map_err(|err| DbError::InvalidEventPayload(format!("{err} (payload: {payload_json})")))?;
-    serde_json::to_string(&value)
-        .map_err(|err| DbError::InvalidEventPayload(format!("{err} (payload: {payload_json})")))
+    hex::encode(hasher.finalize())
 }
 
 /// Inserts a task in `pending` state and persists its `TaskAdded` event in
@@ -156,12 +158,43 @@ pub async fn list_all_events(conn: &Connection) -> Result<Vec<(i64, WorkflowEven
     Ok(events)
 }
 
+/// Loads all workflow event rows in ascending insertion order with chain metadata.
+///
+/// # Errors
+///
+/// Returns an error when the database query fails or a payload cannot be canonicalized.
+pub async fn list_events_ascending(conn: &Connection) -> Result<Vec<WorkflowEventRow>> {
+    let mut rows = conn
+        .query(
+            "SELECT id, task_id, kind, payload, created_at, seq, chain_hash \
+             FROM workflow_events ORDER BY id ASC",
+            Params::None,
+        )
+        .await?;
+    let mut events = Vec::new();
+    while let Some(row) = rows.next().await? {
+        let payload: String = row.get(3)?;
+        let canonical = canonical_payload(&payload)?;
+        events.push(WorkflowEventRow {
+            id: row.get(0)?,
+            task_id: row.get(1)?,
+            kind: row.get(2)?,
+            payload: payload.clone(),
+            canonical_payload: canonical,
+            created_at: row.get(4)?,
+            seq: row.get::<i64>(5).unwrap_or(0),
+            chain_hash: row.get(6)?,
+        });
+    }
+    Ok(events)
+}
+
 /// Appends one event to the log without transaction management, for composing
 /// into a larger transaction.
 async fn append_event_on(conn: &Connection, task_id: i64, event: &WorkflowEvent) -> Result<()> {
     let raw_payload = serde_json::to_string(event)
         .map_err(|err| DbError::InvalidEventPayload(err.to_string()))?;
-    let canonical_payload = canonicalize_json(&raw_payload)?;
+    let payload = canonical_payload(&raw_payload)?;
 
     let mut rows = conn
         .query(
@@ -169,13 +202,16 @@ async fn append_event_on(conn: &Connection, task_id: i64, event: &WorkflowEvent)
             Params::None,
         )
         .await?;
-    let (last_seq, prev_hash): (i64, Option<String>) = match rows.next().await? {
-        Some(row) => (row.get(0)?, row.get(1)?),
+    let (last_seq, prev_hash) = match rows.next().await? {
+        Some(row) => {
+            let s: i64 = row.get(0)?;
+            let h: Option<String> = row.get(1)?;
+            (s, h)
+        }
         None => (0, None),
     };
-
-    let next_seq = last_seq + 1;
-    let next_hash = chain_hash(prev_hash.as_deref(), &canonical_payload);
+    let seq = last_seq + 1;
+    let hash = chain_hash(prev_hash.as_deref(), &payload);
 
     conn.execute(
         "INSERT INTO workflow_events (task_id, kind, payload, created_at, seq, chain_hash) \
@@ -183,38 +219,14 @@ async fn append_event_on(conn: &Connection, task_id: i64, event: &WorkflowEvent)
         params!(
             task_id,
             event.name(),
-            canonical_payload,
+            payload,
             unix_now(),
-            next_seq,
-            next_hash
+            seq,
+            hash.as_str()
         ),
     )
     .await?;
     Ok(())
-}
-
-/// Loads all events ordered ascending by `seq` with hash-chain metadata for audit checking.
-///
-/// # Errors
-///
-/// Returns an error when the database query fails.
-pub async fn list_events_ascending(conn: &Connection) -> Result<Vec<EventChainRow>> {
-    let mut rows = conn
-        .query(
-            "SELECT seq, chain_hash, payload FROM workflow_events ORDER BY seq ASC, id ASC",
-            Params::None,
-        )
-        .await?;
-    let mut events = Vec::new();
-    while let Some(row) = rows.next().await? {
-        let seq: Option<i64> = row.get(0)?;
-        events.push(EventChainRow {
-            seq: seq.unwrap_or(0),
-            chain_hash: row.get(1)?,
-            canonical_payload: row.get(2)?,
-        });
-    }
-    Ok(events)
 }
 
 #[cfg(test)]
@@ -232,46 +244,6 @@ mod tests {
             precondition: None,
             parent_id: None,
         }
-    }
-
-    #[test]
-    fn chain_hash_computes_sha256() {
-        let h1 = chain_hash(None, "{\"a\":1}");
-        let h2 = chain_hash(Some(&h1), "{\"b\":2}");
-        assert_eq!(h1.len(), 64);
-        assert_eq!(h2.len(), 64);
-        assert_ne!(h1, h2);
-    }
-
-    #[test]
-    fn canonicalize_json_sorts_keys() {
-        let uncanonical = "{\"z\": 1, \"a\": 2}";
-        let canonical = canonicalize_json(uncanonical).unwrap();
-        assert_eq!(canonical, "{\"a\":2,\"z\":1}");
-    }
-
-    #[tokio::test(flavor = "current_thread")]
-    async fn events_are_hash_chained_on_insert() {
-        let dir = tempfile::tempdir().unwrap();
-        let conn = connect_and_migrate(dir.path()).await.unwrap();
-
-        insert_task_with_event(&conn, &new_task("t1"))
-            .await
-            .unwrap();
-        insert_task_with_event(&conn, &new_task("t2"))
-            .await
-            .unwrap();
-
-        let rows = list_events_ascending(&conn).await.unwrap();
-        assert_eq!(rows.len(), 2);
-        assert_eq!(rows[0].seq, 1);
-        assert_eq!(rows[1].seq, 2);
-
-        let expected_hash1 = chain_hash(None, &rows[0].canonical_payload);
-        assert_eq!(rows[0].chain_hash.as_deref(), Some(expected_hash1.as_str()));
-
-        let expected_hash2 = chain_hash(Some(&expected_hash1), &rows[1].canonical_payload);
-        assert_eq!(rows[1].chain_hash.as_deref(), Some(expected_hash2.as_str()));
     }
 
     #[tokio::test(flavor = "current_thread")]
@@ -376,5 +348,41 @@ mod tests {
         .await
         .unwrap_err();
         assert!(matches!(err, DbError::Constraint(_)));
+    }
+
+    #[test]
+    fn chain_hash_genesis_and_canonicalization() {
+        let raw = r#"{"z":1,"a":2}"#;
+        let canonical = canonical_payload(raw).unwrap();
+        assert_eq!(canonical, r#"{"a":2,"z":1}"#);
+
+        let h1 = chain_hash(None, &canonical);
+        let h2 = chain_hash(Some("GENESIS"), &canonical);
+        assert_eq!(h1, h2);
+
+        let h_next = chain_hash(Some(&h1), &canonical);
+        assert_ne!(h1, h_next);
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn event_chain_assigns_sequential_seq_and_hashes() {
+        let dir = tempfile::tempdir().unwrap();
+        let conn = connect_and_migrate(dir.path()).await.unwrap();
+
+        let (id, _) = insert_task_with_event(&conn, &new_task("slice 1"))
+            .await
+            .unwrap();
+        advance_subtask_with_event(&conn, id).await.unwrap();
+
+        let rows = list_events_ascending(&conn).await.unwrap();
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[0].seq, 1);
+        assert_eq!(rows[1].seq, 2);
+
+        let expected_h1 = chain_hash(None, &rows[0].canonical_payload);
+        assert_eq!(rows[0].chain_hash.as_deref(), Some(expected_h1.as_str()));
+
+        let expected_h2 = chain_hash(Some(&expected_h1), &rows[1].canonical_payload);
+        assert_eq!(rows[1].chain_hash.as_deref(), Some(expected_h2.as_str()));
     }
 }
