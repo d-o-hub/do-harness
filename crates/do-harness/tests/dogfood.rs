@@ -156,3 +156,38 @@ fn generic_init_verify_is_vacuously_green() {
         "generic pack ships zero sensors; the pass is vacuous by design"
     );
 }
+
+#[test]
+fn doctor_strict_fails_on_warnings() {
+    let dir = tempfile::tempdir().unwrap();
+    let (ok, out) = run(harness(dir.path()).arg("init"));
+    assert!(ok, "init failed:\n{out}");
+
+    let (ok, out) = run(harness(dir.path()).arg("doctor").arg("--strict"));
+    assert!(!ok, "doctor --strict must fail on warnings:\n{out}");
+}
+
+#[test]
+fn verify_fails_on_unknown_sensor_in_config() {
+    let dir = tempfile::tempdir().unwrap();
+    let (ok, out) = run(harness(dir.path()).arg("init"));
+    assert!(ok, "init failed:\n{out}");
+
+    let toml = r#"
+        [hooks]
+        pre-commit = ["typo_sensor"]
+    "#;
+    std::fs::write(dir.path().join("do-harness.toml"), toml).unwrap();
+
+    let output = harness(dir.path()).arg("verify").output().unwrap();
+    assert!(!output.status.success(), "verify must fail on invalid config");
+    let err = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        err.contains("references unknown sensor 'typo_sensor'"),
+        "stderr must mention unknown sensor: {err}"
+    );
+    assert!(
+        err.contains("fail-closed"),
+        "stderr must mention fail-closed doctrine: {err}"
+    );
+}

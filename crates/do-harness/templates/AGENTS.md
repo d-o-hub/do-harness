@@ -4,6 +4,9 @@ This workspace is governed by the do-harness agent execution harness. Agents
 and CI must pass the computational sensors before declaring work complete.
 
 ## Invariants
+- Fail-closed: when a precondition is unmet (config missing or invalid, DB
+  unreadable, binary stale, git absent), do-harness exits non-zero rather than
+  skipping the affected sensor or command.
 - Computational sensors (`do-harness verify`) strictly supersede LLM
   self-assessment: a task is complete only when verified by automated exit
   codes.

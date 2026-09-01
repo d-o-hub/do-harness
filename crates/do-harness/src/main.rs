@@ -152,7 +152,11 @@ enum Command {
         action: HookAction,
     },
     /// Run diagnostic checks on binary resolution and git hook health.
-    Doctor,
+    Doctor {
+        /// Elevate advisory warnings to fatal failure checks.
+        #[arg(long)]
+        strict: bool,
+    },
     /// Report harness trends: sensor stats, strikes, eval pass-rate history.
     Metrics {
         /// Output format.
@@ -413,7 +417,11 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
         Command::Hook { action } => {
             commands::hook(&root, cli.config.as_deref(), action).map_err(CliError::Usage)
         }
-        Command::Doctor => doctor::run(&root).await.map_err(CliError::Verify),
+        Command::Doctor { strict } => {
+            doctor::run(&root, &doctor::DoctorOpts { strict })
+                .await
+                .map_err(CliError::Verify)
+        }
         Command::AuditChain { format } => commands::audit_chain_cmd(&root, format)
             .await
             .map_err(CliError::Verify),
