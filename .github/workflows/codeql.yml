@@ -28,13 +28,13 @@ jobs:
         with:
           toolchain: stable
 
-      - uses: github/codeql-action/init@v3
+      - uses: github/codeql-action/init@a0c73122a6231d3a72b4b04036548af1cd2487c9
         with:
           languages: ${{ matrix.language }}
           queries: security-and-quality
 
       - run: cargo build --release
 
-      - uses: github/codeql-action/analyze@v3
+      - uses: github/codeql-action/analyze@a0c73122a6231d3a72b4b04036548af1cd2487c9
         with:
           category: /language:rust
