@@ -114,10 +114,10 @@ For CI, invoke `do-harness verify --format json` (exit 0/1/2) with the CLI on
 | `distill --skill NAME --pattern P [--description D] [--from-trace ID] [--to-fixture]` | Distill a resolved trace into a skill (refuses without resolution steps); `--to-fixture` raises the skill's pass-rate bar |
 | `eval [--skill NAME] [--bless]` | Validate skills via skill-creator's quick_validate.py and persist skill_evals; `--bless` re-baselines graders and raises the pass-rate bar after a fully green run |
 | `metrics [--format text\|json]` | Report sensor stats, strike counts, and eval pass-rate history |
-| `compliance [--framework NAME] [--format text\|json]` | Print compliance crosswalk for OWASP Agentic Top 10, NIST AI RMF, EU AI Act, and SOC 2 |
+| `compliance [--format text\|json]` | Print compliance mapping to OWASP Agentic Top 10, NIST AI RMF, and EU AI Act |
 | `init [--language rust\|generic] [--force]` | Scaffold a harness workspace in the current directory |
 | `hook install [--force]` / `hook uninstall` / `hook status` | Manage `.git/hooks/pre-commit` + `pre-push` |
-| `doctor [--strict]` | Run diagnostic checks on binary resolution, git hook health, and state-database migration skew (use `--strict` to convert warnings to non-zero failures) |
+| `doctor` | Run diagnostic checks on binary resolution, git hook health, and state-database migration skew (fails when the database outruns the binary) |
 
 Global flags: `--root <path>`, `--config <path>`.
 
@@ -193,7 +193,7 @@ verify:
 
 `do-harness` enforces deterministic, computational controls over the agent development loop (build-time verification sensors, workflow gates, tamper-evident logs, and machine-readable evidence artifacts). It is designed to satisfy dev-loop assurance requirements in regulated environments without over-claiming runtime policy or proxy capabilities.
 
-See [docs/compliance.md](docs/compliance.md) for full mappings against the **OWASP Agentic Top 10 (2026)**, **NIST AI RMF 1.0**, **EU AI Act**, and **SOC 2 (Trust Services Criteria)**.
+See [docs/compliance.md](docs/compliance.md) for full mappings against the **OWASP Agentic Top 10 (2026)**, **NIST AI RMF 1.0**, and the **EU AI Act**.
 
 ## Configuration
 
@@ -205,14 +205,6 @@ See [docs/compliance.md](docs/compliance.md) for full mappings against the **OWA
 - `[[sensors]]` — each sensor has a `name` and an `argv` (the command to execute).
 
 When no config is found, the CLI falls back to the built-in Rust sensor pack. The config file is also the workspace-root marker used for discovery.
-
-## Fail-closed semantics
-
-`do-harness` follows explicit fail-closed contracts across execution gates:
-
-- **Preconditions**: when a precondition is unmet (config missing or invalid, DB unreadable, binary stale, git absent), `do-harness` exits non-zero rather than skipping the affected sensor or command.
-- **Config validation**: referencing an unknown or typo'd sensor name in `do-harness.toml` (e.g. under `[hooks]`) fails at parse/load time with a configuration error.
-- **Strict diagnostics (`doctor --strict`)**: under `--strict`, all advisory warnings (binary under Cargo `target/`, absent git hooks, pending/uninitialized state DB, unreadable/tampered event chain) are elevated to fatal failures (exiting non-zero).
 
 ## License
 
