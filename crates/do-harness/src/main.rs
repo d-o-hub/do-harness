@@ -16,6 +16,7 @@ use crate::report::Format;
 
 mod audit;
 mod commands;
+mod compliance;
 mod config;
 mod dbcheck;
 mod distill;
@@ -159,18 +160,25 @@ enum Command {
         #[arg(long, value_enum, default_value_t = Format::Text)]
         format: Format,
     },
-    /// Print compliance mapping to OWASP Agentic Top 10, NIST AI RMF, and EU AI Act.
-    Compliance {
-        /// Output format.
-        #[arg(long, value_enum, default_value_t = Format::Text)]
-        format: Format,
-    },
+    /// Print compliance mapping to OWASP Agentic Top 10, NIST AI RMF, EU AI Act, and SOC 2.
+    Compliance(ComplianceOpts),
     /// Recompute workflow event hash chain and report first divergence.
     AuditChain {
         /// Output format.
         #[arg(long, value_enum, default_value_t = Format::Text)]
         format: Format,
     },
+}
+
+/// Print the embedded compliance crosswalk.
+#[derive(clap::Args, Debug)]
+pub struct ComplianceOpts {
+    /// Filter by framework; omit to list all controls.
+    #[arg(long, value_enum)]
+    pub framework: Option<compliance::Framework>,
+    /// Output format (text table or JSON).
+    #[arg(long, value_enum, default_value_t = Format::Text)]
+    pub format: Format,
 }
 
 /// Available task-state actions.
@@ -329,8 +337,8 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
         commands::print_version(format);
         return Ok(());
     }
-    if let Command::Compliance { format } = cli.command {
-        commands::print_compliance(format);
+    if let Command::Compliance(opts) = &cli.command {
+        commands::print_compliance(opts).map_err(CliError::Usage)?;
         return Ok(());
     }
 
@@ -341,7 +349,7 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
         _ => commands::resolve_root(cli.root.as_deref()).map_err(CliError::Usage)?,
     };
     match cli.command {
-        Command::Version { .. } | Command::Compliance { .. } => unreachable!(),
+        Command::Version { .. } | Command::Compliance(..) => unreachable!(),
         Command::Init { language, force } => {
             let opts = init::InitOpts { language, force };
             let report = init::init_workspace(&root, &opts)
