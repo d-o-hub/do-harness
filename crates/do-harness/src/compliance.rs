@@ -129,10 +129,7 @@ mod tests {
                 fw
             );
             for control in &filtered.controls {
-                assert!(control
-                    .frameworks
-                    .iter()
-                    .any(|m| m.framework == fw.slug()));
+                assert!(control.frameworks.iter().any(|m| m.framework == fw.slug()));
             }
         }
     }

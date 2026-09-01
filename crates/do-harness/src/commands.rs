@@ -70,10 +70,7 @@ pub fn print_compliance(opts: &crate::ComplianceOpts) -> Result<()> {
                     println!("[{}] {}", control.id, control.name);
                     println!("  Mechanism: {}", control.mechanism);
                     for mapping in &control.frameworks {
-                        if opts
-                            .framework
-                            .map_or(true, |f| mapping.framework == f.slug())
-                        {
+                        if opts.framework.is_none_or(|f| mapping.framework == f.slug()) {
                             println!(
                                 "  Framework mapping ({}): {}",
                                 mapping.framework, mapping.category
