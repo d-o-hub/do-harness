@@ -14,13 +14,6 @@ use crate::dbcheck;
 use crate::hook_script::BinSource;
 use crate::hooks;
 
-/// Options controlling doctor diagnostic behavior.
-#[derive(Debug, Clone, Copy, Default)]
-pub struct DoctorOpts {
-    /// Elevate advisory warnings to fatal failure checks.
-    pub strict: bool,
-}
-
 /// Runs diagnostic checks covering binary resolution, git hook status, and
 /// state-database migration skew.
 ///
@@ -28,7 +21,7 @@ pub struct DoctorOpts {
 ///
 /// Returns an error listing every failed required check, or when git repo
 /// discovery fails.
-pub async fn run(root: &Path, opts: &DoctorOpts) -> Result<()> {
+pub async fn run(root: &Path) -> Result<()> {
     let git_dir = hooks::find_git_dir(root)?;
     let status = hooks::status(&git_dir, root);
 
@@ -36,15 +29,6 @@ pub async fn run(root: &Path, opts: &DoctorOpts) -> Result<()> {
 
     println!("Doctor Summary:");
     println!("===============");
-
-    // 0. Workspace Config Check
-    match crate::config::load(root, None) {
-        Ok(_) => println!("  [OK] config: do-harness.toml valid"),
-        Err(err) => {
-            println!("  [FAIL] config: invalid ({err:#})");
-            failures.push(format!("config invalid: {err:#}"));
-        }
-    }
 
     // 1. Binary Resolution Check
     let bin_path = status.binary.path();
@@ -62,18 +46,12 @@ pub async fn run(root: &Path, opts: &DoctorOpts) -> Result<()> {
         failures.push(format!("binary missing at {}", bin_path.display()));
     }
 
-    // Target directory warning (failure under --strict)
+    // Target directory warning (not a failure condition)
     if status.binary.is_in_target_dir() {
         eprintln!(
             "warning: resolved do-harness binary is under Cargo target/; cargo clean will remove it: {}",
             bin_path.display()
         );
-        if opts.strict {
-            failures.push(format!(
-                "resolved do-harness binary is under Cargo target/: {}",
-                bin_path.display()
-            ));
-        }
     }
 
     // 2. Git Hooks Check (absence is advisory; install via `hook install`)
@@ -87,9 +65,6 @@ pub async fn run(root: &Path, opts: &DoctorOpts) -> Result<()> {
             if installed { "OK" } else { "WARN" },
             if installed { "installed" } else { "absent" }
         );
-        if !installed && opts.strict {
-            failures.push(format!("{name} hook absent"));
-        }
     }
 
     // 3. State Database Skew Check
@@ -97,8 +72,8 @@ pub async fn run(root: &Path, opts: &DoctorOpts) -> Result<()> {
         Ok(health) => {
             let (mark, line) = health.render();
             println!("  [{mark}] state database: {line}");
-            if health.is_blocking() || (opts.strict && mark == "WARN") {
-                failures.push(format!("state database: {line}"));
+            if health.is_blocking() {
+                failures.push(line);
             }
         }
         Err(err) => {
@@ -116,16 +91,10 @@ pub async fn run(root: &Path, opts: &DoctorOpts) -> Result<()> {
                 }
                 crate::audit::ChainReport::Tampered { seq } => {
                     println!("  [WARN] event chain: tampered at seq {seq}");
-                    if opts.strict {
-                        failures.push(format!("event chain tampered at seq {seq}"));
-                    }
                 }
             },
             Err(err) => {
                 println!("  [WARN] event chain: unreadable ({err:#})");
-                if opts.strict {
-                    failures.push(format!("event chain unreadable: {err:#}"));
-                }
             }
         }
     }
@@ -174,7 +143,7 @@ mod tests {
     async fn fails_when_binary_missing_and_names_the_reason() {
         let (_temp, root) = fake_repo_with_git();
 
-        let result = run(&root, &DoctorOpts::default()).await;
+        let result = run(&root).await;
 
         let message = result.unwrap_err().to_string();
         assert!(message.contains("doctor check failed"));
@@ -186,7 +155,7 @@ mod tests {
         let (_temp, root) = fake_repo_with_git();
         stub_binary(&root);
 
-        assert!(run(&root, &DoctorOpts::default()).await.is_ok());
+        assert!(run(&root).await.is_ok());
     }
 
     /// A database written by a newer harness is a required-check failure: the
@@ -205,22 +174,10 @@ mod tests {
         .unwrap();
         drop(conn);
 
-        let result = run(&root, &DoctorOpts::default()).await;
+        let result = run(&root).await;
 
         let message = result.unwrap_err().to_string();
         assert!(message.contains("doctor check failed"));
         assert!(message.contains("rebuild"));
-    }
-
-    #[tokio::test(flavor = "current_thread")]
-    async fn fails_in_strict_mode_when_warnings_present() {
-        let (_temp, root) = fake_repo_with_git();
-        stub_binary(&root);
-
-        let result = run(&root, &DoctorOpts { strict: true }).await;
-
-        let message = result.unwrap_err().to_string();
-        assert!(message.contains("doctor check failed"));
-        assert!(message.contains("hook absent"));
     }
 }

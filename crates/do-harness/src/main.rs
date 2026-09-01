@@ -16,7 +16,6 @@ use crate::report::Format;
 
 mod audit;
 mod commands;
-mod compliance;
 mod config;
 mod dbcheck;
 mod distill;
@@ -152,36 +151,25 @@ enum Command {
         action: HookAction,
     },
     /// Run diagnostic checks on binary resolution and git hook health.
-    Doctor {
-        /// Elevate advisory warnings to fatal failure checks.
-        #[arg(long)]
-        strict: bool,
-    },
+    Doctor,
     /// Report harness trends: sensor stats, strikes, eval pass-rate history.
     Metrics {
         /// Output format.
         #[arg(long, value_enum, default_value_t = Format::Text)]
         format: Format,
     },
-    /// Print compliance mapping to OWASP Agentic Top 10, NIST AI RMF, EU AI Act, and SOC 2.
-    Compliance(ComplianceOpts),
+    /// Print compliance mapping to OWASP Agentic Top 10, NIST AI RMF, and EU AI Act.
+    Compliance {
+        /// Output format.
+        #[arg(long, value_enum, default_value_t = Format::Text)]
+        format: Format,
+    },
     /// Recompute workflow event hash chain and report first divergence.
     AuditChain {
         /// Output format.
         #[arg(long, value_enum, default_value_t = Format::Text)]
         format: Format,
     },
-}
-
-/// Print the embedded compliance crosswalk.
-#[derive(clap::Args, Debug)]
-pub struct ComplianceOpts {
-    /// Filter by framework; omit to list all controls.
-    #[arg(long, value_enum)]
-    pub framework: Option<compliance::Framework>,
-    /// Output format (text table or JSON).
-    #[arg(long, value_enum, default_value_t = Format::Text)]
-    pub format: Format,
 }
 
 /// Available task-state actions.
@@ -340,8 +328,8 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
         commands::print_version(format);
         return Ok(());
     }
-    if let Command::Compliance(opts) = &cli.command {
-        commands::print_compliance(opts).map_err(CliError::Usage)?;
+    if let Command::Compliance { format } = cli.command {
+        commands::print_compliance(format);
         return Ok(());
     }
 
@@ -352,7 +340,7 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
         _ => commands::resolve_root(cli.root.as_deref()).map_err(CliError::Usage)?,
     };
     match cli.command {
-        Command::Version { .. } | Command::Compliance(..) => unreachable!(),
+        Command::Version { .. } | Command::Compliance { .. } => unreachable!(),
         Command::Init { language, force } => {
             let opts = init::InitOpts { language, force };
             let report = init::init_workspace(&root, &opts)
@@ -417,9 +405,7 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
         Command::Hook { action } => {
             commands::hook(&root, cli.config.as_deref(), action).map_err(CliError::Usage)
         }
-        Command::Doctor { strict } => doctor::run(&root, &doctor::DoctorOpts { strict })
-            .await
-            .map_err(CliError::Verify),
+        Command::Doctor => doctor::run(&root).await.map_err(CliError::Verify),
         Command::AuditChain { format } => commands::audit_chain_cmd(&root, format)
             .await
             .map_err(CliError::Verify),
