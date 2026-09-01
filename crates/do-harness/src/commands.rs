@@ -8,6 +8,23 @@ use crate::doctor::describe_binary;
 use crate::report::Format;
 use crate::{ErrorsAction, TaskAction, TraceAction, config, errors, hooks, init, task, trace};
 
+/// Embedded compliance document (`docs/compliance.md`).
+const COMPLIANCE_DOC: &str = include_str!("../../../docs/compliance.md");
+
+/// Prints compliance mapping information in text or JSON format.
+pub fn print_compliance(format: Format) {
+    match format {
+        Format::Text => println!("{COMPLIANCE_DOC}"),
+        Format::Json => {
+            let json = serde_json::json!({
+                "doc": COMPLIANCE_DOC,
+                "frameworks": ["OWASP Agentic Top 10", "NIST AI RMF 1.0", "EU AI Act"]
+            });
+            println!("{json}");
+        }
+    }
+}
+
 /// Prints CLI version information in the requested format.
 pub fn print_version(format: Format) {
     let info = crate::version::VersionInfo::current();
