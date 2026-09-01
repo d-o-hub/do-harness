@@ -47,11 +47,7 @@ fn compliance_command_framework_filter() {
             .output()
             .expect("failed to execute do-harness compliance --framework");
 
-        assert!(
-            output.status.success(),
-            "failed for framework arg: {}",
-            arg
-        );
+        assert!(output.status.success(), "failed for framework arg: {}", arg);
         let stdout = String::from_utf8_lossy(&output.stdout);
         let v: serde_json::Value =
             serde_json::from_str(&stdout).expect("stdout should be valid json");
