@@ -31,6 +31,8 @@ mod hooks;
 mod init;
 mod methods;
 mod metrics;
+#[cfg(feature = "agt-governance")]
+mod policy;
 mod report;
 mod sensors;
 mod skill_write;
