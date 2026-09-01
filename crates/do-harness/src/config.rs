@@ -128,7 +128,12 @@ impl Config {
             }
         }
         let available = self.sensor_names();
-        for name in self.hooks.pre_commit.iter().chain(self.hooks.pre_push.iter()) {
+        for name in self
+            .hooks
+            .pre_commit
+            .iter()
+            .chain(self.hooks.pre_push.iter())
+        {
             if !available.contains(name) {
                 anyhow::bail!(
                     "do-harness.toml references unknown sensor '{name}'; fix the config or register the sensor (fail-closed)"

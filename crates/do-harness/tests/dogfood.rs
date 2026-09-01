@@ -180,7 +180,10 @@ fn verify_fails_on_unknown_sensor_in_config() {
     std::fs::write(dir.path().join("do-harness.toml"), toml).unwrap();
 
     let output = harness(dir.path()).arg("verify").output().unwrap();
-    assert!(!output.status.success(), "verify must fail on invalid config");
+    assert!(
+        !output.status.success(),
+        "verify must fail on invalid config"
+    );
     let err = String::from_utf8_lossy(&output.stderr);
     assert!(
         err.contains("references unknown sensor 'typo_sensor'"),
