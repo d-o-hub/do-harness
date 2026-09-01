@@ -1,0 +1,34 @@
+name: contributor-reputation
+
+# Note: The Python runtime required by AGT contributor-check composite action
+# executes inside GitHub's runner VM. No Python code enters this repository.
+
+on:
+  issues:
+    types: [opened]
+  pull_request_target:
+    types: [opened, reopened]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  screen-author:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Contributor reputation check (microsoft AGT)
+        id: check
+        uses: microsoft/agent-governance-toolkit/.github/actions/contributor-check@v5.0.0
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          checks: "profile,credential"
+          risk-threshold: "MEDIUM"
+
+      - name: Enforce fail-closed on elevated or unknown risk
+        if: steps.check.outputs.risk != 'LOW'
+        run: |
+          echo "Contributor check returned risk level: ${{ steps.check.outputs.risk }}"
+          echo "Fail-closed doctrine: Elevated or unknown risk requires manual approval."
+          exit 1
