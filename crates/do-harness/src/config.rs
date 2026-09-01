@@ -117,13 +117,26 @@ pub fn load(root: &Path, explicit: Option<&Path>) -> Result<Config> {
 }
 
 impl Config {
-    /// Rejects unsupported language pack identifiers.
+    /// Rejects unsupported language pack identifiers and unknown sensor references in hooks.
     fn validate(&self) -> Result<()> {
         if let Some(language) = &self.language {
             if !SUPPORTED_LANGUAGES.contains(&language.as_str()) {
                 anyhow::bail!(
                     "unsupported language pack '{language}' (supported: {})",
                     SUPPORTED_LANGUAGES.join(", ")
+                );
+            }
+        }
+        let available = self.sensor_names();
+        for name in self
+            .hooks
+            .pre_commit
+            .iter()
+            .chain(self.hooks.pre_push.iter())
+        {
+            if !available.contains(name) {
+                anyhow::bail!(
+                    "do-harness.toml references unknown sensor '{name}'; fix the config or register the sensor (fail-closed)"
                 );
             }
         }
@@ -179,7 +192,7 @@ mod tests {
         let text = r#"
             language = "rust"
             [hooks]
-            pre-commit = ["fmt", "loc"]
+            pre-commit = ["fmt", "check"]
             pre-push = []
             [[sensors]]
             name = "fmt"
@@ -193,7 +206,7 @@ mod tests {
         assert_eq!(cfg.language.as_deref(), Some("rust"));
         assert_eq!(
             cfg.hooks.pre_commit,
-            vec!["fmt".to_owned(), "loc".to_owned()]
+            vec!["fmt".to_owned(), "check".to_owned()]
         );
         assert!(cfg.hooks.pre_push.is_empty());
         assert_eq!(cfg.sensors.len(), 2);
@@ -300,5 +313,21 @@ mod tests {
         let cfg = load(dir.path(), Some(&path)).expect("load config");
         assert_eq!(cfg.effective_sensors().len(), 7);
         assert!(cfg.sensor_names().contains(&"clippy".to_owned()));
+    }
+
+    /// Sensor names referenced in hooks that are not in the effective sensor pack fail at load time.
+    #[test]
+    fn rejects_unknown_sensor_references_in_hooks() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("do-harness.toml");
+        let text = r#"
+            [hooks]
+            pre-commit = ["fmt", "unknown_sensor"]
+        "#;
+        std::fs::write(&path, text).expect("write config");
+        let err = load(dir.path(), Some(&path)).expect_err("load must fail");
+        let msg = format!("{err:#}");
+        assert!(msg.contains("references unknown sensor 'unknown_sensor'"));
+        assert!(msg.contains("fail-closed"));
     }
 }
