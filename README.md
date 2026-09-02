@@ -177,7 +177,9 @@ Alternative for users of the pre-commit framework: this repo ships `.pre-commit-
 
 ## CI
 
-GitHub Actions: see `.github/workflows/verify.yml` — lints shell sensors, builds `do-harness`, checks the optional `agt-governance` feature (`cargo check -p do-harness --features agt-governance`), runs `verify --format json`, dogfoods `init && verify` on fresh rust/generic workspaces, and runs `do-harness eval`.
+GitHub Actions: see `.github/workflows/verify.yml` — lints shell sensors, builds `do-harness`, checks the optional `agt-governance` feature (`cargo check -p do-harness --features agt-governance`) and the adjacent `guardian-proxy` crate (`cargo check -p guardian-proxy` / `--features agt-governance`), runs `verify --format json`, dogfoods `init && verify` on fresh rust/generic workspaces, and runs `do-harness eval`.
+
+> **Runtime proxy note:** `do-harness` itself stays a dev-loop harness (no traffic proxy). The adjacent `crates/guardian-proxy` is an *optional* fail-closed sidecar (off by default, requires `agt-governance`) that reuses the same `McpMediator` gate — see `crates/guardian-proxy/README.md` when present.
 
 GitLab CI:
 

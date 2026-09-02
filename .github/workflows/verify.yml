@@ -43,6 +43,8 @@ jobs:
         run: cargo build --release -p do-harness
       - name: Check feature-gated agt-governance adapter
         run: cargo check -p do-harness --features agt-governance
+      - name: Check adjacent guardian-proxy crate
+        run: cargo check -p guardian-proxy && cargo check -p guardian-proxy --features agt-governance
       - name: Run sensors
         env:
           # check-audit.sh fails closed when CI=true; cargo-audit is installed above.
