@@ -1,0 +1,26 @@
+{
+  "skill_name": "skill-creator",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Validate that quick_validate.py correctly gates a valid skill and that init_skill.py scaffolds a new skill that passes the gate.",
+      "expected_output": "quick_validate passes on a valid skill, init_skill creates a new skill directory with SKILL.md that also passes the gate, with residue files proving both.",
+      "files": [],
+      "assertions": [
+        "walk:",
+        "exists:skill_creator_residue",
+        "exists:skill_creator_init_proof",
+        "contains:skill_creator_init_proof|eval-test-skill"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "An invalid skill frontmatter should be rejected by quick_validate.py",
+      "expected_output": "A skill with missing name or invalid naming fails the structure gate, demonstrating fail-closed validation.",
+      "files": [],
+      "assertions": [
+        "Invalid frontmatter is rejected by the gate"
+      ]
+    }
+  ]
+}
