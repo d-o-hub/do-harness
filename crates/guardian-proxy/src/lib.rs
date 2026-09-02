@@ -42,3 +42,6 @@ pub enum ProxyError {
 
 mod proxy;
 pub use proxy::{McpLikeToolCall, ProxyMediator};
+
+mod server;
+pub use server::{AppState, create_router};

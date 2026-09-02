@@ -8,7 +8,7 @@
 
 Accordingly, `do-harness` claims compliance coverage strictly for **build-time, workflow-level, and dev-loop verification controls**.
 
-> **Adjacent optional runtime:** `crates/guardian-proxy` is a separate, off-by-default, fail-closed sidecar (requires `agt-governance` feature). When enabled it reuses `ProxyMediator::decide`/`AgtGate::check` for tool-call mediation, but it is **not** part of the dev-harness compliance boundary above. Runtime claims for the proxy should be evaluated separately and are intentionally minimal in v1 (config + mediator wiring only; no HTTP bind yet).
+> **Adjacent optional runtime:** `crates/guardian-proxy` is a separate, off-by-default, fail-closed sidecar (requires `agt-governance` feature). When enabled it reuses `ProxyMediator::decide`/`AgtGate::check` for tool-call mediation and exposes it over HTTP (`axum` `GET /health`, `POST /mcp/tools/call`). It is **not** part of the dev-harness compliance boundary above; runtime claims for the proxy should be evaluated separately.
 
 ---
 

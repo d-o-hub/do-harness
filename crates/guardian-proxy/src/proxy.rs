@@ -6,7 +6,8 @@ use serde_json::Value;
 use crate::{ForwardDecision, ProxyConfig};
 
 /// MCP-like tool call intercepted by the proxy.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct McpLikeToolCall {
     /// Tool name.
     pub tool: String,

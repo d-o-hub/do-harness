@@ -27,6 +27,9 @@ Microsoft's Agent Governance Toolkit publishes `agent-governance` + `agent-gover
 | `spike-agt-api-stability` | spike-runner | `plans/agt-governance-epic.md` updated with AGT `3.x→4.x→5.x` API diff; no code | #14 spike tasks — **done task 3** |
 | `feat-agt-adapter` | vertical slice | `policy/agt.rs` + `policy/mod.rs` restored with `#[cfg(feature="agt-governance")]`, `Cargo.toml` feature, `verify.yml` feature-on check | #25/#30 diff — **done task 4** |
 | `feat-agt-mcp-surface` | vertical slice | MCP tool-call hook exists so `AgtGate::check` is wired, not dead code | #14 "mediation surface" — **done task 5** |
+| `spike-guardian-transport` | spike-runner | `axum` vs `mcp-sdk` transport decision; no code | **done task 8** |
+| `feat-guardian-proxy` | vertical slice | `crates/guardian-proxy` adjacent crate with `ProxyMediator::decide` + `ProxyConfig` | **done task 9** |
+| `feat-guardian-http` | vertical slice | `axum` router `GET /health` + `POST /mcp/tools/call` with fail-closed forwarding via `reqwest` | **done task 10** |
 | `chore-agt-promotion` | decision | GA + surface satisfied → remove feature flag or keep off-by-default per invariants review | Decision memo §4 — pending GA |
 
 ## Non-goals
@@ -72,6 +75,10 @@ Restored `crates/do-harness/src/policy/agt.rs:1` (`AgtGate::new` + `check` fail-
 
 Added `crates/do-harness/src/policy/mcp.rs:1` (`ToolCall`, `McpMediator` with `#[allow(dead_code, clippy::unnecessary_wraps, clippy::unused_self)]`): `McpMediator::new(agent_id)` constructs `AgtGate` when `agt-governance` enabled, otherwise permissive stub; `check(&ToolCall) -> Result<bool>` delegates to `AgtGate::check` (fail-closed on invalid JSON). Updated `crates/do-harness/src/policy/mod.rs:3` to expose `pub mod mcp;` unconditionally, wiring `AgtGate` so `cargo clippy --features agt-governance -- -D warnings` no longer reports dead code for the gate. Tests cover both paths (`mcp::tests` 4 cases, `agt::tests` 3 cases, feature-on 7 total). Sensors: `cargo check` off/on `0`, `cargo clippy` off/on `0`, `do-harness verify` `8/8`, `do-harness eval` `6/6`.
 
+## Slice completion — feat-guardian-http (2026-09-02, task 10)
+
+Added `crates/guardian-proxy/src/server.rs:1` (`create_router`, `AppState`, `health_handler`, `tool_call_handler` fail-closed) with `axum 0.7` + `reqwest 0.12` forwarding; `McpLikeToolCall` now `Serialize+Deserialize` (`deny_unknown_fields`); `crates/guardian-proxy/src/main.rs:44` binds `TcpListener` and serves router; `Cargo.toml:14` + `crates/guardian-proxy/Cargo.toml:14` workspace deps `axum/reqwest/tower/http-body-util`. Tests: 5 `server::tests` cases covering `GET /health`, `403 on invalid params`, `200 forward to mock upstream`, `502 on unreachable`. Sensors: `cargo check` off/on `0`, `cargo clippy -- -D warnings` `0`, `cargo test -p guardian-proxy` `10/10`, `do-harness verify` `8/8`. `plans/tasks.json:10` done via `verify --record --task 10` gated advances.
+
 ## Next action
 
-All 3 epic slices done (tasks 3–5). Remaining `chore-agt-promotion` is a decision gate pending AGT GA and invariants review — no code to write until criteria `(a) GA` and `(b) surface wired` are both satisfied. Epic now serves as durable backlog for that promotion review.
+All 6 implementation slices done (tasks 3–5, 8–10). Remaining `chore-agt-promotion` is a decision gate pending AGT GA and invariants review — no code to write until criteria `(a) GA` and `(b) surface wired` are both satisfied. Highest-impact follow-up is proxy audit evidence (`ForwardDecision` hash-chained log + metrics) to close `docs/compliance.md` traceability gap for runtime sidecar, or `distill` of the `axum` fail-closed pattern into a reusable skill. Epic now serves as durable backlog for that promotion review.

@@ -4,7 +4,7 @@ Optional fail-closed guardian proxy — adjacent to `do-harness` dev harness, no
 
 - **Off by default:** no `agent-governance` dep unless `agt-governance` feature is enabled.
 - **Fail-closed:** `ProxyMediator::decide` returns `Deny` on invalid params or governance denial, never allow on error.
-- **Transport v1:** validates `ProxyConfig { bind, upstream, agent_id }` (deny_unknown_fields) and mediator wiring; HTTP reverse-proxy (`axum`) deferred to next slice.
+- **Transport v1:** `axum` HTTP proxy (`GET /health`, `POST /mcp/tools/call` + `POST /`) with fail-closed mediation via `ProxyMediator::decide` and `reqwest` forwarding to `ProxyConfig.upstream`; invalid params or governance denial returns `403`, upstream unreachable returns `502`.
 
 Run:
 

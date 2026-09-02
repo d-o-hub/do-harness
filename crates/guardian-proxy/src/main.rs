@@ -12,7 +12,9 @@ use std::path::PathBuf;
 use anyhow::Result;
 use clap::Parser;
 
-use guardian_proxy::{ProxyConfig, ProxyMediator};
+use std::sync::Arc;
+
+use guardian_proxy::{ProxyConfig, ProxyMediator, create_router};
 
 #[derive(Debug, Parser)]
 #[command(
@@ -46,10 +48,10 @@ async fn main() -> Result<()> {
     let cli = Cli::parse();
     let config = load_config(&cli.config)?;
     let mediator = ProxyMediator::new(config.clone())?;
+    let bind = mediator.bind().to_string();
+    let upstream = mediator.upstream().to_string();
     println!(
-        "guardian-proxy: bind={} upstream={} agent_id={} (agt-governance: {})",
-        mediator.bind(),
-        mediator.upstream(),
+        "guardian-proxy: bind={bind} upstream={upstream} agent_id={} (agt-governance: {})",
         config.agent_id,
         if cfg!(feature = "agt-governance") {
             "enabled"
@@ -57,8 +59,10 @@ async fn main() -> Result<()> {
             "stub"
         }
     );
-    // v1: no actual HTTP bind yet — validates config + mediator wiring.
-    // Next slice will add axum Router. Exit 0 so `cargo run -p guardian-proxy`
-    // proves the crate is well-formed in CI.
+    let mediator = Arc::new(mediator);
+    let router = create_router(mediator);
+    let listener = tokio::net::TcpListener::bind(&bind).await?;
+    println!("guardian-proxy: listening on {bind}, forwarding allowed calls to {upstream}");
+    axum::serve(listener, router).await?;
     Ok(())
 }

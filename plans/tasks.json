@@ -1,0 +1,115 @@
+{
+  "exported_at": 1788374698,
+  "tasks": [
+    {
+      "id": 1,
+      "parent_id": null,
+      "title": "roast remediation slice",
+      "method": "vertical-event-slice",
+      "subtask_index": 5,
+      "status": "done",
+      "precondition": null,
+      "created_at": 1787386551,
+      "updated_at": 1787386592
+    },
+    {
+      "id": 2,
+      "parent_id": null,
+      "title": "verify harness e2e round-trip",
+      "method": "vertical-event-slice",
+      "subtask_index": 5,
+      "status": "done",
+      "precondition": "release binary fresh",
+      "created_at": 1787402019,
+      "updated_at": 1787402108
+    },
+    {
+      "id": 3,
+      "parent_id": null,
+      "title": "spike: AGT API stability 3.x->5.x",
+      "method": "spike-and-resolve",
+      "subtask_index": 5,
+      "status": "done",
+      "precondition": null,
+      "created_at": 1788356851,
+      "updated_at": 1788366261
+    },
+    {
+      "id": 4,
+      "parent_id": null,
+      "title": "feat: AGT adapter (feature-flagged stub)",
+      "method": "vertical-event-slice",
+      "subtask_index": 5,
+      "status": "done",
+      "precondition": null,
+      "created_at": 1788356851,
+      "updated_at": 1788366953
+    },
+    {
+      "id": 5,
+      "parent_id": null,
+      "title": "feat: AGT MCP tool-call mediation surface",
+      "method": "vertical-event-slice",
+      "subtask_index": 5,
+      "status": "done",
+      "precondition": null,
+      "created_at": 1788356851,
+      "updated_at": 1788368676
+    },
+    {
+      "id": 6,
+      "parent_id": null,
+      "title": "chore: decompose main.rs (462 LOC) to stay under 450",
+      "method": "vertical-event-slice",
+      "subtask_index": 5,
+      "status": "done",
+      "precondition": null,
+      "created_at": 1788370119,
+      "updated_at": 1788370324
+    },
+    {
+      "id": 7,
+      "parent_id": null,
+      "title": "chore: decompose migrate.rs (452 LOC) to stay under 450",
+      "method": "vertical-event-slice",
+      "subtask_index": 5,
+      "status": "done",
+      "precondition": null,
+      "created_at": 1788370120,
+      "updated_at": 1788370500
+    },
+    {
+      "id": 8,
+      "parent_id": null,
+      "title": "spike: guardian-proxy transport (axum vs mcp-sdk)",
+      "method": "spike-and-resolve",
+      "subtask_index": 5,
+      "status": "done",
+      "precondition": null,
+      "created_at": 1788371053,
+      "updated_at": 1788371072
+    },
+    {
+      "id": 9,
+      "parent_id": null,
+      "title": "feat: guardian-proxy crate (adjacent optional proxy)",
+      "method": "vertical-event-slice",
+      "subtask_index": 5,
+      "status": "done",
+      "precondition": null,
+      "created_at": 1788371053,
+      "updated_at": 1788371443
+    },
+    {
+      "id": 10,
+      "parent_id": null,
+      "title": "feat: guardian-proxy HTTP transport (axum fail-closed)",
+      "method": "vertical-event-slice",
+      "subtask_index": 5,
+      "status": "done",
+      "precondition": null,
+      "created_at": 1788373930,
+      "updated_at": 1788374698
+    }
+  ]
+}
