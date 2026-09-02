@@ -177,7 +177,7 @@ Alternative for users of the pre-commit framework: this repo ships `.pre-commit-
 
 ## CI
 
-GitHub Actions: see `.github/workflows/verify.yml` (builds `do-harness`, then runs `verify --format json`).
+GitHub Actions: see `.github/workflows/verify.yml` — lints shell sensors, builds `do-harness`, checks the optional `agt-governance` feature (`cargo check -p do-harness --features agt-governance`), runs `verify --format json`, dogfoods `init && verify` on fresh rust/generic workspaces, and runs `do-harness eval`.
 
 GitLab CI:
 
