@@ -20,7 +20,7 @@ jobs:
     steps:
       - name: Contributor reputation check (microsoft AGT)
         id: check
-        uses: microsoft/agent-governance-toolkit/.github/actions/contributor-check@v5.0.0
+        uses: microsoft/agent-governance-toolkit/.github/actions/contributor-check@c57d9d9a4849556a3c5347d359012d7a85bc3dfb # v5.0.0
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           checks: "profile,credential"
