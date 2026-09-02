@@ -15,6 +15,7 @@
 
 pub mod error;
 pub mod migrate;
+pub mod migrate_catalog;
 pub mod repo;
 pub mod repo_eval;
 pub mod repo_exec;
