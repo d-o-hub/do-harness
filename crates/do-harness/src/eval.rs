@@ -124,12 +124,16 @@ pub async fn run_eval(root: &Path, skill: Option<&str>, bless: bool) -> Result<(
         let baseline = do_harness_db::get_grader_baseline(&conn, &name).await?;
         if let Some(baseline) = &baseline {
             if !hashes.matches_baseline(baseline) {
-                println!(
-                    "{name}: grader-DRIFT: graders changed since last bless; review the diff \
-                     then run `do-harness eval --bless --skill {name}`"
-                );
-                invalid.push(name);
-                continue;
+                if bless {
+                    println!("{name}: grader-DRIFT: graders changed, re-blessing under --bless");
+                } else {
+                    println!(
+                        "{name}: grader-DRIFT: graders changed since last bless; review the diff \
+                         then run `do-harness eval --bless --skill {name}`"
+                    );
+                    invalid.push(name);
+                    continue;
+                }
             }
         }
 

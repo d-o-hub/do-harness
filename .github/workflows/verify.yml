@@ -57,7 +57,7 @@ jobs:
           ./target/release/do-harness --root "$tmp" init --language generic
           ./target/release/do-harness --root "$tmp" verify --format json
       - name: Dogfood skill eval runner (shebang execution, graded residue)
-        run: ./target/release/do-harness eval --skill spike-runner
+        run: ./target/release/do-harness eval
 
   msrv:
     runs-on: ubuntu-latest
