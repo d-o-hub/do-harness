@@ -1,3 +1,6 @@
 # Heuristics
 - **task done refuses until verify --record --task <id> records the named sensor beat**: workflow gate on task completion (from trace 1)
 - **persistence commands failing with FutureDatabase means the release binary predates the state schema: rebuild (cargo build --release -p do-harness); doctor now flags binary/database migration skew before any command dies**: stale binary vs migrated agent_state.db (from trace 2)
+- **decompose module when file nears 500 LOC (extract cli/catalog to stay under 450)**: 500 LOC ceiling; decompose at 450 per AGENTS.md. main.rs 462->331 via cli.rs, migrate.rs 452->392 via migrate_catalog.rs; check-loc green, clippy/test green (from trace 6)
+- **extract migration catalog into separate module to reduce migrate.rs**: Embedded MIGRATIONS array bloats migrate.rs; move Migration+MIGRATIONS to migrate_catalog.rs (from trace 7)
+- **adjacent guardian-proxy crate off-by-default, fail-closed, reuses McpMediator gate**: crates/guardian-proxy with ProxyConfig deny_unknown_fields, ProxyMediator::decide fail-closed, feature agt-governance, CI checks (from trace 9)

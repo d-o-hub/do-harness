@@ -12,6 +12,8 @@ metadata:
   version: "0.1.0"
   tags: spike prototype uncertainty de-risk scratchpad libsql
 ---
+## Guides
+See references/heuristics.md for distilled heuristics.
 
 # Spike Runner Skill
 
