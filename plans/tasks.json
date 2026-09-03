@@ -1,5 +1,5 @@
 {
-  "exported_at": 1788433619,
+  "exported_at": 1788433766,
   "tasks": [
     {
       "id": 1,
@@ -231,6 +231,17 @@
       "precondition": null,
       "created_at": 1788433386,
       "updated_at": 1788433619
+    },
+    {
+      "id": 22,
+      "parent_id": null,
+      "title": "distill ga-watch learnings into skill heuristics",
+      "method": "vertical-event-slice",
+      "subtask_index": 5,
+      "status": "done",
+      "precondition": null,
+      "created_at": 1788433755,
+      "updated_at": 1788433766
     }
   ]
 }
