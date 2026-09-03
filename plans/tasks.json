@@ -1,5 +1,5 @@
 {
-  "exported_at": 1788453830,
+  "exported_at": 1788456104,
   "tasks": [
     {
       "id": 1,
@@ -264,6 +264,17 @@
       "precondition": null,
       "created_at": 1788453815,
       "updated_at": 1788453830
+    },
+    {
+      "id": 25,
+      "parent_id": null,
+      "title": "distill remote branch-triage pattern into harness heuristics",
+      "method": "vertical-event-slice",
+      "subtask_index": 5,
+      "status": "done",
+      "precondition": null,
+      "created_at": 1788456086,
+      "updated_at": 1788456104
     }
   ]
 }

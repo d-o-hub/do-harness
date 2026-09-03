@@ -5,3 +5,4 @@
 - **extract migration catalog into separate module to reduce migrate.rs**: Embedded MIGRATIONS array bloats migrate.rs; move Migration+MIGRATIONS to migrate_catalog.rs (from trace 7)
 - **adjacent guardian-proxy crate off-by-default, fail-closed, reuses McpMediator gate**: crates/guardian-proxy with ProxyConfig deny_unknown_fields, ProxyMediator::decide fail-closed, feature agt-governance, CI checks (from trace 9)
 - **install the exact CI tool locally when a CI-only sensor fires**: cargo-deny missing locally masked the deps failure (license reject) that CI enforced; check-deps.sh now fails closed on CI=true without cargo-deny, mirroring check-audit.sh (from trace 11)
+- **triage remote branches via merged list plus triple-dot diff-stat before deleting**: `git branch -r --merged main` plus `git diff --stat main...origin/<branch>` classifies merged/absorbed (empty diff, safe to delete) vs superseded/stale/unique (needs product review, never auto-delete) (from trace 12)
