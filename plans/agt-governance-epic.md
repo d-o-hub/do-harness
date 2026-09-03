@@ -93,6 +93,20 @@ Updated `docs/compliance.md:11` adjacent-runtime note to include `GET /metrics` 
 
 Created `.agents/skills/fail-closed-proxy/` (`SKILL.md` decide-audit-forward method, routes, `ProxyMetrics` counters, state-sharing, tests; `evals/evals.json` 2 cases / 8 graded assertions; hermetic `evals/walkthrough.sh` leaving `proxy-checklist.md` residue). Graded `8/8 pass_rate=1.00`, blessed (bar floor `0.95`); full `do-harness eval` `7/7` skills green. `plans/tasks.json:16` done via `verify --record --task 16` gated advances.
 
+## Spike findings — AGT GA-status re-check (2026-09-03, task 17)
+
+> **Spike hypothesis:** the `agent-governance` Rust crate has reached GA, satisfying promotion criterion (a).
+
+**Probed (live, exit 0 via `tests/spikes/agt_ga_recheck.sh`, since removed):**
+
+| Source | Observed | Signal |
+|--------|----------|--------|
+| `crates.io/api/v1/crates/agent-governance` | `max_stable_version=3.2.2`, `num_versions=1`, description `"Public Preview — Rust SDK for the Agent Governance Toolkit (policy, trust, audit, identity)"` | **Not GA** — crate self-describes as Public Preview, unchanged since 2026-04-22 |
+| `api.github.com/.../releases/latest` | `tag=v4.1.0`, `prerelease=false` | Toolkit repo ships v4.x without the old "Public Preview" banner, but with **no GA declaration** for the SDK |
+| Web (Agent 365 GA 2026-05-01) | Enterprise control plane GA at `$15/user/mo` | **Different product** — does not satisfy criterion (a) for the open-source toolkit SDK |
+
+**Result:** criterion (a) **not satisfied** — `VERDICT=NOT_GA`. Decision stands: adapter stays behind `agt-governance` (criterion (b) surface wired is satisfied via `McpMediator` + `guardian-proxy`, but both must hold). Scratchpad removed per spike method. Re-evaluate at the next AGT release.
+
 ## Next action
 
-All implementation slices done (tasks 3–5, 8–12, 14–16). Remaining `chore-agt-promotion` is a decision gate pending AGT GA and invariants review — no code to write until criteria `(a) GA` and `(b) surface wired` are both satisfied. Epic now serves as durable backlog for that promotion review.
+All implementation slices done (tasks 3–5, 8–12, 14–16) plus GA re-check spike (task 17). Remaining `chore-agt-promotion` is a decision gate pending AGT GA and invariants review — no code to write until criteria `(a) GA` and `(b) surface wired` are both satisfied. Epic now serves as durable backlog for that promotion review.
