@@ -13,7 +13,9 @@ Run:
 cargo check -p guardian-proxy
 cargo check -p guardian-proxy --features agt-governance
 cargo test -p guardian-proxy
+cp crates/guardian-proxy/guardian-proxy.example.toml guardian-proxy.toml
 cargo run -p guardian-proxy -- --config guardian-proxy.toml
+cargo run -p guardian-proxy -- --verify-audit guardian-audit.jsonl
 ```
 
 See `plans/agt-governance-epic.md` for promotion criteria.

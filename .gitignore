@@ -26,3 +26,9 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Local guardian-proxy runtime state (never commit live configs or audit logs)
+guardian-proxy.toml
+guardian-audit.jsonl
+**/guardian-proxy.toml
+**/guardian-audit.jsonl

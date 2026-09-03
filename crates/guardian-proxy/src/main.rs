@@ -28,6 +28,9 @@ struct Cli {
     /// Path to proxy config JSON or TOML.
     #[arg(long, default_value = "guardian-proxy.toml")]
     config: PathBuf,
+    /// Verify a hash-chained audit log and exit (fail-closed: tamper exits non-zero).
+    #[arg(long, value_name = "PATH")]
+    verify_audit: Option<PathBuf>,
 }
 
 /// Loads proxy config from JSON or TOML.
@@ -48,6 +51,11 @@ fn load_config(path: &std::path::Path) -> Result<ProxyConfig> {
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
+    if let Some(path) = &cli.verify_audit {
+        AuditLog::verify(path)?;
+        println!("guardian-proxy: audit log {} verified", path.display());
+        return Ok(());
+    }
     let config = load_config(&cli.config)?;
     let mediator = ProxyMediator::new(config.clone())?;
     let bind = mediator.bind().to_string();

@@ -1,5 +1,5 @@
 {
-  "exported_at": 1788421737,
+  "exported_at": 1788422263,
   "tasks": [
     {
       "id": 1,
@@ -121,6 +121,17 @@
       "precondition": null,
       "created_at": 1788375607,
       "updated_at": 1788421737
+    },
+    {
+      "id": 12,
+      "parent_id": null,
+      "title": "feat: guardian-proxy operability (example config + verify-audit CLI + CI test gate)",
+      "method": "vertical-event-slice",
+      "subtask_index": 5,
+      "status": "done",
+      "precondition": null,
+      "created_at": 1788422061,
+      "updated_at": 1788422263
     }
   ]
 }

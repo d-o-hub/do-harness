@@ -1,0 +1,7 @@
+# Example guardian-proxy config — copy to guardian-proxy.toml and adjust.
+# Supports JSON or TOML (JSON tried first). Unknown fields are rejected.
+bind = "127.0.0.1:8787"
+upstream = "http://127.0.0.1:9000"
+agent_id = "dev-agent"
+# Optional hash-chained JSONL decision log (created if missing).
+audit_log = "guardian-audit.jsonl"
