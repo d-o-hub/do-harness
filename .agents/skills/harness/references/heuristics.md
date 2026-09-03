@@ -4,3 +4,4 @@
 - **decompose module when file nears 500 LOC (extract cli/catalog to stay under 450)**: 500 LOC ceiling; decompose at 450 per AGENTS.md. main.rs 462->331 via cli.rs, migrate.rs 452->392 via migrate_catalog.rs; check-loc green, clippy/test green (from trace 6)
 - **extract migration catalog into separate module to reduce migrate.rs**: Embedded MIGRATIONS array bloats migrate.rs; move Migration+MIGRATIONS to migrate_catalog.rs (from trace 7)
 - **adjacent guardian-proxy crate off-by-default, fail-closed, reuses McpMediator gate**: crates/guardian-proxy with ProxyConfig deny_unknown_fields, ProxyMediator::decide fail-closed, feature agt-governance, CI checks (from trace 9)
+- **install the exact CI tool locally when a CI-only sensor fires**: cargo-deny missing locally masked the deps failure (license reject) that CI enforced; check-deps.sh now fails closed on CI=true without cargo-deny, mirroring check-audit.sh (from trace 11)
