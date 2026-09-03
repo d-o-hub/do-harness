@@ -1,0 +1,29 @@
+{
+  "skill_name": "fail-closed-proxy",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Add a tool-call mediation endpoint that denies invalid params and forwards only allowed calls. What statuses and order apply?",
+      "expected_output": "Decide-audit-forward: deny maps to 403, upstream failures map to 502, audit is best-effort and never flips the decision.",
+      "files": [],
+      "assertions": [
+        "walk:",
+        "exists:proxy-checklist.md",
+        "contains:proxy-checklist.md|fail-closed",
+        "contains:proxy-checklist.md|403",
+        "contains:proxy-checklist.md|502"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "The proxy needs observability without affecting routing. Which counters and endpoint apply?",
+      "expected_output": "ProxyMetrics counters (allow, deny, mediator_errors, upstream_ok, upstream_failures, audit_write_failures) exposed as JSON at GET /metrics; counters never affect decisions.",
+      "files": [],
+      "assertions": [
+        "exists:proxy-checklist.md",
+        "contains:proxy-checklist.md|GET /metrics",
+        "contains:proxy-checklist.md|audit_write_failures"
+      ]
+    }
+  ]
+}

@@ -89,6 +89,10 @@ Added `crates/guardian-proxy/src/metrics.rs:1` (`ProxyMetrics` atomic counters +
 
 Updated `docs/compliance.md:11` adjacent-runtime note to include `GET /metrics` and the `ProxyMetrics` counter set (`allow`, `deny`, `mediator_errors`, `upstream_ok`, `upstream_failures`, `audit_write_failures`; counters never affect decisions), closing the task-14 traceability gap. Docs-only; sensors: `do-harness verify` `8/8`. `plans/tasks.json:15` done via `verify --record --task 15` gated advances.
 
+## Slice completion — distill-fail-closed-proxy-skill (2026-09-03, task 16)
+
+Created `.agents/skills/fail-closed-proxy/` (`SKILL.md` decide-audit-forward method, routes, `ProxyMetrics` counters, state-sharing, tests; `evals/evals.json` 2 cases / 8 graded assertions; hermetic `evals/walkthrough.sh` leaving `proxy-checklist.md` residue). Graded `8/8 pass_rate=1.00`, blessed (bar floor `0.95`); full `do-harness eval` `7/7` skills green. `plans/tasks.json:16` done via `verify --record --task 16` gated advances.
+
 ## Next action
 
-All implementation slices done (tasks 3–5, 8–12, 14–15). Remaining `chore-agt-promotion` is a decision gate pending AGT GA and invariants review — no code to write until criteria `(a) GA` and `(b) surface wired` are both satisfied. Highest-impact follow-up is `distill` of the `axum` fail-closed + metrics pattern into a reusable skill. Epic now serves as durable backlog for that promotion review.
+All implementation slices done (tasks 3–5, 8–12, 14–16). Remaining `chore-agt-promotion` is a decision gate pending AGT GA and invariants review — no code to write until criteria `(a) GA` and `(b) surface wired` are both satisfied. Epic now serves as durable backlog for that promotion review.

@@ -1,5 +1,5 @@
 {
-  "exported_at": 1788425957,
+  "exported_at": 1788427302,
   "tasks": [
     {
       "id": 1,
@@ -165,6 +165,17 @@
       "precondition": null,
       "created_at": 1788425911,
       "updated_at": 1788425957
+    },
+    {
+      "id": 16,
+      "parent_id": null,
+      "title": "distill fail-closed proxy pattern into reusable skill",
+      "method": "vertical-event-slice",
+      "subtask_index": 5,
+      "status": "done",
+      "precondition": null,
+      "created_at": 1788427246,
+      "updated_at": 1788427302
     }
   ]
 }
