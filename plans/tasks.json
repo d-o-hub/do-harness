@@ -1,5 +1,5 @@
 {
-  "exported_at": 1788423310,
+  "exported_at": 1788425796,
   "tasks": [
     {
       "id": 1,
@@ -143,6 +143,17 @@
       "precondition": null,
       "created_at": 1788423130,
       "updated_at": 1788423310
+    },
+    {
+      "id": 14,
+      "parent_id": null,
+      "title": "feat: guardian-proxy observability (metrics counters + endpoint)",
+      "method": "vertical-event-slice",
+      "subtask_index": 5,
+      "status": "done",
+      "precondition": null,
+      "created_at": 1788425586,
+      "updated_at": 1788425796
     }
   ]
 }

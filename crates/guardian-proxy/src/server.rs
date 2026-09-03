@@ -14,69 +14,29 @@ use axum::{
 };
 use serde_json::Value;
 
-use crate::{AuditLog, McpLikeToolCall, ProxyMediator};
-
-/// Shared state for the router.
-#[derive(Clone)]
-pub struct AppState {
-    /// Mediator that decides allow/deny.
-    pub mediator: Arc<ProxyMediator>,
-    /// Upstream base URL.
-    pub upstream: String,
-    /// HTTP client for forwarding allowed calls.
-    pub client: reqwest::Client,
-    /// Optional audit log for decision evidence.
-    pub audit: Option<Arc<tokio::sync::Mutex<AuditLog>>>,
-}
-
-impl AppState {
-    /// Creates state from a mediator.
-    #[must_use]
-    pub fn new(mediator: Arc<ProxyMediator>) -> Self {
-        let upstream = mediator.upstream().to_string();
-        let client = reqwest::Client::new();
-        Self {
-            mediator,
-            upstream,
-            client,
-            audit: None,
-        }
-    }
-
-    /// Creates state with audit log.
-    #[must_use]
-    pub fn with_audit(mediator: Arc<ProxyMediator>, audit: AuditLog) -> Self {
-        let upstream = mediator.upstream().to_string();
-        let client = reqwest::Client::new();
-        Self {
-            mediator,
-            upstream,
-            client,
-            audit: Some(Arc::new(tokio::sync::Mutex::new(audit))),
-        }
-    }
-}
+use crate::{AuditLog, McpLikeToolCall, ProxyMediator, state::AppState};
 
 /// Creates the `axum` router for the proxy.
 ///
 /// Routes:
 /// - `GET /health` — liveness probe (always 200)
+/// - `GET /metrics` — observability counters (always 200)
 /// - `POST /mcp/tools/call` — tool-call mediation (fail-closed, forwards on Allow)
 /// - `POST /` — alias for `/mcp/tools/call` (compatibility)
 pub fn create_router(mediator: Arc<ProxyMediator>) -> Router {
-    let state = AppState::new(mediator);
-    Router::new()
-        .route("/health", get(health_handler))
-        .route("/mcp/tools/call", post(tool_call_handler))
-        .route("/", post(tool_call_handler))
-        .with_state(state)
+    create_router_with_state(AppState::new(mediator))
 }
 
 /// Creates router with audit logging.
 pub fn create_router_with_audit(mediator: Arc<ProxyMediator>, audit: AuditLog) -> Router {
-    let state = AppState::with_audit(mediator, audit);
+    create_router_with_state(AppState::with_audit(mediator, audit))
+}
+
+/// Creates a router from explicit state (shares the state's metrics handle).
+pub fn create_router_with_state(state: AppState) -> Router {
     Router::new()
         .route("/health", get(health_handler))
+        .route("/metrics", get(metrics_handler))
         .route("/mcp/tools/call", post(tool_call_handler))
         .route("/", post(tool_call_handler))
         .with_state(state)
@@ -86,11 +46,17 @@ async fn health_handler() -> impl IntoResponse {
     Json(serde_json::json!({"status":"ok"}))
 }
 
+async fn metrics_handler(State(state): State<AppState>) -> impl IntoResponse {
+    Json(state.metrics.snapshot())
+}
+
 async fn record_audit(state: &AppState, call: &McpLikeToolCall, decision: &crate::ForwardDecision) {
     if let Some(audit) = &state.audit {
         let mut guard = audit.lock().await;
         // Audit failure must not change the allow/deny decision; best-effort only.
-        let _ = guard.append(call, decision);
+        if guard.append(call, decision).is_err() {
+            state.metrics.inc_audit_write_failure();
+        }
     }
 }
 
@@ -105,12 +71,18 @@ async fn tool_call_handler(
             let denied = crate::ForwardDecision::Deny {
                 reason: format!("mediator error: {e}"),
             };
+            state.metrics.inc_mediator_error();
+            state.metrics.inc_deny();
             record_audit(&state, &call, &denied).await;
             let body = serde_json::json!({"error": format!("mediator error: {e}")});
             return (StatusCode::FORBIDDEN, Json(body)).into_response();
         }
     };
 
+    match &decision {
+        crate::ForwardDecision::Allow => state.metrics.inc_allow(),
+        crate::ForwardDecision::Deny { .. } => state.metrics.inc_deny(),
+    }
     record_audit(&state, &call, &decision).await;
 
     match decision {
@@ -139,6 +111,7 @@ async fn forward_to_upstream(
     let upstream_resp = match req.send().await {
         Ok(r) => r,
         Err(e) => {
+            state.metrics.inc_upstream_failure();
             let body = serde_json::json!({"error": format!("upstream unreachable: {e}")});
             return (StatusCode::BAD_GATEWAY, Json(body)).into_response();
         }
@@ -149,10 +122,12 @@ async fn forward_to_upstream(
     let bytes = match upstream_resp.bytes().await {
         Ok(b) => b,
         Err(e) => {
+            state.metrics.inc_upstream_failure();
             let body = serde_json::json!({"error": format!("upstream read failed: {e}")});
             return (StatusCode::BAD_GATEWAY, Json(body)).into_response();
         }
     };
+    state.metrics.inc_upstream_ok();
 
     // Try to return JSON if upstream returned JSON, otherwise raw bytes.
     if let Ok(json_val) = serde_json::from_slice::<Value>(&bytes) {
@@ -351,5 +326,84 @@ mod tests {
         assert_eq!(first["decision"], json!("allow"));
         assert_eq!(second["decision"], json!("deny"));
         assert_eq!(second["seq"], json!(2));
+    }
+
+    #[tokio::test]
+    async fn test_metrics_counts_allow_deny_and_upstream_failure() {
+        use crate::ProxyMetrics;
+
+        let mediator = test_mediator_with_upstream("http://127.0.0.1:1");
+        let state = AppState {
+            metrics: Arc::new(ProxyMetrics::new()),
+            ..AppState::new(mediator)
+        };
+        let metrics = Arc::clone(&state.metrics);
+        let router = create_router_with_state(state);
+
+        // Denied call (invalid params).
+        let deny_body =
+            serde_json::to_string(&json!({"tool":"data.read","params":"not a map"})).expect("json");
+        let req = Request::builder()
+            .uri("/mcp/tools/call")
+            .method("POST")
+            .header("content-type", "application/json")
+            .body(AxumBody::from(deny_body))
+            .expect("request");
+        let resp = router.oneshot(req).await.expect("response");
+        assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+
+        // Allowed call with unreachable upstream -> 502 + upstream failure.
+        let mediator2 = test_mediator_with_upstream("http://127.0.0.1:1");
+        let state2 = AppState {
+            mediator: mediator2,
+            upstream: "http://127.0.0.1:1".to_string(),
+            client: reqwest::Client::new(),
+            audit: None,
+            metrics: Arc::clone(&metrics),
+        };
+        let router2 = create_router_with_state(state2);
+        let allow_body =
+            serde_json::to_string(&json!({"tool":"data.read","params":{"path":"/tmp/x"}}))
+                .expect("json");
+        let req2 = Request::builder()
+            .uri("/mcp/tools/call")
+            .method("POST")
+            .header("content-type", "application/json")
+            .body(AxumBody::from(allow_body))
+            .expect("request");
+        let resp2 = router2.oneshot(req2).await.expect("response");
+        assert_eq!(resp2.status(), StatusCode::BAD_GATEWAY);
+
+        let snap = metrics.snapshot();
+        assert_eq!(snap.deny, 1);
+        assert_eq!(snap.allow, 1);
+        assert_eq!(snap.upstream_failures, 1);
+        assert_eq!(snap.audit_write_failures, 0);
+    }
+
+    #[tokio::test]
+    async fn test_metrics_endpoint_returns_snapshot() {
+        let mediator = test_mediator_with_upstream("http://127.0.0.1:9");
+        let router = create_router(mediator);
+        let req = Request::builder()
+            .uri("/metrics")
+            .body(AxumBody::empty())
+            .expect("request");
+        let resp = router.oneshot(req).await.expect("response");
+        assert_eq!(resp.status(), StatusCode::OK);
+        let bytes = axum::body::to_bytes(resp.into_body(), 1024 * 1024)
+            .await
+            .expect("bytes");
+        let val: Value = serde_json::from_slice(&bytes).expect("json");
+        for key in [
+            "allow",
+            "deny",
+            "mediator_errors",
+            "upstream_ok",
+            "upstream_failures",
+            "audit_write_failures",
+        ] {
+            assert!(val.get(key).is_some(), "missing metrics key {key}");
+        }
     }
 }

@@ -41,5 +41,11 @@ pub use proxy::{McpLikeToolCall, ProxyMediator};
 mod audit_log;
 pub use audit_log::{AuditLog, AuditRecord};
 
+mod metrics;
+pub use metrics::{MetricsSnapshot, ProxyMetrics};
+
+mod state;
+pub use state::AppState;
+
 mod server;
-pub use server::{AppState, create_router, create_router_with_audit};
+pub use server::{create_router, create_router_with_audit, create_router_with_state};
