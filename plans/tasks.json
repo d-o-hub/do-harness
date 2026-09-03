@@ -1,5 +1,5 @@
 {
-  "exported_at": 1788456104,
+  "exported_at": 1788456294,
   "tasks": [
     {
       "id": 1,
@@ -275,6 +275,17 @@
       "precondition": null,
       "created_at": 1788456086,
       "updated_at": 1788456104
+    },
+    {
+      "id": 26,
+      "parent_id": null,
+      "title": "chore: push ahead docs commit (branch-triage heuristic)",
+      "method": "vertical-event-slice",
+      "subtask_index": 5,
+      "status": "done",
+      "precondition": null,
+      "created_at": 1788456272,
+      "updated_at": 1788456294
     }
   ]
 }
