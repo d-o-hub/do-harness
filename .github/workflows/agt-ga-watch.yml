@@ -1,0 +1,44 @@
+name: agt-ga-watch
+
+# Monthly informational watch for the `chore-agt-promotion` gate in
+# plans/agt-governance-epic.md. Never blocks CI: NOT_GA and UNKNOWN only log.
+# On VERDICT=GA it opens (or reuses) a tracking issue for human promotion review.
+# The watch never removes the feature flag itself.
+
+on:
+  schedule:
+    - cron: "0 9 1 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    steps:
+      # actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Run AGT GA check
+        id: ga
+        run: |
+          out="$(bash scripts/check-agt-ga.sh)"
+          echo "$out"
+          verdict="$(echo "$out" | sed -n 's/^VERDICT=//p' | tail -1)"
+          if [[ -z "$verdict" ]]; then
+            verdict="UNKNOWN"
+          fi
+          echo "verdict=$verdict" >> "$GITHUB_OUTPUT"
+      - name: Open tracking issue on GA
+        if: steps.ga.outputs.verdict == 'GA'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh issue list --search "[agt-ga-watch] in:title" --state open --limit 1 --json number --jq '.[0].number // empty' | grep -q .; then
+            echo "GA tracking issue already open; skipping creation."
+            exit 0
+          fi
+          gh issue create \
+            --title "[agt-ga-watch] agent-governance sdk signals ga — promotion review due" \
+            --body "scripts/check-agt-ga.sh reported VERDICT=GA. Review the chore-agt-promotion gate in plans/agt-governance-epic.md: confirm (a) sdk ga and (b) mediation surface, then decide on removing or keeping the agt-governance feature flag per invariants review. This issue was opened by automation; the flag was NOT changed."

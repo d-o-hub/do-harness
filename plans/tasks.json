@@ -1,5 +1,5 @@
 {
-  "exported_at": 1788428150,
+  "exported_at": 1788433619,
   "tasks": [
     {
       "id": 1,
@@ -187,6 +187,50 @@
       "precondition": null,
       "created_at": 1788428110,
       "updated_at": 1788428150
+    },
+    {
+      "id": 18,
+      "parent_id": null,
+      "title": "chore(gitignore): ignore local opencode.json provider config",
+      "method": "vertical-event-slice",
+      "subtask_index": 5,
+      "status": "done",
+      "precondition": null,
+      "created_at": 1788433386,
+      "updated_at": 1788433476
+    },
+    {
+      "id": 19,
+      "parent_id": null,
+      "title": "spike: ga-watch source and signal design",
+      "method": "spike-and-resolve",
+      "subtask_index": 5,
+      "status": "done",
+      "precondition": null,
+      "created_at": 1788433386,
+      "updated_at": 1788433538
+    },
+    {
+      "id": 20,
+      "parent_id": null,
+      "title": "feat: check-agt-ga.sh scheduled watch script",
+      "method": "vertical-event-slice",
+      "subtask_index": 5,
+      "status": "done",
+      "precondition": null,
+      "created_at": 1788433386,
+      "updated_at": 1788433599
+    },
+    {
+      "id": 21,
+      "parent_id": null,
+      "title": "feat: agt-ga-watch scheduled workflow plus epic wiring",
+      "method": "vertical-event-slice",
+      "subtask_index": 5,
+      "status": "done",
+      "precondition": null,
+      "created_at": 1788433386,
+      "updated_at": 1788433619
     }
   ]
 }

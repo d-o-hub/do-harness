@@ -107,6 +107,14 @@ Created `.agents/skills/fail-closed-proxy/` (`SKILL.md` decide-audit-forward met
 
 **Result:** criterion (a) **not satisfied** — `VERDICT=NOT_GA`. Decision stands: adapter stays behind `agt-governance` (criterion (b) surface wired is satisfied via `McpMediator` + `guardian-proxy`, but both must hold). Scratchpad removed per spike method. Re-evaluate at the next AGT release.
 
+## GA watch automation (tasks 19–21)
+
+Manual re-spikes (task 17) are replaced by a scheduled informational watch:
+
+- `scripts/check-agt-ga.sh` — prints crate/release evidence plus `VERDICT=GA|NOT_GA|UNKNOWN`. `GA` requires **both** the `crates.io` description to drop `preview` **and** the latest toolkit release notes to declare GA (non-prerelease); any fetch/parse failure yields `UNKNOWN`, never `GA`. Accepts `--crate-json/--release-json` fixtures for hermetic testing. Not a `verify` sensor by design (network-dependent).
+- Spike finding (task 19): `crates.io` returns `403` without a `User-Agent` header — the script sends one.
+- `.github/workflows/agt-ga-watch.yml` — monthly `cron` + `workflow_dispatch`; `contents: read, issues: write`. On `GA` it opens (or reuses) an `[agt-ga-watch]` tracking issue for human promotion review; `NOT_GA`/`UNKNOWN` only log and never fail the run. The watch never removes the `agt-governance` feature flag itself.
+
 ## Next action
 
-All implementation slices done (tasks 3–5, 8–12, 14–16) plus GA re-check spike (task 17). Remaining `chore-agt-promotion` is a decision gate pending AGT GA and invariants review — no code to write until criteria `(a) GA` and `(b) surface wired` are both satisfied. Epic now serves as durable backlog for that promotion review.
+All implementation slices done (tasks 3–5, 8–12, 14–16), GA re-check spike (task 17), hygiene (task 18), and GA watch automation (tasks 19–21). Remaining `chore-agt-promotion` is a decision gate pending AGT GA and invariants review — no code to write until criteria `(a) GA` and `(b) surface wired` are both satisfied. When the watch opens a GA tracking issue, run promotion review against this epic.
