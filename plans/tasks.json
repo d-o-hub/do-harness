@@ -1,5 +1,5 @@
 {
-  "exported_at": 1788433766,
+  "exported_at": 1788434645,
   "tasks": [
     {
       "id": 1,
@@ -242,6 +242,17 @@
       "precondition": null,
       "created_at": 1788433755,
       "updated_at": 1788433766
+    },
+    {
+      "id": 23,
+      "parent_id": null,
+      "title": "fix(ci): make cargo-deny bans pass on duplicate winnow",
+      "method": "vertical-event-slice",
+      "subtask_index": 5,
+      "status": "done",
+      "precondition": null,
+      "created_at": 1788434267,
+      "updated_at": 1788434645
     }
   ]
 }

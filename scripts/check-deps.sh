@@ -4,6 +4,9 @@
 # Sensor: scripts/check-deps.sh
 # Rule: do-harness-types must NOT depend on storage or adapters.
 # Also runs `cargo deny check` when cargo-deny is installed.
+# Enforcement policy (fail-open locally, fail-closed in CI), mirroring
+# scripts/check-audit.sh: a missing cargo-deny must not silently green-light
+# the sensor where CI enforces it.
 
 set -euo pipefail
 
@@ -18,6 +21,9 @@ fi
 
 if command -v cargo-deny >/dev/null 2>&1; then
     (cd "$ROOT" && cargo deny check) || FAIL=1
+elif [[ "${CI:-}" == "true" ]]; then
+    echo "FAIL: cargo-deny is required when CI=true."
+    FAIL=1
 else
     echo "WARN: cargo-deny not installed; skipping deny check."
 fi
