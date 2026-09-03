@@ -85,6 +85,10 @@ Added `crates/guardian-proxy/src/server.rs:1` (`create_router`, `AppState`, `hea
 
 Added `crates/guardian-proxy/src/metrics.rs:1` (`ProxyMetrics` atomic counters + `MetricsSnapshot`) and `crates/guardian-proxy/src/state.rs:1` (`AppState` with shared `metrics: Arc<ProxyMetrics>`); `server.rs` counts `allow`/`deny` on every decision, `mediator_errors` on `decide()` `Err`, `upstream_ok`/`upstream_failures` around `reqwest` forward, and `audit_write_failures` on best-effort append failure, exposed as JSON at `GET /metrics` (never affects decisions). Tests: `metrics::tests` 2 cases + `server::tests` allow/deny/upstream-failure counting and `/metrics` snapshot keys (`cargo test -p guardian-proxy` `18/18`). Sensors: `do-harness verify` `8/8`. `plans/tasks.json:14` done via `verify --record --task 14` gated advances.
 
+## Slice completion — docs-compliance-metrics (2026-09-03, task 15)
+
+Updated `docs/compliance.md:11` adjacent-runtime note to include `GET /metrics` and the `ProxyMetrics` counter set (`allow`, `deny`, `mediator_errors`, `upstream_ok`, `upstream_failures`, `audit_write_failures`; counters never affect decisions), closing the task-14 traceability gap. Docs-only; sensors: `do-harness verify` `8/8`. `plans/tasks.json:15` done via `verify --record --task 15` gated advances.
+
 ## Next action
 
-All implementation slices done (tasks 3–5, 8–12, 14). Remaining `chore-agt-promotion` is a decision gate pending AGT GA and invariants review — no code to write until criteria `(a) GA` and `(b) surface wired` are both satisfied. Highest-impact follow-up is `distill` of the `axum` fail-closed + metrics pattern into a reusable skill, or a `docs/compliance.md` traceability note for the runtime sidecar. Epic now serves as durable backlog for that promotion review.
+All implementation slices done (tasks 3–5, 8–12, 14–15). Remaining `chore-agt-promotion` is a decision gate pending AGT GA and invariants review — no code to write until criteria `(a) GA` and `(b) surface wired` are both satisfied. Highest-impact follow-up is `distill` of the `axum` fail-closed + metrics pattern into a reusable skill. Epic now serves as durable backlog for that promotion review.

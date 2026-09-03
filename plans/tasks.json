@@ -1,5 +1,5 @@
 {
-  "exported_at": 1788425796,
+  "exported_at": 1788425957,
   "tasks": [
     {
       "id": 1,
@@ -154,6 +154,17 @@
       "precondition": null,
       "created_at": 1788425586,
       "updated_at": 1788425796
+    },
+    {
+      "id": 15,
+      "parent_id": null,
+      "title": "docs: compliance traceability note for proxy metrics endpoint",
+      "method": "vertical-event-slice",
+      "subtask_index": 5,
+      "status": "done",
+      "precondition": null,
+      "created_at": 1788425911,
+      "updated_at": 1788425957
     }
   ]
 }
