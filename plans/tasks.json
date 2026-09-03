@@ -1,5 +1,5 @@
 {
-  "exported_at": 1788434645,
+  "exported_at": 1788453830,
   "tasks": [
     {
       "id": 1,
@@ -253,6 +253,17 @@
       "precondition": null,
       "created_at": 1788434267,
       "updated_at": 1788434645
+    },
+    {
+      "id": 24,
+      "parent_id": null,
+      "title": "docs: clarify remaining hardening follow-ups pointer in AGENTS.md",
+      "method": "vertical-event-slice",
+      "subtask_index": 5,
+      "status": "done",
+      "precondition": null,
+      "created_at": 1788453815,
+      "updated_at": 1788453830
     }
   ]
 }
