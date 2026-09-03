@@ -35,14 +35,6 @@ pub enum ForwardDecision {
     },
 }
 
-/// Errors for proxy operations.
-#[derive(Debug, thiserror::Error)]
-pub enum ProxyError {
-    /// Governance unavailable.
-    #[error("governance check failed: {0}")]
-    Governance(String),
-}
-
 mod proxy;
 pub use proxy::{McpLikeToolCall, ProxyMediator};
 

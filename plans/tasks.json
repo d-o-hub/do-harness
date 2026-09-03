@@ -1,5 +1,5 @@
 {
-  "exported_at": 1788422263,
+  "exported_at": 1788423310,
   "tasks": [
     {
       "id": 1,
@@ -132,6 +132,17 @@
       "precondition": null,
       "created_at": 1788422061,
       "updated_at": 1788422263
+    },
+    {
+      "id": 13,
+      "parent_id": null,
+      "title": "chore(proxy): drop dead surface (unused types dep, unconstructed ProxyError)",
+      "method": "vertical-event-slice",
+      "subtask_index": 5,
+      "status": "done",
+      "precondition": null,
+      "created_at": 1788423130,
+      "updated_at": 1788423310
     }
   ]
 }

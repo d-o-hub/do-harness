@@ -20,11 +20,9 @@ serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 sha2.workspace = true
 tempfile.workspace = true
-thiserror.workspace = true
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "net", "sync"] }
 toml.workspace = true
 tower.workspace = true
-do-harness-types = { path = "../types", version = "0.1.0" }
 agent-governance = { version = "3", optional = true }
 serde_yaml = { version = "0.9", optional = true }
 
