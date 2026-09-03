@@ -13,12 +13,15 @@ workspace = true
 anyhow.workspace = true
 axum.workspace = true
 clap = { workspace = true, features = ["derive"] }
+hex.workspace = true
 http-body-util.workspace = true
 reqwest.workspace = true
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
+sha2.workspace = true
+tempfile.workspace = true
 thiserror.workspace = true
-tokio = { workspace = true, features = ["rt-multi-thread", "macros", "net"] }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "net", "sync"] }
 toml.workspace = true
 tower.workspace = true
 do-harness-types = { path = "../types", version = "0.1.0" }

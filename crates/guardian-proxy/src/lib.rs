@@ -18,6 +18,9 @@ pub struct ProxyConfig {
     pub upstream: String,
     /// Logical agent id for governance checks.
     pub agent_id: String,
+    /// Optional path for hash-chained audit log (JSONL).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub audit_log: Option<String>,
 }
 
 /// Decision for a proxied tool call.
@@ -43,5 +46,8 @@ pub enum ProxyError {
 mod proxy;
 pub use proxy::{McpLikeToolCall, ProxyMediator};
 
+mod audit_log;
+pub use audit_log::{AuditLog, AuditRecord};
+
 mod server;
-pub use server::{AppState, create_router};
+pub use server::{AppState, create_router, create_router_with_audit};

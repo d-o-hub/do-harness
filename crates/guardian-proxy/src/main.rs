@@ -14,7 +14,9 @@ use clap::Parser;
 
 use std::sync::Arc;
 
-use guardian_proxy::{ProxyConfig, ProxyMediator, create_router};
+use guardian_proxy::{
+    AuditLog, ProxyConfig, ProxyMediator, create_router, create_router_with_audit,
+};
 
 #[derive(Debug, Parser)]
 #[command(
@@ -60,7 +62,14 @@ async fn main() -> Result<()> {
         }
     );
     let mediator = Arc::new(mediator);
-    let router = create_router(mediator);
+    let router = match &config.audit_log {
+        Some(path) => {
+            let audit = AuditLog::open(path)?;
+            println!("guardian-proxy: audit log at {path}");
+            create_router_with_audit(mediator, audit)
+        }
+        None => create_router(mediator),
+    };
     let listener = tokio::net::TcpListener::bind(&bind).await?;
     println!("guardian-proxy: listening on {bind}, forwarding allowed calls to {upstream}");
     axum::serve(listener, router).await?;

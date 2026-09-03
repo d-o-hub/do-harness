@@ -135,6 +135,7 @@ mod tests {
             bind: "127.0.0.1:0".to_string(),
             upstream: "http://127.0.0.1:9000".to_string(),
             agent_id: "test-agent".to_string(),
+            audit_log: None,
         }
     }
 

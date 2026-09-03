@@ -1,5 +1,5 @@
 {
-  "exported_at": 1788374698,
+  "exported_at": 1788421737,
   "tasks": [
     {
       "id": 1,
@@ -110,6 +110,17 @@
       "precondition": null,
       "created_at": 1788373930,
       "updated_at": 1788374698
+    },
+    {
+      "id": 11,
+      "parent_id": null,
+      "title": "feat: guardian-proxy audit log (hash-chained decision evidence)",
+      "method": "vertical-event-slice",
+      "subtask_index": 5,
+      "status": "done",
+      "precondition": null,
+      "created_at": 1788375607,
+      "updated_at": 1788421737
     }
   ]
 }

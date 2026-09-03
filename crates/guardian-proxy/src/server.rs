@@ -14,7 +14,7 @@ use axum::{
 };
 use serde_json::Value;
 
-use crate::{McpLikeToolCall, ProxyMediator};
+use crate::{AuditLog, McpLikeToolCall, ProxyMediator};
 
 /// Shared state for the router.
 #[derive(Clone)]
@@ -25,6 +25,8 @@ pub struct AppState {
     pub upstream: String,
     /// HTTP client for forwarding allowed calls.
     pub client: reqwest::Client,
+    /// Optional audit log for decision evidence.
+    pub audit: Option<Arc<tokio::sync::Mutex<AuditLog>>>,
 }
 
 impl AppState {
@@ -37,6 +39,20 @@ impl AppState {
             mediator,
             upstream,
             client,
+            audit: None,
+        }
+    }
+
+    /// Creates state with audit log.
+    #[must_use]
+    pub fn with_audit(mediator: Arc<ProxyMediator>, audit: AuditLog) -> Self {
+        let upstream = mediator.upstream().to_string();
+        let client = reqwest::Client::new();
+        Self {
+            mediator,
+            upstream,
+            client,
+            audit: Some(Arc::new(tokio::sync::Mutex::new(audit))),
         }
     }
 }
@@ -56,8 +72,26 @@ pub fn create_router(mediator: Arc<ProxyMediator>) -> Router {
         .with_state(state)
 }
 
+/// Creates router with audit logging.
+pub fn create_router_with_audit(mediator: Arc<ProxyMediator>, audit: AuditLog) -> Router {
+    let state = AppState::with_audit(mediator, audit);
+    Router::new()
+        .route("/health", get(health_handler))
+        .route("/mcp/tools/call", post(tool_call_handler))
+        .route("/", post(tool_call_handler))
+        .with_state(state)
+}
+
 async fn health_handler() -> impl IntoResponse {
     Json(serde_json::json!({"status":"ok"}))
+}
+
+async fn record_audit(state: &AppState, call: &McpLikeToolCall, decision: &crate::ForwardDecision) {
+    if let Some(audit) = &state.audit {
+        let mut guard = audit.lock().await;
+        // Audit failure must not change the allow/deny decision; best-effort only.
+        let _ = guard.append(call, decision);
+    }
 }
 
 async fn tool_call_handler(
@@ -68,10 +102,16 @@ async fn tool_call_handler(
     let decision = match state.mediator.decide(&call) {
         Ok(d) => d,
         Err(e) => {
+            let denied = crate::ForwardDecision::Deny {
+                reason: format!("mediator error: {e}"),
+            };
+            record_audit(&state, &call, &denied).await;
             let body = serde_json::json!({"error": format!("mediator error: {e}")});
             return (StatusCode::FORBIDDEN, Json(body)).into_response();
         }
     };
+
+    record_audit(&state, &call, &decision).await;
 
     match decision {
         crate::ForwardDecision::Deny { reason } => {
@@ -141,6 +181,7 @@ mod tests {
             bind: "127.0.0.1:0".to_string(),
             upstream: upstream.to_string(),
             agent_id: "test-agent".to_string(),
+            audit_log: None,
         };
         Arc::new(ProxyMediator::new(cfg).expect("mediator"))
     }
@@ -261,5 +302,54 @@ mod tests {
             .expect("request");
         let resp = router.oneshot(req).await.expect("response");
         assert_eq!(resp.status(), StatusCode::BAD_GATEWAY);
+    }
+
+    #[tokio::test]
+    async fn test_audit_log_records_allow_and_deny() {
+        use crate::AuditLog;
+
+        let dir = tempfile::tempdir().expect("tempdir");
+        let audit_path = dir.path().join("audit.jsonl");
+        let mediator = test_mediator_with_upstream("http://127.0.0.1:9");
+        let audit = AuditLog::open(&audit_path).expect("open audit");
+        let router = create_router_with_audit(mediator, audit);
+
+        // Allowed call (no params -> stub allows).
+        let body = serde_json::to_string(&json!({"tool":"data.read"})).expect("json");
+        let req = Request::builder()
+            .uri("/mcp/tools/call")
+            .method("POST")
+            .header("content-type", "application/json")
+            .body(AxumBody::from(body))
+            .expect("request");
+        // Upstream unreachable so status is 502, but audit must still record allow.
+        let resp = router.oneshot(req).await.expect("response");
+        assert_eq!(resp.status(), StatusCode::BAD_GATEWAY);
+
+        // Denied call (invalid params).
+        let mediator2 = test_mediator_with_upstream("http://127.0.0.1:9");
+        let audit2 = AuditLog::open(&audit_path).expect("reopen audit");
+        let router2 = create_router_with_audit(mediator2, audit2);
+        let body2 =
+            serde_json::to_string(&json!({"tool":"data.read","params":"not a map"})).expect("json");
+        let req2 = Request::builder()
+            .uri("/mcp/tools/call")
+            .method("POST")
+            .header("content-type", "application/json")
+            .body(AxumBody::from(body2))
+            .expect("request");
+        let resp2 = router2.oneshot(req2).await.expect("response");
+        assert_eq!(resp2.status(), StatusCode::FORBIDDEN);
+
+        // Verify chain: 2 records, allow then deny.
+        AuditLog::verify(&audit_path).expect("verify chain");
+        let content = std::fs::read_to_string(&audit_path).expect("read audit");
+        let lines: Vec<&str> = content.lines().filter(|l| !l.trim().is_empty()).collect();
+        assert_eq!(lines.len(), 2);
+        let first: serde_json::Value = serde_json::from_str(lines[0]).expect("parse");
+        let second: serde_json::Value = serde_json::from_str(lines[1]).expect("parse");
+        assert_eq!(first["decision"], json!("allow"));
+        assert_eq!(second["decision"], json!("deny"));
+        assert_eq!(second["seq"], json!(2));
     }
 }

@@ -30,6 +30,7 @@ Microsoft's Agent Governance Toolkit publishes `agent-governance` + `agent-gover
 | `spike-guardian-transport` | spike-runner | `axum` vs `mcp-sdk` transport decision; no code | **done task 8** |
 | `feat-guardian-proxy` | vertical slice | `crates/guardian-proxy` adjacent crate with `ProxyMediator::decide` + `ProxyConfig` | **done task 9** |
 | `feat-guardian-http` | vertical slice | `axum` router `GET /health` + `POST /mcp/tools/call` with fail-closed forwarding via `reqwest` | **done task 10** |
+| `feat-guardian-audit` | vertical slice | Hash-chained JSONL decision log (`AuditLog`, `ProxyConfig.audit_log`) with `Allow`/`Deny` evidence + tamper detection | **done task 11** |
 | `chore-agt-promotion` | decision | GA + surface satisfied → remove feature flag or keep off-by-default per invariants review | Decision memo §4 — pending GA |
 
 ## Non-goals
