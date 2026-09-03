@@ -1,5 +1,5 @@
 {
-  "exported_at": 1788456294,
+  "exported_at": 1788456344,
   "tasks": [
     {
       "id": 1,
@@ -286,6 +286,17 @@
       "precondition": null,
       "created_at": 1788456272,
       "updated_at": 1788456294
+    },
+    {
+      "id": 27,
+      "parent_id": null,
+      "title": "spike: triage 14 unmerged remote branches (merged + triple-dot diff-stat)",
+      "method": "spike-and-resolve",
+      "subtask_index": 5,
+      "status": "done",
+      "precondition": null,
+      "created_at": 1788456324,
+      "updated_at": 1788456344
     }
   ]
 }
