@@ -7,7 +7,7 @@
 //! `eval` (skill-eval runner), `hook` (git hook management), and `version`
 //! (version information).
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use clap::{Parser, Subcommand};
@@ -28,6 +28,7 @@ mod eval_assert;
 mod eval_integrity;
 mod eval_sandbox;
 mod eval_walk;
+mod evidence;
 mod hook_script;
 mod hooks;
 mod init;
@@ -225,6 +226,8 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
             only,
             record,
             task,
+            evidence,
+            strict,
         } => {
             run_verify(
                 &root,
@@ -234,6 +237,8 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
                 only,
                 record,
                 task,
+                evidence,
+                strict,
             )
             .await
         }
@@ -295,7 +300,12 @@ async fn run_verify(
     only: Vec<String>,
     record: bool,
     task: Option<i64>,
+    evidence: Option<PathBuf>,
+    strict: bool,
 ) -> std::result::Result<(), CliError> {
+    let started_at = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| i64::try_from(d.as_secs()).unwrap_or(i64::MAX));
     let cfg = config::load(root, config).map_err(CliError::Usage)?;
     let blocked = if record {
         telemetry::blocked_sensors(root, &cfg.sensor_names(), task)
@@ -317,6 +327,42 @@ async fn run_verify(
                     .map_err(CliError::Usage)?;
             }
             report::print_report(&report, format);
+
+            let evidence_path = evidence
+                .or_else(|| strict.then(|| PathBuf::from(".do-harness/evidence.json")))
+                .map(|p| if p.is_relative() { root.join(p) } else { p });
+
+            if let Some(path) = evidence_path {
+                let finished_at = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map_or(0, |d| i64::try_from(d.as_secs()).unwrap_or(i64::MAX));
+                let doc = evidence::EvidenceDocument::from_run(
+                    &cfg,
+                    root,
+                    &report,
+                    &opts.only,
+                    task,
+                    started_at,
+                    finished_at,
+                );
+                if let Some(parent) = path.parent() {
+                    if !parent.as_os_str().is_empty() {
+                        let _ = std::fs::create_dir_all(parent);
+                    }
+                }
+                let json =
+                    serde_json::to_vec_pretty(&doc).map_err(|e| CliError::Usage(e.into()))?;
+                std::fs::write(&path, json).map_err(|e| CliError::Usage(e.into()))?;
+
+                if strict && !doc.is_strict_clean() {
+                    eprintln!(
+                        "strict evidence check failed; artifact at {}",
+                        path.display()
+                    );
+                    return Err(CliError::Verify(anyhow::anyhow!("weak evidence")));
+                }
+            }
+
             if report.ok {
                 Ok(())
             } else {

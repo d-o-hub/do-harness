@@ -93,14 +93,14 @@ green after `init`, goes red once the crate is removed, and that the generic
 pack's pass is vacuous. CI repeats `init && verify` on every push (see
 `.github/workflows/verify.yml`).
 
-For CI, invoke `do-harness verify --format json` (exit 0/1/2) with the CLI on
+For CI, invoke `do-harness verify --format json --evidence .do-harness/evidence.json --strict` (exit 0/1/2) with the CLI on
 `PATH` — no build step required.
 
 ## Commands
 
 | Command | Description |
 |---------|-------------|
-| `verify` | Run all sensors (flags: `--fail-fast`, `--format text\|json`, `--only NAME` repeatable; `--record` persists beats + error signatures) |
+| `verify` | Run all sensors (flags: `--fail-fast`, `--format text\|json`, `--only NAME` repeatable; `--record` persists beats + error signatures; `--evidence PATH` writes evidence artifact; `--strict` fails on weak evidence) |
 | `list` | Print sensor names (`--format text\|json`) |
 | `init-db` | Apply migrations to `.do-harness/agent_state.db` |
 | `seed` | Upsert `plans/invariants.json` into the DB |

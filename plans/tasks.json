@@ -1,5 +1,5 @@
 {
-  "exported_at": 1788456344,
+  "exported_at": 1788508513,
   "tasks": [
     {
       "id": 1,
@@ -297,6 +297,17 @@
       "precondition": null,
       "created_at": 1788456324,
       "updated_at": 1788456344
+    },
+    {
+      "id": 28,
+      "parent_id": null,
+      "title": "feat: verify evidence artifact (--evidence/--strict)",
+      "method": "vertical-event-slice",
+      "subtask_index": 5,
+      "status": "done",
+      "precondition": null,
+      "created_at": 1788508294,
+      "updated_at": 1788508513
     }
   ]
 }

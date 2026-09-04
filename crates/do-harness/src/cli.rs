@@ -54,6 +54,12 @@ pub enum Command {
         /// Scope records and fail-fast strikes to this task id.
         #[arg(long)]
         task: Option<i64>,
+        /// Write a machine-readable evidence artifact to path.
+        #[arg(long)]
+        evidence: Option<PathBuf>,
+        /// Enforce strong evidence: exit non-zero on skips or missing timing/exit codes.
+        #[arg(long)]
+        strict: bool,
     },
     /// List sensor names.
     List {

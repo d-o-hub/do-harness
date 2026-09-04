@@ -107,6 +107,70 @@ fn rust_verify_fails_without_a_crate() {
 }
 
 #[test]
+fn rust_verify_with_evidence_writes_artifact() {
+    let dir = tempfile::tempdir().unwrap();
+    let (ok, out) = run(harness(dir.path()).arg("init"));
+    assert!(ok, "init failed:\n{out}");
+
+    let evidence_path = dir.path().join("evidence.json");
+    let (ok, _out) = run(harness(dir.path())
+        .arg("verify")
+        .arg("--evidence")
+        .arg(&evidence_path)
+        .arg("--strict"));
+    assert!(ok, "verify --evidence --strict failed:\n{out}");
+    assert!(evidence_path.exists(), "evidence file was not created");
+
+    let text = std::fs::read_to_string(&evidence_path).unwrap();
+    let doc: Value = serde_json::from_str(&text).expect("valid evidence JSON");
+    assert_eq!(doc["schema_version"], serde_json::json!(1));
+    assert_eq!(doc["tool"], serde_json::json!("do-harness"));
+    assert_eq!(doc["summary"]["verdict"], serde_json::json!("pass"));
+    assert_eq!(doc["summary"]["skip"], serde_json::json!(0));
+}
+
+#[test]
+fn rust_verify_strict_fails_on_failing_sensor_and_writes_artifact() {
+    let dir = tempfile::tempdir().unwrap();
+    let (ok, out) = run(harness(dir.path()).arg("init"));
+    assert!(ok, "init failed:\n{out}");
+    std::fs::remove_file(dir.path().join("Cargo.toml")).unwrap();
+    std::fs::remove_dir_all(dir.path().join("src")).unwrap();
+
+    let evidence_path = dir.path().join("failing_evidence.json");
+    let (ok, _out) = run(harness(dir.path())
+        .arg("verify")
+        .arg("--evidence")
+        .arg(&evidence_path)
+        .arg("--strict"));
+    assert!(!ok, "verify --strict must fail on failing sensors");
+    assert!(
+        evidence_path.exists(),
+        "failing run must still write evidence artifact"
+    );
+
+    let text = std::fs::read_to_string(&evidence_path).unwrap();
+    let doc: Value = serde_json::from_str(&text).expect("valid evidence JSON");
+    assert_eq!(doc["summary"]["verdict"], serde_json::json!("fail"));
+}
+
+#[test]
+fn rust_verify_strict_default_path() {
+    let dir = tempfile::tempdir().unwrap();
+    let (ok, out) = run(harness(dir.path()).arg("init"));
+    assert!(ok, "init failed:\n{out}");
+
+    let (ok, out) = run(harness(dir.path()).arg("verify").arg("--strict"));
+    assert!(ok, "verify --strict failed:\n{out}");
+
+    let default_path = dir.path().join(".do-harness/evidence.json");
+    assert!(
+        default_path.exists(),
+        "default evidence file .do-harness/evidence.json was not created"
+    );
+}
+
+#[test]
 fn audit_chain_cli_reports_intact_and_detects_tampering() {
     let dir = tempfile::tempdir().unwrap();
     let (ok, out) = run(harness(dir.path()).arg("task").arg("add").arg("test task"));
