@@ -9,7 +9,6 @@ use super::*;
 
 const VALID_SKILL_MD: &str = "---\nname: test-skill\ndescription: A fixture skill used by the eval-runner tests.\nlicense: MIT\n---\n\n# Test Skill\n";
 
-/// Locates the real `quick_validate.py` at the repository root.
 fn gate_script_path() -> PathBuf {
     let repo_root = Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
@@ -19,8 +18,6 @@ fn gate_script_path() -> PathBuf {
     repo_root.join(".agents/skills/skill-creator/scripts/quick_validate.py")
 }
 
-/// Builds a tempdir fixture: `.agents/skills/<name>/SKILL.md`, an optional
-/// `evals/evals.json`, and a copy of the real gate script.
 fn fixture_root(skill_md: &str, evals: Option<&str>) -> tempfile::TempDir {
     let dir = tempfile::tempdir().unwrap();
     let skills_root = dir.path().join(".agents/skills");
@@ -37,7 +34,6 @@ fn fixture_root(skill_md: &str, evals: Option<&str>) -> tempfile::TempDir {
     dir
 }
 
-/// Reads the persisted `skill_evals` rows for the fixture skill.
 async fn persisted(dir: &Path) -> Vec<do_harness_types::SkillEval> {
     let conn = do_harness_db::connect_and_migrate(dir).await.unwrap();
     do_harness_db::list_skill_evals(&conn, "test-skill")
@@ -64,6 +60,10 @@ fn single_case_json(assertions: &[&str]) -> String {
     )
 }
 
+async fn eval_run(dir: &Path, skill: Option<&str>, bless: bool) -> Result<()> {
+    run_eval(dir, skill, bless, false, false, false, Format::Text).await
+}
+
 #[tokio::test(flavor = "current_thread")]
 async fn exists_assertion_passes_and_persists_rich_data() {
     let dir = fixture_root(
@@ -78,7 +78,7 @@ async fn exists_assertion_passes_and_persists_rich_data() {
     )
     .unwrap();
 
-    run_eval(dir.path(), None, false).await.unwrap();
+    eval_run(dir.path(), None, false).await.unwrap();
     let rows = persisted(dir.path()).await;
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0].prompt.as_deref(), Some("prompt one"));
@@ -86,9 +86,6 @@ async fn exists_assertion_passes_and_persists_rich_data() {
     assert_eq!(rows[0].pass_rate, Some(1.0));
 }
 
-/// The full verifier-separation loop: a green run is blessable (pinning the
-/// graders and raising the bar), grader tampering then fails the eval with
-/// drift, and after re-blessing, a degraded pass rate misses the bar.
 #[tokio::test(flavor = "current_thread")]
 async fn bless_then_drift_then_bar_miss() {
     let dir = fixture_root(VALID_SKILL_MD, Some(&single_case_json(&["exists:."])));
@@ -96,8 +93,7 @@ async fn bless_then_drift_then_bar_miss() {
         .path()
         .join(".agents/skills/test-skill/evals/evals.json");
 
-    // 1. Green run + bless pins the graders and sets a bar at 0.95.
-    run_eval(dir.path(), None, true).await.unwrap();
+    eval_run(dir.path(), None, true).await.unwrap();
     let conn = do_harness_db::connect_and_migrate(dir.path())
         .await
         .unwrap();
@@ -115,26 +111,22 @@ async fn bless_then_drift_then_bar_miss() {
     );
     drop(conn);
 
-    // 2. Tampering with the grader fails the eval until reviewed.
     fs::write(
         &evals_path,
         fs::read_to_string(&evals_path).unwrap().replace('1', "9"),
     )
     .unwrap();
-    let err = run_eval(dir.path(), None, false).await.unwrap_err();
+    let err = eval_run(dir.path(), None, false).await.unwrap_err();
     assert!(err.to_string().contains("test-skill"), "{err:#}");
 
-    // 3. Restore the graders and re-bless; then degrade the suite to a 0.5
-    //    rate by adding a failing assertion. The bar (0.95) must fail it even
-    //    though the run itself "passes" half its assertions.
     fs::write(&evals_path, single_case_json(&["exists:."])).unwrap();
-    run_eval(dir.path(), None, true).await.unwrap();
+    eval_run(dir.path(), None, true).await.unwrap();
     let degraded = single_case_json(&[
         "exists:.",
         "contains:.agents/skills/test-skill/SKILL.md|absent-needle",
     ]);
     fs::write(&evals_path, degraded).unwrap();
-    let err = run_eval(dir.path(), None, false).await.unwrap_err();
+    let err = eval_run(dir.path(), None, false).await.unwrap_err();
     assert!(err.to_string().contains("test-skill"), "{err:#}");
 }
 
@@ -153,7 +145,7 @@ async fn contains_assertion_passes() {
     )
     .unwrap();
 
-    run_eval(dir.path(), None, false).await.unwrap();
+    eval_run(dir.path(), None, false).await.unwrap();
     let rows = persisted(dir.path()).await;
     assert_eq!(rows[0].pass_rate, Some(1.0));
 }
@@ -167,7 +159,7 @@ async fn failing_db_assertion_drives_pass_rate_to_zero() {
         ])),
     );
 
-    run_eval(dir.path(), Some("test-skill"), false)
+    eval_run(dir.path(), Some("test-skill"), false)
         .await
         .unwrap();
     let rows = persisted(dir.path()).await;
@@ -190,7 +182,7 @@ async fn unprefixed_assertions_are_documentation_excluded_from_pass_rate() {
     )
     .unwrap();
 
-    run_eval(dir.path(), None, false).await.unwrap();
+    eval_run(dir.path(), None, false).await.unwrap();
     let rows = persisted(dir.path()).await;
     assert_eq!(rows[0].pass_rate, Some(1.0));
 }
@@ -221,7 +213,7 @@ async fn walkthrough_artifact_then_exists_passes() {
         fs::set_permissions(&script, fs::Permissions::from_mode(0o755)).unwrap();
     }
 
-    run_eval(dir.path(), None, false).await.unwrap();
+    eval_run(dir.path(), None, false).await.unwrap();
     let rows = persisted(dir.path()).await;
     assert_eq!(rows[0].pass_rate, Some(1.0));
 }
@@ -242,7 +234,7 @@ async fn failing_walkthrough_fails_all_graded_assertions() {
         fs::set_permissions(&script, fs::Permissions::from_mode(0o755)).unwrap();
     }
 
-    run_eval(dir.path(), None, false).await.unwrap();
+    eval_run(dir.path(), None, false).await.unwrap();
     let rows = persisted(dir.path()).await;
     assert_eq!(rows[0].pass_rate, Some(0.0));
 }
@@ -250,7 +242,7 @@ async fn failing_walkthrough_fails_all_graded_assertions() {
 #[tokio::test(flavor = "current_thread")]
 async fn skill_without_evals_skips_persistence() {
     let dir = fixture_root(VALID_SKILL_MD, None);
-    run_eval(dir.path(), None, false).await.unwrap();
+    eval_run(dir.path(), None, false).await.unwrap();
     assert!(persisted(dir.path()).await.is_empty());
 }
 
@@ -258,12 +250,10 @@ async fn skill_without_evals_skips_persistence() {
 async fn skill_failing_structure_gate_errors() {
     let md = "# No frontmatter here\n";
     let dir = fixture_root(md, None);
-    let err = run_eval(dir.path(), None, false).await.unwrap_err();
+    let err = eval_run(dir.path(), None, false).await.unwrap_err();
     assert!(err.to_string().contains("test-skill"));
 }
 
-/// A consumer workspace without skill-creator has no gate script; the skill
-/// is still evaluated and must not hard-fail.
 #[tokio::test(flavor = "current_thread")]
 async fn missing_gate_script_is_not_a_structure_failure() {
     let dir = tempfile::tempdir().unwrap();
@@ -277,7 +267,7 @@ async fn missing_gate_script_is_not_a_structure_failure() {
     .unwrap();
     fs::write(skill_dir.join("alpha.txt"), "x").unwrap();
 
-    run_eval(dir.path(), Some("alpha"), false).await.unwrap();
+    eval_run(dir.path(), Some("alpha"), false).await.unwrap();
 
     let conn = do_harness_db::connect_and_migrate(dir.path())
         .await
@@ -292,7 +282,7 @@ async fn missing_gate_script_is_not_a_structure_failure() {
 #[tokio::test(flavor = "current_thread")]
 async fn unknown_skill_filter_errors() {
     let dir = fixture_root(VALID_SKILL_MD, None);
-    let err = run_eval(dir.path(), Some("ghost"), false)
+    let err = eval_run(dir.path(), Some("ghost"), false)
         .await
         .unwrap_err();
     assert!(

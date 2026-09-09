@@ -1,0 +1,1785 @@
+#compdef do-harness
+
+autoload -U is-at-least
+
+_do-harness() {
+    typeset -A opt_args
+    typeset -a _arguments_options
+    local ret=1
+
+    if is-at-least 5.2; then
+        _arguments_options=(-s -S -C)
+    else
+        _arguments_options=(-s -C)
+    fi
+
+    local context curcontext="$curcontext" state line
+    _arguments "${_arguments_options[@]}" : \
+'--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
+'--config=[Explicit path to do-harness.toml]:FILE:_files' \
+'--color=[Color output (auto, always, never)]:WHEN:_default' \
+'--output=[Default output file path]:FILE:_files' \
+'*-v[Verbosity level (-v, -vv)]' \
+'*--verbose[Verbosity level (-v, -vv)]' \
+'-q[Suppress non-error messages]' \
+'--quiet[Suppress non-error messages]' \
+'--dry-run[Dry run without side effects]' \
+'-h[Print help]' \
+'--help[Print help]' \
+'-V[Print version]' \
+'--version[Print version]' \
+":: :_do-harness_commands" \
+"*::: :->do-harness" \
+&& ret=0
+    case $state in
+    (do-harness)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:do-harness-command-$line[1]:"
+        case $line[1] in
+            (version)
+_arguments "${_arguments_options[@]}" : \
+'--format=[Output format]:FORMAT:((text\:"Human-readable text output"
+json\:"Machine-readable JSON output"))' \
+'--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
+'--config=[Explicit path to do-harness.toml]:FILE:_files' \
+'--color=[Color output (auto, always, never)]:WHEN:_default' \
+'--output=[Default output file path]:FILE:_files' \
+'*-v[Verbosity level (-v, -vv)]' \
+'*--verbose[Verbosity level (-v, -vv)]' \
+'-q[Suppress non-error messages]' \
+'--quiet[Suppress non-error messages]' \
+'--dry-run[Dry run without side effects]' \
+'-h[Print help (see more with '\''--help'\'')]' \
+'--help[Print help (see more with '\''--help'\'')]' \
+'-V[Print version]' \
+'--version[Print version]' \
+&& ret=0
+;;
+(verify)
+_arguments "${_arguments_options[@]}" : \
+'--format=[Output format]:FORMAT:((text\:"Human-readable text output"
+json\:"Machine-readable JSON output"))' \
+'*--only=[Run only the named sensor (repeatable or comma-separated)]:SENSOR:_default' \
+'*--exclude=[Exclude named sensors from the run]:SENSOR:_default' \
+'--task=[Scope records and fail-fast strikes to this task id]:ID:_default' \
+'--evidence=[Write a machine-readable evidence artifact to path]:FILE:_files' \
+'--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
+'--config=[Explicit path to do-harness.toml]:FILE:_files' \
+'--color=[Color output (auto, always, never)]:WHEN:_default' \
+'--output=[Default output file path]:FILE:_files' \
+'--fail-fast[Halt at the first failing sensor]' \
+'--record[Persist beats and error signatures into the state database]' \
+'--strict[Enforce strong evidence\: exit non-zero on skips or missing timing/exit codes]' \
+'*-v[Verbosity level (-v, -vv)]' \
+'*--verbose[Verbosity level (-v, -vv)]' \
+'-q[Suppress non-error messages]' \
+'--quiet[Suppress non-error messages]' \
+'--dry-run[Dry run without side effects]' \
+'-h[Print help (see more with '\''--help'\'')]' \
+'--help[Print help (see more with '\''--help'\'')]' \
+'-V[Print version]' \
+'--version[Print version]' \
+&& ret=0
+;;
+(check)
+_arguments "${_arguments_options[@]}" : \
+'--format=[Output format]:FORMAT:((text\:"Human-readable text output"
+json\:"Machine-readable JSON output"))' \
+'*--only=[Run only the named sensor (repeatable or comma-separated)]:SENSOR:_default' \
+'*--exclude=[Exclude named sensors from the run]:SENSOR:_default' \
+'--task=[Scope records and fail-fast strikes to this task id]:ID:_default' \
+'--evidence=[Write a machine-readable evidence artifact to path]:FILE:_files' \
+'--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
+'--config=[Explicit path to do-harness.toml]:FILE:_files' \
+'--color=[Color output (auto, always, never)]:WHEN:_default' \
+'--output=[Default output file path]:FILE:_files' \
+'--fail-fast[Halt at the first failing sensor]' \
+'--record[Persist beats and error signatures into the state database]' \
+'--strict[Enforce strong evidence\: exit non-zero on skips or missing timing/exit codes]' \
+'*-v[Verbosity level (-v, -vv)]' \
+'*--verbose[Verbosity level (-v, -vv)]' \
+'-q[Suppress non-error messages]' \
+'--quiet[Suppress non-error messages]' \
+'--dry-run[Dry run without side effects]' \
+'-h[Print help (see more with '\''--help'\'')]' \
+'--help[Print help (see more with '\''--help'\'')]' \
+'-V[Print version]' \
+'--version[Print version]' \
+&& ret=0
+;;
+(list)
+_arguments "${_arguments_options[@]}" : \
+'--format=[Output format]:FORMAT:((text\:"Human-readable text output"
+json\:"Machine-readable JSON output"))' \
+'--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
+'--config=[Explicit path to do-harness.toml]:FILE:_files' \
+'--color=[Color output (auto, always, never)]:WHEN:_default' \
+'--output=[Default output file path]:FILE:_files' \
+'*-v[Verbosity level (-v, -vv)]' \
+'*--verbose[Verbosity level (-v, -vv)]' \
+'-q[Suppress non-error messages]' \
+'--quiet[Suppress non-error messages]' \
+'--dry-run[Dry run without side effects]' \
+'-h[Print help (see more with '\''--help'\'')]' \
+'--help[Print help (see more with '\''--help'\'')]' \
+'-V[Print version]' \
+'--version[Print version]' \
+&& ret=0
+;;
+(ls)
+_arguments "${_arguments_options[@]}" : \
+'--format=[Output format]:FORMAT:((text\:"Human-readable text output"
+json\:"Machine-readable JSON output"))' \
+'--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
+'--config=[Explicit path to do-harness.toml]:FILE:_files' \
+'--color=[Color output (auto, always, never)]:WHEN:_default' \
+'--output=[Default output file path]:FILE:_files' \
+'*-v[Verbosity level (-v, -vv)]' \
+'*--verbose[Verbosity level (-v, -vv)]' \
+'-q[Suppress non-error messages]' \
+'--quiet[Suppress non-error messages]' \
+'--dry-run[Dry run without side effects]' \
+'-h[Print help (see more with '\''--help'\'')]' \
+'--help[Print help (see more with '\''--help'\'')]' \
+'-V[Print version]' \
+'--version[Print version]' \
+&& ret=0
+;;
+(init-db)
+_arguments "${_arguments_options[@]}" : \
+'--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
+'--config=[Explicit path to do-harness.toml]:FILE:_files' \
+'--color=[Color output (auto, always, never)]:WHEN:_default' \
+'--output=[Default output file path]:FILE:_files' \
+'*-v[Verbosity level (-v, -vv)]' \
+'*--verbose[Verbosity level (-v, -vv)]' \
+'-q[Suppress non-error messages]' \
+'--quiet[Suppress non-error messages]' \
+'--dry-run[Dry run without side effects]' \
+'-h[Print help]' \
+'--help[Print help]' \
+'-V[Print version]' \
+'--version[Print version]' \
+&& ret=0
+;;
+(seed)
+_arguments "${_arguments_options[@]}" : \
+'--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
+'--config=[Explicit path to do-harness.toml]:FILE:_files' \
+'--color=[Color output (auto, always, never)]:WHEN:_default' \
+'--output=[Default output file path]:FILE:_files' \
+'*-v[Verbosity level (-v, -vv)]' \
+'*--verbose[Verbosity level (-v, -vv)]' \
+'-q[Suppress non-error messages]' \
+'--quiet[Suppress non-error messages]' \
+'--dry-run[Dry run without side effects]' \
+'-h[Print help]' \
+'--help[Print help]' \
+'-V[Print version]' \
+'--version[Print version]' \
+&& ret=0
+;;
+(init)
+_arguments "${_arguments_options[@]}" : \
+'--language=[Language pack to scaffold]:LANGUAGE:((rust\:"Rust sensor pack (fmt/check/clippy/test/loc) plus a check-loc script"
+generic\:"No built-in sensors; commented sensor stubs to fill in"))' \
+'--format=[Output format]:FORMAT:((text\:"Human-readable text output"
+json\:"Machine-readable JSON output"))' \
+'--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
+'--config=[Explicit path to do-harness.toml]:FILE:_files' \
+'--color=[Color output (auto, always, never)]:WHEN:_default' \
+'--output=[Default output file path]:FILE:_files' \
+'--force[Overwrite existing files]' \
+'--no-seed[Do not seed invariants]' \
+'--minimal[Minimal setup without extra skills]' \
+'--no-gitignore[Skip creating/modifying .gitignore]' \
+'*-v[Verbosity level (-v, -vv)]' \
+'*--verbose[Verbosity level (-v, -vv)]' \
+'-q[Suppress non-error messages]' \
+'--quiet[Suppress non-error messages]' \
+'--dry-run[Dry run without side effects]' \
+'-h[Print help (see more with '\''--help'\'')]' \
+'--help[Print help (see more with '\''--help'\'')]' \
+'-V[Print version]' \
+'--version[Print version]' \
+&& ret=0
+;;
+(task)
+_arguments "${_arguments_options[@]}" : \
+'--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
+'--config=[Explicit path to do-harness.toml]:FILE:_files' \
+'--color=[Color output (auto, always, never)]:WHEN:_default' \
+'--output=[Default output file path]:FILE:_files' \
+'*-v[Verbosity level (-v, -vv)]' \
+'*--verbose[Verbosity level (-v, -vv)]' \
+'-q[Suppress non-error messages]' \
+'--quiet[Suppress non-error messages]' \
+'--dry-run[Dry run without side effects]' \
+'-h[Print help]' \
+'--help[Print help]' \
+'-V[Print version]' \
+'--version[Print version]' \
+":: :_do-harness__subcmd__task_commands" \
+"*::: :->task" \
+&& ret=0
+
+    case $state in
+    (task)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:do-harness-task-command-$line[1]:"
+        case $line[1] in
+            (export)
+_arguments "${_arguments_options[@]}" : \
+'-o+[Output file path or - for stdout]:FILE:_files' \
+'--output=[Output file path or - for stdout]:FILE:_files' \
+'--format=[Output format (json/text)]:FORMAT:((text\:"Human-readable text output"
+json\:"Machine-readable JSON output"))' \
+'--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
+'--config=[Explicit path to do-harness.toml]:FILE:_files' \
+'--color=[Color output (auto, always, never)]:WHEN:_default' \
+'--stdout[Write directly to stdout instead of file]' \
+'*-v[Verbosity level (-v, -vv)]' \
+'*--verbose[Verbosity level (-v, -vv)]' \
+'-q[Suppress non-error messages]' \
+'--quiet[Suppress non-error messages]' \
+'--dry-run[Dry run without side effects]' \
+'-h[Print help (see more with '\''--help'\'')]' \
+'--help[Print help (see more with '\''--help'\'')]' \
+'-V[Print version]' \
+'--version[Print version]' \
+&& ret=0
+;;
+(list)
+_arguments "${_arguments_options[@]}" : \
+'--status=[Filter tasks by status (pending, in_progress, completed, failed)]:STATUS:_default' \
+'--method=[Filter tasks by method name]:METHOD:_default' \
+'--parent=[Filter tasks by parent ID]:ID:_default' \
+'--format=[Output format]:FORMAT:((text\:"Human-readable text output"
+json\:"Machine-readable JSON output"))' \
+'--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
+'--config=[Explicit path to do-harness.toml]:FILE:_files' \
+'--color=[Color output (auto, always, never)]:WHEN:_default' \
+'--output=[Default output file path]:FILE:_files' \
+'*-v[Verbosity level (-v, -vv)]' \
+'*--verbose[Verbosity level (-v, -vv)]' \
+'-q[Suppress non-error messages]' \
+'--quiet[Suppress non-error messages]' \
+'--dry-run[Dry run without side effects]' \
+'-h[Print help (see more with '\''--help'\'')]' \
+'--help[Print help (see more with '\''--help'\'')]' \
+'-V[Print version]' \
+'--version[Print version]' \
+&& ret=0
+;;
+(show)
+_arguments "${_arguments_options[@]}" : \
+'--format=[Output format]:FORMAT:((text\:"Human-readable text output"
+json\:"Machine-readable JSON output"))' \
+'--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
+'--config=[Explicit path to do-harness.toml]:FILE:_files' \
+'--color=[Color output (auto, always, never)]:WHEN:_default' \
+'--output=[Default output file path]:FILE:_files' \
+'*-v[Verbosity level (-v, -vv)]' \
+'*--verbose[Verbosity level (-v, -vv)]' \
+'-q[Suppress non-error messages]' \
+'--quiet[Suppress non-error messages]' \
+'--dry-run[Dry run without side effects]' \
+'-h[Print help (see more with '\''--help'\'')]' \
+'--help[Print help (see more with '\''--help'\'')]' \
+'-V[Print version]' \
+'--version[Print version]' \
+':id -- Task id:_default' \
+&& ret=0
+;;
+(add)
+_arguments "${_arguments_options[@]}" : \
+'--method=[Name of HTN method defined in plans/methods.json]:METHOD:_default' \
+'--parent=[Parent task id]:ID:_default' \
+'--precondition=[Recorded precondition guard]:PRECONDITION:_default' \
+'--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
+'--config=[Explicit path to do-harness.toml]:FILE:_files' \
+'--color=[Color output (auto, always, never)]:WHEN:_default' \
+'--output=[Default output file path]:FILE:_files' \
+'*-v[Verbosity level (-v, -vv)]' \
+'*--verbose[Verbosity level (-v, -vv)]' \
+'-q[Suppress non-error messages]' \
+'--quiet[Suppress non-error messages]' \
+'--dry-run[Dry run without side effects]' \
+'-h[Print help]' \
+'--help[Print help]' \
+'-V[Print version]' \
+'--version[Print version]' \
+':title -- Human-readable task title:_default' \
+&& ret=0
+;;
+(advance)
+_arguments "${_arguments_options[@]}" : \
+'--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
+'--config=[Explicit path to do-harness.toml]:FILE:_files' \
+'--color=[Color output (auto, always, never)]:WHEN:_default' \
+'--output=[Default output file path]:FILE:_files' \
+'--dry-run[Perform dry run without state changes]' \
+'*-v[Verbosity level (-v, -vv)]' \
+'*--verbose[Verbosity level (-v, -vv)]' \
+'-q[Suppress non-error messages]' \
+'--quiet[Suppress non-error messages]' \
+'-h[Print help]' \
+'--help[Print help]' \
+'-V[Print version]' \
+'--version[Print version]' \
+':id -- Task id:_default' \
+&& ret=0
+;;
+(done)
+_arguments "${_arguments_options[@]}" : \
+'--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
+'--config=[Explicit path to do-harness.toml]:FILE:_files' \
+'--color=[Color output (auto, always, never)]:WHEN:_default' \
+'--output=[Default output file path]:FILE:_files' \
+'--dry-run[Perform dry run without state changes]' \
+'*-v[Verbosity level (-v, -vv)]' \
+'*--verbose[Verbosity level (-v, -vv)]' \
+'-q[Suppress non-error messages]' \
+'--quiet[Suppress non-error messages]' \
+'-h[Print help]' \
+'--help[Print help]' \
+'-V[Print version]' \
+'--version[Print version]' \
+':id -- Task id:_default' \
+&& ret=0
+;;
+(fail)
+_arguments "${_arguments_options[@]}" : \
+'--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
+'--config=[Explicit path to do-harness.toml]:FILE:_files' \
+'--color=[Color output (auto, always, never)]:WHEN:_default' \
+'--output=[Default output file path]:FILE:_files' \
+'*-v[Verbosity level (-v, -vv)]' \
+'*--verbose[Verbosity level (-v, -vv)]' \
+'-q[Suppress non-error messages]' \
+'--quiet[Suppress non-error messages]' \
+'--dry-run[Dry run without side effects]' \
+'-h[Print help]' \
+'--help[Print help]' \
+'-V[Print version]' \
+'--version[Print version]' \
+':id -- Task id:_default' \
+&& ret=0
+;;
+(remove)
+_arguments "${_arguments_options[@]}" : \
+'--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
+'--config=[Explicit path to do-harness.toml]:FILE:_files' \
+'--color=[Color output (auto, always, never)]:WHEN:_default' \
+'--output=[Default output file path]:FILE:_files' \
+'*-v[Verbosity level (-v, -vv)]' \
+'*--verbose[Verbosity level (-v, -vv)]' \
+'-q[Suppress non-error messages]' \
+'--quiet[Suppress non-error messages]' \
+'--dry-run[Dry run without side effects]' \
+'-h[Print help]' \
+'--help[Print help]' \
+'-V[Print version]' \
+'--version[Print version]' \
+':id -- Task id:_default' \
+&& ret=0
+;;
+(help)
+_arguments "${_arguments_options[@]}" : \
+":: :_do-harness__subcmd__task__subcmd__help_commands" \
+"*::: :->help" \
+&& ret=0
+
+    case $state in
+    (help)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:do-harness-task-help-command-$line[1]:"
+        case $line[1] in
+            (export)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(list)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(show)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(add)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(advance)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(done)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(fail)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(remove)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(help)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+        esac
+    ;;
+esac
+;;
+        esac
+    ;;
+esac
+;;
+(trace)
+_arguments "${_arguments_options[@]}" : \
+'--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
+'--config=[Explicit path to do-harness.toml]:FILE:_files' \
+'--color=[Color output (auto, always, never)]:WHEN:_default' \
+'--output=[Default output file path]:FILE:_files' \
+'*-v[Verbosity level (-v, -vv)]' \
+'*--verbose[Verbosity level (-v, -vv)]' \
+'-q[Suppress non-error messages]' \
+'--quiet[Suppress non-error messages]' \
+'--dry-run[Dry run without side effects]' \
+'-h[Print help]' \
+'--help[Print help]' \
+'-V[Print version]' \
+'--version[Print version]' \
+":: :_do-harness__subcmd__trace_commands" \
+"*::: :->trace" \
+&& ret=0
+
+    case $state in
+    (trace)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:do-harness-trace-command-$line[1]:"
+        case $line[1] in
+            (add)
+_arguments "${_arguments_options[@]}" : \
+'--session=[Session identifier grouping related traces]:SESSION:_default' \
+'--task=[Owning task id]:ID:_default' \
+'--command=[The command that was executed]:COMMAND:_default' \
+'--error-diff=[Error diff or failure output captured]:ERROR_DIFF:_default' \
+'--resolution-steps=[Steps taken to resolve the failure]:RESOLUTION_STEPS:_default' \
+'--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
+'--config=[Explicit path to do-harness.toml]:FILE:_files' \
+'--color=[Color output (auto, always, never)]:WHEN:_default' \
+'--output=[Default output file path]:FILE:_files' \
+'*-v[Verbosity level (-v, -vv)]' \
+'*--verbose[Verbosity level (-v, -vv)]' \
+'-q[Suppress non-error messages]' \
+'--quiet[Suppress non-error messages]' \
+'--dry-run[Dry run without side effects]' \
+'-h[Print help]' \
+'--help[Print help]' \
+'-V[Print version]' \
+'--version[Print version]' \
+&& ret=0
+;;
+(list)
+_arguments "${_arguments_options[@]}" : \
+'--session=[Session identifier]:SESSION:_default' \
+'--format=[Output format]:FORMAT:((text\:"Human-readable text output"
+json\:"Machine-readable JSON output"))' \
+'--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
+'--config=[Explicit path to do-harness.toml]:FILE:_files' \
+'--color=[Color output (auto, always, never)]:WHEN:_default' \
+'--output=[Default output file path]:FILE:_files' \
+'*-v[Verbosity level (-v, -vv)]' \
+'*--verbose[Verbosity level (-v, -vv)]' \
+'-q[Suppress non-error messages]' \
+'--quiet[Suppress non-error messages]' \
+'--dry-run[Dry run without side effects]' \
+'-h[Print help (see more with '\''--help'\'')]' \
+'--help[Print help (see more with '\''--help'\'')]' \
+'-V[Print version]' \
+'--version[Print version]' \
+&& ret=0
+;;
+(sessions)
+_arguments "${_arguments_options[@]}" : \
+'--format=[Output format]:FORMAT:((text\:"Human-readable text output"
+json\:"Machine-readable JSON output"))' \
+'--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
+'--config=[Explicit path to do-harness.toml]:FILE:_files' \
+'--color=[Color output (auto, always, never)]:WHEN:_default' \
+'--output=[Default output file path]:FILE:_files' \
+'*-v[Verbosity level (-v, -vv)]' \
+'*--verbose[Verbosity level (-v, -vv)]' \
+'-q[Suppress non-error messages]' \
+'--quiet[Suppress non-error messages]' \
+'--dry-run[Dry run without side effects]' \
+'-h[Print help (see more with '\''--help'\'')]' \
+'--help[Print help (see more with '\''--help'\'')]' \
+'-V[Print version]' \
+'--version[Print version]' \
+&& ret=0
+;;
+(help)
+_arguments "${_arguments_options[@]}" : \
+":: :_do-harness__subcmd__trace__subcmd__help_commands" \
+"*::: :->help" \
+&& ret=0
+
+    case $state in
+    (help)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:do-harness-trace-help-command-$line[1]:"
+        case $line[1] in
+            (add)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(list)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(sessions)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(help)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+        esac
+    ;;
+esac
+;;
+        esac
+    ;;
+esac
+;;
+(distill)
+_arguments "${_arguments_options[@]}" : \
+'--skill=[Skill the heuristic belongs to]:SKILL:_default' \
+'--pattern=[Generalized pattern to record]:PATTERN:_default' \
+'--description=[When the pattern applies]:DESCRIPTION:_default' \
+'--from-trace=[Source trace id; required as evidence of a resolved fix]:ID:_default' \
+'--format=[Output format]:FORMAT:((text\:"Human-readable text output"
+json\:"Machine-readable JSON output"))' \
+'--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
+'--config=[Explicit path to do-harness.toml]:FILE:_files' \
+'--color=[Color output (auto, always, never)]:WHEN:_default' \
+'--output=[Default output file path]:FILE:_files' \
+'--to-fixture[Raise the skill'\''s pass-rate bar after this recovery]' \
+'--dry-run[Perform dry run without modifying skill files]' \
+'*-v[Verbosity level (-v, -vv)]' \
+'*--verbose[Verbosity level (-v, -vv)]' \
+'-q[Suppress non-error messages]' \
+'--quiet[Suppress non-error messages]' \
+'-h[Print help (see more with '\''--help'\'')]' \
+'--help[Print help (see more with '\''--help'\'')]' \
+'-V[Print version]' \
+'--version[Print version]' \
+&& ret=0
+;;
+(errors)
+_arguments "${_arguments_options[@]}" : \
+'--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
+'--config=[Explicit path to do-harness.toml]:FILE:_files' \
+'--color=[Color output (auto, always, never)]:WHEN:_default' \
+'--output=[Default output file path]:FILE:_files' \
+'*-v[Verbosity level (-v, -vv)]' \
+'*--verbose[Verbosity level (-v, -vv)]' \
+'-q[Suppress non-error messages]' \
+'--quiet[Suppress non-error messages]' \
+'--dry-run[Dry run without side effects]' \
+'-h[Print help]' \
+'--help[Print help]' \
+'-V[Print version]' \
+'--version[Print version]' \
+":: :_do-harness__subcmd__errors_commands" \
+"*::: :->errors" \
+&& ret=0
+
+    case $state in
+    (errors)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:do-harness-errors-command-$line[1]:"
+        case $line[1] in
+            (list)
+_arguments "${_arguments_options[@]}" : \
+'--task=[Scope to one task id]:ID:_default' \
+'--format=[Output format]:FORMAT:((text\:"Human-readable text output"
+json\:"Machine-readable JSON output"))' \
+'--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
+'--config=[Explicit path to do-harness.toml]:FILE:_files' \
+'--color=[Color output (auto, always, never)]:WHEN:_default' \
+'--output=[Default output file path]:FILE:_files' \
+'*-v[Verbosity level (-v, -vv)]' \
+'*--verbose[Verbosity level (-v, -vv)]' \
+'-q[Suppress non-error messages]' \
+'--quiet[Suppress non-error messages]' \
+'--dry-run[Dry run without side effects]' \
+'-h[Print help (see more with '\''--help'\'')]' \
+'--help[Print help (see more with '\''--help'\'')]' \
+'-V[Print version]' \
+'--version[Print version]' \
+&& ret=0
+;;
+(clear)
+_arguments "${_arguments_options[@]}" : \
+'--sensor=[Only clear this signature key (e.g. \`sensor\:<name>\`)]:SENSOR:_default' \
+'--task=[Only clear signatures for this task id]:ID:_default' \
+'--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
+'--config=[Explicit path to do-harness.toml]:FILE:_files' \
+'--color=[Color output (auto, always, never)]:WHEN:_default' \
+'--output=[Default output file path]:FILE:_files' \
+'--force[Force clearing without prompt]' \
+'--dry-run[Perform dry run without clearing]' \
+'*-v[Verbosity level (-v, -vv)]' \
+'*--verbose[Verbosity level (-v, -vv)]' \
+'-q[Suppress non-error messages]' \
+'--quiet[Suppress non-error messages]' \
+'-h[Print help]' \
+'--help[Print help]' \
+'-V[Print version]' \
+'--version[Print version]' \
+&& ret=0
+;;
+(help)
+_arguments "${_arguments_options[@]}" : \
+":: :_do-harness__subcmd__errors__subcmd__help_commands" \
+"*::: :->help" \
+&& ret=0
+
+    case $state in
+    (help)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:do-harness-errors-help-command-$line[1]:"
+        case $line[1] in
+            (list)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(clear)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(help)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+        esac
+    ;;
+esac
+;;
+        esac
+    ;;
+esac
+;;
+(eval)
+_arguments "${_arguments_options[@]}" : \
+'--skill=[Restrict evaluation to this skill directory name]:SKILL:_default' \
+'--format=[Output format]:FORMAT:((text\:"Human-readable text output"
+json\:"Machine-readable JSON output"))' \
+'--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
+'--config=[Explicit path to do-harness.toml]:FILE:_files' \
+'--color=[Color output (auto, always, never)]:WHEN:_default' \
+'--output=[Default output file path]:FILE:_files' \
+'--bless[Re-baseline graders and update pass-rate floor on green run]' \
+'--list-skills[List available skills]' \
+'--fail-fast[Halt on first failing evaluation]' \
+'--dry-run[Perform dry-run evaluation]' \
+'*-v[Verbosity level (-v, -vv)]' \
+'*--verbose[Verbosity level (-v, -vv)]' \
+'-q[Suppress non-error messages]' \
+'--quiet[Suppress non-error messages]' \
+'-h[Print help (see more with '\''--help'\'')]' \
+'--help[Print help (see more with '\''--help'\'')]' \
+'-V[Print version]' \
+'--version[Print version]' \
+&& ret=0
+;;
+(hook)
+_arguments "${_arguments_options[@]}" : \
+'--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
+'--config=[Explicit path to do-harness.toml]:FILE:_files' \
+'--color=[Color output (auto, always, never)]:WHEN:_default' \
+'--output=[Default output file path]:FILE:_files' \
+'*-v[Verbosity level (-v, -vv)]' \
+'*--verbose[Verbosity level (-v, -vv)]' \
+'-q[Suppress non-error messages]' \
+'--quiet[Suppress non-error messages]' \
+'--dry-run[Dry run without side effects]' \
+'-h[Print help]' \
+'--help[Print help]' \
+'-V[Print version]' \
+'--version[Print version]' \
+":: :_do-harness__subcmd__hook_commands" \
+"*::: :->hook" \
+&& ret=0
+
+    case $state in
+    (hook)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:do-harness-hook-command-$line[1]:"
+        case $line[1] in
+            (install)
+_arguments "${_arguments_options[@]}" : \
+'--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
+'--config=[Explicit path to do-harness.toml]:FILE:_files' \
+'--color=[Color output (auto, always, never)]:WHEN:_default' \
+'--output=[Default output file path]:FILE:_files' \
+'--force[Overwrite foreign (unmanaged) hook files]' \
+'*-v[Verbosity level (-v, -vv)]' \
+'*--verbose[Verbosity level (-v, -vv)]' \
+'-q[Suppress non-error messages]' \
+'--quiet[Suppress non-error messages]' \
+'--dry-run[Dry run without side effects]' \
+'-h[Print help]' \
+'--help[Print help]' \
+'-V[Print version]' \
+'--version[Print version]' \
+&& ret=0
+;;
+(uninstall)
+_arguments "${_arguments_options[@]}" : \
+'--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
+'--config=[Explicit path to do-harness.toml]:FILE:_files' \
+'--color=[Color output (auto, always, never)]:WHEN:_default' \
+'--output=[Default output file path]:FILE:_files' \
+'*-v[Verbosity level (-v, -vv)]' \
+'*--verbose[Verbosity level (-v, -vv)]' \
+'-q[Suppress non-error messages]' \
+'--quiet[Suppress non-error messages]' \
+'--dry-run[Dry run without side effects]' \
+'-h[Print help]' \
+'--help[Print help]' \
+'-V[Print version]' \
+'--version[Print version]' \
+&& ret=0
+;;
+(status)
+_arguments "${_arguments_options[@]}" : \
+'--format=[Output format]:FORMAT:((text\:"Human-readable text output"
+json\:"Machine-readable JSON output"))' \
+'--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
+'--config=[Explicit path to do-harness.toml]:FILE:_files' \
+'--color=[Color output (auto, always, never)]:WHEN:_default' \
+'--output=[Default output file path]:FILE:_files' \
+'*-v[Verbosity level (-v, -vv)]' \
+'*--verbose[Verbosity level (-v, -vv)]' \
+'-q[Suppress non-error messages]' \
+'--quiet[Suppress non-error messages]' \
+'--dry-run[Dry run without side effects]' \
+'-h[Print help (see more with '\''--help'\'')]' \
+'--help[Print help (see more with '\''--help'\'')]' \
+'-V[Print version]' \
+'--version[Print version]' \
+&& ret=0
+;;
+(diff)
+_arguments "${_arguments_options[@]}" : \
+'--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
+'--config=[Explicit path to do-harness.toml]:FILE:_files' \
+'--color=[Color output (auto, always, never)]:WHEN:_default' \
+'--output=[Default output file path]:FILE:_files' \
+'*-v[Verbosity level (-v, -vv)]' \
+'*--verbose[Verbosity level (-v, -vv)]' \
+'-q[Suppress non-error messages]' \
+'--quiet[Suppress non-error messages]' \
+'--dry-run[Dry run without side effects]' \
+'-h[Print help]' \
+'--help[Print help]' \
+'-V[Print version]' \
+'--version[Print version]' \
+&& ret=0
+;;
+(help)
+_arguments "${_arguments_options[@]}" : \
+":: :_do-harness__subcmd__hook__subcmd__help_commands" \
+"*::: :->help" \
+&& ret=0
+
+    case $state in
+    (help)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:do-harness-hook-help-command-$line[1]:"
+        case $line[1] in
+            (install)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(uninstall)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(status)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(diff)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(help)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+        esac
+    ;;
+esac
+;;
+        esac
+    ;;
+esac
+;;
+(doctor)
+_arguments "${_arguments_options[@]}" : \
+'--format=[Output format]:FORMAT:((text\:"Human-readable text output"
+json\:"Machine-readable JSON output"))' \
+'--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
+'--config=[Explicit path to do-harness.toml]:FILE:_files' \
+'--color=[Color output (auto, always, never)]:WHEN:_default' \
+'--output=[Default output file path]:FILE:_files' \
+'--strict[Strictly enforce warning checks as failures]' \
+'*-v[Verbosity level (-v, -vv)]' \
+'*--verbose[Verbosity level (-v, -vv)]' \
+'-q[Suppress non-error messages]' \
+'--quiet[Suppress non-error messages]' \
+'--dry-run[Dry run without side effects]' \
+'-h[Print help (see more with '\''--help'\'')]' \
+'--help[Print help (see more with '\''--help'\'')]' \
+'-V[Print version]' \
+'--version[Print version]' \
+&& ret=0
+;;
+(metrics)
+_arguments "${_arguments_options[@]}" : \
+'--format=[Output format]:FORMAT:((text\:"Human-readable text output"
+json\:"Machine-readable JSON output"))' \
+'--sensor=[Filter by sensor name]:SENSOR:_default' \
+'--skill=[Filter by skill name]:SKILL:_default' \
+'--since=[Filter metrics since timestamp (Unix timestamp or ISO string)]:SINCE:_default' \
+'--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
+'--config=[Explicit path to do-harness.toml]:FILE:_files' \
+'--color=[Color output (auto, always, never)]:WHEN:_default' \
+'--output=[Default output file path]:FILE:_files' \
+'*-v[Verbosity level (-v, -vv)]' \
+'*--verbose[Verbosity level (-v, -vv)]' \
+'-q[Suppress non-error messages]' \
+'--quiet[Suppress non-error messages]' \
+'--dry-run[Dry run without side effects]' \
+'-h[Print help (see more with '\''--help'\'')]' \
+'--help[Print help (see more with '\''--help'\'')]' \
+'-V[Print version]' \
+'--version[Print version]' \
+&& ret=0
+;;
+(compliance)
+_arguments "${_arguments_options[@]}" : \
+'--framework=[Filter framework (owasp-agentic-top10, nist-ai-rmf, eu-ai-act, soc2)]:FRAMEWORK:_default' \
+'--format=[Output format]:FORMAT:((text\:"Human-readable text output"
+json\:"Machine-readable JSON output"))' \
+'--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
+'--config=[Explicit path to do-harness.toml]:FILE:_files' \
+'--color=[Color output (auto, always, never)]:WHEN:_default' \
+'--output=[Default output file path]:FILE:_files' \
+'*-v[Verbosity level (-v, -vv)]' \
+'*--verbose[Verbosity level (-v, -vv)]' \
+'-q[Suppress non-error messages]' \
+'--quiet[Suppress non-error messages]' \
+'--dry-run[Dry run without side effects]' \
+'-h[Print help (see more with '\''--help'\'')]' \
+'--help[Print help (see more with '\''--help'\'')]' \
+'-V[Print version]' \
+'--version[Print version]' \
+&& ret=0
+;;
+(audit-chain)
+_arguments "${_arguments_options[@]}" : \
+'--format=[Output format]:FORMAT:((text\:"Human-readable text output"
+json\:"Machine-readable JSON output"))' \
+'--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
+'--config=[Explicit path to do-harness.toml]:FILE:_files' \
+'--color=[Color output (auto, always, never)]:WHEN:_default' \
+'--output=[Default output file path]:FILE:_files' \
+'*-v[Verbosity level (-v, -vv)]' \
+'*--verbose[Verbosity level (-v, -vv)]' \
+'-q[Suppress non-error messages]' \
+'--quiet[Suppress non-error messages]' \
+'--dry-run[Dry run without side effects]' \
+'-h[Print help (see more with '\''--help'\'')]' \
+'--help[Print help (see more with '\''--help'\'')]' \
+'-V[Print version]' \
+'--version[Print version]' \
+&& ret=0
+;;
+(completions)
+_arguments "${_arguments_options[@]}" : \
+'--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
+'--config=[Explicit path to do-harness.toml]:FILE:_files' \
+'--color=[Color output (auto, always, never)]:WHEN:_default' \
+'--output=[Default output file path]:FILE:_files' \
+'*-v[Verbosity level (-v, -vv)]' \
+'*--verbose[Verbosity level (-v, -vv)]' \
+'-q[Suppress non-error messages]' \
+'--quiet[Suppress non-error messages]' \
+'--dry-run[Dry run without side effects]' \
+'-h[Print help]' \
+'--help[Print help]' \
+'-V[Print version]' \
+'--version[Print version]' \
+':shell -- Target shell (bash, zsh, fish, powershell, elvish):(bash elvish fish powershell zsh)' \
+&& ret=0
+;;
+(man)
+_arguments "${_arguments_options[@]}" : \
+'--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
+'--config=[Explicit path to do-harness.toml]:FILE:_files' \
+'--color=[Color output (auto, always, never)]:WHEN:_default' \
+'--output=[Default output file path]:FILE:_files' \
+'*-v[Verbosity level (-v, -vv)]' \
+'*--verbose[Verbosity level (-v, -vv)]' \
+'-q[Suppress non-error messages]' \
+'--quiet[Suppress non-error messages]' \
+'--dry-run[Dry run without side effects]' \
+'-h[Print help]' \
+'--help[Print help]' \
+'-V[Print version]' \
+'--version[Print version]' \
+':dir -- Output directory for man pages:_files -/' \
+&& ret=0
+;;
+(help)
+_arguments "${_arguments_options[@]}" : \
+":: :_do-harness__subcmd__help_commands" \
+"*::: :->help" \
+&& ret=0
+
+    case $state in
+    (help)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:do-harness-help-command-$line[1]:"
+        case $line[1] in
+            (version)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(verify)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(list)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(init-db)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(seed)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(init)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(task)
+_arguments "${_arguments_options[@]}" : \
+":: :_do-harness__subcmd__help__subcmd__task_commands" \
+"*::: :->task" \
+&& ret=0
+
+    case $state in
+    (task)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:do-harness-help-task-command-$line[1]:"
+        case $line[1] in
+            (export)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(list)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(show)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(add)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(advance)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(done)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(fail)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(remove)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+        esac
+    ;;
+esac
+;;
+(trace)
+_arguments "${_arguments_options[@]}" : \
+":: :_do-harness__subcmd__help__subcmd__trace_commands" \
+"*::: :->trace" \
+&& ret=0
+
+    case $state in
+    (trace)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:do-harness-help-trace-command-$line[1]:"
+        case $line[1] in
+            (add)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(list)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(sessions)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+        esac
+    ;;
+esac
+;;
+(distill)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(errors)
+_arguments "${_arguments_options[@]}" : \
+":: :_do-harness__subcmd__help__subcmd__errors_commands" \
+"*::: :->errors" \
+&& ret=0
+
+    case $state in
+    (errors)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:do-harness-help-errors-command-$line[1]:"
+        case $line[1] in
+            (list)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(clear)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+        esac
+    ;;
+esac
+;;
+(eval)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(hook)
+_arguments "${_arguments_options[@]}" : \
+":: :_do-harness__subcmd__help__subcmd__hook_commands" \
+"*::: :->hook" \
+&& ret=0
+
+    case $state in
+    (hook)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:do-harness-help-hook-command-$line[1]:"
+        case $line[1] in
+            (install)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(uninstall)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(status)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(diff)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+        esac
+    ;;
+esac
+;;
+(doctor)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(metrics)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(compliance)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(audit-chain)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(completions)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(man)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(help)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+        esac
+    ;;
+esac
+;;
+        esac
+    ;;
+esac
+}
+
+(( $+functions[_do-harness_commands] )) ||
+_do-harness_commands() {
+    local commands; commands=(
+'version:Print CLI version information' \
+'verify:Run computational sensors' \
+'check:Run computational sensors' \
+'list:List sensor names' \
+'ls:List sensor names' \
+'init-db:Apply pending database migrations' \
+'seed:Seed invariants from plans/invariants.json' \
+'init:Scaffold a harness workspace in a target directory' \
+'task:Inspect and export task state' \
+'trace:Record and list interaction traces' \
+'distill:Extract a heuristic from a resolved trace' \
+'errors:Inspect and clear fail-fast error signatures' \
+'eval:Validate skill structure and benchmark skill evals' \
+'hook:Manage git hooks that run \`do-harness verify\`' \
+'doctor:Run diagnostic checks on binary resolution and git hook health' \
+'metrics:Report harness trends\: sensor stats, strikes, eval pass-rate history' \
+'compliance:Print compliance mapping to OWASP Agentic Top 10, NIST AI RMF, and EU AI Act' \
+'audit-chain:Recompute workflow event hash chain and report first divergence' \
+'completions:Generate shell completions' \
+'man:Generate man page documentation' \
+'help:Print this message or the help of the given subcommand(s)' \
+    )
+    _describe -t commands 'do-harness commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__audit-chain_commands] )) ||
+_do-harness__subcmd__audit-chain_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness audit-chain commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__completions_commands] )) ||
+_do-harness__subcmd__completions_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness completions commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__compliance_commands] )) ||
+_do-harness__subcmd__compliance_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness compliance commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__distill_commands] )) ||
+_do-harness__subcmd__distill_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness distill commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__doctor_commands] )) ||
+_do-harness__subcmd__doctor_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness doctor commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__errors_commands] )) ||
+_do-harness__subcmd__errors_commands() {
+    local commands; commands=(
+'list:List fail-fast error signatures (prefixed with \`sensor\:\`)' \
+'clear:Clear fail-fast error signatures (e.g. \`sensor\:<name>\`)' \
+'help:Print this message or the help of the given subcommand(s)' \
+    )
+    _describe -t commands 'do-harness errors commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__errors__subcmd__clear_commands] )) ||
+_do-harness__subcmd__errors__subcmd__clear_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness errors clear commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__errors__subcmd__help_commands] )) ||
+_do-harness__subcmd__errors__subcmd__help_commands() {
+    local commands; commands=(
+'list:List fail-fast error signatures (prefixed with \`sensor\:\`)' \
+'clear:Clear fail-fast error signatures (e.g. \`sensor\:<name>\`)' \
+'help:Print this message or the help of the given subcommand(s)' \
+    )
+    _describe -t commands 'do-harness errors help commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__errors__subcmd__help__subcmd__clear_commands] )) ||
+_do-harness__subcmd__errors__subcmd__help__subcmd__clear_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness errors help clear commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__errors__subcmd__help__subcmd__help_commands] )) ||
+_do-harness__subcmd__errors__subcmd__help__subcmd__help_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness errors help help commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__errors__subcmd__help__subcmd__list_commands] )) ||
+_do-harness__subcmd__errors__subcmd__help__subcmd__list_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness errors help list commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__errors__subcmd__list_commands] )) ||
+_do-harness__subcmd__errors__subcmd__list_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness errors list commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__eval_commands] )) ||
+_do-harness__subcmd__eval_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness eval commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__help_commands] )) ||
+_do-harness__subcmd__help_commands() {
+    local commands; commands=(
+'version:Print CLI version information' \
+'verify:Run computational sensors' \
+'list:List sensor names' \
+'init-db:Apply pending database migrations' \
+'seed:Seed invariants from plans/invariants.json' \
+'init:Scaffold a harness workspace in a target directory' \
+'task:Inspect and export task state' \
+'trace:Record and list interaction traces' \
+'distill:Extract a heuristic from a resolved trace' \
+'errors:Inspect and clear fail-fast error signatures' \
+'eval:Validate skill structure and benchmark skill evals' \
+'hook:Manage git hooks that run \`do-harness verify\`' \
+'doctor:Run diagnostic checks on binary resolution and git hook health' \
+'metrics:Report harness trends\: sensor stats, strikes, eval pass-rate history' \
+'compliance:Print compliance mapping to OWASP Agentic Top 10, NIST AI RMF, and EU AI Act' \
+'audit-chain:Recompute workflow event hash chain and report first divergence' \
+'completions:Generate shell completions' \
+'man:Generate man page documentation' \
+'help:Print this message or the help of the given subcommand(s)' \
+    )
+    _describe -t commands 'do-harness help commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__help__subcmd__audit-chain_commands] )) ||
+_do-harness__subcmd__help__subcmd__audit-chain_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness help audit-chain commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__help__subcmd__completions_commands] )) ||
+_do-harness__subcmd__help__subcmd__completions_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness help completions commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__help__subcmd__compliance_commands] )) ||
+_do-harness__subcmd__help__subcmd__compliance_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness help compliance commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__help__subcmd__distill_commands] )) ||
+_do-harness__subcmd__help__subcmd__distill_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness help distill commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__help__subcmd__doctor_commands] )) ||
+_do-harness__subcmd__help__subcmd__doctor_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness help doctor commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__help__subcmd__errors_commands] )) ||
+_do-harness__subcmd__help__subcmd__errors_commands() {
+    local commands; commands=(
+'list:List fail-fast error signatures (prefixed with \`sensor\:\`)' \
+'clear:Clear fail-fast error signatures (e.g. \`sensor\:<name>\`)' \
+    )
+    _describe -t commands 'do-harness help errors commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__help__subcmd__errors__subcmd__clear_commands] )) ||
+_do-harness__subcmd__help__subcmd__errors__subcmd__clear_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness help errors clear commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__help__subcmd__errors__subcmd__list_commands] )) ||
+_do-harness__subcmd__help__subcmd__errors__subcmd__list_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness help errors list commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__help__subcmd__eval_commands] )) ||
+_do-harness__subcmd__help__subcmd__eval_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness help eval commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__help__subcmd__help_commands] )) ||
+_do-harness__subcmd__help__subcmd__help_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness help help commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__help__subcmd__hook_commands] )) ||
+_do-harness__subcmd__help__subcmd__hook_commands() {
+    local commands; commands=(
+'install:Write pre-commit and pre-push hooks into \`.git/hooks/\`' \
+'uninstall:Remove managed hooks, leaving foreign hook files untouched' \
+'status:Show whether the managed hooks and release binary are present' \
+'diff:Show diff between installed hooks and current templates' \
+    )
+    _describe -t commands 'do-harness help hook commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__help__subcmd__hook__subcmd__diff_commands] )) ||
+_do-harness__subcmd__help__subcmd__hook__subcmd__diff_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness help hook diff commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__help__subcmd__hook__subcmd__install_commands] )) ||
+_do-harness__subcmd__help__subcmd__hook__subcmd__install_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness help hook install commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__help__subcmd__hook__subcmd__status_commands] )) ||
+_do-harness__subcmd__help__subcmd__hook__subcmd__status_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness help hook status commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__help__subcmd__hook__subcmd__uninstall_commands] )) ||
+_do-harness__subcmd__help__subcmd__hook__subcmd__uninstall_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness help hook uninstall commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__help__subcmd__init_commands] )) ||
+_do-harness__subcmd__help__subcmd__init_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness help init commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__help__subcmd__init-db_commands] )) ||
+_do-harness__subcmd__help__subcmd__init-db_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness help init-db commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__help__subcmd__list_commands] )) ||
+_do-harness__subcmd__help__subcmd__list_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness help list commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__help__subcmd__man_commands] )) ||
+_do-harness__subcmd__help__subcmd__man_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness help man commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__help__subcmd__metrics_commands] )) ||
+_do-harness__subcmd__help__subcmd__metrics_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness help metrics commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__help__subcmd__seed_commands] )) ||
+_do-harness__subcmd__help__subcmd__seed_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness help seed commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__help__subcmd__task_commands] )) ||
+_do-harness__subcmd__help__subcmd__task_commands() {
+    local commands; commands=(
+'export:Write the task list to plans/tasks.json or specified output' \
+'list:Print tasks from the state database' \
+'show:Show details for a specific task' \
+'add:Add a task in \`pending\` state' \
+'advance:Advance the task'\''s subtask pointer' \
+'done:Mark a task done once its sensor-gated subtasks have passed' \
+'fail:Mark a task failed' \
+'remove:Remove or cancel a task' \
+    )
+    _describe -t commands 'do-harness help task commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__help__subcmd__task__subcmd__add_commands] )) ||
+_do-harness__subcmd__help__subcmd__task__subcmd__add_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness help task add commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__help__subcmd__task__subcmd__advance_commands] )) ||
+_do-harness__subcmd__help__subcmd__task__subcmd__advance_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness help task advance commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__help__subcmd__task__subcmd__done_commands] )) ||
+_do-harness__subcmd__help__subcmd__task__subcmd__done_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness help task done commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__help__subcmd__task__subcmd__export_commands] )) ||
+_do-harness__subcmd__help__subcmd__task__subcmd__export_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness help task export commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__help__subcmd__task__subcmd__fail_commands] )) ||
+_do-harness__subcmd__help__subcmd__task__subcmd__fail_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness help task fail commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__help__subcmd__task__subcmd__list_commands] )) ||
+_do-harness__subcmd__help__subcmd__task__subcmd__list_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness help task list commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__help__subcmd__task__subcmd__remove_commands] )) ||
+_do-harness__subcmd__help__subcmd__task__subcmd__remove_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness help task remove commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__help__subcmd__task__subcmd__show_commands] )) ||
+_do-harness__subcmd__help__subcmd__task__subcmd__show_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness help task show commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__help__subcmd__trace_commands] )) ||
+_do-harness__subcmd__help__subcmd__trace_commands() {
+    local commands; commands=(
+'add:Record a trace of an executed command and its resolution' \
+'list:Print traces for a session' \
+'sessions:List distinct trace session identifiers' \
+    )
+    _describe -t commands 'do-harness help trace commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__help__subcmd__trace__subcmd__add_commands] )) ||
+_do-harness__subcmd__help__subcmd__trace__subcmd__add_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness help trace add commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__help__subcmd__trace__subcmd__list_commands] )) ||
+_do-harness__subcmd__help__subcmd__trace__subcmd__list_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness help trace list commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__help__subcmd__trace__subcmd__sessions_commands] )) ||
+_do-harness__subcmd__help__subcmd__trace__subcmd__sessions_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness help trace sessions commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__help__subcmd__verify_commands] )) ||
+_do-harness__subcmd__help__subcmd__verify_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness help verify commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__help__subcmd__version_commands] )) ||
+_do-harness__subcmd__help__subcmd__version_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness help version commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__hook_commands] )) ||
+_do-harness__subcmd__hook_commands() {
+    local commands; commands=(
+'install:Write pre-commit and pre-push hooks into \`.git/hooks/\`' \
+'uninstall:Remove managed hooks, leaving foreign hook files untouched' \
+'status:Show whether the managed hooks and release binary are present' \
+'diff:Show diff between installed hooks and current templates' \
+'help:Print this message or the help of the given subcommand(s)' \
+    )
+    _describe -t commands 'do-harness hook commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__hook__subcmd__diff_commands] )) ||
+_do-harness__subcmd__hook__subcmd__diff_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness hook diff commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__hook__subcmd__help_commands] )) ||
+_do-harness__subcmd__hook__subcmd__help_commands() {
+    local commands; commands=(
+'install:Write pre-commit and pre-push hooks into \`.git/hooks/\`' \
+'uninstall:Remove managed hooks, leaving foreign hook files untouched' \
+'status:Show whether the managed hooks and release binary are present' \
+'diff:Show diff between installed hooks and current templates' \
+'help:Print this message or the help of the given subcommand(s)' \
+    )
+    _describe -t commands 'do-harness hook help commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__hook__subcmd__help__subcmd__diff_commands] )) ||
+_do-harness__subcmd__hook__subcmd__help__subcmd__diff_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness hook help diff commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__hook__subcmd__help__subcmd__help_commands] )) ||
+_do-harness__subcmd__hook__subcmd__help__subcmd__help_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness hook help help commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__hook__subcmd__help__subcmd__install_commands] )) ||
+_do-harness__subcmd__hook__subcmd__help__subcmd__install_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness hook help install commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__hook__subcmd__help__subcmd__status_commands] )) ||
+_do-harness__subcmd__hook__subcmd__help__subcmd__status_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness hook help status commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__hook__subcmd__help__subcmd__uninstall_commands] )) ||
+_do-harness__subcmd__hook__subcmd__help__subcmd__uninstall_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness hook help uninstall commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__hook__subcmd__install_commands] )) ||
+_do-harness__subcmd__hook__subcmd__install_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness hook install commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__hook__subcmd__status_commands] )) ||
+_do-harness__subcmd__hook__subcmd__status_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness hook status commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__hook__subcmd__uninstall_commands] )) ||
+_do-harness__subcmd__hook__subcmd__uninstall_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness hook uninstall commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__init_commands] )) ||
+_do-harness__subcmd__init_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness init commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__init-db_commands] )) ||
+_do-harness__subcmd__init-db_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness init-db commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__list_commands] )) ||
+_do-harness__subcmd__list_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness list commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__man_commands] )) ||
+_do-harness__subcmd__man_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness man commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__metrics_commands] )) ||
+_do-harness__subcmd__metrics_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness metrics commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__seed_commands] )) ||
+_do-harness__subcmd__seed_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness seed commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__task_commands] )) ||
+_do-harness__subcmd__task_commands() {
+    local commands; commands=(
+'export:Write the task list to plans/tasks.json or specified output' \
+'list:Print tasks from the state database' \
+'show:Show details for a specific task' \
+'add:Add a task in \`pending\` state' \
+'advance:Advance the task'\''s subtask pointer' \
+'done:Mark a task done once its sensor-gated subtasks have passed' \
+'fail:Mark a task failed' \
+'remove:Remove or cancel a task' \
+'help:Print this message or the help of the given subcommand(s)' \
+    )
+    _describe -t commands 'do-harness task commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__task__subcmd__add_commands] )) ||
+_do-harness__subcmd__task__subcmd__add_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness task add commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__task__subcmd__advance_commands] )) ||
+_do-harness__subcmd__task__subcmd__advance_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness task advance commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__task__subcmd__done_commands] )) ||
+_do-harness__subcmd__task__subcmd__done_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness task done commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__task__subcmd__export_commands] )) ||
+_do-harness__subcmd__task__subcmd__export_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness task export commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__task__subcmd__fail_commands] )) ||
+_do-harness__subcmd__task__subcmd__fail_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness task fail commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__task__subcmd__help_commands] )) ||
+_do-harness__subcmd__task__subcmd__help_commands() {
+    local commands; commands=(
+'export:Write the task list to plans/tasks.json or specified output' \
+'list:Print tasks from the state database' \
+'show:Show details for a specific task' \
+'add:Add a task in \`pending\` state' \
+'advance:Advance the task'\''s subtask pointer' \
+'done:Mark a task done once its sensor-gated subtasks have passed' \
+'fail:Mark a task failed' \
+'remove:Remove or cancel a task' \
+'help:Print this message or the help of the given subcommand(s)' \
+    )
+    _describe -t commands 'do-harness task help commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__task__subcmd__help__subcmd__add_commands] )) ||
+_do-harness__subcmd__task__subcmd__help__subcmd__add_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness task help add commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__task__subcmd__help__subcmd__advance_commands] )) ||
+_do-harness__subcmd__task__subcmd__help__subcmd__advance_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness task help advance commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__task__subcmd__help__subcmd__done_commands] )) ||
+_do-harness__subcmd__task__subcmd__help__subcmd__done_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness task help done commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__task__subcmd__help__subcmd__export_commands] )) ||
+_do-harness__subcmd__task__subcmd__help__subcmd__export_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness task help export commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__task__subcmd__help__subcmd__fail_commands] )) ||
+_do-harness__subcmd__task__subcmd__help__subcmd__fail_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness task help fail commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__task__subcmd__help__subcmd__help_commands] )) ||
+_do-harness__subcmd__task__subcmd__help__subcmd__help_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness task help help commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__task__subcmd__help__subcmd__list_commands] )) ||
+_do-harness__subcmd__task__subcmd__help__subcmd__list_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness task help list commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__task__subcmd__help__subcmd__remove_commands] )) ||
+_do-harness__subcmd__task__subcmd__help__subcmd__remove_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness task help remove commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__task__subcmd__help__subcmd__show_commands] )) ||
+_do-harness__subcmd__task__subcmd__help__subcmd__show_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness task help show commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__task__subcmd__list_commands] )) ||
+_do-harness__subcmd__task__subcmd__list_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness task list commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__task__subcmd__remove_commands] )) ||
+_do-harness__subcmd__task__subcmd__remove_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness task remove commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__task__subcmd__show_commands] )) ||
+_do-harness__subcmd__task__subcmd__show_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness task show commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__trace_commands] )) ||
+_do-harness__subcmd__trace_commands() {
+    local commands; commands=(
+'add:Record a trace of an executed command and its resolution' \
+'list:Print traces for a session' \
+'sessions:List distinct trace session identifiers' \
+'help:Print this message or the help of the given subcommand(s)' \
+    )
+    _describe -t commands 'do-harness trace commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__trace__subcmd__add_commands] )) ||
+_do-harness__subcmd__trace__subcmd__add_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness trace add commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__trace__subcmd__help_commands] )) ||
+_do-harness__subcmd__trace__subcmd__help_commands() {
+    local commands; commands=(
+'add:Record a trace of an executed command and its resolution' \
+'list:Print traces for a session' \
+'sessions:List distinct trace session identifiers' \
+'help:Print this message or the help of the given subcommand(s)' \
+    )
+    _describe -t commands 'do-harness trace help commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__trace__subcmd__help__subcmd__add_commands] )) ||
+_do-harness__subcmd__trace__subcmd__help__subcmd__add_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness trace help add commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__trace__subcmd__help__subcmd__help_commands] )) ||
+_do-harness__subcmd__trace__subcmd__help__subcmd__help_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness trace help help commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__trace__subcmd__help__subcmd__list_commands] )) ||
+_do-harness__subcmd__trace__subcmd__help__subcmd__list_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness trace help list commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__trace__subcmd__help__subcmd__sessions_commands] )) ||
+_do-harness__subcmd__trace__subcmd__help__subcmd__sessions_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness trace help sessions commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__trace__subcmd__list_commands] )) ||
+_do-harness__subcmd__trace__subcmd__list_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness trace list commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__trace__subcmd__sessions_commands] )) ||
+_do-harness__subcmd__trace__subcmd__sessions_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness trace sessions commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__verify_commands] )) ||
+_do-harness__subcmd__verify_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness verify commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__version_commands] )) ||
+_do-harness__subcmd__version_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness version commands' commands "$@"
+}
+
+if [ "$funcstack[1]" = "_do-harness" ]; then
+    _do-harness "$@"
+else
+    compdef _do-harness do-harness
+fi

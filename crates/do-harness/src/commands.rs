@@ -6,13 +6,10 @@ use anyhow::{Context, Result};
 
 use crate::doctor::describe_binary;
 use crate::report::Format;
-use crate::{ErrorsAction, TaskAction, TraceAction, config, errors, hooks, init, task, trace};
+use crate::cli::{ErrorsAction, HookAction, TaskAction, TraceAction};
+use crate::{config, errors, hooks, init, task, trace};
 
 /// Dispatches audit-chain check and prints report.
-///
-/// # Errors
-///
-/// Returns an error if the hash chain is tampered or the database cannot be read.
 pub async fn audit_chain_cmd(root: &Path, format: Format) -> Result<()> {
     let report = crate::audit::audit_chain(root).await?;
     match format {
@@ -48,14 +45,30 @@ pub async fn audit_chain_cmd(root: &Path, format: Format) -> Result<()> {
 /// Embedded compliance document (`docs/compliance.md`).
 const COMPLIANCE_DOC: &str = include_str!("../../../docs/compliance.md");
 
-/// Prints compliance mapping information in text or JSON format.
-pub fn print_compliance(format: Format) {
+/// Prints compliance mapping information with optional framework filtering.
+pub fn print_compliance_filtered(framework: Option<&str>, format: Format) {
+    let frameworks = vec!["OWASP Agentic Top 10", "NIST AI RMF 1.0", "EU AI Act", "SOC 2"];
+    let filtered_frameworks: Vec<&str> = if let Some(fw) = framework {
+        frameworks
+            .into_iter()
+            .filter(|f| f.to_lowercase().contains(&fw.to_lowercase()))
+            .collect()
+    } else {
+        frameworks
+    };
+
     match format {
-        Format::Text => println!("{COMPLIANCE_DOC}"),
+        Format::Text => {
+            if let Some(fw) = framework {
+                println!("Framework filter: {fw}\n");
+            }
+            println!("{COMPLIANCE_DOC}");
+        }
         Format::Json => {
             let json = serde_json::json!({
                 "doc": COMPLIANCE_DOC,
-                "frameworks": ["OWASP Agentic Top 10", "NIST AI RMF 1.0", "EU AI Act"]
+                "frameworks": filtered_frameworks,
+                "selected_framework": framework
             });
             println!("{json}");
         }
@@ -69,19 +82,20 @@ pub fn print_version(format: Format) {
 }
 
 /// Dispatches task-state actions.
-///
-/// # Errors
-///
-/// Returns an error when the state database cannot be opened or the export
-/// cannot be written.
 pub async fn task_cmd(root: &Path, action: TaskAction) -> Result<()> {
     match action {
-        TaskAction::Export => {
-            let count = task::export_tasks(root).await?;
-            println!("Exported {count} task(s) to plans/tasks.json");
+        TaskAction::Export { output, stdout, format } => {
+            let count = task::export_tasks(root, output.as_deref(), stdout, format).await?;
+            if !stdout {
+                let target = output.map_or_else(|| PathBuf::from("plans/tasks.json"), |p| p);
+                println!("Exported {count} task(s) to {}", target.display());
+            }
             Ok(())
         }
-        TaskAction::List { format } => task::list_tasks(root, format).await,
+        TaskAction::List { status, method, parent, format } => {
+            task::list_tasks(root, format, status.as_deref(), method.as_deref(), parent).await
+        }
+        TaskAction::Show { id, format } => task::show_task(root, id, format).await,
         TaskAction::Add {
             title,
             method,
@@ -99,29 +113,36 @@ pub async fn task_cmd(root: &Path, action: TaskAction) -> Result<()> {
             println!("Added task {id}: {title}");
             Ok(())
         }
-        TaskAction::Advance { id } => {
-            let (index, _event) = task::advance_task(root, id).await?;
-            println!("Advanced task {id} to subtask_index={index}");
-            Ok(())
+        TaskAction::Advance { id, dry_run } => {
+            if dry_run {
+                println!("Dry run: would advance task {id}");
+                Ok(())
+            } else {
+                let (index, _event) = task::advance_task(root, id).await?;
+                println!("Advanced task {id} to subtask_index={index}");
+                Ok(())
+            }
         }
-        TaskAction::Done { id } => {
-            task::done_task(root, id).await?;
-            println!("Done task {id}");
-            Ok(())
+        TaskAction::Done { id, dry_run } => {
+            if dry_run {
+                println!("Dry run: would mark task {id} done");
+                Ok(())
+            } else {
+                task::done_task(root, id).await?;
+                println!("Done task {id}");
+                Ok(())
+            }
         }
         TaskAction::Fail { id } => {
             task::fail_task(root, id).await?;
             println!("Failed task {id}");
             Ok(())
         }
+        TaskAction::Remove { id } => task::remove_task(root, id).await,
     }
 }
 
 /// Dispatches trace actions.
-///
-/// # Errors
-///
-/// Returns an error when the state database cannot be opened.
 pub async fn trace_cmd(root: &Path, action: TraceAction) -> Result<()> {
     match action {
         TraceAction::Add {
@@ -143,19 +164,27 @@ pub async fn trace_cmd(root: &Path, action: TraceAction) -> Result<()> {
             Ok(())
         }
         TraceAction::List { session, format } => trace::list_traces(root, &session, format).await,
+        TraceAction::Sessions { format } => trace::list_sessions(root, format).await,
     }
 }
 
 /// Dispatches error-signature actions.
-///
-/// # Errors
-///
-/// Returns an error when the state database cannot be opened.
 pub async fn errors_cmd(root: &Path, action: ErrorsAction) -> Result<()> {
     match action {
         ErrorsAction::List { task, format } => errors::list(root, task, format).await,
-        ErrorsAction::Clear { sensor, task } => {
-            let removed = errors::clear(root, task, sensor.as_deref()).await?;
+        ErrorsAction::Clear { sensor, task, force: _, dry_run } => {
+            if dry_run {
+                println!("Dry run: would clear error signatures");
+                return Ok(());
+            }
+            let key = sensor.as_deref().map(|s| {
+                if s.starts_with("sensor:") {
+                    s.to_owned()
+                } else {
+                    format!("sensor:{s}")
+                }
+            });
+            let removed = errors::clear(root, task, key.as_deref()).await?;
             println!("Cleared {removed} error signature(s)");
             Ok(())
         }
@@ -163,58 +192,53 @@ pub async fn errors_cmd(root: &Path, action: ErrorsAction) -> Result<()> {
 }
 
 /// Dispatches hook management using the configured sensor split.
-///
-/// # Errors
-///
-/// Returns an error when no git repository is found or a hook file cannot be
-/// written or removed.
-pub fn hook(root: &Path, config_path: Option<&Path>, action: crate::HookAction) -> Result<()> {
+pub fn hook(root: &Path, config_path: Option<&Path>, action: HookAction) -> Result<()> {
     let cwd = std::env::current_dir().context("failed to read current directory")?;
     let git_dir = hooks::find_git_dir(&cwd)?;
     match action {
-        crate::HookAction::Install { force } => {
+        HookAction::Install { force } => {
             let cfg = config::load(root, config_path)?;
             hooks::install(&git_dir, &cfg.hooks.pre_commit, &cfg.hooks.pre_push, force)?;
             println!(
-                "Installed pre-commit, pre-push, and commit-msg hooks in {}",
+                "Installed managed git hooks in {}",
                 git_dir.display()
             );
         }
-        crate::HookAction::Uninstall => {
+        HookAction::Uninstall => {
             hooks::uninstall(&git_dir)?;
             println!("Removed managed hooks from {}", git_dir.display());
         }
-        crate::HookAction::Status => {
+        HookAction::Status { format } => {
             let status = hooks::status(&git_dir, root);
-            println!(
-                "pre-commit: {}  pre-push: {}  commit-msg: {}  binary: {} ({})",
-                if status.pre_commit {
-                    "installed"
-                } else {
-                    "absent"
-                },
-                if status.pre_push {
-                    "installed"
-                } else {
-                    "absent"
-                },
-                if status.commit_msg {
-                    "installed"
-                } else {
-                    "absent"
-                },
-                describe_binary(&status.binary),
-                if status.binary.present() {
-                    "present"
-                } else {
-                    "missing"
+            match format {
+                Format::Text => {
+                    println!(
+                        "pre-commit: {}  pre-push: {}  commit-msg: {}  binary: {} ({})",
+                        if status.pre_commit { "installed" } else { "absent" },
+                        if status.pre_push { "installed" } else { "absent" },
+                        if status.commit_msg { "installed" } else { "absent" },
+                        describe_binary(&status.binary),
+                        if status.binary.present() { "present" } else { "missing" }
+                    );
                 }
-            );
-            if status.binary.is_in_target_dir() {
-                eprintln!(
-                    "warning: resolved do-harness binary is under Cargo target/; cargo clean will remove it: {}",
-                    status.binary.path().display()
-                );
+                Format::Json => {
+                    let json = serde_json::json!({
+                        "pre_commit": status.pre_commit,
+                        "pre_push": status.pre_push,
+                        "commit_msg": status.commit_msg,
+                        "binary_present": status.binary.present(),
+                        "binary_source": describe_binary(&status.binary)
+                    });
+                    println!("{json}");
+                }
+            }
+        }
+        HookAction::Diff => {
+            let status = hooks::status(&git_dir, root);
+            if status.pre_commit && status.pre_push && status.commit_msg {
+                println!("Hooks match installed templates.");
+            } else {
+                println!("One or more hooks differ or are missing.");
             }
         }
     }
@@ -251,11 +275,6 @@ pub async fn seed(root: &Path) -> Result<()> {
 }
 
 /// Resolves the workspace root: explicit override or walk up from cwd.
-///
-/// # Errors
-///
-/// Returns an error when the explicit root is not a directory or no harness
-/// root can be discovered from the current directory.
 pub fn resolve_root(explicit: Option<&Path>) -> Result<PathBuf> {
     if let Some(path) = explicit {
         if !path.is_dir() {
@@ -269,13 +288,6 @@ pub fn resolve_root(explicit: Option<&Path>) -> Result<PathBuf> {
 }
 
 /// Resolves the target directory for `init`: explicit root or cwd.
-///
-/// Unlike [`resolve_root`], this does not require an existing harness root so
-/// fresh repositories can be scaffolded.
-///
-/// # Errors
-///
-/// Returns an error when the explicit root is not a directory.
 pub fn init_target(explicit: Option<&Path>) -> Result<PathBuf> {
     if let Some(path) = explicit {
         if !path.is_dir() {

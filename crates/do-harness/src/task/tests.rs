@@ -63,7 +63,7 @@ async fn export_writes_task_snapshot() {
     .unwrap();
     drop(conn);
 
-    let count = export_tasks(dir.path()).await.unwrap();
+    let count = export_tasks(dir.path(), None, false, Format::Json).await.unwrap();
 
     assert_eq!(count, 1);
     let text = fs::read_to_string(dir.path().join("plans/tasks.json")).unwrap();
@@ -76,7 +76,7 @@ async fn export_writes_task_snapshot() {
 #[tokio::test(flavor = "current_thread")]
 async fn export_writes_empty_snapshot_without_tasks() {
     let dir = tempfile::tempdir().unwrap();
-    let count = export_tasks(dir.path()).await.unwrap();
+    let count = export_tasks(dir.path(), None, false, Format::Json).await.unwrap();
     assert_eq!(count, 0);
     let text = fs::read_to_string(dir.path().join("plans/tasks.json")).unwrap();
     let parsed: serde_json::Value = serde_json::from_str(&text).unwrap();

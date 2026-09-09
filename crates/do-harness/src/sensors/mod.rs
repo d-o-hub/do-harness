@@ -13,11 +13,14 @@ use crate::report::{SensorResult, VerifyReport};
 use crate::telemetry::FAIL_FAST_STRIKES;
 
 /// Options controlling a verify run.
+#[derive(Debug, Clone, Default)]
 pub struct VerifyOpts {
     /// Halt at the first failing sensor.
     pub fail_fast: bool,
     /// Restrict execution to these sensor names; empty = all.
     pub only: Vec<String>,
+    /// Exclude these sensor names from execution.
+    pub exclude: Vec<String>,
     /// Sensor names halted by the fail-fast policy (not executed).
     pub blocked: Vec<String>,
 }
@@ -29,8 +32,25 @@ pub struct VerifyOpts {
 /// Returns an error when a name in `only` does not match any configured sensor.
 pub fn verify(cfg: &Config, root: &Path, opts: &VerifyOpts) -> Result<VerifyReport> {
     let sensors = cfg.effective_sensors();
+
+    let effective_only: Vec<String> = opts
+        .only
+        .iter()
+        .flat_map(|s| s.split(','))
+        .map(|s| s.trim().to_owned())
+        .filter(|s| !s.is_empty())
+        .collect();
+
+    let effective_exclude: Vec<String> = opts
+        .exclude
+        .iter()
+        .flat_map(|s| s.split(','))
+        .map(|s| s.trim().to_owned())
+        .filter(|s| !s.is_empty())
+        .collect();
+
     let mut unknown: Vec<&str> = Vec::new();
-    for name in &opts.only {
+    for name in &effective_only {
         if !sensors.iter().any(|s| &s.name == name) {
             unknown.push(name);
         }
@@ -38,7 +58,7 @@ pub fn verify(cfg: &Config, root: &Path, opts: &VerifyOpts) -> Result<VerifyRepo
     if !unknown.is_empty() {
         let available = cfg.sensor_names().join(", ");
         return Err(anyhow!(
-            "unknown sensor(s): {} (available: {available})",
+            "unknown sensor(s): {} (available: {available}; run `do-harness list` to see configured sensors)",
             unknown.join(", ")
         ));
     }
@@ -54,9 +74,14 @@ pub fn verify(cfg: &Config, root: &Path, opts: &VerifyOpts) -> Result<VerifyRepo
 
     let mut results: Vec<SensorResult> = Vec::new();
     for spec in sensors {
-        if !opts.only.is_empty() && !opts.only.contains(&spec.name) {
+        if !effective_only.is_empty() && !effective_only.contains(&spec.name) {
             continue;
         }
+        if effective_exclude.contains(&spec.name) {
+            continue;
+        }
+
+        // Blocked synthesis: sensor is halted by fail-fast policy (ok=false, exit_code=None, duration_ms=0).
         let result = if opts.blocked.contains(&spec.name) {
             SensorResult {
                 name: spec.name.clone(),

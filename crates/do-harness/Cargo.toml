@@ -11,6 +11,8 @@ workspace = true
 
 [dependencies]
 clap = { workspace = true, features = ["derive"] }
+clap_complete = "4"
+clap_mangen = "0.3"
 sha2.workspace = true
 tokio.workspace = true
 anyhow.workspace = true

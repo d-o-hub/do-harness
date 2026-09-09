@@ -1,0 +1,108 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH do-harness 1  "do-harness 0.1.0 (d7b8348-dirty 2026-09-04)"
+.SH NAME
+do\-harness \- do\-harness agent execution harness CLI
+.SH SYNOPSIS
+\fBdo\-harness\fR [\fB\-\-root\fR] [\fB\-\-config\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-color\fR] [\fB\-\-output\fR] [\fB\-\-dry\-run\fR] [\fB\-h\fR|\fB\-\-help\fR] [\fB\-V\fR|\fB\-\-version\fR] <\fIsubcommands\fR>
+.SH DESCRIPTION
+do\-harness agent execution harness CLI
+.SH OPTIONS
+.TP
+\fB\-\-root\fR \fI<DIR>\fR
+Workspace root override (default: walk up from cwd)
+.TP
+\fB\-\-config\fR \fI<FILE>\fR
+Explicit path to do\-harness.toml
+.TP
+\fB\-v\fR, \fB\-\-verbose\fR
+Verbosity level (\-v, \-vv)
+.TP
+\fB\-q\fR, \fB\-\-quiet\fR
+Suppress non\-error messages
+.TP
+\fB\-\-color\fR \fI<WHEN>\fR
+Color output (auto, always, never)
+.TP
+\fB\-\-output\fR \fI<FILE>\fR
+Default output file path
+.TP
+\fB\-\-dry\-run\fR
+Dry run without side effects
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help
+.TP
+\fB\-V\fR, \fB\-\-version\fR
+Print version
+.SH SUBCOMMANDS
+.TP
+do\-harness\-version(1)
+Print CLI version information
+.TP
+do\-harness\-verify(1)
+Run computational sensors
+.TP
+do\-harness\-list(1)
+List sensor names
+.TP
+do\-harness\-init\-db(1)
+Apply pending database migrations
+.TP
+do\-harness\-seed(1)
+Seed invariants from plans/invariants.json
+.TP
+do\-harness\-init(1)
+Scaffold a harness workspace in a target directory
+.TP
+do\-harness\-task(1)
+Inspect and export task state
+.TP
+do\-harness\-trace(1)
+Record and list interaction traces
+.TP
+do\-harness\-distill(1)
+Extract a heuristic from a resolved trace
+.TP
+do\-harness\-errors(1)
+Inspect and clear fail\-fast error signatures
+.TP
+do\-harness\-eval(1)
+Validate skill structure and benchmark skill evals
+.TP
+do\-harness\-hook(1)
+Manage git hooks that run `do\-harness verify`
+.TP
+do\-harness\-doctor(1)
+Run diagnostic checks on binary resolution and git hook health
+.TP
+do\-harness\-metrics(1)
+Report harness trends: sensor stats, strikes, eval pass\-rate history
+.TP
+do\-harness\-compliance(1)
+Print compliance mapping to OWASP Agentic Top 10, NIST AI RMF, and EU AI Act
+.TP
+do\-harness\-audit\-chain(1)
+Recompute workflow event hash chain and report first divergence
+.TP
+do\-harness\-completions(1)
+Generate shell completions
+.TP
+do\-harness\-man(1)
+Generate man page documentation
+.TP
+do\-harness\-help(1)
+Print this message or the help of the given subcommand(s)
+.SH EXTRA
+Examples:
+  do\-harness init
+  do\-harness hook install
+  do\-harness verify \-\-record
+  do\-harness verify \-\-record \-\-task <id>
+
+Exit Codes:
+  0  Success
+  1  Verification or check failure
+  2  Usage, configuration, or environment error
+.SH VERSION
+v0.1.0 (d7b8348\-dirty 2026\-09\-04)

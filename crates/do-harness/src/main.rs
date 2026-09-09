@@ -10,7 +10,7 @@
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use clap::{Parser, Subcommand};
+use clap::{CommandFactory, Parser};
 
 use crate::cli::{Cli, Command};
 use crate::report::Format;
@@ -43,120 +43,8 @@ mod telemetry;
 mod trace;
 mod version;
 
-/// Available task-state actions.
-#[derive(Debug, Subcommand)]
-enum TaskAction {
-    /// Write the task list to plans/tasks.json.
-    Export,
-    /// Print tasks from the state database.
-    List {
-        /// Output format.
-        #[arg(long, value_enum, default_value_t = Format::Text)]
-        format: Format,
-    },
-    /// Add a task in `pending` state.
-    Add {
-        /// Human-readable task title.
-        title: String,
-        /// Name of the HTN method this task follows.
-        #[arg(long)]
-        method: Option<String>,
-        /// Parent task id.
-        #[arg(long)]
-        parent: Option<i64>,
-        /// Recorded precondition guard.
-        #[arg(long)]
-        precondition: Option<String>,
-    },
-    /// Advance the task's subtask pointer.
-    Advance {
-        /// Task id.
-        id: i64,
-    },
-    /// Mark a task done once its sensor-gated subtasks have passed.
-    Done {
-        /// Task id.
-        id: i64,
-    },
-    /// Mark a task failed.
-    Fail {
-        /// Task id.
-        id: i64,
-    },
-}
-
-/// Available error-signature actions.
-#[derive(Debug, Subcommand)]
-enum ErrorsAction {
-    /// List fail-fast error signatures.
-    List {
-        /// Scope to one task id.
-        #[arg(long)]
-        task: Option<i64>,
-        /// Output format.
-        #[arg(long, value_enum, default_value_t = Format::Text)]
-        format: Format,
-    },
-    /// Clear fail-fast error signatures (optionally for one sensor/task).
-    Clear {
-        /// Only clear this signature key.
-        #[arg(long)]
-        sensor: Option<String>,
-        /// Only clear signatures for this task id.
-        #[arg(long)]
-        task: Option<i64>,
-    },
-}
-
-/// Available trace actions.
-#[derive(Debug, Subcommand)]
-enum TraceAction {
-    /// Record a trace of an executed command and its resolution.
-    Add {
-        /// Session identifier grouping related traces.
-        #[arg(long)]
-        session: String,
-        /// Owning task id.
-        #[arg(long)]
-        task: Option<i64>,
-        /// The command that was executed.
-        #[arg(long)]
-        command: Option<String>,
-        /// Error diff or failure output captured.
-        #[arg(long = "error-diff")]
-        error_diff: Option<String>,
-        /// Steps taken to resolve the failure.
-        #[arg(long = "resolution-steps")]
-        resolution_steps: Option<String>,
-    },
-    /// Print traces for a session.
-    List {
-        /// Session identifier.
-        #[arg(long)]
-        session: String,
-        /// Output format.
-        #[arg(long, value_enum, default_value_t = Format::Text)]
-        format: Format,
-    },
-}
-
-/// Available hook-management actions.
-#[derive(Debug, Copy, Clone, Subcommand)]
-enum HookAction {
-    /// Write pre-commit and pre-push hooks into `.git/hooks/`.
-    Install {
-        /// Overwrite foreign (unmanaged) hook files.
-        #[arg(long)]
-        force: bool,
-    },
-    /// Remove managed hooks, leaving foreign hook files untouched.
-    Uninstall,
-    /// Show whether the managed hooks and release binary are present.
-    Status,
-}
-
 /// Classified CLI failure carrying its process exit code.
-enum CliError {
+pub enum CliError {
     /// Usage, config, or discovery problems: exit 2.
     Usage(anyhow::Error),
     /// Sensor verification failed: exit 1.
@@ -165,7 +53,7 @@ enum CliError {
 
 impl CliError {
     /// The process exit code for this error class.
-    fn exit_code(&self) -> u8 {
+    pub fn exit_code(&self) -> u8 {
         match self {
             CliError::Usage(_) => 2,
             CliError::Verify(_) => 1,
@@ -195,13 +83,30 @@ async fn main() -> ExitCode {
 
 /// Dispatches the parsed CLI and classifies failures.
 async fn run(cli: Cli) -> std::result::Result<(), CliError> {
-    if let Command::Version { format } = cli.command {
-        commands::print_version(format);
-        return Ok(());
-    }
-    if let Command::Compliance { format } = cli.command {
-        commands::print_compliance(format);
-        return Ok(());
+    match &cli.command {
+        Command::Version { format } => {
+            commands::print_version(*format);
+            return Ok(());
+        }
+        Command::Compliance { framework, format } => {
+            commands::print_compliance_filtered(framework.as_deref(), *format);
+            return Ok(());
+        }
+        Command::Completions { shell } => {
+            let mut cmd = Cli::command();
+            clap_complete::generate(*shell, &mut cmd, "do-harness", &mut std::io::stdout());
+            return Ok(());
+        }
+        Command::Man { dir } => {
+            let cmd = Cli::command();
+            let man = clap_mangen::Man::new(cmd);
+            std::fs::create_dir_all(dir).map_err(|e| CliError::Usage(e.into()))?;
+            let mut buffer = Vec::new();
+            man.render(&mut buffer).map_err(|e| CliError::Usage(e.into()))?;
+            std::fs::write(dir.join("do-harness.1"), buffer).map_err(|e| CliError::Usage(e.into()))?;
+            return Ok(());
+        }
+        _ => {}
     }
 
     let root = match &cli.command {
@@ -210,9 +115,20 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
         }
         _ => commands::resolve_root(cli.root.as_deref()).map_err(CliError::Usage)?,
     };
+
     match cli.command {
-        Command::Version { .. } | Command::Compliance { .. } => unreachable!(),
-        Command::Init { language, force } => {
+        Command::Version { .. }
+        | Command::Compliance { .. }
+        | Command::Completions { .. }
+        | Command::Man { .. } => unreachable!(),
+        Command::Init {
+            language,
+            force,
+            format: _,
+            no_seed: _,
+            minimal: _,
+            no_gitignore: _,
+        } => {
             let opts = init::InitOpts { language, force };
             let report = init::init_workspace(&root, &opts)
                 .await
@@ -224,6 +140,7 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
             fail_fast,
             format,
             only,
+            exclude,
             record,
             task,
             evidence,
@@ -235,6 +152,7 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
                 fail_fast,
                 format,
                 only,
+                exclude,
                 record,
                 task,
                 evidence,
@@ -261,6 +179,8 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
             description,
             from_trace,
             to_fixture,
+            dry_run,
+            format,
         } => distill::distill(
             &root,
             &skill,
@@ -268,25 +188,50 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
             description.as_deref(),
             from_trace,
             to_fixture,
+            dry_run,
+            format,
         )
         .await
         .map_err(CliError::Usage),
         Command::Errors { action } => commands::errors_cmd(&root, action)
             .await
             .map_err(CliError::Usage),
-        Command::Eval { skill, bless } => eval::run_eval(&root, skill.as_deref(), bless)
-            .await
-            .map_err(CliError::Verify),
+        Command::Eval {
+            skill,
+            bless,
+            list_skills,
+            fail_fast,
+            dry_run,
+            format,
+        } => eval::run_eval(
+            &root,
+            skill.as_deref(),
+            bless,
+            list_skills,
+            fail_fast,
+            dry_run,
+            format,
+        )
+        .await
+        .map_err(CliError::Verify),
         Command::Hook { action } => {
             commands::hook(&root, cli.config.as_deref(), action).map_err(CliError::Usage)
         }
-        Command::Doctor => doctor::run(&root).await.map_err(CliError::Verify),
+        Command::Doctor { format, strict } => {
+            doctor::run(&root, format, strict).await.map_err(CliError::Verify)
+        }
         Command::AuditChain { format } => commands::audit_chain_cmd(&root, format)
             .await
             .map_err(CliError::Verify),
-        Command::Metrics { format } => metrics::run_metrics(&root, format)
-            .await
-            .map_err(CliError::Usage),
+        Command::Metrics { format, sensor, skill, since } => metrics::run_metrics(
+            &root,
+            format,
+            sensor.as_deref(),
+            skill.as_deref(),
+            since.as_deref(),
+        )
+        .await
+        .map_err(CliError::Usage),
     }
 }
 
@@ -298,6 +243,7 @@ async fn run_verify(
     fail_fast: bool,
     format: Format,
     only: Vec<String>,
+    exclude: Vec<String>,
     record: bool,
     task: Option<i64>,
     evidence: Option<PathBuf>,
@@ -317,6 +263,7 @@ async fn run_verify(
     let opts = sensors::VerifyOpts {
         fail_fast,
         only,
+        exclude,
         blocked,
     };
     match sensors::verify(&cfg, root, &opts) {
@@ -351,8 +298,8 @@ async fn run_verify(
                     }
                 }
                 let json =
-                    serde_json::to_vec_pretty(&doc).map_err(|e| CliError::Usage(e.into()))?;
-                std::fs::write(&path, json).map_err(|e| CliError::Usage(e.into()))?;
+                    serde_json::to_vec_pretty(&doc).map_err(|e| CliError::Verify(e.into()))?;
+                std::fs::write(&path, json).map_err(|e| CliError::Verify(e.into()))?;
 
                 if strict && !doc.is_strict_clean() {
                     eprintln!(
