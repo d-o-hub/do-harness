@@ -49,6 +49,7 @@ struct SkillReport {
 }
 
 /// Runs the skill-eval benchmark for skills under `.agents/skills`.
+#[allow(clippy::too_many_lines, clippy::fn_params_excessive_bools)]
 pub async fn run_eval(
     root: &Path,
     skill: Option<&str>,

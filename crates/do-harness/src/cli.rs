@@ -160,7 +160,10 @@ pub enum Command {
         #[arg(long, value_name = "SKILL")]
         skill: Option<String>,
         /// Bless a fully green run: re-baseline graders and update pass-rate floor.
-        #[arg(long, help = "Re-baseline graders and update pass-rate floor on green run")]
+        #[arg(
+            long,
+            help = "Re-baseline graders and update pass-rate floor on green run"
+        )]
         bless: bool,
         /// List available skills.
         #[arg(long)]
@@ -250,7 +253,7 @@ pub enum TaskAction {
     },
     /// Print tasks from the state database.
     List {
-        /// Filter tasks by status (pending, in_progress, completed, failed).
+        /// Filter tasks by status (pending, `in_progress`, completed, failed).
         #[arg(long)]
         status: Option<String>,
         /// Filter tasks by method name.

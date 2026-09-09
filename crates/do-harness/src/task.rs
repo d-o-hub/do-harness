@@ -1,5 +1,6 @@
 //! Task state queries and exports for `do-harness task`.
 
+use std::fmt::Write;
 use std::fs;
 use std::path::Path;
 
@@ -20,7 +21,12 @@ pub struct TaskSnapshot {
 }
 
 /// Writes `plans/tasks.json` or custom output with the task list; returns task count.
-pub async fn export_tasks(root: &Path, output: Option<&Path>, stdout: bool, format: Format) -> Result<usize> {
+pub async fn export_tasks(
+    root: &Path,
+    output: Option<&Path>,
+    stdout: bool,
+    format: Format,
+) -> Result<usize> {
     let conn = do_harness_db::connect_and_migrate(root).await?;
     let tasks = do_harness_db::list_tasks(&conn).await?;
     let snapshot = TaskSnapshot {
@@ -41,11 +47,14 @@ pub async fn export_tasks(root: &Path, output: Option<&Path>, stdout: bool, form
 
     let target_path = output.map_or_else(|| root.join("plans/tasks.json"), Path::to_path_buf);
     let content = match format {
-        Format::Json => format!("{}\n", serde_json::to_string_pretty(&snapshot).context("failed to serialize task snapshot")?),
+        Format::Json => format!(
+            "{}\n",
+            serde_json::to_string_pretty(&snapshot).context("failed to serialize task snapshot")?
+        ),
         Format::Text => {
             let mut s = String::new();
             for t in &snapshot.tasks {
-                s.push_str(&format!("{}: {} [{}]\n", t.id, t.title, t.status.as_str()));
+                let _ = writeln!(s, "{}: {} [{}]", t.id, t.title, t.status.as_str());
             }
             s
         }
@@ -146,11 +155,20 @@ pub async fn show_task(root: &Path, id: i64, format: Format) -> Result<()> {
             println!("  status: {}", task.status.as_str());
             println!("  method: {}", task.method.as_deref().unwrap_or("-"));
             println!("  subtask_index: {}", task.subtask_index);
-            println!("  parent_id: {}", task.parent_id.map_or("-".to_owned(), |p| p.to_string()));
-            println!("  precondition: {}", task.precondition.as_deref().unwrap_or("-"));
+            println!(
+                "  parent_id: {}",
+                task.parent_id.map_or("-".to_owned(), |p| p.to_string())
+            );
+            println!(
+                "  precondition: {}",
+                task.precondition.as_deref().unwrap_or("-")
+            );
         }
         Format::Json => {
-            println!("{}", serde_json::to_string_pretty(&task).context("failed to serialize task")?);
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&task).context("failed to serialize task")?
+            );
         }
     }
     Ok(())

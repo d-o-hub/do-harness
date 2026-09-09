@@ -4,9 +4,9 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 
+use crate::cli::{ErrorsAction, HookAction, TaskAction, TraceAction};
 use crate::doctor::describe_binary;
 use crate::report::Format;
-use crate::cli::{ErrorsAction, HookAction, TaskAction, TraceAction};
 use crate::{config, errors, hooks, init, task, trace};
 
 /// Dispatches audit-chain check and prints report.
@@ -47,7 +47,12 @@ const COMPLIANCE_DOC: &str = include_str!("../../../docs/compliance.md");
 
 /// Prints compliance mapping information with optional framework filtering.
 pub fn print_compliance_filtered(framework: Option<&str>, format: Format) {
-    let frameworks = vec!["OWASP Agentic Top 10", "NIST AI RMF 1.0", "EU AI Act", "SOC 2"];
+    let frameworks = vec![
+        "OWASP Agentic Top 10",
+        "NIST AI RMF 1.0",
+        "EU AI Act",
+        "SOC 2",
+    ];
     let filtered_frameworks: Vec<&str> = if let Some(fw) = framework {
         frameworks
             .into_iter()
@@ -84,17 +89,24 @@ pub fn print_version(format: Format) {
 /// Dispatches task-state actions.
 pub async fn task_cmd(root: &Path, action: TaskAction) -> Result<()> {
     match action {
-        TaskAction::Export { output, stdout, format } => {
+        TaskAction::Export {
+            output,
+            stdout,
+            format,
+        } => {
             let count = task::export_tasks(root, output.as_deref(), stdout, format).await?;
             if !stdout {
-                let target = output.map_or_else(|| PathBuf::from("plans/tasks.json"), |p| p);
+                let target = output.unwrap_or_else(|| PathBuf::from("plans/tasks.json"));
                 println!("Exported {count} task(s) to {}", target.display());
             }
             Ok(())
         }
-        TaskAction::List { status, method, parent, format } => {
-            task::list_tasks(root, format, status.as_deref(), method.as_deref(), parent).await
-        }
+        TaskAction::List {
+            status,
+            method,
+            parent,
+            format,
+        } => task::list_tasks(root, format, status.as_deref(), method.as_deref(), parent).await,
         TaskAction::Show { id, format } => task::show_task(root, id, format).await,
         TaskAction::Add {
             title,
@@ -172,7 +184,12 @@ pub async fn trace_cmd(root: &Path, action: TraceAction) -> Result<()> {
 pub async fn errors_cmd(root: &Path, action: ErrorsAction) -> Result<()> {
     match action {
         ErrorsAction::List { task, format } => errors::list(root, task, format).await,
-        ErrorsAction::Clear { sensor, task, force: _, dry_run } => {
+        ErrorsAction::Clear {
+            sensor,
+            task,
+            force: _,
+            dry_run,
+        } => {
             if dry_run {
                 println!("Dry run: would clear error signatures");
                 return Ok(());
@@ -199,10 +216,7 @@ pub fn hook(root: &Path, config_path: Option<&Path>, action: HookAction) -> Resu
         HookAction::Install { force } => {
             let cfg = config::load(root, config_path)?;
             hooks::install(&git_dir, &cfg.hooks.pre_commit, &cfg.hooks.pre_push, force)?;
-            println!(
-                "Installed managed git hooks in {}",
-                git_dir.display()
-            );
+            println!("Installed managed git hooks in {}", git_dir.display());
         }
         HookAction::Uninstall => {
             hooks::uninstall(&git_dir)?;
@@ -214,11 +228,27 @@ pub fn hook(root: &Path, config_path: Option<&Path>, action: HookAction) -> Resu
                 Format::Text => {
                     println!(
                         "pre-commit: {}  pre-push: {}  commit-msg: {}  binary: {} ({})",
-                        if status.pre_commit { "installed" } else { "absent" },
-                        if status.pre_push { "installed" } else { "absent" },
-                        if status.commit_msg { "installed" } else { "absent" },
+                        if status.pre_commit {
+                            "installed"
+                        } else {
+                            "absent"
+                        },
+                        if status.pre_push {
+                            "installed"
+                        } else {
+                            "absent"
+                        },
+                        if status.commit_msg {
+                            "installed"
+                        } else {
+                            "absent"
+                        },
                         describe_binary(&status.binary),
-                        if status.binary.present() { "present" } else { "missing" }
+                        if status.binary.present() {
+                            "present"
+                        } else {
+                            "missing"
+                        }
                     );
                 }
                 Format::Json => {

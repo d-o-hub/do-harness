@@ -253,7 +253,7 @@ json\:"Machine-readable JSON output"))' \
 ;;
 (list)
 _arguments "${_arguments_options[@]}" : \
-'--status=[Filter tasks by status (pending, in_progress, completed, failed)]:STATUS:_default' \
+'--status=[Filter tasks by status (pending, \`in_progress\`, completed, failed)]:STATUS:_default' \
 '--method=[Filter tasks by method name]:METHOD:_default' \
 '--parent=[Filter tasks by parent ID]:ID:_default' \
 '--format=[Output format]:FORMAT:((text\:"Human-readable text output"

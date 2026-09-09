@@ -188,7 +188,7 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_s
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from export" -l dry-run -d 'Dry run without side effects'
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from export" -s h -l help -d 'Print help (see more with \'--help\')'
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from export" -s V -l version -d 'Print version'
-complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from list" -l status -d 'Filter tasks by status (pending, in_progress, completed, failed)' -r
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from list" -l status -d 'Filter tasks by status (pending, `in_progress`, completed, failed)' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from list" -l method -d 'Filter tasks by method name' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from list" -l parent -d 'Filter tasks by parent ID' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from list" -l format -d 'Output format' -r -f -a "text\t'Human-readable text output'

@@ -53,6 +53,7 @@ pub enum CliError {
 
 impl CliError {
     /// The process exit code for this error class.
+    #[must_use]
     pub fn exit_code(&self) -> u8 {
         match self {
             CliError::Usage(_) => 2,
@@ -82,6 +83,7 @@ async fn main() -> ExitCode {
 }
 
 /// Dispatches the parsed CLI and classifies failures.
+#[allow(clippy::too_many_lines)]
 async fn run(cli: Cli) -> std::result::Result<(), CliError> {
     match &cli.command {
         Command::Version { format } => {
@@ -102,8 +104,10 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
             let man = clap_mangen::Man::new(cmd);
             std::fs::create_dir_all(dir).map_err(|e| CliError::Usage(e.into()))?;
             let mut buffer = Vec::new();
-            man.render(&mut buffer).map_err(|e| CliError::Usage(e.into()))?;
-            std::fs::write(dir.join("do-harness.1"), buffer).map_err(|e| CliError::Usage(e.into()))?;
+            man.render(&mut buffer)
+                .map_err(|e| CliError::Usage(e.into()))?;
+            std::fs::write(dir.join("do-harness.1"), buffer)
+                .map_err(|e| CliError::Usage(e.into()))?;
             return Ok(());
         }
         _ => {}
@@ -217,13 +221,18 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
         Command::Hook { action } => {
             commands::hook(&root, cli.config.as_deref(), action).map_err(CliError::Usage)
         }
-        Command::Doctor { format, strict } => {
-            doctor::run(&root, format, strict).await.map_err(CliError::Verify)
-        }
+        Command::Doctor { format, strict } => doctor::run(&root, format, strict)
+            .await
+            .map_err(CliError::Verify),
         Command::AuditChain { format } => commands::audit_chain_cmd(&root, format)
             .await
             .map_err(CliError::Verify),
-        Command::Metrics { format, sensor, skill, since } => metrics::run_metrics(
+        Command::Metrics {
+            format,
+            sensor,
+            skill,
+            since,
+        } => metrics::run_metrics(
             &root,
             format,
             sensor.as_deref(),

@@ -241,7 +241,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand --version 'Print version'
         }
         &'do-harness;task;list'= {
-            cand --status 'Filter tasks by status (pending, in_progress, completed, failed)'
+            cand --status 'Filter tasks by status (pending, `in_progress`, completed, failed)'
             cand --method 'Filter tasks by method name'
             cand --parent 'Filter tasks by parent ID'
             cand --format 'Output format'

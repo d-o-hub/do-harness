@@ -255,7 +255,7 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             break
         }
         'do-harness;task;list' {
-            [CompletionResult]::new('--status', '--status', [CompletionResultType]::ParameterName, 'Filter tasks by status (pending, in_progress, completed, failed)')
+            [CompletionResult]::new('--status', '--status', [CompletionResultType]::ParameterName, 'Filter tasks by status (pending, `in_progress`, completed, failed)')
             [CompletionResult]::new('--method', '--method', [CompletionResultType]::ParameterName, 'Filter tasks by method name')
             [CompletionResult]::new('--parent', '--parent', [CompletionResultType]::ParameterName, 'Filter tasks by parent ID')
             [CompletionResult]::new('--format', '--format', [CompletionResultType]::ParameterName, 'Output format')

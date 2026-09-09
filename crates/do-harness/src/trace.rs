@@ -73,7 +73,10 @@ pub async fn list_traces(root: &Path, session: &str, format: Format) -> Result<(
 pub async fn list_sessions(root: &Path, format: Format) -> Result<()> {
     let conn = do_harness_db::connect_and_migrate(root).await?;
     let mut rows = conn
-        .query("SELECT DISTINCT session_id FROM traces ORDER BY session_id", ())
+        .query(
+            "SELECT DISTINCT session_id FROM traces ORDER BY session_id",
+            (),
+        )
         .await?;
     let mut sessions = Vec::new();
     while let Some(row) = rows.next().await? {

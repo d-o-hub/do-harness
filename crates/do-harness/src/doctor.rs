@@ -12,6 +12,7 @@ use crate::report::Format;
 
 /// Runs diagnostic checks covering binary resolution, git hook status, and
 /// state-database migration skew.
+#[allow(clippy::too_many_lines)]
 pub async fn run(root: &Path, format: Format, strict: bool) -> Result<()> {
     let git_dir = hooks::find_git_dir(root)?;
     let status = hooks::status(&git_dir, root);
@@ -27,7 +28,10 @@ pub async fn run(root: &Path, format: Format, strict: bool) -> Result<()> {
     }
 
     if strict && status.binary.is_in_target_dir() {
-        failures.push(format!("binary is under target/ in strict mode: {}", bin_path.display()));
+        failures.push(format!(
+            "binary is under target/ in strict mode: {}",
+            bin_path.display()
+        ));
     }
 
     let hooks_installed = status.pre_commit && status.pre_push && status.commit_msg;
@@ -72,13 +76,22 @@ pub async fn run(root: &Path, format: Format, strict: bool) -> Result<()> {
         println!("===============");
 
         if bin_ok {
-            println!("  [OK] Binary resolution: {bin_source_desc} ({})", bin_path.display());
+            println!(
+                "  [OK] Binary resolution: {bin_source_desc} ({})",
+                bin_path.display()
+            );
         } else {
-            println!("  [FAIL] Binary resolution: {bin_source_desc} ({}) - file missing", bin_path.display());
+            println!(
+                "  [FAIL] Binary resolution: {bin_source_desc} ({}) - file missing",
+                bin_path.display()
+            );
         }
 
         if status.binary.is_in_target_dir() {
-            eprintln!("warning: resolved do-harness binary is under Cargo target/; cargo clean will remove it: {}", bin_path.display());
+            eprintln!(
+                "warning: resolved do-harness binary is under Cargo target/; cargo clean will remove it: {}",
+                bin_path.display()
+            );
         }
 
         for (name, installed) in [
