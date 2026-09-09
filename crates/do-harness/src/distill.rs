@@ -4,22 +4,10 @@ use std::path::Path;
 
 use anyhow::Result;
 
+use crate::report::Format;
+
 /// Distills a heuristic from a resolved trace into a skill.
-///
-/// Evidence guardrail: `from_trace` must point at a trace whose resolution
-/// steps were recorded via `do-harness trace add --resolution-steps`, and the
-/// skill must already exist under `root/.agents/skills/<skill>/SKILL.md`.
-/// Inserts the heuristic row and prints its id.
-///
-/// With `to_fixture`, the recovered failure permanently hardens the skill's
-/// test: the blessed pass-rate bar is raised to `best_ever - tolerance`, so a
-/// future regression below the pre-failure level fails the eval even when its
-/// current assertions stay green.
-///
-/// # Errors
-///
-/// Returns an error when evidence is missing, the skill is unknown, the trace
-/// cannot be loaded, the trace lacks resolution steps, or the insert fails.
+#[allow(clippy::too_many_arguments)]
 pub async fn distill(
     root: &Path,
     skill: &str,
@@ -27,6 +15,8 @@ pub async fn distill(
     description: Option<&str>,
     from_trace: Option<i64>,
     to_fixture: bool,
+    dry_run: bool,
+    format: Format,
 ) -> Result<()> {
     let Some(trace_id) = from_trace else {
         anyhow::bail!(
@@ -57,6 +47,12 @@ pub async fn distill(
             "distill requires evidence: no ok sensor beat recorded (run do-harness verify --record)"
         );
     }
+
+    if dry_run {
+        println!("Dry run: would distill heuristic for {skill} from trace {trace_id}: '{pattern}'");
+        return Ok(());
+    }
+
     let id = do_harness_db::insert_heuristic(
         &conn,
         &do_harness_db::NewHeuristic {
@@ -69,17 +65,27 @@ pub async fn distill(
     .await?;
     crate::skill_write::append_heuristic(root, skill, pattern, description, trace_id)?;
     crate::skill_write::ensure_skill_pointer(root, skill)?;
-    println!("Distilled heuristic {id} for {skill}; appended to references/heuristics.md");
+
+    if format == Format::Json {
+        let json = serde_json::json!({
+            "id": id,
+            "skill": skill,
+            "pattern": pattern,
+            "description": description,
+            "from_trace": trace_id,
+            "to_fixture": to_fixture
+        });
+        println!("{json}");
+    } else {
+        println!("Distilled heuristic {id} for {skill}; appended to references/heuristics.md");
+    }
+
     if to_fixture {
         raise_bar_from_recovery(&conn, skill).await?;
     }
     Ok(())
 }
 
-/// Raises the skill's bar floor after a recovered failure: the new floor is
-/// `best_ever - tolerance` (clamped to `[0, 1]`), and it never lowers an
-/// existing bar. Requires prior eval history; without any recorded run there
-/// is no honest baseline to ratchet from, so this is a no-op with a note.
 async fn raise_bar_from_recovery(conn: &do_harness_db::Connection, skill: &str) -> Result<()> {
     let best = do_harness_db::max_pass_rate(conn, skill).await?;
     match do_harness_integrity_floor(best) {
@@ -99,7 +105,6 @@ async fn raise_bar_from_recovery(conn: &do_harness_db::Connection, skill: &str) 
     Ok(())
 }
 
-/// The bar floor implied by the best-ever pass rate.
 fn do_harness_integrity_floor(best_ever: Option<f64>) -> Option<f64> {
     crate::eval_integrity::GraderHashes::bar_floor(best_ever)
 }
@@ -166,6 +171,8 @@ mod tests {
             Some("fires when clippy reports a missing lifetime"),
             Some(trace_id),
             false,
+            false,
+            Format::Text,
         )
         .await
         .unwrap();
@@ -198,6 +205,8 @@ mod tests {
             Some("applies when the borrow checker flags a missing bound"),
             Some(trace_id),
             false,
+            false,
+            Format::Text,
         )
         .await
         .unwrap();
@@ -222,12 +231,30 @@ mod tests {
         seed_ok_beat(dir.path()).await;
         let trace_id = seed_trace(dir.path(), "s1", Some("fixed lifetime")).await;
 
-        distill(dir.path(), "harness", "one", None, Some(trace_id), false)
-            .await
-            .unwrap();
-        distill(dir.path(), "harness", "two", None, Some(trace_id), false)
-            .await
-            .unwrap();
+        distill(
+            dir.path(),
+            "harness",
+            "one",
+            None,
+            Some(trace_id),
+            false,
+            false,
+            Format::Text,
+        )
+        .await
+        .unwrap();
+        distill(
+            dir.path(),
+            "harness",
+            "two",
+            None,
+            Some(trace_id),
+            false,
+            false,
+            Format::Text,
+        )
+        .await
+        .unwrap();
 
         let skill_md = fs::read_to_string(
             dir.path()
@@ -251,9 +278,18 @@ mod tests {
         write_skill_md(dir.path(), "harness");
         let trace_id = seed_trace(dir.path(), "s1", Some("fixed lifetime")).await;
 
-        let err = distill(dir.path(), "harness", "p", None, Some(trace_id), false)
-            .await
-            .unwrap_err();
+        let err = distill(
+            dir.path(),
+            "harness",
+            "p",
+            None,
+            Some(trace_id),
+            false,
+            false,
+            Format::Text,
+        )
+        .await
+        .unwrap_err();
         assert_eq!(
             err.to_string(),
             "distill requires evidence: no ok sensor beat recorded (run do-harness verify --record)"
@@ -263,9 +299,18 @@ mod tests {
     #[tokio::test(flavor = "current_thread")]
     async fn distill_refuses_without_from_trace() {
         let dir = tempfile::tempdir().unwrap();
-        let err = distill(dir.path(), "harness", "p", None, None, false)
-            .await
-            .unwrap_err();
+        let err = distill(
+            dir.path(),
+            "harness",
+            "p",
+            None,
+            None,
+            false,
+            false,
+            Format::Text,
+        )
+        .await
+        .unwrap_err();
         assert_eq!(
             err.to_string(),
             "distill requires evidence: pass --from-trace <id> of a resolved trace (see do-harness trace add)"
@@ -275,9 +320,18 @@ mod tests {
     #[tokio::test(flavor = "current_thread")]
     async fn distill_refuses_unknown_skill() {
         let dir = tempfile::tempdir().unwrap();
-        let err = distill(dir.path(), "nope", "p", None, Some(1), false)
-            .await
-            .unwrap_err();
+        let err = distill(
+            dir.path(),
+            "nope",
+            "p",
+            None,
+            Some(1),
+            false,
+            false,
+            Format::Text,
+        )
+        .await
+        .unwrap_err();
         assert_eq!(
             err.to_string(),
             "unknown skill 'nope': no SKILL.md under .agents/skills"
@@ -288,9 +342,18 @@ mod tests {
     async fn distill_refuses_missing_trace() {
         let dir = tempfile::tempdir().unwrap();
         write_skill_md(dir.path(), "harness");
-        let err = distill(dir.path(), "harness", "p", None, Some(999), false)
-            .await
-            .unwrap_err();
+        let err = distill(
+            dir.path(),
+            "harness",
+            "p",
+            None,
+            Some(999),
+            false,
+            false,
+            Format::Text,
+        )
+        .await
+        .unwrap_err();
         assert_eq!(err.to_string(), "trace 999 not found");
     }
 
@@ -300,9 +363,18 @@ mod tests {
         write_skill_md(dir.path(), "harness");
         let trace_id = seed_trace(dir.path(), "s1", None).await;
 
-        let err = distill(dir.path(), "harness", "p", None, Some(trace_id), false)
-            .await
-            .unwrap_err();
+        let err = distill(
+            dir.path(),
+            "harness",
+            "p",
+            None,
+            Some(trace_id),
+            false,
+            false,
+            Format::Text,
+        )
+        .await
+        .unwrap_err();
         assert_eq!(
             err.to_string(),
             format!(
@@ -317,9 +389,18 @@ mod tests {
         write_skill_md(dir.path(), "harness");
         let trace_id = seed_trace(dir.path(), "s1", Some("")).await;
 
-        let err = distill(dir.path(), "harness", "p", None, Some(trace_id), false)
-            .await
-            .unwrap_err();
+        let err = distill(
+            dir.path(),
+            "harness",
+            "p",
+            None,
+            Some(trace_id),
+            false,
+            false,
+            Format::Text,
+        )
+        .await
+        .unwrap_err();
         assert_eq!(
             err.to_string(),
             format!(

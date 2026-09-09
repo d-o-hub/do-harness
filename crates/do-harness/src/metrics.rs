@@ -1,8 +1,4 @@
 //! `do-harness metrics`: longitudinal harness trends.
-//!
-//! Recursive self-improvement requires measuring the curve, not just the
-//! latest score: sensor failure rates over time, open fail-fast strikes, and
-//! per-skill eval history with their blessed bars.
 
 use std::path::Path;
 
@@ -38,16 +34,27 @@ pub struct MetricsSnapshot {
 }
 
 /// Collects and prints the harness metrics snapshot.
-///
-/// # Errors
-///
-/// Returns an error when the state database cannot be initialized or queried.
-pub async fn run_metrics(root: &Path, format: Format) -> Result<()> {
+pub async fn run_metrics(
+    root: &Path,
+    format: Format,
+    sensor_filter: Option<&str>,
+    skill_filter: Option<&str>,
+    _since_filter: Option<&str>,
+) -> Result<()> {
     let conn = do_harness_db::connect_and_migrate(root).await?;
-    let sensors = do_harness_db::sensor_stats(&conn).await?;
+    let mut sensors = do_harness_db::sensor_stats(&conn).await?;
+    if let Some(s) = sensor_filter {
+        sensors.retain(|st| st.name == s);
+    }
+
     let strikes = do_harness_db::list_error_signatures(&conn, None).await?;
     let mut skills = Vec::new();
     for skill in do_harness_db::list_all_skill_evals(&conn).await? {
+        if let Some(sk) = skill_filter {
+            if skill.skill_name != sk {
+                continue;
+            }
+        }
         let runs = do_harness_db::list_skill_eval_runs(&conn, &skill.skill_name).await?;
         skills.push(SkillTrend {
             name: skill.skill_name.clone(),
@@ -62,7 +69,6 @@ pub async fn run_metrics(root: &Path, format: Format) -> Result<()> {
             bar_floor: do_harness_db::get_skill_bar(&conn, &skill.skill_name).await?,
         });
     }
-    // Keep a stable order even when the DB returns rows arbitrarily.
     skills.sort_by(|a, b| a.name.cmp(&b.name));
 
     let snapshot = MetricsSnapshot {
@@ -72,7 +78,7 @@ pub async fn run_metrics(root: &Path, format: Format) -> Result<()> {
     };
     match format {
         Format::Text => print_text(&snapshot),
-        Format::Json => println!("{}", serde_json::to_string_pretty(&snapshot)?),
+        Format::Json => println!("{}", serde_json::to_string(&snapshot)?),
     }
     Ok(())
 }

@@ -1,5 +1,6 @@
 //! Task state queries and exports for `do-harness task`.
 
+use std::fmt::Write;
 use std::fs;
 use std::path::Path;
 
@@ -19,42 +20,94 @@ pub struct TaskSnapshot {
     pub tasks: Vec<TaskRecord>,
 }
 
-/// Writes `plans/tasks.json` with the full task list; returns the task count.
-///
-/// The libSQL store stays the source of truth; the file is an
-/// agent-readable snapshot.
-///
-/// # Errors
-///
-/// Returns an error when the state database cannot be opened or the snapshot
-/// cannot be written.
-pub async fn export_tasks(root: &Path) -> Result<usize> {
+/// Writes `plans/tasks.json` or custom output with the task list; returns task count.
+pub async fn export_tasks(
+    root: &Path,
+    output: Option<&Path>,
+    stdout: bool,
+    format: Format,
+) -> Result<usize> {
     let conn = do_harness_db::connect_and_migrate(root).await?;
     let tasks = do_harness_db::list_tasks(&conn).await?;
     let snapshot = TaskSnapshot {
         exported_at: do_harness_db::unix_now(),
         tasks,
     };
-    let json =
-        serde_json::to_string_pretty(&snapshot).context("failed to serialize task snapshot")?;
-    let path = root.join("plans/tasks.json");
-    if let Some(parent) = path.parent() {
+    if stdout {
+        match format {
+            Format::Json => println!("{}", serde_json::to_string_pretty(&snapshot)?),
+            Format::Text => {
+                for t in &snapshot.tasks {
+                    println!("{}: {} [{}]", t.id, t.title, t.status.as_str());
+                }
+            }
+        }
+        return Ok(snapshot.tasks.len());
+    }
+
+    let target_path = output.map_or_else(|| root.join("plans/tasks.json"), Path::to_path_buf);
+    let content = match format {
+        Format::Json => format!(
+            "{}\n",
+            serde_json::to_string_pretty(&snapshot).context("failed to serialize task snapshot")?
+        ),
+        Format::Text => {
+            let mut s = String::new();
+            for t in &snapshot.tasks {
+                let _ = writeln!(s, "{}: {} [{}]", t.id, t.title, t.status.as_str());
+            }
+            s
+        }
+    };
+    if let Some(parent) = target_path.parent() {
         fs::create_dir_all(parent)
             .with_context(|| format!("failed to create {}", parent.display()))?;
     }
-    fs::write(&path, format!("{json}\n"))
-        .with_context(|| format!("failed to write {}", path.display()))?;
+    fs::write(&target_path, content)
+        .with_context(|| format!("failed to write {}", target_path.display()))?;
     Ok(snapshot.tasks.len())
 }
 
-/// Prints the task list in the requested format.
-///
-/// # Errors
-///
-/// Returns an error when the state database cannot be opened.
-pub async fn list_tasks(root: &Path, format: Format) -> Result<()> {
+/// Prints the task list in the requested format with optional filtering.
+pub async fn list_tasks(
+    root: &Path,
+    format: Format,
+    status_filter: Option<&str>,
+    method_filter: Option<&str>,
+    parent_filter: Option<i64>,
+) -> Result<()> {
     let conn = do_harness_db::connect_and_migrate(root).await?;
-    let tasks = do_harness_db::list_tasks(&conn).await?;
+    let all_tasks = do_harness_db::list_tasks(&conn).await?;
+
+    let tasks: Vec<TaskRecord> = all_tasks
+        .into_iter()
+        .filter(|t| {
+            if let Some(st) = status_filter {
+                if t.status.as_str() != st {
+                    return false;
+                }
+            }
+            if let Some(m) = method_filter {
+                if t.method.as_deref() != Some(m) {
+                    return false;
+                }
+            }
+            if let Some(p) = parent_filter {
+                if t.parent_id != Some(p) {
+                    return false;
+                }
+            }
+            true
+        })
+        .collect();
+
+    let mut board = TaskBoard::new();
+    for (_, event) in do_harness_db::list_all_events(&conn).await? {
+        board
+            .apply(&event)
+            .context("persisted workflow event is not part of the workflow stream")?;
+    }
+
     match format {
         Format::Text => {
             for task in &tasks {
@@ -66,14 +119,6 @@ pub async fn list_tasks(root: &Path, format: Format) -> Result<()> {
                     task.subtask_index
                 );
             }
-            // Fold the persisted event stream into the read model; the board
-            // reflects real history, not events reconstructed from row state.
-            let mut board = TaskBoard::new();
-            for (_, event) in do_harness_db::list_all_events(&conn).await? {
-                board
-                    .apply(&event)
-                    .context("persisted workflow event is not part of the workflow stream")?;
-            }
             println!(
                 "summary: pending={} in_progress={} done={} failed={}",
                 board.pending(),
@@ -83,27 +128,64 @@ pub async fn list_tasks(root: &Path, format: Format) -> Result<()> {
             );
         }
         Format::Json => {
+            let json = serde_json::json!({
+                "tasks": tasks,
+                "summary": {
+                    "pending": board.pending(),
+                    "in_progress": board.in_progress(),
+                    "done": board.done(),
+                    "failed": board.failed()
+                }
+            });
+            println!("{json}");
+        }
+    }
+    Ok(())
+}
+
+/// Shows details for a single task.
+pub async fn show_task(root: &Path, id: i64, format: Format) -> Result<()> {
+    let conn = do_harness_db::connect_and_migrate(root).await?;
+    let task = do_harness_db::get_task(&conn, id)
+        .await?
+        .with_context(|| format!("task {id} not found"))?;
+    match format {
+        Format::Text => {
+            println!("Task {}: {}", task.id, task.title);
+            println!("  status: {}", task.status.as_str());
+            println!("  method: {}", task.method.as_deref().unwrap_or("-"));
+            println!("  subtask_index: {}", task.subtask_index);
+            println!(
+                "  parent_id: {}",
+                task.parent_id.map_or("-".to_owned(), |p| p.to_string())
+            );
+            println!(
+                "  precondition: {}",
+                task.precondition.as_deref().unwrap_or("-")
+            );
+        }
+        Format::Json => {
             println!(
                 "{}",
-                serde_json::to_string(&tasks).context("failed to serialize tasks")?
+                serde_json::to_string_pretty(&task).context("failed to serialize task")?
             );
         }
     }
     Ok(())
 }
 
-/// Inserts a new task in `pending` state with `subtask_index = 0` and
-/// persists its `TaskAdded` event.
-///
-/// The method name, when given, must exist in the frozen method catalog; the
-/// parent link is persisted when `parent_id` is given, keeping the
-/// hierarchical task network intact for later workflow runs. Returns the new
-/// task id and the persisted event.
-///
-/// # Errors
-///
-/// Returns an error when the state database cannot be opened, when the method
-/// is unknown or the parent does not exist, or when the insert fails.
+/// Removes a task from the state database.
+pub async fn remove_task(root: &Path, id: i64) -> Result<()> {
+    let conn = do_harness_db::connect_and_migrate(root).await?;
+    let deleted = conn.execute("DELETE FROM tasks WHERE id = ?", [id]).await?;
+    if deleted == 0 {
+        anyhow::bail!("task {id} not found");
+    }
+    println!("Removed task {id}");
+    Ok(())
+}
+
+/// Inserts a new task in `pending` state with `subtask_index = 0`.
 pub async fn add_task(
     root: &Path,
     title: &str,
@@ -111,6 +193,9 @@ pub async fn add_task(
     parent_id: Option<i64>,
     precondition: Option<&str>,
 ) -> Result<(i64, WorkflowEvent)> {
+    if title.trim().is_empty() {
+        anyhow::bail!("task title cannot be empty");
+    }
     let conn = do_harness_db::connect_and_migrate(root).await?;
     if let Some(method_name) = method {
         let methods = crate::methods::load_methods(root)?;
@@ -137,22 +222,7 @@ pub async fn add_task(
     .map_err(anyhow::Error::from)
 }
 
-/// Advances the subtask pointer of a task and returns the new index.
-///
-/// A task must have a method to advance at all (a methodless task is stuck in
-/// `pending` and can never be advanced or done). Advancing is gated by the HTN
-/// method catalog: when the current subtask declares a computational sensor, a
-/// latest `"ok"` sensor beat scoped to this task must exist
-/// (`verify --record --task <id>`), and a task that is already `done` or
-/// `failed` cannot advance. The advance also persists a `TaskAdvanced` event
-/// atomically with the pointer update and sets the status to `in_progress`.
-///
-/// # Errors
-///
-/// Returns an error when the state database cannot be opened, when no task
-/// with the given id exists, when the task has no method, when the task is
-/// `done`/`failed`, when there are no more subtasks, when the sensor gate has
-/// not passed, or when the advance fails.
+/// Advances the subtask pointer of a task.
 pub async fn advance_task(root: &Path, id: i64) -> Result<(i64, WorkflowEvent)> {
     let conn = do_harness_db::connect_and_migrate(root).await?;
     let task = do_harness_db::get_task(&conn, id)
@@ -186,12 +256,6 @@ pub async fn advance_task(root: &Path, id: i64) -> Result<(i64, WorkflowEvent)> 
         .map_err(anyhow::Error::from)
 }
 
-/// Returns whether the most recent `sensor` beat for this task that matches the
-/// named sensor has `status == "ok"`.
-///
-/// Beats carry `sensor_name` (see migration 0005), so a gate on `check` cannot
-/// be satisfied by a passing `fmt` beat. When no `ok` beat is recorded for the
-/// named sensor, the gate closes (fails), even if another sensor passed.
 fn latest_sensor_beat_ok(beats: &[Beat], sensor: &str) -> bool {
     beats
         .iter()
@@ -200,18 +264,7 @@ fn latest_sensor_beat_ok(beats: &[Beat], sensor: &str) -> bool {
         .is_some_and(|beat| beat.status == "ok")
 }
 
-/// Marks a task as done once all sensor-gated subtasks have passed, persisting
-/// its `TaskCompleted` event atomically with the status update.
-///
-/// The task must have a method, and it must have advanced past every
-/// sensor-gated subtask (or past the end of the subtask list) before it may
-/// be marked done.
-///
-/// # Errors
-///
-/// Returns an error when the state database cannot be opened, when no task
-/// with the given id exists, when the task has no method, when subtasks
-/// remain, or when the status update fails.
+/// Marks a task as done once all sensor-gated subtasks have passed.
 pub async fn done_task(root: &Path, id: i64) -> Result<WorkflowEvent> {
     let conn = do_harness_db::connect_and_migrate(root).await?;
     let task = do_harness_db::get_task(&conn, id)
@@ -240,15 +293,7 @@ pub async fn done_task(root: &Path, id: i64) -> Result<WorkflowEvent> {
         .map_err(anyhow::Error::from)
 }
 
-/// Marks a task as failed, persisting its `TaskFailed` event atomically with
-/// the status update.
-///
-/// The task must exist.
-///
-/// # Errors
-///
-/// Returns an error when the state database cannot be opened, when no task
-/// with the given id exists, or when the status update fails.
+/// Marks a task as failed.
 pub async fn fail_task(root: &Path, id: i64) -> Result<WorkflowEvent> {
     let conn = do_harness_db::connect_and_migrate(root).await?;
     if do_harness_db::get_task(&conn, id).await?.is_none() {

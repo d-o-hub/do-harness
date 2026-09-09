@@ -22,11 +22,6 @@ pub struct TraceOpts<'a> {
 }
 
 /// Inserts a trace and returns its id.
-///
-/// # Errors
-///
-/// Returns an error when the state database cannot be opened or the insert
-/// fails.
 pub async fn add_trace(root: &Path, opts: &TraceOpts<'_>) -> Result<i64> {
     let conn = do_harness_db::connect_and_migrate(root).await?;
     let id = do_harness_db::insert_trace(
@@ -44,11 +39,6 @@ pub async fn add_trace(root: &Path, opts: &TraceOpts<'_>) -> Result<i64> {
 }
 
 /// Prints the traces of a session in the requested format.
-///
-/// # Errors
-///
-/// Returns an error when the state database cannot be opened, the listing
-/// fails, or the traces cannot be serialized.
 pub async fn list_traces(root: &Path, session: &str, format: Format) -> Result<()> {
     let conn = do_harness_db::connect_and_migrate(root).await?;
     let traces = do_harness_db::list_traces(&conn, session).await?;
@@ -61,12 +51,48 @@ pub async fn list_traces(root: &Path, session: &str, format: Format) -> Result<(
                     None => "-".to_owned(),
                 };
                 println!("{}: {command} session={session} task={task}", trace.id);
+                if let Some(diff) = &trace.error_diff {
+                    println!("    error_diff: {diff}");
+                }
+                if let Some(steps) = &trace.resolution_steps {
+                    println!("    resolution_steps: {steps}");
+                }
             }
         }
         Format::Json => {
             println!(
                 "{}",
                 serde_json::to_string(&traces).context("failed to serialize traces")?
+            );
+        }
+    }
+    Ok(())
+}
+
+/// Lists distinct trace sessions in the requested format.
+pub async fn list_sessions(root: &Path, format: Format) -> Result<()> {
+    let conn = do_harness_db::connect_and_migrate(root).await?;
+    let mut rows = conn
+        .query(
+            "SELECT DISTINCT session_id FROM traces ORDER BY session_id",
+            (),
+        )
+        .await?;
+    let mut sessions = Vec::new();
+    while let Some(row) = rows.next().await? {
+        let s: String = row.get(0)?;
+        sessions.push(s);
+    }
+    match format {
+        Format::Text => {
+            for session in &sessions {
+                println!("{session}");
+            }
+        }
+        Format::Json => {
+            println!(
+                "{}",
+                serde_json::to_string(&sessions).context("failed to serialize sessions")?
             );
         }
     }

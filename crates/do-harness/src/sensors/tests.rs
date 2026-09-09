@@ -35,6 +35,7 @@ fn failing_sensor_fails_report() {
         &VerifyOpts {
             fail_fast: false,
             only: vec![],
+            exclude: vec![],
             blocked: vec![],
         },
     )
@@ -58,6 +59,7 @@ fn only_filter_runs_subset() {
         &VerifyOpts {
             fail_fast: false,
             only: vec!["pass".to_owned()],
+            exclude: vec![],
             blocked: vec![],
         },
     )
@@ -78,6 +80,7 @@ fn unknown_only_name_errors() {
         &VerifyOpts {
             fail_fast: false,
             only: vec!["nope".to_owned()],
+            exclude: vec![],
             blocked: vec![],
         },
     )
@@ -97,6 +100,7 @@ fn fail_fast_stops_at_first_failure() {
         &VerifyOpts {
             fail_fast: true,
             only: vec![],
+            exclude: vec![],
             blocked: vec![],
         },
     )
@@ -125,6 +129,7 @@ fn verify_with_no_effective_sensors_succeeds() {
         &VerifyOpts {
             fail_fast: false,
             only: vec![],
+            exclude: vec![],
             blocked: vec![],
         },
     )
@@ -145,6 +150,7 @@ fn blocked_sensor_is_not_executed() {
         &VerifyOpts {
             fail_fast: false,
             only: vec![],
+            exclude: vec![],
             blocked: vec!["mark".to_owned()],
         },
     )
@@ -167,6 +173,7 @@ fn blocked_sensor_counts_as_failed() {
         &VerifyOpts {
             fail_fast: false,
             only: vec![],
+            exclude: vec![],
             blocked: vec!["halt".to_owned()],
         },
     )
@@ -189,6 +196,7 @@ fn fail_fast_stops_at_first_blocked_sensor() {
         &VerifyOpts {
             fail_fast: true,
             only: vec![],
+            exclude: vec![],
             blocked: vec!["halt".to_owned()],
         },
     )
@@ -229,6 +237,7 @@ fn retries_failing_sensor_until_success() {
         &VerifyOpts {
             fail_fast: false,
             only: vec![],
+            exclude: vec![],
             blocked: vec![],
         },
     )
@@ -269,6 +278,7 @@ fn times_out_hanging_sensor() {
         &VerifyOpts {
             fail_fast: false,
             only: vec![],
+            exclude: vec![],
             blocked: vec![],
         },
     )
@@ -309,6 +319,7 @@ fn allow_failure_sensor_does_not_fail_gate_but_surfaces_output() {
         &VerifyOpts {
             fail_fast: false,
             only: vec![],
+            exclude: vec![],
             blocked: vec![],
         },
     )
@@ -350,6 +361,7 @@ fn transient_exit_codes_restricts_retries() {
         &VerifyOpts {
             fail_fast: false,
             only: vec![],
+            exclude: vec![],
             blocked: vec![],
         },
     )

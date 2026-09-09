@@ -1,10 +1,5 @@
 //! `doctor` subcommand: binary resolution, git hook health, and state-database
 //! migration skew.
-//!
-//! Advisory findings (absent hooks, uninitialized database) print warnings;
-//! required-check failures (binary missing, database newer than this binary)
-//! make doctor exit non-zero with every reason carried in the error so CI and
-//! other non-interactive callers can classify the failure.
 
 use std::path::Path;
 
@@ -13,101 +8,142 @@ use anyhow::Result;
 use crate::dbcheck;
 use crate::hook_script::BinSource;
 use crate::hooks;
+use crate::report::Format;
 
 /// Runs diagnostic checks covering binary resolution, git hook status, and
 /// state-database migration skew.
-///
-/// # Errors
-///
-/// Returns an error listing every failed required check, or when git repo
-/// discovery fails.
-pub async fn run(root: &Path) -> Result<()> {
+#[allow(clippy::too_many_lines)]
+pub async fn run(root: &Path, format: Format, strict: bool) -> Result<()> {
     let git_dir = hooks::find_git_dir(root)?;
     let status = hooks::status(&git_dir, root);
 
     let mut failures: Vec<String> = Vec::new();
 
-    println!("Doctor Summary:");
-    println!("===============");
-
-    // 1. Binary Resolution Check
     let bin_path = status.binary.path();
     let bin_source_desc = describe_binary(&status.binary);
-    if status.binary.present() {
-        println!(
-            "  [OK] Binary resolution: {bin_source_desc} ({})",
-            bin_path.display()
-        );
-    } else {
-        println!(
-            "  [FAIL] Binary resolution: {bin_source_desc} ({}) - file missing",
-            bin_path.display()
-        );
+    let bin_ok = status.binary.present();
+
+    if !bin_ok {
         failures.push(format!("binary missing at {}", bin_path.display()));
     }
 
-    // Target directory warning (not a failure condition)
-    if status.binary.is_in_target_dir() {
-        eprintln!(
-            "warning: resolved do-harness binary is under Cargo target/; cargo clean will remove it: {}",
+    if strict && status.binary.is_in_target_dir() {
+        failures.push(format!(
+            "binary is under target/ in strict mode: {}",
             bin_path.display()
-        );
+        ));
     }
 
-    // 2. Git Hooks Check (absence is advisory; install via `hook install`)
-    for (name, installed) in [
-        ("pre-commit", status.pre_commit),
-        ("pre-push", status.pre_push),
-        ("commit-msg", status.commit_msg),
-    ] {
-        println!(
-            "  [{}] {name} hook: {}",
-            if installed { "OK" } else { "WARN" },
-            if installed { "installed" } else { "absent" }
-        );
+    let hooks_installed = status.pre_commit && status.pre_push && status.commit_msg;
+    if strict && !hooks_installed {
+        failures.push("one or more managed git hooks absent in strict mode".to_owned());
     }
 
-    // 3. State Database Skew Check
-    match dbcheck::probe(root).await {
-        Ok(health) => {
-            let (mark, line) = health.render();
-            println!("  [{mark}] state database: {line}");
-            if health.is_blocking() {
-                failures.push(line);
-            }
-        }
-        Err(err) => {
-            println!("  [FAIL] state database: unreadable ({err:#})");
-            failures.push(format!("state database unreadable: {err:#}"));
+    let db_res = dbcheck::probe(root).await;
+    let db_ok = match &db_res {
+        Ok(health) => !health.is_blocking(),
+        Err(_) => false,
+    };
+    if let Err(e) = &db_res {
+        failures.push(format!("state database unreadable: {e:#}"));
+    } else if let Ok(health) = &db_res {
+        if health.is_blocking() {
+            let (_, line) = health.render();
+            failures.push(line);
         }
     }
 
-    // 4. Workflow Event Hash Chain Integrity Check (informational)
-    if do_harness_db::db_path(root).exists() {
-        match crate::audit::audit_chain(root).await {
-            Ok(report) => match report {
-                crate::audit::ChainReport::Intact { count } => {
-                    println!("  [OK] event chain: intact ({count} event(s))");
-                }
-                crate::audit::ChainReport::Tampered { seq } => {
-                    println!("  [WARN] event chain: tampered at seq {seq}");
-                }
+    if format == Format::Json {
+        let json = serde_json::json!({
+            "ok": failures.is_empty(),
+            "binary": {
+                "present": bin_ok,
+                "source": bin_source_desc,
+                "path": bin_path.display().to_string(),
+                "in_target_dir": status.binary.is_in_target_dir()
             },
-            Err(err) => {
-                println!("  [WARN] event chain: unreadable ({err:#})");
+            "hooks": {
+                "pre_commit": status.pre_commit,
+                "pre_push": status.pre_push,
+                "commit_msg": status.commit_msg,
+            },
+            "database_ok": db_ok,
+            "failures": failures
+        });
+        println!("{json}");
+    } else {
+        println!("Doctor Summary:");
+        println!("===============");
+
+        if bin_ok {
+            println!(
+                "  [OK] Binary resolution: {bin_source_desc} ({})",
+                bin_path.display()
+            );
+        } else {
+            println!(
+                "  [FAIL] Binary resolution: {bin_source_desc} ({}) - file missing",
+                bin_path.display()
+            );
+        }
+
+        if status.binary.is_in_target_dir() {
+            eprintln!(
+                "warning: resolved do-harness binary is under Cargo target/; cargo clean will remove it: {}",
+                bin_path.display()
+            );
+        }
+
+        for (name, installed) in [
+            ("pre-commit", status.pre_commit),
+            ("pre-push", status.pre_push),
+            ("commit-msg", status.commit_msg),
+        ] {
+            println!(
+                "  [{}] {name} hook: {}",
+                if installed { "OK" } else { "WARN" },
+                if installed { "installed" } else { "absent" }
+            );
+        }
+
+        match &db_res {
+            Ok(health) => {
+                let (mark, line) = health.render();
+                println!("  [{mark}] state database: {line}");
             }
+            Err(err) => {
+                println!("  [FAIL] state database: unreadable ({err:#})");
+            }
+        }
+
+        if do_harness_db::db_path(root).exists() {
+            match crate::audit::audit_chain(root).await {
+                Ok(report) => match report {
+                    crate::audit::ChainReport::Intact { count } => {
+                        println!("  [OK] event chain: intact ({count} event(s))");
+                    }
+                    crate::audit::ChainReport::Tampered { seq } => {
+                        println!("  [WARN] event chain: tampered at seq {seq}");
+                    }
+                },
+                Err(err) => {
+                    println!("  [WARN] event chain: unreadable ({err:#})");
+                }
+            }
+        }
+
+        if failures.is_empty() {
+            println!("\nDoctor checks passed.");
         }
     }
 
     if failures.is_empty() {
-        println!("\nDoctor checks passed.");
         Ok(())
     } else {
         anyhow::bail!("doctor check failed: {}", failures.join("; "))
     }
 }
 
-/// Describes where the `do-harness` binary resolves from.
 pub(crate) fn describe_binary(source: &BinSource) -> String {
     match source {
         BinSource::Env(path) => format!("env:{}", path.display()),
@@ -132,7 +168,6 @@ mod tests {
         (temp, root)
     }
 
-    /// Stubs a target/release/do-harness so the binary-resolution check passes.
     fn stub_binary(root: &Path) {
         let bin_path = root.join("target/release/do-harness");
         fs::create_dir_all(bin_path.parent().unwrap()).unwrap();
@@ -143,7 +178,7 @@ mod tests {
     async fn fails_when_binary_missing_and_names_the_reason() {
         let (_temp, root) = fake_repo_with_git();
 
-        let result = run(&root).await;
+        let result = run(&root, Format::Text, false).await;
 
         let message = result.unwrap_err().to_string();
         assert!(message.contains("doctor check failed"));
@@ -155,12 +190,9 @@ mod tests {
         let (_temp, root) = fake_repo_with_git();
         stub_binary(&root);
 
-        assert!(run(&root).await.is_ok());
+        assert!(run(&root, Format::Text, false).await.is_ok());
     }
 
-    /// A database written by a newer harness is a required-check failure: the
-    /// binary cannot persist anything until it is rebuilt, and the error must
-    /// say so explicitly.
     #[tokio::test(flavor = "current_thread")]
     async fn fails_when_state_database_is_future() {
         let (_temp, root) = fake_repo_with_git();
@@ -174,7 +206,7 @@ mod tests {
         .unwrap();
         drop(conn);
 
-        let result = run(&root).await;
+        let result = run(&root, Format::Text, false).await;
 
         let message = result.unwrap_err().to_string();
         assert!(message.contains("doctor check failed"));
