@@ -24,6 +24,12 @@ axum = { version = "0.7" }
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 tower = { version = "0.5" }
 http-body-util = "0.1"
+# Exact pin (exemption from the caret-range policy in AGENTS.md): the
+# agent-governance toolkit is pre-GA (Public Preview, max_stable 3.2.2), so
+# floating it risks silent API drift. Update with
+# `cargo update -p agent-governance --precise <ver>` and re-run
+# `cargo deny check` + `cargo audit`; see plans/agt-governance-epic.md
+# (chore-agt-promotion gate) before removing the pin.
 agent-governance = "=3.2.2"
 
 # Dev-profile tuning lives here (Cargo only honors [profile.*] in manifests,
