@@ -23,7 +23,7 @@ tempfile.workspace = true
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "net", "sync"] }
 toml.workspace = true
 tower.workspace = true
-agent-governance = { version = "3", optional = true }
+agent-governance = { workspace = true, optional = true }
 serde_yaml = { version = "0.9", optional = true }
 
 [features]

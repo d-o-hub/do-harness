@@ -24,6 +24,7 @@ axum = { version = "0.7" }
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 tower = { version = "0.5" }
 http-body-util = "0.1"
+agent-governance = "=3.2.2"
 
 # Dev-profile tuning lives here (Cargo only honors [profile.*] in manifests,
 # never in .cargo/config.toml).
