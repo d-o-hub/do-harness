@@ -58,8 +58,11 @@ jobs:
         run: cargo test -p guardian-proxy
       - name: Run sensors
         env:
-          # check-audit.sh fails closed when CI=true; cargo-audit is installed above.
+          # check-audit.sh / check-deps.sh fail closed when CI=true;
+          # cargo-audit and cargo-deny are installed above.
           CI: "true"
+          # Belt and braces: missing tools fail even if CI=true is dropped.
+          DO_HARNESS_REQUIRE_TOOLS: "1"
         run: ./target/release/do-harness verify --format json --evidence .do-harness/evidence.json --strict
       - name: Lint full PR commit range
         # The commitlint sensor only checks COUNT=1 locally; PRs must lint
