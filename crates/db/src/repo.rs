@@ -93,15 +93,22 @@ pub async fn list_tasks(conn: &Connection) -> Result<Vec<TaskRecord>> {
 
 /// Updates a task's lifecycle state.
 ///
+/// The update reports the row back via `RETURNING`, so a missing task id is
+/// reported directly instead of silently updating zero rows.
+///
 /// # Errors
 ///
-/// Returns an error when the update statement fails.
+/// Returns an error when the update statement fails or the task does not exist.
 pub async fn update_task_status(conn: &Connection, id: i64, status: TaskState) -> Result<()> {
-    conn.execute(
-        "UPDATE tasks SET status = ?1, updated_at = ?2 WHERE id = ?3",
-        params!(status.as_str(), unix_now(), id),
-    )
-    .await?;
+    let mut rows = conn
+        .query(
+            "UPDATE tasks SET status = ?1, updated_at = ?2 WHERE id = ?3 RETURNING id",
+            params!(status.as_str(), unix_now(), id),
+        )
+        .await?;
+    rows.next()
+        .await?
+        .ok_or_else(|| DbError::NotFound(format!("task {id} not found")))?;
     Ok(())
 }
 
@@ -246,6 +253,19 @@ mod tests {
             get_task(&conn, id).await.unwrap().unwrap().status,
             TaskState::Failed
         );
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn update_task_status_reports_missing_task_as_not_found() {
+        let dir = tempfile::tempdir().unwrap();
+        let conn = crate::migrate::connect_and_migrate(dir.path())
+            .await
+            .unwrap();
+
+        let err = update_task_status(&conn, 999, TaskState::Failed)
+            .await
+            .unwrap_err();
+        assert!(matches!(err, crate::error::DbError::NotFound(_)));
     }
 
     #[tokio::test(flavor = "current_thread")]
