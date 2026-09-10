@@ -61,11 +61,16 @@ jobs:
           # check-audit.sh fails closed when CI=true; cargo-audit is installed above.
           CI: "true"
         run: ./target/release/do-harness verify --format json --evidence .do-harness/evidence.json --strict
+      - name: Lint full PR commit range
+        # The commitlint sensor only checks COUNT=1 locally; PRs must lint
+        # every non-merge commit (fetch-depth: 0 makes both SHAs available).
+        if: github.event_name == 'pull_request'
+        run: bash scripts/check-commitlint.sh --range "${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }}"
       - name: Dogfood greenfield rust init + verify
         run: |
           tmp="$(mktemp -d)"
           ./target/release/do-harness --root "$tmp" init
-          ./target/release/do-harness --root "$tmp" verify --format json
+          ./target/release/do-harness --root "$tmp" verify --format json --strict
       - name: Dogfood generic init (vacuous verify, documented)
         run: |
           tmp="$(mktemp -d)"
