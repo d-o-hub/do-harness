@@ -37,6 +37,8 @@ jobs:
       - uses: taiki-e/install-action@ba47c86ac325773530516bb756137ac718732518
         with:
           tool: cargo-deny,cargo-audit
+      # Pin maintenance note: agent-governance is pinned to =3.2.2 in workspace dependencies
+      # until GA. Use `cargo update -p agent-governance --precise <ver>` for updates.
       - name: Lint shell sensors
         run: shellcheck scripts/*.sh crates/do-harness/templates/scripts/*.sh
       - name: Build harness CLI

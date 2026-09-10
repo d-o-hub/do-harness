@@ -6,13 +6,34 @@
 #   direction rules).
 
 [advisories]
+# Note: cargo-deny unconditionally denies vulnerabilities. `unsound` and `unmaintained`
+# scope options are "all" | "workspace" | "transitive" | "none".
+unsound = "all"
+unmaintained = "transitive"
 yanked = "deny"
 
 [bans]
-multiple-versions = "warn"
+multiple-versions = "deny"
 wildcards = "deny"
 deny = []
-skip = []
+skip = [
+  # getrandom v0.2 vs v0.4: reqwest/ring via guardian-proxy relies on getrandom 0.2,
+  # tempfile relies on getrandom 0.4.
+  { crate = "getrandom@0.2.17", reason = "ring / rustls dependency via reqwest requires getrandom 0.2, while tempfile uses getrandom 0.4" },
+  # rustix v0.38 vs v1.1: bindgen / libsql-ffi requires rustix 0.38, tempfile requires rustix 1.1.
+  { crate = "rustix@0.38.44", reason = "bindgen/libsql-ffi requires rustix 0.38, tempfile uses rustix 1.1" },
+  # linux-raw-sys v0.4 vs v0.12: corresponding to rustix 0.38 vs 1.1 transitives.
+  { crate = "linux-raw-sys@0.4.15", reason = "transitive dependency of rustix 0.38 vs 1.1" },
+  # syn v2 vs v3: bindgen/serde_derive/thiserror-impl rely on syn v2, async-trait/clap_derive/tokio-macros rely on syn v3.
+  { crate = "syn@2.0.119", reason = "bindgen, serde_derive, and thiserror-impl require syn v2, while clap_derive and tokio-macros require syn v3" },
+  # windows-sys v0.52 / v0.59 / v0.61: ring uses 0.52, bindgen/rustix 0.38 uses 0.59, tempfile/tokio/mio uses 0.61.
+  { crate = "windows-sys@0.52.0", reason = "ring uses windows-sys 0.52" },
+  { crate = "windows-sys@0.59.0", reason = "bindgen and rustix 0.38 use windows-sys 0.59" },
+  # winnow v0.7 vs v1.0: toml vs toml_parser transitives.
+  { crate = "winnow@1.0.4", reason = "transitive dependency via toml_parser vs toml" },
+  # shlex v1 vs v2: bindgen uses shlex 1, cc uses shlex 2.
+  { crate = "shlex@1.3.0", reason = "bindgen uses shlex 1 while cc uses shlex 2" },
+]
 skip-tree = []
 
 [licenses]

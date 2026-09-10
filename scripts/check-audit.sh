@@ -24,4 +24,5 @@ if ! cargo audit --version >/dev/null 2>&1; then
     exit 0
 fi
 
-cargo audit
+# Ignore RUSTSEC-2026-0097 (rand 0.8.5 unsound warning in agent-governance dev/optional tree; agent-governance 3.2.2 is pinned until GA).
+cargo audit --deny warnings --ignore RUSTSEC-2026-0097
