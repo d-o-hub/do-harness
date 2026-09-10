@@ -31,5 +31,13 @@ if ! cargo audit --version >/dev/null 2>&1; then
     exit 0
 fi
 
-# Ignore RUSTSEC-2026-0097 (rand 0.8.5 unsound warning in agent-governance dev/optional tree; agent-governance 3.2.2 is pinned until GA).
+# Ignore RUSTSEC-2026-0097 (rand 0.8.5 unsound: `thread_rng` aliasing, only
+# triggerable with a custom logger calling back into ThreadRng during reseed;
+# advisory: https://rustsec.org/advisories/RUSTSEC-2026-0097, alias
+# GHSA-cq8v-f236-94qc, patched in rand >= 0.8.6).
+# Scope justification: rand 0.8.5 is pulled ONLY by the optional, pre-GA
+# agent-governance dep (verified via Cargo.lock reverse-deps), never by
+# first-party code. Revisit when agent-governance revs past 3.2.2
+# (`cargo update -p agent-governance --precise <ver>`) or at GA promotion
+# (plans/agt-governance-epic.md), when the pin — and this ignore — go away.
 cargo audit --deny warnings --ignore RUSTSEC-2026-0097
