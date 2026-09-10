@@ -38,6 +38,22 @@ pub async fn connect(path: impl AsRef<Path>) -> Result<Connection> {
     // the REFERENCES clauses in the schema are never enforced.
     conn.execute("PRAGMA foreign_keys = ON", Params::None)
         .await?;
+    // Concurrent `verify --record` writers hit SQLITE_BUSY on the default
+    // delete journal; WAL lets readers proceed during a write while
+    // busy_timeout turns a transient lock into a short wait instead of an
+    // immediate error. synchronous=NORMAL stays durable under WAL for this
+    // workload (checkpoint coordination preserves crash safety).
+    // NOTE: PRAGMA assignments can return the new value as a row, and
+    // `execute` rejects row-returning SQL, so every PRAGMA goes through
+    // `query` with drained rows.
+    for pragma in [
+        "PRAGMA journal_mode = WAL",
+        "PRAGMA busy_timeout = 5000",
+        "PRAGMA synchronous = NORMAL",
+    ] {
+        let mut rows = conn.query(pragma, Params::None).await?;
+        while rows.next().await?.is_some() {}
+    }
     Ok(conn)
 }
 
@@ -261,6 +277,33 @@ mod tests {
                 pair[1].name
             );
         }
+    }
+
+    /// Concurrent `verify --record` writers must not hit SQLITE_BUSY on the
+    /// default delete journal: connections open in WAL with a busy timeout
+    /// (#37). `synchronous` reads back numeric (NORMAL = 1).
+    #[tokio::test(flavor = "current_thread")]
+    async fn connect_enables_wal_concurrency_pragmas() {
+        let dir = tempfile::tempdir().unwrap();
+        let conn = connect(dir.path().join("state.db")).await.unwrap();
+        assert_eq!(pragma_text(&conn, "PRAGMA journal_mode").await, "wal");
+        assert_eq!(pragma_int(&conn, "PRAGMA busy_timeout").await, 5000);
+        assert_eq!(pragma_int(&conn, "PRAGMA synchronous").await, 1);
+    }
+
+    async fn pragma_text(conn: &Connection, sql: &str) -> String {
+        let mut rows = conn.query(sql, Params::None).await.unwrap();
+        rows.next()
+            .await
+            .unwrap()
+            .unwrap()
+            .get::<String>(0)
+            .unwrap()
+    }
+
+    async fn pragma_int(conn: &Connection, sql: &str) -> i64 {
+        let mut rows = conn.query(sql, Params::None).await.unwrap();
+        rows.next().await.unwrap().unwrap().get::<i64>(0).unwrap()
     }
 
     #[tokio::test(flavor = "current_thread")]
