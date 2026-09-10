@@ -13,12 +13,19 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      # Least privilege: read source, write only the evidence artifact.
+      contents: read
+      actions: write
     steps:
       # actions/checkout@v4
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           # Full history so the commitlint sensor can inspect recent subjects.
           fetch-depth: 0
+          # No push/fetch credentials persisted: this workflow never pushes.
+          persist-credentials: false
       - name: Resolve pinned toolchain
         id: toolchain
         run: |
@@ -66,12 +73,28 @@ jobs:
           ./target/release/do-harness --root "$tmp" verify --format json
       - name: Dogfood skill eval runner (shebang execution, graded residue)
         run: ./target/release/do-harness eval
+      - name: Assert evidence integrity
+        run: |
+          test -f .do-harness/evidence.json
+          test -n "$(jq -r '.git_sha // empty' .do-harness/evidence.json)"
+      # actions/upload-artifact@v4 (v4.6.2)
+      - name: Upload verify evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: verify-evidence
+          path: .do-harness/evidence.json
+          if-no-files-found: error
 
   msrv:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       # actions/checkout@v4
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          # No push/fetch credentials persisted: this workflow never pushes.
+          persist-credentials: false
       - name: Resolve MSRV
         id: msrv
         run: |
@@ -87,4 +110,4 @@ jobs:
         with:
           key: msrv
       - name: Check workspace on MSRV
-        run: cargo check --workspace
+        run: cargo check --workspace --locked
