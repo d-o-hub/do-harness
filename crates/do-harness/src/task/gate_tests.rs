@@ -9,7 +9,7 @@ async fn insert_task_with_method(dir: &tempfile::TempDir, method: &str) -> i64 {
     let conn = do_harness_db::connect_and_migrate(dir.path())
         .await
         .unwrap();
-    let id = do_harness_db::insert_task(
+    let (id, _) = do_harness_db::insert_task_with_event(
         &conn,
         &do_harness_db::NewTask {
             title: "dangling",

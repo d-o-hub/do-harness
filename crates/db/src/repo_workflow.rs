@@ -72,15 +72,23 @@ pub async fn insert_task_with_event(
 /// Advances a task's subtask pointer and persists its `TaskAdvanced` event in
 /// one transaction. Returns the new subtask index and the persisted event.
 ///
+/// When `required_sensor` is set, the sensor's latest beat is re-checked
+/// inside the transaction before advancing, so a concurrent writer cannot
+/// slip past the CLI's pre-check.
+///
 /// # Errors
 ///
-/// Returns an error when the update, event append, or transaction fails, or
-/// when the task does not exist.
+/// Returns an error when the gate fails, the update, event append, or
+/// transaction fails, or when the task does not exist.
 pub async fn advance_subtask_with_event(
     conn: &Connection,
     id: i64,
+    required_sensor: Option<&str>,
 ) -> Result<(i64, WorkflowEvent)> {
     let tx = conn.transaction().await?;
+    if let Some(sensor) = required_sensor {
+        ensure_sensor_ok_on(&tx, id, sensor).await?;
+    }
     let index = advance_subtask(&tx, id).await?;
     let event = WorkflowEvent::TaskAdvanced(TaskAdvanced {
         id,
@@ -95,14 +103,18 @@ pub async fn advance_subtask_with_event(
 /// matching `TaskCompleted`/`TaskFailed` event in one transaction.
 /// Non-terminal states are rejected: lifecycle entry points own them.
 ///
+/// Every sensor in `required_sensors` is re-checked inside the transaction
+/// (latest beat must be `ok`), closing the read-then-write gate race.
+///
 /// # Errors
 ///
-/// Returns an error when the state is not terminal, when the update, event
-/// append, or transaction fails, or when the task does not exist.
+/// Returns an error when the state is not terminal, a gate fails, the update,
+/// event append, or transaction fails, or when the task does not exist.
 pub async fn update_task_status_with_event(
     conn: &Connection,
     id: i64,
     status: TaskState,
+    required_sensors: &[String],
 ) -> Result<WorkflowEvent> {
     let event = match status {
         TaskState::Done => WorkflowEvent::TaskCompleted(TaskCompleted { id }),
@@ -115,10 +127,57 @@ pub async fn update_task_status_with_event(
     if crate::repo::get_task(&tx, id).await?.is_none() {
         return Err(DbError::NotFound(format!("task {id} not found")));
     }
+    for sensor in required_sensors {
+        ensure_sensor_ok_on(&tx, id, sensor).await?;
+    }
     update_task_status(&tx, id, status).await?;
     append_event_on(&tx, id, &event).await?;
     tx.commit().await?;
     Ok(event)
+}
+
+/// Returns `Ok` when the task's latest beat for `sensor` is `"ok"`, otherwise
+/// a [`DbError::GateUnsatisfied`]. Runs on a transaction connection so the
+/// check and the dependent write commit or roll back together.
+async fn ensure_sensor_ok_on(conn: &Connection, task_id: i64, sensor: &str) -> Result<()> {
+    let mut rows = conn
+        .query(
+            "SELECT status FROM beats \
+             WHERE task_id = ?1 AND beat_type = 'sensor' AND sensor_name = ?2 \
+             ORDER BY id DESC LIMIT 1",
+            params!(task_id, sensor),
+        )
+        .await?;
+    match rows.next().await? {
+        Some(row) if row.get::<String>(0)? == "ok" => Ok(()),
+        _ => Err(DbError::GateUnsatisfied {
+            task_id,
+            sensor: sensor.to_owned(),
+        }),
+    }
+}
+
+/// Counts tasks whose `TaskAdded` event is missing from the event log.
+///
+/// Normal command writers always append the event in the task transaction, so
+/// a non-zero count proves an out-of-band write (raw SQL or a crash in a
+/// non-transactional path) and is surfaced by `doctor`.
+///
+/// # Errors
+///
+/// Returns an error when the query fails.
+pub async fn count_tasks_without_added_event(conn: &Connection) -> Result<i64> {
+    let mut rows = conn
+        .query(
+            "SELECT COUNT(*) FROM tasks t WHERE NOT EXISTS (\
+             SELECT 1 FROM workflow_events e WHERE e.task_id = t.id AND e.kind = 'TaskAdded')",
+            Params::None,
+        )
+        .await?;
+    match rows.next().await? {
+        Some(row) => Ok(row.get(0)?),
+        None => Ok(0),
+    }
 }
 
 /// Loads the full workflow event stream as `(task_id, event)` pairs ordered
@@ -179,38 +238,58 @@ pub async fn list_events_ascending(conn: &Connection) -> Result<Vec<WorkflowEven
 
 /// Appends one event to the log without transaction management, for composing
 /// into a larger transaction.
+///
+/// The `seq` read-then-insert races under concurrent writers (for example a
+/// pre-commit `verify --record` overlapping a manual `task advance`); the
+/// `UNIQUE(seq)` constraint from migration 0011 turns the race into a
+/// constraint error, and this loop re-reads the tail and retries.
 async fn append_event_on(conn: &Connection, task_id: i64, event: &WorkflowEvent) -> Result<()> {
+    const MAX_SEQ_RETRIES: usize = 5;
+
     let raw_payload = serde_json::to_string(event)
         .map_err(|err| DbError::InvalidEventPayload(err.to_string()))?;
     let payload = canonical_payload(&raw_payload)?;
 
-    let mut rows = conn
-        .query(
-            "SELECT seq, chain_hash FROM workflow_events ORDER BY seq DESC LIMIT 1",
-            Params::None,
-        )
-        .await?;
-    let (last_seq, prev_hash) = match rows.next().await? {
-        Some(row) => (row.get::<i64>(0)?, Some(row.get::<String>(1)?)),
-        None => (0, None),
-    };
-    let seq = last_seq + 1;
-    let hash = chain_hash(prev_hash.as_deref(), &payload);
+    for attempt in 0..MAX_SEQ_RETRIES {
+        let mut rows = conn
+            .query(
+                "SELECT seq, chain_hash FROM workflow_events ORDER BY seq DESC LIMIT 1",
+                Params::None,
+            )
+            .await?;
+        let (last_seq, prev_hash) = match rows.next().await? {
+            Some(row) => (row.get::<i64>(0)?, Some(row.get::<String>(1)?)),
+            None => (0, None),
+        };
+        drop(rows);
+        let seq = last_seq + 1;
+        let hash = chain_hash(prev_hash.as_deref(), &payload);
 
-    conn.execute(
-        "INSERT INTO workflow_events (task_id, kind, payload, created_at, seq, chain_hash) \
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-        params!(
-            task_id,
-            event.name(),
-            payload,
-            unix_now(),
-            seq,
-            hash.as_str()
-        ),
-    )
-    .await?;
-    Ok(())
+        match conn
+            .execute(
+                "INSERT INTO workflow_events (task_id, kind, payload, created_at, seq, chain_hash) \
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                params!(
+                    task_id,
+                    event.name(),
+                    payload.as_str(),
+                    unix_now(),
+                    seq,
+                    hash.as_str()
+                ),
+            )
+            .await
+        {
+            Ok(_) => return Ok(()),
+            Err(err) => match DbError::from(err) {
+                DbError::Constraint(_) if attempt + 1 < MAX_SEQ_RETRIES => {}
+                other => return Err(other),
+            },
+        }
+    }
+    Err(DbError::Constraint(
+        "workflow event seq retries exhausted under concurrent writers".to_owned(),
+    ))
 }
 
 #[cfg(test)]
@@ -256,9 +335,9 @@ mod tests {
         let (id, _) = insert_task_with_event(&conn, &new_task("slice"))
             .await
             .unwrap();
-        let (index, _) = advance_subtask_with_event(&conn, id).await.unwrap();
+        let (index, _) = advance_subtask_with_event(&conn, id, None).await.unwrap();
         assert_eq!(index, 1);
-        update_task_status_with_event(&conn, id, TaskState::Done)
+        update_task_status_with_event(&conn, id, TaskState::Done, &[])
             .await
             .unwrap();
         drop(conn);
@@ -282,7 +361,7 @@ mod tests {
             .unwrap();
 
         for state in [TaskState::Pending, TaskState::InProgress] {
-            let err = update_task_status_with_event(&conn, id, state)
+            let err = update_task_status_with_event(&conn, id, state, &[])
                 .await
                 .unwrap_err();
             assert!(matches!(err, DbError::InvalidTerminalState(_)));
@@ -294,7 +373,9 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let conn = connect_and_migrate(dir.path()).await.unwrap();
 
-        let err = advance_subtask_with_event(&conn, 999).await.unwrap_err();
+        let err = advance_subtask_with_event(&conn, 999, None)
+            .await
+            .unwrap_err();
         assert!(matches!(err, DbError::NotFound(_)));
     }
 
@@ -305,7 +386,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let conn = connect_and_migrate(dir.path()).await.unwrap();
 
-        let err = update_task_status_with_event(&conn, 999, TaskState::Done)
+        let err = update_task_status_with_event(&conn, 999, TaskState::Done, &[])
             .await
             .unwrap_err();
         assert!(matches!(err, DbError::NotFound(_)));
@@ -356,7 +437,7 @@ mod tests {
         let (id, _) = insert_task_with_event(&conn, &new_task("slice 1"))
             .await
             .unwrap();
-        advance_subtask_with_event(&conn, id).await.unwrap();
+        advance_subtask_with_event(&conn, id, None).await.unwrap();
 
         let rows = list_events_ascending(&conn).await.unwrap();
         assert_eq!(rows.len(), 2);
@@ -368,5 +449,44 @@ mod tests {
 
         let expected_h2 = chain_hash(Some(&expected_h1), &rows[1].canonical_payload);
         assert_eq!(rows[1].chain_hash.as_str(), expected_h2.as_str());
+    }
+
+    /// The sensor gate is re-checked inside the write transaction, so a stale
+    /// CLI pre-check cannot advance past a missing beat.
+    #[tokio::test(flavor = "current_thread")]
+    async fn advance_rechecks_sensor_gate_inside_transaction() {
+        use crate::repo_exec::{NewBeat, record_sensor_outcome};
+
+        let dir = tempfile::tempdir().unwrap();
+        let conn = connect_and_migrate(dir.path()).await.unwrap();
+        let (id, _) = insert_task_with_event(&conn, &new_task("gated"))
+            .await
+            .unwrap();
+
+        let err = advance_subtask_with_event(&conn, id, Some("check"))
+            .await
+            .unwrap_err();
+        assert!(matches!(err, DbError::GateUnsatisfied { .. }), "{err}");
+
+        record_sensor_outcome(
+            &conn,
+            &NewBeat {
+                task_id: Some(id),
+                beat_type: "sensor",
+                status: "ok",
+                sensor_exit_code: Some(0),
+                sensor_name: Some("check"),
+                started_at: 1,
+                completed_at: Some(1),
+            },
+            true,
+            None,
+        )
+        .await
+        .unwrap();
+
+        advance_subtask_with_event(&conn, id, Some("check"))
+            .await
+            .unwrap();
     }
 }

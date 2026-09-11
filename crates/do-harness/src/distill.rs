@@ -141,7 +141,7 @@ mod tests {
 
     async fn seed_ok_beat(root: &Path) {
         let conn = do_harness_db::connect_and_migrate(root).await.unwrap();
-        do_harness_db::insert_beat(
+        do_harness_db::record_sensor_outcome(
             &conn,
             &do_harness_db::NewBeat {
                 task_id: None,
@@ -152,6 +152,8 @@ mod tests {
                 started_at: 1,
                 completed_at: Some(1),
             },
+            true,
+            None,
         )
         .await
         .unwrap();

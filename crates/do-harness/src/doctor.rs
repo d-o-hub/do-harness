@@ -53,6 +53,24 @@ pub async fn run(root: &Path, format: Format, strict: bool) -> Result<()> {
         }
     }
 
+    // Out-of-band task writes leave tasks with no TaskAdded event; they break
+    // the append-only workflow log and would otherwise go unnoticed.
+    let orphan_tasks = if do_harness_db::db_path(root).exists() {
+        match do_harness_db::connect_and_migrate(root).await {
+            Ok(conn) => do_harness_db::count_tasks_without_added_event(&conn)
+                .await
+                .unwrap_or(0),
+            Err(_) => 0,
+        }
+    } else {
+        0
+    };
+    if orphan_tasks > 0 {
+        failures.push(format!(
+            "{orphan_tasks} task(s) have no TaskAdded event (out-of-band write)"
+        ));
+    }
+
     if format == Format::Json {
         let json = serde_json::json!({
             "ok": failures.is_empty(),
@@ -68,6 +86,7 @@ pub async fn run(root: &Path, format: Format, strict: bool) -> Result<()> {
                 "commit_msg": status.commit_msg,
             },
             "database_ok": db_ok,
+            "orphan_tasks": orphan_tasks,
             "failures": failures
         });
         println!("{json}");
@@ -114,6 +133,14 @@ pub async fn run(root: &Path, format: Format, strict: bool) -> Result<()> {
             Err(err) => {
                 println!("  [FAIL] state database: unreadable ({err:#})");
             }
+        }
+
+        if orphan_tasks > 0 {
+            println!(
+                "  [FAIL] event log: {orphan_tasks} task(s) without a TaskAdded event (out-of-band write)"
+            );
+        } else {
+            println!("  [OK] event log: no orphan tasks");
         }
 
         if do_harness_db::db_path(root).exists() {
@@ -211,5 +238,36 @@ mod tests {
         let message = result.unwrap_err().to_string();
         assert!(message.contains("doctor check failed"));
         assert!(message.contains("rebuild"));
+    }
+
+    /// Out-of-band writes that leave a task without its `TaskAdded` event are
+    /// surfaced as a hard doctor failure.
+    #[tokio::test(flavor = "current_thread")]
+    async fn fails_on_orphan_task_without_added_event() {
+        let (_temp, root) = fake_repo_with_git();
+        stub_binary(&root);
+        let conn = do_harness_db::connect_and_migrate(&root).await.unwrap();
+        let (id, _) = do_harness_db::insert_task_with_event(
+            &conn,
+            &do_harness_db::NewTask {
+                title: "orphan",
+                method: Some("mini"),
+                subtask_index: 0,
+                precondition: None,
+                parent_id: None,
+            },
+        )
+        .await
+        .unwrap();
+        conn.execute("DELETE FROM workflow_events WHERE task_id = ?1", [id])
+            .await
+            .unwrap();
+        drop(conn);
+
+        let message = run(&root, Format::Text, false)
+            .await
+            .unwrap_err()
+            .to_string();
+        assert!(message.contains("no TaskAdded event"), "{message}");
     }
 }

@@ -30,7 +30,7 @@ pub struct NewBeat<'a> {
 /// # Errors
 ///
 /// Returns an error when the insert statement fails.
-pub async fn insert_beat(conn: &Connection, beat: &NewBeat<'_>) -> Result<i64> {
+pub(crate) async fn insert_beat(conn: &Connection, beat: &NewBeat<'_>) -> Result<i64> {
     let mut rows = conn
         .query(
             "INSERT INTO beats (task_id, beat_type, status, sensor_exit_code, sensor_name, \
@@ -183,6 +183,40 @@ pub async fn record_sensor_outcome(
     };
     tx.commit().await?;
     Ok(count)
+}
+
+/// One sensor outcome persisted by [`record_verify_batch`].
+#[derive(Debug, Clone)]
+pub struct SensorOutcome<'a> {
+    /// Beat row to insert for the sensor.
+    pub beat: NewBeat<'a>,
+    /// Whether the sensor passed; failures bump the matching signature.
+    pub ok: bool,
+    /// Failure output kept as the signature message.
+    pub message: Option<&'a str>,
+}
+
+/// Persists every sensor outcome in one transaction, so a crash can never
+/// leave a partially recorded verify run (half the beats and strikes of a
+/// report). Halted sensors are filtered by the caller before batching.
+///
+/// # Errors
+///
+/// Returns an error when the transaction, a beat insert, or a signature
+/// update fails; nothing is committed unless every outcome succeeds.
+pub async fn record_verify_batch(conn: &Connection, outcomes: &[SensorOutcome<'_>]) -> Result<()> {
+    let tx = conn.transaction().await?;
+    for outcome in outcomes {
+        insert_beat(&tx, &outcome.beat).await?;
+        let signature = format!("sensor:{}", outcome.beat.sensor_name.unwrap_or("unknown"));
+        if outcome.ok {
+            reset_error_signature(&tx, &signature, outcome.beat.task_id).await?;
+        } else {
+            bump_error_signature_on(&tx, &signature, outcome.beat.task_id, outcome.message).await?;
+        }
+    }
+    tx.commit().await?;
+    Ok(())
 }
 
 /// Fetches an error signature by its `(signature, task_id)` key.
@@ -390,5 +424,57 @@ mod tests {
             .unwrap();
         assert_eq!(sig.attempt_count, 3);
         assert_eq!(sig.message.as_deref(), Some("m2"));
+    }
+
+    /// A failing outcome in the middle of a batch rolls back every earlier
+    /// beat: verify runs either persist completely or not at all.
+    #[tokio::test(flavor = "current_thread")]
+    async fn record_verify_batch_rolls_back_everything_on_failure() {
+        let dir = tempfile::tempdir().unwrap();
+        let conn = crate::migrate::connect_and_migrate(dir.path())
+            .await
+            .unwrap();
+        let outcomes = vec![
+            SensorOutcome {
+                beat: NewBeat {
+                    task_id: None,
+                    beat_type: "sensor",
+                    status: "ok",
+                    sensor_exit_code: Some(0),
+                    sensor_name: Some("check"),
+                    started_at: 1,
+                    completed_at: Some(1),
+                },
+                ok: true,
+                message: None,
+            },
+            SensorOutcome {
+                // FK violation: task 9999 does not exist.
+                beat: NewBeat {
+                    task_id: Some(9999),
+                    beat_type: "sensor",
+                    status: "failed",
+                    sensor_exit_code: Some(1),
+                    sensor_name: Some("test"),
+                    started_at: 1,
+                    completed_at: Some(1),
+                },
+                ok: false,
+                message: Some("boom"),
+            },
+        ];
+
+        assert!(record_verify_batch(&conn, &outcomes).await.is_err());
+        assert!(
+            list_beats(&conn, None).await.unwrap().is_empty(),
+            "first beat must be rolled back with the failed batch"
+        );
+        assert!(
+            get_error_signature(&conn, "sensor:test", Some(9999))
+                .await
+                .unwrap()
+                .is_none(),
+            "signature bump must be rolled back too"
+        );
     }
 }

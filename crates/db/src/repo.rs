@@ -28,7 +28,7 @@ const TASK_COLUMNS: &str = "id, parent_id, title, method, subtask_index, status,
 /// # Errors
 ///
 /// Returns an error when the insert statement fails.
-pub async fn insert_task(conn: &Connection, task: &NewTask<'_>) -> Result<i64> {
+pub(crate) async fn insert_task(conn: &Connection, task: &NewTask<'_>) -> Result<i64> {
     let now = unix_now();
     let mut rows = conn
         .query(
@@ -99,7 +99,11 @@ pub async fn list_tasks(conn: &Connection) -> Result<Vec<TaskRecord>> {
 /// # Errors
 ///
 /// Returns an error when the update statement fails or the task does not exist.
-pub async fn update_task_status(conn: &Connection, id: i64, status: TaskState) -> Result<()> {
+pub(crate) async fn update_task_status(
+    conn: &Connection,
+    id: i64,
+    status: TaskState,
+) -> Result<()> {
     let mut rows = conn
         .query(
             "UPDATE tasks SET status = ?1, updated_at = ?2 WHERE id = ?3 RETURNING id",
@@ -121,7 +125,7 @@ pub async fn update_task_status(conn: &Connection, id: i64, status: TaskState) -
 /// # Errors
 ///
 /// Returns an error when the update fails or the task does not exist.
-pub async fn advance_subtask(conn: &Connection, id: i64) -> Result<i64> {
+pub(crate) async fn advance_subtask(conn: &Connection, id: i64) -> Result<i64> {
     let mut rows = conn
         .query(
             "UPDATE tasks SET subtask_index = subtask_index + 1, status = ?1, \

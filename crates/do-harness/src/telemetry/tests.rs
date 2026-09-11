@@ -198,7 +198,7 @@ async fn record_verify_scopes_to_task() {
     let conn = do_harness_db::connect_and_migrate(dir.path())
         .await
         .unwrap();
-    let task_id = do_harness_db::insert_task(
+    let (task_id, _) = do_harness_db::insert_task_with_event(
         &conn,
         &do_harness_db::NewTask {
             title: "slice",

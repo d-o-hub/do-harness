@@ -252,9 +252,15 @@ pub async fn advance_task(root: &Path, id: i64) -> Result<(i64, WorkflowEvent)> 
             );
         }
     }
-    do_harness_db::advance_subtask_with_event(&conn, id)
+    do_harness_db::advance_subtask_with_event(&conn, id, method.subtasks[idx].sensor.as_deref())
         .await
-        .map_err(anyhow::Error::from)
+        .map_err(|err| match err {
+            do_harness_db::DbError::GateUnsatisfied { sensor, .. } => anyhow::anyhow!(
+                "cannot advance task {id}: subtask '{}' requires sensor '{sensor}' to pass (run: do-harness verify --record --task {id})",
+                method.subtasks[idx].name
+            ),
+            other => other.into(),
+        })
 }
 
 fn latest_sensor_beat_ok(beats: &[Beat], sensor: &str) -> bool {
@@ -289,9 +295,20 @@ pub async fn done_task(root: &Path, id: i64) -> Result<WorkflowEvent> {
             method.subtasks.len()
         );
     }
-    do_harness_db::update_task_status_with_event(&conn, id, TaskState::Done)
+    let required_sensors: Vec<String> = method
+        .subtasks
+        .iter()
+        .take(index.min(method.subtasks.len()))
+        .filter_map(|sub| sub.sensor.clone())
+        .collect();
+    do_harness_db::update_task_status_with_event(&conn, id, TaskState::Done, &required_sensors)
         .await
-        .map_err(anyhow::Error::from)
+        .map_err(|err| match err {
+            do_harness_db::DbError::GateUnsatisfied { sensor, .. } => anyhow::anyhow!(
+                "cannot mark task {id} done: sensor '{sensor}' has no passing beat (run: do-harness verify --record --task {id})"
+            ),
+            other => other.into(),
+        })
 }
 
 /// Marks a task as failed.
@@ -300,7 +317,7 @@ pub async fn fail_task(root: &Path, id: i64) -> Result<WorkflowEvent> {
     if do_harness_db::get_task(&conn, id).await?.is_none() {
         anyhow::bail!("task {id} not found");
     }
-    do_harness_db::update_task_status_with_event(&conn, id, TaskState::Failed)
+    do_harness_db::update_task_status_with_event(&conn, id, TaskState::Failed, &[])
         .await
         .map_err(anyhow::Error::from)
 }

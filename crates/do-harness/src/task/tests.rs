@@ -29,7 +29,7 @@ pub(super) fn write_catalog(root: &Path) {
 pub(super) async fn insert_ok_beat(root: &Path, task_id: i64, sensor: &str) {
     let conn = do_harness_db::connect_and_migrate(root).await.unwrap();
     let now = do_harness_db::unix_now();
-    do_harness_db::insert_beat(
+    do_harness_db::record_sensor_outcome(
         &conn,
         &do_harness_db::NewBeat {
             task_id: Some(task_id),
@@ -40,6 +40,8 @@ pub(super) async fn insert_ok_beat(root: &Path, task_id: i64, sensor: &str) {
             started_at: now,
             completed_at: Some(now),
         },
+        true,
+        None,
     )
     .await
     .unwrap();
@@ -51,7 +53,7 @@ async fn export_writes_task_snapshot() {
     let conn = do_harness_db::connect_and_migrate(dir.path())
         .await
         .unwrap();
-    do_harness_db::insert_task(
+    let _ = do_harness_db::insert_task_with_event(
         &conn,
         &do_harness_db::NewTask {
             title: "slice",

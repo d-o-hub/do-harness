@@ -55,6 +55,16 @@ pub enum DbError {
     /// A record expected to exist was missing.
     #[error("not found: {0}")]
     NotFound(String),
+    /// A workflow gate's required sensor has no passing beat at write time
+    /// (re-checked inside the command transaction to close the read-then-write
+    /// race with concurrent `verify --record`).
+    #[error("task {task_id} gate unsatisfied: sensor '{sensor}' has no passing beat")]
+    GateUnsatisfied {
+        /// Task whose gate failed.
+        task_id: i64,
+        /// Sensor that must have a latest `ok` sensor beat.
+        sensor: String,
+    },
     /// No harness root could be discovered.
     #[error("harness root not found: {0}")]
     RootNotFound(String),

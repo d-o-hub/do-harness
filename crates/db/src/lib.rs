@@ -41,17 +41,14 @@ pub use migrate::{
     unix_now,
 };
 pub use query::count_where;
-pub use repo::{
-    NewTask, advance_subtask, get_task, insert_task, list_tasks, seed_invariants,
-    update_task_status,
-};
+pub use repo::{NewTask, get_task, list_tasks, seed_invariants};
 pub use repo_eval::{
     NewSkillEvalRun, bless_grader_baseline, get_grader_baseline, get_skill_bar,
     insert_skill_eval_run, list_skill_eval_runs, max_pass_rate, raise_skill_bar,
 };
 pub use repo_exec::{
-    NewBeat, bump_error_signature, get_error_signature, insert_beat, list_beats,
-    record_sensor_outcome,
+    NewBeat, SensorOutcome, bump_error_signature, get_error_signature, list_beats,
+    record_sensor_outcome, record_verify_batch,
 };
 pub use repo_heuristic::{NewHeuristic, insert_heuristic, list_heuristics};
 pub use repo_metrics::{SensorStat, has_ok_beat, sensor_stats};
@@ -62,6 +59,7 @@ pub use repo_skill_eval::{
 pub use repo_trace::{NewTrace, get_trace, insert_trace, list_traces};
 pub use repo_workflow::{
     WorkflowEventRow, advance_subtask_with_event, canonical_payload, chain_hash,
-    insert_task_with_event, list_all_events, list_events_ascending, update_task_status_with_event,
+    count_tasks_without_added_event, insert_task_with_event, list_all_events,
+    list_events_ascending, update_task_status_with_event,
 };
 pub use root::{db_path, find_harness_root};

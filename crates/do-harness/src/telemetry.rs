@@ -51,13 +51,18 @@ pub async fn record_verify(
 ) -> Result<()> {
     let conn = do_harness_db::connect_and_migrate(root).await?;
     let now = do_harness_db::unix_now();
-    for sensor in &report.sensors {
-        if blocked.contains(&sensor.name) {
-            continue;
-        }
-        do_harness_db::record_sensor_outcome(
-            &conn,
-            &do_harness_db::NewBeat {
+    let messages: Vec<String> = report
+        .sensors
+        .iter()
+        .map(|sensor| truncate_message(&sensor.output))
+        .collect();
+    let outcomes: Vec<do_harness_db::SensorOutcome<'_>> = report
+        .sensors
+        .iter()
+        .zip(&messages)
+        .filter(|(sensor, _)| !blocked.contains(&sensor.name))
+        .map(|(sensor, message)| do_harness_db::SensorOutcome {
+            beat: do_harness_db::NewBeat {
                 task_id,
                 beat_type: "sensor",
                 status: if sensor.ok { "ok" } else { "failed" },
@@ -66,11 +71,11 @@ pub async fn record_verify(
                 started_at: now,
                 completed_at: Some(now),
             },
-            sensor.ok,
-            Some(&truncate_message(&sensor.output)),
-        )
-        .await?;
-    }
+            ok: sensor.ok,
+            message: Some(message),
+        })
+        .collect();
+    do_harness_db::record_verify_batch(&conn, &outcomes).await?;
     Ok(())
 }
 

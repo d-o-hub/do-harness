@@ -114,7 +114,7 @@ async fn db_assertion_valid_identifiers_grade_against_real_db() {
     let conn = do_harness_db::connect_and_migrate(dir.path())
         .await
         .unwrap();
-    do_harness_db::insert_beat(
+    do_harness_db::record_sensor_outcome(
         &conn,
         &do_harness_db::NewBeat {
             task_id: None,
@@ -125,6 +125,8 @@ async fn db_assertion_valid_identifiers_grade_against_real_db() {
             started_at: 0,
             completed_at: Some(1),
         },
+        true,
+        None,
     )
     .await
     .unwrap();
