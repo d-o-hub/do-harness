@@ -61,7 +61,9 @@ jobs:
           CI: "true"
           # Belt and braces: missing tools fail even if CI=true is dropped.
           DO_HARNESS_REQUIRE_TOOLS: "1"
-        run: ./target/release/do-harness verify --format json --evidence .do-harness/evidence.json --strict
+        run: ./target/release/do-harness verify --set verification --format json --strict
+      - name: Assert verification evidence is green
+        run: ./target/release/do-harness status --set verification --format json
       - name: Record Cargo.lock hash
         run: |
           mkdir -p .do-harness
@@ -89,8 +91,9 @@ jobs:
         run: ./target/release/do-harness eval
       - name: Assert evidence integrity
         run: |
-          test -f .do-harness/evidence.json
-          test -n "$(jq -r '.git_sha // empty' .do-harness/evidence.json)"
+          test -f .do-harness/evidence.verification.json
+          test -n "$(jq -r '.git_sha // empty' .do-harness/evidence.verification.json)"
+          test "$(jq -r '.signal_set' .do-harness/evidence.verification.json)" = "verification"
       # actions/upload-artifact@v4 (v4.6.2)
       - name: Upload verify evidence
         if: always()
@@ -98,7 +101,7 @@ jobs:
         with:
           name: verify-evidence
           path: |
-            .do-harness/evidence.json
+            .do-harness/evidence.verification.json
             .do-harness/Cargo.lock.sha256
           if-no-files-found: error
 
@@ -127,3 +130,32 @@ jobs:
           key: msrv
       - name: Check workspace on MSRV
         run: cargo check --workspace --locked
+
+  dsh-bundle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      # actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          # No push/fetch credentials persisted: this workflow never pushes.
+          persist-credentials: false
+      - name: Resolve pinned toolchain
+        id: toolchain
+        run: |
+          channel="$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)"
+          echo "channel=$channel" >> "$GITHUB_OUTPUT"
+      # dtolnay/rust-toolchain@master (SHA within master history per action docs)
+      - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772
+        with:
+          toolchain: ${{ steps.toolchain.outputs.channel }}
+      # Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
+      - name: Build harness CLI for the bundle tests
+        run: cargo build --release -p do-harness
+      - name: Lint DSH bundle JavaScript
+        run: node --check integrations/deepseek-harness/index.js integrations/deepseek-harness/lib/*.mjs
+      - name: Test DSH bundle (unit + real-binary e2e)
+        env:
+          DO_HARNESS_BIN: ${{ github.workspace }}/target/release/do-harness
+        run: node --test integrations/deepseek-harness/test/*.test.mjs

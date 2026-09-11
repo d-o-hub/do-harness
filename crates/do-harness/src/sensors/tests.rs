@@ -1,5 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
+use std::collections::BTreeMap;
+
 use super::*;
 use crate::config::{Config, HooksConfig};
 
@@ -10,6 +12,7 @@ fn config_with(specs: &[(&str, &[&str])]) -> Config {
             pre_commit: vec![],
             pre_push: vec![],
         },
+        signal_sets: BTreeMap::new(),
         sensors: specs
             .iter()
             .map(|(name, argv)| SensorSpec {
@@ -19,6 +22,7 @@ fn config_with(specs: &[(&str, &[&str])]) -> Config {
                 timeout: None,
                 allow_failure: false,
                 transient_exit_codes: vec![],
+                when_changed: vec![],
             })
             .collect(),
     }
@@ -126,6 +130,7 @@ fn verify_with_no_effective_sensors_succeeds() {
             pre_push: vec![],
         },
         sensors: vec![],
+        signal_sets: BTreeMap::new(),
     };
     let report = verify(
         &cfg,
@@ -229,6 +234,7 @@ fn retries_failing_sensor_until_success() {
     let cfg = Config {
         language: None,
         hooks: HooksConfig::default(),
+        signal_sets: BTreeMap::new(),
         sensors: vec![SensorSpec {
             name: "flaky".to_owned(),
             argv: vec!["sh".to_owned(), "-c".to_owned(), script],
@@ -236,6 +242,7 @@ fn retries_failing_sensor_until_success() {
             timeout: None,
             allow_failure: false,
             transient_exit_codes: vec![],
+            when_changed: vec![],
         }],
     };
 
@@ -270,6 +277,7 @@ fn times_out_hanging_sensor() {
     let cfg = Config {
         language: None,
         hooks: HooksConfig::default(),
+        signal_sets: BTreeMap::new(),
         sensors: vec![SensorSpec {
             name: "hang".to_owned(),
             argv: vec!["sleep".to_owned(), "10".to_owned()],
@@ -277,6 +285,7 @@ fn times_out_hanging_sensor() {
             timeout: Some(1),
             allow_failure: false,
             transient_exit_codes: vec![],
+            when_changed: vec![],
         }],
     };
 
@@ -309,6 +318,7 @@ fn allow_failure_sensor_does_not_fail_gate_but_surfaces_output() {
     let cfg = Config {
         language: None,
         hooks: HooksConfig::default(),
+        signal_sets: BTreeMap::new(),
         sensors: vec![SensorSpec {
             name: "advisory".to_owned(),
             argv: vec![
@@ -320,6 +330,7 @@ fn allow_failure_sensor_does_not_fail_gate_but_surfaces_output() {
             timeout: None,
             allow_failure: true,
             transient_exit_codes: vec![],
+            when_changed: vec![],
         }],
     };
 
@@ -356,6 +367,7 @@ fn transient_exit_codes_restricts_retries() {
     let cfg = Config {
         language: None,
         hooks: HooksConfig::default(),
+        signal_sets: BTreeMap::new(),
         sensors: vec![SensorSpec {
             name: "transient_check".to_owned(),
             argv: vec!["sh".to_owned(), "-c".to_owned(), script],
@@ -363,6 +375,7 @@ fn transient_exit_codes_restricts_retries() {
             timeout: None,
             allow_failure: false,
             transient_exit_codes: vec![75],
+            when_changed: vec![],
         }],
     };
 

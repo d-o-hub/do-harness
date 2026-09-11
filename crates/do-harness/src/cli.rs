@@ -68,6 +68,12 @@ pub enum Command {
         /// Output format.
         #[arg(long, value_enum, default_value_t = Format::Text)]
         format: Format,
+        /// Run only the sensors in this development signal set.
+        #[arg(long, value_name = "SET")]
+        set: Option<String>,
+        /// Run only sensors applicable to the working-tree change.
+        #[arg(long)]
+        changed: bool,
         /// Run only the named sensor (repeatable or comma-separated).
         #[arg(long = "only", action = ArgAction::Append, value_name = "SENSOR")]
         only: Vec<String>,
@@ -90,6 +96,33 @@ pub enum Command {
     /// List sensor names.
     #[command(visible_alias = "ls")]
     List {
+        /// List development signal-set names instead of sensors.
+        #[arg(long)]
+        sets: bool,
+        /// Output format.
+        #[arg(long, value_enum, default_value_t = Format::Text)]
+        format: Format,
+    },
+    /// Explain which sensors the current change selects, without running them.
+    Explain {
+        /// Explain this development signal set (default: all sensors).
+        #[arg(long, value_name = "SET")]
+        set: Option<String>,
+        /// Select by working-tree change instead of listing everything.
+        #[arg(long)]
+        changed: bool,
+        /// Output format.
+        #[arg(long, value_enum, default_value_t = Format::Text)]
+        format: Format,
+    },
+    /// Report verification evidence freshness without running sensors.
+    Status {
+        /// Check evidence for this development signal set.
+        #[arg(long, value_name = "SET")]
+        set: Option<String>,
+        /// Read evidence from this file instead of the default artifact.
+        #[arg(long, value_hint = ValueHint::FilePath, value_name = "FILE")]
+        evidence: Option<PathBuf>,
         /// Output format.
         #[arg(long, value_enum, default_value_t = Format::Text)]
         format: Format,
@@ -114,9 +147,9 @@ pub enum Command {
     },
     /// Scaffold a harness workspace in a target directory.
     Init {
-        /// Language pack to scaffold.
-        #[arg(long, value_enum, default_value_t = init::Language::Rust)]
-        language: init::Language,
+        /// Language pack to scaffold (default: detect from the repository).
+        #[arg(long, value_enum, value_name = "LANG")]
+        language: Option<init::Language>,
         /// Overwrite existing files.
         #[arg(long)]
         force: bool,

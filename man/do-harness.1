@@ -1,6 +1,6 @@
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
-.TH do-harness 1  "do-harness 0.1.0 (7b44110 2026-09-11)" 
+.TH do-harness 1  "do-harness 0.1.0 (249c7aa-dirty 2026-09-11)" 
 .SH NAME
 do\-harness \- do\-harness agent execution harness CLI
 .SH SYNOPSIS
@@ -45,6 +45,12 @@ Run computational sensors
 .TP
 do\-harness\-list(1)
 List sensor names
+.TP
+do\-harness\-explain(1)
+Explain which sensors the current change selects, without running them
+.TP
+do\-harness\-status(1)
+Report verification evidence freshness without running sensors
 .TP
 do\-harness\-init\-db(1)
 Apply pending database migrations
@@ -108,4 +114,4 @@ Exit Codes:
   1  Verification or check failure
   2  Usage, configuration, or environment error
 .SH VERSION
-v0.1.0 (7b44110 2026\-09\-11)
+v0.1.0 (249c7aa\-dirty 2026\-09\-11)

@@ -60,6 +60,7 @@ json\:"Machine-readable JSON output"))' \
 _arguments "${_arguments_options[@]}" : \
 '--format=[Output format]:FORMAT:((text\:"Human-readable text output"
 json\:"Machine-readable JSON output"))' \
+'--set=[Run only the sensors in this development signal set]:SET:_default' \
 '*--only=[Run only the named sensor (repeatable or comma-separated)]:SENSOR:_default' \
 '*--exclude=[Exclude named sensors from the run]:SENSOR:_default' \
 '--task=[Scope records and fail-fast strikes to this task id]:ID:_default' \
@@ -69,6 +70,7 @@ json\:"Machine-readable JSON output"))' \
 '--color=[Color output (auto, always, never)]:WHEN:_default' \
 '--output=[Default output file path]:FILE:_files' \
 '--fail-fast[Halt at the first failing sensor]' \
+'--changed[Run only sensors applicable to the working-tree change]' \
 '--record[Persist beats and error signatures into the state database]' \
 '--strict[Enforce strong evidence\: exit non-zero on skips or missing timing/exit codes]' \
 '*-v[Verbosity level (-v, -vv)]' \
@@ -86,6 +88,7 @@ json\:"Machine-readable JSON output"))' \
 _arguments "${_arguments_options[@]}" : \
 '--format=[Output format]:FORMAT:((text\:"Human-readable text output"
 json\:"Machine-readable JSON output"))' \
+'--set=[Run only the sensors in this development signal set]:SET:_default' \
 '*--only=[Run only the named sensor (repeatable or comma-separated)]:SENSOR:_default' \
 '*--exclude=[Exclude named sensors from the run]:SENSOR:_default' \
 '--task=[Scope records and fail-fast strikes to this task id]:ID:_default' \
@@ -95,6 +98,7 @@ json\:"Machine-readable JSON output"))' \
 '--color=[Color output (auto, always, never)]:WHEN:_default' \
 '--output=[Default output file path]:FILE:_files' \
 '--fail-fast[Halt at the first failing sensor]' \
+'--changed[Run only sensors applicable to the working-tree change]' \
 '--record[Persist beats and error signatures into the state database]' \
 '--strict[Enforce strong evidence\: exit non-zero on skips or missing timing/exit codes]' \
 '*-v[Verbosity level (-v, -vv)]' \
@@ -116,6 +120,7 @@ json\:"Machine-readable JSON output"))' \
 '--config=[Explicit path to do-harness.toml]:FILE:_files' \
 '--color=[Color output (auto, always, never)]:WHEN:_default' \
 '--output=[Default output file path]:FILE:_files' \
+'--sets[List development signal-set names instead of sensors]' \
 '*-v[Verbosity level (-v, -vv)]' \
 '*--verbose[Verbosity level (-v, -vv)]' \
 '-q[Suppress non-error messages]' \
@@ -129,6 +134,49 @@ json\:"Machine-readable JSON output"))' \
 ;;
 (ls)
 _arguments "${_arguments_options[@]}" : \
+'--format=[Output format]:FORMAT:((text\:"Human-readable text output"
+json\:"Machine-readable JSON output"))' \
+'--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
+'--config=[Explicit path to do-harness.toml]:FILE:_files' \
+'--color=[Color output (auto, always, never)]:WHEN:_default' \
+'--output=[Default output file path]:FILE:_files' \
+'--sets[List development signal-set names instead of sensors]' \
+'*-v[Verbosity level (-v, -vv)]' \
+'*--verbose[Verbosity level (-v, -vv)]' \
+'-q[Suppress non-error messages]' \
+'--quiet[Suppress non-error messages]' \
+'--dry-run[Dry run without side effects]' \
+'-h[Print help (see more with '\''--help'\'')]' \
+'--help[Print help (see more with '\''--help'\'')]' \
+'-V[Print version]' \
+'--version[Print version]' \
+&& ret=0
+;;
+(explain)
+_arguments "${_arguments_options[@]}" : \
+'--set=[Explain this development signal set (default\: all sensors)]:SET:_default' \
+'--format=[Output format]:FORMAT:((text\:"Human-readable text output"
+json\:"Machine-readable JSON output"))' \
+'--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
+'--config=[Explicit path to do-harness.toml]:FILE:_files' \
+'--color=[Color output (auto, always, never)]:WHEN:_default' \
+'--output=[Default output file path]:FILE:_files' \
+'--changed[Select by working-tree change instead of listing everything]' \
+'*-v[Verbosity level (-v, -vv)]' \
+'*--verbose[Verbosity level (-v, -vv)]' \
+'-q[Suppress non-error messages]' \
+'--quiet[Suppress non-error messages]' \
+'--dry-run[Dry run without side effects]' \
+'-h[Print help (see more with '\''--help'\'')]' \
+'--help[Print help (see more with '\''--help'\'')]' \
+'-V[Print version]' \
+'--version[Print version]' \
+&& ret=0
+;;
+(status)
+_arguments "${_arguments_options[@]}" : \
+'--set=[Check evidence for this development signal set]:SET:_default' \
+'--evidence=[Read evidence from this file instead of the default artifact]:FILE:_files' \
 '--format=[Output format]:FORMAT:((text\:"Human-readable text output"
 json\:"Machine-readable JSON output"))' \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
@@ -186,7 +234,7 @@ _arguments "${_arguments_options[@]}" : \
 ;;
 (init)
 _arguments "${_arguments_options[@]}" : \
-'--language=[Language pack to scaffold]:LANGUAGE:((rust\:"Rust sensor pack (fmt/check/clippy/test/loc) plus a check-loc script"
+'--language=[Language pack to scaffold (default\: detect from the repository)]:LANG:((rust\:"Rust sensor pack (fmt/check/clippy/test/loc) plus check scripts"
 generic\:"No built-in sensors; commented sensor stubs to fill in"))' \
 '--format=[Output format]:FORMAT:((text\:"Human-readable text output"
 json\:"Machine-readable JSON output"))' \
@@ -1032,6 +1080,14 @@ _arguments "${_arguments_options[@]}" : \
 _arguments "${_arguments_options[@]}" : \
 && ret=0
 ;;
+(explain)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(status)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
 (init-db)
 _arguments "${_arguments_options[@]}" : \
 && ret=0
@@ -1237,6 +1293,8 @@ _do-harness_commands() {
 'check:Run computational sensors' \
 'list:List sensor names' \
 'ls:List sensor names' \
+'explain:Explain which sensors the current change selects, without running them' \
+'status:Report verification evidence freshness without running sensors' \
 'init-db:Apply pending database migrations' \
 'seed:Seed invariants from plans/invariants.json' \
 'init:Scaffold a harness workspace in a target directory' \
@@ -1330,12 +1388,19 @@ _do-harness__subcmd__eval_commands() {
     local commands; commands=()
     _describe -t commands 'do-harness eval commands' commands "$@"
 }
+(( $+functions[_do-harness__subcmd__explain_commands] )) ||
+_do-harness__subcmd__explain_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness explain commands' commands "$@"
+}
 (( $+functions[_do-harness__subcmd__help_commands] )) ||
 _do-harness__subcmd__help_commands() {
     local commands; commands=(
 'version:Print CLI version information' \
 'verify:Run computational sensors' \
 'list:List sensor names' \
+'explain:Explain which sensors the current change selects, without running them' \
+'status:Report verification evidence freshness without running sensors' \
 'init-db:Apply pending database migrations' \
 'seed:Seed invariants from plans/invariants.json' \
 'init:Scaffold a harness workspace in a target directory' \
@@ -1403,6 +1468,11 @@ _do-harness__subcmd__help__subcmd__errors__subcmd__list_commands() {
 _do-harness__subcmd__help__subcmd__eval_commands() {
     local commands; commands=()
     _describe -t commands 'do-harness help eval commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__help__subcmd__explain_commands] )) ||
+_do-harness__subcmd__help__subcmd__explain_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness help explain commands' commands "$@"
 }
 (( $+functions[_do-harness__subcmd__help__subcmd__help_commands] )) ||
 _do-harness__subcmd__help__subcmd__help_commands() {
@@ -1473,6 +1543,11 @@ _do-harness__subcmd__help__subcmd__metrics_commands() {
 _do-harness__subcmd__help__subcmd__seed_commands() {
     local commands; commands=()
     _describe -t commands 'do-harness help seed commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__help__subcmd__status_commands] )) ||
+_do-harness__subcmd__help__subcmd__status_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness help status commands' commands "$@"
 }
 (( $+functions[_do-harness__subcmd__help__subcmd__task_commands] )) ||
 _do-harness__subcmd__help__subcmd__task_commands() {
@@ -1669,6 +1744,11 @@ _do-harness__subcmd__metrics_commands() {
 _do-harness__subcmd__seed_commands() {
     local commands; commands=()
     _describe -t commands 'do-harness seed commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__status_commands] )) ||
+_do-harness__subcmd__status_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness status commands' commands "$@"
 }
 (( $+functions[_do-harness__subcmd__task_commands] )) ||
 _do-harness__subcmd__task_commands() {

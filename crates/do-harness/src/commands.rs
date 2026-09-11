@@ -7,7 +7,7 @@ use anyhow::{Context, Result};
 use crate::cli::{ErrorsAction, HookAction, TaskAction, TraceAction};
 use crate::doctor::describe_binary;
 use crate::report::Format;
-use crate::{config, errors, hooks, init, task, trace};
+use crate::{config, errors, hooks, task, trace};
 
 /// Dispatches audit-chain check and prints report.
 pub async fn audit_chain_cmd(root: &Path, format: Format) -> Result<()> {
@@ -405,32 +405,4 @@ pub fn init_target(explicit: Option<&Path>) -> Result<PathBuf> {
         return Ok(path.to_path_buf());
     }
     std::env::current_dir().context("failed to read current directory")
-}
-
-/// Prints the init report and next steps.
-pub fn print_init(report: &init::InitReport, root: &Path, language: init::Language) {
-    println!("Initialized do-harness workspace in {}", root.display());
-    for path in &report.written {
-        println!("  wrote {path}");
-    }
-    for path in &report.skipped {
-        println!("  skipped {path} (exists; re-run with --force to overwrite)");
-    }
-    println!("Seeded {} invariants.", report.seeded);
-    println!();
-    println!("Next steps:");
-    println!("  do-harness hook install   # wire git hooks");
-    println!("  do-harness list           # show the configured sensors");
-    match language {
-        init::Language::Rust => {
-            println!(
-                "  do-harness verify         # full rust suite; a fresh init scaffolded the crate to verify"
-            );
-        }
-        init::Language::Generic => {
-            println!(
-                "  do-harness verify         # NOTE: zero sensors — a pass is vacuous until you add [[sensors]]"
-            );
-        }
-    }
 }

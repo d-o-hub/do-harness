@@ -1,33 +1,59 @@
 //! `do-harness init`: scaffold a harness workspace in a consumer repository.
+//!
+//! Init is evidence-driven: it detects what the repository is, probes the
+//! candidate sensors' tooling, generates a contract containing only proven
+//! signals, then executes that contract once. A red baseline is surfaced
+//! (and fails the command) instead of presenting the repository as ready.
 
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 
 use anyhow::{Context, Result};
 
+pub mod baseline;
+pub mod detect;
+pub mod report;
+
+pub use baseline::{Baseline, BaselineState};
+pub use detect::{Candidate, CandidateStatus};
+pub use report::print_report;
+
 /// `.gitignore` entries the harness needs; appended, never clobbered.
 const GITIGNORE_ENTRIES: &str = ".do-harness/\n.agents/events/\n";
 
 /// Target language for the scaffolded sensor pack.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, clap::ValueEnum)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, serde::Serialize, clap::ValueEnum)]
+#[serde(rename_all = "lowercase")]
 pub enum Language {
-    /// Rust sensor pack (fmt/check/clippy/test/loc) plus a check-loc script.
+    /// Rust sensor pack (fmt/check/clippy/test/loc) plus check scripts.
+    #[default]
     Rust,
     /// No built-in sensors; commented sensor stubs to fill in.
     Generic,
 }
 
 /// Options for [`init_workspace`].
+///
+/// Each boolean maps 1:1 to an independent CLI flag (`--force`, `--no-seed`,
+/// `--minimal`, `--no-gitignore`); they are not a state machine.
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Clone)]
 pub struct InitOpts {
-    /// Which language pack to scaffold.
-    pub language: Language,
+    /// Explicit language pack; `None` detects it from the repository.
+    pub language: Option<Language>,
     /// Overwrite existing files.
     pub force: bool,
+    /// Skip seeding `plans/invariants.json` into the state database.
+    pub no_seed: bool,
+    /// Skip skill scaffolding.
+    pub minimal: bool,
+    /// Skip creating/modifying `.gitignore`.
+    pub no_gitignore: bool,
 }
 
 /// Files written or skipped during an init run.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, serde::Serialize)]
 pub struct InitReport {
     /// Relative paths written.
     pub written: Vec<String>,
@@ -37,10 +63,18 @@ pub struct InitReport {
     pub seeded: usize,
     /// Number of skills scaffolded (SKILL.md written).
     pub skills: usize,
+    /// Resolved language pack.
+    pub language: Language,
+    /// Human-readable repository facts.
+    pub detected: Vec<String>,
+    /// Probed candidate signals for the resolved pack.
+    pub candidates: Vec<Candidate>,
+    /// Outcome of executing the generated contract once; filled by
+    /// [`run_baseline`] (the CLI always runs it).
+    pub baseline: Option<Baseline>,
 }
 
 const AGENTS_TEMPLATE: &str = include_str!("../templates/AGENTS.md");
-const CONFIG_RUST: &str = include_str!("../templates/do-harness.toml.rust");
 const CONFIG_GENERIC: &str = include_str!("../templates/do-harness.toml.generic");
 const INVARIANTS_RUST: &str = include_str!("../templates/plans/invariants.json.rust");
 const INVARIANTS_GENERIC: &str = include_str!("../templates/plans/invariants.json.generic");
@@ -52,6 +86,12 @@ const CRATE_MANIFEST: &str = include_str!("../templates/crate/Cargo.toml");
 const CRATE_LIB: &str = include_str!("../templates/crate/src/lib.rs");
 
 /// Portable skill templates written into `.agents/skills/<name>/SKILL.md`.
+///
+/// Only skills with operational value to an adopting project are scaffolded.
+/// The do-harness development methodology skills (htn-planner, spike-runner,
+/// event-modeler, skill-distiller) remain in this repository's own
+/// `.agents/skills/` for developing do-harness, but are deliberately not
+/// forced onto consumers.
 struct SkillSpec {
     name: &'static str,
     skill_md: &'static str,
@@ -59,48 +99,14 @@ struct SkillSpec {
     walkthrough: Option<&'static str>,
 }
 
-const SKILLS: &[SkillSpec] = &[
-    SkillSpec {
-        name: "harness",
-        skill_md: include_str!("../templates/skills/harness/SKILL.md"),
-        evals: include_str!("../templates/skills/harness/evals/evals.json"),
-        walkthrough: Some(include_str!(
-            "../templates/skills/harness/evals/walkthrough.sh"
-        )),
-    },
-    SkillSpec {
-        name: "htn-planner",
-        skill_md: include_str!("../templates/skills/htn-planner/SKILL.md"),
-        evals: include_str!("../templates/skills/htn-planner/evals/evals.json"),
-        walkthrough: Some(include_str!(
-            "../templates/skills/htn-planner/evals/walkthrough.sh"
-        )),
-    },
-    SkillSpec {
-        name: "spike-runner",
-        skill_md: include_str!("../templates/skills/spike-runner/SKILL.md"),
-        evals: include_str!("../templates/skills/spike-runner/evals/evals.json"),
-        walkthrough: Some(include_str!(
-            "../templates/skills/spike-runner/evals/walkthrough.sh"
-        )),
-    },
-    SkillSpec {
-        name: "skill-distiller",
-        skill_md: include_str!("../templates/skills/skill-distiller/SKILL.md"),
-        evals: include_str!("../templates/skills/skill-distiller/evals/evals.json"),
-        walkthrough: Some(include_str!(
-            "../templates/skills/skill-distiller/evals/walkthrough.sh"
-        )),
-    },
-    SkillSpec {
-        name: "event-modeler",
-        skill_md: include_str!("../templates/skills/event-modeler/SKILL.md"),
-        evals: include_str!("../templates/skills/event-modeler/evals/evals.json"),
-        walkthrough: Some(include_str!(
-            "../templates/skills/event-modeler/evals/walkthrough.sh"
-        )),
-    },
-];
+const SKILLS: &[SkillSpec] = &[SkillSpec {
+    name: "harness",
+    skill_md: include_str!("../templates/skills/harness/SKILL.md"),
+    evals: include_str!("../templates/skills/harness/evals/evals.json"),
+    walkthrough: Some(include_str!(
+        "../templates/skills/harness/evals/walkthrough.sh"
+    )),
+}];
 
 /// skill-creator ships its scaffolding script and the structure gate so that a
 /// consumer's `do-harness eval` can run the real `quick_validate.py`.
@@ -113,8 +119,14 @@ const SKILL_CREATOR_QUICK_VALIDATE: &str =
 /// Scaffolds a harness workspace in `root`, then initializes the state
 /// database and seeds the invariants.
 ///
-/// Existing files are left untouched unless `opts.force` is set; `.gitignore`
-/// is appended to rather than overwritten.
+/// The language pack is detected from repository reality unless
+/// `opts.language` requests one explicitly. For Rust, the generated config
+/// includes only the probes that passed; missing required tooling is
+/// surfaced and omitted. Existing files are left untouched unless
+/// `opts.force` is set; `.gitignore` is appended to rather than overwritten.
+///
+/// The baseline execution is a separate step ([`run_baseline`]) so callers
+/// can scaffold without running the suite.
 ///
 /// # Errors
 ///
@@ -122,17 +134,34 @@ const SKILL_CREATOR_QUICK_VALIDATE: &str =
 /// initialized, or `plans/invariants.json` does not match the decision-header
 /// schema.
 pub async fn init_workspace(root: &Path, opts: &InitOpts) -> Result<InitReport> {
-    let mut report = InitReport::default();
+    let existing_language = if root.join("do-harness.toml").exists() {
+        crate::config::load(root, None)
+            .await
+            .ok()
+            .and_then(|cfg| cfg.language)
+    } else {
+        None
+    };
+    let detection = detect::inspect(root, opts.language, existing_language.as_deref());
+    let mut report = InitReport {
+        language: detection.language,
+        detected: detection.findings,
+        candidates: detection.candidates,
+        ..Default::default()
+    };
 
     validate_existing_invariants(root, opts)?;
 
     write_if_absent(root, "AGENTS.md", AGENTS_TEMPLATE, opts.force, &mut report)?;
-    let config = match opts.language {
-        Language::Rust => CONFIG_RUST,
-        Language::Generic => CONFIG_GENERIC,
+    let config = match report.language {
+        Language::Rust => {
+            let sensors = detect::included_specs(report.language, &report.candidates);
+            generate_rust_config(&sensors)?
+        }
+        Language::Generic => CONFIG_GENERIC.to_owned(),
     };
-    write_if_absent(root, "do-harness.toml", config, opts.force, &mut report)?;
-    let invariants = match opts.language {
+    write_if_absent(root, "do-harness.toml", &config, opts.force, &mut report)?;
+    let invariants = match report.language {
         Language::Rust => INVARIANTS_RUST,
         Language::Generic => INVARIANTS_GENERIC,
     };
@@ -143,17 +172,81 @@ pub async fn init_workspace(root: &Path, opts: &InitOpts) -> Result<InitReport> 
         opts.force,
         &mut report,
     )?;
-    if opts.language == Language::Rust {
+    if report.language == Language::Rust {
         scaffold_scripts(root, opts, &mut report)?;
         scaffold_crate(root, &mut report)?;
     }
+    if !opts.minimal {
+        scaffold_skills(root, opts, &mut report)?;
+    }
+    if !opts.no_gitignore {
+        append_gitignore(root, &mut report)?;
+    }
+
+    if !opts.no_seed {
+        report.seeded = seed_invariants(root, false).await?;
+    }
+    Ok(report)
+}
+
+/// Runs the effective contract once and stores the outcome in `report`.
+///
+/// # Errors
+///
+/// Returns an error when the config cannot be loaded or executed.
+pub async fn run_baseline(root: &Path, report: &mut InitReport) -> Result<()> {
+    let (cfg, _) = crate::config::load_raw(root, None).await?;
+    report.baseline = Some(baseline::run(&cfg, root)?);
+    Ok(())
+}
+
+/// Renders the Rust `do-harness.toml` for the included sensors.
+///
+/// Signal sets are derived from the pack: feedback is the fast subset,
+/// verification/release cover every included sensor. Hooks are filtered to
+/// included sensors too, so a missing tool cannot make a hook fail.
+fn generate_rust_config(sensors: &[crate::config::SensorSpec]) -> Result<String> {
+    let names: Vec<&str> = sensors.iter().map(|spec| spec.name.as_str()).collect();
+    let mut signal_sets: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    let feedback = ["fmt", "check", "clippy"]
+        .iter()
+        .filter(|name| names.contains(name))
+        .map(ToString::to_string)
+        .collect();
+    let full = names.iter().map(ToString::to_string).collect::<Vec<_>>();
+    signal_sets.insert("feedback".to_owned(), feedback);
+    signal_sets.insert("verification".to_owned(), full.clone());
+    signal_sets.insert("release".to_owned(), full);
+    let pre_commit = ["fmt", "loc"]
+        .iter()
+        .filter(|name| names.contains(name))
+        .map(ToString::to_string)
+        .collect();
+    let cfg = crate::config::Config {
+        language: Some("rust".to_owned()),
+        hooks: crate::config::HooksConfig {
+            pre_commit,
+            pre_push: Vec::new(),
+        },
+        signal_sets,
+        sensors: sensors.to_vec(),
+    };
+    let body = toml::to_string(&cfg).context("failed to render generated config")?;
+    Ok(format!(
+        "# do-harness.toml — generated by `do-harness init` from detected tooling.\n\
+         # Edit freely; `do-harness explain --set verification --changed` shows what applies.\n{body}"
+    ))
+}
+
+/// Writes the portable skill subset (harness + skill-creator).
+fn scaffold_skills(root: &Path, opts: &InitOpts, report: &mut InitReport) -> Result<()> {
     for spec in SKILLS {
         let skill_dir = format!(".agents/skills/{}", spec.name);
         let skill_md = format!("{skill_dir}/SKILL.md");
         // Count a skill as scaffolded only when its SKILL.md is actually
         // written (fresh, or overwritten via --force) — not when skipped.
         let skill_md_written = opts.force || !root.join(&skill_md).exists();
-        write_if_absent(root, &skill_md, spec.skill_md, opts.force, &mut report)?;
+        write_if_absent(root, &skill_md, spec.skill_md, opts.force, report)?;
         if skill_md_written {
             report.skills += 1;
         }
@@ -162,7 +255,7 @@ pub async fn init_workspace(root: &Path, opts: &InitOpts) -> Result<InitReport> 
             &format!("{skill_dir}/evals/evals.json"),
             spec.evals,
             opts.force,
-            &mut report,
+            report,
         )?;
         if let Some(walkthrough) = spec.walkthrough {
             write_if_absent(
@@ -170,7 +263,7 @@ pub async fn init_workspace(root: &Path, opts: &InitOpts) -> Result<InitReport> 
                 &format!("{skill_dir}/evals/walkthrough.sh"),
                 walkthrough,
                 opts.force,
-                &mut report,
+                report,
             )?;
             crate::fs_perm::set_owner_exec(
                 &root.join(format!("{skill_dir}/evals/walkthrough.sh")),
@@ -183,29 +276,26 @@ pub async fn init_workspace(root: &Path, opts: &InitOpts) -> Result<InitReport> 
         ".agents/skills/skill-creator/SKILL.md",
         SKILL_CREATOR_MD,
         opts.force,
-        &mut report,
+        report,
     )?;
     write_if_absent(
         root,
         ".agents/skills/skill-creator/scripts/init_skill.py",
         SKILL_CREATOR_INIT,
         opts.force,
-        &mut report,
+        report,
     )?;
     write_if_absent(
         root,
         ".agents/skills/skill-creator/scripts/quick_validate.py",
         SKILL_CREATOR_QUICK_VALIDATE,
         opts.force,
-        &mut report,
+        report,
     )?;
     crate::fs_perm::set_owner_exec(
         &root.join(".agents/skills/skill-creator/scripts/quick_validate.py"),
     )?;
-    append_gitignore(root, &mut report)?;
-
-    report.seeded = seed_invariants(root, false).await?;
-    Ok(report)
+    Ok(())
 }
 
 /// Validates a pre-existing `plans/invariants.json` BEFORE touching the

@@ -36,6 +36,8 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand check 'Run computational sensors'
             cand list 'List sensor names'
             cand ls 'List sensor names'
+            cand explain 'Explain which sensors the current change selects, without running them'
+            cand status 'Report verification evidence freshness without running sensors'
             cand init-db 'Apply pending database migrations'
             cand seed 'Seed invariants from plans/invariants.json'
             cand init 'Scaffold a harness workspace in a target directory'
@@ -72,6 +74,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
         }
         &'do-harness;verify'= {
             cand --format 'Output format'
+            cand --set 'Run only the sensors in this development signal set'
             cand --only 'Run only the named sensor (repeatable or comma-separated)'
             cand --exclude 'Exclude named sensors from the run'
             cand --task 'Scope records and fail-fast strikes to this task id'
@@ -81,6 +84,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand --color 'Color output (auto, always, never)'
             cand --output 'Default output file path'
             cand --fail-fast 'Halt at the first failing sensor'
+            cand --changed 'Run only sensors applicable to the working-tree change'
             cand --record 'Persist beats and error signatures into the state database'
             cand --strict 'Enforce strong evidence: exit non-zero on skips or missing timing/exit codes'
             cand -v 'Verbosity level (-v, -vv)'
@@ -95,6 +99,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
         }
         &'do-harness;check'= {
             cand --format 'Output format'
+            cand --set 'Run only the sensors in this development signal set'
             cand --only 'Run only the named sensor (repeatable or comma-separated)'
             cand --exclude 'Exclude named sensors from the run'
             cand --task 'Scope records and fail-fast strikes to this task id'
@@ -104,6 +109,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand --color 'Color output (auto, always, never)'
             cand --output 'Default output file path'
             cand --fail-fast 'Halt at the first failing sensor'
+            cand --changed 'Run only sensors applicable to the working-tree change'
             cand --record 'Persist beats and error signatures into the state database'
             cand --strict 'Enforce strong evidence: exit non-zero on skips or missing timing/exit codes'
             cand -v 'Verbosity level (-v, -vv)'
@@ -122,6 +128,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand --config 'Explicit path to do-harness.toml'
             cand --color 'Color output (auto, always, never)'
             cand --output 'Default output file path'
+            cand --sets 'List development signal-set names instead of sensors'
             cand -v 'Verbosity level (-v, -vv)'
             cand --verbose 'Verbosity level (-v, -vv)'
             cand -q 'Suppress non-error messages'
@@ -133,6 +140,43 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand --version 'Print version'
         }
         &'do-harness;ls'= {
+            cand --format 'Output format'
+            cand --root 'Workspace root override (default: walk up from cwd)'
+            cand --config 'Explicit path to do-harness.toml'
+            cand --color 'Color output (auto, always, never)'
+            cand --output 'Default output file path'
+            cand --sets 'List development signal-set names instead of sensors'
+            cand -v 'Verbosity level (-v, -vv)'
+            cand --verbose 'Verbosity level (-v, -vv)'
+            cand -q 'Suppress non-error messages'
+            cand --quiet 'Suppress non-error messages'
+            cand --dry-run 'Dry run without side effects'
+            cand -h 'Print help (see more with ''--help'')'
+            cand --help 'Print help (see more with ''--help'')'
+            cand -V 'Print version'
+            cand --version 'Print version'
+        }
+        &'do-harness;explain'= {
+            cand --set 'Explain this development signal set (default: all sensors)'
+            cand --format 'Output format'
+            cand --root 'Workspace root override (default: walk up from cwd)'
+            cand --config 'Explicit path to do-harness.toml'
+            cand --color 'Color output (auto, always, never)'
+            cand --output 'Default output file path'
+            cand --changed 'Select by working-tree change instead of listing everything'
+            cand -v 'Verbosity level (-v, -vv)'
+            cand --verbose 'Verbosity level (-v, -vv)'
+            cand -q 'Suppress non-error messages'
+            cand --quiet 'Suppress non-error messages'
+            cand --dry-run 'Dry run without side effects'
+            cand -h 'Print help (see more with ''--help'')'
+            cand --help 'Print help (see more with ''--help'')'
+            cand -V 'Print version'
+            cand --version 'Print version'
+        }
+        &'do-harness;status'= {
+            cand --set 'Check evidence for this development signal set'
+            cand --evidence 'Read evidence from this file instead of the default artifact'
             cand --format 'Output format'
             cand --root 'Workspace root override (default: walk up from cwd)'
             cand --config 'Explicit path to do-harness.toml'
@@ -183,7 +227,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand --version 'Print version'
         }
         &'do-harness;init'= {
-            cand --language 'Language pack to scaffold'
+            cand --language 'Language pack to scaffold (default: detect from the repository)'
             cand --format 'Output format'
             cand --root 'Workspace root override (default: walk up from cwd)'
             cand --config 'Explicit path to do-harness.toml'
@@ -819,6 +863,8 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand version 'Print CLI version information'
             cand verify 'Run computational sensors'
             cand list 'List sensor names'
+            cand explain 'Explain which sensors the current change selects, without running them'
+            cand status 'Report verification evidence freshness without running sensors'
             cand init-db 'Apply pending database migrations'
             cand seed 'Seed invariants from plans/invariants.json'
             cand init 'Scaffold a harness workspace in a target directory'
@@ -842,6 +888,10 @@ set edit:completion:arg-completer[do-harness] = {|@words|
         &'do-harness;help;verify'= {
         }
         &'do-harness;help;list'= {
+        }
+        &'do-harness;help;explain'= {
+        }
+        &'do-harness;help;status'= {
         }
         &'do-harness;help;init-db'= {
         }

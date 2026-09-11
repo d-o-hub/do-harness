@@ -4,45 +4,60 @@ language = "rust"
 pre-commit = ["fmt", "loc"]
 pre-push = []
 
+[signal-sets]
+feedback = ["fmt", "check", "clippy"]
+verification = ["fmt", "check", "clippy", "test", "loc", "skills", "deps", "shell", "check-agt", "audit", "commitlint"]
+release = ["fmt", "check", "clippy", "test", "loc", "skills", "deps", "shell", "check-agt", "audit", "commitlint"]
+
 [[sensors]]
 name = "fmt"
 argv = ["cargo", "fmt", "--all", "--", "--check"]
+when-changed = ["**/*.rs", "Cargo.toml", "Cargo.lock", "rust-toolchain.toml"]
 
 [[sensors]]
 name = "check"
 argv = ["cargo", "check", "--workspace"]
+when-changed = ["**/*.rs", "Cargo.toml", "Cargo.lock"]
 
 [[sensors]]
 name = "clippy"
 argv = ["cargo", "clippy", "--workspace", "--all-targets", "--", "-D", "warnings"]
+when-changed = ["**/*.rs", "Cargo.toml", "Cargo.lock"]
 
 [[sensors]]
 name = "test"
 argv = ["cargo", "test", "--workspace"]
+when-changed = ["**/*.rs", "Cargo.toml", "Cargo.lock"]
 
 [[sensors]]
 name = "loc"
 argv = ["bash", "scripts/check-loc.sh"]
+when-changed = ["**/*.rs"]
 
 [[sensors]]
 name = "skills"
 argv = ["bash", "scripts/check-skills-sync.sh"]
+when-changed = [".agents/skills/**", "crates/do-harness/templates/skills/**", "scripts/check-skills-sync.sh"]
 
 [[sensors]]
 name = "deps"
 argv = ["bash", "scripts/check-deps.sh"]
+when-changed = ["Cargo.toml", "Cargo.lock", "crates/**/Cargo.toml", "deny.toml", "scripts/check-deps.sh"]
 
 [[sensors]]
 name = "shell"
 argv = ["bash", "scripts/check-shell.sh"]
+when-changed = ["scripts/**", "crates/do-harness/templates/scripts/**"]
 
 [[sensors]]
 name = "check-agt"
 argv = ["cargo", "check", "-p", "guardian-proxy", "--features", "agt-governance"]
+when-changed = ["crates/guardian-proxy/**", "Cargo.toml", "Cargo.lock"]
 
 [[sensors]]
 name = "audit"
 argv = ["bash", "scripts/check-audit.sh"]
+when-changed = ["Cargo.toml", "Cargo.lock"]
 
 [[sensors]]
 name = "commitlint"

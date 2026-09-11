@@ -1,0 +1,30 @@
+{
+  "name": "dsh-do-harness",
+  "version": "0.1.0",
+  "description": "DeepSeek Harness bundle exposing do-harness development signals as one typed tool plus an optional strict completion gate.",
+  "type": "module",
+  "main": "index.js",
+  "files": [
+    "index.js",
+    "lib",
+    "cordis.patch.yml",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=22.19"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "keywords": [
+    "dsh-plugin",
+    "do-harness",
+    "verification"
+  ],
+  "license": "MIT"
+}

@@ -18,6 +18,7 @@ async fn record_verify_persists_beats_and_signatures() {
             allow_failure: false,
             output: "boom".to_owned(),
         }],
+        signal_set: None,
     };
 
     record_verify(dir.path(), &report, &[], None).await.unwrap();
@@ -53,6 +54,7 @@ async fn record_verify_skips_signatures_when_all_pass() {
             allow_failure: false,
             output: String::new(),
         }],
+        signal_set: None,
     };
 
     record_verify(dir.path(), &report, &[], None).await.unwrap();
@@ -87,6 +89,7 @@ async fn record_verify_skips_blocked_sensor_signature() {
             allow_failure: false,
             output: "halted: ...".to_owned(),
         }],
+        signal_set: None,
     };
 
     record_verify(dir.path(), &report, &["halted".to_owned()], None)
@@ -171,6 +174,7 @@ async fn record_verify_resets_strikes_on_pass() {
             allow_failure: false,
             output: String::new(),
         }],
+        signal_set: None,
     };
     record_verify(dir.path(), &report, &[], None).await.unwrap();
 
@@ -224,6 +228,7 @@ async fn record_verify_scopes_to_task() {
             allow_failure: false,
             output: "E0308".to_owned(),
         }],
+        signal_set: None,
     };
     record_verify(dir.path(), &report, &[], Some(task_id))
         .await

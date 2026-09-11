@@ -1,5 +1,5 @@
 {
-  "exported_at": 1789123035,
+  "exported_at": 1789144573,
   "tasks": [
     {
       "id": 1,
@@ -330,12 +330,111 @@
       "precondition": null,
       "created_at": 1789122968,
       "updated_at": 1789123034
+    },
+    {
+      "id": 31,
+      "parent_id": null,
+      "title": "feat: development signal sets over sensors (issue 1)",
+      "method": "vertical-event-slice",
+      "subtask_index": 5,
+      "status": "done",
+      "precondition": null,
+      "created_at": 1789132260,
+      "updated_at": 1789135242
+    },
+    {
+      "id": 32,
+      "parent_id": null,
+      "title": "feat: change-aware signal applicability and explain (issue 2)",
+      "method": "vertical-event-slice",
+      "subtask_index": 5,
+      "status": "done",
+      "precondition": null,
+      "created_at": 1789132260,
+      "updated_at": 1789136079
+    },
+    {
+      "id": 33,
+      "parent_id": null,
+      "title": "feat: fingerprints, freshness states and status (issue 3)",
+      "method": "vertical-event-slice",
+      "subtask_index": 5,
+      "status": "done",
+      "precondition": null,
+      "created_at": 1789132260,
+      "updated_at": 1789137165
+    },
+    {
+      "id": 34,
+      "parent_id": null,
+      "title": "feat: lean development-contract AGENTS.md generator (issue 4)",
+      "method": "vertical-event-slice",
+      "subtask_index": 5,
+      "status": "done",
+      "precondition": null,
+      "created_at": 1789141969,
+      "updated_at": 1789141997
+    },
+    {
+      "id": 35,
+      "parent_id": null,
+      "title": "feat: evidence-driven init and baseline proof (issue 5)",
+      "method": "vertical-event-slice",
+      "subtask_index": 5,
+      "status": "done",
+      "precondition": null,
+      "created_at": 1789141969,
+      "updated_at": 1789142019
+    },
+    {
+      "id": 36,
+      "parent_id": null,
+      "title": "feat: DSH development_signals bundle (issue 6)",
+      "method": "vertical-event-slice",
+      "subtask_index": 5,
+      "status": "done",
+      "precondition": null,
+      "created_at": 1789141969,
+      "updated_at": 1789142042
+    },
+    {
+      "id": 37,
+      "parent_id": null,
+      "title": "feat: DSH strict completion gate (issue 7)",
+      "method": "vertical-event-slice",
+      "subtask_index": 5,
+      "status": "done",
+      "precondition": null,
+      "created_at": 1789141969,
+      "updated_at": 1789142067
+    },
+    {
+      "id": 38,
+      "parent_id": null,
+      "title": "test: DSH end-to-end dogfood and CI job (issue 8)",
+      "method": "vertical-event-slice",
+      "subtask_index": 5,
+      "status": "done",
+      "precondition": null,
+      "created_at": 1789141969,
+      "updated_at": 1789142092
+    },
+    {
+      "id": 39,
+      "parent_id": null,
+      "title": "test: validate DSH bundle against real DSH runtime (0.1.5-rc.1)",
+      "method": "vertical-event-slice",
+      "subtask_index": 5,
+      "status": "done",
+      "precondition": null,
+      "created_at": 1789144534,
+      "updated_at": 1789144573
     }
   ],
   "summary": {
     "pending": 0,
     "in_progress": 0,
-    "done": 30,
+    "done": 39,
     "failed": 0
   }
 }
