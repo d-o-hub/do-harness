@@ -147,7 +147,7 @@ impl ProxyMediator {
 ///
 /// # Errors
 ///
-/// Returns [`GuardianError::Config`] when the upstream is missing, is not an
+/// Returns `GuardianError::Config` when the upstream is missing, is not an
 /// http(s) URL, or is denied by a rule.
 pub fn validate_upstream(config: &ProxyConfig) -> Result<()> {
     let host = upstream_host(&config.upstream).ok_or_else(|| {

@@ -3,7 +3,7 @@
 //!
 //! Module layout:
 //! - [`root`] — workspace root discovery
-//! - [`migrate`] — connection and embedded migrations
+//! - [`mod@migrate`] — connection and embedded migrations
 //! - [`repo`] — execution tables (tasks, invariants)
 //! - [`repo_exec`] — beats and error signatures
 //! - [`repo_scope`] — signature lifecycle (reset, list, clear)

@@ -99,7 +99,7 @@ fn known_max_version() -> i64 {
 
 /// Reads applied vs. known migration versions without mutating anything.
 ///
-/// Unlike [`migrate`], this never writes and never fails on a database from a
+/// Unlike [`migrate()`], this never writes and never fails on a database from a
 /// newer binary; it returns the raw versions so diagnostics (e.g. `doctor`)
 /// can classify skew before any persistence command hits the downgrade guard.
 ///
