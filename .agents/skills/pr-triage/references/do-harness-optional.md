@@ -31,7 +31,10 @@ zero LLM review; the residual is the only thing sent to the model.
 `do-harness` works in any git repository: no `do-harness.toml` and no
 initialization are required. Gate policy, when present, is read from
 `.github/pr-gate.toml` at the **merge-base revision only** (never the PR head);
-absent policy means nothing is proven.
+absent, malformed, or partially invalid policy means nothing is proven. A valid
+`[proof]` table opts in: `mechanical` globs may be skipped, `behavioral` globs
+never are, and structural rename-only/mode-only units are skipped. Contradicted
+mechanical claims appear in `false_proven` and stay residual.
 
 ## State
 

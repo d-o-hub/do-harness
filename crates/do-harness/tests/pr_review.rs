@@ -129,7 +129,7 @@ fn policy_is_read_from_the_merge_base_not_the_head() {
     commit_file(
         dir.path(),
         ".github/pr-gate.toml",
-        "strict = true\n",
+        "[proof]\nmechanical = [\"**/Cargo.lock\"]\n",
         "policy base",
     );
     let base_sha = String::from_utf8(
@@ -177,6 +177,107 @@ fn malformed_base_policy_warns_but_keeps_reviewing() {
     let report = json(&review(dir.path(), &["--format", "json"]));
     assert_eq!(report["policy"]["present"], serde_json::json!(true));
     assert!(!report["warnings"].as_array().unwrap().is_empty());
+    assert!(report["skipped"].as_array().unwrap().is_empty());
+}
+
+#[test]
+fn policy_skips_mechanical_units_and_audits_them() {
+    let dir = tempfile::tempdir().unwrap();
+    init_repo(dir.path());
+    commit_file(dir.path(), "src/lib.rs", "fn a() {}\n", "src base");
+    commit_file(dir.path(), "Cargo.lock", "# lock\n", "lock base");
+    commit_file(
+        dir.path(),
+        ".github/pr-gate.toml",
+        "[proof]\nmechanical = [\"**/Cargo.lock\"]\n",
+        "policy",
+    );
+    git(dir.path(), &["switch", "-q", "-c", "feature"]);
+    commit_file(dir.path(), "Cargo.lock", "# lock\n# dep\n", "lock change");
+    commit_file(dir.path(), "src/lib.rs", "fn a() { b(); }\n", "src change");
+
+    let report = json(&review(dir.path(), &["--format", "json"]));
+    assert_eq!(report["policy"]["present"], serde_json::json!(true));
+    let paths = |key: &str| -> Vec<String> {
+        report[key]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|unit| unit["path"].as_str().unwrap().to_owned())
+            .collect()
+    };
+    assert_eq!(paths("skipped"), vec!["Cargo.lock"]);
+    assert_eq!(paths("residual"), vec!["src/lib.rs"]);
+    assert!(report["false_proven"].as_array().unwrap().is_empty());
+    assert!(report["warnings"].as_array().unwrap().is_empty());
+}
+
+#[test]
+fn seeded_defect_is_never_skipped() {
+    let dir = tempfile::tempdir().unwrap();
+    init_repo(dir.path());
+    commit_file(
+        dir.path(),
+        "crates/core/src/lib.rs",
+        "pub fn a() {}\n",
+        "base",
+    );
+    commit_file(
+        dir.path(),
+        ".github/pr-gate.toml",
+        "[proof]\nmechanical = [\"**/*.rs\"]\nbehavioral = [\"crates/**\"]\n",
+        "policy",
+    );
+    git(dir.path(), &["switch", "-q", "-c", "feature"]);
+    commit_file(
+        dir.path(),
+        "crates/core/src/lib.rs",
+        "pub fn a() { panic!(); }\n",
+        "defect",
+    );
+
+    let report = json(&review(dir.path(), &["--format", "json"]));
+    assert!(report["skipped"].as_array().unwrap().is_empty());
+    assert_eq!(report["residual"].as_array().unwrap().len(), 1);
+    assert!(!report["false_proven"].as_array().unwrap().is_empty());
+}
+
+#[test]
+fn invalid_glob_proves_nothing() {
+    let dir = tempfile::tempdir().unwrap();
+    init_repo(dir.path());
+    commit_file(dir.path(), "Cargo.lock", "# lock\n", "lock base");
+    commit_file(
+        dir.path(),
+        ".github/pr-gate.toml",
+        "[proof]\nmechanical = [\"**/Cargo.lock\"]\nbehavioral = [\"[\"]\n",
+        "policy",
+    );
+    git(dir.path(), &["switch", "-q", "-c", "feature"]);
+    commit_file(dir.path(), "Cargo.lock", "# lock\n# dep\n", "lock change");
+
+    let report = json(&review(dir.path(), &["--format", "json"]));
+    assert!(report["skipped"].as_array().unwrap().is_empty());
+    assert!(!report["warnings"].as_array().unwrap().is_empty());
+}
+
+#[test]
+fn structural_rename_is_proven_with_policy() {
+    let dir = tempfile::tempdir().unwrap();
+    init_repo(dir.path());
+    commit_file(dir.path(), "old.txt", "content\n", "base");
+    commit_file(dir.path(), ".github/pr-gate.toml", "[proof]\n", "policy");
+    git(dir.path(), &["switch", "-q", "-c", "feature"]);
+    std::fs::rename(dir.path().join("old.txt"), dir.path().join("new.txt")).unwrap();
+    git(dir.path(), &["add", "-A"]);
+    git(dir.path(), &["commit", "-q", "-m", "rename"]);
+
+    let report = json(&review(dir.path(), &["--format", "json"]));
+    assert!(report["residual"].as_array().unwrap().is_empty());
+    let skipped = report["skipped"].as_array().unwrap();
+    assert_eq!(skipped.len(), 1);
+    assert_eq!(skipped[0]["path"], serde_json::json!("new.txt"));
+    assert_eq!(skipped[0]["header"], serde_json::json!("rename-only"));
 }
 
 #[test]
