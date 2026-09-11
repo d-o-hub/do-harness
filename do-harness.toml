@@ -25,6 +25,10 @@ name = "loc"
 argv = ["bash", "scripts/check-loc.sh"]
 
 [[sensors]]
+name = "skills"
+argv = ["bash", "scripts/check-skills-sync.sh"]
+
+[[sensors]]
 name = "deps"
 argv = ["bash", "scripts/check-deps.sh"]
 
