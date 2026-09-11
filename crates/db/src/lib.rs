@@ -7,7 +7,9 @@
 //! - [`repo`] — execution tables (tasks, invariants)
 //! - [`repo_exec`] — beats and error signatures
 //! - [`repo_scope`] — signature lifecycle (reset, list, clear)
-//! - [`repo_learn`] — learning tables (traces, heuristics, skill evals)
+//! - [`repo_trace`] — execution traces
+//! - [`repo_heuristic`] — distilled heuristics
+//! - [`repo_skill_eval`] — latest skill evaluations
 //! - [`repo_eval`] — eval-run history, skill bars, grader baselines
 //! - [`repo_workflow`] — append-only workflow events + transactional commands
 
@@ -19,9 +21,11 @@ pub mod migrate_catalog;
 pub mod repo;
 pub mod repo_eval;
 pub mod repo_exec;
-pub mod repo_learn;
+pub mod repo_heuristic;
 pub mod repo_metrics;
 pub mod repo_scope;
+pub mod repo_skill_eval;
+pub mod repo_trace;
 pub mod repo_workflow;
 pub mod root;
 
@@ -45,12 +49,13 @@ pub use repo_exec::{
     NewBeat, bump_error_signature, get_error_signature, insert_beat, list_beats,
     record_sensor_outcome,
 };
-pub use repo_learn::{
-    NewHeuristic, NewSkillEval, NewTrace, get_trace, insert_heuristic, insert_skill_eval,
-    insert_trace, list_all_skill_evals, list_heuristics, list_skill_evals, list_traces,
-};
+pub use repo_heuristic::{NewHeuristic, insert_heuristic, list_heuristics};
 pub use repo_metrics::{SensorStat, has_ok_beat, sensor_stats};
 pub use repo_scope::{clear_error_signatures, list_error_signatures, reset_error_signature};
+pub use repo_skill_eval::{
+    NewSkillEval, insert_skill_eval, list_all_skill_evals, list_skill_evals,
+};
+pub use repo_trace::{NewTrace, get_trace, insert_trace, list_traces};
 pub use repo_workflow::{
     WorkflowEventRow, advance_subtask_with_event, canonical_payload, chain_hash,
     insert_task_with_event, list_all_events, list_events_ascending, update_task_status_with_event,
