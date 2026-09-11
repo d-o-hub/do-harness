@@ -458,6 +458,7 @@ dependencies = [
  "clap_mangen",
  "do-harness-db",
  "do-harness-types",
+ "hex",
  "serde",
  "serde_json",
  "sha2",

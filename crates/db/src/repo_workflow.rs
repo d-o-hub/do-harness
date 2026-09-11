@@ -57,6 +57,19 @@ pub async fn insert_task_with_event(
     conn: &Connection,
     task: &NewTask<'_>,
 ) -> Result<(i64, WorkflowEvent)> {
+    crate::error::retry_on_busy(3, move || {
+        let conn = conn;
+        let task = task;
+        async move { insert_task_with_event_once(conn, task).await }
+    })
+    .await
+}
+
+/// Transaction body for [`insert_task_with_event`], retried as a unit on busy.
+async fn insert_task_with_event_once(
+    conn: &Connection,
+    task: &NewTask<'_>,
+) -> Result<(i64, WorkflowEvent)> {
     let tx = conn.transaction().await?;
     let id = insert_task(&tx, task).await?;
     let event = WorkflowEvent::TaskAdded(TaskAdded {
@@ -81,6 +94,19 @@ pub async fn insert_task_with_event(
 /// Returns an error when the gate fails, the update, event append, or
 /// transaction fails, or when the task does not exist.
 pub async fn advance_subtask_with_event(
+    conn: &Connection,
+    id: i64,
+    required_sensor: Option<&str>,
+) -> Result<(i64, WorkflowEvent)> {
+    crate::error::retry_on_busy(3, move || {
+        let conn = conn;
+        async move { advance_subtask_with_event_once(conn, id, required_sensor).await }
+    })
+    .await
+}
+
+/// Transaction body for [`advance_subtask_with_event`], retried on busy.
+async fn advance_subtask_with_event_once(
     conn: &Connection,
     id: i64,
     required_sensor: Option<&str>,
@@ -111,6 +137,20 @@ pub async fn advance_subtask_with_event(
 /// Returns an error when the state is not terminal, a gate fails, the update,
 /// event append, or transaction fails, or when the task does not exist.
 pub async fn update_task_status_with_event(
+    conn: &Connection,
+    id: i64,
+    status: TaskState,
+    required_sensors: &[String],
+) -> Result<WorkflowEvent> {
+    crate::error::retry_on_busy(3, move || {
+        let conn = conn;
+        async move { update_task_status_with_event_once(conn, id, status, required_sensors).await }
+    })
+    .await
+}
+
+/// Transaction body for [`update_task_status_with_event`], retried on busy.
+async fn update_task_status_with_event_once(
     conn: &Connection,
     id: i64,
     status: TaskState,

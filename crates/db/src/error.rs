@@ -141,7 +141,9 @@ where
             Ok(value) => return Ok(value),
             Err(err) if err.is_busy() && attempt + 1 < attempts => {
                 last = Some(err);
-                tokio::task::yield_now().await;
+                // Progressive backoff so the competing writer can finish.
+                let backoff = u64::try_from(attempt + 1).unwrap_or(1) * 10;
+                tokio::time::sleep(std::time::Duration::from_millis(backoff)).await;
             }
             Err(err) => return Err(err),
         }

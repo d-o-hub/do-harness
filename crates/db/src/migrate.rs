@@ -207,6 +207,16 @@ pub async fn migrate(conn: &Connection) -> Result<()> {
 ///
 /// Returns an error if connecting, backing up, or migrating fails.
 pub async fn connect_and_migrate(root: &Path) -> Result<Connection> {
+    crate::error::retry_on_busy(5, move || {
+        let root = root.to_path_buf();
+        async move { connect_and_migrate_once(&root).await }
+    })
+    .await
+}
+
+/// Single attempt body for [`connect_and_migrate`], retried as a unit when the
+/// connection or migration probe hits transient lock contention.
+async fn connect_and_migrate_once(root: &Path) -> Result<Connection> {
     let path = crate::root::db_path(root);
     let conn = connect(&path).await?;
     let skew = inspect_migrations(&conn).await?;
@@ -216,8 +226,40 @@ pub async fn connect_and_migrate(root: &Path) -> Result<Connection> {
     {
         backup_state_file(&path)?;
     }
-    migrate(&conn).await?;
+    migrate_with_retry(&conn).await?;
     Ok(conn)
+}
+
+/// Applies migrations, tolerating a concurrent migrator.
+///
+/// Two processes can pass the pending check together; the loser then fails on
+/// a duplicate `CREATE`/`ALTER` mid-migration (rolled back atomically). If the
+/// catalog is fully applied afterwards, the loser simply succeeds.
+///
+/// # Errors
+///
+/// Returns the last migration error when the catalog is still not applied.
+async fn migrate_with_retry(conn: &Connection) -> Result<()> {
+    const ATTEMPTS: usize = 5;
+
+    let mut last: Option<DbError> = None;
+    for attempt in 0..ATTEMPTS {
+        match migrate(conn).await {
+            Ok(()) => return Ok(()),
+            Err(err) if err.is_busy() && attempt + 1 < ATTEMPTS => {
+                last = Some(err);
+                tokio::task::yield_now().await;
+            }
+            Err(err) => {
+                let skew = inspect_migrations(conn).await?;
+                if skew.applied_max == Some(skew.known_max) {
+                    return Ok(());
+                }
+                return Err(err);
+            }
+        }
+    }
+    Err(last.unwrap_or_else(|| DbError::NotFound("migration retry state lost".to_owned())))
 }
 
 /// Copies the state database beside itself as `<file>.bak`.
