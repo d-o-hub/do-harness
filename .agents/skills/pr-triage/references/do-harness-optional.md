@@ -25,6 +25,11 @@ prove, with minimal context and an audit list of skipped (proven) units. Review
 only the residual units. If `false_proven` guards or parse errors appear in the
 output, treat those units as unresolved and escalate.
 
+Check `measurement.verdict` before using the residual: review the residual only
+when it is `reduced`; on `no-go` the residual is not smaller than the raw diff,
+so use `gh pr diff PR`. Record `t_raw`, `t_res`, `ratio`, and `verdict` in the
+sweep report for every PR where `pr review` ran.
+
 In the full-autonomy path, mechanical and dependency-only changes merge with
 zero LLM review; the residual is the only thing sent to the model.
 

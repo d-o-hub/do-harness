@@ -90,6 +90,11 @@ fn range_review_lists_residual_units_and_serves_cache() {
     assert_eq!(report["skipped"].as_array().unwrap().len(), 0);
     assert_eq!(report["false_proven"].as_array().unwrap().len(), 0);
     assert!(!report["merge_base"].as_str().unwrap().is_empty());
+    let measurement = &report["measurement"];
+    assert!(measurement["t_raw"].as_u64().unwrap() > 0);
+    assert!(measurement["t_res"].as_u64().unwrap() > 0);
+    assert!(measurement["ratio"].as_f64().unwrap() > 0.0);
+    assert!(measurement["verdict"].is_string());
     let residual = report["residual"].as_array().unwrap();
     assert!(residual.len() >= 2, "residual: {residual:?}");
     assert!(residual.iter().all(|unit| unit["id"].is_string()));
@@ -210,6 +215,13 @@ fn policy_skips_mechanical_units_and_audits_them() {
     assert_eq!(paths("residual"), vec!["src/lib.rs"]);
     assert!(report["false_proven"].as_array().unwrap().is_empty());
     assert!(report["warnings"].as_array().unwrap().is_empty());
+    assert_eq!(
+        report["measurement"]["verdict"],
+        serde_json::json!("reduced")
+    );
+    let t_raw = report["measurement"]["t_raw"].as_u64().unwrap();
+    let t_res = report["measurement"]["t_res"].as_u64().unwrap();
+    assert!(t_res < t_raw, "t_res={t_res} t_raw={t_raw}");
 }
 
 #[test]
