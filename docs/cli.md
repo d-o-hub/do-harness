@@ -293,6 +293,12 @@ revisions or diff cannot be resolved, and `2` for invalid arguments. The only
 write is a best-effort cache under the repository git directory; the command
 never writes into the work tree.
 
+JSON reports also carry `measurement`: `t_raw` (unified-diff bytes), `t_res`
+(serialized residual payload bytes), `ratio` (`t_res / t_raw`), and `verdict`
+(`reduced` when `t_res < t_raw`, otherwise `no-go`). Shared review context
+cancels out; the JSON envelope counts against the residual. Consumers should
+review the residual only on `reduced` and fall back to the raw diff on `no-go`.
+
 ### `completions`
 Generate shell completions for `bash`, `zsh`, `fish`, `powershell`, `elvish`.
 

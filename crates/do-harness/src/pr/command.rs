@@ -12,7 +12,7 @@ use crate::report::Format;
 use super::diff::Change;
 use super::gh;
 use super::no_effect::{self, Effect};
-use super::review::{self, ReviewReport};
+use super::review::{self, Reduction, ReviewReport};
 
 /// What to analyze.
 #[derive(Debug, Clone)]
@@ -174,6 +174,13 @@ fn print_review(report: &ReviewReport) {
         report.residual.len(),
         report.skipped.len()
     );
+    println!(
+        "input: {} -> {} bytes ({:.3}, {})",
+        report.measurement.t_raw,
+        report.measurement.t_res,
+        report.measurement.ratio,
+        reduction_label(report.measurement.verdict)
+    );
     for unit in &report.skipped {
         let anchor = unit.header.as_deref().unwrap_or("-");
         println!(
@@ -204,6 +211,13 @@ fn change_label(change: Change) -> &'static str {
         Change::Modified => "modified",
         Change::Deleted => "deleted",
         Change::Renamed => "renamed",
+    }
+}
+
+fn reduction_label(reduction: Reduction) -> &'static str {
+    match reduction {
+        Reduction::Reduced => "reduced",
+        Reduction::NoGo => "no-go",
     }
 }
 

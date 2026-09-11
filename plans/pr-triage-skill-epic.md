@@ -1,6 +1,6 @@
 # Epic: pr-triage Agent Skill
 
-> **Status:** phase 1 complete (skill + evals); phase 2 complete (`pr no-effect` + `pr review` with cache); phase 3 complete (proof skipping + `false_proven`)
+> **Status:** phases 1–4 complete (skill + evals; `pr no-effect` + `pr review` with cache; proof skipping + `false_proven`; measurement + benchmark)
 > **Related:** Agent Skills open standard, GitHub PR lifecycle, optional `do-harness` token reduction
 > **Created:** 2026-09-11
 
@@ -112,6 +112,25 @@ residual plus evidence; the skill works with `gh` + `git` alone.
   now 11 cases including the seeded-defect oracle (`mechanical = ["**/*.rs"]`
   overridden by `behavioral = ["crates/**"]` never skips the defect), mechanical
   lockfile audit, invalid-glob fail-closed, and structural rename proof.
+
+## Phase 4 completion — context-inclusive measurement (2026-09-11)
+
+- `pr review` report v3 adds `measurement`: `t_raw` (unified-diff bytes), `t_res`
+  (serialized residual payload bytes), `ratio`, and `verdict` (`reduced` iff
+  `t_res < t_raw`, otherwise `no-go`). Context shared by both review paths
+  cancels out; the JSON envelope counts against the residual.
+- `scripts/pr-review-benchmark.sh [COUNT]` replays the last first-parent commits
+  and reports `t_raw`/`t_res`/`verdict`/`skipped` per commit plus ordinary-PR
+  totals. Run:
+  `DO_HARNESS_BIN=target/debug/do-harness bash scripts/pr-review-benchmark.sh 15`.
+- Benchmark over this repository's 15 first-parent commits (no proof policy
+  present, so all ordinary): **2 reduced / 13 no-go**. Finding: the JSON
+  residual does not beat `gh pr diff` for ordinary PRs; the win comes only when
+  proof skipping removes units (asserted in `tests/pr_review.rs` with a skipped
+  lockfile). The skill now reviews the residual only on `reduced`, falls back to
+  `gh pr diff` on `no-go`, and records the four measurement fields per sweep.
+- Evidence: `review::tests` pins the reduced/no-go/empty computation;
+  `tests/pr_review.rs` asserts measurement fields and the reduced case.
 
 ## Task tracking note
 

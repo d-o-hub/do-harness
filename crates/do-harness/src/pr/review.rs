@@ -15,7 +15,7 @@ use super::proof::{self, GatePolicy, ProofRules};
 use crate::changes::git_command;
 
 /// Stable review report schema version.
-pub const SCHEMA_VERSION: u32 = 2;
+pub const SCHEMA_VERSION: u32 = 3;
 
 /// Where the gate policy was read from and whether it parsed.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -41,6 +41,33 @@ pub struct FalseProven {
     pub unit_id: String,
     /// Why the skip is untrusted.
     pub reason: String,
+}
+
+/// Review-input reduction verdict.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum Reduction {
+    /// The residual is smaller than the raw diff.
+    Reduced,
+    /// The residual is not smaller; review the raw diff instead.
+    NoGo,
+}
+
+/// Context-inclusive input-size measurement for one review.
+///
+/// `t_raw` is the unified-diff size in bytes and `t_res` the serialized
+/// residual payload in bytes — the only thing sent for review. Context shared
+/// by both review paths is identical and drops out of the comparison.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Measurement {
+    /// Raw diff size in bytes.
+    pub t_raw: usize,
+    /// Residual payload size in bytes.
+    pub t_res: usize,
+    /// `t_res / t_raw`, rounded to three decimals; `0.0` for an empty diff.
+    pub ratio: f64,
+    /// Whether the residual reduced the review input.
+    pub verdict: Reduction,
 }
 
 /// Deterministic review report.
@@ -69,6 +96,8 @@ pub struct ReviewReport {
     pub skipped: Vec<Unit>,
     /// Revoked mechanical claims; the affected units stay residual.
     pub false_proven: Vec<FalseProven>,
+    /// Input-size measurement for the sweep report.
+    pub measurement: Measurement,
     /// Non-fatal diagnostics; affected units stay residual.
     pub warnings: Vec<String>,
 }
@@ -204,6 +233,9 @@ fn assemble(inputs: Inputs<'_>, recompute: bool) -> ReviewReport {
             }
         }
     }
+    let t_raw = inputs.diff.len();
+    let t_res = serde_json::to_string(&residual).map_or(t_raw, |json| json.len());
+    let measurement = measure(t_raw, t_res);
     let mut report = ReviewReport {
         schema_version: SCHEMA_VERSION,
         mode: inputs.mode.to_owned(),
@@ -216,6 +248,7 @@ fn assemble(inputs: Inputs<'_>, recompute: bool) -> ReviewReport {
         residual,
         skipped,
         false_proven,
+        measurement,
         warnings,
     };
     if inputs.cacheable {
@@ -333,4 +366,44 @@ fn sha256_hex(bytes: &[u8]) -> String {
     let mut hasher = Sha256::new();
     hasher.update(bytes);
     hex::encode(hasher.finalize())
+}
+
+/// Builds the reduction measurement, rounding the ratio to three decimals.
+#[allow(clippy::cast_precision_loss)]
+fn measure(t_raw: usize, t_res: usize) -> Measurement {
+    let ratio = if t_raw == 0 {
+        0.0
+    } else {
+        ((t_res as f64 / t_raw as f64) * 1000.0).round() / 1000.0
+    };
+    let verdict = if t_res < t_raw {
+        Reduction::Reduced
+    } else {
+        Reduction::NoGo
+    };
+    Measurement {
+        t_raw,
+        t_res,
+        ratio,
+        verdict,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used)]
+
+    use super::*;
+
+    #[test]
+    fn measure_reduces_and_reports_no_go() {
+        let reduced = measure(100, 50);
+        assert_eq!(reduced.verdict, Reduction::Reduced);
+        assert!((reduced.ratio - 0.5).abs() < 1e-9);
+        let no_go = measure(100, 100);
+        assert_eq!(no_go.verdict, Reduction::NoGo);
+        let empty = measure(0, 0);
+        assert_eq!(empty.verdict, Reduction::NoGo);
+        assert!(empty.ratio.abs() < 1e-9);
+    }
 }

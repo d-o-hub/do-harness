@@ -64,7 +64,8 @@ Run these steps in order. Stop the sweep on any escalation and report it.
    with `scripts/threads.sh issue-comments PR` findings; they cannot be resolved.
    Escalate comments that require a product or human decision.
 10. **Review and roast.** If `do-harness pr review` is available, run it and
-    review only its residual units; otherwise roast `gh pr diff PR`. Follow
+    review its residual units only when `measurement.verdict` is `reduced`;
+    otherwise roast `gh pr diff PR`. Follow
     [references/review-contract.md](references/review-contract.md): concrete
     defects only, with failure mode, evidence, severity, and smallest fix.
     Apply blocking fixes, commit, push, then return to step 7. Cap at three
@@ -78,7 +79,9 @@ Run these steps in order. Stop the sweep on any escalation and report it.
     halt the sweep, and report. Record the outcome with
     `scripts/state.sh set PR HEAD_SHA BASE_SHA merged` (or `reverted`).
 13. **Report.** After the sweep, print one line per PR: number, decision
-    (merged, closed, fixed, skipped, escalated), head SHA, and reason.
+    (merged, closed, fixed, skipped, escalated), head SHA, and reason. Include
+    the review `measurement` (`t_raw`, `t_res`, `ratio`, `verdict`) for every PR
+    where `do-harness pr review` ran.
 
 ## Guardrails
 
