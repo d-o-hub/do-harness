@@ -14,7 +14,7 @@ argv = ["cargo", "check", "--workspace"]
 
 [[sensors]]
 name = "clippy"
-argv = ["cargo", "clippy", "--workspace", "--", "-D", "warnings"]
+argv = ["cargo", "clippy", "--workspace", "--all-targets", "--", "-D", "warnings"]
 
 [[sensors]]
 name = "test"

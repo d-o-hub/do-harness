@@ -157,6 +157,8 @@ fn resolve_git_sha(root: &Path) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used)]
+
     use super::*;
 
     #[test]
@@ -210,8 +212,8 @@ mod tests {
             tool: "do-harness",
             harness_version: "0.1.0",
             git_sha: Some("46463ef".into()),
-            started_at: 1755852762,
-            finished_at: 1755852810,
+            started_at: 1_755_852_762,
+            finished_at: 1_755_852_810,
             root: "/abs/workspace".into(),
             task_id: None,
             sensor_pack: "rust".into(),
