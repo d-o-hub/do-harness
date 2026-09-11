@@ -123,7 +123,7 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
         Command::Version { .. }
         | Command::Compliance { .. }
         | Command::Completions { .. }
-        | Command::Man { .. } => unreachable!(),
+        | Command::Man { .. } => unreachable!("version/compliance/completions/man handled above"),
         Command::Init {
             language,
             force,
