@@ -1,0 +1,57 @@
+[
+  {
+    "number": 1,
+    "isDraft": false,
+    "baseRefName": "main",
+    "headRefName": "feature-a",
+    "headRefOid": "a",
+    "mergeStateStatus": "CLEAN",
+    "author": { "login": "me" },
+    "createdAt": "2024-01-01T00:00:00Z",
+    "labels": []
+  },
+  {
+    "number": 2,
+    "isDraft": false,
+    "baseRefName": "feature-a",
+    "headRefName": "feature-b",
+    "headRefOid": "b",
+    "mergeStateStatus": "BEHIND",
+    "author": { "login": "me" },
+    "createdAt": "2024-01-02T00:00:00Z",
+    "labels": []
+  },
+  {
+    "number": 3,
+    "isDraft": true,
+    "baseRefName": "main",
+    "headRefName": "feature-c",
+    "headRefOid": "c",
+    "mergeStateStatus": "CLEAN",
+    "author": { "login": "me" },
+    "createdAt": "2024-01-01T00:00:00Z",
+    "labels": []
+  },
+  {
+    "number": 4,
+    "isDraft": false,
+    "baseRefName": "main",
+    "headRefName": "feature-d",
+    "headRefOid": "d",
+    "mergeStateStatus": "CLEAN",
+    "author": { "login": "me" },
+    "createdAt": "2023-12-01T00:00:00Z",
+    "labels": [{ "name": "hold" }]
+  },
+  {
+    "number": 5,
+    "isDraft": false,
+    "baseRefName": "main",
+    "headRefName": "feature-e",
+    "headRefOid": "e",
+    "mergeStateStatus": "CLEAN",
+    "author": { "login": "me" },
+    "createdAt": "2023-12-31T00:00:00Z",
+    "labels": []
+  }
+]

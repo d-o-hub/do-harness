@@ -1,0 +1,69 @@
+{
+  "skill_name": "pr-triage",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Review the pr-triage skill contract: it must forbid auto-merge, require --match-head-commit, update to the latest base, gate on every check, and resolve review threads with evidence.",
+      "expected_output": "SKILL.md and references state the guardrails, and the deterministic scripts for preflight, merge ordering, no-effect, checks, threads, and state ship with the skill.",
+      "files": [],
+      "assertions": [
+        "walk:",
+        "contains:.agents/skills/pr-triage/SKILL.md|--match-head-commit",
+        "contains:.agents/skills/pr-triage/SKILL.md|Never use auto-merge",
+        "contains:.agents/skills/pr-triage/references/merge-order.md|update-branch",
+        "contains:.agents/skills/pr-triage/references/check-policy.md|SKIP",
+        "contains:.agents/skills/pr-triage/references/review-contract.md|failure mode",
+        "exists:.agents/skills/pr-triage/scripts/preflight.sh",
+        "exists:.agents/skills/pr-triage/scripts/state.sh"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Given open PRs that include a stack, a draft, a hold-labeled PR, and two independent PRs, produce the merge order; then detect whether a changed PR and an empty-commit PR have any effective change.",
+      "expected_output": "Order is stack first, then oldest-first, with drafts and hold-labeled PRs excluded; the changed PR reports has-effect and the empty commit reports no-effect.",
+      "files": [],
+      "assertions": [
+        "walk:",
+        "contains:pr_list_order.txt|2,5,1",
+        "contains:no_effect_has.txt|has-effect",
+        "contains:no_effect_empty.txt|no-effect"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Classify a PR's checks when everything passes with one job skipped, when a job fails, and when a job is still running.",
+      "expected_output": "The pass case exits 0 with a PASS summary, the failure case exits 1 with FAIL, and the pending case exits 2 with PENDING.",
+      "files": [],
+      "assertions": [
+        "walk:",
+        "contains:checks_summary.txt|pass_exit=0",
+        "contains:checks_summary.txt|fail_exit=1",
+        "contains:checks_summary.txt|pending_exit=2",
+        "contains:checks_fail.out|FAIL"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "List review threads on a PR, resolve one, and track sweep state across set/get/clear.",
+      "expected_output": "The unresolved thread is listed, resolution returns resolved=true, the state record is readable after set, and clearing removes it.",
+      "files": [],
+      "assertions": [
+        "walk:",
+        "contains:threads.tsv|T_1",
+        "contains:thread_resolve.txt|resolved=true",
+        "contains:state_get.txt|merged",
+        "contains:state_cleared.txt|cleared"
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "Run the harness no-effect command on the sandbox repository against an unchanged revision.",
+      "expected_output": "The command exits 0 and reports no-effect for base and head pointing at the same revision.",
+      "files": [],
+      "assertions": [
+        "walk:",
+        "cli:pr no-effect --base HEAD --head HEAD:contains:no-effect"
+      ]
+    }
+  ]
+}

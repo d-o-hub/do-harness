@@ -1,0 +1,10 @@
+{
+  "check_runs": [
+    {
+      "name": "verify",
+      "status": "completed",
+      "conclusion": "failure",
+      "app": { "slug": "github-actions" }
+    }
+  ]
+}
