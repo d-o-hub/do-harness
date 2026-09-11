@@ -56,6 +56,7 @@ pub async fn run_eval(
             .to_owned();
 
         let hashes = crate::eval_integrity::grader_hashes(&skills_root.join(&name))
+            .await
             .context(format!("failed to hash graders for skill '{name}'"))?;
         let baseline = do_harness_db::get_grader_baseline(&conn, &name).await?;
         if let Some(baseline) = &baseline {
@@ -160,6 +161,7 @@ pub async fn run_eval(
     }
 }
 
+#[must_use]
 pub(super) fn discover_skills(skills_root: &Path) -> Vec<PathBuf> {
     let mut dirs = Vec::new();
     let Ok(entries) = fs::read_dir(skills_root) else {

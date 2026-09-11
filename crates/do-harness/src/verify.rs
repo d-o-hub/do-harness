@@ -10,7 +10,9 @@ pub(crate) async fn run(root: &Path, mut opts: VerifyOpts) -> std::result::Resul
     let started_at = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_or(0, |d| i64::try_from(d.as_secs()).unwrap_or(i64::MAX));
-    let cfg = config::load(root, opts.config.as_deref()).map_err(CliError::Usage)?;
+    let cfg = config::load(root, opts.config.as_deref())
+        .await
+        .map_err(CliError::Usage)?;
     if opts.record {
         opts.blocked = telemetry::blocked_sensors(root, &cfg.sensor_names(), opts.task)
             .await
@@ -49,12 +51,14 @@ pub(crate) async fn run(root: &Path, mut opts: VerifyOpts) -> std::result::Resul
                 );
                 if let Some(parent) = path.parent() {
                     if !parent.as_os_str().is_empty() {
-                        let _ = std::fs::create_dir_all(parent);
+                        let _ = tokio::fs::create_dir_all(parent).await;
                     }
                 }
                 let json =
                     serde_json::to_vec_pretty(&doc).map_err(|e| CliError::Verify(e.into()))?;
-                std::fs::write(&path, json).map_err(|e| CliError::Verify(e.into()))?;
+                tokio::fs::write(&path, json)
+                    .await
+                    .map_err(|e| CliError::Verify(e.into()))?;
 
                 if opts.strict && !doc.is_strict_clean() {
                     eprintln!(

@@ -10,6 +10,7 @@ pub(super) enum GateVerdict {
     Unavailable,
 }
 
+#[must_use]
 pub(super) fn run_structure_gate(dir: &Path, gate_script: &Path) -> (GateVerdict, String) {
     if !gate_script.is_file() {
         return (

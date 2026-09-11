@@ -31,9 +31,9 @@ const BUILTIN_CATALOG: &str = include_str!("../../../plans/methods.json");
 ///
 /// Returns an error when the file exists but cannot be read or does not match
 /// the method catalog schema.
-pub fn load_methods(root: &Path) -> Result<Vec<Method>> {
+pub async fn load_methods(root: &Path) -> Result<Vec<Method>> {
     let path = root.join("plans/methods.json");
-    match std::fs::read_to_string(&path) {
+    match tokio::fs::read_to_string(&path).await {
         Ok(text) => {
             let file: MethodFile = serde_json::from_str(&text).with_context(|| {
                 format!(

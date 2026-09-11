@@ -1,6 +1,5 @@
 //! Evaluation JSON contracts and assertion grading.
 
-use std::fs;
 use std::io;
 use std::path::Path;
 
@@ -57,7 +56,13 @@ pub(super) async fn check_skill(
         expected_outcome: None,
     };
 
-    let (verdict, gate_msg) = run_structure_gate(dir, gate_script);
+    let (verdict, gate_msg) = {
+        let dir = dir.to_path_buf();
+        let gate_script = gate_script.to_path_buf();
+        tokio::task::spawn_blocking(move || run_structure_gate(&dir, &gate_script))
+            .await
+            .with_context(|| format!("structure gate task failed for '{name}'"))?
+    };
     if verdict == GateVerdict::Fail {
         return Ok(SkillReport {
             gate_failed: true,
@@ -76,7 +81,7 @@ pub(super) async fn check_skill(
     };
 
     let evals_path = dir.join("evals/evals.json");
-    let content = match fs::read_to_string(&evals_path) {
+    let content = match tokio::fs::read_to_string(&evals_path).await {
         Ok(content) => content,
         Err(err) if err.kind() == io::ErrorKind::NotFound => {
             let mut report = empty();
@@ -97,7 +102,13 @@ pub(super) async fn check_skill(
         }
     };
 
-    let walk = crate::eval_walk::run_walkthrough(dir, root);
+    let walk = {
+        let dir = dir.to_path_buf();
+        let root = root.to_path_buf();
+        tokio::task::spawn_blocking(move || crate::eval_walk::run_walkthrough(&dir, &root))
+            .await
+            .with_context(|| format!("walkthrough task failed for '{name}'"))?
+    };
     let outcome = grade_skill(&parsed, root, &walk).await?;
 
     let line = match outcome.pass_rate {

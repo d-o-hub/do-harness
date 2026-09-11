@@ -1,5 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
+use std::fs;
+
 use super::*;
 
 /// Writes a minimal frozen method catalog for tests that gate on it.

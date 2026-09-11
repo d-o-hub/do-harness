@@ -10,7 +10,7 @@ license = "MIT"
 
 [workspace.dependencies]
 libsql = { version = "0.9", default-features = false }
-tokio = { version = "1", features = ["rt", "macros"] }
+tokio = { version = "1", features = ["rt", "macros", "fs", "process", "sync"] }
 anyhow = "1"
 serde = "1"
 serde_json = "1"

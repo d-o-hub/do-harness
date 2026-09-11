@@ -164,7 +164,9 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
             verify::run(&root, opts).await
         }
         Command::List { format } => {
-            let cfg = config::load(&root, cli.config.as_deref()).map_err(CliError::Usage)?;
+            let cfg = config::load(&root, cli.config.as_deref())
+                .await
+                .map_err(CliError::Usage)?;
             report::print_names(&cfg.sensor_names(), format);
             Ok(())
         }
@@ -217,9 +219,9 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
         )
         .await
         .map_err(CliError::Verify),
-        Command::Hook { action } => {
-            commands::hook(&root, cli.config.as_deref(), action).map_err(CliError::Usage)
-        }
+        Command::Hook { action } => commands::hook(&root, cli.config.as_deref(), action)
+            .await
+            .map_err(CliError::Usage),
         Command::Doctor { format, strict } => doctor::run(&root, format, strict)
             .await
             .map_err(CliError::Verify),

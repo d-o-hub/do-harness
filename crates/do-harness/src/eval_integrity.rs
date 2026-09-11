@@ -49,9 +49,9 @@ impl GraderHashes {
 /// # Errors
 ///
 /// Returns an error when an existing grader file cannot be read.
-pub fn grader_hashes(skill_dir: &Path) -> Result<GraderHashes> {
+pub async fn grader_hashes(skill_dir: &Path) -> Result<GraderHashes> {
     let walkthrough = skill_dir.join("evals/walkthrough.sh");
-    let walkthrough_bytes = match std::fs::read(&walkthrough) {
+    let walkthrough_bytes = match tokio::fs::read(&walkthrough).await {
         Ok(bytes) => bytes,
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => Vec::new(),
         Err(err) => {
@@ -59,7 +59,7 @@ pub fn grader_hashes(skill_dir: &Path) -> Result<GraderHashes> {
         }
     };
     let specs_path = skill_dir.join("evals/evals.json");
-    let specs_bytes = match std::fs::read(&specs_path) {
+    let specs_bytes = match tokio::fs::read(&specs_path).await {
         Ok(bytes) => bytes,
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => Vec::new(),
         Err(err) => {
@@ -103,35 +103,35 @@ mod tests {
         dir.to_path_buf()
     }
 
-    #[test]
-    fn hashes_are_deterministic_and_content_sensitive() {
+    #[tokio::test(flavor = "current_thread")]
+    async fn hashes_are_deterministic_and_content_sensitive() {
         let dir = tempfile::tempdir().unwrap();
         let skill = write_skill(
             dir.path(),
             Some("#!/bin/sh\nexit 0\n"),
             "{\"skill_name\":\"x\",\"evals\":[]}",
         );
-        let first = grader_hashes(&skill).unwrap();
-        let again = grader_hashes(&skill).unwrap();
+        let first = grader_hashes(&skill).await.unwrap();
+        let again = grader_hashes(&skill).await.unwrap();
         assert_eq!(first, again);
         assert_eq!(first.walkthrough_sha.len(), 64);
 
         std::fs::write(skill.join("evals/walkthrough.sh"), "#!/bin/sh\nexit 1\n").unwrap();
-        let changed = grader_hashes(&skill).unwrap();
+        let changed = grader_hashes(&skill).await.unwrap();
         assert_ne!(first.walkthrough_sha, changed.walkthrough_sha);
         assert_eq!(first.specs_sha, changed.specs_sha);
     }
 
-    #[test]
-    fn missing_walkthrough_hashes_as_empty() {
+    #[tokio::test(flavor = "current_thread")]
+    async fn missing_walkthrough_hashes_as_empty() {
         let dir = tempfile::tempdir().unwrap();
         let skill = write_skill(dir.path(), None, "{}");
-        let hashes = grader_hashes(&skill).unwrap();
+        let hashes = grader_hashes(&skill).await.unwrap();
         assert_eq!(hashes.walkthrough_sha, hex_sha256(&[]));
     }
 
-    #[test]
-    fn matches_baseline_compares_both_hashes() {
+    #[tokio::test(flavor = "current_thread")]
+    async fn matches_baseline_compares_both_hashes() {
         let baseline = GraderBaseline {
             skill_name: "harness".to_owned(),
             walkthrough_sha: "aaa".to_owned(),
@@ -150,8 +150,8 @@ mod tests {
         assert!(!drifted.matches_baseline(&baseline));
     }
 
-    #[test]
-    fn bar_floor_applies_tolerance_and_clamps() {
+    #[tokio::test(flavor = "current_thread")]
+    async fn bar_floor_applies_tolerance_and_clamps() {
         assert_eq!(GraderHashes::bar_floor(Some(1.0)), Some(0.95));
         assert_eq!(GraderHashes::bar_floor(Some(0.5)), Some(0.45));
         // A low best-ever clamps at zero rather than going negative.

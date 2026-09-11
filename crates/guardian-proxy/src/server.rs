@@ -51,12 +51,20 @@ async fn metrics_handler(State(state): State<AppState>) -> impl IntoResponse {
 }
 
 async fn record_audit(state: &AppState, call: &McpLikeToolCall, decision: &crate::ForwardDecision) {
-    if let Some(audit) = &state.audit {
-        let mut guard = audit.lock().await;
-        // Audit failure must not change the allow/deny decision; best-effort only.
-        if guard.append(call, decision).is_err() {
-            state.metrics.inc_audit_write_failure();
-        }
+    let Some(audit) = state.audit.clone() else {
+        return;
+    };
+    // The audit log uses synchronous std::fs; append it on a blocking thread
+    // so the current-thread executor is never stalled by disk I/O.
+    let call = call.clone();
+    let decision = decision.clone();
+    let written = tokio::task::spawn_blocking(move || {
+        let mut guard = audit.blocking_lock();
+        guard.append(&call, &decision).is_ok()
+    })
+    .await;
+    if !matches!(written, Ok(true)) {
+        state.metrics.inc_audit_write_failure();
     }
 }
 

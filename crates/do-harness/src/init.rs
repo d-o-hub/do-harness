@@ -243,7 +243,8 @@ fn validate_existing_invariants(root: &Path, opts: &InitOpts) -> Result<()> {
 /// Upserts `plans/invariants.json` into the state database.
 pub(crate) async fn seed_invariants(root: &Path) -> Result<usize> {
     let json_path = root.join("plans/invariants.json");
-    let json = fs::read_to_string(&json_path)
+    let json = tokio::fs::read_to_string(&json_path)
+        .await
         .with_context(|| format!("failed to read {}", json_path.display()))?;
     let headers: Vec<do_harness_types::DecisionHeader> = serde_json::from_str(&json)
         .context("invalid plans/invariants.json: does not match DecisionHeader schema")?;

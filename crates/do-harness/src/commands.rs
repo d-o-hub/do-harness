@@ -209,12 +209,12 @@ pub async fn errors_cmd(root: &Path, action: ErrorsAction) -> Result<()> {
 }
 
 /// Dispatches hook management using the configured sensor split.
-pub fn hook(root: &Path, config_path: Option<&Path>, action: HookAction) -> Result<()> {
+pub async fn hook(root: &Path, config_path: Option<&Path>, action: HookAction) -> Result<()> {
     let cwd = std::env::current_dir().context("failed to read current directory")?;
     let git_dir = hooks::find_git_dir(&cwd)?;
     match action {
         HookAction::Install { force } => {
-            let cfg = config::load(root, config_path)?;
+            let cfg = config::load(root, config_path).await?;
             hooks::install(&git_dir, &cfg.hooks.pre_commit, &cfg.hooks.pre_push, force)?;
             println!("Installed managed git hooks in {}", git_dir.display());
         }

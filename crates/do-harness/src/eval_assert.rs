@@ -27,7 +27,6 @@
 //! counted in the numerator or denominator of `pass_rate`.
 
 use std::path::Path;
-use std::process::Command;
 
 use anyhow::Result;
 
@@ -70,13 +69,13 @@ pub async fn grade(root: &Path, spec: &str, walk: &WalkRun) -> Result<AssertionG
         return Ok(grade_exists(root, path));
     }
     if let Some(rest) = spec.strip_prefix("contains:") {
-        return Ok(grade_contains(root, rest));
+        return Ok(grade_contains(root, rest).await);
     }
     if let Some(rest) = spec.strip_prefix("db:") {
         return grade_db(root, rest).await;
     }
     if let Some(rest) = spec.strip_prefix("cli:") {
-        return Ok(grade_cli(root, rest));
+        return Ok(grade_cli(root, rest).await);
     }
     if spec.starts_with("walk:") {
         return Ok(walk_success(walk, spec));
@@ -95,12 +94,12 @@ fn grade_exists(root: &Path, path: &str) -> AssertionGrade {
 }
 
 /// The `contains:PATH|NEEDLE` grader.
-fn grade_contains(root: &Path, rest: &str) -> AssertionGrade {
+async fn grade_contains(root: &Path, rest: &str) -> AssertionGrade {
     let Some((path, needle)) = rest.split_once('|') else {
         return fail("contains: expected contains:PATH|NEEDLE".to_owned());
     };
     let abs = root.join(path);
-    match std::fs::read_to_string(&abs) {
+    match tokio::fs::read_to_string(&abs).await {
         Ok(contents) => {
             if contents.contains(needle) {
                 pass(format!("contains: {} has '{}'", abs.display(), needle))
@@ -174,7 +173,7 @@ fn is_identifier(ident: &str) -> bool {
 /// Fixture-supplied `--root`/`--config` arguments are rejected: clap's global
 /// args are last-wins, so letting a fixture move the root would let the
 /// fixture under test redirect the grader at the caller's real workspace.
-fn grade_cli(root: &Path, rest: &str) -> AssertionGrade {
+async fn grade_cli(root: &Path, rest: &str) -> AssertionGrade {
     let Some((argv, text)) = rest.split_once(":contains:") else {
         return fail("cli: expected cli:ARGV:contains:TEXT".to_owned());
     };
@@ -188,12 +187,12 @@ fn grade_cli(root: &Path, rest: &str) -> AssertionGrade {
         ));
     }
     let bin = binary_for_eval();
-    let mut cmd = Command::new(&bin);
+    let mut cmd = tokio::process::Command::new(&bin);
     cmd.arg("--root")
         .arg(root)
         .args(&cmd_parts)
         .env("DO_HARNESS_ROOT", root);
-    let output = match cmd.output() {
+    let output = match cmd.output().await {
         Ok(out) => out,
         Err(err) => {
             return fail(format!("cli: could not run harness binary {bin}: {err}"));

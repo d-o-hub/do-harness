@@ -1,7 +1,6 @@
 //! Task state queries and exports for `do-harness task`.
 
 use std::fmt::Write;
-use std::fs;
 use std::path::Path;
 
 use anyhow::{Context, Result};
@@ -60,10 +59,12 @@ pub async fn export_tasks(
         }
     };
     if let Some(parent) = target_path.parent() {
-        fs::create_dir_all(parent)
+        tokio::fs::create_dir_all(parent)
+            .await
             .with_context(|| format!("failed to create {}", parent.display()))?;
     }
-    fs::write(&target_path, content)
+    tokio::fs::write(&target_path, content)
+        .await
         .with_context(|| format!("failed to write {}", target_path.display()))?;
     Ok(snapshot.tasks.len())
 }
@@ -198,7 +199,7 @@ pub async fn add_task(
     }
     let conn = do_harness_db::connect_and_migrate(root).await?;
     if let Some(method_name) = method {
-        let methods = crate::methods::load_methods(root)?;
+        let methods = crate::methods::load_methods(root).await?;
         if crate::methods::find_method(&methods, method_name).is_none() {
             anyhow::bail!("unknown method '{method_name}': not in plans/methods.json");
         }
@@ -236,7 +237,7 @@ pub async fn advance_task(root: &Path, id: i64) -> Result<(i64, WorkflowEvent)> 
     };
     let idx = usize::try_from(task.subtask_index)
         .with_context(|| format!("task {id} has an invalid subtask_index"))?;
-    let methods = crate::methods::load_methods(root)?;
+    let methods = crate::methods::load_methods(root).await?;
     let method = crate::methods::find_method(&methods, &method_name)
         .with_context(|| format!("task {id} references unknown method '{method_name}'"))?;
     if idx >= method.subtasks.len() {
@@ -273,7 +274,7 @@ pub async fn done_task(root: &Path, id: i64) -> Result<WorkflowEvent> {
     let Some(method_name) = task.method else {
         anyhow::bail!("task {id} has no method; cannot mark done");
     };
-    let methods = crate::methods::load_methods(root)?;
+    let methods = crate::methods::load_methods(root).await?;
     let method = crate::methods::find_method(&methods, &method_name)
         .with_context(|| format!("task {id} references unknown method '{method_name}'"))?;
     let index = usize::try_from(task.subtask_index)

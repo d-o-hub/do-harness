@@ -18,7 +18,7 @@ fn test_mediator_with_upstream(upstream: &str) -> Arc<ProxyMediator> {
     Arc::new(ProxyMediator::new(cfg).expect("mediator"))
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "current_thread")]
 async fn test_health_returns_ok() {
     let mediator = test_mediator_with_upstream("http://127.0.0.1:9");
     let router = create_router(mediator);
@@ -30,7 +30,7 @@ async fn test_health_returns_ok() {
     assert_eq!(resp.status(), StatusCode::OK);
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "current_thread")]
 async fn test_deny_invalid_params_returns_403() {
     let mediator = test_mediator_with_upstream("http://127.0.0.1:9");
     let router = create_router(mediator);
@@ -46,7 +46,7 @@ async fn test_deny_invalid_params_returns_403() {
     assert_eq!(resp.status(), StatusCode::FORBIDDEN);
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "current_thread")]
 async fn test_allow_forwards_to_upstream() {
     // Start a tiny upstream mock.
     let upstream_listener = tokio::net::TcpListener::bind("127.0.0.1:0")
@@ -88,7 +88,7 @@ async fn test_allow_forwards_to_upstream() {
     assert_eq!(val["echo"]["tool"], json!("data.read"));
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "current_thread")]
 async fn test_allow_no_params_forwards() {
     let upstream_listener = tokio::net::TcpListener::bind("127.0.0.1:0")
         .await
@@ -121,7 +121,7 @@ async fn test_allow_no_params_forwards() {
     assert_eq!(resp.status(), StatusCode::OK);
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "current_thread")]
 async fn test_upstream_unreachable_returns_502() {
     let mediator = test_mediator_with_upstream("http://127.0.0.1:1");
     let router = create_router(mediator);
@@ -137,7 +137,7 @@ async fn test_upstream_unreachable_returns_502() {
     assert_eq!(resp.status(), StatusCode::BAD_GATEWAY);
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "current_thread")]
 async fn test_audit_log_records_allow_and_deny() {
     use crate::AuditLog;
 
@@ -186,7 +186,7 @@ async fn test_audit_log_records_allow_and_deny() {
     assert_eq!(second["seq"], json!(2));
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "current_thread")]
 async fn test_metrics_counts_allow_deny_and_upstream_failure() {
     use crate::ProxyMetrics;
 
@@ -238,7 +238,7 @@ async fn test_metrics_counts_allow_deny_and_upstream_failure() {
     assert_eq!(snap.audit_write_failures, 0);
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "current_thread")]
 async fn test_metrics_endpoint_returns_snapshot() {
     let mediator = test_mediator_with_upstream("http://127.0.0.1:9");
     let router = create_router(mediator);
