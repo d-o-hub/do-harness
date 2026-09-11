@@ -66,6 +66,9 @@ pub struct MigrationSkew {
     pub applied_max: Option<i64>,
     /// Highest version in this binary's embedded catalog.
     pub known_max: i64,
+    /// The database has user tables but no `schema_migrations` tracking table:
+    /// a legacy/foreign database rather than a freshly created empty file.
+    pub legacy: bool,
 }
 
 impl MigrationSkew {
@@ -116,16 +119,44 @@ pub async fn inspect_migrations(conn: &Connection) -> Result<MigrationSkew> {
         None => false,
     };
     if !tracked {
+        let mut tables = conn
+            .query(
+                "SELECT COUNT(*) FROM sqlite_master \
+                 WHERE type = 'table' AND name NOT LIKE 'sqlite_%'",
+                Params::None,
+            )
+            .await?;
+        let legacy = match tables.next().await? {
+            Some(row) => row.get::<i64>(0)? > 0,
+            None => false,
+        };
         return Ok(MigrationSkew {
             applied_max: None,
             known_max: known_max_version(),
+            legacy,
         });
     }
     let applied = applied_versions(conn).await?;
     Ok(MigrationSkew {
         applied_max: applied.iter().copied().max(),
         known_max: known_max_version(),
+        legacy: false,
     })
+}
+
+/// Returns the number of applied schema migrations.
+///
+/// # Errors
+///
+/// Returns an error when the tracking-table probe fails.
+pub async fn count_migrations(conn: &Connection) -> Result<i64> {
+    let mut rows = conn
+        .query("SELECT COUNT(*) FROM schema_migrations", Params::None)
+        .await?;
+    match rows.next().await? {
+        Some(row) => Ok(row.get(0)?),
+        None => Ok(0),
+    }
 }
 
 /// Applies all pending embedded migrations to `conn` in ascending version order.
@@ -167,13 +198,78 @@ pub async fn migrate(conn: &Connection) -> Result<()> {
 
 /// Connects to the agent-state database under `root` and applies migrations.
 ///
+/// When pending migrations exist, the database file is first copied to
+/// `agent_state.db.bak` (best-effort snapshot) so an interrupted or
+/// destructive migration (`0006` deletes rows, `0011` rebuilds tables) can be
+/// recovered manually.
+///
 /// # Errors
 ///
-/// Returns an error if connecting or migrating fails.
+/// Returns an error if connecting, backing up, or migrating fails.
 pub async fn connect_and_migrate(root: &Path) -> Result<Connection> {
-    let conn = connect(crate::root::db_path(root)).await?;
-    migrate(&conn).await?;
+    crate::error::retry_on_busy(5, move || {
+        let root = root.to_path_buf();
+        async move { connect_and_migrate_once(&root).await }
+    })
+    .await
+}
+
+/// Single attempt body for [`connect_and_migrate`], retried as a unit when the
+/// connection or migration probe hits transient lock contention.
+async fn connect_and_migrate_once(root: &Path) -> Result<Connection> {
+    let path = crate::root::db_path(root);
+    let conn = connect(&path).await?;
+    let skew = inspect_migrations(&conn).await?;
+    if skew
+        .applied_max
+        .is_some_and(|applied| applied < skew.known_max)
+    {
+        backup_state_file(&path)?;
+    }
+    migrate_with_retry(&conn).await?;
     Ok(conn)
+}
+
+/// Applies migrations, tolerating a concurrent migrator.
+///
+/// Two processes can pass the pending check together; the loser then fails on
+/// a duplicate `CREATE`/`ALTER` mid-migration (rolled back atomically). If the
+/// catalog is fully applied afterwards, the loser simply succeeds.
+///
+/// # Errors
+///
+/// Returns the last migration error when the catalog is still not applied.
+async fn migrate_with_retry(conn: &Connection) -> Result<()> {
+    const ATTEMPTS: usize = 5;
+
+    let mut last: Option<DbError> = None;
+    for attempt in 0..ATTEMPTS {
+        match migrate(conn).await {
+            Ok(()) => return Ok(()),
+            Err(err) if err.is_busy() && attempt + 1 < ATTEMPTS => {
+                last = Some(err);
+                tokio::task::yield_now().await;
+            }
+            Err(err) => {
+                let skew = inspect_migrations(conn).await?;
+                if skew.applied_max == Some(skew.known_max) {
+                    return Ok(());
+                }
+                return Err(err);
+            }
+        }
+    }
+    Err(last.unwrap_or_else(|| DbError::NotFound("migration retry state lost".to_owned())))
+}
+
+/// Copies the state database beside itself as `<file>.bak`.
+fn backup_state_file(path: &Path) -> Result<()> {
+    let backup = path.with_extension("db.bak");
+    std::fs::copy(path, &backup).map_err(|source| DbError::Backup {
+        path: backup,
+        source,
+    })?;
+    Ok(())
 }
 
 /// Returns the set of migration versions already applied.
@@ -193,6 +289,8 @@ async fn apply_migration(conn: &Connection, migration: &Migration) -> Result<()>
     let tx = conn.transaction().await?;
     tx.execute_batch(migration.sql).await?;
     if migration.version == 10 {
+        // `&Transaction` derefs to `&Connection`, so the backfill shares the
+        // migration transaction and commits or rolls back with it.
         backfill_workflow_event_chain(&tx).await?;
     }
     tx.execute(
@@ -259,177 +357,4 @@ pub fn unix_now() -> i64 {
 }
 
 #[cfg(test)]
-mod tests {
-    #![allow(clippy::unwrap_used, clippy::expect_used)]
-
-    use super::*;
-
-    #[test]
-    fn migration_catalog_is_strictly_ascending() {
-        assert!(!MIGRATIONS.is_empty());
-        for pair in MIGRATIONS.windows(2) {
-            assert!(
-                pair[0].version < pair[1].version,
-                "catalog out of order: {} ({}) then {} ({})",
-                pair[0].version,
-                pair[0].name,
-                pair[1].version,
-                pair[1].name
-            );
-        }
-    }
-
-    /// Concurrent `verify --record` writers must not hit SQLITE_BUSY on the
-    /// default delete journal: connections open in WAL with a busy timeout
-    /// (#37). `synchronous` reads back numeric (NORMAL = 1).
-    #[tokio::test(flavor = "current_thread")]
-    async fn connect_enables_wal_concurrency_pragmas() {
-        let dir = tempfile::tempdir().unwrap();
-        let conn = connect(dir.path().join("state.db")).await.unwrap();
-        assert_eq!(pragma_text(&conn, "PRAGMA journal_mode").await, "wal");
-        assert_eq!(pragma_int(&conn, "PRAGMA busy_timeout").await, 5000);
-        assert_eq!(pragma_int(&conn, "PRAGMA synchronous").await, 1);
-    }
-
-    async fn pragma_text(conn: &Connection, sql: &str) -> String {
-        let mut rows = conn.query(sql, Params::None).await.unwrap();
-        rows.next()
-            .await
-            .unwrap()
-            .unwrap()
-            .get::<String>(0)
-            .unwrap()
-    }
-
-    async fn pragma_int(conn: &Connection, sql: &str) -> i64 {
-        let mut rows = conn.query(sql, Params::None).await.unwrap();
-        rows.next().await.unwrap().unwrap().get::<i64>(0).unwrap()
-    }
-
-    #[tokio::test(flavor = "current_thread")]
-    async fn migrate_is_idempotent() {
-        let dir = tempfile::tempdir().unwrap();
-        let conn = connect(dir.path().join("state.db")).await.unwrap();
-        migrate(&conn).await.unwrap();
-        migrate(&conn).await.unwrap();
-        let versions = applied_versions(&conn).await.unwrap();
-        assert_eq!(versions.len(), MIGRATIONS.len());
-    }
-
-    /// A database written by a newer harness fails fast instead of silently
-    /// running with a diverged schema.
-    #[tokio::test(flavor = "current_thread")]
-    async fn migrate_rejects_database_from_newer_binary() {
-        let dir = tempfile::tempdir().unwrap();
-        let conn = connect(dir.path().join("state.db")).await.unwrap();
-        migrate(&conn).await.unwrap();
-        conn.execute(
-            "INSERT INTO schema_migrations (version, name, applied_at) VALUES (9999, 'future', 0)",
-            Params::None,
-        )
-        .await
-        .unwrap();
-
-        let err = migrate(&conn).await.unwrap_err();
-        assert!(matches!(err, DbError::FutureDatabase { applied: 9999, .. }));
-    }
-
-    /// A fresh connection has no tracking table, so inspection reports an
-    /// uninitialized database instead of erroring.
-    #[tokio::test(flavor = "current_thread")]
-    async fn inspect_reports_uninitialized_database() {
-        let dir = tempfile::tempdir().unwrap();
-        let conn = connect(dir.path().join("state.db")).await.unwrap();
-
-        let skew = inspect_migrations(&conn).await.unwrap();
-
-        assert_eq!(skew.applied_max, None);
-        assert!(!skew.is_future());
-        assert!(skew.is_pending());
-    }
-
-    /// Inspection is read-only: it classifies a future database without the
-    /// downgrade guard aborting, so diagnostics can explain the skew.
-    #[tokio::test(flavor = "current_thread")]
-    async fn inspect_classifies_future_and_current_databases() {
-        let dir = tempfile::tempdir().unwrap();
-        let conn = connect(dir.path().join("state.db")).await.unwrap();
-        migrate(&conn).await.unwrap();
-
-        let current = inspect_migrations(&conn).await.unwrap();
-        assert_eq!(current.applied_max, Some(known_max_version()));
-        assert!(!current.is_future());
-        assert!(!current.is_pending());
-
-        conn.execute(
-            "INSERT INTO schema_migrations (version, name, applied_at) VALUES (9999, 'future', 0)",
-            Params::None,
-        )
-        .await
-        .unwrap();
-
-        let future = inspect_migrations(&conn).await.unwrap();
-        assert_eq!(future.applied_max, Some(9999));
-        assert!(future.is_future());
-        assert!(!future.is_pending());
-    }
-
-    #[tokio::test(flavor = "current_thread")]
-    async fn connect_and_migrate_creates_state_db() {
-        let dir = tempfile::tempdir().unwrap();
-        let conn = connect_and_migrate(dir.path()).await.unwrap();
-        assert!(crate::root::db_path(dir.path()).exists());
-        drop(conn);
-    }
-
-    #[tokio::test(flavor = "current_thread")]
-    async fn migration_backfills_existing_unchained_events() {
-        let dir = tempfile::tempdir().unwrap();
-        let conn = connect(crate::root::db_path(dir.path())).await.unwrap();
-
-        conn.execute(
-            "CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at INTEGER NOT NULL)",
-            Params::None,
-        )
-        .await
-        .unwrap();
-
-        for v in 1..=9 {
-            let m = MIGRATIONS.iter().find(|m| m.version == v).unwrap();
-            let tx = conn.transaction().await.unwrap();
-            tx.execute_batch(m.sql).await.unwrap();
-            tx.execute(
-                "INSERT INTO schema_migrations (version, name, applied_at) VALUES (?1, ?2, 0)",
-                libsql::params!(m.version, m.name),
-            )
-            .await
-            .unwrap();
-            tx.commit().await.unwrap();
-        }
-
-        conn.execute(
-            "INSERT INTO tasks (id, title, status, subtask_index, created_at, updated_at) VALUES (1, 't', 'pending', 0, 100, 100)",
-            Params::None,
-        )
-        .await
-        .unwrap();
-
-        conn.execute(
-            "INSERT INTO workflow_events (task_id, kind, payload, created_at) VALUES (1, 'TaskAdded', '{\"b\":2,\"a\":1}', 100)",
-            Params::None,
-        )
-        .await
-        .unwrap();
-
-        migrate(&conn).await.unwrap();
-
-        let rows = crate::repo_workflow::list_events_ascending(&conn)
-            .await
-            .unwrap();
-        assert_eq!(rows.len(), 1);
-        assert_eq!(rows[0].seq, 1);
-        assert_eq!(rows[0].canonical_payload, "{\"a\":1,\"b\":2}");
-        let expected_hash = crate::repo_workflow::chain_hash(None, "{\"a\":1,\"b\":2}");
-        assert_eq!(rows[0].chain_hash.as_deref(), Some(expected_hash.as_str()));
-    }
-}
+mod tests;

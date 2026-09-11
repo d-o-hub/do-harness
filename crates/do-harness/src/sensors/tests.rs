@@ -37,6 +37,7 @@ fn failing_sensor_fails_report() {
             only: vec![],
             exclude: vec![],
             blocked: vec![],
+            ..Default::default()
         },
     )
     .expect("verify");
@@ -61,6 +62,7 @@ fn only_filter_runs_subset() {
             only: vec!["pass".to_owned()],
             exclude: vec![],
             blocked: vec![],
+            ..Default::default()
         },
     )
     .expect("verify");
@@ -82,6 +84,7 @@ fn unknown_only_name_errors() {
             only: vec!["nope".to_owned()],
             exclude: vec![],
             blocked: vec![],
+            ..Default::default()
         },
     )
     .expect_err("verify must fail");
@@ -102,6 +105,7 @@ fn fail_fast_stops_at_first_failure() {
             only: vec![],
             exclude: vec![],
             blocked: vec![],
+            ..Default::default()
         },
     )
     .expect("verify");
@@ -131,6 +135,7 @@ fn verify_with_no_effective_sensors_succeeds() {
             only: vec![],
             exclude: vec![],
             blocked: vec![],
+            ..Default::default()
         },
     )
     .expect("verify");
@@ -152,6 +157,7 @@ fn blocked_sensor_is_not_executed() {
             only: vec![],
             exclude: vec![],
             blocked: vec!["mark".to_owned()],
+            ..Default::default()
         },
     )
     .expect("verify");
@@ -175,6 +181,7 @@ fn blocked_sensor_counts_as_failed() {
             only: vec![],
             exclude: vec![],
             blocked: vec!["halt".to_owned()],
+            ..Default::default()
         },
     )
     .expect("verify");
@@ -198,6 +205,7 @@ fn fail_fast_stops_at_first_blocked_sensor() {
             only: vec![],
             exclude: vec![],
             blocked: vec!["halt".to_owned()],
+            ..Default::default()
         },
     )
     .expect("verify");
@@ -239,6 +247,7 @@ fn retries_failing_sensor_until_success() {
             only: vec![],
             exclude: vec![],
             blocked: vec![],
+            ..Default::default()
         },
     )
     .expect("verify");
@@ -280,6 +289,7 @@ fn times_out_hanging_sensor() {
             only: vec![],
             exclude: vec![],
             blocked: vec![],
+            ..Default::default()
         },
     )
     .expect("verify");
@@ -321,6 +331,7 @@ fn allow_failure_sensor_does_not_fail_gate_but_surfaces_output() {
             only: vec![],
             exclude: vec![],
             blocked: vec![],
+            ..Default::default()
         },
     )
     .expect("verify");
@@ -363,6 +374,7 @@ fn transient_exit_codes_restricts_retries() {
             only: vec![],
             exclude: vec![],
             blocked: vec![],
+            ..Default::default()
         },
     )
     .expect("verify");

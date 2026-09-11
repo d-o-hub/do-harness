@@ -5,3 +5,10 @@ upstream = "http://127.0.0.1:9000"
 agent_id = "dev-agent"
 # Optional hash-chained JSONL decision log (created if missing).
 audit_log = "guardian-audit.jsonl"
+# SSRF policy: link-local/metadata upstreams are always rejected; loopback and
+# private upstreams require this opt-in (development sidecars).
+allow_private_upstreams = true
+# Optional exact host allowlist; empty permits any non-denied host.
+upstream_allowlist = []
+# Optional bearer token required on GET /metrics.
+# metrics_token = "change-me"

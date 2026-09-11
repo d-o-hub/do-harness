@@ -40,4 +40,7 @@ fi
 # first-party code. Revisit when agent-governance revs past 3.2.2
 # (`cargo update -p agent-governance --precise <ver>`) or at GA promotion
 # (plans/agt-governance-epic.md), when the pin — and this ignore — go away.
+# Advisory-DB pin decision: intentionally unpinned. RustSec advisories are the
+# point of the scan, and a pinned snapshot would hide post-pin disclosures;
+# reproducibility comes from Cargo.lock (deps) and `cargo audit --deny warnings`.
 cargo audit --deny warnings --ignore RUSTSEC-2026-0097

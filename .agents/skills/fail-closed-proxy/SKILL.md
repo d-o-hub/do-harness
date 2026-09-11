@@ -30,9 +30,9 @@ plus audit and metrics evidence. Decisions never depend on observability.
    `upstream_failures`, body read -> `upstream_ok`.
 
 ## Routes
-- `GET /health` — liveness probe (always 200).
-- `GET /metrics` — JSON snapshot of `ProxyMetrics` (always 200).
-- `POST /mcp/tools/call` and `POST /` — mediation entry points.
+- `GET /health` — liveness probe (200 only while the mediator is initialized; 503 degraded).
+- `GET /metrics` — JSON snapshot of `ProxyMetrics` (bearer token when `metrics_token` is set).
+- `POST /mcp/tools/call` — the single mediation entry point (no `POST /` alias).
 
 ## Counters (`ProxyMetrics`)
 `allow`, `deny`, `mediator_errors`, `upstream_ok`, `upstream_failures`,

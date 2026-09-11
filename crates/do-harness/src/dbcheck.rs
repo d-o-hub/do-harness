@@ -15,8 +15,12 @@ use do_harness_db::{connect, db_path, inspect_migrations};
 pub enum DbHealth {
     /// No database file exists yet (`init-db` has never run).
     Absent,
-    /// The database file exists but carries no migration tracking table.
+    /// The database file exists but carries no migration tracking table and no
+    /// user tables either (an empty or freshly created file).
     Uninitialized,
+    /// The database has user tables but no migration tracking table: a legacy
+    /// or foreign database, not a harness-created store.
+    Legacy,
     /// This binary ships migrations the database has not applied yet.
     Pending {
         /// Highest version applied in the database.
@@ -56,6 +60,10 @@ impl DbHealth {
                 "WARN",
                 "exists but was never migrated (run: do-harness init-db)".to_owned(),
             ),
+            DbHealth::Legacy => (
+                "WARN",
+                "legacy database without migration tracking; back up and re-create it (run: do-harness init-db on a fresh path)".to_owned(),
+            ),
             DbHealth::Pending { applied, known } => (
                 "WARN",
                 format!(
@@ -93,6 +101,7 @@ pub async fn probe(root: &Path) -> Result<DbHealth> {
     // Route through the canonical predicates so classification has a single
     // source of truth in the db crate.
     Ok(match skew.applied_max {
+        None if skew.legacy => DbHealth::Legacy,
         None => DbHealth::Uninitialized,
         Some(applied) if skew.is_future() => DbHealth::Future {
             applied,
@@ -205,5 +214,21 @@ mod tests {
         ] {
             assert!(!benign.is_blocking());
         }
+    }
+
+    /// User tables without a tracking table classify as legacy, not as an
+    /// empty uninitialized file.
+    #[tokio::test(flavor = "current_thread")]
+    async fn legacy_for_user_tables_without_tracking() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = db_path(dir.path());
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        let conn = connect(&path).await.unwrap();
+        conn.execute("CREATE TABLE foreign_data (id INTEGER PRIMARY KEY)", ())
+            .await
+            .unwrap();
+        drop(conn);
+
+        assert_eq!(probe(dir.path()).await.unwrap(), DbHealth::Legacy);
     }
 }

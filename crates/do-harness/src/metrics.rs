@@ -34,39 +34,50 @@ pub struct MetricsSnapshot {
 }
 
 /// Collects and prints the harness metrics snapshot.
+///
+/// # Errors
+///
+/// Returns an error when `--since` is not a Unix timestamp, or the state
+/// database cannot be read.
 pub async fn run_metrics(
     root: &Path,
     format: Format,
     sensor_filter: Option<&str>,
     skill_filter: Option<&str>,
-    _since_filter: Option<&str>,
+    since_filter: Option<&str>,
 ) -> Result<()> {
+    let since = match since_filter {
+        Some(raw) => Some(raw.parse::<i64>().map_err(|_| {
+            anyhow::anyhow!("invalid --since '{raw}': expected a Unix timestamp in seconds")
+        })?),
+        None => None,
+    };
     let conn = do_harness_db::connect_and_migrate(root).await?;
-    let mut sensors = do_harness_db::sensor_stats(&conn).await?;
+    let mut sensors = do_harness_db::sensor_stats(&conn, since).await?;
     if let Some(s) = sensor_filter {
         sensors.retain(|st| st.name == s);
     }
 
     let strikes = do_harness_db::list_error_signatures(&conn, None).await?;
+    let latest_by_skill: std::collections::HashMap<String, Option<f64>> =
+        do_harness_db::list_all_skill_evals(&conn)
+            .await?
+            .into_iter()
+            .map(|eval| (eval.skill_name, eval.pass_rate))
+            .collect();
     let mut skills = Vec::new();
-    for skill in do_harness_db::list_all_skill_evals(&conn).await? {
+    for summary in do_harness_db::skill_eval_summary(&conn, since).await? {
         if let Some(sk) = skill_filter {
-            if skill.skill_name != sk {
+            if summary.skill_name != sk {
                 continue;
             }
         }
-        let runs = do_harness_db::list_skill_eval_runs(&conn, &skill.skill_name).await?;
         skills.push(SkillTrend {
-            name: skill.skill_name.clone(),
-            latest_pass_rate: skill.pass_rate,
-            best_pass_rate: runs
-                .iter()
-                .filter_map(|run| run.pass_rate)
-                .fold(None::<f64>, |best, rate| {
-                    best.map_or(Some(rate), |b| Some(b.max(rate)))
-                }),
-            runs: i64::try_from(runs.len()).unwrap_or(i64::MAX),
-            bar_floor: do_harness_db::get_skill_bar(&conn, &skill.skill_name).await?,
+            latest_pass_rate: latest_by_skill.get(&summary.skill_name).copied().flatten(),
+            bar_floor: do_harness_db::get_skill_bar(&conn, &summary.skill_name).await?,
+            name: summary.skill_name,
+            best_pass_rate: summary.best_pass_rate,
+            runs: summary.runs,
         });
     }
     skills.sort_by(|a, b| a.name.cmp(&b.name));

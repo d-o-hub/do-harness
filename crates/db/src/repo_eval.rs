@@ -2,7 +2,7 @@
 
 use crate::error::{DbError, Result};
 use crate::migrate::unix_now;
-use do_harness_types::{GraderBaseline, SkillEvalRun};
+use do_harness_types::{GraderBaseline, SkillEvalBless, SkillEvalRun};
 use libsql::{Connection, params};
 
 /// Insert parameters for a new skill-eval run.
@@ -55,11 +55,26 @@ pub async fn list_skill_eval_runs(
     conn: &Connection,
     skill_name: &str,
 ) -> Result<Vec<SkillEvalRun>> {
+    list_skill_eval_runs_page(conn, skill_name, -1, 0).await
+}
+
+/// Lists a skill's evaluation runs with `LIMIT`/`OFFSET` paging (`limit = -1`
+/// disables the limit).
+///
+/// # Errors
+///
+/// Returns an error when the query fails.
+pub async fn list_skill_eval_runs_page(
+    conn: &Connection,
+    skill_name: &str,
+    limit: i64,
+    offset: i64,
+) -> Result<Vec<SkillEvalRun>> {
     let mut rows = conn
         .query(
             "SELECT id, skill_name, graded, passed, pass_rate, ran_at \
-             FROM skill_eval_runs WHERE skill_name = ?1 ORDER BY id",
-            params!(skill_name),
+             FROM skill_eval_runs WHERE skill_name = ?1 ORDER BY id LIMIT ?2 OFFSET ?3",
+            params!(skill_name, limit, offset),
         )
         .await?;
     let mut runs = Vec::new();
@@ -74,6 +89,53 @@ pub async fn list_skill_eval_runs(
         });
     }
     Ok(runs)
+}
+
+/// Per-skill aggregate over the append-only `skill_eval_runs` history,
+/// computed in SQL so `metrics` does not issue one query per skill.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SkillEvalSummary {
+    /// Skill name.
+    pub skill_name: String,
+    /// Number of recorded runs.
+    pub runs: i64,
+    /// Best pass rate across the history.
+    pub best_pass_rate: Option<f64>,
+    /// Most recent pass rate in the history.
+    pub latest_pass_rate: Option<f64>,
+}
+
+/// Aggregates run counts and pass rates per skill, optionally ignoring runs
+/// older than `since` (Unix seconds; [`None`] means all history).
+///
+/// # Errors
+///
+/// Returns an error when the query fails.
+pub async fn skill_eval_summary(
+    conn: &Connection,
+    since: Option<i64>,
+) -> Result<Vec<SkillEvalSummary>> {
+    let mut rows = conn
+        .query(
+            "SELECT r.skill_name, COUNT(*), MAX(r.pass_rate), \
+               (SELECT latest.pass_rate FROM skill_eval_runs latest \
+                WHERE latest.skill_name = r.skill_name ORDER BY latest.id DESC LIMIT 1) \
+             FROM skill_eval_runs r \
+             WHERE (?1 IS NULL OR r.ran_at >= ?1) \
+             GROUP BY r.skill_name ORDER BY r.skill_name",
+            params!(since),
+        )
+        .await?;
+    let mut summaries = Vec::new();
+    while let Some(row) = rows.next().await? {
+        summaries.push(SkillEvalSummary {
+            skill_name: row.get(0)?,
+            runs: row.get(1)?,
+            best_pass_rate: row.get(2)?,
+            latest_pass_rate: row.get(3)?,
+        });
+    }
+    Ok(summaries)
 }
 
 /// The highest recorded pass rate across a skill's history, if any.
@@ -160,152 +222,80 @@ pub async fn get_grader_baseline(
     }
 }
 
-/// Upserts a skill's grader baseline to the given hashes.
+/// Upserts a skill's grader baseline and appends an immutable bless-history
+/// row recording `approver` and optional `reason`, in one transaction.
 ///
 /// # Errors
 ///
-/// Returns an error when the upsert statement fails.
+/// Returns an error when the upsert, history append, or transaction fails.
 pub async fn bless_grader_baseline(
     conn: &Connection,
     skill_name: &str,
     walkthrough_sha: &str,
     specs_sha: &str,
+    approver: &str,
+    reason: Option<&str>,
 ) -> Result<()> {
-    conn.execute(
+    let now = unix_now();
+    let tx = conn.transaction().await?;
+    tx.execute(
         "INSERT INTO grader_baselines (skill_name, walkthrough_sha, specs_sha, blessed_at) \
          VALUES (?1, ?2, ?3, ?4) \
          ON CONFLICT(skill_name) DO UPDATE SET \
            walkthrough_sha = excluded.walkthrough_sha, \
            specs_sha = excluded.specs_sha, \
            blessed_at = excluded.blessed_at",
-        params!(skill_name, walkthrough_sha, specs_sha, unix_now()),
+        params!(skill_name, walkthrough_sha, specs_sha, now),
     )
     .await?;
+    tx.execute(
+        "INSERT INTO skill_eval_blesses \
+         (skill_name, walkthrough_sha, specs_sha, approver, reason, blessed_at) \
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        params!(
+            skill_name,
+            walkthrough_sha,
+            specs_sha,
+            approver,
+            reason,
+            now
+        ),
+    )
+    .await?;
+    tx.commit().await?;
     Ok(())
 }
 
-#[cfg(test)]
-mod tests {
-    #![allow(clippy::unwrap_used, clippy::expect_used)]
-
-    use super::*;
-
-    fn connect() -> tempfile::TempDir {
-        let dir = tempfile::tempdir().unwrap();
-        std::fs::create_dir_all(crate::root::db_path(dir.path()).parent().unwrap()).unwrap();
-        dir
-    }
-
-    async fn open(dir: &tempfile::TempDir) -> Connection {
-        crate::migrate::connect_and_migrate(dir.path())
-            .await
-            .unwrap()
-    }
-
-    #[tokio::test(flavor = "current_thread")]
-    async fn eval_runs_append_and_list_in_order() {
-        let dir = connect();
-        let conn = open(&dir).await;
-        insert_skill_eval_run(
-            &conn,
-            &NewSkillEvalRun {
-                skill_name: "harness",
-                graded: 4,
-                passed: 3,
-                pass_rate: Some(0.75),
-            },
+/// Lists a skill's bless history in approval order (oldest first).
+///
+/// # Errors
+///
+/// Returns an error when the query fails.
+pub async fn list_grader_blesses(
+    conn: &Connection,
+    skill_name: &str,
+) -> Result<Vec<SkillEvalBless>> {
+    let mut rows = conn
+        .query(
+            "SELECT id, skill_name, walkthrough_sha, specs_sha, approver, reason, blessed_at \
+             FROM skill_eval_blesses WHERE skill_name = ?1 ORDER BY id",
+            params!(skill_name),
         )
-        .await
-        .unwrap();
-        insert_skill_eval_run(
-            &conn,
-            &NewSkillEvalRun {
-                skill_name: "harness",
-                graded: 4,
-                passed: 4,
-                pass_rate: Some(1.0),
-            },
-        )
-        .await
-        .unwrap();
-
-        let runs = list_skill_eval_runs(&conn, "harness").await.unwrap();
-        assert_eq!(runs.len(), 2);
-        assert_eq!(runs[0].passed, 3);
-        assert_eq!(runs[1].passed, 4);
-        assert!(
-            list_skill_eval_runs(&conn, "other")
-                .await
-                .unwrap()
-                .is_empty()
-        );
+        .await?;
+    let mut blesses = Vec::new();
+    while let Some(row) = rows.next().await? {
+        blesses.push(SkillEvalBless {
+            id: row.get(0)?,
+            skill_name: row.get(1)?,
+            walkthrough_sha: row.get(2)?,
+            specs_sha: row.get(3)?,
+            approver: row.get(4)?,
+            reason: row.get(5)?,
+            blessed_at: row.get(6)?,
+        });
     }
-
-    #[tokio::test(flavor = "current_thread")]
-    async fn skill_bar_never_lowers() {
-        let dir = connect();
-        let conn = open(&dir).await;
-        assert!(get_skill_bar(&conn, "harness").await.unwrap().is_none());
-        assert!(raise_skill_bar(&conn, "harness", 0.9).await.unwrap());
-        assert_eq!(get_skill_bar(&conn, "harness").await.unwrap(), Some(0.9));
-        // A lower floor is refused; the stored bar stays at 0.95 after a raise.
-        assert!(!raise_skill_bar(&conn, "harness", 0.5).await.unwrap());
-        assert_eq!(get_skill_bar(&conn, "harness").await.unwrap(), Some(0.9));
-        assert!(raise_skill_bar(&conn, "harness", 0.95).await.unwrap());
-        assert_eq!(get_skill_bar(&conn, "harness").await.unwrap(), Some(0.95));
-    }
-
-    #[tokio::test(flavor = "current_thread")]
-    async fn grader_baseline_upserts_per_skill() {
-        let dir = connect();
-        let conn = open(&dir).await;
-        assert!(
-            get_grader_baseline(&conn, "harness")
-                .await
-                .unwrap()
-                .is_none()
-        );
-        bless_grader_baseline(&conn, "harness", "aaa", "bbb")
-            .await
-            .unwrap();
-        bless_grader_baseline(&conn, "harness", "ccc", "ddd")
-            .await
-            .unwrap();
-        let baseline = get_grader_baseline(&conn, "harness")
-            .await
-            .unwrap()
-            .unwrap();
-        assert_eq!(baseline.walkthrough_sha, "ccc");
-        assert_eq!(baseline.specs_sha, "ddd");
-    }
-
-    #[tokio::test(flavor = "current_thread")]
-    async fn max_pass_rate_tracks_history() {
-        let dir = connect();
-        let conn = open(&dir).await;
-        assert_eq!(max_pass_rate(&conn, "none").await.unwrap(), None);
-        insert_skill_eval_run(
-            &conn,
-            &NewSkillEvalRun {
-                skill_name: "harness",
-                graded: 2,
-                passed: 1,
-                pass_rate: Some(0.5),
-            },
-        )
-        .await
-        .unwrap();
-        insert_skill_eval_run(
-            &conn,
-            &NewSkillEvalRun {
-                skill_name: "harness",
-                graded: 2,
-                passed: 2,
-                pass_rate: Some(1.0),
-            },
-        )
-        .await
-        .unwrap();
-        assert_eq!(max_pass_rate(&conn, "harness").await.unwrap(), Some(1.0));
-    }
+    Ok(blesses)
 }
+
+#[cfg(test)]
+mod tests;

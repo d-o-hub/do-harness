@@ -3,5 +3,5 @@
 -- counter is per-task (NULL task_id = workspace-global) instead of global.
 
 DROP INDEX IF EXISTS idx_error_signatures_signature;
-CREATE UNIQUE INDEX idx_error_signatures_signature_task
+CREATE UNIQUE INDEX IF NOT EXISTS idx_error_signatures_signature_task
     ON error_signatures(signature, task_id);

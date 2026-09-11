@@ -1,5 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
+use std::fs;
+
 use super::*;
 
 /// Writes a minimal frozen method catalog for tests that gate on it.
@@ -27,7 +29,7 @@ pub(super) fn write_catalog(root: &Path) {
 pub(super) async fn insert_ok_beat(root: &Path, task_id: i64, sensor: &str) {
     let conn = do_harness_db::connect_and_migrate(root).await.unwrap();
     let now = do_harness_db::unix_now();
-    do_harness_db::insert_beat(
+    do_harness_db::record_sensor_outcome(
         &conn,
         &do_harness_db::NewBeat {
             task_id: Some(task_id),
@@ -38,53 +40,11 @@ pub(super) async fn insert_ok_beat(root: &Path, task_id: i64, sensor: &str) {
             started_at: now,
             completed_at: Some(now),
         },
+        true,
+        None,
     )
     .await
     .unwrap();
-}
-
-#[tokio::test(flavor = "current_thread")]
-async fn export_writes_task_snapshot() {
-    let dir = tempfile::tempdir().unwrap();
-    let conn = do_harness_db::connect_and_migrate(dir.path())
-        .await
-        .unwrap();
-    do_harness_db::insert_task(
-        &conn,
-        &do_harness_db::NewTask {
-            title: "slice",
-            method: Some("vertical-event-slice"),
-            subtask_index: 0,
-            precondition: None,
-            parent_id: None,
-        },
-    )
-    .await
-    .unwrap();
-    drop(conn);
-
-    let count = export_tasks(dir.path(), None, false, Format::Json)
-        .await
-        .unwrap();
-
-    assert_eq!(count, 1);
-    let text = fs::read_to_string(dir.path().join("plans/tasks.json")).unwrap();
-    let parsed: serde_json::Value = serde_json::from_str(&text).unwrap();
-    assert_eq!(parsed["tasks"][0]["title"], "slice");
-    assert_eq!(parsed["tasks"][0]["status"], "pending");
-    assert_eq!(parsed["tasks"][0]["method"], "vertical-event-slice");
-}
-
-#[tokio::test(flavor = "current_thread")]
-async fn export_writes_empty_snapshot_without_tasks() {
-    let dir = tempfile::tempdir().unwrap();
-    let count = export_tasks(dir.path(), None, false, Format::Json)
-        .await
-        .unwrap();
-    assert_eq!(count, 0);
-    let text = fs::read_to_string(dir.path().join("plans/tasks.json")).unwrap();
-    let parsed: serde_json::Value = serde_json::from_str(&text).unwrap();
-    assert_eq!(parsed["tasks"].as_array().unwrap().len(), 0);
 }
 
 #[tokio::test(flavor = "current_thread")]

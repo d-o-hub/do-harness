@@ -101,6 +101,9 @@ pub async fn task_cmd(root: &Path, action: TaskAction) -> Result<()> {
             }
             Ok(())
         }
+        TaskAction::Import { file, check } => {
+            task::import_tasks(root, file.as_deref(), check).await
+        }
         TaskAction::List {
             status,
             method,
@@ -209,12 +212,12 @@ pub async fn errors_cmd(root: &Path, action: ErrorsAction) -> Result<()> {
 }
 
 /// Dispatches hook management using the configured sensor split.
-pub fn hook(root: &Path, config_path: Option<&Path>, action: HookAction) -> Result<()> {
+pub async fn hook(root: &Path, config_path: Option<&Path>, action: HookAction) -> Result<()> {
     let cwd = std::env::current_dir().context("failed to read current directory")?;
     let git_dir = hooks::find_git_dir(&cwd)?;
     match action {
         HookAction::Install { force } => {
-            let cfg = config::load(root, config_path)?;
+            let cfg = config::load(root, config_path).await?;
             hooks::install(&git_dir, &cfg.hooks.pre_commit, &cfg.hooks.pre_push, force)?;
             println!("Installed managed git hooks in {}", git_dir.display());
         }
@@ -262,6 +265,15 @@ pub fn hook(root: &Path, config_path: Option<&Path>, action: HookAction) -> Resu
                     println!("{json}");
                 }
             }
+            if !status.binary.present() {
+                anyhow::bail!(
+                    "do-harness binary missing at {}; build it or set DO_HARNESS_BIN",
+                    status.binary.path().display()
+                );
+            }
+            if !(status.pre_commit && status.pre_push && status.commit_msg) {
+                eprintln!("hint: run `do-harness hook install` to (re)install managed hooks");
+            }
         }
         HookAction::Diff => {
             let status = hooks::status(&git_dir, root);
@@ -275,32 +287,99 @@ pub fn hook(root: &Path, config_path: Option<&Path>, action: HookAction) -> Resu
     Ok(())
 }
 
+/// Options for `init-db`.
+#[derive(Debug, Clone, Copy)]
+pub struct InitDbOpts {
+    /// Report pending migrations and exit non-zero when any are pending.
+    pub check: bool,
+    /// Report migration state without applying anything (exit 0).
+    pub dry_run: bool,
+    /// Skip the interactive confirmation prompt.
+    pub yes: bool,
+}
+
 /// Applies pending migrations and reports the number applied.
-pub async fn init_db(root: &Path) -> Result<()> {
+///
+/// Interactive terminals confirm before applying pending migrations; hooks,
+/// CI, and piped invocations apply without prompting (pass `--yes` to force
+/// non-interactive behavior explicitly). `--check`/`--dry-run` never write.
+///
+/// # Errors
+///
+/// Returns an error when the health probe fails, `--check` sees an unmigrated
+/// database, or applying migrations fails.
+pub async fn init_db(root: &Path, opts: &InitDbOpts) -> Result<()> {
+    use std::io::IsTerminal as _;
+
+    let health = crate::dbcheck::probe(root).await?;
+    let pending = matches!(health, crate::dbcheck::DbHealth::Pending { .. });
+    if opts.check || opts.dry_run {
+        let (mark, line) = health.render();
+        println!("[{mark}] {line}");
+        if opts.check && !matches!(health, crate::dbcheck::DbHealth::Current) {
+            anyhow::bail!("database is not at the current migration version");
+        }
+        return Ok(());
+    }
+    if pending && !opts.yes && std::io::stdin().is_terminal() && !confirm_migrations(&health)? {
+        anyhow::bail!("migration cancelled; re-run with --yes to apply");
+    }
     let conn = do_harness_db::connect_and_migrate(root).await?;
-    let mut rows = conn
-        .query("SELECT COUNT(*) FROM schema_migrations", ())
-        .await?;
-    let count = match rows.next().await? {
-        Some(row) => row.get::<i64>(0)?,
-        None => anyhow::bail!("schema_migrations is unexpectedly empty"),
-    };
+    let count = do_harness_db::count_migrations(&conn).await?;
     println!("Done. Applied schema migrations: {count}");
     Ok(())
 }
 
-/// Seeds the `invariants` table from `plans/invariants.json`.
-pub async fn seed(root: &Path) -> Result<()> {
-    let json_path = root.join("plans/invariants.json");
-    let json = std::fs::read_to_string(&json_path)
-        .with_context(|| format!("failed to read {}", json_path.display()))?;
-    let headers: Vec<do_harness_types::DecisionHeader> = serde_json::from_str(&json)
-        .context("invalid invariants.json: does not match DecisionHeader schema")?;
+/// Prompts on the terminal for confirmation to apply pending migrations.
+fn confirm_migrations(health: &crate::dbcheck::DbHealth) -> Result<bool> {
+    use std::io::{BufRead as _, Write as _};
 
+    let (_, line) = health.render();
+    print!("{line}\nApply pending migrations now? [y/N] ");
+    std::io::stdout()
+        .flush()
+        .context("failed to flush prompt")?;
+    let mut answer = String::new();
+    std::io::stdin()
+        .lock()
+        .read_line(&mut answer)
+        .context("failed to read confirmation")?;
+    Ok(matches!(
+        answer.trim().to_ascii_lowercase().as_str(),
+        "y" | "yes"
+    ))
+}
+
+/// Prunes old beats and compacts the state database.
+///
+/// `--prune-beats <days>` deletes beats older than the cutoff while keeping at
+/// least `keep_per_task` most-recent beats per task; the database is then
+/// `VACUUM`-compacted. Without the flag only `VACUUM` runs.
+///
+/// # Errors
+///
+/// Returns an error when the database cannot be opened or pruned.
+pub async fn maintenance(root: &Path, prune_beats: Option<i64>, keep_per_task: i64) -> Result<()> {
     let conn = do_harness_db::connect_and_migrate(root).await?;
-    let written = do_harness_db::seed_invariants(&conn, &headers).await?;
+    if let Some(days) = prune_beats {
+        let cutoff = do_harness_db::unix_now().saturating_sub(days.max(0).saturating_mul(86_400));
+        let deleted = do_harness_db::prune_beats(&conn, cutoff, keep_per_task.max(0)).await?;
+        println!(
+            "Pruned {deleted} beat(s) older than {days} day(s) (kept >= {keep_per_task} per task)"
+        );
+    }
+    do_harness_db::vacuum(&conn).await?;
+    println!("VACUUM complete");
+    Ok(())
+}
 
-    println!("Seeded {written} invariants from {}", json_path.display());
+/// Seeds the `invariants` table from `plans/invariants.json`.
+pub async fn seed(root: &Path, prune: bool) -> Result<()> {
+    let written = crate::init::seed_invariants(root, prune).await?;
+    println!(
+        "Seeded {written} invariants from {}",
+        root.join("plans/invariants.json").display()
+    );
     Ok(())
 }
 

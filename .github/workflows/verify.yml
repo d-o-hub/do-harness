@@ -50,20 +50,23 @@ jobs:
         run: shellcheck scripts/*.sh crates/do-harness/templates/scripts/*.sh
       - name: Build harness CLI
         run: cargo build --release -p do-harness
-      - name: Check feature-gated agt-governance adapter
-        run: cargo check -p do-harness --features agt-governance
       - name: Check adjacent guardian-proxy crate
         run: cargo check -p guardian-proxy && cargo check -p guardian-proxy --features agt-governance
       - name: Test adjacent guardian-proxy crate
         run: cargo test -p guardian-proxy
       - name: Run sensors
         env:
-          # check-audit.sh / check-deps.sh fail closed when CI=true;
-          # cargo-audit and cargo-deny are installed above.
+          # check-audit.sh / check-deps.sh / check-shell.sh fail closed when
+          # CI=true; cargo-audit and cargo-deny are installed above.
           CI: "true"
           # Belt and braces: missing tools fail even if CI=true is dropped.
           DO_HARNESS_REQUIRE_TOOLS: "1"
         run: ./target/release/do-harness verify --format json --evidence .do-harness/evidence.json --strict
+      - name: Record Cargo.lock hash
+        run: |
+          mkdir -p .do-harness
+          sha256sum Cargo.lock > .do-harness/Cargo.lock.sha256
+          cat .do-harness/Cargo.lock.sha256
       - name: Lint full PR commit range
         # The commitlint sensor only checks COUNT=1 locally; PRs must lint
         # every non-merge commit (fetch-depth: 0 makes both SHAs available).
@@ -74,11 +77,14 @@ jobs:
           tmp="$(mktemp -d)"
           ./target/release/do-harness --root "$tmp" init
           ./target/release/do-harness --root "$tmp" verify --format json --strict
-      - name: Dogfood generic init (vacuous verify, documented)
+      - name: Dogfood generic init (vacuous verify, evidenced)
         run: |
           tmp="$(mktemp -d)"
           ./target/release/do-harness --root "$tmp" init --language generic
-          ./target/release/do-harness --root "$tmp" verify --format json
+          ./target/release/do-harness --root "$tmp" verify --format json --strict --evidence "$tmp/.do-harness/evidence.json"
+          # The generic pack is empty by design: assert the artifact says so
+          # instead of letting a vacuous pass masquerade as a real rust gate.
+          test "$(jq -r '.sensor_pack' "$tmp/.do-harness/evidence.json")" = "generic"
       - name: Dogfood skill eval runner (shebang execution, graded residue)
         run: ./target/release/do-harness eval
       - name: Assert evidence integrity
@@ -91,7 +97,9 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: verify-evidence
-          path: .do-harness/evidence.json
+          path: |
+            .do-harness/evidence.json
+            .do-harness/Cargo.lock.sha256
           if-no-files-found: error
 
   msrv:

@@ -5,9 +5,6 @@ use std::path::Path;
 
 use anyhow::{Context, Result};
 
-/// Executable bits (owner read/write/execute) applied to installed scripts.
-const OWNER_EXEC_MASK: u32 = 0o111;
-
 /// `.gitignore` entries the harness needs; appended, never clobbered.
 const GITIGNORE_ENTRIES: &str = ".do-harness/\n.agents/events/\n";
 
@@ -49,6 +46,8 @@ const INVARIANTS_RUST: &str = include_str!("../templates/plans/invariants.json.r
 const INVARIANTS_GENERIC: &str = include_str!("../templates/plans/invariants.json.generic");
 const CHECK_LOC: &str = include_str!("../templates/scripts/check-loc.sh");
 const CHECK_COMMITLINT: &str = include_str!("../templates/scripts/check-commitlint.sh");
+const CHECK_DEPS: &str = include_str!("../templates/scripts/check-deps.sh");
+const CHECK_AUDIT: &str = include_str!("../templates/scripts/check-audit.sh");
 const CRATE_MANIFEST: &str = include_str!("../templates/crate/Cargo.toml");
 const CRATE_LIB: &str = include_str!("../templates/crate/src/lib.rs");
 
@@ -145,22 +144,7 @@ pub async fn init_workspace(root: &Path, opts: &InitOpts) -> Result<InitReport> 
         &mut report,
     )?;
     if opts.language == Language::Rust {
-        write_if_absent(
-            root,
-            "scripts/check-loc.sh",
-            CHECK_LOC,
-            opts.force,
-            &mut report,
-        )?;
-        make_executable(&root.join("scripts/check-loc.sh"))?;
-        write_if_absent(
-            root,
-            "scripts/check-commitlint.sh",
-            CHECK_COMMITLINT,
-            opts.force,
-            &mut report,
-        )?;
-        make_executable(&root.join("scripts/check-commitlint.sh"))?;
+        scaffold_scripts(root, opts, &mut report)?;
         scaffold_crate(root, &mut report)?;
     }
     for spec in SKILLS {
@@ -188,7 +172,9 @@ pub async fn init_workspace(root: &Path, opts: &InitOpts) -> Result<InitReport> 
                 opts.force,
                 &mut report,
             )?;
-            make_executable(&root.join(format!("{skill_dir}/evals/walkthrough.sh")))?;
+            crate::fs_perm::set_owner_exec(
+                &root.join(format!("{skill_dir}/evals/walkthrough.sh")),
+            )?;
         }
     }
 
@@ -213,10 +199,12 @@ pub async fn init_workspace(root: &Path, opts: &InitOpts) -> Result<InitReport> 
         opts.force,
         &mut report,
     )?;
-    make_executable(&root.join(".agents/skills/skill-creator/scripts/quick_validate.py"))?;
+    crate::fs_perm::set_owner_exec(
+        &root.join(".agents/skills/skill-creator/scripts/quick_validate.py"),
+    )?;
     append_gitignore(root, &mut report)?;
 
-    report.seeded = seed_invariants(root).await?;
+    report.seeded = seed_invariants(root, false).await?;
     Ok(report)
 }
 
@@ -240,14 +228,29 @@ fn validate_existing_invariants(root: &Path, opts: &InitOpts) -> Result<()> {
 }
 
 /// Upserts `plans/invariants.json` into the state database.
-async fn seed_invariants(root: &Path) -> Result<usize> {
+pub(crate) async fn seed_invariants(root: &Path, prune: bool) -> Result<usize> {
     let json_path = root.join("plans/invariants.json");
-    let json = fs::read_to_string(&json_path)
+    let json = tokio::fs::read_to_string(&json_path)
+        .await
         .with_context(|| format!("failed to read {}", json_path.display()))?;
     let headers: Vec<do_harness_types::DecisionHeader> = serde_json::from_str(&json)
         .context("invalid plans/invariants.json: does not match DecisionHeader schema")?;
     let conn = do_harness_db::connect_and_migrate(root).await?;
-    Ok(do_harness_db::seed_invariants(&conn, &headers).await?)
+    Ok(do_harness_db::seed_invariants(&conn, &headers, prune).await?)
+}
+
+/// Writes the Rust-pack helper scripts and marks them executable.
+fn scaffold_scripts(root: &Path, opts: &InitOpts, report: &mut InitReport) -> Result<()> {
+    for (relative, body) in [
+        ("scripts/check-loc.sh", CHECK_LOC),
+        ("scripts/check-commitlint.sh", CHECK_COMMITLINT),
+        ("scripts/check-deps.sh", CHECK_DEPS),
+        ("scripts/check-audit.sh", CHECK_AUDIT),
+    ] {
+        write_if_absent(root, relative, body, opts.force, report)?;
+        crate::fs_perm::set_owner_exec(&root.join(relative))?;
+    }
+    Ok(())
 }
 
 /// Writes `body` to `root/relative`, skipping existing files unless `force`.
@@ -320,24 +323,6 @@ fn append_gitignore(root: &Path, report: &mut InitReport) -> Result<()> {
     }
     fs::write(&path, updated).with_context(|| format!("failed to write {}", path.display()))?;
     report.written.push(".gitignore".to_owned());
-    Ok(())
-}
-
-/// Adds owner execute permission to `path` (unix only).
-#[cfg(unix)]
-fn make_executable(path: &Path) -> Result<()> {
-    use std::os::unix::fs::PermissionsExt;
-    let permissions = fs::metadata(path)
-        .with_context(|| format!("failed to stat {}", path.display()))?
-        .permissions();
-    let mode = permissions.mode() | OWNER_EXEC_MASK;
-    fs::set_permissions(path, fs::Permissions::from_mode(mode))
-        .with_context(|| format!("failed to chmod {}", path.display()))
-}
-
-/// No-op on non-unix platforms.
-#[cfg(not(unix))]
-fn make_executable(_path: &Path) -> Result<()> {
     Ok(())
 }
 

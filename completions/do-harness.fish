@@ -49,6 +49,7 @@ complete -c do-harness -n "__fish_do_harness_needs_command" -f -a "eval" -d 'Val
 complete -c do-harness -n "__fish_do_harness_needs_command" -f -a "hook" -d 'Manage git hooks that run `do-harness verify`'
 complete -c do-harness -n "__fish_do_harness_needs_command" -f -a "doctor" -d 'Run diagnostic checks on binary resolution and git hook health'
 complete -c do-harness -n "__fish_do_harness_needs_command" -f -a "metrics" -d 'Report harness trends: sensor stats, strikes, eval pass-rate history'
+complete -c do-harness -n "__fish_do_harness_needs_command" -f -a "maintenance" -d 'Prune old beats and compact the state database'
 complete -c do-harness -n "__fish_do_harness_needs_command" -f -a "compliance" -d 'Print compliance mapping to OWASP Agentic Top 10, NIST AI RMF, and EU AI Act'
 complete -c do-harness -n "__fish_do_harness_needs_command" -f -a "audit-chain" -d 'Recompute workflow event hash chain and report first divergence'
 complete -c do-harness -n "__fish_do_harness_needs_command" -f -a "completions" -d 'Generate shell completions'
@@ -127,15 +128,18 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand init-db" -l root -
 complete -c do-harness -n "__fish_do_harness_using_subcommand init-db" -l config -d 'Explicit path to do-harness.toml' -r -F
 complete -c do-harness -n "__fish_do_harness_using_subcommand init-db" -l color -d 'Color output (auto, always, never)' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand init-db" -l output -d 'Default output file path' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand init-db" -l check -d 'Report pending migrations and exit non-zero when any are pending'
+complete -c do-harness -n "__fish_do_harness_using_subcommand init-db" -l dry-run -d 'Report pending migrations without applying them (exit 0)'
+complete -c do-harness -n "__fish_do_harness_using_subcommand init-db" -s y -l yes -d 'Skip the interactive confirmation prompt'
 complete -c do-harness -n "__fish_do_harness_using_subcommand init-db" -s v -l verbose -d 'Verbosity level (-v, -vv)'
 complete -c do-harness -n "__fish_do_harness_using_subcommand init-db" -s q -l quiet -d 'Suppress non-error messages'
-complete -c do-harness -n "__fish_do_harness_using_subcommand init-db" -l dry-run -d 'Dry run without side effects'
 complete -c do-harness -n "__fish_do_harness_using_subcommand init-db" -s h -l help -d 'Print help'
 complete -c do-harness -n "__fish_do_harness_using_subcommand init-db" -s V -l version -d 'Print version'
 complete -c do-harness -n "__fish_do_harness_using_subcommand seed" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
 complete -c do-harness -n "__fish_do_harness_using_subcommand seed" -l config -d 'Explicit path to do-harness.toml' -r -F
 complete -c do-harness -n "__fish_do_harness_using_subcommand seed" -l color -d 'Color output (auto, always, never)' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand seed" -l output -d 'Default output file path' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand seed" -l prune -d 'Delete invariants no longer present in plans/invariants.json'
 complete -c do-harness -n "__fish_do_harness_using_subcommand seed" -s v -l verbose -d 'Verbosity level (-v, -vv)'
 complete -c do-harness -n "__fish_do_harness_using_subcommand seed" -s q -l quiet -d 'Suppress non-error messages'
 complete -c do-harness -n "__fish_do_harness_using_subcommand seed" -l dry-run -d 'Dry run without side effects'
@@ -158,24 +162,25 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand init" -s q -l quie
 complete -c do-harness -n "__fish_do_harness_using_subcommand init" -l dry-run -d 'Dry run without side effects'
 complete -c do-harness -n "__fish_do_harness_using_subcommand init" -s h -l help -d 'Print help (see more with \'--help\')'
 complete -c do-harness -n "__fish_do_harness_using_subcommand init" -s V -l version -d 'Print version'
-complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export list show add advance done fail remove help" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
-complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export list show add advance done fail remove help" -l config -d 'Explicit path to do-harness.toml' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export list show add advance done fail remove help" -l color -d 'Color output (auto, always, never)' -r
-complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export list show add advance done fail remove help" -l output -d 'Default output file path' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export list show add advance done fail remove help" -s v -l verbose -d 'Verbosity level (-v, -vv)'
-complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export list show add advance done fail remove help" -s q -l quiet -d 'Suppress non-error messages'
-complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export list show add advance done fail remove help" -l dry-run -d 'Dry run without side effects'
-complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export list show add advance done fail remove help" -s h -l help -d 'Print help'
-complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export list show add advance done fail remove help" -s V -l version -d 'Print version'
-complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export list show add advance done fail remove help" -f -a "export" -d 'Write the task list to plans/tasks.json or specified output'
-complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export list show add advance done fail remove help" -f -a "list" -d 'Print tasks from the state database'
-complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export list show add advance done fail remove help" -f -a "show" -d 'Show details for a specific task'
-complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export list show add advance done fail remove help" -f -a "add" -d 'Add a task in `pending` state'
-complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export list show add advance done fail remove help" -f -a "advance" -d 'Advance the task\'s subtask pointer'
-complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export list show add advance done fail remove help" -f -a "done" -d 'Mark a task done once its sensor-gated subtasks have passed'
-complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export list show add advance done fail remove help" -f -a "fail" -d 'Mark a task failed'
-complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export list show add advance done fail remove help" -f -a "remove" -d 'Remove or cancel a task'
-complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export list show add advance done fail remove help" -f -a "help" -d 'Print this message or the help of the given subcommand(s)'
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export import list show add advance done fail remove help" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export import list show add advance done fail remove help" -l config -d 'Explicit path to do-harness.toml' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export import list show add advance done fail remove help" -l color -d 'Color output (auto, always, never)' -r
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export import list show add advance done fail remove help" -l output -d 'Default output file path' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export import list show add advance done fail remove help" -s v -l verbose -d 'Verbosity level (-v, -vv)'
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export import list show add advance done fail remove help" -s q -l quiet -d 'Suppress non-error messages'
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export import list show add advance done fail remove help" -l dry-run -d 'Dry run without side effects'
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export import list show add advance done fail remove help" -s h -l help -d 'Print help'
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export import list show add advance done fail remove help" -s V -l version -d 'Print version'
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export import list show add advance done fail remove help" -f -a "export" -d 'Write the task list to plans/tasks.json or specified output'
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export import list show add advance done fail remove help" -f -a "import" -d 'Validate plans/tasks.json against the state database'
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export import list show add advance done fail remove help" -f -a "list" -d 'Print tasks from the state database'
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export import list show add advance done fail remove help" -f -a "show" -d 'Show details for a specific task'
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export import list show add advance done fail remove help" -f -a "add" -d 'Add a task in `pending` state'
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export import list show add advance done fail remove help" -f -a "advance" -d 'Advance the task\'s subtask pointer'
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export import list show add advance done fail remove help" -f -a "done" -d 'Mark a task done once its sensor-gated subtasks have passed'
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export import list show add advance done fail remove help" -f -a "fail" -d 'Mark a task failed'
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export import list show add advance done fail remove help" -f -a "remove" -d 'Remove or cancel a task'
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export import list show add advance done fail remove help" -f -a "help" -d 'Print this message or the help of the given subcommand(s)'
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from export" -s o -l output -d 'Output file path or - for stdout' -r -F
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from export" -l format -d 'Output format (json/text)' -r -f -a "text\t'Human-readable text output'
 json\t'Machine-readable JSON output'"
@@ -188,6 +193,17 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_s
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from export" -l dry-run -d 'Dry run without side effects'
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from export" -s h -l help -d 'Print help (see more with \'--help\')'
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from export" -s V -l version -d 'Print version'
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from import" -l file -d 'Snapshot file (defaults to plans/tasks.json under the root)' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from import" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from import" -l config -d 'Explicit path to do-harness.toml' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from import" -l color -d 'Color output (auto, always, never)' -r
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from import" -l output -d 'Default output file path' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from import" -l check -d 'Exit non-zero when the snapshot and database drift'
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from import" -s v -l verbose -d 'Verbosity level (-v, -vv)'
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from import" -s q -l quiet -d 'Suppress non-error messages'
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from import" -l dry-run -d 'Dry run without side effects'
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from import" -s h -l help -d 'Print help'
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from import" -s V -l version -d 'Print version'
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from list" -l status -d 'Filter tasks by status (pending, `in_progress`, completed, failed)' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from list" -l method -d 'Filter tasks by method name' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from list" -l parent -d 'Filter tasks by parent ID' -r
@@ -262,6 +278,7 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_s
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from remove" -s h -l help -d 'Print help'
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from remove" -s V -l version -d 'Print version'
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from help" -f -a "export" -d 'Write the task list to plans/tasks.json or specified output'
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from help" -f -a "import" -d 'Validate plans/tasks.json against the state database'
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from help" -f -a "list" -d 'Print tasks from the state database'
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from help" -f -a "show" -d 'Show details for a specific task'
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from help" -f -a "add" -d 'Add a task in `pending` state'
@@ -382,6 +399,7 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand errors; and __fish
 complete -c do-harness -n "__fish_do_harness_using_subcommand eval" -l skill -d 'Restrict evaluation to this skill directory name' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand eval" -l format -d 'Output format' -r -f -a "text\t'Human-readable text output'
 json\t'Machine-readable JSON output'"
+complete -c do-harness -n "__fish_do_harness_using_subcommand eval" -l approver -d 'Approver identity recorded with `--bless` (defaults to `DO_HARNESS_APPROVER` or the git user email)' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand eval" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
 complete -c do-harness -n "__fish_do_harness_using_subcommand eval" -l config -d 'Explicit path to do-harness.toml' -r -F
 complete -c do-harness -n "__fish_do_harness_using_subcommand eval" -l color -d 'Color output (auto, always, never)' -r
@@ -468,7 +486,7 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand metrics" -l format
 json\t'Machine-readable JSON output'"
 complete -c do-harness -n "__fish_do_harness_using_subcommand metrics" -l sensor -d 'Filter by sensor name' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand metrics" -l skill -d 'Filter by skill name' -r
-complete -c do-harness -n "__fish_do_harness_using_subcommand metrics" -l since -d 'Filter metrics since timestamp (Unix timestamp or ISO string)' -r
+complete -c do-harness -n "__fish_do_harness_using_subcommand metrics" -l since -d 'Filter metrics since a Unix timestamp in seconds' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand metrics" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
 complete -c do-harness -n "__fish_do_harness_using_subcommand metrics" -l config -d 'Explicit path to do-harness.toml' -r -F
 complete -c do-harness -n "__fish_do_harness_using_subcommand metrics" -l color -d 'Color output (auto, always, never)' -r
@@ -478,6 +496,17 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand metrics" -s q -l q
 complete -c do-harness -n "__fish_do_harness_using_subcommand metrics" -l dry-run -d 'Dry run without side effects'
 complete -c do-harness -n "__fish_do_harness_using_subcommand metrics" -s h -l help -d 'Print help (see more with \'--help\')'
 complete -c do-harness -n "__fish_do_harness_using_subcommand metrics" -s V -l version -d 'Print version'
+complete -c do-harness -n "__fish_do_harness_using_subcommand maintenance" -l prune-beats -d 'Delete beats older than this many days (keeps the most recent per task)' -r
+complete -c do-harness -n "__fish_do_harness_using_subcommand maintenance" -l keep-per-task -d 'Minimum most-recent beats kept per task when pruning' -r
+complete -c do-harness -n "__fish_do_harness_using_subcommand maintenance" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
+complete -c do-harness -n "__fish_do_harness_using_subcommand maintenance" -l config -d 'Explicit path to do-harness.toml' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand maintenance" -l color -d 'Color output (auto, always, never)' -r
+complete -c do-harness -n "__fish_do_harness_using_subcommand maintenance" -l output -d 'Default output file path' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand maintenance" -s v -l verbose -d 'Verbosity level (-v, -vv)'
+complete -c do-harness -n "__fish_do_harness_using_subcommand maintenance" -s q -l quiet -d 'Suppress non-error messages'
+complete -c do-harness -n "__fish_do_harness_using_subcommand maintenance" -l dry-run -d 'Dry run without side effects'
+complete -c do-harness -n "__fish_do_harness_using_subcommand maintenance" -s h -l help -d 'Print help'
+complete -c do-harness -n "__fish_do_harness_using_subcommand maintenance" -s V -l version -d 'Print version'
 complete -c do-harness -n "__fish_do_harness_using_subcommand compliance" -l framework -d 'Filter framework (owasp-agentic-top10, nist-ai-rmf, eu-ai-act, soc2)' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand compliance" -l format -d 'Output format' -r -f -a "text\t'Human-readable text output'
 json\t'Machine-readable JSON output'"
@@ -519,26 +548,28 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand man" -s q -l quiet
 complete -c do-harness -n "__fish_do_harness_using_subcommand man" -l dry-run -d 'Dry run without side effects'
 complete -c do-harness -n "__fish_do_harness_using_subcommand man" -s h -l help -d 'Print help'
 complete -c do-harness -n "__fish_do_harness_using_subcommand man" -s V -l version -d 'Print version'
-complete -c do-harness -n "__fish_do_harness_using_subcommand help; and not __fish_seen_subcommand_from version verify list init-db seed init task trace distill errors eval hook doctor metrics compliance audit-chain completions man help" -f -a "version" -d 'Print CLI version information'
-complete -c do-harness -n "__fish_do_harness_using_subcommand help; and not __fish_seen_subcommand_from version verify list init-db seed init task trace distill errors eval hook doctor metrics compliance audit-chain completions man help" -f -a "verify" -d 'Run computational sensors'
-complete -c do-harness -n "__fish_do_harness_using_subcommand help; and not __fish_seen_subcommand_from version verify list init-db seed init task trace distill errors eval hook doctor metrics compliance audit-chain completions man help" -f -a "list" -d 'List sensor names'
-complete -c do-harness -n "__fish_do_harness_using_subcommand help; and not __fish_seen_subcommand_from version verify list init-db seed init task trace distill errors eval hook doctor metrics compliance audit-chain completions man help" -f -a "init-db" -d 'Apply pending database migrations'
-complete -c do-harness -n "__fish_do_harness_using_subcommand help; and not __fish_seen_subcommand_from version verify list init-db seed init task trace distill errors eval hook doctor metrics compliance audit-chain completions man help" -f -a "seed" -d 'Seed invariants from plans/invariants.json'
-complete -c do-harness -n "__fish_do_harness_using_subcommand help; and not __fish_seen_subcommand_from version verify list init-db seed init task trace distill errors eval hook doctor metrics compliance audit-chain completions man help" -f -a "init" -d 'Scaffold a harness workspace in a target directory'
-complete -c do-harness -n "__fish_do_harness_using_subcommand help; and not __fish_seen_subcommand_from version verify list init-db seed init task trace distill errors eval hook doctor metrics compliance audit-chain completions man help" -f -a "task" -d 'Inspect and export task state'
-complete -c do-harness -n "__fish_do_harness_using_subcommand help; and not __fish_seen_subcommand_from version verify list init-db seed init task trace distill errors eval hook doctor metrics compliance audit-chain completions man help" -f -a "trace" -d 'Record and list interaction traces'
-complete -c do-harness -n "__fish_do_harness_using_subcommand help; and not __fish_seen_subcommand_from version verify list init-db seed init task trace distill errors eval hook doctor metrics compliance audit-chain completions man help" -f -a "distill" -d 'Extract a heuristic from a resolved trace'
-complete -c do-harness -n "__fish_do_harness_using_subcommand help; and not __fish_seen_subcommand_from version verify list init-db seed init task trace distill errors eval hook doctor metrics compliance audit-chain completions man help" -f -a "errors" -d 'Inspect and clear fail-fast error signatures'
-complete -c do-harness -n "__fish_do_harness_using_subcommand help; and not __fish_seen_subcommand_from version verify list init-db seed init task trace distill errors eval hook doctor metrics compliance audit-chain completions man help" -f -a "eval" -d 'Validate skill structure and benchmark skill evals'
-complete -c do-harness -n "__fish_do_harness_using_subcommand help; and not __fish_seen_subcommand_from version verify list init-db seed init task trace distill errors eval hook doctor metrics compliance audit-chain completions man help" -f -a "hook" -d 'Manage git hooks that run `do-harness verify`'
-complete -c do-harness -n "__fish_do_harness_using_subcommand help; and not __fish_seen_subcommand_from version verify list init-db seed init task trace distill errors eval hook doctor metrics compliance audit-chain completions man help" -f -a "doctor" -d 'Run diagnostic checks on binary resolution and git hook health'
-complete -c do-harness -n "__fish_do_harness_using_subcommand help; and not __fish_seen_subcommand_from version verify list init-db seed init task trace distill errors eval hook doctor metrics compliance audit-chain completions man help" -f -a "metrics" -d 'Report harness trends: sensor stats, strikes, eval pass-rate history'
-complete -c do-harness -n "__fish_do_harness_using_subcommand help; and not __fish_seen_subcommand_from version verify list init-db seed init task trace distill errors eval hook doctor metrics compliance audit-chain completions man help" -f -a "compliance" -d 'Print compliance mapping to OWASP Agentic Top 10, NIST AI RMF, and EU AI Act'
-complete -c do-harness -n "__fish_do_harness_using_subcommand help; and not __fish_seen_subcommand_from version verify list init-db seed init task trace distill errors eval hook doctor metrics compliance audit-chain completions man help" -f -a "audit-chain" -d 'Recompute workflow event hash chain and report first divergence'
-complete -c do-harness -n "__fish_do_harness_using_subcommand help; and not __fish_seen_subcommand_from version verify list init-db seed init task trace distill errors eval hook doctor metrics compliance audit-chain completions man help" -f -a "completions" -d 'Generate shell completions'
-complete -c do-harness -n "__fish_do_harness_using_subcommand help; and not __fish_seen_subcommand_from version verify list init-db seed init task trace distill errors eval hook doctor metrics compliance audit-chain completions man help" -f -a "man" -d 'Generate man page documentation'
-complete -c do-harness -n "__fish_do_harness_using_subcommand help; and not __fish_seen_subcommand_from version verify list init-db seed init task trace distill errors eval hook doctor metrics compliance audit-chain completions man help" -f -a "help" -d 'Print this message or the help of the given subcommand(s)'
+complete -c do-harness -n "__fish_do_harness_using_subcommand help; and not __fish_seen_subcommand_from version verify list init-db seed init task trace distill errors eval hook doctor metrics maintenance compliance audit-chain completions man help" -f -a "version" -d 'Print CLI version information'
+complete -c do-harness -n "__fish_do_harness_using_subcommand help; and not __fish_seen_subcommand_from version verify list init-db seed init task trace distill errors eval hook doctor metrics maintenance compliance audit-chain completions man help" -f -a "verify" -d 'Run computational sensors'
+complete -c do-harness -n "__fish_do_harness_using_subcommand help; and not __fish_seen_subcommand_from version verify list init-db seed init task trace distill errors eval hook doctor metrics maintenance compliance audit-chain completions man help" -f -a "list" -d 'List sensor names'
+complete -c do-harness -n "__fish_do_harness_using_subcommand help; and not __fish_seen_subcommand_from version verify list init-db seed init task trace distill errors eval hook doctor metrics maintenance compliance audit-chain completions man help" -f -a "init-db" -d 'Apply pending database migrations'
+complete -c do-harness -n "__fish_do_harness_using_subcommand help; and not __fish_seen_subcommand_from version verify list init-db seed init task trace distill errors eval hook doctor metrics maintenance compliance audit-chain completions man help" -f -a "seed" -d 'Seed invariants from plans/invariants.json'
+complete -c do-harness -n "__fish_do_harness_using_subcommand help; and not __fish_seen_subcommand_from version verify list init-db seed init task trace distill errors eval hook doctor metrics maintenance compliance audit-chain completions man help" -f -a "init" -d 'Scaffold a harness workspace in a target directory'
+complete -c do-harness -n "__fish_do_harness_using_subcommand help; and not __fish_seen_subcommand_from version verify list init-db seed init task trace distill errors eval hook doctor metrics maintenance compliance audit-chain completions man help" -f -a "task" -d 'Inspect and export task state'
+complete -c do-harness -n "__fish_do_harness_using_subcommand help; and not __fish_seen_subcommand_from version verify list init-db seed init task trace distill errors eval hook doctor metrics maintenance compliance audit-chain completions man help" -f -a "trace" -d 'Record and list interaction traces'
+complete -c do-harness -n "__fish_do_harness_using_subcommand help; and not __fish_seen_subcommand_from version verify list init-db seed init task trace distill errors eval hook doctor metrics maintenance compliance audit-chain completions man help" -f -a "distill" -d 'Extract a heuristic from a resolved trace'
+complete -c do-harness -n "__fish_do_harness_using_subcommand help; and not __fish_seen_subcommand_from version verify list init-db seed init task trace distill errors eval hook doctor metrics maintenance compliance audit-chain completions man help" -f -a "errors" -d 'Inspect and clear fail-fast error signatures'
+complete -c do-harness -n "__fish_do_harness_using_subcommand help; and not __fish_seen_subcommand_from version verify list init-db seed init task trace distill errors eval hook doctor metrics maintenance compliance audit-chain completions man help" -f -a "eval" -d 'Validate skill structure and benchmark skill evals'
+complete -c do-harness -n "__fish_do_harness_using_subcommand help; and not __fish_seen_subcommand_from version verify list init-db seed init task trace distill errors eval hook doctor metrics maintenance compliance audit-chain completions man help" -f -a "hook" -d 'Manage git hooks that run `do-harness verify`'
+complete -c do-harness -n "__fish_do_harness_using_subcommand help; and not __fish_seen_subcommand_from version verify list init-db seed init task trace distill errors eval hook doctor metrics maintenance compliance audit-chain completions man help" -f -a "doctor" -d 'Run diagnostic checks on binary resolution and git hook health'
+complete -c do-harness -n "__fish_do_harness_using_subcommand help; and not __fish_seen_subcommand_from version verify list init-db seed init task trace distill errors eval hook doctor metrics maintenance compliance audit-chain completions man help" -f -a "metrics" -d 'Report harness trends: sensor stats, strikes, eval pass-rate history'
+complete -c do-harness -n "__fish_do_harness_using_subcommand help; and not __fish_seen_subcommand_from version verify list init-db seed init task trace distill errors eval hook doctor metrics maintenance compliance audit-chain completions man help" -f -a "maintenance" -d 'Prune old beats and compact the state database'
+complete -c do-harness -n "__fish_do_harness_using_subcommand help; and not __fish_seen_subcommand_from version verify list init-db seed init task trace distill errors eval hook doctor metrics maintenance compliance audit-chain completions man help" -f -a "compliance" -d 'Print compliance mapping to OWASP Agentic Top 10, NIST AI RMF, and EU AI Act'
+complete -c do-harness -n "__fish_do_harness_using_subcommand help; and not __fish_seen_subcommand_from version verify list init-db seed init task trace distill errors eval hook doctor metrics maintenance compliance audit-chain completions man help" -f -a "audit-chain" -d 'Recompute workflow event hash chain and report first divergence'
+complete -c do-harness -n "__fish_do_harness_using_subcommand help; and not __fish_seen_subcommand_from version verify list init-db seed init task trace distill errors eval hook doctor metrics maintenance compliance audit-chain completions man help" -f -a "completions" -d 'Generate shell completions'
+complete -c do-harness -n "__fish_do_harness_using_subcommand help; and not __fish_seen_subcommand_from version verify list init-db seed init task trace distill errors eval hook doctor metrics maintenance compliance audit-chain completions man help" -f -a "man" -d 'Generate man page documentation'
+complete -c do-harness -n "__fish_do_harness_using_subcommand help; and not __fish_seen_subcommand_from version verify list init-db seed init task trace distill errors eval hook doctor metrics maintenance compliance audit-chain completions man help" -f -a "help" -d 'Print this message or the help of the given subcommand(s)'
 complete -c do-harness -n "__fish_do_harness_using_subcommand help; and __fish_seen_subcommand_from task" -f -a "export" -d 'Write the task list to plans/tasks.json or specified output'
+complete -c do-harness -n "__fish_do_harness_using_subcommand help; and __fish_seen_subcommand_from task" -f -a "import" -d 'Validate plans/tasks.json against the state database'
 complete -c do-harness -n "__fish_do_harness_using_subcommand help; and __fish_seen_subcommand_from task" -f -a "list" -d 'Print tasks from the state database'
 complete -c do-harness -n "__fish_do_harness_using_subcommand help; and __fish_seen_subcommand_from task" -f -a "show" -d 'Show details for a specific task'
 complete -c do-harness -n "__fish_do_harness_using_subcommand help; and __fish_seen_subcommand_from task" -f -a "add" -d 'Add a task in `pending` state'

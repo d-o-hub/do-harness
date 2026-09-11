@@ -11,9 +11,10 @@ workspace = true
 
 [dependencies]
 clap = { workspace = true, features = ["derive"] }
-clap_complete = "4"
-clap_mangen = "0.3"
+clap_complete.workspace = true
+clap_mangen.workspace = true
 sha2.workspace = true
+hex.workspace = true
 tokio.workspace = true
 anyhow.workspace = true
 serde = { workspace = true, features = ["derive"] }
@@ -22,12 +23,5 @@ toml.workspace = true
 tempfile.workspace = true
 do-harness-db = { path = "../db", version = "0.1.0" }
 do-harness-types = { path = "../types", version = "0.1.0" }
-libsql = { workspace = true, features = ["core"] }
-agent-governance = { workspace = true, optional = true }
-serde_yaml = { version = "0.9", optional = true }
-
-[features]
-default = []
-agt-governance = ["dep:agent-governance", "dep:serde_yaml"]
 
 [dev-dependencies]

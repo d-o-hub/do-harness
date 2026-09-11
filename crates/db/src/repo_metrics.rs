@@ -15,19 +15,21 @@ pub struct SensorStat {
     pub failures: i64,
 }
 
-/// Aggregates sensor-beat statistics per sensor name.
+/// Aggregates sensor-beat statistics per sensor name, optionally ignoring
+/// beats older than `since` (Unix seconds; [`None`] means all history).
 ///
 /// # Errors
 ///
 /// Returns an error when the query fails.
-pub async fn sensor_stats(conn: &Connection) -> Result<Vec<SensorStat>> {
+pub async fn sensor_stats(conn: &Connection, since: Option<i64>) -> Result<Vec<SensorStat>> {
     let mut rows = conn
         .query(
             "SELECT sensor_name, COUNT(*), \
              SUM(CASE WHEN status != 'ok' THEN 1 ELSE 0 END) \
              FROM beats WHERE beat_type = 'sensor' AND sensor_name IS NOT NULL \
+             AND (?1 IS NULL OR started_at >= ?1) \
              GROUP BY sensor_name ORDER BY sensor_name",
-            Params::None,
+            libsql::params!(since),
         )
         .await?;
     let mut stats = Vec::new();

@@ -50,7 +50,7 @@ pub async fn audit_chain(root: &Path) -> Result<ChainReport> {
     let mut seq_expected = 1i64;
     for row in do_harness_db::list_events_ascending(&conn).await? {
         let expected = do_harness_db::chain_hash(prev.as_deref(), &row.canonical_payload);
-        if row.seq != seq_expected || row.chain_hash.as_deref() != Some(expected.as_str()) {
+        if row.seq != seq_expected || row.chain_hash != expected {
             return Ok(ChainReport::tampered(row.seq));
         }
         prev = Some(expected);

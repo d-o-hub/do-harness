@@ -5,7 +5,10 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use anyhow::Result;
+
 use super::*;
+use crate::report::Format;
 
 const VALID_SKILL_MD: &str = "---\nname: test-skill\ndescription: A fixture skill used by the eval-runner tests.\nlicense: MIT\n---\n\n# Test Skill\n";
 
@@ -61,7 +64,17 @@ fn single_case_json(assertions: &[&str]) -> String {
 }
 
 async fn eval_run(dir: &Path, skill: Option<&str>, bless: bool) -> Result<()> {
-    run_eval(dir, skill, bless, false, false, false, Format::Text).await
+    run_eval(
+        dir,
+        skill,
+        bless,
+        false,
+        false,
+        false,
+        Format::Text,
+        Some("test-approver"),
+    )
+    .await
 }
 
 #[tokio::test(flavor = "current_thread")]

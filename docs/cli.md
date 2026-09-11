@@ -32,6 +32,17 @@ Runs computational sensors defined in `do-harness.toml`.
 - `--evidence <FILE>`: Write machine-readable evidence artifact JSON.
 - `--strict`: Exit non-zero if any sensors were skipped or evidence checks fail. Default evidence artifact path: `.do-harness/evidence.json`.
 
+A sensor configured with `allow_failure = true` keeps the local `verify` gate
+green (it prints `WARN`), but its evidence verdict is still `fail` and
+`--strict` rejects it: softness applies to the developer loop, never to the
+evidence artifact.
+
+Evidence schema v2 records each sensor's exact `argv` and a SHA-256 of its
+captured output, and chains artifacts written to the same path
+(`chain_hash`/`prev_hash`) so tampering or reordering is detectable. CI uploads
+only the artifact and a `Cargo.lock` hash; the local database is not uploaded
+and can be pruned with `maintenance`.
+
 ### `task`
 Task state inspection and workflow management.
 
@@ -55,10 +66,19 @@ Skill structure validation and evaluation benchmark runner.
 
 - `--skill <SKILL>`: Restrict evaluation to target skill directory.
 - `--bless`: Re-baseline grader hashes and raise pass-rate floor on green run.
+  Every bless appends an immutable `skill_eval_blesses` row recording the
+  approver and timestamp; an approver is required (`--approver`,
+  `DO_HARNESS_APPROVER`, or the git user email).
+- `--approver <NAME>`: Identity recorded with `--bless`.
 - `--list-skills`: List discovered skills under `.agents/skills`.
 - `--fail-fast`: Halt evaluation on first failing skill.
 - `--dry-run`: Perform dry-run evaluation without updating state.
 - `--format <Format>`: Output format (`text` or `json`).
+
+**Sandbox boundary:** walkthroughs and graded assertions execute in a
+`tempfile` filesystem sandbox only. There is no seccomp/netns/gVisor
+isolation; children run with the caller's privileges. Treat skill walkthroughs
+as untrusted code and wrap the whole command in an outer sandbox if needed.
 
 ### `distill`
 Extracts a heuristic from a resolved trace into a skill.
@@ -98,7 +118,21 @@ Longitudinal trends: sensor stats, strikes, and skill pass rates.
 - `--format <Format>`: Output format (`text` or `json`).
 - `--sensor <SENSOR>`: Filter by sensor name.
 - `--skill <SKILL>`: Filter by skill name.
-- `--since <TIME>`: Filter metrics since timestamp.
+- `--since <UNIX_SECONDS>`: Filter metrics since a Unix timestamp in seconds.
+
+### `maintenance`
+Prune unbounded history and compact the local state database.
+
+- `--prune-beats <DAYS>`: Delete beats older than the cutoff, keeping at least
+  `--keep-per-task` most-recent beats per task (task-less beats form their own
+  partition).
+- `--keep-per-task <N>`: Minimum most-recent beats retained per task when
+  pruning (default 20).
+
+`VACUUM` always runs after the optional prune. Recommended retention: run
+`maintenance --prune-beats 30` on a schedule; `skill_eval_runs` history is
+retained in full locally (it is small) but CI only uploads the current
+`.do-harness/evidence.json` artifact, not the database.
 
 ### `compliance`
 Compliance mapping to OWASP Agentic Top 10, NIST AI RMF, EU AI Act, and SOC 2.

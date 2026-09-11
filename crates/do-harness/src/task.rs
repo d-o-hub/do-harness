@@ -1,23 +1,38 @@
 //! Task state queries and exports for `do-harness task`.
 
 use std::fmt::Write;
-use std::fs;
 use std::path::Path;
 
 use anyhow::{Context, Result};
 use do_harness_types::{Beat, Projection, TaskBoard, TaskRecord, TaskState, WorkflowEvent};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::report::Format;
 
 /// Snapshot of the task list written to `plans/tasks.json`.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct TaskSnapshot {
     /// Unix timestamp of the export.
     pub exported_at: i64,
     /// All tasks ordered by id.
     pub tasks: Vec<TaskRecord>,
+    /// Read-model board summary at export time.
+    pub summary: TaskSummary,
+}
+
+/// Board summary embedded in the export snapshot.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TaskSummary {
+    /// Tasks in `pending`.
+    pub pending: i64,
+    /// Tasks in `in_progress`.
+    pub in_progress: i64,
+    /// Tasks in `done`.
+    pub done: i64,
+    /// Tasks in `failed`.
+    pub failed: i64,
 }
 
 /// Writes `plans/tasks.json` or custom output with the task list; returns task count.
@@ -28,10 +43,26 @@ pub async fn export_tasks(
     format: Format,
 ) -> Result<usize> {
     let conn = do_harness_db::connect_and_migrate(root).await?;
-    let tasks = do_harness_db::list_tasks(&conn).await?;
+    // Snapshot the board inside one read transaction so a concurrent task
+    // command cannot produce a half-updated export.
+    let tx = conn.transaction().await?;
+    let tasks = do_harness_db::list_tasks(&tx).await?;
+    let mut board = TaskBoard::new();
+    for (_, event) in do_harness_db::list_all_events(&tx).await? {
+        board
+            .apply(&event)
+            .context("persisted workflow event is not part of the workflow stream")?;
+    }
+    tx.commit().await?;
     let snapshot = TaskSnapshot {
         exported_at: do_harness_db::unix_now(),
         tasks,
+        summary: TaskSummary {
+            pending: board.pending(),
+            in_progress: board.in_progress(),
+            done: board.done(),
+            failed: board.failed(),
+        },
     };
     if stdout {
         match format {
@@ -60,12 +91,96 @@ pub async fn export_tasks(
         }
     };
     if let Some(parent) = target_path.parent() {
-        fs::create_dir_all(parent)
+        tokio::fs::create_dir_all(parent)
+            .await
             .with_context(|| format!("failed to create {}", parent.display()))?;
     }
-    fs::write(&target_path, content)
-        .with_context(|| format!("failed to write {}", target_path.display()))?;
+    // Write to a sibling temp file and rename: readers never observe a
+    // truncated snapshot even if the process dies mid-write.
+    let tmp_path = target_path.with_extension("tmp");
+    tokio::fs::write(&tmp_path, content)
+        .await
+        .with_context(|| format!("failed to write {}", tmp_path.display()))?;
+    tokio::fs::rename(&tmp_path, &target_path)
+        .await
+        .with_context(|| format!("failed to replace {}", target_path.display()))?;
     Ok(snapshot.tasks.len())
+}
+
+/// Validates a `plans/tasks.json` snapshot against the state database.
+///
+/// With `check`, any drift fails the command; without it the drift is reported
+/// but the command succeeds (a dry-run view of what a future import would need
+/// to reconcile). Writing snapshots back into the database is intentionally
+/// not supported: task ids are database-assigned and the workflow event log is
+/// append-only, so imports must go through `task add`.
+///
+/// # Errors
+///
+/// Returns an error when the snapshot cannot be read or parsed, or when
+/// `check` is set and the snapshot drifts from the database.
+pub async fn import_tasks(root: &Path, file: Option<&Path>, check: bool) -> Result<()> {
+    let path = file.map_or_else(|| root.join("plans/tasks.json"), Path::to_path_buf);
+    let raw = tokio::fs::read_to_string(&path)
+        .await
+        .with_context(|| format!("failed to read {}", path.display()))?;
+    let snapshot: TaskSnapshot = serde_json::from_str(&raw)
+        .with_context(|| format!("invalid task snapshot at {}", path.display()))?;
+
+    let conn = do_harness_db::connect_and_migrate(root).await?;
+    let db_tasks = do_harness_db::list_tasks(&conn).await?;
+
+    let mut diffs = Vec::new();
+    for task in &snapshot.tasks {
+        match db_tasks.iter().find(|db| db.id == task.id) {
+            None => diffs.push(format!(
+                "task {} '{}' present in snapshot, missing from database",
+                task.id, task.title
+            )),
+            Some(db) => {
+                if db.status != task.status {
+                    diffs.push(format!(
+                        "task {} status: snapshot={} database={}",
+                        task.id,
+                        task.status.as_str(),
+                        db.status.as_str()
+                    ));
+                }
+                if db.subtask_index != task.subtask_index {
+                    diffs.push(format!(
+                        "task {} subtask_index: snapshot={} database={}",
+                        task.id, task.subtask_index, db.subtask_index
+                    ));
+                }
+                if db.title != task.title {
+                    diffs.push(format!("task {} title differs from database", task.id));
+                }
+            }
+        }
+    }
+    for db in &db_tasks {
+        if !snapshot.tasks.iter().any(|task| task.id == db.id) {
+            diffs.push(format!(
+                "task {} '{}' present in database, missing from snapshot",
+                db.id, db.title
+            ));
+        }
+    }
+
+    println!(
+        "snapshot: {} task(s) exported_at={}; database: {} task(s); {} difference(s)",
+        snapshot.tasks.len(),
+        snapshot.exported_at,
+        db_tasks.len(),
+        diffs.len()
+    );
+    for diff in &diffs {
+        println!("  {diff}");
+    }
+    if check && !diffs.is_empty() {
+        anyhow::bail!("task snapshot drift: {} difference(s)", diffs.len());
+    }
+    Ok(())
 }
 
 /// Prints the task list in the requested format with optional filtering.
@@ -198,7 +313,7 @@ pub async fn add_task(
     }
     let conn = do_harness_db::connect_and_migrate(root).await?;
     if let Some(method_name) = method {
-        let methods = crate::methods::load_methods(root)?;
+        let methods = crate::methods::load_methods(root).await?;
         if crate::methods::find_method(&methods, method_name).is_none() {
             anyhow::bail!("unknown method '{method_name}': not in plans/methods.json");
         }
@@ -236,7 +351,7 @@ pub async fn advance_task(root: &Path, id: i64) -> Result<(i64, WorkflowEvent)> 
     };
     let idx = usize::try_from(task.subtask_index)
         .with_context(|| format!("task {id} has an invalid subtask_index"))?;
-    let methods = crate::methods::load_methods(root)?;
+    let methods = crate::methods::load_methods(root).await?;
     let method = crate::methods::find_method(&methods, &method_name)
         .with_context(|| format!("task {id} references unknown method '{method_name}'"))?;
     if idx >= method.subtasks.len() {
@@ -251,9 +366,15 @@ pub async fn advance_task(root: &Path, id: i64) -> Result<(i64, WorkflowEvent)> 
             );
         }
     }
-    do_harness_db::advance_subtask_with_event(&conn, id)
+    do_harness_db::advance_subtask_with_event(&conn, id, method.subtasks[idx].sensor.as_deref())
         .await
-        .map_err(anyhow::Error::from)
+        .map_err(|err| match err {
+            do_harness_db::DbError::GateUnsatisfied { sensor, .. } => anyhow::anyhow!(
+                "cannot advance task {id}: subtask '{}' requires sensor '{sensor}' to pass (run: do-harness verify --record --task {id})",
+                method.subtasks[idx].name
+            ),
+            other => other.into(),
+        })
 }
 
 fn latest_sensor_beat_ok(beats: &[Beat], sensor: &str) -> bool {
@@ -273,7 +394,7 @@ pub async fn done_task(root: &Path, id: i64) -> Result<WorkflowEvent> {
     let Some(method_name) = task.method else {
         anyhow::bail!("task {id} has no method; cannot mark done");
     };
-    let methods = crate::methods::load_methods(root)?;
+    let methods = crate::methods::load_methods(root).await?;
     let method = crate::methods::find_method(&methods, &method_name)
         .with_context(|| format!("task {id} references unknown method '{method_name}'"))?;
     let index = usize::try_from(task.subtask_index)
@@ -288,9 +409,20 @@ pub async fn done_task(root: &Path, id: i64) -> Result<WorkflowEvent> {
             method.subtasks.len()
         );
     }
-    do_harness_db::update_task_status_with_event(&conn, id, TaskState::Done)
+    let required_sensors: Vec<String> = method
+        .subtasks
+        .iter()
+        .take(index.min(method.subtasks.len()))
+        .filter_map(|sub| sub.sensor.clone())
+        .collect();
+    do_harness_db::update_task_status_with_event(&conn, id, TaskState::Done, &required_sensors)
         .await
-        .map_err(anyhow::Error::from)
+        .map_err(|err| match err {
+            do_harness_db::DbError::GateUnsatisfied { sensor, .. } => anyhow::anyhow!(
+                "cannot mark task {id} done: sensor '{sensor}' has no passing beat (run: do-harness verify --record --task {id})"
+            ),
+            other => other.into(),
+        })
 }
 
 /// Marks a task as failed.
@@ -299,11 +431,13 @@ pub async fn fail_task(root: &Path, id: i64) -> Result<WorkflowEvent> {
     if do_harness_db::get_task(&conn, id).await?.is_none() {
         anyhow::bail!("task {id} not found");
     }
-    do_harness_db::update_task_status_with_event(&conn, id, TaskState::Failed)
+    do_harness_db::update_task_status_with_event(&conn, id, TaskState::Failed, &[])
         .await
         .map_err(anyhow::Error::from)
 }
 
+#[cfg(test)]
+mod export_tests;
 #[cfg(test)]
 mod tests;
 

@@ -10,7 +10,6 @@ use serde::Deserialize;
 #[serde(deny_unknown_fields)]
 pub struct Config {
     /// Optional host language tag (informational; reserved for language packs).
-    #[allow(dead_code)]
     pub language: Option<String>,
     /// Hook sensor selection.
     #[serde(default)]
@@ -97,7 +96,7 @@ fn rust_pack() -> Vec<SensorSpec> {
 /// # Errors
 ///
 /// Returns an error when the selected file cannot be read or parsed.
-pub fn load(root: &Path, explicit: Option<&Path>) -> Result<Config> {
+pub async fn load(root: &Path, explicit: Option<&Path>) -> Result<Config> {
     let path = match explicit {
         Some(path) => path.to_path_buf(),
         None => root.join("do-harness.toml"),
@@ -108,7 +107,8 @@ pub fn load(root: &Path, explicit: Option<&Path>) -> Result<Config> {
         }
         return Ok(rust_default());
     }
-    let text = std::fs::read_to_string(&path)
+    let text = tokio::fs::read_to_string(&path)
+        .await
         .with_context(|| format!("failed to read config file {}", path.display()))?;
     let cfg: Config =
         toml::from_str(&text).with_context(|| format!("invalid config file {}", path.display()))?;
@@ -172,8 +172,8 @@ mod tests {
     use super::*;
 
     /// Writes a config file into a tempdir and loads it explicitly.
-    #[test]
-    fn parses_valid_config() {
+    #[tokio::test(flavor = "current_thread")]
+    async fn parses_valid_config() {
         let dir = tempfile::tempdir().expect("tempdir");
         let path = dir.path().join("do-harness.toml");
         let text = r#"
@@ -189,7 +189,7 @@ mod tests {
             argv = ["cargo", "check", "--workspace"]
         "#;
         std::fs::write(&path, text).expect("write config");
-        let cfg = load(dir.path(), Some(&path)).expect("load config");
+        let cfg = load(dir.path(), Some(&path)).await.expect("load config");
         assert_eq!(cfg.language.as_deref(), Some("rust"));
         assert_eq!(
             cfg.hooks.pre_commit,
@@ -204,18 +204,20 @@ mod tests {
     }
 
     /// Unknown top-level keys are rejected by `deny_unknown_fields`.
-    #[test]
-    fn rejects_unknown_fields() {
+    #[tokio::test(flavor = "current_thread")]
+    async fn rejects_unknown_fields() {
         let dir = tempfile::tempdir().expect("tempdir");
         let path = dir.path().join("do-harness.toml");
         std::fs::write(&path, "bogus_key = 1\n").expect("write config");
-        let err = load(dir.path(), Some(&path)).expect_err("load must fail");
+        let err = load(dir.path(), Some(&path))
+            .await
+            .expect_err("load must fail");
         assert!(format!("{err:#}").contains("bogus_key"));
     }
 
     /// Parses new per-sensor fields: retry, timeout, `allow_failure`, `transient_exit_codes`.
-    #[test]
-    fn parses_transient_failure_sensor_options() {
+    #[tokio::test(flavor = "current_thread")]
+    async fn parses_transient_failure_sensor_options() {
         let dir = tempfile::tempdir().expect("tempdir");
         let path = dir.path().join("do-harness.toml");
         let text = r#"
@@ -228,7 +230,7 @@ mod tests {
             transient_exit_codes = [75, 429]
         "#;
         std::fs::write(&path, text).expect("write config");
-        let cfg = load(dir.path(), Some(&path)).expect("load config");
+        let cfg = load(dir.path(), Some(&path)).await.expect("load config");
         assert_eq!(cfg.sensors.len(), 1);
         let sensor = &cfg.sensors[0];
         assert_eq!(sensor.name, "links");
@@ -239,8 +241,8 @@ mod tests {
     }
 
     /// Unknown fields in [[sensors]] are rejected by `deny_unknown_fields`.
-    #[test]
-    fn rejects_unknown_sensor_fields() {
+    #[tokio::test(flavor = "current_thread")]
+    async fn rejects_unknown_sensor_fields() {
         let dir = tempfile::tempdir().expect("tempdir");
         let path = dir.path().join("do-harness.toml");
         let text = r#"
@@ -250,15 +252,17 @@ mod tests {
             unknown_sensor_option = true
         "#;
         std::fs::write(&path, text).expect("write config");
-        let err = load(dir.path(), Some(&path)).expect_err("load must fail");
+        let err = load(dir.path(), Some(&path))
+            .await
+            .expect_err("load must fail");
         assert!(format!("{err:#}").contains("unknown_sensor_option"));
     }
 
     /// A missing default config falls back to the built-in Rust pack.
-    #[test]
-    fn missing_file_returns_rust_default() {
+    #[tokio::test(flavor = "current_thread")]
+    async fn missing_file_returns_rust_default() {
         let dir = tempfile::tempdir().expect("tempdir");
-        let cfg = load(dir.path(), None).expect("load default");
+        let cfg = load(dir.path(), None).await.expect("load default");
         assert_eq!(cfg.language, None);
         assert_eq!(
             cfg.hooks.pre_commit,
@@ -271,33 +275,35 @@ mod tests {
     }
 
     /// An unknown language pack identifier is rejected at load time.
-    #[test]
-    fn rejects_unknown_language_pack() {
+    #[tokio::test(flavor = "current_thread")]
+    async fn rejects_unknown_language_pack() {
         let dir = tempfile::tempdir().expect("tempdir");
         let path = dir.path().join("do-harness.toml");
         std::fs::write(&path, "language = \"python\"\n").expect("write config");
-        let err = load(dir.path(), Some(&path)).expect_err("load must fail");
+        let err = load(dir.path(), Some(&path))
+            .await
+            .expect_err("load must fail");
         assert!(format!("{err:#}").contains("unsupported language pack 'python'"));
     }
 
     /// The generic pack with no sensors yields an empty sensor list.
-    #[test]
-    fn generic_language_yields_no_effective_sensors() {
+    #[tokio::test(flavor = "current_thread")]
+    async fn generic_language_yields_no_effective_sensors() {
         let dir = tempfile::tempdir().expect("tempdir");
         let path = dir.path().join("do-harness.toml");
         std::fs::write(&path, "language = \"generic\"\n").expect("write config");
-        let cfg = load(dir.path(), Some(&path)).expect("load config");
+        let cfg = load(dir.path(), Some(&path)).await.expect("load config");
         assert!(cfg.effective_sensors().is_empty());
         assert!(cfg.sensor_names().is_empty());
     }
 
     /// The rust pack with no sensors falls back to the built-in Rust sensors.
-    #[test]
-    fn rust_language_without_sensors_uses_builtin_pack() {
+    #[tokio::test(flavor = "current_thread")]
+    async fn rust_language_without_sensors_uses_builtin_pack() {
         let dir = tempfile::tempdir().expect("tempdir");
         let path = dir.path().join("do-harness.toml");
         std::fs::write(&path, "language = \"rust\"\n").expect("write config");
-        let cfg = load(dir.path(), Some(&path)).expect("load config");
+        let cfg = load(dir.path(), Some(&path)).await.expect("load config");
         assert_eq!(cfg.effective_sensors().len(), 7);
         assert!(cfg.sensor_names().contains(&"clippy".to_owned()));
     }

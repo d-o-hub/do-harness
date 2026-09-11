@@ -47,6 +47,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand hook 'Manage git hooks that run `do-harness verify`'
             cand doctor 'Run diagnostic checks on binary resolution and git hook health'
             cand metrics 'Report harness trends: sensor stats, strikes, eval pass-rate history'
+            cand maintenance 'Prune old beats and compact the state database'
             cand compliance 'Print compliance mapping to OWASP Agentic Top 10, NIST AI RMF, and EU AI Act'
             cand audit-chain 'Recompute workflow event hash chain and report first divergence'
             cand completions 'Generate shell completions'
@@ -152,11 +153,14 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand --config 'Explicit path to do-harness.toml'
             cand --color 'Color output (auto, always, never)'
             cand --output 'Default output file path'
+            cand --check 'Report pending migrations and exit non-zero when any are pending'
+            cand --dry-run 'Report pending migrations without applying them (exit 0)'
+            cand -y 'Skip the interactive confirmation prompt'
+            cand --yes 'Skip the interactive confirmation prompt'
             cand -v 'Verbosity level (-v, -vv)'
             cand --verbose 'Verbosity level (-v, -vv)'
             cand -q 'Suppress non-error messages'
             cand --quiet 'Suppress non-error messages'
-            cand --dry-run 'Dry run without side effects'
             cand -h 'Print help'
             cand --help 'Print help'
             cand -V 'Print version'
@@ -167,6 +171,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand --config 'Explicit path to do-harness.toml'
             cand --color 'Color output (auto, always, never)'
             cand --output 'Default output file path'
+            cand --prune 'Delete invariants no longer present in plans/invariants.json'
             cand -v 'Verbosity level (-v, -vv)'
             cand --verbose 'Verbosity level (-v, -vv)'
             cand -q 'Suppress non-error messages'
@@ -213,6 +218,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand -V 'Print version'
             cand --version 'Print version'
             cand export 'Write the task list to plans/tasks.json or specified output'
+            cand import 'Validate plans/tasks.json against the state database'
             cand list 'Print tasks from the state database'
             cand show 'Show details for a specific task'
             cand add 'Add a task in `pending` state'
@@ -237,6 +243,23 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand --dry-run 'Dry run without side effects'
             cand -h 'Print help (see more with ''--help'')'
             cand --help 'Print help (see more with ''--help'')'
+            cand -V 'Print version'
+            cand --version 'Print version'
+        }
+        &'do-harness;task;import'= {
+            cand --file 'Snapshot file (defaults to plans/tasks.json under the root)'
+            cand --root 'Workspace root override (default: walk up from cwd)'
+            cand --config 'Explicit path to do-harness.toml'
+            cand --color 'Color output (auto, always, never)'
+            cand --output 'Default output file path'
+            cand --check 'Exit non-zero when the snapshot and database drift'
+            cand -v 'Verbosity level (-v, -vv)'
+            cand --verbose 'Verbosity level (-v, -vv)'
+            cand -q 'Suppress non-error messages'
+            cand --quiet 'Suppress non-error messages'
+            cand --dry-run 'Dry run without side effects'
+            cand -h 'Print help'
+            cand --help 'Print help'
             cand -V 'Print version'
             cand --version 'Print version'
         }
@@ -355,6 +378,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
         }
         &'do-harness;task;help'= {
             cand export 'Write the task list to plans/tasks.json or specified output'
+            cand import 'Validate plans/tasks.json against the state database'
             cand list 'Print tasks from the state database'
             cand show 'Show details for a specific task'
             cand add 'Add a task in `pending` state'
@@ -365,6 +389,8 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand help 'Print this message or the help of the given subcommand(s)'
         }
         &'do-harness;task;help;export'= {
+        }
+        &'do-harness;task;help;import'= {
         }
         &'do-harness;task;help;list'= {
         }
@@ -556,6 +582,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
         &'do-harness;eval'= {
             cand --skill 'Restrict evaluation to this skill directory name'
             cand --format 'Output format'
+            cand --approver 'Approver identity recorded with `--bless` (defaults to `DO_HARNESS_APPROVER` or the git user email)'
             cand --root 'Workspace root override (default: walk up from cwd)'
             cand --config 'Explicit path to do-harness.toml'
             cand --color 'Color output (auto, always, never)'
@@ -693,7 +720,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand --format 'Output format'
             cand --sensor 'Filter by sensor name'
             cand --skill 'Filter by skill name'
-            cand --since 'Filter metrics since timestamp (Unix timestamp or ISO string)'
+            cand --since 'Filter metrics since a Unix timestamp in seconds'
             cand --root 'Workspace root override (default: walk up from cwd)'
             cand --config 'Explicit path to do-harness.toml'
             cand --color 'Color output (auto, always, never)'
@@ -705,6 +732,23 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand --dry-run 'Dry run without side effects'
             cand -h 'Print help (see more with ''--help'')'
             cand --help 'Print help (see more with ''--help'')'
+            cand -V 'Print version'
+            cand --version 'Print version'
+        }
+        &'do-harness;maintenance'= {
+            cand --prune-beats 'Delete beats older than this many days (keeps the most recent per task)'
+            cand --keep-per-task 'Minimum most-recent beats kept per task when pruning'
+            cand --root 'Workspace root override (default: walk up from cwd)'
+            cand --config 'Explicit path to do-harness.toml'
+            cand --color 'Color output (auto, always, never)'
+            cand --output 'Default output file path'
+            cand -v 'Verbosity level (-v, -vv)'
+            cand --verbose 'Verbosity level (-v, -vv)'
+            cand -q 'Suppress non-error messages'
+            cand --quiet 'Suppress non-error messages'
+            cand --dry-run 'Dry run without side effects'
+            cand -h 'Print help'
+            cand --help 'Print help'
             cand -V 'Print version'
             cand --version 'Print version'
         }
@@ -786,6 +830,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand hook 'Manage git hooks that run `do-harness verify`'
             cand doctor 'Run diagnostic checks on binary resolution and git hook health'
             cand metrics 'Report harness trends: sensor stats, strikes, eval pass-rate history'
+            cand maintenance 'Prune old beats and compact the state database'
             cand compliance 'Print compliance mapping to OWASP Agentic Top 10, NIST AI RMF, and EU AI Act'
             cand audit-chain 'Recompute workflow event hash chain and report first divergence'
             cand completions 'Generate shell completions'
@@ -806,6 +851,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
         }
         &'do-harness;help;task'= {
             cand export 'Write the task list to plans/tasks.json or specified output'
+            cand import 'Validate plans/tasks.json against the state database'
             cand list 'Print tasks from the state database'
             cand show 'Show details for a specific task'
             cand add 'Add a task in `pending` state'
@@ -815,6 +861,8 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand remove 'Remove or cancel a task'
         }
         &'do-harness;help;task;export'= {
+        }
+        &'do-harness;help;task;import'= {
         }
         &'do-harness;help;task;list'= {
         }
@@ -870,6 +918,8 @@ set edit:completion:arg-completer[do-harness] = {|@words|
         &'do-harness;help;doctor'= {
         }
         &'do-harness;help;metrics'= {
+        }
+        &'do-harness;help;maintenance'= {
         }
         &'do-harness;help;compliance'= {
         }

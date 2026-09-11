@@ -2,8 +2,12 @@
 # check-loc.sh — enforces the 500 LOC per file invariant.
 #
 # Sensor: scripts/check-loc.sh
-# Fails if any .rs file under crates/ exceeds MAX lines.
-# Writes a warning when a file is at or above the decomposition threshold.
+# Scope decision: all `.rs` files under `crates/` count, including test
+# modules and the `templates/crate` scaffold (it ships to consumers), because
+# reviewability does not depend on a file's role. Out of scope: root `tests/`
+# (spike residue), `.agents/skills/` (markdown/python), `scripts/` (shell),
+# and non-Rust template assets.
+# Fails if any file exceeds MAX lines; warns at the decomposition threshold.
 
 set -euo pipefail
 

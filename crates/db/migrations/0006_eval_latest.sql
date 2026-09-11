@@ -1,4 +1,7 @@
 -- 0006_eval_latest.sql
+--
+-- IRREVERSIBLE: the DELETE below discards all but the latest skill_evals row
+-- per skill; there is no down migration that can restore the dropped history.
 -- Collapse skill_evals history to one row per skill (latest wins) and drop the
 -- never-written token_efficiency column. Subsequent writes upsert on the now
 -- unique skill_name.
@@ -9,7 +12,7 @@ DELETE FROM skill_evals WHERE id NOT IN (
 );
 
 -- Rebuild without token_efficiency and with a UNIQUE skill_name.
-CREATE TABLE skill_evals_new (
+CREATE TABLE IF NOT EXISTS skill_evals_new (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     skill_name TEXT NOT NULL UNIQUE,
     prompt TEXT,

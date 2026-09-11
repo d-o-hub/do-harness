@@ -1,0 +1,5 @@
+Contact: https://github.com/d-o-hub/do-harness/security/advisories/new
+Expires: 2027-09-11T00:00:00.000Z
+Preferred-Languages: en
+Canonical: https://github.com/d-o-hub/do-harness/blob/main/SECURITY.md
+Policy: https://github.com/d-o-hub/do-harness/blob/main/SECURITY.md

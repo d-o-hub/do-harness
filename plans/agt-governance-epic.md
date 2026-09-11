@@ -33,6 +33,7 @@ Microsoft's Agent Governance Toolkit publishes `agent-governance` + `agent-gover
 | `feat-guardian-audit` | vertical slice | Hash-chained JSONL decision log (`AuditLog`, `ProxyConfig.audit_log`) with `Allow`/`Deny` evidence + tamper detection | **done task 11** |
 | `feat-guardian-operability` | vertical slice | Example config + `--verify-audit` fail-closed CLI + `cargo test -p guardian-proxy` CI gate | **done task 12** |
 | `chore-agt-promotion` | decision | GA + surface satisfied → remove feature flag or keep off-by-default per invariants review | Decision memo §4 — pending GA |
+| `chore-remove-doharness-policy` | refactor | Delete duplicated `do-harness/src/policy/` (`AgtGate`/`McpMediator`) now that `guardian-proxy` is the sole tool-call mediation surface; drop the `agt-governance` feature from the CLI crate | #34 item 10 — **done task 30** |
 
 ## Non-goals
 
@@ -118,3 +119,7 @@ Manual re-spikes (task 17) are replaced by a scheduled informational watch:
 ## Next action
 
 All implementation slices done (tasks 3–5, 8–12, 14–16), GA re-check spike (task 17), hygiene (task 18), and GA watch automation (tasks 19–21). Remaining `chore-agt-promotion` is a decision gate pending AGT GA and invariants review — no code to write until criteria `(a) GA` and `(b) surface wired` are both satisfied. When the watch opens a GA tracking issue, run promotion review against this epic.
+
+## Slice completion — chore-remove-doharness-policy (2026-09-11, task 30)
+
+Removed the duplicated in-CLI adapter (`crates/do-harness/src/policy/{agt,mcp}.rs`) that had no production caller and carried blanket `#[allow(dead_code)]`. `guardian-proxy` is now the sole tool-call mediation surface and the only home of the feature-gated AGT client (`crates/guardian-proxy/src/proxy.rs` `AgtGateWrapper`). The `agt-governance` feature/optional deps were dropped from `crates/do-harness/Cargo.toml`; CI keeps `cargo check -p guardian-proxy --features agt-governance`. Promotion criterion (a) GA remains unsatisfied (`VERDICT=NOT_GA` above), so the proxy feature flag stays off by default.

@@ -33,6 +33,9 @@ else
     echo "do-harness: binary not found. Set DO_HARNESS_BIN, add do-harness to PATH, or build with: cargo build --release -p do-harness" >&2
     exit 2
   fi
+  if [[ -n "$(find "$ROOT/crates" -name '*.rs' -newer "$BIN" -print -quit 2>/dev/null)" ]]; then
+    echo "do-harness: warning: $BIN is older than workspace sources; rebuild with: cargo build --release -p do-harness" >&2
+  fi
 fi
 "#;
 

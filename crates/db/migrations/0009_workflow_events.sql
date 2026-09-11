@@ -5,7 +5,7 @@
 -- read models (the task board) fold a real event stream instead of
 -- reconstructing events from current row state.
 
-CREATE TABLE workflow_events (
+CREATE TABLE IF NOT EXISTS workflow_events (
     id INTEGER PRIMARY KEY,
     task_id INTEGER NOT NULL REFERENCES tasks(id),
     kind TEXT NOT NULL,
@@ -13,7 +13,7 @@ CREATE TABLE workflow_events (
     created_at INTEGER NOT NULL
 );
 
-CREATE INDEX idx_workflow_events_task ON workflow_events(task_id, id);
+CREATE INDEX IF NOT EXISTS idx_workflow_events_task ON workflow_events(task_id, id);
 
 -- Backfill one synthetic event per pre-existing task so history that predates
 -- this table folds into the same projections; payloads mirror the serde

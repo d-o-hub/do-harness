@@ -28,7 +28,7 @@ const TASK_COLUMNS: &str = "id, parent_id, title, method, subtask_index, status,
 /// # Errors
 ///
 /// Returns an error when the insert statement fails.
-pub async fn insert_task(conn: &Connection, task: &NewTask<'_>) -> Result<i64> {
+pub(crate) async fn insert_task(conn: &Connection, task: &NewTask<'_>) -> Result<i64> {
     let now = unix_now();
     let mut rows = conn
         .query(
@@ -99,7 +99,11 @@ pub async fn list_tasks(conn: &Connection) -> Result<Vec<TaskRecord>> {
 /// # Errors
 ///
 /// Returns an error when the update statement fails or the task does not exist.
-pub async fn update_task_status(conn: &Connection, id: i64, status: TaskState) -> Result<()> {
+pub(crate) async fn update_task_status(
+    conn: &Connection,
+    id: i64,
+    status: TaskState,
+) -> Result<()> {
     let mut rows = conn
         .query(
             "UPDATE tasks SET status = ?1, updated_at = ?2 WHERE id = ?3 RETURNING id",
@@ -121,7 +125,7 @@ pub async fn update_task_status(conn: &Connection, id: i64, status: TaskState) -
 /// # Errors
 ///
 /// Returns an error when the update fails or the task does not exist.
-pub async fn advance_subtask(conn: &Connection, id: i64) -> Result<i64> {
+pub(crate) async fn advance_subtask(conn: &Connection, id: i64) -> Result<i64> {
     let mut rows = conn
         .query(
             "UPDATE tasks SET subtask_index = subtask_index + 1, status = ?1, \
@@ -154,38 +158,81 @@ fn task_from_row(row: &libsql::Row) -> Result<TaskRecord> {
     })
 }
 
-/// Upserts a collection of decision headers into the `invariants` table.
+/// Upserts decision headers into the `invariants` table.
 ///
-/// Existing invariants are matched on their `invariant` text and updated;
-/// new ones are inserted. Returns the number of invariants written. The whole
-/// batch commits atomically: a failure leaves the table untouched.
+/// When `prune` is set, invariants absent from `headers` are deleted so the
+/// table mirrors `plans/invariants.json` exactly (stale rows otherwise persist
+/// forever because the upsert only inserts/updates). Returns the number of
+/// headers written.
 ///
 /// # Errors
 ///
-/// Returns an error if any upsert statement fails.
-pub async fn seed_invariants(conn: &Connection, headers: &[DecisionHeader]) -> Result<usize> {
+/// Returns an error when the upsert, prune, or transaction fails.
+pub async fn seed_invariants(
+    conn: &Connection,
+    headers: &[DecisionHeader],
+    prune: bool,
+) -> Result<usize> {
     let now = unix_now();
     let tx = conn.transaction().await?;
     for header in headers {
         tx.execute(
-            "INSERT INTO invariants (invariant, rationale, sensor, category, created_at) \
-             VALUES (?1, ?2, ?3, ?4, ?5) \
+            "INSERT INTO invariants (invariant, rationale, sensor, category, created_at, updated_at) \
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6) \
              ON CONFLICT(invariant) DO UPDATE SET \
                rationale = excluded.rationale, \
                sensor = excluded.sensor, \
-               category = excluded.category",
+               category = excluded.category, \
+               updated_at = excluded.updated_at",
             params!(
                 header.invariant.as_str(),
                 header.rationale.as_str(),
                 header.sensor.as_str(),
                 header.category.as_str(),
+                now,
                 now
             ),
         )
         .await?;
     }
+    if prune {
+        let wanted: std::collections::HashSet<&str> = headers
+            .iter()
+            .map(|header| header.invariant.as_str())
+            .collect();
+        let mut rows = tx
+            .query("SELECT invariant FROM invariants", Params::None)
+            .await?;
+        let mut stale: Vec<String> = Vec::new();
+        while let Some(row) = rows.next().await? {
+            let name: String = row.get(0)?;
+            if !wanted.contains(name.as_str()) {
+                stale.push(name);
+            }
+        }
+        drop(rows);
+        for name in stale {
+            tx.execute("DELETE FROM invariants WHERE invariant = ?1", params!(name))
+                .await?;
+        }
+    }
     tx.commit().await?;
     Ok(headers.len())
+}
+
+/// Highest `tasks.updated_at`, used to detect stale `plans/tasks.json` exports.
+///
+/// # Errors
+///
+/// Returns an error when the query fails.
+pub async fn latest_task_update(conn: &Connection) -> Result<Option<i64>> {
+    let mut rows = conn
+        .query("SELECT MAX(updated_at) FROM tasks", Params::None)
+        .await?;
+    match rows.next().await? {
+        Some(row) => Ok(row.get(0)?),
+        None => Ok(None),
+    }
 }
 
 #[cfg(test)]
@@ -296,14 +343,14 @@ mod tests {
             "s1".into(),
             "contracts".into(),
         )];
-        seed_invariants(&conn, &first).await.unwrap();
+        seed_invariants(&conn, &first, false).await.unwrap();
         let second = vec![DecisionHeader::new(
             "inv".into(),
             "r2".into(),
             "s2".into(),
             "contracts".into(),
         )];
-        seed_invariants(&conn, &second).await.unwrap();
+        seed_invariants(&conn, &second, false).await.unwrap();
 
         let mut rows = conn
             .query("SELECT COUNT(*) FROM invariants", Params::None)

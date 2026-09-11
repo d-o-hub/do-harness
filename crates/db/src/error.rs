@@ -9,6 +9,9 @@ pub type Result<T> = std::result::Result<T, DbError>;
 /// fold into their primary code, hence the mask in [`DbError::from`].
 const SQLITE_CONSTRAINT: std::ffi::c_int = 19;
 
+/// `SQLite` primary result code for a transient lock (`database is locked`).
+const SQLITE_BUSY: std::ffi::c_int = 5;
+
 /// Errors produced by the do-harness persistence layer.
 ///
 /// All `libsql` failures (execute, query, row access, transactions) funnel
@@ -35,6 +38,15 @@ pub enum DbError {
         #[source]
         source: libsql::Error,
     },
+    /// Failed to write the pre-migration backup copy.
+    #[error("failed to back up state database to {path}: {source}")]
+    Backup {
+        /// Backup path that could not be written.
+        path: PathBuf,
+        /// Underlying filesystem error.
+        #[source]
+        source: std::io::Error,
+    },
     /// A SQL statement, query, or transaction failed.
     #[error("sql failed: {0}")]
     Sql(libsql::Error),
@@ -55,6 +67,16 @@ pub enum DbError {
     /// A record expected to exist was missing.
     #[error("not found: {0}")]
     NotFound(String),
+    /// A workflow gate's required sensor has no passing beat at write time
+    /// (re-checked inside the command transaction to close the read-then-write
+    /// race with concurrent `verify --record`).
+    #[error("task {task_id} gate unsatisfied: sensor '{sensor}' has no passing beat")]
+    GateUnsatisfied {
+        /// Task whose gate failed.
+        task_id: i64,
+        /// Sensor that must have a latest `ok` sensor beat.
+        sensor: String,
+    },
     /// No harness root could be discovered.
     #[error("harness root not found: {0}")]
     RootNotFound(String),
@@ -85,8 +107,59 @@ impl From<libsql::Error> for DbError {
     }
 }
 
+impl DbError {
+    /// Whether this failure is transient `SQLite` lock contention.
+    ///
+    /// WAL plus `busy_timeout` make these rare, but a writer that loses the
+    /// race can still surface `SQLITE_BUSY`; callers wrap idempotent units of
+    /// work in [`retry_on_busy`].
+    #[must_use]
+    pub fn is_busy(&self) -> bool {
+        match self {
+            DbError::Sql(libsql::Error::SqliteFailure(code, _)) => (code & 0xFF) == SQLITE_BUSY,
+            _ => false,
+        }
+    }
+}
+
+/// Runs `op` up to `attempts` times, retrying only transient `SQLITE_BUSY`
+/// failures. Non-busy errors return immediately; `op` must be idempotent
+/// (fully transactional) because a retry replays the whole unit of work.
+///
+/// # Errors
+///
+/// Returns the last error when every attempt fails (or the first non-busy
+/// error).
+pub async fn retry_on_busy<T, F, Fut>(attempts: usize, mut op: F) -> Result<T>
+where
+    F: FnMut() -> Fut,
+    Fut: std::future::Future<Output = Result<T>>,
+{
+    let mut last: Option<DbError> = None;
+    for attempt in 0..attempts {
+        match op().await {
+            Ok(value) => return Ok(value),
+            Err(err) if err.is_busy() && attempt + 1 < attempts => {
+                last = Some(err);
+                // Progressive backoff so the competing writer can finish.
+                let backoff = u64::try_from(attempt + 1).unwrap_or(1) * 10;
+                tokio::time::sleep(std::time::Duration::from_millis(backoff)).await;
+            }
+            Err(err) => return Err(err),
+        }
+    }
+    Err(last.unwrap_or_else(|| {
+        DbError::Sql(libsql::Error::SqliteFailure(
+            SQLITE_BUSY,
+            "busy retries exhausted".to_owned(),
+        ))
+    }))
+}
+
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used)]
+
     use super::*;
 
     /// Constraint failures surface as `Constraint`, everything else as `Sql`.
@@ -111,5 +184,57 @@ mod tests {
             "generic failure".to_owned(),
         ));
         assert!(matches!(other, DbError::Sql(_)));
+    }
+
+    /// `SQLITE_BUSY` is classified as transient and other errors are not.
+    #[test]
+    fn busy_is_transient_and_other_errors_are_not() {
+        let busy = DbError::from(libsql::Error::SqliteFailure(
+            SQLITE_BUSY,
+            "database is locked".to_owned(),
+        ));
+        assert!(busy.is_busy());
+        let constraint = DbError::from(libsql::Error::SqliteFailure(
+            SQLITE_CONSTRAINT,
+            "constraint".to_owned(),
+        ));
+        assert!(!constraint.is_busy());
+        assert!(!DbError::NotFound("x".to_owned()).is_busy());
+    }
+
+    /// The retry wrapper replays only busy failures and returns the value.
+    #[tokio::test(flavor = "current_thread")]
+    async fn retry_on_busy_replays_transient_then_succeeds() {
+        let mut calls = 0usize;
+        let result: Result<u32> = retry_on_busy(3, || {
+            calls += 1;
+            let busy = calls < 2;
+            async move {
+                if busy {
+                    Err(DbError::from(libsql::Error::SqliteFailure(
+                        SQLITE_BUSY,
+                        "database is locked".to_owned(),
+                    )))
+                } else {
+                    Ok(7)
+                }
+            }
+        })
+        .await;
+        assert_eq!(result.unwrap(), 7);
+        assert_eq!(calls, 2);
+    }
+
+    /// Non-busy failures are not retried.
+    #[tokio::test(flavor = "current_thread")]
+    async fn retry_on_busy_returns_non_busy_immediately() {
+        let mut calls = 0usize;
+        let result: Result<u32> = retry_on_busy(3, || {
+            calls += 1;
+            async move { Err(DbError::NotFound("gone".to_owned())) }
+        })
+        .await;
+        assert!(matches!(result, Err(DbError::NotFound(_))));
+        assert_eq!(calls, 1);
     }
 }
