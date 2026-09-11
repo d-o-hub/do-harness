@@ -55,21 +55,27 @@ pub async fn run(root: &Path, format: Format, strict: bool) -> Result<()> {
 
     // Out-of-band task writes leave tasks with no TaskAdded event; they break
     // the append-only workflow log and would otherwise go unnoticed.
-    let orphan_tasks = if do_harness_db::db_path(root).exists() {
+    let (orphan_tasks, latest_task_update) = if do_harness_db::db_path(root).exists() {
         match do_harness_db::connect_and_migrate(root).await {
-            Ok(conn) => do_harness_db::count_tasks_without_added_event(&conn)
-                .await
-                .unwrap_or(0),
-            Err(_) => 0,
+            Ok(conn) => (
+                do_harness_db::count_tasks_without_added_event(&conn)
+                    .await
+                    .unwrap_or(0),
+                do_harness_db::latest_task_update(&conn)
+                    .await
+                    .unwrap_or(None),
+            ),
+            Err(_) => (0, None),
         }
     } else {
-        0
+        (0, None)
     };
     if orphan_tasks > 0 {
         failures.push(format!(
             "{orphan_tasks} task(s) have no TaskAdded event (out-of-band write)"
         ));
     }
+    let stale_export = check_task_export(root, latest_task_update, &mut failures).await;
 
     if format == Format::Json {
         let json = serde_json::json!({
@@ -87,6 +93,7 @@ pub async fn run(root: &Path, format: Format, strict: bool) -> Result<()> {
             },
             "database_ok": db_ok,
             "orphan_tasks": orphan_tasks,
+            "stale_task_export": stale_export,
             "failures": failures
         });
         println!("{json}");
@@ -143,6 +150,12 @@ pub async fn run(root: &Path, format: Format, strict: bool) -> Result<()> {
             println!("  [OK] event log: no orphan tasks");
         }
 
+        if stale_export {
+            println!("  [FAIL] task export: plans/tasks.json lags the database");
+        } else {
+            println!("  [OK] task export: up to date or absent");
+        }
+
         if do_harness_db::db_path(root).exists() {
             match crate::audit::audit_chain(root).await {
                 Ok(report) => match report {
@@ -176,6 +189,45 @@ pub(crate) fn describe_binary(source: &BinSource) -> String {
         BinSource::Env(path) => format!("env:{}", path.display()),
         BinSource::Path(path) => format!("path:{}", path.display()),
         BinSource::Repo(path) => format!("repo:{}", path.display()),
+    }
+}
+
+/// Flags `plans/tasks.json` when it predates the newest task update.
+///
+/// Returns `true` when the export is missing, unreadable, invalid, or stale;
+/// failures are also appended to `failures`.
+async fn check_task_export(
+    root: &Path,
+    latest_task_update: Option<i64>,
+    failures: &mut Vec<String>,
+) -> bool {
+    let path = root.join("plans/tasks.json");
+    if !path.exists() {
+        return false;
+    }
+    let raw = match tokio::fs::read_to_string(&path).await {
+        Ok(raw) => raw,
+        Err(err) => {
+            failures.push(format!("plans/tasks.json unreadable: {err}"));
+            return true;
+        }
+    };
+    match serde_json::from_str::<crate::task::TaskSnapshot>(&raw) {
+        Ok(snapshot) => {
+            if latest_task_update.is_some_and(|updated| updated > snapshot.exported_at) {
+                failures.push(
+                    "plans/tasks.json export lags the database (run: do-harness task export)"
+                        .to_owned(),
+                );
+                true
+            } else {
+                false
+            }
+        }
+        Err(err) => {
+            failures.push(format!("plans/tasks.json invalid: {err}"));
+            true
+        }
     }
 }
 
@@ -269,5 +321,39 @@ mod tests {
             .unwrap_err()
             .to_string();
         assert!(message.contains("no TaskAdded event"), "{message}");
+    }
+
+    /// A `plans/tasks.json` older than the newest task update is a failure.
+    #[tokio::test(flavor = "current_thread")]
+    async fn fails_on_stale_task_export() {
+        let (_temp, root) = fake_repo_with_git();
+        stub_binary(&root);
+        let conn = do_harness_db::connect_and_migrate(&root).await.unwrap();
+        do_harness_db::insert_task_with_event(
+            &conn,
+            &do_harness_db::NewTask {
+                title: "fresh",
+                method: Some("mini"),
+                subtask_index: 0,
+                precondition: None,
+                parent_id: None,
+            },
+        )
+        .await
+        .unwrap();
+        drop(conn);
+        let plans = root.join("plans");
+        std::fs::create_dir_all(&plans).unwrap();
+        std::fs::write(
+            plans.join("tasks.json"),
+            r#"{"exported_at":0,"tasks":[],"summary":{"pending":0,"in_progress":0,"done":0,"failed":0}}"#,
+        )
+        .unwrap();
+
+        let message = run(&root, Format::Text, false)
+            .await
+            .unwrap_err()
+            .to_string();
+        assert!(message.contains("lags the database"), "{message}");
     }
 }

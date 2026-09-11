@@ -41,7 +41,7 @@ pub use migrate::{
     unix_now,
 };
 pub use query::count_where;
-pub use repo::{NewTask, get_task, list_tasks, seed_invariants};
+pub use repo::{NewTask, get_task, latest_task_update, list_tasks, seed_invariants};
 pub use repo_eval::{
     NewSkillEvalRun, SkillEvalSummary, bless_grader_baseline, get_grader_baseline, get_skill_bar,
     insert_skill_eval_run, list_skill_eval_runs, list_skill_eval_runs_page, max_pass_rate,

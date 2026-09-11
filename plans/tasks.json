@@ -1,5 +1,5 @@
 {
-  "exported_at": 1788515430,
+  "exported_at": 1789116373,
   "tasks": [
     {
       "id": 1,
@@ -320,5 +320,11 @@
       "created_at": 1788515298,
       "updated_at": 1788515429
     }
-  ]
+  ],
+  "summary": {
+    "pending": 0,
+    "in_progress": 0,
+    "done": 29,
+    "failed": 0
+  }
 }

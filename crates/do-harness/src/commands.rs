@@ -101,6 +101,9 @@ pub async fn task_cmd(root: &Path, action: TaskAction) -> Result<()> {
             }
             Ok(())
         }
+        TaskAction::Import { file, check } => {
+            task::import_tasks(root, file.as_deref(), check).await
+        }
         TaskAction::List {
             status,
             method,
@@ -362,8 +365,8 @@ pub async fn maintenance(root: &Path, prune_beats: Option<i64>, keep_per_task: i
 }
 
 /// Seeds the `invariants` table from `plans/invariants.json`.
-pub async fn seed(root: &Path) -> Result<()> {
-    let written = crate::init::seed_invariants(root).await?;
+pub async fn seed(root: &Path, prune: bool) -> Result<()> {
+    let written = crate::init::seed_invariants(root, prune).await?;
     println!(
         "Seeded {written} invariants from {}",
         root.join("plans/invariants.json").display()

@@ -252,7 +252,7 @@ async fn invariants_updated_at_tracks_upserts() {
         "sensor".to_owned(),
         "category".to_owned(),
     )];
-    do_harness_db::seed_invariants(&conn, &headers)
+    do_harness_db::seed_invariants(&conn, &headers, false)
         .await
         .expect("seed");
     let mut rows = conn

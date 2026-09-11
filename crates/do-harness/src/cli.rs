@@ -103,7 +103,11 @@ pub enum Command {
         yes: bool,
     },
     /// Seed invariants from plans/invariants.json.
-    Seed,
+    Seed {
+        /// Delete invariants no longer present in plans/invariants.json.
+        #[arg(long)]
+        prune: bool,
+    },
     /// Scaffold a harness workspace in a target directory.
     Init {
         /// Language pack to scaffold.
@@ -269,6 +273,15 @@ pub enum TaskAction {
         /// Output format (json/text).
         #[arg(long, value_enum, default_value_t = Format::Json)]
         format: Format,
+    },
+    /// Validate plans/tasks.json against the state database.
+    Import {
+        /// Snapshot file (defaults to plans/tasks.json under the root).
+        #[arg(long, value_hint = ValueHint::FilePath, value_name = "FILE")]
+        file: Option<PathBuf>,
+        /// Exit non-zero when the snapshot and database drift.
+        #[arg(long)]
+        check: bool,
     },
     /// Print tasks from the state database.
     List {

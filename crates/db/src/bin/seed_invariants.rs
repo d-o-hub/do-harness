@@ -3,8 +3,9 @@
 //! Reads the machine-readable decision headers, validates them against the
 //! [`DecisionHeader`] schema contract, and upserts them into libSQL.
 //!
-//! Usage: `seed_invariants [ROOT]` — `ROOT` defaults to the discovered
-//! workspace root.
+//! Usage: `seed_invariants [--prune] [ROOT]` — `ROOT` defaults to the
+//! discovered workspace root; `--prune` deletes invariants that are no longer
+//! present in the JSON file.
 
 use std::path::PathBuf;
 
@@ -32,7 +33,13 @@ fn resolve_root(arg: Option<&str>) -> Result<PathBuf> {
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<()> {
-    let root = resolve_root(std::env::args().nth(1).as_deref())?;
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    let prune = args.iter().any(|arg| arg == "--prune");
+    let root_arg = args
+        .iter()
+        .find(|arg| !arg.starts_with("--"))
+        .map(String::as_str);
+    let root = resolve_root(root_arg)?;
     let json_path = root.join(INVARIANTS_RELATIVE_PATH);
     let json = std::fs::read_to_string(&json_path)
         .with_context(|| format!("failed to read {}", json_path.display()))?;
@@ -40,7 +47,7 @@ async fn main() -> Result<()> {
         .context("invalid invariants.json: does not match DecisionHeader schema")?;
 
     let conn = connect_and_migrate(&root).await?;
-    let written = seed_invariants(&conn, &headers).await?;
+    let written = seed_invariants(&conn, &headers, prune).await?;
 
     println!("Seeded {written} invariants from {}", json_path.display());
     Ok(())

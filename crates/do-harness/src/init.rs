@@ -217,7 +217,7 @@ pub async fn init_workspace(root: &Path, opts: &InitOpts) -> Result<InitReport> 
     )?;
     append_gitignore(root, &mut report)?;
 
-    report.seeded = seed_invariants(root).await?;
+    report.seeded = seed_invariants(root, false).await?;
     Ok(report)
 }
 
@@ -241,7 +241,7 @@ fn validate_existing_invariants(root: &Path, opts: &InitOpts) -> Result<()> {
 }
 
 /// Upserts `plans/invariants.json` into the state database.
-pub(crate) async fn seed_invariants(root: &Path) -> Result<usize> {
+pub(crate) async fn seed_invariants(root: &Path, prune: bool) -> Result<usize> {
     let json_path = root.join("plans/invariants.json");
     let json = tokio::fs::read_to_string(&json_path)
         .await
@@ -249,7 +249,7 @@ pub(crate) async fn seed_invariants(root: &Path) -> Result<usize> {
     let headers: Vec<do_harness_types::DecisionHeader> = serde_json::from_str(&json)
         .context("invalid plans/invariants.json: does not match DecisionHeader schema")?;
     let conn = do_harness_db::connect_and_migrate(root).await?;
-    Ok(do_harness_db::seed_invariants(&conn, &headers).await?)
+    Ok(do_harness_db::seed_invariants(&conn, &headers, prune).await?)
 }
 
 /// Writes `body` to `root/relative`, skipping existing files unless `force`.
