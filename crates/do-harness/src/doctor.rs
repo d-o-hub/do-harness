@@ -12,11 +12,24 @@ use crate::report::Format;
 
 /// Runs diagnostic checks covering binary resolution, git hook status, and
 /// state-database migration skew.
-#[allow(clippy::too_many_lines)]
 pub async fn run(root: &Path, format: Format, strict: bool) -> Result<()> {
     let git_dir = hooks::find_git_dir(root)?;
     let status = hooks::status(&git_dir, root);
+    run_with_status(root, format, strict, &status).await
+}
 
+/// Core diagnostics over an already-resolved hook/binary status.
+///
+/// Split from [`run`] so tests are hermetic: binary resolution reads
+/// `DO_HARNESS_BIN`/`PATH`, and a test that expects a missing binary must not
+/// inherit the caller's resolved binary.
+#[allow(clippy::too_many_lines)]
+pub(crate) async fn run_with_status(
+    root: &Path,
+    format: Format,
+    strict: bool,
+    status: &hooks::HookStatus,
+) -> Result<()> {
     let mut failures: Vec<String> = Vec::new();
 
     let bin_path = status.binary.path();
@@ -253,11 +266,22 @@ mod tests {
         fs::write(&bin_path, "stub").unwrap();
     }
 
+    /// Hook status pinned to the repository-local binary path, independent of
+    /// the caller's `DO_HARNESS_BIN`/`PATH`.
+    fn repo_status(root: &Path) -> hooks::HookStatus {
+        hooks::HookStatus {
+            pre_commit: true,
+            pre_push: true,
+            commit_msg: true,
+            binary: BinSource::Repo(root.join("target/release/do-harness")),
+        }
+    }
+
     #[tokio::test(flavor = "current_thread")]
     async fn fails_when_binary_missing_and_names_the_reason() {
         let (_temp, root) = fake_repo_with_git();
 
-        let result = run(&root, Format::Text, false).await;
+        let result = run_with_status(&root, Format::Text, false, &repo_status(&root)).await;
 
         let message = result.unwrap_err().to_string();
         assert!(message.contains("doctor check failed"));
@@ -269,7 +293,11 @@ mod tests {
         let (_temp, root) = fake_repo_with_git();
         stub_binary(&root);
 
-        assert!(run(&root, Format::Text, false).await.is_ok());
+        assert!(
+            run_with_status(&root, Format::Text, false, &repo_status(&root))
+                .await
+                .is_ok()
+        );
     }
 
     #[tokio::test(flavor = "current_thread")]
@@ -285,7 +313,7 @@ mod tests {
         .unwrap();
         drop(conn);
 
-        let result = run(&root, Format::Text, false).await;
+        let result = run_with_status(&root, Format::Text, false, &repo_status(&root)).await;
 
         let message = result.unwrap_err().to_string();
         assert!(message.contains("doctor check failed"));
@@ -316,7 +344,7 @@ mod tests {
             .unwrap();
         drop(conn);
 
-        let message = run(&root, Format::Text, false)
+        let message = run_with_status(&root, Format::Text, false, &repo_status(&root))
             .await
             .unwrap_err()
             .to_string();
@@ -350,7 +378,7 @@ mod tests {
         )
         .unwrap();
 
-        let message = run(&root, Format::Text, false)
+        let message = run_with_status(&root, Format::Text, false, &repo_status(&root))
             .await
             .unwrap_err()
             .to_string();

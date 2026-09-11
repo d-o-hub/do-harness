@@ -41,16 +41,25 @@ The harness is designed to be adopted by any codebase, Rust or not:
    ```
 
    This writes `do-harness.toml`, `AGENTS.md`, `plans/invariants.json`,
-   `.agents/skills/`, and `.gitignore` entries, then initializes the local
-   libSQL state and seeds the invariants. Existing files are left untouched
-   unless you pass `--force`. When no `Cargo.toml` exists, the rust pack also
-   scaffolds a minimal crate (`Cargo.toml` + `src/lib.rs`) so `init && verify`
-   is green on a truly empty tree; existing crates are never touched, not
-   even with `--force`.
+   `.agents/skills/` (the `harness` skill plus `skill-creator` for building
+   project-specific skills), and `.gitignore` entries, then initializes the
+   local libSQL state and seeds the invariants. Existing files are left
+   untouched unless you pass `--force`. When no `Cargo.toml` exists, the rust
+   pack also scaffolds a minimal crate (`Cargo.toml` + `src/lib.rs`) so
+   `init && verify` is green on a truly empty tree; existing crates are never
+   touched, not even with `--force`. `init` then runs the generated contract
+   once and reports `Initial verification: GREEN | RED | VACUOUS`, exiting
+   non-zero on RED instead of claiming a verified workspace.
+
+   The generated `AGENTS.md` is a routing/completion contract only. This
+   repository's own `AGENTS.md` and `.agents/skills/` describe how to develop
+   do-harness itself (HTN planning, spikes, event modeling, ATDD, skill
+   distillation); those development-methodology skills are intentionally not
+   scaffolded into adopting projects.
 
 2. Configure sensors for your stack in `do-harness.toml`. Language packs:
-   `rust` (fmt/check/clippy/test/loc/commitlint) and `generic` (ships no
-   sensors — add your own `[[sensors]]` entries). With zero sensors
+   `rust` (fmt/check/clippy/test/loc/deps/audit/commitlint) and `generic`
+   (ships no sensors — add your own `[[sensors]]` entries). With zero sensors
    `verify` exits 0 without running any command: a vacuous pass, not
    evidence. Define real sensors before treating verify output as proof.
 
@@ -100,8 +109,10 @@ For CI, invoke `do-harness verify --format json --evidence .do-harness/evidence.
 
 | Command | Description |
 |---------|-------------|
-| `verify` | Run all sensors (flags: `--fail-fast`, `--format text\|json`, `--only NAME` repeatable; `--record` persists beats + error signatures; `--evidence PATH` writes evidence artifact; `--strict` fails on weak evidence) |
-| `list` | Print sensor names (`--format text\|json`) |
+| `verify` | Run all sensors (flags: `--fail-fast`, `--format text\|json`, `--set SET`, `--changed`, `--only NAME` repeatable; `--record` persists beats + error signatures; `--evidence PATH` writes evidence artifact; `--strict` fails on weak evidence) |
+| `list` | Print sensor names (`--format text\|json`, `--sets` for signal-set names) |
+| `explain` | Explain which sensors the current change selects, without running them (`--set SET`, `--changed`) |
+| `status` | Report evidence freshness (`green\|red\|stale\|missing`) for `--set SET` without running sensors |
 | `init-db` | Apply migrations to `.do-harness/agent_state.db` |
 | `seed` | Upsert `plans/invariants.json` into the DB |
 | `task list [--format text\|json]` / `task export` | Read task state from the local database; export writes `plans/tasks.json` |
@@ -181,6 +192,17 @@ GitHub Actions: see `.github/workflows/verify.yml` — lints shell sensors, buil
 
 > **Runtime proxy note:** `do-harness` itself stays a dev-loop harness (no traffic proxy). The adjacent `crates/guardian-proxy` is an *optional* fail-closed sidecar (off by default, requires `agt-governance`) that reuses the same `McpMediator` gate — see `crates/guardian-proxy/README.md` when present.
 
+## DeepSeek Harness integration
+
+`integrations/deepseek-harness/` ships an out-of-tree DSH bundle that exposes
+do-harness development signals as one typed `development_signals` tool and an
+optional strict completion gate. The Rust core has no DeepSeek, Cordis, or
+Node.js dependency, and removing the bundle leaves normal CLI use unaffected.
+All verification policy stays in the CLI; the bundle only invokes it through
+DSH's managed subprocess seam. See
+[`integrations/deepseek-harness/README.md`](integrations/deepseek-harness/README.md)
+for the install walkthrough and configuration.
+
 GitLab CI:
 
 ```yaml
@@ -205,6 +227,12 @@ See [docs/compliance.md](docs/compliance.md) for full mappings against the **OWA
   ships no sensors).
 - `[hooks]` — `pre-commit` / `pre-push` lists naming the sensors each hook runs; an empty `pre-push` list means the full suite.
 - `[[sensors]]` — each sensor has a `name` and an `argv` (the command to execute).
+  Optional `when-changed` globs declare when the sensor applies to the current
+  change (`verify --changed` / `explain`); sensors without it always run.
+- `[signal-sets]` — named sensor selections for a decision (`feedback` for the
+  edit loop, `verification` for pre-completion, `release` for releases).
+  `verify --set <name>` runs only that set; without `[signal-sets]`,
+  `verification`/`release` mean the full list and `feedback` is rejected.
 
 When no config is found, the CLI falls back to the built-in Rust sensor pack. The config file is also the workspace-root marker used for discovery.
 

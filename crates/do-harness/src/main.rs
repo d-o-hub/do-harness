@@ -13,7 +13,9 @@ use clap::{CommandFactory, Parser};
 
 use crate::cli::{Cli, Command};
 
+mod applicability;
 mod audit;
+mod changes;
 mod cli;
 mod commands;
 mod config;
@@ -27,6 +29,8 @@ mod eval_integrity;
 mod eval_sandbox;
 mod eval_walk;
 mod evidence;
+mod explain;
+mod fingerprint;
 mod fs_perm;
 mod hook_script;
 mod hooks;
@@ -35,7 +39,9 @@ mod methods;
 mod metrics;
 mod report;
 mod sensors;
+mod signals;
 mod skill_write;
+mod status;
 mod task;
 mod telemetry;
 mod trace;
@@ -133,21 +139,42 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
         Command::Init {
             language,
             force,
-            format: _,
-            no_seed: _,
-            minimal: _,
-            no_gitignore: _,
+            format,
+            no_seed,
+            minimal,
+            no_gitignore,
         } => {
-            let opts = init::InitOpts { language, force };
-            let report = init::init_workspace(&root, &opts)
+            let opts = init::InitOpts {
+                language,
+                force,
+                no_seed,
+                minimal,
+                no_gitignore,
+            };
+            let mut report = init::init_workspace(&root, &opts)
                 .await
                 .map_err(CliError::Usage)?;
-            commands::print_init(&report, &root, language);
-            Ok(())
+            init::run_baseline(&root, &mut report)
+                .await
+                .map_err(CliError::Usage)?;
+            init::print_report(&report, &root, format);
+            if report
+                .baseline
+                .as_ref()
+                .is_some_and(|baseline| baseline.state == init::BaselineState::Red)
+            {
+                Err(CliError::Verify(anyhow::anyhow!(
+                    "initial verification is RED; fix the failures above and re-run init or verify"
+                )))
+            } else {
+                Ok(())
+            }
         }
         Command::Verify {
             fail_fast,
             format,
+            set,
+            changed,
             only,
             exclude,
             record,
@@ -157,6 +184,8 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
         } => {
             let opts = sensors::VerifyOpts {
                 fail_fast,
+                set,
+                changed,
                 only,
                 exclude,
                 record,
@@ -169,13 +198,27 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
             };
             verify::run(&root, opts).await
         }
-        Command::List { format } => {
+        Command::List { sets, format } => {
             let cfg = config::load(&root, cli.config.as_deref())
                 .await
                 .map_err(CliError::Usage)?;
-            report::print_names(&cfg.sensor_names(), format);
+            if sets {
+                report::print_names(&crate::signals::available(&cfg), format);
+            } else {
+                report::print_names(&cfg.sensor_names(), format);
+            }
             Ok(())
         }
+        Command::Explain {
+            set,
+            changed,
+            format,
+        } => explain::run(&root, cli.config.as_deref(), set, changed, format).await,
+        Command::Status {
+            set,
+            evidence,
+            format,
+        } => status::run(&root, cli.config.as_deref(), set, evidence, format).await,
         Command::InitDb {
             check,
             dry_run,

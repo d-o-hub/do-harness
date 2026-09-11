@@ -1,0 +1,3 @@
+// node_modules/ is only present for local bundle development; a DSH profile
+// install manages dependencies in the profile directory.
+node_modules/

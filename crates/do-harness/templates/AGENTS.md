@@ -1,49 +1,42 @@
-# AGENTS.md — Agent Execution Harness Contract
+# Development contract
 
-This workspace is governed by the do-harness agent execution harness. Agents
-and CI must pass the computational sensors before declaring work complete.
+This repository uses do-harness for computational verification.
 
-## Invariants
-- Computational sensors (`do-harness verify`) strictly supersede LLM
-  self-assessment: a task is complete only when verified by automated exit
-  codes.
-- Task tracking lives in `plans/tasks.json` or the local state database
-  (`.do-harness/agent_state.db`).
-- All skills reside in `.agents/skills/`; task tracking resides in `plans/`.
+## Working loop
 
-## Greenfield Adoption (No Assumptions)
-- `do-harness init` (rust pack) also scaffolds a minimal cargo crate when no
-  `Cargo.toml` exists, so `init && verify` is green on an empty tree;
-  existing crates are never touched, not even with `--force`.
-- The generic pack ships no sensors: `verify` exits 0 without running any
-  command — a vacuous pass. Add `[[sensors]]` before treating it as evidence.
-- Never assume the harness works in this repo: re-prove it with
-  `do-harness verify --format json` and read the per-sensor exit codes.
+During implementation:
 
-## 6-Phase Coding Workflow
-1. **HTN planning** — decompose the request into ordered subtasks
-   (`.agents/skills/htn-planner`).
-2. **Spike** — if an API, dependency, or boundary is uncertain, isolate it in
-   a throwaway scratchpad first (`.agents/skills/spike-runner`).
-3. **Event modeling** — define commands, events, and projections before
-   implementation (`.agents/skills/event-modeler`).
-4. **ATDD red** — write failing acceptance fixtures first.
-5. **Implement & verify** — make the fixtures pass, then run
-   `do-harness verify`; every sensor must exit 0.
-6. **Distill** — compress what you learned into the matching skill
-   (`.agents/skills/skill-distiller`).
+    do-harness verify --set feedback --changed
 
-## Self-Correction Protocol
-- On a sensor failure: classify it, apply the minimal fix, re-run the failing
-  sensor, and proceed only when it is green.
-- If the same subtask fails the same sensor 3 consecutive times, halt and
-  surface a diagnostic (fail-fast policy).
+Before claiming completion:
 
-## Workflow Gates
-- Pre-commit and pre-push: `do-harness verify --fail-fast` (via
-  `do-harness hook install`)
-- CI: `do-harness verify --format json --evidence .do-harness/evidence.json --strict` (exit 0 = pass, 1 = sensor failure / weak evidence,
-  2 = usage/config error)
+    do-harness verify --set verification --changed --strict
 
-Sensors are defined in `do-harness.toml`; `do-harness hook install` wires the
-git hooks, and `do-harness init-db` / `seed` initialize local state.
+Do not disable, bypass, remove, or weaken a required signal merely to obtain a
+passing result. Fix the underlying cause and re-run the sensor.
+
+## Completion
+
+A change is complete only when current verification evidence is green:
+
+    do-harness status --set verification
+
+`status` never runs sensors. `green` means passing evidence matches the
+current workspace and policy. `stale` means the workspace or `do-harness.toml`
+changed after verification: re-run the verification set. `red` means required
+checks failed. `missing` means no current evidence exists yet.
+
+## Repository knowledge
+
+- Follow the nearest `AGENTS.md` and the project documentation.
+- Load project-specific skills from `.agents/skills/` only when applicable.
+- Sensors and signal sets live in `do-harness.toml`; run
+  `do-harness explain --set verification --changed` to see which sensors apply
+  to the current change and why.
+
+## Adoption notes
+
+- `do-harness init` writes this file non-destructively; `--force` overwrites.
+- The generic pack ships zero sensors: its pass is vacuous, not evidence.
+- Git hooks: `do-harness hook install`. CI:
+  `do-harness verify --set verification --format json --strict`.

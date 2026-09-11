@@ -13,10 +13,19 @@ use crate::report::{Format, SensorResult, VerifyReport};
 use crate::telemetry::FAIL_FAST_STRIKES;
 
 /// Options controlling a verify run.
+///
+/// Each boolean maps 1:1 to an independent CLI flag (`--fail-fast`,
+/// `--changed`, `--record`, `--strict`); they are not a state machine, so
+/// the struct keeps one field per flag.
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Clone, Default)]
 pub struct VerifyOpts {
     /// Halt at the first failing sensor.
     pub fail_fast: bool,
+    /// Restrict execution to this development signal set; empty = all.
+    pub set: Option<String>,
+    /// Restrict execution to sensors applicable to the working-tree change.
+    pub changed: bool,
     /// Restrict execution to these sensor names; empty = all.
     pub only: Vec<String>,
     /// Exclude these sensor names from execution.
@@ -39,60 +48,31 @@ pub struct VerifyOpts {
 
 /// Runs the selected sensors from `root` and returns the aggregate report.
 ///
+/// `--set` selects the candidate signal set; `--changed` keeps only the
+/// applicable sensors; `--only` narrows within them and `--exclude` removes
+/// from them.
+///
 /// # Errors
 ///
-/// Returns an error when a name in `only` does not match any configured sensor.
+/// Returns an error when a name in `only` does not match any configured
+/// sensor, when a name in `only` is outside the selected signal set, or when
+/// the requested signal set is unknown or unconfigured.
 pub fn verify(cfg: &Config, root: &Path, opts: &VerifyOpts) -> Result<VerifyReport> {
-    let sensors = cfg.effective_sensors();
+    let signal_set = opts.set.clone();
+    let selection = resolve_selection(cfg, root, opts)?;
 
-    let effective_only: Vec<String> = opts
-        .only
-        .iter()
-        .flat_map(|s| s.split(','))
-        .map(|s| s.trim().to_owned())
-        .filter(|s| !s.is_empty())
-        .collect();
-
-    let effective_exclude: Vec<String> = opts
-        .exclude
-        .iter()
-        .flat_map(|s| s.split(','))
-        .map(|s| s.trim().to_owned())
-        .filter(|s| !s.is_empty())
-        .collect();
-
-    let mut unknown: Vec<&str> = Vec::new();
-    for name in &effective_only {
-        if !sensors.iter().any(|s| &s.name == name) {
-            unknown.push(name);
-        }
-    }
-    if !unknown.is_empty() {
-        let available = cfg.sensor_names().join(", ");
-        return Err(anyhow!(
-            "unknown sensor(s): {} (available: {available}; run `do-harness list` to see configured sensors)",
-            unknown.join(", ")
-        ));
-    }
-
-    if sensors.is_empty() {
+    if selection.specs.is_empty() {
         return Ok(VerifyReport {
             ok: true,
             root: root.display().to_string(),
             failed: vec![],
             sensors: vec![],
+            signal_set,
         });
     }
 
     let mut results: Vec<SensorResult> = Vec::new();
-    for spec in sensors {
-        if !effective_only.is_empty() && !effective_only.contains(&spec.name) {
-            continue;
-        }
-        if effective_exclude.contains(&spec.name) {
-            continue;
-        }
-
+    for spec in selection.specs {
         // Blocked synthesis: sensor is halted by fail-fast policy (ok=false, exit_code=None, duration_ms=0).
         let result = if opts.blocked.contains(&spec.name) {
             SensorResult {
@@ -126,6 +106,113 @@ pub fn verify(cfg: &Config, root: &Path, opts: &VerifyOpts) -> Result<VerifyRepo
         root: root.display().to_string(),
         failed,
         sensors: results,
+        signal_set,
+    })
+}
+
+/// A fully resolved verify selection: the specs to execute plus the
+/// change-aware reasoning behind them (for evidence and `explain` parity).
+pub struct ResolvedSelection<'a> {
+    /// Specs to execute, in run order.
+    pub specs: Vec<&'a SensorSpec>,
+    /// Sensors skipped by `--changed` applicability, with reasons.
+    pub skipped: Vec<crate::applicability::Skipped>,
+}
+
+/// Resolves the ordered sensor specs a verify run executes.
+///
+/// `--set` defines the candidate list (in set order); `--changed` keeps only
+/// the sensors applicable to the working-tree change (fail-closed: every
+/// candidate when discovery fails); `--only` narrows within the applicable
+/// list; `--exclude` removes from it. Without `--set` the effective sensor
+/// list is used unchanged.
+///
+/// # Errors
+///
+/// Returns an error when a name in `only` is unknown, lies outside the
+/// selected signal set, or when the requested signal set is unknown.
+pub fn resolve_selection<'a>(
+    cfg: &'a Config,
+    root: &Path,
+    opts: &VerifyOpts,
+) -> Result<ResolvedSelection<'a>> {
+    let sensors = cfg.effective_sensors();
+
+    let effective_only: Vec<String> = opts
+        .only
+        .iter()
+        .flat_map(|s| s.split(','))
+        .map(|s| s.trim().to_owned())
+        .filter(|s| !s.is_empty())
+        .collect();
+
+    let effective_exclude: Vec<String> = opts
+        .exclude
+        .iter()
+        .flat_map(|s| s.split(','))
+        .map(|s| s.trim().to_owned())
+        .filter(|s| !s.is_empty())
+        .collect();
+
+    let mut unknown: Vec<&str> = Vec::new();
+    for name in &effective_only {
+        if !sensors.iter().any(|s| &s.name == name) {
+            unknown.push(name);
+        }
+    }
+    if !unknown.is_empty() {
+        let available = cfg.sensor_names().join(", ");
+        return Err(anyhow!(
+            "unknown sensor(s): {} (available: {available}; run `do-harness list` to see configured sensors)",
+            unknown.join(", ")
+        ));
+    }
+
+    let ordered: Vec<&SensorSpec> = crate::signals::candidate_specs(cfg, opts.set.as_deref())?;
+    if let Some(name) = &opts.set {
+        let outside: Vec<&str> = effective_only
+            .iter()
+            .filter(|only| !ordered.iter().any(|spec| &spec.name == *only))
+            .map(String::as_str)
+            .collect();
+        if !outside.is_empty() {
+            let members: Vec<&str> = ordered.iter().map(|spec| spec.name.as_str()).collect();
+            return Err(anyhow!(
+                "sensor(s) {} not in signal set '{name}' (set sensors: {})",
+                outside.join(", "),
+                members.join(", ")
+            ));
+        }
+    }
+
+    let applicable: Vec<&SensorSpec> = if opts.changed {
+        let changed = crate::changes::discover(root);
+        let selection = crate::applicability::select(&ordered, &changed);
+        let names = selection.selected_names();
+        let skipped = selection.skipped;
+        let specs: Vec<&SensorSpec> = ordered
+            .into_iter()
+            .filter(|spec| {
+                names.contains(&spec.name)
+                    && (effective_only.is_empty() || effective_only.contains(&spec.name))
+                    && !effective_exclude.contains(&spec.name)
+            })
+            .collect();
+        return Ok(ResolvedSelection { specs, skipped });
+    } else {
+        ordered
+    };
+
+    let specs: Vec<&SensorSpec> = applicable
+        .into_iter()
+        .filter(|spec| {
+            (effective_only.is_empty() || effective_only.contains(&spec.name))
+                && !effective_exclude.contains(&spec.name)
+        })
+        .collect();
+    Ok(ResolvedSelection {
+        specs,
+        skipped: Vec::new(),
     })
 }
 

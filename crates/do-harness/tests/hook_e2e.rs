@@ -6,6 +6,10 @@
 use std::path::Path;
 use std::process::{Command, Output};
 
+mod support;
+
+use support::git_command;
+
 fn harness() -> Command {
     Command::new(env!("CARGO_BIN_EXE_do-harness"))
 }
@@ -23,11 +27,7 @@ fn run(cmd: &mut Command) -> Output {
 }
 
 fn git(dir: &Path, args: &[&str]) -> Output {
-    Command::new("git")
-        .current_dir(dir)
-        .args(args)
-        .output()
-        .expect("spawn git")
+    git_command(dir).args(args).output().expect("spawn git")
 }
 
 fn git_ok(dir: &Path, args: &[&str]) {
@@ -60,8 +60,7 @@ fn installed_commit_msg_hook_blocks_bad_subject() {
     std::fs::write(root.join("note.txt"), "hello\n").expect("write note");
     git_ok(root, &["add", "-A"]);
 
-    let bad = Command::new("git")
-        .current_dir(root)
+    let bad = git_command(root)
         .args(["commit", "-m", "Bad Subject"])
         .env("DO_HARNESS_BIN", env!("CARGO_BIN_EXE_do-harness"))
         .output()
@@ -71,8 +70,7 @@ fn installed_commit_msg_hook_blocks_bad_subject() {
         "uppercase subject must be blocked by the commit-msg hook"
     );
 
-    let good = Command::new("git")
-        .current_dir(root)
+    let good = git_command(root)
         .args(["commit", "-m", "feat: e2e hook check"])
         .env("DO_HARNESS_BIN", env!("CARGO_BIN_EXE_do-harness"))
         .output()

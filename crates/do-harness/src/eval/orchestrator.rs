@@ -183,7 +183,7 @@ fn resolve_approver(explicit: Option<&str>) -> Result<String> {
             return Ok(value.trim().to_owned());
         }
     }
-    if let Ok(output) = std::process::Command::new("git")
+    if let Ok(output) = crate::changes::git_command(Path::new("."))
         .args(["config", "user.email"])
         .output()
     {

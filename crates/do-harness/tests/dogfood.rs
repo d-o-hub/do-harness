@@ -123,7 +123,7 @@ fn rust_verify_with_evidence_writes_artifact() {
 
     let text = std::fs::read_to_string(&evidence_path).unwrap();
     let doc: Value = serde_json::from_str(&text).expect("valid evidence JSON");
-    assert_eq!(doc["schema_version"], serde_json::json!(2));
+    assert_eq!(doc["schema_version"], serde_json::json!(3));
     assert_eq!(doc["tool"], serde_json::json!("do-harness"));
     assert_eq!(doc["summary"]["verdict"], serde_json::json!("pass"));
     assert_eq!(doc["summary"]["skip"], serde_json::json!(0));

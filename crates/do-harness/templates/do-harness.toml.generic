@@ -16,3 +16,12 @@ pre-push = []
 # [[sensors]]
 # name = "test"
 # argv = ["npm", "test"]
+#
+# Group sensors into development signal sets (feedback / verification /
+# release); `verify --set <name>` runs only that set. Sets refer to sensor
+# names and never contain command lines. Add `when-changed` globs to skip a
+# sensor when the change touches none of its paths (`verify --changed`).
+# [signal-sets]
+# feedback = ["lint"]
+# verification = ["lint", "test"]
+# release = ["lint", "test"]

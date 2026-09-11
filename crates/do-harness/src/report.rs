@@ -33,7 +33,7 @@ pub struct SensorResult {
 }
 
 /// Aggregate verify report. Serializes to the stable JSON contract.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Default, Serialize)]
 pub struct VerifyReport {
     /// True when every sensor passed.
     pub ok: bool,
@@ -43,6 +43,9 @@ pub struct VerifyReport {
     pub failed: Vec<String>,
     /// Per-sensor results in run order.
     pub sensors: Vec<SensorResult>,
+    /// Development signal set selected via `--set`; absent for full runs.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub signal_set: Option<String>,
 }
 
 /// Lines of failing-sensor output shown on stderr.
@@ -128,6 +131,7 @@ mod tests {
                 allow_failure: false,
                 output: "hidden".to_owned(),
             }],
+            signal_set: None,
         };
         let json = serde_json::to_string(&report).expect("serialize");
         let value: serde_json::Value = serde_json::from_str(&json).expect("parse");

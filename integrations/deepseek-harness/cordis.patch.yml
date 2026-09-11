@@ -1,0 +1,24 @@
+# DSH bundle layer: mounts the do-harness development-signal tool and the
+# optional strict completion gate. Every field has a default; profiles can
+# override any of them by restating this row (patches replace the whole
+# config value).
+- insert:
+    - id: do-harness-signals
+      name: dsh-do-harness
+      config:
+        # Executable name or absolute path; defaults to $DO_HARNESS_BIN or
+        # `do-harness` on PATH.
+        binary: do-harness
+        # Repository root all do-harness commands run from. Defaults to the
+        # harness process working directory.
+        workspace: .
+        # Signal set used by development_signals(action="run") when the model
+        # omits `set`.
+        defaultSignalSet: feedback
+        # Signal set the strict completion gate checks.
+        completionSignalSet: verification
+        # Refuse completion while evidence is stale/red/missing.
+        strictCompletion: false
+        # Consecutive continuation prompts allowed for one unchanged failure
+        # before the gate stops enforcing and surfaces the error.
+        maxContinuations: 3

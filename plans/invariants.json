@@ -88,5 +88,17 @@
     "rationale": "eval_integrity hash baselines already fail drift until an explicit re-bless",
     "sensor": "do-harness eval (grader baselines)",
     "category": "verification"
+  },
+  {
+    "invariant": "A change is complete only when current verification evidence for its signal set is green (do-harness status)",
+    "rationale": "Git SHA alone cannot detect uncommitted edits, so completion depends on workspace/policy fingerprints, not commit identity",
+    "sensor": "do-harness status --set verification (green|red|stale|missing)",
+    "category": "verification"
+  },
+  {
+    "invariant": "Signal sets refer to sensors by name and never duplicate verification policy outside the Rust core",
+    "rationale": "Agent runtimes consume selection, applicability, freshness, and evidence semantics instead of reconstructing them",
+    "sensor": "do-harness verify --set / explain / status",
+    "category": "architecture"
   }
 ]
