@@ -29,6 +29,7 @@ mod eval_integrity;
 mod eval_sandbox;
 mod eval_walk;
 mod evidence;
+mod fs_perm;
 mod hook_script;
 mod hooks;
 mod init;

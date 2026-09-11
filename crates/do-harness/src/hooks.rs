@@ -11,9 +11,6 @@ use crate::hook_script::{
     BinSource, MARKER, commit_msg_body, only_args, resolve_binary, script_body,
 };
 
-/// Executable bits (owner read/write/execute) applied to installed hook files.
-const OWNER_EXEC_MASK: u32 = 0o111;
-
 /// Finds the `.git` directory (or git-dir) for the repository containing `cwd`.
 ///
 /// Walks up from `cwd`, returning the first directory that contains an entry
@@ -163,21 +160,8 @@ fn write_hook_checked(path: &Path, body: &str, force: bool) -> Result<()> {
 /// Writes `body` to `path` and marks it executable.
 fn write_hook(path: &Path, body: &str) -> Result<()> {
     fs::write(path, body).with_context(|| format!("failed to write {}", path.display()))?;
-    #[cfg(unix)]
-    set_executable(path)?;
+    crate::fs_perm::set_owner_exec(path)?;
     Ok(())
-}
-
-/// Adds owner execute permission to the file at `path` (unix only).
-#[cfg(unix)]
-fn set_executable(path: &Path) -> Result<()> {
-    use std::os::unix::fs::PermissionsExt;
-    let permissions = fs::metadata(path)
-        .with_context(|| format!("failed to stat {}", path.display()))?
-        .permissions();
-    let mode = permissions.mode() | OWNER_EXEC_MASK;
-    fs::set_permissions(path, fs::Permissions::from_mode(mode))
-        .with_context(|| format!("failed to chmod {}", path.display()))
 }
 
 #[cfg(test)]

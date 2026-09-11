@@ -63,7 +63,7 @@ fn installed_hooks_are_executable() {
         .unwrap()
         .permissions()
         .mode();
-    assert_ne!(mode & OWNER_EXEC_MASK, 0);
+    assert_ne!(mode & crate::fs_perm::OWNER_EXEC_MASK, 0);
 }
 
 #[test]

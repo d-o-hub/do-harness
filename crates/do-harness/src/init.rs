@@ -5,9 +5,6 @@ use std::path::Path;
 
 use anyhow::{Context, Result};
 
-/// Executable bits (owner read/write/execute) applied to installed scripts.
-const OWNER_EXEC_MASK: u32 = 0o111;
-
 /// `.gitignore` entries the harness needs; appended, never clobbered.
 const GITIGNORE_ENTRIES: &str = ".do-harness/\n.agents/events/\n";
 
@@ -152,7 +149,7 @@ pub async fn init_workspace(root: &Path, opts: &InitOpts) -> Result<InitReport> 
             opts.force,
             &mut report,
         )?;
-        make_executable(&root.join("scripts/check-loc.sh"))?;
+        crate::fs_perm::set_owner_exec(&root.join("scripts/check-loc.sh"))?;
         write_if_absent(
             root,
             "scripts/check-commitlint.sh",
@@ -160,7 +157,7 @@ pub async fn init_workspace(root: &Path, opts: &InitOpts) -> Result<InitReport> 
             opts.force,
             &mut report,
         )?;
-        make_executable(&root.join("scripts/check-commitlint.sh"))?;
+        crate::fs_perm::set_owner_exec(&root.join("scripts/check-commitlint.sh"))?;
         scaffold_crate(root, &mut report)?;
     }
     for spec in SKILLS {
@@ -188,7 +185,9 @@ pub async fn init_workspace(root: &Path, opts: &InitOpts) -> Result<InitReport> 
                 opts.force,
                 &mut report,
             )?;
-            make_executable(&root.join(format!("{skill_dir}/evals/walkthrough.sh")))?;
+            crate::fs_perm::set_owner_exec(
+                &root.join(format!("{skill_dir}/evals/walkthrough.sh")),
+            )?;
         }
     }
 
@@ -213,7 +212,9 @@ pub async fn init_workspace(root: &Path, opts: &InitOpts) -> Result<InitReport> 
         opts.force,
         &mut report,
     )?;
-    make_executable(&root.join(".agents/skills/skill-creator/scripts/quick_validate.py"))?;
+    crate::fs_perm::set_owner_exec(
+        &root.join(".agents/skills/skill-creator/scripts/quick_validate.py"),
+    )?;
     append_gitignore(root, &mut report)?;
 
     report.seeded = seed_invariants(root).await?;
@@ -320,24 +321,6 @@ fn append_gitignore(root: &Path, report: &mut InitReport) -> Result<()> {
     }
     fs::write(&path, updated).with_context(|| format!("failed to write {}", path.display()))?;
     report.written.push(".gitignore".to_owned());
-    Ok(())
-}
-
-/// Adds owner execute permission to `path` (unix only).
-#[cfg(unix)]
-fn make_executable(path: &Path) -> Result<()> {
-    use std::os::unix::fs::PermissionsExt;
-    let permissions = fs::metadata(path)
-        .with_context(|| format!("failed to stat {}", path.display()))?
-        .permissions();
-    let mode = permissions.mode() | OWNER_EXEC_MASK;
-    fs::set_permissions(path, fs::Permissions::from_mode(mode))
-        .with_context(|| format!("failed to chmod {}", path.display()))
-}
-
-/// No-op on non-unix platforms.
-#[cfg(not(unix))]
-fn make_executable(_path: &Path) -> Result<()> {
     Ok(())
 }
 
