@@ -4,8 +4,8 @@
 //! `init-db` (migrations), `seed` (architecture invariants from
 //! `plans/invariants.json`), `init` (workspace scaffold), `task` (task
 //! state), `trace` (interaction traces), `distill` (heuristic extraction),
-//! `eval` (skill-eval runner), `hook` (git hook management), and `version`
-//! (version information).
+//! `eval` (skill-eval runner), `hook` (git hook management), `pr`
+//! (deterministic PR analysis), and `version` (version information).
 
 use std::process::ExitCode;
 
@@ -37,6 +37,7 @@ mod hooks;
 mod init;
 mod methods;
 mod metrics;
+mod pr;
 mod report;
 mod sensors;
 mod signals;
@@ -122,6 +123,9 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
         Command::Init { .. } => {
             commands::init_target(cli.root.as_deref()).map_err(CliError::Usage)?
         }
+        Command::Pr { .. } => {
+            pr::command::resolve_root(cli.root.as_deref()).map_err(CliError::Usage)?
+        }
         _ => commands::resolve_root(cli.root.as_deref()).map_err(CliError::Usage)?,
     };
 
@@ -130,6 +134,7 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
         | Command::Compliance { .. }
         | Command::Completions { .. }
         | Command::Man { .. } => unreachable!("version/compliance/completions/man handled above"),
+        Command::Pr { action } => pr::command::run(&root, action),
         Command::Maintenance {
             prune_beats,
             keep_per_task,
