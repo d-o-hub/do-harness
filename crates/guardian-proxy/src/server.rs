@@ -7,8 +7,8 @@ use std::sync::Arc;
 use axum::{
     Json, Router,
     body::Body,
-    extract::State,
-    http::{HeaderMap, StatusCode},
+    extract::{DefaultBodyLimit, State},
+    http::{HeaderMap, HeaderValue, StatusCode},
     response::{IntoResponse, Response},
     routing::{get, post},
 };
@@ -16,13 +16,23 @@ use serde_json::Value;
 
 use crate::{AuditLog, McpLikeToolCall, ProxyMediator, state::AppState};
 
+/// Maximum accepted request body (JSON tool call): one mebibyte.
+const MAX_REQUEST_BYTES: usize = 1024 * 1024;
+/// Maximum buffered upstream response body: one mebibyte.
+const MAX_UPSTREAM_BYTES: usize = 1024 * 1024;
+/// Response header advertising whether governance is enforced or stubbed.
+const GOVERNANCE_HEADER: &str = "x-do-harness-governance";
+
 /// Creates the `axum` router for the proxy.
 ///
 /// Routes:
-/// - `GET /health` — liveness probe (always 200)
-/// - `GET /metrics` — observability counters (always 200)
-/// - `POST /mcp/tools/call` — tool-call mediation (fail-closed, forwards on Allow)
-/// - `POST /` — alias for `/mcp/tools/call` (compatibility)
+/// - `GET /health` — 200 only while the mediator is initialized; 503 degraded.
+/// - `GET /metrics` — observability counters (bearer token when configured).
+/// - `POST /mcp/tools/call` — tool-call mediation (fail-closed, forwards on Allow).
+///
+/// Request bodies are capped at one mebibyte; upstream responses are buffered up to
+/// the same bound. There is intentionally no `POST /` alias: one mediation
+/// entry point keeps the attack surface minimal.
 pub fn create_router(mediator: Arc<ProxyMediator>) -> Router {
     create_router_with_state(AppState::new(mediator))
 }
@@ -32,22 +42,48 @@ pub fn create_router_with_audit(mediator: Arc<ProxyMediator>, audit: AuditLog) -
     create_router_with_state(AppState::with_audit(mediator, audit))
 }
 
+/// Creates a degraded router: `/health` is 503 and every tool call is denied.
+pub fn create_router_degraded(error: String) -> Router {
+    create_router_with_state(AppState::degraded(error))
+}
+
 /// Creates a router from explicit state (shares the state's metrics handle).
 pub fn create_router_with_state(state: AppState) -> Router {
     Router::new()
         .route("/health", get(health_handler))
         .route("/metrics", get(metrics_handler))
         .route("/mcp/tools/call", post(tool_call_handler))
-        .route("/", post(tool_call_handler))
+        .layer(DefaultBodyLimit::max(MAX_REQUEST_BYTES))
         .with_state(state)
 }
 
-async fn health_handler() -> impl IntoResponse {
-    Json(serde_json::json!({"status":"ok"}))
+async fn health_handler(State(state): State<AppState>) -> Response {
+    match &state.init_error {
+        Some(error) => (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(serde_json::json!({"status":"degraded","error":error})),
+        )
+            .into_response(),
+        None => Json(serde_json::json!({"status":"ok"})).into_response(),
+    }
 }
 
-async fn metrics_handler(State(state): State<AppState>) -> impl IntoResponse {
-    Json(state.metrics.snapshot())
+async fn metrics_handler(State(state): State<AppState>, headers: HeaderMap) -> Response {
+    if let Some(token) = state.metrics_token.as_deref() {
+        let authorized = headers
+            .get(axum::http::header::AUTHORIZATION)
+            .and_then(|value| value.to_str().ok())
+            .and_then(|value| value.strip_prefix("Bearer "))
+            .is_some_and(|presented| presented == token);
+        if !authorized {
+            return (
+                StatusCode::UNAUTHORIZED,
+                Json(serde_json::json!({"error":"missing or invalid metrics token"})),
+            )
+                .into_response();
+        }
+    }
+    Json(state.metrics.snapshot()).into_response()
 }
 
 async fn record_audit(state: &AppState, call: &McpLikeToolCall, decision: &crate::ForwardDecision) {
@@ -60,11 +96,19 @@ async fn record_audit(state: &AppState, call: &McpLikeToolCall, decision: &crate
     let decision = decision.clone();
     let written = tokio::task::spawn_blocking(move || {
         let mut guard = audit.blocking_lock();
-        guard.append(&call, &decision).is_ok()
+        guard.append(&call, &decision)
     })
     .await;
-    if !matches!(written, Ok(true)) {
-        state.metrics.inc_audit_write_failure();
+    match written {
+        Ok(Ok(_record)) => {}
+        Ok(Err(err)) => {
+            state.metrics.inc_audit_write_failure();
+            eprintln!("guardian-proxy: ALERT: audit append failed: {err}");
+        }
+        Err(join_err) => {
+            state.metrics.inc_audit_write_failure();
+            eprintln!("guardian-proxy: ALERT: audit task failed: {join_err}");
+        }
     }
 }
 
@@ -73,7 +117,18 @@ async fn tool_call_handler(
     headers: HeaderMap,
     Json(call): Json<McpLikeToolCall>,
 ) -> Response {
-    let decision = match state.mediator.decide(&call) {
+    if let Some(error) = &state.init_error {
+        let body = serde_json::json!({"error": format!("governance unavailable: {error}")});
+        return governance_header((StatusCode::SERVICE_UNAVAILABLE, Json(body)).into_response());
+    }
+    let Some(mediator) = &state.mediator else {
+        let body = serde_json::json!({"error": "mediator unavailable"});
+        return governance_header((StatusCode::SERVICE_UNAVAILABLE, Json(body)).into_response());
+    };
+
+    // Decision mapping is explicit and fail-closed: only an explicit Allow is
+    // forwarded; denials and errors are returned as 403.
+    let decision = match mediator.decide(&call) {
         Ok(d) => d,
         Err(e) => {
             let denied = crate::ForwardDecision::Deny {
@@ -83,23 +138,40 @@ async fn tool_call_handler(
             state.metrics.inc_deny();
             record_audit(&state, &call, &denied).await;
             let body = serde_json::json!({"error": format!("mediator error: {e}")});
-            return (StatusCode::FORBIDDEN, Json(body)).into_response();
+            return governance_header((StatusCode::FORBIDDEN, Json(body)).into_response());
         }
     };
 
+    if !cfg!(feature = "agt-governance") {
+        state.metrics.inc_stub_decision();
+    }
     match &decision {
         crate::ForwardDecision::Allow => state.metrics.inc_allow(),
         crate::ForwardDecision::Deny { .. } => state.metrics.inc_deny(),
     }
     record_audit(&state, &call, &decision).await;
 
-    match decision {
+    let response = match decision {
         crate::ForwardDecision::Deny { reason } => {
             let body = serde_json::json!({"error": reason});
             (StatusCode::FORBIDDEN, Json(body)).into_response()
         }
         crate::ForwardDecision::Allow => forward_to_upstream(&state, &call, &headers).await,
-    }
+    };
+    governance_header(response)
+}
+
+/// Tags a response with whether governance is enforced or stubbed.
+fn governance_header(mut response: Response) -> Response {
+    let mode = if cfg!(feature = "agt-governance") {
+        "enforced"
+    } else {
+        "stub"
+    };
+    response
+        .headers_mut()
+        .insert(GOVERNANCE_HEADER, HeaderValue::from_static(mode));
+    response
 }
 
 async fn forward_to_upstream(
@@ -127,14 +199,28 @@ async fn forward_to_upstream(
 
     let status =
         StatusCode::from_u16(upstream_resp.status().as_u16()).unwrap_or(StatusCode::BAD_GATEWAY);
+    // Buffer the upstream body under an explicit cap instead of trusting it.
+    if upstream_resp
+        .content_length()
+        .is_some_and(|len| len > MAX_UPSTREAM_BYTES as u64)
+    {
+        state.metrics.inc_upstream_failure();
+        let body = serde_json::json!({"error": "upstream response exceeds size limit"});
+        return (StatusCode::BAD_GATEWAY, Json(body)).into_response();
+    }
     let bytes = match upstream_resp.bytes().await {
-        Ok(b) => b,
+        Ok(bytes) => bytes,
         Err(e) => {
             state.metrics.inc_upstream_failure();
             let body = serde_json::json!({"error": format!("upstream read failed: {e}")});
             return (StatusCode::BAD_GATEWAY, Json(body)).into_response();
         }
     };
+    if bytes.len() > MAX_UPSTREAM_BYTES {
+        state.metrics.inc_upstream_failure();
+        let body = serde_json::json!({"error": "upstream response exceeds size limit"});
+        return (StatusCode::BAD_GATEWAY, Json(body)).into_response();
+    }
     state.metrics.inc_upstream_ok();
 
     // Try to return JSON if upstream returned JSON, otherwise raw bytes.

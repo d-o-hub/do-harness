@@ -21,6 +21,16 @@ pub struct ProxyConfig {
     /// Optional path for hash-chained audit log (JSONL).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub audit_log: Option<String>,
+    /// Explicit host allowlist for the upstream. Empty means "any host except
+    /// link-local/metadata and, unless opted in, private/loopback".
+    #[serde(default)]
+    pub upstream_allowlist: Vec<String>,
+    /// Permit loopback/private upstreams (development sidecars).
+    #[serde(default)]
+    pub allow_private_upstreams: bool,
+    /// Optional bearer token required on `GET /metrics`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub metrics_token: Option<String>,
 }
 
 /// Decision for a proxied tool call.
@@ -36,7 +46,7 @@ pub enum ForwardDecision {
 }
 
 mod proxy;
-pub use proxy::{McpLikeToolCall, ProxyMediator};
+pub use proxy::{McpLikeToolCall, ProxyMediator, validate_upstream};
 
 mod audit_log;
 pub use audit_log::{AuditLog, AuditRecord};
@@ -51,4 +61,6 @@ mod state;
 pub use state::AppState;
 
 mod server;
-pub use server::{create_router, create_router_with_audit, create_router_with_state};
+pub use server::{
+    create_router, create_router_degraded, create_router_with_audit, create_router_with_state,
+};

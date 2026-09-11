@@ -16,6 +16,7 @@ pub struct ProxyMetrics {
     upstream_ok: AtomicU64,
     upstream_failures: AtomicU64,
     audit_write_failures: AtomicU64,
+    stub_decisions: AtomicU64,
 }
 
 /// JSON snapshot of [`ProxyMetrics`].
@@ -34,6 +35,8 @@ pub struct MetricsSnapshot {
     pub upstream_failures: u64,
     /// Best-effort audit appends that failed.
     pub audit_write_failures: u64,
+    /// Decisions taken with the permissive `agt-governance`-off stub.
+    pub stub_decisions: u64,
 }
 
 impl ProxyMetrics {
@@ -73,6 +76,11 @@ impl ProxyMetrics {
         self.audit_write_failures.fetch_add(1, Ordering::Relaxed);
     }
 
+    /// Records a decision taken by the permissive stub.
+    pub fn inc_stub_decision(&self) {
+        self.stub_decisions.fetch_add(1, Ordering::Relaxed);
+    }
+
     /// Returns a point-in-time snapshot.
     #[must_use]
     pub fn snapshot(&self) -> MetricsSnapshot {
@@ -83,6 +91,7 @@ impl ProxyMetrics {
             upstream_ok: self.upstream_ok.load(Ordering::Relaxed),
             upstream_failures: self.upstream_failures.load(Ordering::Relaxed),
             audit_write_failures: self.audit_write_failures.load(Ordering::Relaxed),
+            stub_decisions: self.stub_decisions.load(Ordering::Relaxed),
         }
     }
 }
@@ -101,6 +110,7 @@ mod tests {
         m.inc_upstream_ok();
         m.inc_upstream_failure();
         m.inc_audit_write_failure();
+        m.inc_stub_decision();
         let snap = m.snapshot();
         assert_eq!(
             snap,
@@ -111,6 +121,7 @@ mod tests {
                 upstream_ok: 1,
                 upstream_failures: 1,
                 audit_write_failures: 1,
+                stub_decisions: 1,
             }
         );
     }

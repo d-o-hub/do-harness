@@ -14,6 +14,9 @@ fn test_mediator_with_upstream(upstream: &str) -> Arc<ProxyMediator> {
         upstream: upstream.to_string(),
         agent_id: "test-agent".to_string(),
         audit_log: None,
+        upstream_allowlist: vec![],
+        allow_private_upstreams: true,
+        metrics_token: None,
     };
     Arc::new(ProxyMediator::new(cfg).expect("mediator"))
 }
@@ -112,13 +115,28 @@ async fn test_allow_no_params_forwards() {
     let router = create_router(mediator);
     let body = serde_json::to_string(&json!({"tool":"data.read"})).expect("json");
     let req = Request::builder()
-        .uri("/")
+        .uri("/mcp/tools/call")
         .method("POST")
         .header("content-type", "application/json")
         .body(AxumBody::from(body))
         .expect("request");
     let resp = router.oneshot(req).await.expect("response");
     assert_eq!(resp.status(), StatusCode::OK);
+}
+
+/// The removed `POST /` compatibility alias is gone: one entry point only.
+#[tokio::test(flavor = "current_thread")]
+async fn test_root_alias_is_not_routed() {
+    let mediator = test_mediator_with_upstream("http://127.0.0.1:9");
+    let router = create_router(mediator);
+    let req = Request::builder()
+        .uri("/")
+        .method("POST")
+        .header("content-type", "application/json")
+        .body(AxumBody::from("{}"))
+        .expect("request");
+    let resp = router.oneshot(req).await.expect("response");
+    assert_eq!(resp.status(), StatusCode::NOT_FOUND);
 }
 
 #[tokio::test(flavor = "current_thread")]
@@ -213,11 +231,13 @@ async fn test_metrics_counts_allow_deny_and_upstream_failure() {
     // Allowed call with unreachable upstream -> 502 + upstream failure.
     let mediator2 = test_mediator_with_upstream("http://127.0.0.1:1");
     let state2 = AppState {
-        mediator: mediator2,
+        mediator: Some(mediator2),
         upstream: "http://127.0.0.1:1".to_string(),
         client: reqwest::Client::new(),
         audit: None,
         metrics: Arc::clone(&metrics),
+        init_error: None,
+        metrics_token: None,
     };
     let router2 = create_router_with_state(state2);
     let allow_body = serde_json::to_string(&json!({"tool":"data.read","params":{"path":"/tmp/x"}}))
@@ -262,4 +282,99 @@ async fn test_metrics_endpoint_returns_snapshot() {
     ] {
         assert!(val.get(key).is_some(), "missing metrics key {key}");
     }
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn test_metrics_requires_bearer_token_when_configured() {
+    let mediator = test_mediator_with_upstream("http://127.0.0.1:9");
+    let mut state = AppState::new(mediator);
+    state.metrics_token = Some("secret".to_string());
+    let router = create_router_with_state(state);
+
+    let req = Request::builder()
+        .uri("/metrics")
+        .body(AxumBody::empty())
+        .expect("request");
+    let resp = router.clone().oneshot(req).await.expect("response");
+    assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+
+    let req = Request::builder()
+        .uri("/metrics")
+        .header("authorization", "Bearer wrong")
+        .body(AxumBody::empty())
+        .expect("request");
+    let resp = router.clone().oneshot(req).await.expect("response");
+    assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+
+    let req = Request::builder()
+        .uri("/metrics")
+        .header("authorization", "Bearer secret")
+        .body(AxumBody::empty())
+        .expect("request");
+    let resp = router.oneshot(req).await.expect("response");
+    assert_eq!(resp.status(), StatusCode::OK);
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn test_degraded_router_fails_closed() {
+    let router = create_router_degraded("mediator init failed".to_string());
+
+    let req = Request::builder()
+        .uri("/health")
+        .body(AxumBody::empty())
+        .expect("request");
+    let resp = router.clone().oneshot(req).await.expect("response");
+    assert_eq!(resp.status(), StatusCode::SERVICE_UNAVAILABLE);
+
+    let req = Request::builder()
+        .uri("/mcp/tools/call")
+        .method("POST")
+        .header("content-type", "application/json")
+        .body(AxumBody::from(r#"{"tool":"data.read"}"#))
+        .expect("request");
+    let resp = router.oneshot(req).await.expect("response");
+    assert_eq!(resp.status(), StatusCode::SERVICE_UNAVAILABLE);
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn test_request_body_limit_rejects_oversized_payload() {
+    let mediator = test_mediator_with_upstream("http://127.0.0.1:9");
+    let router = create_router(mediator);
+    let blob = "x".repeat(1024 * 1024 + 1);
+    let body = format!(r#"{{"tool":"data.read","params":{{"blob":"{blob}"}}}}"#);
+    let req = Request::builder()
+        .uri("/mcp/tools/call")
+        .method("POST")
+        .header("content-type", "application/json")
+        .body(AxumBody::from(body))
+        .expect("request");
+    let resp = router.oneshot(req).await.expect("response");
+    assert_eq!(resp.status(), StatusCode::PAYLOAD_TOO_LARGE);
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn test_responses_advertise_governance_mode() {
+    let mediator = test_mediator_with_upstream("http://127.0.0.1:9");
+    let router = create_router(mediator);
+    let req = Request::builder()
+        .uri("/mcp/tools/call")
+        .method("POST")
+        .header("content-type", "application/json")
+        .body(AxumBody::from(
+            r#"{"tool":"data.read","params":"not a map"}"#,
+        ))
+        .expect("request");
+    let resp = router.oneshot(req).await.expect("response");
+    assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+    let mode = resp
+        .headers()
+        .get("x-do-harness-governance")
+        .and_then(|value| value.to_str().ok())
+        .expect("governance header");
+    let expected = if cfg!(feature = "agt-governance") {
+        "enforced"
+    } else {
+        "stub"
+    };
+    assert_eq!(mode, expected);
 }

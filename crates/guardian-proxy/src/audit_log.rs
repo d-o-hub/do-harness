@@ -69,6 +69,24 @@ impl AuditRecord {
     }
 }
 
+/// Reads the tail record's next `(seq, prev_hash)` from the log, or genesis.
+///
+/// Called while holding the file lock so the sequence reflects every writer's
+/// committed appends, not this handle's stale in-memory state.
+fn tail_of(path: &Path) -> Result<(u64, String)> {
+    let content = std::fs::read_to_string(path).map_err(|io| GuardianError::AuditIo {
+        path: path.display().to_string(),
+        io,
+    })?;
+    match content.lines().rev().find(|line| !line.trim().is_empty()) {
+        Some(line) => {
+            let record: AuditRecord = serde_json::from_str(line)?;
+            Ok((record.seq + 1, record.chain_hash))
+        }
+        None => Ok((1, "GENESIS".to_string())),
+    }
+}
+
 /// Append-only audit log writer.
 #[derive(Debug)]
 pub struct AuditLog {
@@ -137,16 +155,20 @@ impl AuditLog {
 
     /// Appends a decision record.
     ///
+    /// The file is locked exclusively across processes and re-read under the
+    /// lock, so concurrent proxy instances cannot fork `seq`/`prev_hash`; the
+    /// write is `fsync`ed before the lock is released.
+    ///
     /// # Errors
     ///
-    /// Returns error if serialization or file append fails.
+    /// Returns error if locking, serialization, or file append fails.
     pub fn append(
         &mut self,
         call: &McpLikeToolCall,
         decision: &ForwardDecision,
     ) -> Result<AuditRecord> {
-        let record = AuditRecord::new(self.next_seq, self.prev_hash.clone(), call, decision)?;
-        let line = serde_json::to_string(&record)?;
+        use fs2::FileExt as _;
+
         let mut file = std::fs::OpenOptions::new()
             .create(true)
             .append(true)
@@ -155,11 +177,31 @@ impl AuditLog {
                 path: self.path.display().to_string(),
                 io,
             })?;
-        writeln!(file, "{line}").map_err(|io| GuardianError::AuditIo {
+        file.lock_exclusive().map_err(|io| GuardianError::AuditIo {
             path: self.path.display().to_string(),
             io,
         })?;
-        self.next_seq += 1;
+
+        let (seq, prev_hash) = match tail_of(&self.path) {
+            Ok(tail) => tail,
+            Err(err) => {
+                let _ = fs2::FileExt::unlock(&file);
+                return Err(err);
+            }
+        };
+        let record = AuditRecord::new(seq, prev_hash, call, decision)?;
+        let line = serde_json::to_string(&record)?;
+        let write_result = writeln!(file, "{line}")
+            .and_then(|()| file.sync_all())
+            .map_err(|io| GuardianError::AuditIo {
+                path: self.path.display().to_string(),
+                io,
+            });
+        // Unlock on every path so a failure cannot wedge later writers.
+        let _ = fs2::FileExt::unlock(&file);
+        write_result?;
+
+        self.next_seq = seq + 1;
         self.prev_hash.clone_from(&record.chain_hash);
         Ok(record)
     }
@@ -253,5 +295,30 @@ mod tests {
         assert_eq!(h1, h2);
         let h3 = chain_hash(Some(&h1), r#"{"a":1}"#);
         assert_ne!(h1, h3);
+    }
+
+    /// Two writers (simulating two proxy processes) share one chain: the
+    /// second append re-reads the tail under the lock instead of forking seq.
+    #[test]
+    fn test_two_writers_share_chain() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("audit.jsonl");
+        let mut first = AuditLog::open(&path).expect("first open");
+        let mut second = AuditLog::open(&path).expect("second open");
+        let call = McpLikeToolCall::new("data.read", None);
+
+        let r1 = first
+            .append(&call, &ForwardDecision::Allow)
+            .expect("append");
+        let r2 = second
+            .append(&call, &ForwardDecision::Allow)
+            .expect("append");
+        assert_eq!(r1.seq, 1);
+        assert_eq!(r2.seq, 2);
+        assert_eq!(r2.prev_hash, r1.chain_hash);
+
+        AuditLog::verify(&path).expect("chain intact");
+        let reopened = AuditLog::open(&path).expect("reopen");
+        assert_eq!(reopened.next_seq(), 3);
     }
 }
