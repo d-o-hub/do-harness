@@ -208,6 +208,40 @@ mod tests {
         assert!(!doc_no_exit.is_strict_clean());
     }
 
+    /// `allow_failure` softens the local gate only: evidence must still record
+    /// the sensor as failed so `--strict` cannot bless a weak run.
+    #[test]
+    fn soft_failure_is_recorded_as_fail_not_pass() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut cfg = crate::config::rust_default();
+        cfg.sensors = vec![crate::config::SensorSpec {
+            name: "links".into(),
+            argv: vec!["true".into()],
+            retry: None,
+            timeout: None,
+            allow_failure: true,
+            transient_exit_codes: vec![],
+        }];
+        let report = VerifyReport {
+            ok: true,
+            root: dir.path().display().to_string(),
+            failed: vec![],
+            sensors: vec![crate::report::SensorResult {
+                name: "links".into(),
+                ok: false,
+                exit_code: Some(1),
+                duration_ms: 5,
+                allow_failure: true,
+                output: "boom".into(),
+            }],
+        };
+        let doc = EvidenceDocument::from_run(&cfg, dir.path(), &report, &[], None, 0, 1);
+        assert_eq!(doc.sensors[0].verdict, "fail");
+        assert_eq!(doc.summary.fail, 1);
+        assert_eq!(doc.summary.pass, 0);
+        assert!(!doc.is_strict_clean());
+    }
+
     #[test]
     fn serialization_matches_schema() {
         let doc = EvidenceDocument {

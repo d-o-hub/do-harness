@@ -64,5 +64,29 @@
     "rationale": "Prevents re-introducing dead columns and unbounded eval history",
     "sensor": "cargo test --test schema_usage (crates/db) / verify --only test",
     "category": "storage"
+  },
+  {
+    "invariant": "No bundled secret scanner (gitleaks); rely on platform secret scanning",
+    "rationale": "A second secret-scanner binary would be one more tool to install and keep green; GitHub secret scanning covers the repo and CI logs never echo secrets",
+    "sensor": "documented wontfix (issue #38)",
+    "category": "supply-chain"
+  },
+  {
+    "invariant": "No SBOM generation inside the verify loop",
+    "rationale": "SBOMs are release-time artifacts, not per-commit sensors; generate them in release tooling if binaries are published",
+    "sensor": "documented wontfix (issue #38)",
+    "category": "supply-chain"
+  },
+  {
+    "invariant": "Lockfile freshness enforced by the CI --locked check on MSRV",
+    "rationale": "cargo check --locked in the msrv job detects a stale Cargo.lock without adding another sensor",
+    "sensor": "verify.yml msrv job (cargo check --workspace --locked)",
+    "category": "supply-chain"
+  },
+  {
+    "invariant": "Eval grader drift blocked by SHA-256 baselines, not a separate sensor",
+    "rationale": "eval_integrity hash baselines already fail drift until an explicit re-bless",
+    "sensor": "do-harness eval (grader baselines)",
+    "category": "verification"
   }
 ]

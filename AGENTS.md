@@ -87,7 +87,8 @@
 - **No Hallucinated Success**: A subtask is complete only when verified by automated exit codes.
 - **Hooks**: `do-harness hook install` writes .git/hooks/pre-commit (fmt + loc, run with `--record` so beats persist) and pre-push (full verify); uninstall/status remove/inspect managed hooks.
 - **Workflow gates**: pre-commit = `do-harness verify --fail-fast --only fmt --only loc`; pre-push = `do-harness verify --fail-fast`; CI = `verify.yml` lints shell + `cargo check -p guardian-proxy --features agt-governance` + `do-harness verify --format json --evidence .do-harness/evidence.json --strict` (exit 0/1/2) + dogfood `init && verify` + `do-harness eval`.
-- **Persistence commands**: `do-harness task list`/`task export` surface task state (libSQL is the source of truth; export writes `plans/tasks.json`); `verify --record` persists beats and bumps error signatures for failing sensors; `task add/advance/fail`, `trace add/list`, `distill`, `eval`, `metrics` are implemented.
+- **Persistence commands**: `do-harness task list`/`task export` surface task state (libSQL is the source of truth; export writes `plans/tasks.json` with a board summary and `task import --check` validates freshness); `verify --record` persists beats and bumps error signatures for failing sensors; `task add/advance/fail`, `trace add/list`, `distill`, `eval`, `metrics`, and `maintenance --prune-beats` are implemented.
+- **Sensor policy decisions**: explicit wontfix entries (gitleaks, SBOM, lockfile freshness, eval bless-drift) live in `plans/invariants.json`; `do-harness seed --prune` keeps libSQL in sync and drops stale rows. `shell` (shellcheck, fail-closed in CI) and `check-agt` (guardian-proxy governance feature) are workspace sensors.
 - **Root discovery**: the CLI walks up from cwd for do-harness.toml, or AGENTS.md with .do-harness/ or plans/invariants.json; override with --root.
 
 ---

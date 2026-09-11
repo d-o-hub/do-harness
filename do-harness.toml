@@ -33,6 +33,14 @@ name = "deps"
 argv = ["bash", "scripts/check-deps.sh"]
 
 [[sensors]]
+name = "shell"
+argv = ["bash", "scripts/check-shell.sh"]
+
+[[sensors]]
+name = "check-agt"
+argv = ["cargo", "check", "-p", "guardian-proxy", "--features", "agt-governance"]
+
+[[sensors]]
 name = "audit"
 argv = ["bash", "scripts/check-audit.sh"]
 

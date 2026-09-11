@@ -32,6 +32,11 @@ Runs computational sensors defined in `do-harness.toml`.
 - `--evidence <FILE>`: Write machine-readable evidence artifact JSON.
 - `--strict`: Exit non-zero if any sensors were skipped or evidence checks fail. Default evidence artifact path: `.do-harness/evidence.json`.
 
+A sensor configured with `allow_failure = true` keeps the local `verify` gate
+green (it prints `WARN`), but its evidence verdict is still `fail` and
+`--strict` rejects it: softness applies to the developer loop, never to the
+evidence artifact.
+
 ### `task`
 Task state inspection and workflow management.
 
