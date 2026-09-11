@@ -102,6 +102,44 @@ pub enum TaskAction {
     },
 }
 
+/// Available deterministic PR analysis actions.
+#[derive(Debug, Subcommand)]
+pub enum PrAction {
+    /// Report whether a PR or revision range introduces any effective change.
+    NoEffect {
+        /// Pull request number; resolves base and head through `gh`.
+        #[arg(value_name = "PR", conflicts_with_all = ["base", "head"])]
+        pr: Option<u64>,
+        /// Base revision (local mode; requires --head).
+        #[arg(long, value_name = "REV", requires = "head")]
+        base: Option<String>,
+        /// Head revision (local mode; requires --base).
+        #[arg(long, value_name = "REV", requires = "base")]
+        head: Option<String>,
+        /// Output format.
+        #[arg(long, value_enum, default_value_t = Format::Text)]
+        format: Format,
+    },
+    /// Emit the semantic residual: changed units evidence could not prove.
+    Review {
+        /// Pull request number; resolves base and head through `gh`.
+        #[arg(value_name = "PR", conflicts_with_all = ["base", "head"])]
+        pr: Option<u64>,
+        /// Base revision (local mode; requires --head).
+        #[arg(long, value_name = "REV", requires = "head")]
+        base: Option<String>,
+        /// Head revision (local mode; requires --base).
+        #[arg(long, value_name = "REV", requires = "base")]
+        head: Option<String>,
+        /// Ignore the cached report and recompute from scratch.
+        #[arg(long)]
+        recompute: bool,
+        /// Output format.
+        #[arg(long, value_enum, default_value_t = Format::Text)]
+        format: Format,
+    },
+}
+
 /// Available error-signature actions.
 #[derive(Debug, Subcommand)]
 pub enum ErrorsAction {

@@ -11,7 +11,7 @@ use crate::init;
 mod actions;
 
 use crate::report::Format;
-pub use actions::{ErrorsAction, HookAction, TaskAction, TraceAction};
+pub use actions::{ErrorsAction, HookAction, PrAction, TaskAction, TraceAction};
 
 /// Unified entrypoint for harness sensors and database maintenance.
 #[derive(Debug, Parser)]
@@ -126,6 +126,11 @@ pub enum Command {
         /// Output format.
         #[arg(long, value_enum, default_value_t = Format::Text)]
         format: Format,
+    },
+    /// Deterministic PR analysis (read-only; works in any git repository).
+    Pr {
+        #[command(subcommand)]
+        action: PrAction,
     },
     /// Apply pending database migrations.
     InitDb {

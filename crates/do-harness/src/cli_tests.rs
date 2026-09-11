@@ -69,3 +69,74 @@ fn completions_and_man_subcommands_parse() {
     let man = Cli::try_parse_from(["do-harness", "man", "/tmp/man"]).expect("man");
     assert!(matches!(man.command, Command::Man { .. }));
 }
+
+#[test]
+fn pr_no_effect_parses_range_and_rejects_mixed_modes() {
+    let range = Cli::try_parse_from([
+        "do-harness",
+        "pr",
+        "no-effect",
+        "--base",
+        "main",
+        "--head",
+        "HEAD",
+    ])
+    .expect("range mode parses");
+    assert!(matches!(range.command, Command::Pr { .. }));
+
+    let pr = Cli::try_parse_from(["do-harness", "pr", "no-effect", "42"]).expect("pr mode parses");
+    assert!(matches!(pr.command, Command::Pr { .. }));
+
+    let conflict = Cli::try_parse_from([
+        "do-harness",
+        "pr",
+        "no-effect",
+        "42",
+        "--base",
+        "main",
+        "--head",
+        "HEAD",
+    ])
+    .expect_err("pr and range must conflict");
+    assert!(conflict.to_string().contains("--base") || conflict.to_string().contains("--head"));
+
+    let missing = Cli::try_parse_from(["do-harness", "pr", "no-effect", "--base", "main"])
+        .expect_err("base without head must fail");
+    assert!(missing.to_string().contains("--head"));
+}
+
+#[test]
+fn pr_review_parses_recompute_and_rejects_mixed_modes() {
+    let range = Cli::try_parse_from([
+        "do-harness",
+        "pr",
+        "review",
+        "--base",
+        "main",
+        "--head",
+        "HEAD",
+        "--recompute",
+    ])
+    .expect("range mode with recompute parses");
+    assert!(matches!(range.command, Command::Pr { .. }));
+
+    let pr = Cli::try_parse_from(["do-harness", "pr", "review", "42"]).expect("pr mode parses");
+    assert!(matches!(pr.command, Command::Pr { .. }));
+
+    let conflict = Cli::try_parse_from([
+        "do-harness",
+        "pr",
+        "review",
+        "42",
+        "--base",
+        "main",
+        "--head",
+        "HEAD",
+    ])
+    .expect_err("pr and range must conflict");
+    assert!(conflict.to_string().contains("--base") || conflict.to_string().contains("--head"));
+
+    let missing = Cli::try_parse_from(["do-harness", "pr", "review", "--head", "main"])
+        .expect_err("head without base must fail");
+    assert!(missing.to_string().contains("--base"));
+}

@@ -247,6 +247,39 @@ Verify event hash chain integrity in `.do-harness/agent_state.db`.
 
 - `--format <Format>`: Output format (`text` or `json`).
 
+### `pr no-effect`
+Report whether a pull request or revision range introduces any effective change,
+using the merge-base tree delta. Read-only; works in any git repository without
+harness initialization.
+
+- `<PR>`: Pull request number; base and head are resolved through `gh`.
+- `--base <REV> --head <REV>`: Local mode without GitHub.
+- `--format <Format>`: Output format (`text` or `json`).
+
+Exit `0` when the verdict is determined (whether `no-effect` or `has-effect`),
+`1` when it cannot be determined, and `2` for invalid arguments. An analysis
+error is never reported as `no-effect`.
+
+### `pr review`
+Emit the semantic residual for a pull request or revision range: the changed
+hunks (units) that evidence could not prove, with minimal context, plus the
+audit list of skipped units and any untrusted `false_proven` claims. Works in
+any git repository without harness initialization. The gate policy is read
+from `.github/pr-gate.toml` **at the merge-base revision only**; an absent or
+malformed policy proves nothing, so every unit stays residual and a malformed
+policy adds a warning.
+
+- `<PR>`: Pull request number; base and head are resolved through `gh`,
+  falling back to `gh pr diff` when the clone cannot resolve them.
+- `--base <REV> --head <REV>`: Local mode without GitHub.
+- `--recompute`: Ignore the cached report and recompute from scratch.
+- `--format <Format>`: Output format (`text` or `json`).
+
+Exit `0` when a report is produced (even with a full residual), `1` when the
+revisions or diff cannot be resolved, and `2` for invalid arguments. The only
+write is a best-effort cache under the repository git directory; the command
+never writes into the work tree.
+
 ### `completions`
 Generate shell completions for `bash`, `zsh`, `fish`, `powershell`, `elvish`.
 
