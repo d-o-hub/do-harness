@@ -1,79 +1,113 @@
 # Compliance mapping
 
-`do-harness` enforces deterministic, computational controls over the agent development loop. This document maps those controls to recognized AI assurance frameworks: the **OWASP Agentic Top 10 (2026)**, the **NIST AI Risk Management Framework (AI RMF 1.0)**, and the **EU AI Act**.
+> **Assessment date:** 2026-09-11 · **Harness version:** 0.1.0 · **Scope:** dev-loop only
+>
+> Pinned framework editions: **OWASP Top 10 for Agentic Applications (2026, ASI01–ASI10)**;
+> **NIST AI RMF 1.0 (NIST AI 100-1, January 2023)**;
+> **EU AI Act, Regulation (EU) 2024/1689**;
+> **SOC 2 Trust Services Criteria (2017, revised 2022)**.
 
 ## Scope & Positioning
 
-`do-harness` is a **dev-loop verification harness** (feedforward guides + feedback sensors, workflow gates, tamper-evident logs, and evidence artifacts). It is **not** a runtime policy engine or inline proxy (such as Microsoft Agent Governance Toolkit / AGT).
+`do-harness` is a **dev-loop verification harness** (feedforward guides + feedback
+sensors, workflow gates, tamper-evident logs, and evidence artifacts). It is
+**not** a runtime policy engine, inline proxy, or production agent runtime.
 
-Accordingly, `do-harness` claims compliance coverage strictly for **build-time, workflow-level, and dev-loop verification controls**.
+Compliance coverage is claimed strictly for **build-time, workflow-level, and
+dev-loop verification controls**. In particular:
 
-> **Adjacent optional runtime:** `crates/guardian-proxy` is a separate, off-by-default, fail-closed sidecar (requires `agt-governance` feature). When enabled it reuses `ProxyMediator::decide`/`AgtGate::check` for tool-call mediation and exposes it over HTTP (`axum` `GET /health`, `GET /metrics`, `POST /mcp/tools/call`), with every decision appended to an optional hash-chained JSONL audit log (`AuditLog`, `SHA-256(prev|payload)`, tamper-evident on reopen) and counted in in-memory observability counters (`ProxyMetrics`: `allow`, `deny`, `mediator_errors`, `upstream_ok`, `upstream_failures`, `audit_write_failures`; counters never affect decisions). It is **not** part of the dev-harness compliance boundary above; runtime claims for the proxy should be evaluated separately.
+- The **EU AI Act** rows below are *dev-loop scope only*. `do-harness` is not a
+  high-risk AI system and this document is **not** a conformity assessment under
+  Regulation (EU) 2024/1689.
+- **NIST AI RMF** mappings describe how the harness supports organisational
+  GOVERN/MAP/MEASURE/MANAGE practices during development. HTN task
+  decomposition orders *engineering work*, not AI-system risk categorization.
+- Every `✅` row below links the file or command that enforces it; rows without
+  evidence are marked partial.
+
+> **Adjacent optional runtime:** `crates/guardian-proxy` is a separate,
+> off-by-default, fail-closed sidecar (requires the `agt-governance` feature).
+> It validates upstreams against an SSRF policy, caps request/response bodies,
+> times out upstream calls, denies all traffic when mediation is unavailable,
+> and can bind decisions to a hash-chained JSONL audit log with cross-process
+> file locking (`crates/guardian-proxy/README.md`). It is **not** part of the
+> dev-harness compliance boundary and its threat model is documented separately
+> in [`docs/threat-model-proxy.md`](threat-model-proxy.md).
 
 ---
 
 ## High-Level Control Matrix
 
-| do-harness Control | Mechanism | OWASP Agentic Top 10 | NIST AI RMF | EU AI Act |
-|---|---|---|---|---|
-| **Computational sensors** (`verify`) | Deterministic checks strictly supersede LLM self-assessment | ASI04, ASI05, ASI09, Traceability | MEASURE 1, MEASURE 2 | Art. 15 (Accuracy & Robustness) |
-| **Task-completion gate** (`task done`) | Refuses task completion until `verify --record` passes named sensor | ASI02, ASI08, ASI09, ASI10 | MANAGE 1, MANAGE 4 | Art. 14 (Human Oversight) |
-| **Evidence artifact** (`verify --format json`, `task export`) | Machine-readable, reproducible run record | ASI09, Traceability | MEASURE 1, MEASURE 3 | Art. 12 (Record-keeping) |
-| **Hash-chained event log** (`.do-harness/agent_state.db`) | Tamper-evident append-only audit trail of workflow events | ASI06, Traceability | GOVERN 2, MEASURE 3 | Art. 12 (Technical Documentation & Record-keeping) |
-| **Fail-closed semantics** | Deny-by-default on unmet preconditions or sensor failures | ASI08, ASI10 | GOVERN 1, MANAGE 1 | Art. 9 (Risk Management System) |
+| do-harness Control | Mechanism | OWASP Agentic Top 10 | NIST AI RMF | EU AI Act (dev-loop) | Evidence |
+|---|---|---|---|---|---|
+| **Computational sensors** (`verify`) | Deterministic checks strictly supersede LLM self-assessment | ASI04, ASI05, ASI09 | MEASURE 1 | Art. 15 | [`sensors/mod.rs`](../crates/do-harness/src/sensors/mod.rs), [`do-harness.toml`](../do-harness.toml) |
+| **Task-completion gate** (`task done`) | Re-checks named sensor beats inside the write transaction | ASI02, ASI08, ASI10 | MANAGE 1 | Art. 14 | [`repo_workflow.rs`](../crates/db/src/repo_workflow.rs), [`task.rs`](../crates/do-harness/src/task.rs) |
+| **Evidence artifact** (`verify --evidence`) | Schema-versioned run record with argv + output hashes and a hash chain | ASI09 | MEASURE 1, MEASURE 3 | Art. 12 | [`evidence.rs`](../crates/do-harness/src/evidence.rs) |
+| **Hash-chained event log** (`.do-harness/agent_state.db`) | Append-only workflow events with `UNIQUE(seq)` and verified chain | ASI06 | GOVERN 2, MEASURE 3 | Art. 12 | [`repo_workflow.rs`](../crates/db/src/repo_workflow.rs), [`0011_schema_hardening.sql`](../crates/db/migrations/0011_schema_hardening.sql) |
+| **Fail-closed semantics** | Deny-by-default on unmet gates, unknown sensors, or DB skew | ASI08, ASI10 | GOVERN 1, MANAGE 1 | Art. 9 (dev-loop) | [`sensors/mod.rs`](../crates/do-harness/src/sensors/mod.rs), [`dbcheck.rs`](../crates/do-harness/src/dbcheck.rs) |
 
 ---
 
-## OWASP Agentic Top 10 (ASI 2026 Taxonomy)
-
-The OWASP Top 10 for Agentic Applications (2026) defines 10 primary risk categories (ASI01–ASI10) plus traceability extensions.
+## OWASP Agentic Top 10 (ASI 2026 taxonomy)
 
 | Risk ID | Risk Title | Coverage | do-harness Control & Evidence |
 |---|---|---|---|
-| **ASI01** | Agent Goal Hijack | ⚠️ Partial (Dev-Loop) | Dev-loop verification sensors validate prompt injection test suites and fixture baselines before release. *Runtime prompt interception is out of scope.* |
-| **ASI02** | Tool Misuse and Exploitation | ✅ Full (Dev-Loop) | Workflow gates (`task add/advance/done`) validate methods against the strict method catalog (`plans/methods.json`). Sensors enforce schema and API invariants. |
-| **ASI03** | Identity and Privilege Abuse | ⚠️ Partial (Dev-Loop) | Git hook integration (`check-commitlint.sh`) and workspace invariants (`plans/invariants.json`) enforce identity and commit rules during development. |
-| **ASI04** | Agentic Supply Chain Vulnerabilities | ✅ Full (Dev-Loop) | Dependency direction linting (`check-deps.sh`) and `cargo deny` sensors prevent compromised or unapproved external dependencies from entering the build. |
-| **ASI05** | Unexpected Code Execution (RCE) | ✅ Full (Dev-Loop) | Static sensors (`clippy -D warnings`, `#![forbid(unsafe_code)]`, and `check-loc.sh`) restrict unsafe code constructs, unverified execution, and complexity spikes. |
-| **ASI06** | Memory and Context Poisoning | ⚠️ Partial (Dev-Loop) | Append-only event log (`workflow_events`) and libSQL state recording ensure dev-loop state changes are tamper-evident. *Runtime agent memory sandboxing is out of scope.* |
-| **ASI07** | Insecure Inter-Agent Communication | ✅ Full (Dev-Loop) | Strongly typed Rust contracts (`crates/types`) enforce command/event schema invariants across HTN planning and task decomposition. |
-| **ASI08** | Cascading Agent Failures | ✅ Full (Dev-Loop) | Per-sensor strike counters and fail-fast recovery (`errors list/clear`) halt execution after 3 consecutive failures to prevent cascading errors. |
-| **ASI09** | Human-Agent Trust Exploitation | ✅ Full (Dev-Loop) | Automated computational sensors strictly override agent self-assessment. `task done` refuses completion claims without verified sensor passes. |
-| **ASI10** | Rogue Agents | ✅ Full (Dev-Loop) | Fail-closed workflow gates deny agent task completion when preconditions or sensor beats are unmet. |
-| **AGT Extension** | Agent Traceability | ✅ Full | Merkle-like hash-chained workflow event log (`workflow_events`) and structured JSON run reports (`verify --format json`) provide cryptographic auditability. |
+| **ASI01** | Agent Goal Hijack | ⚠️ Partial (Dev-Loop) | Fixture assertions can encode prompt-injection expectations; runtime prompt interception is out of scope. [`eval_assert.rs`](../crates/do-harness/src/eval_assert.rs) |
+| **ASI02** | Tool Misuse and Exploitation | ✅ Dev-Loop | Methods validated against the catalog and each subtask gate re-checked in-transaction. [`methods.rs`](../crates/do-harness/src/methods.rs), [`repo_workflow.rs`](../crates/db/src/repo_workflow.rs) |
+| **ASI03** | Identity and Privilege Abuse | ⚠️ Partial (Dev-Loop) | Commit identity rules and machine-readable invariants; runtime identity/credential policy is out of scope. [`check-commitlint.sh`](../scripts/check-commitlint.sh), [`plans/invariants.json`](../plans/invariants.json) |
+| **ASI04** | Agentic Supply Chain Vulnerabilities | ✅ Dev-Loop | `cargo deny` + RustSec sensors and transitive dependency-direction checks. [`check-deps.sh`](../scripts/check-deps.sh), [`check-audit.sh`](../scripts/check-audit.sh), [`deny.toml`](../deny.toml) |
+| **ASI05** | Unexpected Code Execution (RCE) | ✅ Dev-Loop | `#![forbid(unsafe_code)]`, `clippy -D warnings`, LOC cap; eval walkthroughs use **filesystem isolation only** (no seccomp/netns/gVisor — see [`docs/threat-model-eval.md`](threat-model-eval.md)). [`eval_sandbox.rs`](../crates/do-harness/src/eval_sandbox.rs) |
+| **ASI06** | Memory and Context Poisoning | ⚠️ Partial (Dev-Loop) | Append-only `workflow_events` + `UNIQUE(seq)`/`UNIQUE(chain_hash)` and `audit-chain` verification; runtime agent memory sandboxing is out of scope. [`0011_schema_hardening.sql`](../crates/db/migrations/0011_schema_hardening.sql), [`audit.rs`](../crates/do-harness/src/audit.rs) |
+| **ASI07** | Insecure Inter-Agent Communication | ✅ Dev-Loop | Strongly typed command/event contracts with `deny_unknown_fields`. [`crates/types`](../crates/types) |
+| **ASI08** | Cascading Agent Failures | ✅ Dev-Loop | Per-sensor strike counters and fail-fast halt after 3 consecutive failures; blocked sensors are synthesized as failures. [`telemetry.rs`](../crates/do-harness/src/telemetry.rs) |
+| **ASI09** | Human-Agent Trust Exploitation | ✅ Dev-Loop | Computational sensors override self-assessment; `task done` rejects unverified claims. [`sensors/mod.rs`](../crates/do-harness/src/sensors/mod.rs), [`repo_workflow.rs`](../crates/db/src/repo_workflow.rs) |
+| **ASI10** | Rogue Agents | ✅ Dev-Loop | Terminal transitions require passing gates re-checked inside the command transaction. [`repo_workflow.rs`](../crates/db/src/repo_workflow.rs) |
+| **do-harness Traceability extension** | *Non-standard; not an OWASP ASI category* | ✅ Dev-Loop | Hash-chained workflow events and hash-chained evidence artifacts. [`repo_workflow.rs`](../crates/db/src/repo_workflow.rs), [`evidence.rs`](../crates/do-harness/src/evidence.rs) |
 
 ---
 
 ## NIST AI Risk Management Framework (AI RMF 1.0)
 
-Mapping to the four core functions of NIST AI RMF 1.0 (NIST AI 100-1):
+Mappings are **organisational dev-loop support**, not certification:
 
-### 1. GOVERN (Policies, Processes, and Procedures)
-- **GOVERN 1 (Policies in place)**: Machine-readable architecture invariants (`plans/invariants.json`) seeded into libSQL (`seed_invariants`) provide executable policies.
-- **GOVERN 2 (Accountability structures)**: Append-only event stream (`workflow_events`) and recorded sensor beats (`.do-harness/agent_state.db`) provide tamper-evident developer/agent accountability.
+### GOVERN
+- **GOVERN 1 (Policies)** — [`plans/invariants.json`](../plans/invariants.json) persisted via `do-harness seed`, with explicit wontfix decisions recorded.
+- **GOVERN 2 (Accountability)** — append-only `workflow_events` and sensor beats in `.do-harness/agent_state.db`; `doctor` surfaces orphan tasks and stale exports.
 
-### 2. MAP (Context and Risk Identification)
-- **MAP 1 & MAP 2 (Context & Categorization)**: HTN task decomposition (`plans/tasks.json`, methods catalog) structures agent activities into explicit, categorized subtasks with declared preconditions.
-- **MAP 4 (Risks identified)**: Static invariants and sensor suites continuously surface code, dependency, and structural risks during development.
+### MAP
+- **MAP 1 & MAP 2 (Context)** — HTN decomposition and the frozen [`plans/methods.json`](../plans/methods.json) catalog make *engineering task* context explicit. This is **not** AI-system risk categorization.
+- **MAP 4 (Risks identified)** — static invariant and sensor suites surface code/dependency/structure risks; this narrows the scope of MAP 4 to dev-loop artifacts.
 
-### 3. MEASURE (Assessment, Analysis, and Tracking)
-- **MEASURE 1 (Metrics applied)**: `do-harness metrics` tracks sensor success rates, strike counts, and skill evaluation pass-rate history.
-- **MEASURE 2 & 3 (AI Systems Evaluated & Risk Tracking)**: `do-harness eval` benchmarks hermetic walkthroughs against SHA-256 baseline baselines (`eval --bless`) with a pass-rate bar ratchet.
+### MEASURE
+- **MEASURE 1 (Metrics applied)** — `do-harness metrics` aggregates sensor stats, strike counts, and skill pass-rate history in SQL.
+- **MEASURE 2 & 3 (Analysis and tracking)** — `do-harness eval` grades sandboxed walkthroughs against SHA-256 baselines with a pass-rate floor; these are **dev-loop fixture evaluations**, not evaluations of a deployed AI system.
 
-### 4. MANAGE (Risk Response and Monitoring)
-- **MANAGE 1 (Risk Response)**: Fail-fast strike policy halts execution after 3 consecutive sensor failures; fail-closed gates block invalid state transitions.
-- **MANAGE 4 (Risks Monitored)**: Continuous dev-loop verification via pre-commit and pre-push git hooks (`do-harness hook install`).
+### MANAGE
+- **MANAGE 1 (Risk response)** — fail-fast strikes and fail-closed gates; busy/lock retries keep concurrent writers consistent.
+- **MANAGE 4 (Monitoring)** — pre-commit/pre-push hooks run the same sensor pack as CI; `maintenance` prunes unbounded history.
 
 ---
 
-## EU AI Act Alignment
+## EU AI Act Alignment (dev-loop scope only)
 
-Verified against official EU AI Act regulatory requirements for high-risk AI systems and general-purpose AI models:
+These rows map Articles 9/10/12/14/15 to **developer-workflow controls**. They
+are not a claim of conformity for any high-risk AI system under Regulation (EU)
+2024/1689.
 
 | EU AI Act Article | Requirement | do-harness Implementation & Evidence |
 |---|---|---|
-| **Article 9** | Risk management system | Continuous dev-loop sensor evaluation (`do-harness verify`), fail-fast strike halting, and fail-closed task completion gates. |
-| **Article 10** | Data & data governance | Strongly typed schema contracts (`crates/types`) and dependency auditing (`check-deps.sh`, `deny.toml`) ensure workspace data integrity. |
-| **Article 12** | Technical documentation & Record-keeping | Automatic generation of machine-readable evidence artifacts (`verify --format json`, `task export`) and hash-chained event logs (`workflow_events`). |
-| **Article 14** | Human oversight | `task done` gate refuses agent self-certification; human/system verification requires passing computational sensor beats before task completion. |
-| **Article 15** | Accuracy, robustness and cybersecurity | Automated feedback sensors (`cargo check`, `cargo test`, `clippy -D warnings`, `#![forbid(unsafe_code)]`, LOC caps) enforce deterministic quality standards. |
+| **Article 9** | Risk management system | Continuous `verify` sensors, fail-fast strike halting, and fail-closed task gates. [`sensors/mod.rs`](../crates/do-harness/src/sensors/mod.rs) |
+| **Article 10** | Data & data governance | Strongly typed schema contracts and dependency auditing. [`crates/types`](../crates/types), [`check-deps.sh`](../scripts/check-deps.sh) |
+| **Article 12** | Technical documentation & record-keeping | Evidence artifacts and hash-chained event logs with enforced uniqueness. [`evidence.rs`](../crates/do-harness/src/evidence.rs), [`repo_workflow.rs`](../crates/db/src/repo_workflow.rs) |
+| **Article 14** | Human oversight | `task done` requires passing beats; `eval --bless` records an approver identity in append-only history. [`repo_eval.rs`](../crates/db/src/repo_eval.rs) |
+| **Article 15** | Accuracy, robustness and cybersecurity | `cargo check`/`test`/`clippy`, `forbid(unsafe_code)`, LOC caps, SSRF-guarded optional proxy. [`do-harness.toml`](../do-harness.toml), [`crates/guardian-proxy`](../crates/guardian-proxy) |
+
+---
+
+## SOC 2 Trust Services Criteria (dev-loop scope)
+
+| Criterion | Dev-loop mapping | Evidence |
+|---|---|---|
+| **CC6.1** — Logical access | Managed git hooks and commit-message enforcement; permissions are least-privilege in CI. [`hooks.rs`](../crates/do-harness/src/hooks.rs), [`verify.yml`](../.github/workflows/verify.yml) |
+| **CC7.2** — Monitoring | Sensor strikes, `metrics`, and `doctor` orphans/freshness. [`metrics.rs`](../crates/do-harness/src/metrics.rs), [`doctor.rs`](../crates/do-harness/src/doctor.rs) |
+| **CC8.1** — Change management | Every change is sensor-gated locally and in CI, with evidence artifacts uploaded per run. [`verify.yml`](../.github/workflows/verify.yml) |
