@@ -38,6 +38,15 @@ pub enum DbError {
         #[source]
         source: libsql::Error,
     },
+    /// Failed to write the pre-migration backup copy.
+    #[error("failed to back up state database to {path}: {source}")]
+    Backup {
+        /// Backup path that could not be written.
+        path: PathBuf,
+        /// Underlying filesystem error.
+        #[source]
+        source: std::io::Error,
+    },
     /// A SQL statement, query, or transaction failed.
     #[error("sql failed: {0}")]
     Sql(libsql::Error),

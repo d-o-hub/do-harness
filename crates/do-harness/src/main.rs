@@ -170,7 +170,20 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
             report::print_names(&cfg.sensor_names(), format);
             Ok(())
         }
-        Command::InitDb => commands::init_db(&root).await.map_err(CliError::Usage),
+        Command::InitDb {
+            check,
+            dry_run,
+            yes,
+        } => commands::init_db(
+            &root,
+            &commands::InitDbOpts {
+                check,
+                dry_run,
+                yes,
+            },
+        )
+        .await
+        .map_err(CliError::Usage),
         Command::Seed => commands::seed(&root).await.map_err(CliError::Usage),
         Command::Task { action } => commands::task_cmd(&root, action)
             .await

@@ -3,4 +3,4 @@
 -- attempts with an upsert instead of a scan.
 
 DROP INDEX IF EXISTS idx_error_signatures_signature;
-CREATE UNIQUE INDEX idx_error_signatures_signature ON error_signatures(signature);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_error_signatures_signature ON error_signatures(signature);

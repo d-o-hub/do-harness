@@ -29,7 +29,7 @@ WHERE task_id IS NULL
 -- Per-task strikes keep their (signature, task_id) uniqueness; global strikes
 -- get a dedicated partial index so NULL task_id rows are covered too.
 DROP INDEX IF EXISTS idx_error_signatures_signature_task;
-CREATE UNIQUE INDEX idx_error_signatures_signature_task
+CREATE UNIQUE INDEX IF NOT EXISTS idx_error_signatures_signature_task
     ON error_signatures(signature, task_id) WHERE task_id IS NOT NULL;
-CREATE UNIQUE INDEX idx_error_signatures_signature_global
+CREATE UNIQUE INDEX IF NOT EXISTS idx_error_signatures_signature_global
     ON error_signatures(signature) WHERE task_id IS NULL;

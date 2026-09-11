@@ -170,3 +170,16 @@ async fn pragma_int(conn: &Connection, sql: &str) -> i64 {
     let mut rows = conn.query(sql, Params::None).await.unwrap();
     rows.next().await.unwrap().unwrap().get::<i64>(0).unwrap()
 }
+
+/// Pending migrations snapshot the database to `agent_state.db.bak` first.
+#[test]
+fn backup_state_file_copies_database() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("agent_state.db");
+    std::fs::write(&path, b"pre-migration").unwrap();
+
+    backup_state_file(&path).unwrap();
+
+    let backup = path.with_extension("db.bak");
+    assert_eq!(std::fs::read(&backup).unwrap(), b"pre-migration");
+}

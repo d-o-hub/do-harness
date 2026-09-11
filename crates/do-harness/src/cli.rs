@@ -91,7 +91,17 @@ pub enum Command {
         format: Format,
     },
     /// Apply pending database migrations.
-    InitDb,
+    InitDb {
+        /// Report pending migrations and exit non-zero when any are pending.
+        #[arg(long)]
+        check: bool,
+        /// Report pending migrations without applying them (exit 0).
+        #[arg(long)]
+        dry_run: bool,
+        /// Skip the interactive confirmation prompt.
+        #[arg(long, short = 'y')]
+        yes: bool,
+    },
     /// Seed invariants from plans/invariants.json.
     Seed,
     /// Scaffold a harness workspace in a target directory.

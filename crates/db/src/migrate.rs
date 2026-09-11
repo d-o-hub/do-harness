@@ -66,6 +66,9 @@ pub struct MigrationSkew {
     pub applied_max: Option<i64>,
     /// Highest version in this binary's embedded catalog.
     pub known_max: i64,
+    /// The database has user tables but no `schema_migrations` tracking table:
+    /// a legacy/foreign database rather than a freshly created empty file.
+    pub legacy: bool,
 }
 
 impl MigrationSkew {
@@ -116,15 +119,28 @@ pub async fn inspect_migrations(conn: &Connection) -> Result<MigrationSkew> {
         None => false,
     };
     if !tracked {
+        let mut tables = conn
+            .query(
+                "SELECT COUNT(*) FROM sqlite_master \
+                 WHERE type = 'table' AND name NOT LIKE 'sqlite_%'",
+                Params::None,
+            )
+            .await?;
+        let legacy = match tables.next().await? {
+            Some(row) => row.get::<i64>(0)? > 0,
+            None => false,
+        };
         return Ok(MigrationSkew {
             applied_max: None,
             known_max: known_max_version(),
+            legacy,
         });
     }
     let applied = applied_versions(conn).await?;
     Ok(MigrationSkew {
         applied_max: applied.iter().copied().max(),
         known_max: known_max_version(),
+        legacy: false,
     })
 }
 
@@ -182,13 +198,36 @@ pub async fn migrate(conn: &Connection) -> Result<()> {
 
 /// Connects to the agent-state database under `root` and applies migrations.
 ///
+/// When pending migrations exist, the database file is first copied to
+/// `agent_state.db.bak` (best-effort snapshot) so an interrupted or
+/// destructive migration (`0006` deletes rows, `0011` rebuilds tables) can be
+/// recovered manually.
+///
 /// # Errors
 ///
-/// Returns an error if connecting or migrating fails.
+/// Returns an error if connecting, backing up, or migrating fails.
 pub async fn connect_and_migrate(root: &Path) -> Result<Connection> {
-    let conn = connect(crate::root::db_path(root)).await?;
+    let path = crate::root::db_path(root);
+    let conn = connect(&path).await?;
+    let skew = inspect_migrations(&conn).await?;
+    if skew
+        .applied_max
+        .is_some_and(|applied| applied < skew.known_max)
+    {
+        backup_state_file(&path)?;
+    }
     migrate(&conn).await?;
     Ok(conn)
+}
+
+/// Copies the state database beside itself as `<file>.bak`.
+fn backup_state_file(path: &Path) -> Result<()> {
+    let backup = path.with_extension("db.bak");
+    std::fs::copy(path, &backup).map_err(|source| DbError::Backup {
+        path: backup,
+        source,
+    })?;
+    Ok(())
 }
 
 /// Returns the set of migration versions already applied.
