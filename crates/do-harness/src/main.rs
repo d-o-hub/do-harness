@@ -149,19 +149,19 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
             evidence,
             strict,
         } => {
-            verify::run(
-                &root,
-                cli.config.as_deref(),
+            let opts = sensors::VerifyOpts {
                 fail_fast,
-                format,
                 only,
                 exclude,
                 record,
                 task,
                 evidence,
                 strict,
-            )
-            .await
+                format,
+                config: cli.config.clone(),
+                ..Default::default()
+            };
+            verify::run(&root, opts).await
         }
         Command::List { format } => {
             let cfg = config::load(&root, cli.config.as_deref()).map_err(CliError::Usage)?;

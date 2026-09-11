@@ -2,51 +2,36 @@
 
 use std::path::{Path, PathBuf};
 
-use crate::report::{self, Format};
-use crate::{CliError, config, evidence, sensors, telemetry};
+use crate::sensors::VerifyOpts;
+use crate::{CliError, config, evidence, report, sensors, telemetry};
 
 /// Runs the `verify` subcommand: sensors, optional beat recording, report.
-#[allow(clippy::too_many_arguments)]
-pub(crate) async fn run(
-    root: &Path,
-    config: Option<&Path>,
-    fail_fast: bool,
-    format: Format,
-    only: Vec<String>,
-    exclude: Vec<String>,
-    record: bool,
-    task: Option<i64>,
-    evidence: Option<PathBuf>,
-    strict: bool,
-) -> std::result::Result<(), CliError> {
+pub(crate) async fn run(root: &Path, mut opts: VerifyOpts) -> std::result::Result<(), CliError> {
     let started_at = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_or(0, |d| i64::try_from(d.as_secs()).unwrap_or(i64::MAX));
-    let cfg = config::load(root, config).map_err(CliError::Usage)?;
-    let blocked = if record {
-        telemetry::blocked_sensors(root, &cfg.sensor_names(), task)
+    let cfg = config::load(root, opts.config.as_deref()).map_err(CliError::Usage)?;
+    if opts.record {
+        opts.blocked = telemetry::blocked_sensors(root, &cfg.sensor_names(), opts.task)
             .await
-            .map_err(CliError::Usage)?
-    } else {
-        Vec::new()
-    };
-    let opts = sensors::VerifyOpts {
-        fail_fast,
-        only,
-        exclude,
-        blocked,
-    };
+            .map_err(CliError::Usage)?;
+    }
     match sensors::verify(&cfg, root, &opts) {
         Ok(report) => {
-            if record {
-                telemetry::record_verify(root, &report, &opts.blocked, task)
+            if opts.record {
+                telemetry::record_verify(root, &report, &opts.blocked, opts.task)
                     .await
                     .map_err(CliError::Usage)?;
             }
-            report::print_report(&report, format);
+            report::print_report(&report, opts.format);
 
-            let evidence_path = evidence
-                .or_else(|| strict.then(|| PathBuf::from(".do-harness/evidence.json")))
+            let evidence_path = opts
+                .evidence
+                .clone()
+                .or_else(|| {
+                    opts.strict
+                        .then(|| PathBuf::from(".do-harness/evidence.json"))
+                })
                 .map(|p| if p.is_relative() { root.join(p) } else { p });
 
             if let Some(path) = evidence_path {
@@ -58,7 +43,7 @@ pub(crate) async fn run(
                     root,
                     &report,
                     &opts.only,
-                    task,
+                    opts.task,
                     started_at,
                     finished_at,
                 );
@@ -71,7 +56,7 @@ pub(crate) async fn run(
                     serde_json::to_vec_pretty(&doc).map_err(|e| CliError::Verify(e.into()))?;
                 std::fs::write(&path, json).map_err(|e| CliError::Verify(e.into()))?;
 
-                if strict && !doc.is_strict_clean() {
+                if opts.strict && !doc.is_strict_clean() {
                     eprintln!(
                         "strict evidence check failed; artifact at {}",
                         path.display()

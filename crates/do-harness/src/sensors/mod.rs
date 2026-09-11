@@ -1,7 +1,7 @@
 //! Computational sensor runner for `do-harness verify`.
 
 use std::io::Read;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -9,7 +9,7 @@ use std::time::{Duration, Instant};
 use anyhow::{Result, anyhow};
 
 use crate::config::{Config, SensorSpec};
-use crate::report::{SensorResult, VerifyReport};
+use crate::report::{Format, SensorResult, VerifyReport};
 use crate::telemetry::FAIL_FAST_STRIKES;
 
 /// Options controlling a verify run.
@@ -23,6 +23,18 @@ pub struct VerifyOpts {
     pub exclude: Vec<String>,
     /// Sensor names halted by the fail-fast policy (not executed).
     pub blocked: Vec<String>,
+    /// Persist sensor beats to the state database.
+    pub record: bool,
+    /// Task id scoping persisted beats when `record` is set.
+    pub task: Option<i64>,
+    /// Evidence artifact path; relative paths resolve against the root.
+    pub evidence: Option<PathBuf>,
+    /// Fail the run when the evidence artifact is not strictly clean.
+    pub strict: bool,
+    /// Report output format.
+    pub format: Format,
+    /// Explicit config file override.
+    pub config: Option<PathBuf>,
 }
 
 /// Runs the selected sensors from `root` and returns the aggregate report.
