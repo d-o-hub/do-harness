@@ -23,7 +23,7 @@ tokio = { workspace = true, features = ["rt-multi-thread", "macros", "net", "syn
 toml.workspace = true
 tower.workspace = true
 agent-governance = { workspace = true, optional = true }
-serde_yaml = { version = "0.9", optional = true }
+serde_yaml = { workspace = true, optional = true }
 thiserror.workspace = true
 
 [features]

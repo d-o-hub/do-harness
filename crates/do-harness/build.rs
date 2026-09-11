@@ -1,5 +1,7 @@
 //! Build script for `do-harness` to capture git metadata at compile time.
 
+#![forbid(unsafe_code)]
+
 use std::path::Path;
 use std::process::Command;
 

@@ -12,7 +12,7 @@
 //! column identifier appears in that production source. A new migration that
 //! adds a column with no matching writer code yields a column absent from the
 //! production source and the test fails.
-#![deny(unsafe_code)]
+#![forbid(unsafe_code)]
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use std::path::Path;
