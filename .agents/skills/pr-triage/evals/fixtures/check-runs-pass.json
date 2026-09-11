@@ -1,0 +1,16 @@
+{
+  "check_runs": [
+    {
+      "name": "verify",
+      "status": "completed",
+      "conclusion": "success",
+      "app": { "slug": "github-actions" }
+    },
+    {
+      "name": "docs",
+      "status": "completed",
+      "conclusion": "skipped",
+      "app": { "slug": "github-actions" }
+    }
+  ]
+}
