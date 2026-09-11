@@ -264,10 +264,23 @@ error is never reported as `no-effect`.
 Emit the semantic residual for a pull request or revision range: the changed
 hunks (units) that evidence could not prove, with minimal context, plus the
 audit list of skipped units and any untrusted `false_proven` claims. Works in
-any git repository without harness initialization. The gate policy is read
-from `.github/pr-gate.toml` **at the merge-base revision only**; an absent or
-malformed policy proves nothing, so every unit stays residual and a malformed
-policy adds a warning.
+any git repository without harness initialization.
+
+Proof skipping is driven by `.github/pr-gate.toml`, read **at the merge-base
+revision only** (never the PR head):
+
+```toml
+[proof]
+mechanical = ["**/Cargo.lock", "docs/generated/**"]
+behavioral = ["crates/**", "src/**"]
+```
+
+A unit is moved to `skipped` when its path matches a `mechanical` glob and no
+`behavioral` glob, or when the change is structural (rename-only or mode-only).
+Behavioral matches always stay residual; a mechanical claim contradicted by a
+behavioral rule (or by the protected policy path itself) is revoked, kept
+residual, and recorded in `false_proven`. Absent, malformed, or partially
+invalid policy — including invalid globs — proves nothing and adds a warning.
 
 - `<PR>`: Pull request number; base and head are resolved through `gh`,
   falling back to `gh pr diff` when the clone cannot resolve them.

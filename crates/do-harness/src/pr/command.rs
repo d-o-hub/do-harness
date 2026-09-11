@@ -174,6 +174,18 @@ fn print_review(report: &ReviewReport) {
         report.residual.len(),
         report.skipped.len()
     );
+    for unit in &report.skipped {
+        let anchor = unit.header.as_deref().unwrap_or("-");
+        println!(
+            "  skipped {} [{}] {}",
+            unit.id,
+            change_label(unit.change),
+            anchor
+        );
+    }
+    for claim in &report.false_proven {
+        println!("  revoked {}: {}", claim.unit_id, claim.reason);
+    }
     for unit in &report.residual {
         let anchor = unit.header.as_deref().unwrap_or("-");
         println!("  {} [{}] {}", unit.id, change_label(unit.change), anchor);

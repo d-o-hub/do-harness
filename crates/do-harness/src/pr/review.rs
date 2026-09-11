@@ -11,12 +11,11 @@ use super::command::Target;
 use super::diff::{self, Unit};
 use super::gh;
 use super::no_effect;
+use super::proof::{self, GatePolicy, ProofRules};
 use crate::changes::git_command;
 
 /// Stable review report schema version.
-pub const SCHEMA_VERSION: u32 = 1;
-/// Gate policy path, read from the merge-base revision only.
-pub const POLICY_PATH: &str = ".github/pr-gate.toml";
+pub const SCHEMA_VERSION: u32 = 2;
 
 /// Where the gate policy was read from and whether it parsed.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -30,12 +29,12 @@ pub struct Policy {
     pub source_rev: Option<String>,
     /// Hex sha256 of the policy bytes; `none` when absent.
     pub sha256: String,
+    /// Parsed proof rules; `None` when the policy is absent or malformed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rules: Option<ProofRules>,
 }
 
-/// Proof claim that a residual unit was skipped but looks behavioral.
-///
-/// Always empty until phase-3 proof mapping lands; the field is part of the
-/// frozen schema so consumers can fail closed on it.
+/// Proof claim that was revoked before it could skip a unit.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FalseProven {
     /// Unit id the claim covers.
@@ -66,9 +65,9 @@ pub struct ReviewReport {
     pub policy: Policy,
     /// Changed units evidence could not prove.
     pub residual: Vec<Unit>,
-    /// Proven units listed for audit; empty until proof mapping lands.
+    /// Proven units listed for audit.
     pub skipped: Vec<Unit>,
-    /// Untrusted skip claims; empty until proof mapping lands.
+    /// Revoked mechanical claims; the affected units stay residual.
     pub false_proven: Vec<FalseProven>,
     /// Non-fatal diagnostics; affected units stay residual.
     pub warnings: Vec<String>,
@@ -185,8 +184,26 @@ fn assemble(inputs: Inputs<'_>, recompute: bool) -> ReviewReport {
         }
     }
     let parsed = diff::parse(&inputs.diff);
+    let matcher = proof::Matcher::compile(inputs.policy.rules.as_ref());
     let mut warnings = inputs.warnings;
     warnings.extend(parsed.warnings);
+    warnings.extend_from_slice(matcher.warnings());
+    let mut residual = Vec::new();
+    let mut skipped = Vec::new();
+    let mut false_proven = Vec::new();
+    for unit in parsed.units {
+        match matcher.evaluate(&unit) {
+            proof::Verdict::Residual => residual.push(unit),
+            proof::Verdict::Proven => skipped.push(unit),
+            proof::Verdict::Revoked { reason } => {
+                false_proven.push(FalseProven {
+                    unit_id: unit.id.clone(),
+                    reason,
+                });
+                residual.push(unit);
+            }
+        }
+    }
     let mut report = ReviewReport {
         schema_version: SCHEMA_VERSION,
         mode: inputs.mode.to_owned(),
@@ -196,9 +213,9 @@ fn assemble(inputs: Inputs<'_>, recompute: bool) -> ReviewReport {
         merge_base: inputs.merge_base.to_owned(),
         cached: false,
         policy: inputs.policy,
-        residual: parsed.units,
-        skipped: Vec::new(),
-        false_proven: Vec::new(),
+        residual,
+        skipped,
+        false_proven,
         warnings,
     };
     if inputs.cacheable {
@@ -259,12 +276,12 @@ fn local_diff(root: &Path, base: &str, head: &str) -> Result<String> {
 /// Reads and validates the policy from `rev`, never from the PR head.
 fn probe_policy(root: &Path, rev: &str) -> (Policy, Option<String>) {
     let output = git_command(root)
-        .args(["show", &format!("{rev}:{POLICY_PATH}")])
+        .args(["show", &format!("{rev}:{}", proof::POLICY_PATH)])
         .output();
     let Ok(output) = output else {
         return (
             absent_policy(Some(rev)),
-            Some(format!("could not read {POLICY_PATH} at {rev}")),
+            Some(format!("could not read {} at {rev}", proof::POLICY_PATH)),
         );
     };
     if !output.status.success() {
@@ -272,31 +289,42 @@ fn probe_policy(root: &Path, rev: &str) -> (Policy, Option<String>) {
     }
     let bytes = output.stdout;
     let sha256 = sha256_hex(&bytes);
-    let policy = Policy {
-        path: POLICY_PATH.to_owned(),
+    let present = Policy {
+        path: proof::POLICY_PATH.to_owned(),
         present: true,
         source_rev: Some(rev.to_owned()),
         sha256,
+        rules: None,
     };
     match String::from_utf8(bytes) {
-        Ok(text) => match toml::from_str::<toml::Value>(&text) {
-            Ok(_) => (policy, None),
+        Ok(text) => match toml::from_str::<GatePolicy>(&text) {
+            Ok(parsed) => (
+                Policy {
+                    rules: Some(parsed.proof),
+                    ..present
+                },
+                None,
+            ),
             Err(err) => (
-                policy,
-                Some(format!("malformed {POLICY_PATH} at {rev}: {err}")),
+                present,
+                Some(format!("malformed {} at {rev}: {err}", proof::POLICY_PATH)),
             ),
         },
-        Err(_) => (policy, Some(format!("{POLICY_PATH} at {rev} is not UTF-8"))),
+        Err(_) => (
+            present,
+            Some(format!("{} at {rev} is not UTF-8", proof::POLICY_PATH)),
+        ),
     }
 }
 
 /// Policy probe result when the file is absent or cannot be read.
 fn absent_policy(source_rev: Option<&str>) -> Policy {
     Policy {
-        path: POLICY_PATH.to_owned(),
+        path: proof::POLICY_PATH.to_owned(),
         present: false,
         source_rev: source_rev.map(str::to_owned),
         sha256: "none".to_owned(),
+        rules: None,
     }
 }
 

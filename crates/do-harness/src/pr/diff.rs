@@ -6,6 +6,11 @@
 
 use serde::{Deserialize, Serialize};
 
+/// Synthetic unit header for pure renames.
+pub const HEADER_RENAME_ONLY: &str = "rename-only";
+/// Synthetic unit header for mode-only changes.
+pub const HEADER_MODE_CHANGE: &str = "mode change";
+
 /// File-level change kind.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -180,9 +185,9 @@ fn finish_file(file: &mut FileState, pending: &mut Option<Pending>, out: &mut Pa
     } else if state.added_marker || state.deleted_marker {
         "empty file"
     } else if state.change == Some(Change::Renamed) {
-        "rename-only"
+        HEADER_RENAME_ONLY
     } else if state.mode_changed {
-        "mode change"
+        HEADER_MODE_CHANGE
     } else {
         return;
     };

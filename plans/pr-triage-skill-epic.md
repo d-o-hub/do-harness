@@ -1,6 +1,6 @@
 # Epic: pr-triage Agent Skill
 
-> **Status:** phase 1 complete (skill + evals); phase 2 complete (`pr no-effect` + `pr review` with cache)
+> **Status:** phase 1 complete (skill + evals); phase 2 complete (`pr no-effect` + `pr review` with cache); phase 3 complete (proof skipping + `false_proven`)
 > **Related:** Agent Skills open standard, GitHub PR lifecycle, optional `do-harness` token reduction
 > **Created:** 2026-09-11
 
@@ -96,6 +96,22 @@ residual plus evidence; the skill works with `gh` + `git` alone.
   policy warning, missing-rev exit 1, usage exit 2); `pr::diff` 10 parser
   tests; `cargo test --workspace`, `cargo clippy --workspace --all-targets`,
   and `do-harness verify` green on the slice.
+
+## Phase 3 completion — proof skipping + `false_proven` (2026-09-11)
+
+- Policy schema: `.github/pr-gate.toml` `[proof]` table with `mechanical` and
+  `behavioral` glob arrays (`crates/do-harness/src/pr/proof.rs`), parsed with
+  `deny_unknown_fields`; absent, malformed, or invalid-glob policy proves
+  nothing.
+- Verdicts: mechanically matched paths and structural rename-only/mode-only
+  units move to `skipped` for audit; behavioral matches always stay residual;
+  a mechanical claim contradicted by a behavioral rule (or the protected policy
+  path) is revoked into `false_proven` and kept residual.
+- Report schema bumped to v2; phase-2 cache entries are ignored, not migrated.
+- Evidence: `pr::proof_tests` guard suite (6 cases) plus `tests/pr_review.rs`
+  now 11 cases including the seeded-defect oracle (`mechanical = ["**/*.rs"]`
+  overridden by `behavioral = ["crates/**"]` never skips the defect), mechanical
+  lockfile audit, invalid-glob fail-closed, and structural rename proof.
 
 ## Task tracking note
 
