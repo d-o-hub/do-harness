@@ -8,6 +8,7 @@
 #![forbid(unsafe_code)]
 
 pub mod beat;
+pub mod chain;
 pub mod decision;
 pub mod error_signature;
 pub mod eval_run;
@@ -20,6 +21,7 @@ pub mod trace;
 pub mod workflow;
 
 pub use beat::Beat;
+pub use chain::{canonical_payload, canonical_value, chain_hash};
 pub use decision::DecisionHeader;
 pub use error_signature::ErrorSignature;
 pub use eval_run::{GraderBaseline, SkillEvalRun};

@@ -6,24 +6,10 @@ use std::io::Write as _;
 use std::path::{Path, PathBuf};
 
 use anyhow::Result;
+use do_harness_types::{canonical_value, chain_hash};
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 
 use crate::{ForwardDecision, McpLikeToolCall};
-
-/// Canonical payload for a decision: sorted JSON keys via `serde_json::Value`.
-fn canonical_json(value: &serde_json::Value) -> String {
-    serde_json::to_string(value).unwrap_or_else(|_| "{}".to_string())
-}
-
-/// Computes SHA-256 chain hash: `SHA-256(prev || "|" || payload)`, `prev` defaults to `GENESIS`.
-fn chain_hash(prev: Option<&str>, payload: &str) -> String {
-    let mut hasher = Sha256::new();
-    hasher.update(prev.unwrap_or("GENESIS").as_bytes());
-    hasher.update(b"|");
-    hasher.update(payload.as_bytes());
-    hex::encode(hasher.finalize())
-}
 
 /// A single audit record persisted as JSONL.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -52,7 +38,7 @@ impl AuditRecord {
         prev_hash: String,
         call: &McpLikeToolCall,
         decision: &ForwardDecision,
-    ) -> Self {
+    ) -> Result<Self> {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map_or(0, |d| i64::try_from(d.as_millis()).unwrap_or(0));
@@ -67,21 +53,18 @@ impl AuditRecord {
             "decision": decision_str,
             "reason": reason,
         });
-        let canonical = canonical_json(&payload_for_hash);
-        let chain_hash = chain_hash(Some(&prev_hash), &canonical);
-        // For genesis, use GENESIS as prev_hash already set; compute above from prev_hash which may be GENESIS.
-        // But for audit correctness, when prev_hash is GENESIS, chain_hash is chain_hash(GENESIS, payload).
-        // So we compute correctly: if prev_hash == "GENESIS", we passed "GENESIS" as prev.
-        Self {
+        let canonical = canonical_value(&payload_for_hash)?;
+        let hash = chain_hash(Some(&prev_hash), &canonical);
+        Ok(Self {
             seq,
             prev_hash,
-            chain_hash,
+            chain_hash: hash,
             created_at: now,
             tool: call.tool.clone(),
             params: call.params.clone(),
             decision: decision_str,
             reason,
-        }
+        })
     }
 }
 
@@ -114,7 +97,7 @@ impl AuditLog {
                     "decision": record.decision,
                     "reason": record.reason,
                 });
-                let canonical = canonical_json(&payload_for_hash);
+                let canonical = canonical_value(&payload_for_hash)?;
                 let expected = chain_hash(Some(&prev), &canonical);
                 if expected != record.chain_hash {
                     anyhow::bail!("audit log tamper detected at seq {}", record.seq);
@@ -157,7 +140,7 @@ impl AuditLog {
         call: &McpLikeToolCall,
         decision: &ForwardDecision,
     ) -> Result<AuditRecord> {
-        let record = AuditRecord::new(self.next_seq, self.prev_hash.clone(), call, decision);
+        let record = AuditRecord::new(self.next_seq, self.prev_hash.clone(), call, decision)?;
         let line = serde_json::to_string(&record)?;
         let mut file = std::fs::OpenOptions::new()
             .create(true)

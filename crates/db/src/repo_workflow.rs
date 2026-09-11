@@ -12,7 +12,8 @@ use do_harness_types::{
     DomainEvent, TaskAdded, TaskAdvanced, TaskCompleted, TaskFailed, TaskState, WorkflowEvent,
 };
 use libsql::{Connection, params, params::Params};
-use sha2::{Digest, Sha256};
+
+pub use do_harness_types::chain_hash;
 
 /// Structured database row from `workflow_events` with sequence and hash chain.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -35,28 +36,15 @@ pub struct WorkflowEventRow {
     pub chain_hash: Option<String>,
 }
 
-/// Canonicalizes a JSON string by parsing into `serde_json::Value` and re-serializing,
-/// ensuring object keys are sorted deterministically.
+/// Canonicalizes a workflow event payload, mapping canonicalization failures
+/// to [`DbError::InvalidEventPayload`].
 ///
 /// # Errors
 ///
-/// Returns an error if the payload is not valid JSON or re-serialization fails.
+/// Returns an error if the payload is not valid JSON.
 pub fn canonical_payload(payload_json: &str) -> Result<String> {
-    let value: serde_json::Value = serde_json::from_str(payload_json)
-        .map_err(|err| DbError::InvalidEventPayload(err.to_string()))?;
-    serde_json::to_string(&value).map_err(|err| DbError::InvalidEventPayload(err.to_string()))
-}
-
-/// Computes SHA-256 chain hash: `SHA-256(prev || "|" || payload_json)`.
-///
-/// If `prev` is [`None`], defaults to `"GENESIS"`.
-#[must_use]
-pub fn chain_hash(prev: Option<&str>, payload_json: &str) -> String {
-    let mut hasher = Sha256::new();
-    hasher.update(prev.unwrap_or("GENESIS").as_bytes());
-    hasher.update(b"|");
-    hasher.update(payload_json.as_bytes());
-    hex::encode(hasher.finalize())
+    do_harness_types::canonical_payload(payload_json)
+        .map_err(|err| DbError::InvalidEventPayload(err.to_string()))
 }
 
 /// Inserts a task in `pending` state and persists its `TaskAdded` event in

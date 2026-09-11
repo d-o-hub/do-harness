@@ -474,11 +474,9 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "do-harness-types",
- "hex",
  "libsql",
  "serde",
  "serde_json",
- "sha2",
  "tempfile",
  "thiserror 1.0.69",
  "tokio",
@@ -488,8 +486,10 @@ dependencies = [
 name = "do-harness-types"
 version = "0.1.0"
 dependencies = [
+ "hex",
  "serde",
  "serde_json",
+ "sha2",
  "thiserror 1.0.69",
 ]
 
@@ -706,13 +706,12 @@ dependencies = [
  "anyhow",
  "axum",
  "clap",
- "hex",
+ "do-harness-types",
  "http-body-util",
  "reqwest",
  "serde",
  "serde_json",
  "serde_yaml",
- "sha2",
  "tempfile",
  "tokio",
  "toml",
