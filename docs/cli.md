@@ -98,7 +98,21 @@ Longitudinal trends: sensor stats, strikes, and skill pass rates.
 - `--format <Format>`: Output format (`text` or `json`).
 - `--sensor <SENSOR>`: Filter by sensor name.
 - `--skill <SKILL>`: Filter by skill name.
-- `--since <TIME>`: Filter metrics since timestamp.
+- `--since <UNIX_SECONDS>`: Filter metrics since a Unix timestamp in seconds.
+
+### `maintenance`
+Prune unbounded history and compact the local state database.
+
+- `--prune-beats <DAYS>`: Delete beats older than the cutoff, keeping at least
+  `--keep-per-task` most-recent beats per task (task-less beats form their own
+  partition).
+- `--keep-per-task <N>`: Minimum most-recent beats retained per task when
+  pruning (default 20).
+
+`VACUUM` always runs after the optional prune. Recommended retention: run
+`maintenance --prune-beats 30` on a schedule; `skill_eval_runs` history is
+retained in full locally (it is small) but CI only uploads the current
+`.do-harness/evidence.json` artifact, not the database.
 
 ### `compliance`
 Compliance mapping to OWASP Agentic Top 10, NIST AI RMF, EU AI Act, and SOC 2.

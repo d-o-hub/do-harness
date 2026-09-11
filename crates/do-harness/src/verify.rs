@@ -13,6 +13,12 @@ pub(crate) async fn run(root: &Path, mut opts: VerifyOpts) -> std::result::Resul
     let cfg = config::load(root, opts.config.as_deref())
         .await
         .map_err(CliError::Usage)?;
+    if opts.record && opts.task.is_none() {
+        eprintln!(
+            "warning: verify --record without --task records beats in the global namespace; \
+             pass --task <id> to scope them to a task"
+        );
+    }
     if opts.record {
         opts.blocked = telemetry::blocked_sensors(root, &cfg.sensor_names(), opts.task)
             .await

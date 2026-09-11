@@ -124,6 +124,12 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
         | Command::Compliance { .. }
         | Command::Completions { .. }
         | Command::Man { .. } => unreachable!("version/compliance/completions/man handled above"),
+        Command::Maintenance {
+            prune_beats,
+            keep_per_task,
+        } => commands::maintenance(&root, prune_beats, keep_per_task)
+            .await
+            .map_err(CliError::Usage),
         Command::Init {
             language,
             force,

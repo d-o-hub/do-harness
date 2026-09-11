@@ -55,11 +55,26 @@ pub async fn list_skill_eval_runs(
     conn: &Connection,
     skill_name: &str,
 ) -> Result<Vec<SkillEvalRun>> {
+    list_skill_eval_runs_page(conn, skill_name, -1, 0).await
+}
+
+/// Lists a skill's evaluation runs with `LIMIT`/`OFFSET` paging (`limit = -1`
+/// disables the limit).
+///
+/// # Errors
+///
+/// Returns an error when the query fails.
+pub async fn list_skill_eval_runs_page(
+    conn: &Connection,
+    skill_name: &str,
+    limit: i64,
+    offset: i64,
+) -> Result<Vec<SkillEvalRun>> {
     let mut rows = conn
         .query(
             "SELECT id, skill_name, graded, passed, pass_rate, ran_at \
-             FROM skill_eval_runs WHERE skill_name = ?1 ORDER BY id",
-            params!(skill_name),
+             FROM skill_eval_runs WHERE skill_name = ?1 ORDER BY id LIMIT ?2 OFFSET ?3",
+            params!(skill_name, limit, offset),
         )
         .await?;
     let mut runs = Vec::new();
@@ -74,6 +89,53 @@ pub async fn list_skill_eval_runs(
         });
     }
     Ok(runs)
+}
+
+/// Per-skill aggregate over the append-only `skill_eval_runs` history,
+/// computed in SQL so `metrics` does not issue one query per skill.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SkillEvalSummary {
+    /// Skill name.
+    pub skill_name: String,
+    /// Number of recorded runs.
+    pub runs: i64,
+    /// Best pass rate across the history.
+    pub best_pass_rate: Option<f64>,
+    /// Most recent pass rate in the history.
+    pub latest_pass_rate: Option<f64>,
+}
+
+/// Aggregates run counts and pass rates per skill, optionally ignoring runs
+/// older than `since` (Unix seconds; [`None`] means all history).
+///
+/// # Errors
+///
+/// Returns an error when the query fails.
+pub async fn skill_eval_summary(
+    conn: &Connection,
+    since: Option<i64>,
+) -> Result<Vec<SkillEvalSummary>> {
+    let mut rows = conn
+        .query(
+            "SELECT r.skill_name, COUNT(*), MAX(r.pass_rate), \
+               (SELECT latest.pass_rate FROM skill_eval_runs latest \
+                WHERE latest.skill_name = r.skill_name ORDER BY latest.id DESC LIMIT 1) \
+             FROM skill_eval_runs r \
+             WHERE (?1 IS NULL OR r.ran_at >= ?1) \
+             GROUP BY r.skill_name ORDER BY r.skill_name",
+            params!(since),
+        )
+        .await?;
+    let mut summaries = Vec::new();
+    while let Some(row) = rows.next().await? {
+        summaries.push(SkillEvalSummary {
+            skill_name: row.get(0)?,
+            runs: row.get(1)?,
+            best_pass_rate: row.get(2)?,
+            latest_pass_rate: row.get(3)?,
+        });
+    }
+    Ok(summaries)
 }
 
 /// The highest recorded pass rate across a skill's history, if any.
@@ -307,5 +369,37 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(max_pass_rate(&conn, "harness").await.unwrap(), Some(1.0));
+    }
+
+    /// The SQL summary matches the per-run aggregation and honors `since`.
+    #[tokio::test(flavor = "current_thread")]
+    async fn skill_eval_summary_aggregates_history() {
+        let dir = tempfile::tempdir().unwrap();
+        let conn = crate::migrate::connect_and_migrate(dir.path())
+            .await
+            .unwrap();
+        for rate in [0.5, 1.0, 0.75] {
+            insert_skill_eval_run(
+                &conn,
+                &NewSkillEvalRun {
+                    skill_name: "harness",
+                    graded: 4,
+                    passed: 3,
+                    pass_rate: Some(rate),
+                },
+            )
+            .await
+            .unwrap();
+        }
+
+        let summary = skill_eval_summary(&conn, None).await.unwrap();
+        assert_eq!(summary.len(), 1);
+        assert_eq!(summary[0].runs, 3);
+        assert_eq!(summary[0].best_pass_rate, Some(1.0));
+        assert_eq!(summary[0].latest_pass_rate, Some(0.75));
+
+        // A future cutoff filters every run out.
+        let empty = skill_eval_summary(&conn, Some(i64::MAX)).await.unwrap();
+        assert!(empty.is_empty());
     }
 }

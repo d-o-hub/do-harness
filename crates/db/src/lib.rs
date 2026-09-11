@@ -43,12 +43,13 @@ pub use migrate::{
 pub use query::count_where;
 pub use repo::{NewTask, get_task, list_tasks, seed_invariants};
 pub use repo_eval::{
-    NewSkillEvalRun, bless_grader_baseline, get_grader_baseline, get_skill_bar,
-    insert_skill_eval_run, list_skill_eval_runs, max_pass_rate, raise_skill_bar,
+    NewSkillEvalRun, SkillEvalSummary, bless_grader_baseline, get_grader_baseline, get_skill_bar,
+    insert_skill_eval_run, list_skill_eval_runs, list_skill_eval_runs_page, max_pass_rate,
+    raise_skill_bar, skill_eval_summary,
 };
 pub use repo_exec::{
-    NewBeat, SensorOutcome, bump_error_signature, get_error_signature, list_beats,
-    record_sensor_outcome, record_verify_batch,
+    NewBeat, SensorOutcome, bump_error_signature, get_error_signature, list_beats, list_beats_page,
+    prune_beats, record_sensor_outcome, record_verify_batch, vacuum,
 };
 pub use repo_heuristic::{NewHeuristic, insert_heuristic, list_heuristics};
 pub use repo_metrics::{SensorStat, has_ok_beat, sensor_stats};
@@ -56,7 +57,7 @@ pub use repo_scope::{clear_error_signatures, list_error_signatures, reset_error_
 pub use repo_skill_eval::{
     NewSkillEval, insert_skill_eval, list_all_skill_evals, list_skill_evals,
 };
-pub use repo_trace::{NewTrace, get_trace, insert_trace, list_traces};
+pub use repo_trace::{NewTrace, get_trace, insert_trace, list_traces, list_traces_page};
 pub use repo_workflow::{
     WorkflowEventRow, advance_subtask_with_event, canonical_payload, chain_hash,
     count_tasks_without_added_event, insert_task_with_event, list_all_events,

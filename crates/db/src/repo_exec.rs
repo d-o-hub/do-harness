@@ -61,20 +61,35 @@ pub(crate) async fn insert_beat(conn: &Connection, beat: &NewBeat<'_>) -> Result
 ///
 /// Returns an error when the query fails.
 pub async fn list_beats(conn: &Connection, task_id: Option<i64>) -> Result<Vec<Beat>> {
+    list_beats_page(conn, task_id, -1, 0).await
+}
+
+/// Lists beats with `LIMIT`/`OFFSET` paging (`limit = -1` disables the limit).
+///
+/// # Errors
+///
+/// Returns an error when the query fails.
+pub async fn list_beats_page(
+    conn: &Connection,
+    task_id: Option<i64>,
+    limit: i64,
+    offset: i64,
+) -> Result<Vec<Beat>> {
     let mut rows = match task_id {
         Some(id) => {
             conn.query(
                 "SELECT id, task_id, beat_type, status, sensor_exit_code, sensor_name, \
-                 started_at, completed_at FROM beats WHERE task_id = ?1 ORDER BY id",
-                params!(id),
+                 started_at, completed_at FROM beats WHERE task_id = ?1 ORDER BY id \
+                 LIMIT ?2 OFFSET ?3",
+                params!(id, limit, offset),
             )
             .await?
         }
         None => {
             conn.query(
                 "SELECT id, task_id, beat_type, status, sensor_exit_code, sensor_name, \
-                 started_at, completed_at FROM beats ORDER BY id",
-                Params::None,
+                 started_at, completed_at FROM beats ORDER BY id LIMIT ?1 OFFSET ?2",
+                params!(limit, offset),
             )
             .await?
         }
@@ -93,6 +108,38 @@ pub async fn list_beats(conn: &Connection, task_id: Option<i64>) -> Result<Vec<B
         });
     }
     Ok(beats)
+}
+
+/// Deletes beats older than `older_than` while keeping at least
+/// `keep_per_task` most-recent beats per task (task-less beats form their own
+/// partition). Returns the number of deleted rows.
+///
+/// # Errors
+///
+/// Returns an error when the delete fails.
+pub async fn prune_beats(conn: &Connection, older_than: i64, keep_per_task: i64) -> Result<u64> {
+    let deleted = conn
+        .execute(
+            "DELETE FROM beats WHERE started_at < ?1 AND id NOT IN (\
+               SELECT id FROM (\
+                 SELECT id, ROW_NUMBER() OVER (PARTITION BY task_id ORDER BY id DESC) AS rn \
+                 FROM beats\
+               ) WHERE rn <= ?2\
+             )",
+            params!(older_than, keep_per_task),
+        )
+        .await?;
+    Ok(deleted)
+}
+
+/// Compacts the database file after pruning (`VACUUM`).
+///
+/// # Errors
+///
+/// Returns an error when `VACUUM` fails (for example inside a transaction).
+pub async fn vacuum(conn: &Connection) -> Result<()> {
+    conn.execute("VACUUM", Params::None).await?;
+    Ok(())
 }
 
 /// Records a new error-signature attempt or increments an existing one,
@@ -262,231 +309,4 @@ pub async fn get_error_signature(
 }
 
 #[cfg(test)]
-mod tests {
-    #![allow(clippy::unwrap_used, clippy::expect_used)]
-
-    use super::*;
-    use crate::repo::NewTask;
-
-    #[tokio::test(flavor = "current_thread")]
-    async fn insert_beat_roundtrips_and_filters_by_task() {
-        let dir = tempfile::tempdir().unwrap();
-        let conn = crate::migrate::connect_and_migrate(dir.path())
-            .await
-            .unwrap();
-        let task_id = crate::repo::insert_task(
-            &conn,
-            &NewTask {
-                title: "slice",
-                method: Some("vertical-event-slice"),
-                subtask_index: 0,
-                precondition: None,
-                parent_id: None,
-            },
-        )
-        .await
-        .unwrap();
-        insert_beat(
-            &conn,
-            &NewBeat {
-                task_id: Some(task_id),
-                beat_type: "sensor",
-                status: "failed",
-                sensor_exit_code: Some(1),
-                sensor_name: Some("check"),
-                started_at: 1,
-                completed_at: Some(2),
-            },
-        )
-        .await
-        .unwrap();
-
-        let beats = list_beats(&conn, Some(task_id)).await.unwrap();
-        assert_eq!(beats.len(), 1);
-        assert_eq!(beats[0].beat_type, "sensor");
-        assert_eq!(beats[0].status, "failed");
-        assert_eq!(beats[0].sensor_exit_code, Some(1));
-        assert_eq!(beats[0].started_at, 1);
-        assert_eq!(list_beats(&conn, None).await.unwrap().len(), 1);
-        assert!(
-            list_beats(&conn, Some(task_id + 1))
-                .await
-                .unwrap()
-                .is_empty()
-        );
-    }
-
-    /// Foreign keys are enforced: a beat referencing a missing task is
-    /// rejected instead of silently orphaned.
-    #[tokio::test(flavor = "current_thread")]
-    async fn insert_beat_rejects_missing_task_fk() {
-        let dir = tempfile::tempdir().unwrap();
-        let conn = crate::migrate::connect_and_migrate(dir.path())
-            .await
-            .unwrap();
-        let result = insert_beat(
-            &conn,
-            &NewBeat {
-                task_id: Some(9999),
-                beat_type: "sensor",
-                status: "ok",
-                sensor_exit_code: Some(0),
-                sensor_name: Some("check"),
-                started_at: 1,
-                completed_at: Some(2),
-            },
-        )
-        .await;
-        assert!(result.is_err(), "FK violation must surface as an error");
-    }
-
-    /// Workspace-global strikes (NULL `task_id`) are unique per signature: a
-    /// raw duplicate insert violates the partial unique index.
-    #[tokio::test(flavor = "current_thread")]
-    async fn duplicate_global_signature_insert_is_rejected() {
-        let dir = tempfile::tempdir().unwrap();
-        let conn = crate::migrate::connect_and_migrate(dir.path())
-            .await
-            .unwrap();
-        bump_error_signature(&conn, "sensor:clippy", None, Some("m1"))
-            .await
-            .unwrap();
-        let dupe = conn
-            .execute(
-                "INSERT INTO error_signatures (signature, task_id, attempt_count, message, \
-                 created_at) VALUES ('sensor:clippy', NULL, 1, NULL, 0)",
-                Params::None,
-            )
-            .await;
-        assert!(dupe.is_err(), "duplicate global strike must be rejected");
-    }
-
-    #[tokio::test(flavor = "current_thread")]
-    async fn record_sensor_outcome_is_atomic_beat_plus_strike() {
-        let dir = tempfile::tempdir().unwrap();
-        let conn = crate::migrate::connect_and_migrate(dir.path())
-            .await
-            .unwrap();
-
-        let beat = |status: &'static str| NewBeat {
-            task_id: None,
-            beat_type: "sensor",
-            status,
-            sensor_exit_code: Some(0),
-            sensor_name: Some("atomic"),
-            started_at: 1,
-            completed_at: Some(2),
-        };
-        record_sensor_outcome(&conn, &beat("failed"), false, Some("boom"))
-            .await
-            .unwrap();
-        record_sensor_outcome(&conn, &beat("failed"), false, Some("boom2"))
-            .await
-            .unwrap();
-        assert_eq!(
-            get_error_signature(&conn, "sensor:atomic", None)
-                .await
-                .unwrap()
-                .unwrap()
-                .attempt_count,
-            2
-        );
-        record_sensor_outcome(&conn, &beat("ok"), true, None)
-            .await
-            .unwrap();
-        assert!(
-            get_error_signature(&conn, "sensor:atomic", None)
-                .await
-                .unwrap()
-                .is_none(),
-            "passing outcome must reset the strike inside the same transaction"
-        );
-        assert_eq!(list_beats(&conn, None).await.unwrap().len(), 3);
-    }
-
-    #[tokio::test(flavor = "current_thread")]
-    async fn bump_error_signature_starts_at_one_and_increments() {
-        let dir = tempfile::tempdir().unwrap();
-        let conn = crate::migrate::connect_and_migrate(dir.path())
-            .await
-            .unwrap();
-
-        assert_eq!(
-            bump_error_signature(&conn, "sensor:clippy", None, Some("m1"))
-                .await
-                .unwrap(),
-            1
-        );
-        assert_eq!(
-            bump_error_signature(&conn, "sensor:clippy", None, Some("m2"))
-                .await
-                .unwrap(),
-            2
-        );
-        assert_eq!(
-            bump_error_signature(&conn, "sensor:clippy", None, None)
-                .await
-                .unwrap(),
-            3
-        );
-
-        let sig = get_error_signature(&conn, "sensor:clippy", None)
-            .await
-            .unwrap()
-            .unwrap();
-        assert_eq!(sig.attempt_count, 3);
-        assert_eq!(sig.message.as_deref(), Some("m2"));
-    }
-
-    /// A failing outcome in the middle of a batch rolls back every earlier
-    /// beat: verify runs either persist completely or not at all.
-    #[tokio::test(flavor = "current_thread")]
-    async fn record_verify_batch_rolls_back_everything_on_failure() {
-        let dir = tempfile::tempdir().unwrap();
-        let conn = crate::migrate::connect_and_migrate(dir.path())
-            .await
-            .unwrap();
-        let outcomes = vec![
-            SensorOutcome {
-                beat: NewBeat {
-                    task_id: None,
-                    beat_type: "sensor",
-                    status: "ok",
-                    sensor_exit_code: Some(0),
-                    sensor_name: Some("check"),
-                    started_at: 1,
-                    completed_at: Some(1),
-                },
-                ok: true,
-                message: None,
-            },
-            SensorOutcome {
-                // FK violation: task 9999 does not exist.
-                beat: NewBeat {
-                    task_id: Some(9999),
-                    beat_type: "sensor",
-                    status: "failed",
-                    sensor_exit_code: Some(1),
-                    sensor_name: Some("test"),
-                    started_at: 1,
-                    completed_at: Some(1),
-                },
-                ok: false,
-                message: Some("boom"),
-            },
-        ];
-
-        assert!(record_verify_batch(&conn, &outcomes).await.is_err());
-        assert!(
-            list_beats(&conn, None).await.unwrap().is_empty(),
-            "first beat must be rolled back with the failed batch"
-        );
-        assert!(
-            get_error_signature(&conn, "sensor:test", Some(9999))
-                .await
-                .unwrap()
-                .is_none(),
-            "signature bump must be rolled back too"
-        );
-    }
-}
+mod tests;

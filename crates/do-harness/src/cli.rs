@@ -213,9 +213,18 @@ pub enum Command {
         /// Filter by skill name.
         #[arg(long, value_name = "SKILL")]
         skill: Option<String>,
-        /// Filter metrics since timestamp (Unix timestamp or ISO string).
-        #[arg(long)]
+        /// Filter metrics since a Unix timestamp in seconds.
+        #[arg(long, value_name = "UNIX_SECONDS")]
         since: Option<String>,
+    },
+    /// Prune old beats and compact the state database.
+    Maintenance {
+        /// Delete beats older than this many days (keeps the most recent per task).
+        #[arg(long, value_name = "DAYS")]
+        prune_beats: Option<i64>,
+        /// Minimum most-recent beats kept per task when pruning.
+        #[arg(long, value_name = "N", default_value_t = 20)]
+        keep_per_task: i64,
     },
     /// Print compliance mapping to OWASP Agentic Top 10, NIST AI RMF, and EU AI Act.
     Compliance {

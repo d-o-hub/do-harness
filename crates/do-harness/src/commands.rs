@@ -338,6 +338,29 @@ fn confirm_migrations(health: &crate::dbcheck::DbHealth) -> Result<bool> {
     ))
 }
 
+/// Prunes old beats and compacts the state database.
+///
+/// `--prune-beats <days>` deletes beats older than the cutoff while keeping at
+/// least `keep_per_task` most-recent beats per task; the database is then
+/// `VACUUM`-compacted. Without the flag only `VACUUM` runs.
+///
+/// # Errors
+///
+/// Returns an error when the database cannot be opened or pruned.
+pub async fn maintenance(root: &Path, prune_beats: Option<i64>, keep_per_task: i64) -> Result<()> {
+    let conn = do_harness_db::connect_and_migrate(root).await?;
+    if let Some(days) = prune_beats {
+        let cutoff = do_harness_db::unix_now().saturating_sub(days.max(0).saturating_mul(86_400));
+        let deleted = do_harness_db::prune_beats(&conn, cutoff, keep_per_task.max(0)).await?;
+        println!(
+            "Pruned {deleted} beat(s) older than {days} day(s) (kept >= {keep_per_task} per task)"
+        );
+    }
+    do_harness_db::vacuum(&conn).await?;
+    println!("VACUUM complete");
+    Ok(())
+}
+
 /// Seeds the `invariants` table from `plans/invariants.json`.
 pub async fn seed(root: &Path) -> Result<()> {
     let written = crate::init::seed_invariants(root).await?;

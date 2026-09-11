@@ -54,11 +54,26 @@ pub async fn insert_trace(conn: &Connection, trace: &NewTrace<'_>) -> Result<i64
 ///
 /// Returns an error when the query fails.
 pub async fn list_traces(conn: &Connection, session_id: &str) -> Result<Vec<Trace>> {
+    list_traces_page(conn, session_id, -1, 0).await
+}
+
+/// Lists traces for a session with `LIMIT`/`OFFSET` paging (`limit = -1`
+/// disables the limit).
+///
+/// # Errors
+///
+/// Returns an error when the query fails.
+pub async fn list_traces_page(
+    conn: &Connection,
+    session_id: &str,
+    limit: i64,
+    offset: i64,
+) -> Result<Vec<Trace>> {
     let mut rows = conn
         .query(
             "SELECT id, task_id, session_id, command, error_diff, resolution_steps, created_at \
-             FROM traces WHERE session_id = ?1 ORDER BY id",
-            params!(session_id),
+             FROM traces WHERE session_id = ?1 ORDER BY id LIMIT ?2 OFFSET ?3",
+            params!(session_id, limit, offset),
         )
         .await?;
     let mut traces = Vec::new();
