@@ -241,7 +241,7 @@ fn validate_existing_invariants(root: &Path, opts: &InitOpts) -> Result<()> {
 }
 
 /// Upserts `plans/invariants.json` into the state database.
-async fn seed_invariants(root: &Path) -> Result<usize> {
+pub(crate) async fn seed_invariants(root: &Path) -> Result<usize> {
     let json_path = root.join("plans/invariants.json");
     let json = fs::read_to_string(&json_path)
         .with_context(|| format!("failed to read {}", json_path.display()))?;

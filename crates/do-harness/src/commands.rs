@@ -285,16 +285,11 @@ pub async fn init_db(root: &Path) -> Result<()> {
 
 /// Seeds the `invariants` table from `plans/invariants.json`.
 pub async fn seed(root: &Path) -> Result<()> {
-    let json_path = root.join("plans/invariants.json");
-    let json = std::fs::read_to_string(&json_path)
-        .with_context(|| format!("failed to read {}", json_path.display()))?;
-    let headers: Vec<do_harness_types::DecisionHeader> = serde_json::from_str(&json)
-        .context("invalid invariants.json: does not match DecisionHeader schema")?;
-
-    let conn = do_harness_db::connect_and_migrate(root).await?;
-    let written = do_harness_db::seed_invariants(&conn, &headers).await?;
-
-    println!("Seeded {written} invariants from {}", json_path.display());
+    let written = crate::init::seed_invariants(root).await?;
+    println!(
+        "Seeded {written} invariants from {}",
+        root.join("plans/invariants.json").display()
+    );
     Ok(())
 }
 
