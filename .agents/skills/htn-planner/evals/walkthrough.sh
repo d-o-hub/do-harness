@@ -7,7 +7,7 @@ bin="${DO_HARNESS_BIN:-do-harness}"
 
 "$bin" --root "$root" task add "plan user registration" --method vertical-event-slice >/dev/null
 
-id="$("$bin" --root "$root" task list --format json | python3 -c 'import sys,json;print(json.load(sys.stdin)[0]["id"])')"
+id="$("$bin" --root "$root" task list --format json | python3 -c 'import sys,json;print(json.load(sys.stdin)["tasks"][0]["id"])')"
 
 # Insert ok beats for the sensors the vertical-event-slice method gates on.
 python3 - "$root" "$id" << 'EOF'
