@@ -437,6 +437,8 @@ pub async fn fail_task(root: &Path, id: i64) -> Result<WorkflowEvent> {
 }
 
 #[cfg(test)]
+mod export_tests;
+#[cfg(test)]
 mod tests;
 
 #[cfg(test)]
