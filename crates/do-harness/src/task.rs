@@ -27,7 +27,11 @@ pub async fn export_tasks(
     format: Format,
 ) -> Result<usize> {
     let conn = do_harness_db::connect_and_migrate(root).await?;
-    let tasks = do_harness_db::list_tasks(&conn).await?;
+    // Snapshot the board inside one read transaction so a concurrent task
+    // command cannot produce a half-updated export.
+    let tx = conn.transaction().await?;
+    let tasks = do_harness_db::list_tasks(&tx).await?;
+    tx.commit().await?;
     let snapshot = TaskSnapshot {
         exported_at: do_harness_db::unix_now(),
         tasks,
@@ -63,9 +67,15 @@ pub async fn export_tasks(
             .await
             .with_context(|| format!("failed to create {}", parent.display()))?;
     }
-    tokio::fs::write(&target_path, content)
+    // Write to a sibling temp file and rename: readers never observe a
+    // truncated snapshot even if the process dies mid-write.
+    let tmp_path = target_path.with_extension("tmp");
+    tokio::fs::write(&tmp_path, content)
         .await
-        .with_context(|| format!("failed to write {}", target_path.display()))?;
+        .with_context(|| format!("failed to write {}", tmp_path.display()))?;
+    tokio::fs::rename(&tmp_path, &target_path)
+        .await
+        .with_context(|| format!("failed to replace {}", target_path.display()))?;
     Ok(snapshot.tasks.len())
 }
 

@@ -31,7 +31,7 @@ pub mod repo_trace;
 pub mod repo_workflow;
 pub mod root;
 
-pub use error::{DbError, Result};
+pub use error::{DbError, Result, retry_on_busy};
 
 /// Re-exported so downstream crates can name connection types without
 /// depending on `libsql` directly.

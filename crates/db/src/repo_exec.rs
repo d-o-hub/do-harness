@@ -205,6 +205,18 @@ pub struct SensorOutcome<'a> {
 /// Returns an error when the transaction, a beat insert, or a signature
 /// update fails; nothing is committed unless every outcome succeeds.
 pub async fn record_verify_batch(conn: &Connection, outcomes: &[SensorOutcome<'_>]) -> Result<()> {
+    const MAX_BUSY_ATTEMPTS: usize = 3;
+
+    crate::error::retry_on_busy(MAX_BUSY_ATTEMPTS, move || {
+        let conn = conn;
+        let outcomes = outcomes;
+        async move { record_verify_batch_once(conn, outcomes).await }
+    })
+    .await
+}
+
+/// Transaction body for [`record_verify_batch`], retried as a unit on busy.
+async fn record_verify_batch_once(conn: &Connection, outcomes: &[SensorOutcome<'_>]) -> Result<()> {
     let tx = conn.transaction().await?;
     for outcome in outcomes {
         insert_beat(&tx, &outcome.beat).await?;

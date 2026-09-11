@@ -208,6 +208,8 @@ async fn apply_migration(conn: &Connection, migration: &Migration) -> Result<()>
     let tx = conn.transaction().await?;
     tx.execute_batch(migration.sql).await?;
     if migration.version == 10 {
+        // `&Transaction` derefs to `&Connection`, so the backfill shares the
+        // migration transaction and commits or rolls back with it.
         backfill_workflow_event_chain(&tx).await?;
     }
     tx.execute(
