@@ -143,3 +143,30 @@ async fn migration_backfills_existing_unchained_events() {
     let expected_hash = crate::repo_workflow::chain_hash(None, "{\"a\":1,\"b\":2}");
     assert_eq!(rows[0].chain_hash.as_deref(), Some(expected_hash.as_str()));
 }
+
+/// Concurrent `verify --record` writers must not hit `SQLITE_BUSY` on the
+/// default delete journal: connections open in WAL with a busy timeout
+/// (#37). `synchronous` reads back numeric (NORMAL = 1).
+#[tokio::test(flavor = "current_thread")]
+async fn connect_enables_wal_concurrency_pragmas() {
+    let dir = tempfile::tempdir().unwrap();
+    let conn = connect(dir.path().join("state.db")).await.unwrap();
+    assert_eq!(pragma_text(&conn, "PRAGMA journal_mode").await, "wal");
+    assert_eq!(pragma_int(&conn, "PRAGMA busy_timeout").await, 5000);
+    assert_eq!(pragma_int(&conn, "PRAGMA synchronous").await, 1);
+}
+
+async fn pragma_text(conn: &Connection, sql: &str) -> String {
+    let mut rows = conn.query(sql, Params::None).await.unwrap();
+    rows.next()
+        .await
+        .unwrap()
+        .unwrap()
+        .get::<String>(0)
+        .unwrap()
+}
+
+async fn pragma_int(conn: &Connection, sql: &str) -> i64 {
+    let mut rows = conn.query(sql, Params::None).await.unwrap();
+    rows.next().await.unwrap().unwrap().get::<i64>(0).unwrap()
+}

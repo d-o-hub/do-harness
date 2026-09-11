@@ -38,6 +38,22 @@ pub async fn connect(path: impl AsRef<Path>) -> Result<Connection> {
     // the REFERENCES clauses in the schema are never enforced.
     conn.execute("PRAGMA foreign_keys = ON", Params::None)
         .await?;
+    // Concurrent `verify --record` writers hit SQLITE_BUSY on the default
+    // delete journal; WAL lets readers proceed during a write while
+    // busy_timeout turns a transient lock into a short wait instead of an
+    // immediate error. synchronous=NORMAL stays durable under WAL for this
+    // workload (checkpoint coordination preserves crash safety).
+    // NOTE: PRAGMA assignments can return the new value as a row, and
+    // `execute` rejects row-returning SQL, so every PRAGMA goes through
+    // `query` with drained rows.
+    for pragma in [
+        "PRAGMA journal_mode = WAL",
+        "PRAGMA busy_timeout = 5000",
+        "PRAGMA synchronous = NORMAL",
+    ] {
+        let mut rows = conn.query(pragma, Params::None).await?;
+        while rows.next().await?.is_some() {}
+    }
     Ok(conn)
 }
 
