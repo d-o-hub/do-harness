@@ -10,7 +10,6 @@ use serde::Deserialize;
 #[serde(deny_unknown_fields)]
 pub struct Config {
     /// Optional host language tag (informational; reserved for language packs).
-    #[allow(dead_code)]
     pub language: Option<String>,
     /// Hook sensor selection.
     #[serde(default)]

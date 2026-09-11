@@ -22,11 +22,5 @@ toml.workspace = true
 tempfile.workspace = true
 do-harness-db = { path = "../db", version = "0.1.0" }
 do-harness-types = { path = "../types", version = "0.1.0" }
-agent-governance = { workspace = true, optional = true }
-serde_yaml = { version = "0.9", optional = true }
-
-[features]
-default = []
-agt-governance = ["dep:agent-governance", "dep:serde_yaml"]
 
 [dev-dependencies]
