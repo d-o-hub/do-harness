@@ -50,6 +50,7 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('hook', 'hook', [CompletionResultType]::ParameterValue, 'Manage git hooks that run `do-harness verify`')
             [CompletionResult]::new('doctor', 'doctor', [CompletionResultType]::ParameterValue, 'Run diagnostic checks on binary resolution and git hook health')
             [CompletionResult]::new('metrics', 'metrics', [CompletionResultType]::ParameterValue, 'Report harness trends: sensor stats, strikes, eval pass-rate history')
+            [CompletionResult]::new('maintenance', 'maintenance', [CompletionResultType]::ParameterValue, 'Prune old beats and compact the state database')
             [CompletionResult]::new('compliance', 'compliance', [CompletionResultType]::ParameterValue, 'Print compliance mapping to OWASP Agentic Top 10, NIST AI RMF, and EU AI Act')
             [CompletionResult]::new('audit-chain', 'audit-chain', [CompletionResultType]::ParameterValue, 'Recompute workflow event hash chain and report first divergence')
             [CompletionResult]::new('completions', 'completions', [CompletionResultType]::ParameterValue, 'Generate shell completions')
@@ -161,11 +162,14 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Explicit path to do-harness.toml')
             [CompletionResult]::new('--color', '--color', [CompletionResultType]::ParameterName, 'Color output (auto, always, never)')
             [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Default output file path')
+            [CompletionResult]::new('--check', '--check', [CompletionResultType]::ParameterName, 'Report pending migrations and exit non-zero when any are pending')
+            [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Report pending migrations without applying them (exit 0)')
+            [CompletionResult]::new('-y', '-y', [CompletionResultType]::ParameterName, 'Skip the interactive confirmation prompt')
+            [CompletionResult]::new('--yes', '--yes', [CompletionResultType]::ParameterName, 'Skip the interactive confirmation prompt')
             [CompletionResult]::new('-v', '-v', [CompletionResultType]::ParameterName, 'Verbosity level (-v, -vv)')
             [CompletionResult]::new('--verbose', '--verbose', [CompletionResultType]::ParameterName, 'Verbosity level (-v, -vv)')
             [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Suppress non-error messages')
             [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Suppress non-error messages')
-            [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Dry run without side effects')
             [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
             [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
             [CompletionResult]::new('-V', '-V ', [CompletionResultType]::ParameterName, 'Print version')
@@ -177,6 +181,7 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Explicit path to do-harness.toml')
             [CompletionResult]::new('--color', '--color', [CompletionResultType]::ParameterName, 'Color output (auto, always, never)')
             [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Default output file path')
+            [CompletionResult]::new('--prune', '--prune', [CompletionResultType]::ParameterName, 'Delete invariants no longer present in plans/invariants.json')
             [CompletionResult]::new('-v', '-v', [CompletionResultType]::ParameterName, 'Verbosity level (-v, -vv)')
             [CompletionResult]::new('--verbose', '--verbose', [CompletionResultType]::ParameterName, 'Verbosity level (-v, -vv)')
             [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Suppress non-error messages')
@@ -225,6 +230,7 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('-V', '-V ', [CompletionResultType]::ParameterName, 'Print version')
             [CompletionResult]::new('--version', '--version', [CompletionResultType]::ParameterName, 'Print version')
             [CompletionResult]::new('export', 'export', [CompletionResultType]::ParameterValue, 'Write the task list to plans/tasks.json or specified output')
+            [CompletionResult]::new('import', 'import', [CompletionResultType]::ParameterValue, 'Validate plans/tasks.json against the state database')
             [CompletionResult]::new('list', 'list', [CompletionResultType]::ParameterValue, 'Print tasks from the state database')
             [CompletionResult]::new('show', 'show', [CompletionResultType]::ParameterValue, 'Show details for a specific task')
             [CompletionResult]::new('add', 'add', [CompletionResultType]::ParameterValue, 'Add a task in `pending` state')
@@ -250,6 +256,24 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Dry run without side effects')
             [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
             [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            [CompletionResult]::new('-V', '-V ', [CompletionResultType]::ParameterName, 'Print version')
+            [CompletionResult]::new('--version', '--version', [CompletionResultType]::ParameterName, 'Print version')
+            break
+        }
+        'do-harness;task;import' {
+            [CompletionResult]::new('--file', '--file', [CompletionResultType]::ParameterName, 'Snapshot file (defaults to plans/tasks.json under the root)')
+            [CompletionResult]::new('--root', '--root', [CompletionResultType]::ParameterName, 'Workspace root override (default: walk up from cwd)')
+            [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Explicit path to do-harness.toml')
+            [CompletionResult]::new('--color', '--color', [CompletionResultType]::ParameterName, 'Color output (auto, always, never)')
+            [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Default output file path')
+            [CompletionResult]::new('--check', '--check', [CompletionResultType]::ParameterName, 'Exit non-zero when the snapshot and database drift')
+            [CompletionResult]::new('-v', '-v', [CompletionResultType]::ParameterName, 'Verbosity level (-v, -vv)')
+            [CompletionResult]::new('--verbose', '--verbose', [CompletionResultType]::ParameterName, 'Verbosity level (-v, -vv)')
+            [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Suppress non-error messages')
+            [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Suppress non-error messages')
+            [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Dry run without side effects')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
             [CompletionResult]::new('-V', '-V ', [CompletionResultType]::ParameterName, 'Print version')
             [CompletionResult]::new('--version', '--version', [CompletionResultType]::ParameterName, 'Print version')
             break
@@ -376,6 +400,7 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
         }
         'do-harness;task;help' {
             [CompletionResult]::new('export', 'export', [CompletionResultType]::ParameterValue, 'Write the task list to plans/tasks.json or specified output')
+            [CompletionResult]::new('import', 'import', [CompletionResultType]::ParameterValue, 'Validate plans/tasks.json against the state database')
             [CompletionResult]::new('list', 'list', [CompletionResultType]::ParameterValue, 'Print tasks from the state database')
             [CompletionResult]::new('show', 'show', [CompletionResultType]::ParameterValue, 'Show details for a specific task')
             [CompletionResult]::new('add', 'add', [CompletionResultType]::ParameterValue, 'Add a task in `pending` state')
@@ -387,6 +412,9 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             break
         }
         'do-harness;task;help;export' {
+            break
+        }
+        'do-harness;task;help;import' {
             break
         }
         'do-harness;task;help;list' {
@@ -604,6 +632,7 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
         'do-harness;eval' {
             [CompletionResult]::new('--skill', '--skill', [CompletionResultType]::ParameterName, 'Restrict evaluation to this skill directory name')
             [CompletionResult]::new('--format', '--format', [CompletionResultType]::ParameterName, 'Output format')
+            [CompletionResult]::new('--approver', '--approver', [CompletionResultType]::ParameterName, 'Approver identity recorded with `--bless` (defaults to `DO_HARNESS_APPROVER` or the git user email)')
             [CompletionResult]::new('--root', '--root', [CompletionResultType]::ParameterName, 'Workspace root override (default: walk up from cwd)')
             [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Explicit path to do-harness.toml')
             [CompletionResult]::new('--color', '--color', [CompletionResultType]::ParameterName, 'Color output (auto, always, never)')
@@ -754,7 +783,7 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('--format', '--format', [CompletionResultType]::ParameterName, 'Output format')
             [CompletionResult]::new('--sensor', '--sensor', [CompletionResultType]::ParameterName, 'Filter by sensor name')
             [CompletionResult]::new('--skill', '--skill', [CompletionResultType]::ParameterName, 'Filter by skill name')
-            [CompletionResult]::new('--since', '--since', [CompletionResultType]::ParameterName, 'Filter metrics since timestamp (Unix timestamp or ISO string)')
+            [CompletionResult]::new('--since', '--since', [CompletionResultType]::ParameterName, 'Filter metrics since a Unix timestamp in seconds')
             [CompletionResult]::new('--root', '--root', [CompletionResultType]::ParameterName, 'Workspace root override (default: walk up from cwd)')
             [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Explicit path to do-harness.toml')
             [CompletionResult]::new('--color', '--color', [CompletionResultType]::ParameterName, 'Color output (auto, always, never)')
@@ -766,6 +795,24 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Dry run without side effects')
             [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
             [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            [CompletionResult]::new('-V', '-V ', [CompletionResultType]::ParameterName, 'Print version')
+            [CompletionResult]::new('--version', '--version', [CompletionResultType]::ParameterName, 'Print version')
+            break
+        }
+        'do-harness;maintenance' {
+            [CompletionResult]::new('--prune-beats', '--prune-beats', [CompletionResultType]::ParameterName, 'Delete beats older than this many days (keeps the most recent per task)')
+            [CompletionResult]::new('--keep-per-task', '--keep-per-task', [CompletionResultType]::ParameterName, 'Minimum most-recent beats kept per task when pruning')
+            [CompletionResult]::new('--root', '--root', [CompletionResultType]::ParameterName, 'Workspace root override (default: walk up from cwd)')
+            [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Explicit path to do-harness.toml')
+            [CompletionResult]::new('--color', '--color', [CompletionResultType]::ParameterName, 'Color output (auto, always, never)')
+            [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Default output file path')
+            [CompletionResult]::new('-v', '-v', [CompletionResultType]::ParameterName, 'Verbosity level (-v, -vv)')
+            [CompletionResult]::new('--verbose', '--verbose', [CompletionResultType]::ParameterName, 'Verbosity level (-v, -vv)')
+            [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Suppress non-error messages')
+            [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Suppress non-error messages')
+            [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Dry run without side effects')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
             [CompletionResult]::new('-V', '-V ', [CompletionResultType]::ParameterName, 'Print version')
             [CompletionResult]::new('--version', '--version', [CompletionResultType]::ParameterName, 'Print version')
             break
@@ -852,6 +899,7 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('hook', 'hook', [CompletionResultType]::ParameterValue, 'Manage git hooks that run `do-harness verify`')
             [CompletionResult]::new('doctor', 'doctor', [CompletionResultType]::ParameterValue, 'Run diagnostic checks on binary resolution and git hook health')
             [CompletionResult]::new('metrics', 'metrics', [CompletionResultType]::ParameterValue, 'Report harness trends: sensor stats, strikes, eval pass-rate history')
+            [CompletionResult]::new('maintenance', 'maintenance', [CompletionResultType]::ParameterValue, 'Prune old beats and compact the state database')
             [CompletionResult]::new('compliance', 'compliance', [CompletionResultType]::ParameterValue, 'Print compliance mapping to OWASP Agentic Top 10, NIST AI RMF, and EU AI Act')
             [CompletionResult]::new('audit-chain', 'audit-chain', [CompletionResultType]::ParameterValue, 'Recompute workflow event hash chain and report first divergence')
             [CompletionResult]::new('completions', 'completions', [CompletionResultType]::ParameterValue, 'Generate shell completions')
@@ -879,6 +927,7 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
         }
         'do-harness;help;task' {
             [CompletionResult]::new('export', 'export', [CompletionResultType]::ParameterValue, 'Write the task list to plans/tasks.json or specified output')
+            [CompletionResult]::new('import', 'import', [CompletionResultType]::ParameterValue, 'Validate plans/tasks.json against the state database')
             [CompletionResult]::new('list', 'list', [CompletionResultType]::ParameterValue, 'Print tasks from the state database')
             [CompletionResult]::new('show', 'show', [CompletionResultType]::ParameterValue, 'Show details for a specific task')
             [CompletionResult]::new('add', 'add', [CompletionResultType]::ParameterValue, 'Add a task in `pending` state')
@@ -889,6 +938,9 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             break
         }
         'do-harness;help;task;export' {
+            break
+        }
+        'do-harness;help;task;import' {
             break
         }
         'do-harness;help;task;list' {
@@ -967,6 +1019,9 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             break
         }
         'do-harness;help;metrics' {
+            break
+        }
+        'do-harness;help;maintenance' {
             break
         }
         'do-harness;help;compliance' {

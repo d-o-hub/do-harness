@@ -152,11 +152,14 @@ _arguments "${_arguments_options[@]}" : \
 '--config=[Explicit path to do-harness.toml]:FILE:_files' \
 '--color=[Color output (auto, always, never)]:WHEN:_default' \
 '--output=[Default output file path]:FILE:_files' \
+'--check[Report pending migrations and exit non-zero when any are pending]' \
+'--dry-run[Report pending migrations without applying them (exit 0)]' \
+'-y[Skip the interactive confirmation prompt]' \
+'--yes[Skip the interactive confirmation prompt]' \
 '*-v[Verbosity level (-v, -vv)]' \
 '*--verbose[Verbosity level (-v, -vv)]' \
 '-q[Suppress non-error messages]' \
 '--quiet[Suppress non-error messages]' \
-'--dry-run[Dry run without side effects]' \
 '-h[Print help]' \
 '--help[Print help]' \
 '-V[Print version]' \
@@ -169,6 +172,7 @@ _arguments "${_arguments_options[@]}" : \
 '--config=[Explicit path to do-harness.toml]:FILE:_files' \
 '--color=[Color output (auto, always, never)]:WHEN:_default' \
 '--output=[Default output file path]:FILE:_files' \
+'--prune[Delete invariants no longer present in plans/invariants.json]' \
 '*-v[Verbosity level (-v, -vv)]' \
 '*--verbose[Verbosity level (-v, -vv)]' \
 '-q[Suppress non-error messages]' \
@@ -247,6 +251,25 @@ json\:"Machine-readable JSON output"))' \
 '--dry-run[Dry run without side effects]' \
 '-h[Print help (see more with '\''--help'\'')]' \
 '--help[Print help (see more with '\''--help'\'')]' \
+'-V[Print version]' \
+'--version[Print version]' \
+&& ret=0
+;;
+(import)
+_arguments "${_arguments_options[@]}" : \
+'--file=[Snapshot file (defaults to plans/tasks.json under the root)]:FILE:_files' \
+'--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
+'--config=[Explicit path to do-harness.toml]:FILE:_files' \
+'--color=[Color output (auto, always, never)]:WHEN:_default' \
+'--output=[Default output file path]:FILE:_files' \
+'--check[Exit non-zero when the snapshot and database drift]' \
+'*-v[Verbosity level (-v, -vv)]' \
+'*--verbose[Verbosity level (-v, -vv)]' \
+'-q[Suppress non-error messages]' \
+'--quiet[Suppress non-error messages]' \
+'--dry-run[Dry run without side effects]' \
+'-h[Print help]' \
+'--help[Print help]' \
 '-V[Print version]' \
 '--version[Print version]' \
 && ret=0
@@ -399,6 +422,10 @@ _arguments "${_arguments_options[@]}" : \
         curcontext="${curcontext%:*:*}:do-harness-task-help-command-$line[1]:"
         case $line[1] in
             (export)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(import)
 _arguments "${_arguments_options[@]}" : \
 && ret=0
 ;;
@@ -690,6 +717,7 @@ _arguments "${_arguments_options[@]}" : \
 '--skill=[Restrict evaluation to this skill directory name]:SKILL:_default' \
 '--format=[Output format]:FORMAT:((text\:"Human-readable text output"
 json\:"Machine-readable JSON output"))' \
+'--approver=[Approver identity recorded with \`--bless\` (defaults to \`DO_HARNESS_APPROVER\` or the git user email)]:NAME:_default' \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
 '--config=[Explicit path to do-harness.toml]:FILE:_files' \
 '--color=[Color output (auto, always, never)]:WHEN:_default' \
@@ -870,7 +898,7 @@ _arguments "${_arguments_options[@]}" : \
 json\:"Machine-readable JSON output"))' \
 '--sensor=[Filter by sensor name]:SENSOR:_default' \
 '--skill=[Filter by skill name]:SKILL:_default' \
-'--since=[Filter metrics since timestamp (Unix timestamp or ISO string)]:SINCE:_default' \
+'--since=[Filter metrics since a Unix timestamp in seconds]:UNIX_SECONDS:_default' \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
 '--config=[Explicit path to do-harness.toml]:FILE:_files' \
 '--color=[Color output (auto, always, never)]:WHEN:_default' \
@@ -882,6 +910,25 @@ json\:"Machine-readable JSON output"))' \
 '--dry-run[Dry run without side effects]' \
 '-h[Print help (see more with '\''--help'\'')]' \
 '--help[Print help (see more with '\''--help'\'')]' \
+'-V[Print version]' \
+'--version[Print version]' \
+&& ret=0
+;;
+(maintenance)
+_arguments "${_arguments_options[@]}" : \
+'--prune-beats=[Delete beats older than this many days (keeps the most recent per task)]:DAYS:_default' \
+'--keep-per-task=[Minimum most-recent beats kept per task when pruning]:N:_default' \
+'--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
+'--config=[Explicit path to do-harness.toml]:FILE:_files' \
+'--color=[Color output (auto, always, never)]:WHEN:_default' \
+'--output=[Default output file path]:FILE:_files' \
+'*-v[Verbosity level (-v, -vv)]' \
+'*--verbose[Verbosity level (-v, -vv)]' \
+'-q[Suppress non-error messages]' \
+'--quiet[Suppress non-error messages]' \
+'--dry-run[Dry run without side effects]' \
+'-h[Print help]' \
+'--help[Print help]' \
 '-V[Print version]' \
 '--version[Print version]' \
 && ret=0
@@ -1010,6 +1057,10 @@ _arguments "${_arguments_options[@]}" : \
         curcontext="${curcontext%:*:*}:do-harness-help-task-command-$line[1]:"
         case $line[1] in
             (export)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(import)
 _arguments "${_arguments_options[@]}" : \
 && ret=0
 ;;
@@ -1145,6 +1196,10 @@ _arguments "${_arguments_options[@]}" : \
 _arguments "${_arguments_options[@]}" : \
 && ret=0
 ;;
+(maintenance)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
 (compliance)
 _arguments "${_arguments_options[@]}" : \
 && ret=0
@@ -1193,6 +1248,7 @@ _do-harness_commands() {
 'hook:Manage git hooks that run \`do-harness verify\`' \
 'doctor:Run diagnostic checks on binary resolution and git hook health' \
 'metrics:Report harness trends\: sensor stats, strikes, eval pass-rate history' \
+'maintenance:Prune old beats and compact the state database' \
 'compliance:Print compliance mapping to OWASP Agentic Top 10, NIST AI RMF, and EU AI Act' \
 'audit-chain:Recompute workflow event hash chain and report first divergence' \
 'completions:Generate shell completions' \
@@ -1291,6 +1347,7 @@ _do-harness__subcmd__help_commands() {
 'hook:Manage git hooks that run \`do-harness verify\`' \
 'doctor:Run diagnostic checks on binary resolution and git hook health' \
 'metrics:Report harness trends\: sensor stats, strikes, eval pass-rate history' \
+'maintenance:Prune old beats and compact the state database' \
 'compliance:Print compliance mapping to OWASP Agentic Top 10, NIST AI RMF, and EU AI Act' \
 'audit-chain:Recompute workflow event hash chain and report first divergence' \
 'completions:Generate shell completions' \
@@ -1397,6 +1454,11 @@ _do-harness__subcmd__help__subcmd__list_commands() {
     local commands; commands=()
     _describe -t commands 'do-harness help list commands' commands "$@"
 }
+(( $+functions[_do-harness__subcmd__help__subcmd__maintenance_commands] )) ||
+_do-harness__subcmd__help__subcmd__maintenance_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness help maintenance commands' commands "$@"
+}
 (( $+functions[_do-harness__subcmd__help__subcmd__man_commands] )) ||
 _do-harness__subcmd__help__subcmd__man_commands() {
     local commands; commands=()
@@ -1416,6 +1478,7 @@ _do-harness__subcmd__help__subcmd__seed_commands() {
 _do-harness__subcmd__help__subcmd__task_commands() {
     local commands; commands=(
 'export:Write the task list to plans/tasks.json or specified output' \
+'import:Validate plans/tasks.json against the state database' \
 'list:Print tasks from the state database' \
 'show:Show details for a specific task' \
 'add:Add a task in \`pending\` state' \
@@ -1450,6 +1513,11 @@ _do-harness__subcmd__help__subcmd__task__subcmd__export_commands() {
 _do-harness__subcmd__help__subcmd__task__subcmd__fail_commands() {
     local commands; commands=()
     _describe -t commands 'do-harness help task fail commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__help__subcmd__task__subcmd__import_commands] )) ||
+_do-harness__subcmd__help__subcmd__task__subcmd__import_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness help task import commands' commands "$@"
 }
 (( $+functions[_do-harness__subcmd__help__subcmd__task__subcmd__list_commands] )) ||
 _do-harness__subcmd__help__subcmd__task__subcmd__list_commands() {
@@ -1582,6 +1650,11 @@ _do-harness__subcmd__list_commands() {
     local commands; commands=()
     _describe -t commands 'do-harness list commands' commands "$@"
 }
+(( $+functions[_do-harness__subcmd__maintenance_commands] )) ||
+_do-harness__subcmd__maintenance_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness maintenance commands' commands "$@"
+}
 (( $+functions[_do-harness__subcmd__man_commands] )) ||
 _do-harness__subcmd__man_commands() {
     local commands; commands=()
@@ -1601,6 +1674,7 @@ _do-harness__subcmd__seed_commands() {
 _do-harness__subcmd__task_commands() {
     local commands; commands=(
 'export:Write the task list to plans/tasks.json or specified output' \
+'import:Validate plans/tasks.json against the state database' \
 'list:Print tasks from the state database' \
 'show:Show details for a specific task' \
 'add:Add a task in \`pending\` state' \
@@ -1641,6 +1715,7 @@ _do-harness__subcmd__task__subcmd__fail_commands() {
 _do-harness__subcmd__task__subcmd__help_commands() {
     local commands; commands=(
 'export:Write the task list to plans/tasks.json or specified output' \
+'import:Validate plans/tasks.json against the state database' \
 'list:Print tasks from the state database' \
 'show:Show details for a specific task' \
 'add:Add a task in \`pending\` state' \
@@ -1682,6 +1757,11 @@ _do-harness__subcmd__task__subcmd__help__subcmd__help_commands() {
     local commands; commands=()
     _describe -t commands 'do-harness task help help commands' commands "$@"
 }
+(( $+functions[_do-harness__subcmd__task__subcmd__help__subcmd__import_commands] )) ||
+_do-harness__subcmd__task__subcmd__help__subcmd__import_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness task help import commands' commands "$@"
+}
 (( $+functions[_do-harness__subcmd__task__subcmd__help__subcmd__list_commands] )) ||
 _do-harness__subcmd__task__subcmd__help__subcmd__list_commands() {
     local commands; commands=()
@@ -1696,6 +1776,11 @@ _do-harness__subcmd__task__subcmd__help__subcmd__remove_commands() {
 _do-harness__subcmd__task__subcmd__help__subcmd__show_commands() {
     local commands; commands=()
     _describe -t commands 'do-harness task help show commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__task__subcmd__import_commands] )) ||
+_do-harness__subcmd__task__subcmd__import_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness task import commands' commands "$@"
 }
 (( $+functions[_do-harness__subcmd__task__subcmd__list_commands] )) ||
 _do-harness__subcmd__task__subcmd__list_commands() {
