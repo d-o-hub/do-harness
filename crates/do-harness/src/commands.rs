@@ -278,13 +278,7 @@ pub fn hook(root: &Path, config_path: Option<&Path>, action: HookAction) -> Resu
 /// Applies pending migrations and reports the number applied.
 pub async fn init_db(root: &Path) -> Result<()> {
     let conn = do_harness_db::connect_and_migrate(root).await?;
-    let mut rows = conn
-        .query("SELECT COUNT(*) FROM schema_migrations", ())
-        .await?;
-    let count = match rows.next().await? {
-        Some(row) => row.get::<i64>(0)?,
-        None => anyhow::bail!("schema_migrations is unexpectedly empty"),
-    };
+    let count = do_harness_db::count_migrations(&conn).await?;
     println!("Done. Applied schema migrations: {count}");
     Ok(())
 }

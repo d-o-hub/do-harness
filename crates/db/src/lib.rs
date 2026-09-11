@@ -12,12 +12,14 @@
 //! - [`repo_skill_eval`] — latest skill evaluations
 //! - [`repo_eval`] — eval-run history, skill bars, grader baselines
 //! - [`repo_workflow`] — append-only workflow events + transactional commands
+//! - [`query`] — generic parameterized read-only helpers
 
 #![forbid(unsafe_code)]
 
 pub mod error;
 pub mod migrate;
 pub mod migrate_catalog;
+pub mod query;
 pub mod repo;
 pub mod repo_eval;
 pub mod repo_exec;
@@ -35,8 +37,10 @@ pub use error::{DbError, Result};
 /// depending on `libsql` directly.
 pub use libsql::Connection;
 pub use migrate::{
-    MigrationSkew, connect, connect_and_migrate, inspect_migrations, migrate, unix_now,
+    MigrationSkew, connect, connect_and_migrate, count_migrations, inspect_migrations, migrate,
+    unix_now,
 };
+pub use query::count_where;
 pub use repo::{
     NewTask, advance_subtask, get_task, insert_task, list_tasks, seed_invariants,
     update_task_status,

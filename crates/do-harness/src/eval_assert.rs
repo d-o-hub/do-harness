@@ -30,7 +30,6 @@ use std::path::Path;
 use std::process::Command;
 
 use anyhow::Result;
-use libsql::params;
 
 use crate::eval_walk::WalkRun;
 
@@ -138,12 +137,8 @@ async fn grade_db(root: &Path, rest: &str) -> Result<AssertionGrade> {
     }
 
     let db = do_harness_db::connect_and_migrate(root).await?;
-    let sql = format!("SELECT COUNT(*) FROM \"{table}\" WHERE \"{column}\" = ?1");
-    let count = match db.query(&sql, params![value]).await {
-        Ok(mut rows) => match rows.next().await? {
-            Some(row) => row.get::<i64>(0)?,
-            None => 0,
-        },
+    let count = match do_harness_db::count_where(&db, table, column, value).await {
+        Ok(count) => count,
         Err(err) => {
             return Ok(fail(format!("db: could not query {table}: {err}")));
         }

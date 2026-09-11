@@ -112,6 +112,21 @@ pub async fn inspect_migrations(conn: &Connection) -> Result<MigrationSkew> {
     })
 }
 
+/// Returns the number of applied schema migrations.
+///
+/// # Errors
+///
+/// Returns an error when the tracking-table probe fails.
+pub async fn count_migrations(conn: &Connection) -> Result<i64> {
+    let mut rows = conn
+        .query("SELECT COUNT(*) FROM schema_migrations", Params::None)
+        .await?;
+    match rows.next().await? {
+        Some(row) => Ok(row.get(0)?),
+        None => Ok(0),
+    }
+}
+
 /// Applies all pending embedded migrations to `conn` in ascending version order.
 ///
 /// Tracked via a `schema_migrations(version, name, applied_at)` table so each

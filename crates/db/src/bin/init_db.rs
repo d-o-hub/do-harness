@@ -29,17 +29,7 @@ async fn main() -> Result<()> {
     println!("Initializing agent-state database at: {}", path.display());
 
     let conn = connect_and_migrate(&root).await?;
-
-    let mut rows = conn
-        .query(
-            "SELECT COUNT(*) FROM schema_migrations",
-            libsql::params::Params::None,
-        )
-        .await?;
-    let version_count = match rows.next().await? {
-        Some(row) => row.get::<i64>(0)?,
-        None => anyhow::bail!("schema_migrations is unexpectedly empty"),
-    };
+    let version_count = do_harness_db::count_migrations(&conn).await?;
 
     println!("Done. Applied schema migrations: {version_count}");
     Ok(())
