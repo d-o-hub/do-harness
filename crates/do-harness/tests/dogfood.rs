@@ -123,10 +123,14 @@ fn rust_verify_with_evidence_writes_artifact() {
 
     let text = std::fs::read_to_string(&evidence_path).unwrap();
     let doc: Value = serde_json::from_str(&text).expect("valid evidence JSON");
-    assert_eq!(doc["schema_version"], serde_json::json!(1));
+    assert_eq!(doc["schema_version"], serde_json::json!(2));
     assert_eq!(doc["tool"], serde_json::json!("do-harness"));
     assert_eq!(doc["summary"]["verdict"], serde_json::json!("pass"));
     assert_eq!(doc["summary"]["skip"], serde_json::json!(0));
+    // Every sensor records its argv and an output hash; the artifact is sealed.
+    assert!(doc["sensors"][0]["argv"].is_array());
+    assert!(doc["sensors"][0]["output_sha256"].is_string());
+    assert!(doc["chain_hash"].as_str().is_some_and(|h| !h.is_empty()));
 }
 
 #[test]

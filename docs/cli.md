@@ -37,6 +37,12 @@ green (it prints `WARN`), but its evidence verdict is still `fail` and
 `--strict` rejects it: softness applies to the developer loop, never to the
 evidence artifact.
 
+Evidence schema v2 records each sensor's exact `argv` and a SHA-256 of its
+captured output, and chains artifacts written to the same path
+(`chain_hash`/`prev_hash`) so tampering or reordering is detectable. CI uploads
+only the artifact and a `Cargo.lock` hash; the local database is not uploaded
+and can be pruned with `maintenance`.
+
 ### `task`
 Task state inspection and workflow management.
 

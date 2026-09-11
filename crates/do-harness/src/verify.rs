@@ -46,7 +46,7 @@ pub(crate) async fn run(root: &Path, mut opts: VerifyOpts) -> std::result::Resul
                 let finished_at = std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
                     .map_or(0, |d| i64::try_from(d.as_secs()).unwrap_or(i64::MAX));
-                let doc = evidence::EvidenceDocument::from_run(
+                let mut doc = evidence::EvidenceDocument::from_run(
                     &cfg,
                     root,
                     &report,
@@ -55,6 +55,21 @@ pub(crate) async fn run(root: &Path, mut opts: VerifyOpts) -> std::result::Resul
                     started_at,
                     finished_at,
                 );
+                // Chain artifacts in the same workspace: reading an existing
+                // artifact's chain hash makes tampering/reordering detectable.
+                let prev_hash = tokio::fs::read(&path)
+                    .await
+                    .ok()
+                    .and_then(|bytes| serde_json::from_slice::<serde_json::Value>(&bytes).ok())
+                    .and_then(|value| {
+                        value
+                            .get("chain_hash")
+                            .and_then(|hash| hash.as_str())
+                            .map(ToOwned::to_owned)
+                    })
+                    .filter(|hash| !hash.is_empty());
+                doc.seal(prev_hash.clone())
+                    .map_err(|e| CliError::Verify(e.into()))?;
                 if let Some(parent) = path.parent() {
                     if !parent.as_os_str().is_empty() {
                         let _ = tokio::fs::create_dir_all(parent).await;
@@ -66,7 +81,8 @@ pub(crate) async fn run(root: &Path, mut opts: VerifyOpts) -> std::result::Resul
                     .await
                     .map_err(|e| CliError::Verify(e.into()))?;
 
-                if opts.strict && !doc.is_strict_clean() {
+                if opts.strict && !(doc.is_strict_clean() && doc.verify_chain(prev_hash.as_deref()))
+                {
                     eprintln!(
                         "strict evidence check failed; artifact at {}",
                         path.display()
