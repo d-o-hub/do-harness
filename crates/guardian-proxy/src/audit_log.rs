@@ -5,7 +5,7 @@
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
 
-use anyhow::Result;
+use crate::error::{GuardianError, Result};
 use do_harness_types::{canonical_value, chain_hash};
 use serde::{Deserialize, Serialize};
 
@@ -85,7 +85,10 @@ impl AuditLog {
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
         let path = path.as_ref().to_path_buf();
         let (next_seq, prev_hash) = if path.exists() {
-            let content = std::fs::read_to_string(&path)?;
+            let content = std::fs::read_to_string(&path).map_err(|io| GuardianError::AuditIo {
+                path: path.display().to_string(),
+                io,
+            })?;
             let mut seq = 0u64;
             let mut prev = "GENESIS".to_string();
             for line in content.lines().filter(|l| !l.trim().is_empty()) {
@@ -99,11 +102,9 @@ impl AuditLog {
                 });
                 let canonical = canonical_value(&payload_for_hash)?;
                 let expected = chain_hash(Some(&prev), &canonical);
-                if expected != record.chain_hash {
-                    anyhow::bail!("audit log tamper detected at seq {}", record.seq);
-                }
-                if record.prev_hash != prev {
-                    anyhow::bail!("audit log prev_hash mismatch at seq {}", record.seq);
+                let seq_i64 = i64::try_from(record.seq).unwrap_or(i64::MAX);
+                if expected != record.chain_hash || record.prev_hash != prev {
+                    return Err(GuardianError::Tampered { seq: seq_i64 });
                 }
                 seq = record.seq;
                 prev.clone_from(&record.chain_hash);
@@ -112,7 +113,10 @@ impl AuditLog {
         } else {
             if let Some(parent) = path.parent() {
                 if !parent.as_os_str().is_empty() {
-                    std::fs::create_dir_all(parent)?;
+                    std::fs::create_dir_all(parent).map_err(|io| GuardianError::AuditIo {
+                        path: parent.display().to_string(),
+                        io,
+                    })?;
                 }
             }
             (1, "GENESIS".to_string())
@@ -145,8 +149,15 @@ impl AuditLog {
         let mut file = std::fs::OpenOptions::new()
             .create(true)
             .append(true)
-            .open(&self.path)?;
-        writeln!(file, "{line}")?;
+            .open(&self.path)
+            .map_err(|io| GuardianError::AuditIo {
+                path: self.path.display().to_string(),
+                io,
+            })?;
+        writeln!(file, "{line}").map_err(|io| GuardianError::AuditIo {
+            path: self.path.display().to_string(),
+            io,
+        })?;
         self.next_seq += 1;
         self.prev_hash.clone_from(&record.chain_hash);
         Ok(record)

@@ -24,6 +24,7 @@ toml.workspace = true
 tower.workspace = true
 agent-governance = { workspace = true, optional = true }
 serde_yaml = { version = "0.9", optional = true }
+thiserror.workspace = true
 
 [features]
 default = []

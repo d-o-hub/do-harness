@@ -1,9 +1,9 @@
 //! Mediation logic: fail-closed gate for proxied tool calls.
 
-use anyhow::Result;
-use serde_json::Value;
-
+use crate::error::Result;
 use crate::{ForwardDecision, ProxyConfig};
+
+use serde_json::Value;
 
 /// MCP-like tool call intercepted by the proxy.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
@@ -40,9 +40,8 @@ struct AgtGateWrapper {
 #[cfg(feature = "agt-governance")]
 impl AgtGateWrapper {
     fn new(agent_id: &str) -> Result<Self> {
-        use anyhow::Context as _;
         let client = agent_governance::AgentMeshClient::new(agent_id)
-            .context("failed to init AgentMeshClient")?;
+            .map_err(|err| crate::error::GuardianError::GovernanceInit(err.to_string()))?;
         Ok(Self { client })
     }
 

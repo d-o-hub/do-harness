@@ -41,6 +41,9 @@ pub use proxy::{McpLikeToolCall, ProxyMediator};
 mod audit_log;
 pub use audit_log::{AuditLog, AuditRecord};
 
+mod error;
+pub use error::{GuardianError, Result};
+
 mod metrics;
 pub use metrics::{MetricsSnapshot, ProxyMetrics};
 
