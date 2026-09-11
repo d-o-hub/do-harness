@@ -2,7 +2,10 @@
 # check-deps.sh — enforces dependency direction and runs cargo-deny.
 #
 # Sensor: scripts/check-deps.sh
-# Rule: do-harness-types must NOT depend on storage or adapters.
+# Rules:
+#   1. do-harness-types (schema) must NOT depend on storage/adapters.
+#   2. guardian-proxy (adjacent adapter) must NOT depend on the do-harness CLI.
+# Both are checked over the real `cargo tree` closure, not just the manifest.
 # Also runs `cargo deny check` when cargo-deny is installed.
 # Enforcement policy (fail-open locally, fail-closed on demand), mirroring
 # scripts/check-audit.sh: a missing cargo-deny must not silently green-light
@@ -21,6 +24,32 @@ FAIL=0
 if grep -qE 'do-harness-(db|core|adapters|cli)' "$TYPES_MANIFEST"; then
     echo "FAIL: do-harness-types must not depend on storage or adapters."
     FAIL=1
+fi
+
+# Real closure check: cargo tree resolves the full normal-dependency graph.
+# A tree failure is a hard error under required-tools mode, a WARN otherwise.
+if closure="$(cd "$ROOT" && cargo tree -p do-harness-types --edges normal --prefix none 2>/dev/null)"; then
+    if echo "$closure" | grep -qE '^(do-harness-db|do-harness|guardian-proxy|libsql)( |$)'; then
+        echo "FAIL: do-harness-types closure must not contain storage or adapters."
+        FAIL=1
+    fi
+elif require_tools; then
+    echo "FAIL: cargo tree failed under required-tools mode."
+    FAIL=1
+else
+    echo "WARN: cargo tree unavailable; skipping transitive closure check."
+fi
+
+if closure="$(cd "$ROOT" && cargo tree -p guardian-proxy --edges normal --prefix none 2>/dev/null)"; then
+    if echo "$closure" | grep -qE '^do-harness( |$)'; then
+        echo "FAIL: guardian-proxy must not depend on the do-harness CLI."
+        FAIL=1
+    fi
+elif require_tools; then
+    echo "FAIL: cargo tree failed under required-tools mode."
+    FAIL=1
+else
+    echo "WARN: cargo tree unavailable; skipping guardian-proxy closure check."
 fi
 
 if command -v cargo-deny >/dev/null 2>&1; then

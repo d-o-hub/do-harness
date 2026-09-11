@@ -43,6 +43,7 @@ done
 
 fetch() {
     curl --fail --silent --show-error --max-time 20 \
+        --retry 3 --retry-connrefused --retry-delay 1 \
         -A "$USER_AGENT" -H "Accept: application/json" "$1"
 }
 

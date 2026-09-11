@@ -17,6 +17,7 @@ permissions:
 jobs:
   screen-author:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Contributor reputation check (microsoft AGT)
         id: check
