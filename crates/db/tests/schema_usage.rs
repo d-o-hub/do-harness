@@ -175,3 +175,110 @@ async fn has_unique_index(conn: &Connection, table: &str, column: &str) -> Resul
     }
     Ok(false)
 }
+
+/// Test 3: post-`0011` hardening makes chain columns mandatory and unique.
+#[tokio::test(flavor = "current_thread")]
+async fn workflow_events_chain_columns_are_mandatory_and_unique() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let conn = migrated_conn(dir.path()).await.expect("migrated conn");
+
+    assert!(
+        column_notnull(&conn, "workflow_events", "seq")
+            .await
+            .expect("seq info"),
+        "workflow_events.seq must be NOT NULL after migration 0011"
+    );
+    assert!(
+        column_notnull(&conn, "workflow_events", "chain_hash")
+            .await
+            .expect("chain_hash info"),
+        "workflow_events.chain_hash must be NOT NULL after migration 0011"
+    );
+    assert!(
+        has_unique_index(&conn, "workflow_events", "seq")
+            .await
+            .expect("unique seq"),
+        "workflow_events.seq must be UNIQUE"
+    );
+    assert!(
+        has_unique_index(&conn, "workflow_events", "chain_hash")
+            .await
+            .expect("unique chain_hash"),
+        "workflow_events.chain_hash must be UNIQUE"
+    );
+}
+
+/// Test 4: the `beats` CHECK rejects a sensor beat with no sensor name.
+#[tokio::test(flavor = "current_thread")]
+async fn beats_reject_sensor_without_sensor_name() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let conn = migrated_conn(dir.path()).await.expect("migrated conn");
+
+    let rejected = conn
+        .execute(
+            "INSERT INTO beats (beat_type, status, started_at) VALUES ('sensor', 'ok', 0)",
+            Params::None,
+        )
+        .await;
+    assert!(
+        rejected.is_err(),
+        "CHECK must reject a sensor beat without sensor_name"
+    );
+
+    conn.execute(
+        "INSERT INTO beats (beat_type, status, started_at) VALUES ('manual', 'ok', 0)",
+        Params::None,
+    )
+    .await
+    .expect("non-sensor beats stay name-optional");
+}
+
+/// Test 5: `invariants.updated_at` exists and refreshes on upsert.
+#[tokio::test(flavor = "current_thread")]
+async fn invariants_updated_at_tracks_upserts() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let conn = migrated_conn(dir.path()).await.expect("migrated conn");
+
+    assert!(
+        column_notnull(&conn, "invariants", "updated_at")
+            .await
+            .expect("updated_at info"),
+        "invariants.updated_at must exist after migration 0011"
+    );
+
+    let headers = vec![do_harness_types::DecisionHeader::new(
+        "inv".to_owned(),
+        "rationale".to_owned(),
+        "sensor".to_owned(),
+        "category".to_owned(),
+    )];
+    do_harness_db::seed_invariants(&conn, &headers)
+        .await
+        .expect("seed");
+    let mut rows = conn
+        .query(
+            "SELECT created_at, updated_at FROM invariants",
+            Params::None,
+        )
+        .await
+        .expect("read");
+    let row = rows.next().await.expect("row").expect("present");
+    let created: i64 = row.get(0).expect("created_at");
+    let updated: i64 = row.get(1).expect("updated_at");
+    assert!(updated >= created);
+    assert!(updated > 0);
+}
+
+/// Returns whether `table.column` is declared NOT NULL.
+async fn column_notnull(conn: &Connection, table: &str, column: &str) -> Result<bool> {
+    let sql = format!("PRAGMA table_info({table})");
+    let mut rows = conn.query(sql.as_str(), Params::None).await?;
+    while let Some(row) = rows.next().await? {
+        let name: String = row.get(1)?;
+        if name == column {
+            let notnull: i64 = row.get(3)?;
+            return Ok(notnull != 0);
+        }
+    }
+    Ok(false)
+}

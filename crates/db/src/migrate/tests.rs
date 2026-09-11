@@ -141,7 +141,7 @@ async fn migration_backfills_existing_unchained_events() {
     assert_eq!(rows[0].seq, 1);
     assert_eq!(rows[0].canonical_payload, "{\"a\":1,\"b\":2}");
     let expected_hash = crate::repo_workflow::chain_hash(None, "{\"a\":1,\"b\":2}");
-    assert_eq!(rows[0].chain_hash.as_deref(), Some(expected_hash.as_str()));
+    assert_eq!(rows[0].chain_hash.as_str(), expected_hash.as_str());
 }
 
 /// Concurrent `verify --record` writers must not hit `SQLITE_BUSY` on the

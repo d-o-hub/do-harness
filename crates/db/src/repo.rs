@@ -168,17 +168,19 @@ pub async fn seed_invariants(conn: &Connection, headers: &[DecisionHeader]) -> R
     let tx = conn.transaction().await?;
     for header in headers {
         tx.execute(
-            "INSERT INTO invariants (invariant, rationale, sensor, category, created_at) \
-             VALUES (?1, ?2, ?3, ?4, ?5) \
+            "INSERT INTO invariants (invariant, rationale, sensor, category, created_at, updated_at) \
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6) \
              ON CONFLICT(invariant) DO UPDATE SET \
                rationale = excluded.rationale, \
                sensor = excluded.sensor, \
-               category = excluded.category",
+               category = excluded.category, \
+               updated_at = excluded.updated_at",
             params!(
                 header.invariant.as_str(),
                 header.rationale.as_str(),
                 header.sensor.as_str(),
                 header.category.as_str(),
+                now,
                 now
             ),
         )

@@ -62,4 +62,9 @@ pub const MIGRATIONS: &[Migration] = &[
         name: "workflow_event_chain",
         sql: include_str!("../migrations/0010_workflow_event_chain.sql"),
     },
+    Migration {
+        version: 11,
+        name: "schema_hardening",
+        sql: include_str!("../migrations/0011_schema_hardening.sql"),
+    },
 ];

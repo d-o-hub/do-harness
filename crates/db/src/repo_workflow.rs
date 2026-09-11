@@ -32,8 +32,8 @@ pub struct WorkflowEventRow {
     pub created_at: i64,
     /// Monotonic sequence number in the chain.
     pub seq: i64,
-    /// SHA-256 chain hash for this row.
-    pub chain_hash: Option<String>,
+    /// SHA-256 chain hash for this row (mandatory since migration 0011).
+    pub chain_hash: String,
 }
 
 /// Canonicalizes a workflow event payload, mapping canonicalization failures
@@ -170,7 +170,7 @@ pub async fn list_events_ascending(conn: &Connection) -> Result<Vec<WorkflowEven
             payload: payload.clone(),
             canonical_payload: canonical,
             created_at: row.get(4)?,
-            seq: row.get::<i64>(5).unwrap_or(0),
+            seq: row.get(5)?,
             chain_hash: row.get(6)?,
         });
     }
@@ -186,16 +186,12 @@ async fn append_event_on(conn: &Connection, task_id: i64, event: &WorkflowEvent)
 
     let mut rows = conn
         .query(
-            "SELECT seq, chain_hash FROM workflow_events WHERE seq IS NOT NULL ORDER BY seq DESC LIMIT 1",
+            "SELECT seq, chain_hash FROM workflow_events ORDER BY seq DESC LIMIT 1",
             Params::None,
         )
         .await?;
     let (last_seq, prev_hash) = match rows.next().await? {
-        Some(row) => {
-            let s: i64 = row.get(0)?;
-            let h: Option<String> = row.get(1)?;
-            (s, h)
-        }
+        Some(row) => (row.get::<i64>(0)?, Some(row.get::<String>(1)?)),
         None => (0, None),
     };
     let seq = last_seq + 1;
@@ -368,9 +364,9 @@ mod tests {
         assert_eq!(rows[1].seq, 2);
 
         let expected_h1 = chain_hash(None, &rows[0].canonical_payload);
-        assert_eq!(rows[0].chain_hash.as_deref(), Some(expected_h1.as_str()));
+        assert_eq!(rows[0].chain_hash.as_str(), expected_h1.as_str());
 
         let expected_h2 = chain_hash(Some(&expected_h1), &rows[1].canonical_payload);
-        assert_eq!(rows[1].chain_hash.as_deref(), Some(expected_h2.as_str()));
+        assert_eq!(rows[1].chain_hash.as_str(), expected_h2.as_str());
     }
 }
