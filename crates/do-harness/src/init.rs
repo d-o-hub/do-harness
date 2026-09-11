@@ -144,38 +144,7 @@ pub async fn init_workspace(root: &Path, opts: &InitOpts) -> Result<InitReport> 
         &mut report,
     )?;
     if opts.language == Language::Rust {
-        write_if_absent(
-            root,
-            "scripts/check-loc.sh",
-            CHECK_LOC,
-            opts.force,
-            &mut report,
-        )?;
-        crate::fs_perm::set_owner_exec(&root.join("scripts/check-loc.sh"))?;
-        write_if_absent(
-            root,
-            "scripts/check-commitlint.sh",
-            CHECK_COMMITLINT,
-            opts.force,
-            &mut report,
-        )?;
-        crate::fs_perm::set_owner_exec(&root.join("scripts/check-commitlint.sh"))?;
-        write_if_absent(
-            root,
-            "scripts/check-deps.sh",
-            CHECK_DEPS,
-            opts.force,
-            &mut report,
-        )?;
-        crate::fs_perm::set_owner_exec(&root.join("scripts/check-deps.sh"))?;
-        write_if_absent(
-            root,
-            "scripts/check-audit.sh",
-            CHECK_AUDIT,
-            opts.force,
-            &mut report,
-        )?;
-        crate::fs_perm::set_owner_exec(&root.join("scripts/check-audit.sh"))?;
+        scaffold_scripts(root, opts, &mut report)?;
         scaffold_crate(root, &mut report)?;
     }
     for spec in SKILLS {
@@ -268,6 +237,20 @@ pub(crate) async fn seed_invariants(root: &Path, prune: bool) -> Result<usize> {
         .context("invalid plans/invariants.json: does not match DecisionHeader schema")?;
     let conn = do_harness_db::connect_and_migrate(root).await?;
     Ok(do_harness_db::seed_invariants(&conn, &headers, prune).await?)
+}
+
+/// Writes the Rust-pack helper scripts and marks them executable.
+fn scaffold_scripts(root: &Path, opts: &InitOpts, report: &mut InitReport) -> Result<()> {
+    for (relative, body) in [
+        ("scripts/check-loc.sh", CHECK_LOC),
+        ("scripts/check-commitlint.sh", CHECK_COMMITLINT),
+        ("scripts/check-deps.sh", CHECK_DEPS),
+        ("scripts/check-audit.sh", CHECK_AUDIT),
+    ] {
+        write_if_absent(root, relative, body, opts.force, report)?;
+        crate::fs_perm::set_owner_exec(&root.join(relative))?;
+    }
+    Ok(())
 }
 
 /// Writes `body` to `root/relative`, skipping existing files unless `force`.
