@@ -9,6 +9,10 @@ use std::process::Command;
 
 use serde_json::Value;
 
+mod support;
+
+use support::git_command;
+
 /// Builds a `do-harness --root <root>` command using the real binary.
 fn harness(root: &Path) -> Command {
     let mut cmd = Command::new(env!("CARGO_BIN_EXE_do-harness"));
@@ -28,9 +32,8 @@ fn run(cmd: &mut Command) -> (Option<i32>, String, String) {
 
 /// Runs a git command inside `root`, asserting success.
 fn git(root: &Path, args: &[&str]) {
-    let status = Command::new("git")
+    let status = git_command(root)
         .args(args)
-        .current_dir(root)
         .env("GIT_CONFIG_NOSYSTEM", "1")
         .env("GIT_AUTHOR_NAME", "t")
         .env("GIT_AUTHOR_EMAIL", "t@t")

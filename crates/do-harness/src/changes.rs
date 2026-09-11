@@ -78,11 +78,35 @@ pub fn discover(root: &Path) -> ChangedFiles {
     }
 }
 
+/// Builds a `git` command rooted at `root` with hook-inherited repository
+/// environment removed.
+///
+/// Git exports `GIT_DIR` (and related variables) to hooks; leaving them in
+/// place makes every git call silently target the hook's repository instead
+/// of `root`. Clearing them keeps `--root` authoritative and makes change
+/// discovery deterministic regardless of how the CLI was invoked.
+pub(crate) fn git_command(root: &Path) -> Command {
+    let mut command = Command::new("git");
+    command.current_dir(root);
+    for key in [
+        "GIT_DIR",
+        "GIT_WORK_TREE",
+        "GIT_INDEX_FILE",
+        "GIT_OBJECT_DIRECTORY",
+        "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+        "GIT_CEILING_DIRECTORIES",
+        "GIT_NAMESPACE",
+        "GIT_PREFIX",
+    ] {
+        command.env_remove(key);
+    }
+    command
+}
+
 /// Whether `root` lies inside a git working tree.
 fn is_work_tree(root: &Path) -> bool {
-    Command::new("git")
+    git_command(root)
         .args(["rev-parse", "--is-inside-work-tree"])
-        .current_dir(root)
         .output()
         .is_ok_and(|out| {
             out.status.success() && String::from_utf8_lossy(&out.stdout).trim() == "true"
@@ -94,9 +118,8 @@ fn is_work_tree(root: &Path) -> bool {
 /// An unborn `HEAD` (no commits yet) yields no tracked changes, which is
 /// safe: every file is untracked and covered by [`untracked_files`].
 fn tracked_changes(root: &Path) -> Vec<ChangedFile> {
-    let output = Command::new("git")
+    let output = git_command(root)
         .args(["diff", "--name-status", "-z", "HEAD"])
-        .current_dir(root)
         .output();
     let Ok(output) = output else {
         return Vec::new();
@@ -170,9 +193,8 @@ fn tracked_changes(root: &Path) -> Vec<ChangedFile> {
 
 /// Untracked non-ignored files, NUL-separated.
 fn untracked_files(root: &Path) -> Vec<ChangedFile> {
-    let output = Command::new("git")
+    let output = git_command(root)
         .args(["ls-files", "--others", "--exclude-standard", "-z"])
-        .current_dir(root)
         .output();
     let Ok(output) = output else {
         return Vec::new();
@@ -290,9 +312,8 @@ mod tests {
 
     /// Runs a git command inside `root`, asserting success.
     fn git(root: &Path, args: &[&str]) {
-        let status = std::process::Command::new("git")
+        let status = git_command(root)
             .args(args)
-            .current_dir(root)
             .env("GIT_CONFIG_NOSYSTEM", "1")
             .env("GIT_AUTHOR_NAME", "t")
             .env("GIT_AUTHOR_EMAIL", "t@t")

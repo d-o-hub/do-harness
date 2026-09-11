@@ -1,7 +1,6 @@
 //! Evidence artifact writer for `do-harness verify --evidence`.
 
 use std::path::Path;
-use std::process::Command;
 
 use serde::{Deserialize, Serialize};
 
@@ -271,9 +270,8 @@ fn output_sha256(output: &str) -> String {
 
 /// Resolves git commit SHA at runtime or falls back to compile-time env var.
 fn resolve_git_sha(root: &Path) -> Option<String> {
-    if let Ok(output) = Command::new("git")
+    if let Ok(output) = crate::changes::git_command(root)
         .args(["rev-parse", "HEAD"])
-        .current_dir(root)
         .output()
     {
         if output.status.success() {

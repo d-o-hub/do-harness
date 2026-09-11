@@ -30,18 +30,29 @@ function e2eSkip() {
 
 /** Runs one git command in `cwd`, asserting success. */
 function git(cwd, args) {
-  const result = spawnSync('git', args, {
-    cwd,
-    encoding: 'utf8',
-    env: {
-      ...process.env,
-      GIT_CONFIG_NOSYSTEM: '1',
-      GIT_AUTHOR_NAME: 't',
-      GIT_AUTHOR_EMAIL: 't@t',
-      GIT_COMMITTER_NAME: 't',
-      GIT_COMMITTER_EMAIL: 't@t',
-    },
-  })
+  const env = {
+    ...process.env,
+    GIT_CONFIG_NOSYSTEM: '1',
+    GIT_AUTHOR_NAME: 't',
+    GIT_AUTHOR_EMAIL: 't@t',
+    GIT_COMMITTER_NAME: 't',
+    GIT_COMMITTER_EMAIL: 't@t',
+  }
+  // Tests may run under a git hook; the fixture repo must not inherit the
+  // hook's repository environment.
+  for (const key of [
+    'GIT_DIR',
+    'GIT_WORK_TREE',
+    'GIT_INDEX_FILE',
+    'GIT_OBJECT_DIRECTORY',
+    'GIT_ALTERNATE_OBJECT_DIRECTORIES',
+    'GIT_CEILING_DIRECTORIES',
+    'GIT_NAMESPACE',
+    'GIT_PREFIX',
+  ]) {
+    delete env[key]
+  }
+  const result = spawnSync('git', args, { cwd, encoding: 'utf8', env })
   assert.equal(result.status, 0, `git ${args.join(' ')}: ${result.stderr}`)
 }
 

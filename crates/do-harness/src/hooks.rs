@@ -3,7 +3,6 @@
 
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 use anyhow::{Context, Result, bail};
 
@@ -32,9 +31,8 @@ pub fn find_git_dir(cwd: &Path) -> Result<PathBuf> {
         current = dir.parent();
     }
 
-    let output = Command::new("git")
+    let output = crate::changes::git_command(cwd)
         .args(["rev-parse", "--git-dir"])
-        .current_dir(cwd)
         .output()
         .with_context(|| format!("failed to run `git rev-parse` from {}", cwd.display()))?;
     if !output.status.success() {

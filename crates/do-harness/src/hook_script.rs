@@ -357,9 +357,8 @@ mod tests {
     #[test]
     fn commit_msg_hook_blocks_commit_without_lint_script() {
         let temp = tempfile::tempdir().unwrap();
-        let status = std::process::Command::new("git")
+        let status = crate::changes::git_command(temp.path())
             .args(["init", "-q"])
-            .current_dir(temp.path())
             .status()
             .unwrap();
         assert!(status.success());
