@@ -5,7 +5,10 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use anyhow::Result;
+
 use super::*;
+use crate::report::Format;
 
 const VALID_SKILL_MD: &str = "---\nname: test-skill\ndescription: A fixture skill used by the eval-runner tests.\nlicense: MIT\n---\n\n# Test Skill\n";
 

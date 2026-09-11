@@ -1,7 +1,11 @@
 #![cfg(test)]
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-use super::*;
+use std::fs;
+
+use super::gate::{GateVerdict, run_structure_gate};
+use super::grading::{EvalCase, SkillEvals, grade_skill};
+use super::orchestrator::discover_skills;
 use crate::eval_walk::WalkRun;
 
 /// `discover_skills` returns only directories with a `SKILL.md`, sorted.
