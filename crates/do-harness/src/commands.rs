@@ -265,6 +265,15 @@ pub async fn hook(root: &Path, config_path: Option<&Path>, action: HookAction) -
                     println!("{json}");
                 }
             }
+            if !status.binary.present() {
+                anyhow::bail!(
+                    "do-harness binary missing at {}; build it or set DO_HARNESS_BIN",
+                    status.binary.path().display()
+                );
+            }
+            if !(status.pre_commit && status.pre_push && status.commit_msg) {
+                eprintln!("hint: run `do-harness hook install` to (re)install managed hooks");
+            }
         }
         HookAction::Diff => {
             let status = hooks::status(&git_dir, root);

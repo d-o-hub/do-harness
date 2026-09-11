@@ -46,6 +46,8 @@ const INVARIANTS_RUST: &str = include_str!("../templates/plans/invariants.json.r
 const INVARIANTS_GENERIC: &str = include_str!("../templates/plans/invariants.json.generic");
 const CHECK_LOC: &str = include_str!("../templates/scripts/check-loc.sh");
 const CHECK_COMMITLINT: &str = include_str!("../templates/scripts/check-commitlint.sh");
+const CHECK_DEPS: &str = include_str!("../templates/scripts/check-deps.sh");
+const CHECK_AUDIT: &str = include_str!("../templates/scripts/check-audit.sh");
 const CRATE_MANIFEST: &str = include_str!("../templates/crate/Cargo.toml");
 const CRATE_LIB: &str = include_str!("../templates/crate/src/lib.rs");
 
@@ -158,6 +160,22 @@ pub async fn init_workspace(root: &Path, opts: &InitOpts) -> Result<InitReport> 
             &mut report,
         )?;
         crate::fs_perm::set_owner_exec(&root.join("scripts/check-commitlint.sh"))?;
+        write_if_absent(
+            root,
+            "scripts/check-deps.sh",
+            CHECK_DEPS,
+            opts.force,
+            &mut report,
+        )?;
+        crate::fs_perm::set_owner_exec(&root.join("scripts/check-deps.sh"))?;
+        write_if_absent(
+            root,
+            "scripts/check-audit.sh",
+            CHECK_AUDIT,
+            opts.force,
+            &mut report,
+        )?;
+        crate::fs_perm::set_owner_exec(&root.join("scripts/check-audit.sh"))?;
         scaffold_crate(root, &mut report)?;
     }
     for spec in SKILLS {
