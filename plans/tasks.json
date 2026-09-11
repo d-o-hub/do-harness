@@ -1,5 +1,5 @@
 {
-  "exported_at": 1789116373,
+  "exported_at": 1789123035,
   "tasks": [
     {
       "id": 1,
@@ -319,12 +319,23 @@
       "precondition": null,
       "created_at": 1788515298,
       "updated_at": 1788515429
+    },
+    {
+      "id": 30,
+      "parent_id": null,
+      "title": "chore: remove duplicated do-harness policy adapter",
+      "method": "vertical-event-slice",
+      "subtask_index": 5,
+      "status": "done",
+      "precondition": null,
+      "created_at": 1789122968,
+      "updated_at": 1789123034
     }
   ],
   "summary": {
     "pending": 0,
     "in_progress": 0,
-    "done": 29,
+    "done": 30,
     "failed": 0
   }
 }
