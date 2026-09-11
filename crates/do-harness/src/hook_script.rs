@@ -334,18 +334,30 @@ mod tests {
 
     /// Writes the generated hook body plus a dummy message file into `dir`
     /// and executes the hook there, returning the exit code (None = killed).
+    ///
+    /// Hook-inherited repository variables are removed so the generated
+    /// hook's `git rev-parse` resolves the fixture directory, not the caller's
+    /// repository.
     fn run_commit_msg_hook(dir: &Path) -> Option<i32> {
         let hook = dir.join("commit-msg");
         std::fs::write(&hook, commit_msg_body()).unwrap();
         let msg = dir.join("COMMIT_EDITMSG");
         std::fs::write(&msg, "fix: typo\n").unwrap();
-        std::process::Command::new("bash")
-            .arg(&hook)
-            .arg(&msg)
-            .current_dir(dir)
-            .status()
-            .unwrap()
-            .code()
+        let mut command = std::process::Command::new("bash");
+        command.arg(&hook).arg(&msg).current_dir(dir);
+        for key in [
+            "GIT_DIR",
+            "GIT_WORK_TREE",
+            "GIT_INDEX_FILE",
+            "GIT_OBJECT_DIRECTORY",
+            "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+            "GIT_CEILING_DIRECTORIES",
+            "GIT_NAMESPACE",
+            "GIT_PREFIX",
+        ] {
+            command.env_remove(key);
+        }
+        command.status().unwrap().code()
     }
 
     #[test]
