@@ -1,4 +1,14 @@
 //! Hermetic sandbox construction for `do-harness eval`.
+//!
+//! # Sandbox boundary (be explicit)
+//!
+//! "Hermetic" here means filesystem isolation only: the walkthrough and every
+//! graded assertion run against a `tempfile` directory, so residue cannot
+//! touch the caller's repository. The child process still runs with the
+//! caller's privileges and full syscall access — there is **no** seccomp
+//! filter, network namespace, cgroup, or gVisor-style sandbox. Do not run
+//! walkthroughs from untrusted skills without an outer sandbox. The stderr
+//! tail captured on failure is an observability bound, not containment.
 
 use std::fs;
 use std::path::{Path, PathBuf};

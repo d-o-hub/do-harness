@@ -64,7 +64,17 @@ fn single_case_json(assertions: &[&str]) -> String {
 }
 
 async fn eval_run(dir: &Path, skill: Option<&str>, bless: bool) -> Result<()> {
-    run_eval(dir, skill, bless, false, false, false, Format::Text).await
+    run_eval(
+        dir,
+        skill,
+        bless,
+        false,
+        false,
+        false,
+        Format::Text,
+        Some("test-approver"),
+    )
+    .await
 }
 
 #[tokio::test(flavor = "current_thread")]

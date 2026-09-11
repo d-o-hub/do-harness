@@ -41,50 +41,66 @@ impl GraderHashes {
     }
 }
 
+/// Maximum bytes hashed for a grader file; a larger file is rejected rather
+/// than read into memory (baselines only need the content, not the whole tool).
+const MAX_GRADER_BYTES: u64 = 1024 * 1024;
+
 /// Computes the grader hashes for a skill directory.
 ///
-/// Missing grader files (no `evals.json`, no `walkthrough.sh`) hash as
-/// empty, so a baseline can also pin their absence.
+/// Missing grader files hash as a distinct `absent` sentinel (not the empty
+/// hash), so pinning absence cannot be confused with pinning an empty file.
+/// The walkthrough hash also covers the executable bits: `chmod -x` changes
+/// behavior (bash fallback) and must invalidate the baseline.
 ///
 /// # Errors
 ///
-/// Returns an error when an existing grader file cannot be read.
+/// Returns an error when an existing grader file cannot be read or exceeds
+/// [`MAX_GRADER_BYTES`].
 pub async fn grader_hashes(skill_dir: &Path) -> Result<GraderHashes> {
-    let walkthrough = skill_dir.join("evals/walkthrough.sh");
-    let walkthrough_bytes = match tokio::fs::read(&walkthrough).await {
-        Ok(bytes) => bytes,
-        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Vec::new(),
-        Err(err) => {
-            return Err(err).context(format!("failed to read {}", walkthrough.display()));
-        }
-    };
-    let specs_path = skill_dir.join("evals/evals.json");
-    let specs_bytes = match tokio::fs::read(&specs_path).await {
-        Ok(bytes) => bytes,
-        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Vec::new(),
-        Err(err) => {
-            return Err(err).context(format!("failed to read {}", specs_path.display()));
-        }
-    };
     Ok(GraderHashes {
-        walkthrough_sha: hex_sha256(&walkthrough_bytes),
-        specs_sha: hex_sha256(&specs_bytes),
+        walkthrough_sha: hash_grader(&skill_dir.join("evals/walkthrough.sh")).await?,
+        specs_sha: hash_grader(&skill_dir.join("evals/evals.json")).await?,
     })
 }
 
+/// Hashes one grader file with its executable bits in the digest.
+async fn hash_grader(path: &Path) -> Result<String> {
+    let metadata = match tokio::fs::metadata(path).await {
+        Ok(metadata) => metadata,
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+            return Ok(sha256_hex(b"absent"));
+        }
+        Err(err) => {
+            return Err(err).context(format!("failed to stat {}", path.display()));
+        }
+    };
+    if metadata.len() > MAX_GRADER_BYTES {
+        anyhow::bail!(
+            "grader file {} is {} bytes (max {MAX_GRADER_BYTES})",
+            path.display(),
+            metadata.len()
+        );
+    }
+    #[cfg(unix)]
+    let mode = {
+        use std::os::unix::fs::PermissionsExt as _;
+        metadata.permissions().mode() & 0o111
+    };
+    #[cfg(not(unix))]
+    let mode = 0u32;
+
+    let bytes = tokio::fs::read(path)
+        .await
+        .context(format!("failed to read {}", path.display()))?;
+    let mut hasher = Sha256::new();
+    hasher.update(format!("mode:{mode:o}:len:{}:", bytes.len()).as_bytes());
+    hasher.update(&bytes);
+    Ok(hex::encode(hasher.finalize()))
+}
+
 /// Lowercase hex encoding of the SHA-256 digest of `bytes`.
-fn hex_sha256(bytes: &[u8]) -> String {
-    const HEX: &[u8; 16] = b"0123456789abcdef";
-    let digest = Sha256::digest(bytes);
-    digest
-        .iter()
-        .flat_map(|byte| {
-            [
-                HEX[usize::from(byte >> 4)] as char,
-                HEX[usize::from(byte & 0x0F)] as char,
-            ]
-        })
-        .collect()
+fn sha256_hex(bytes: &[u8]) -> String {
+    hex::encode(Sha256::digest(bytes))
 }
 
 #[cfg(test)]
@@ -123,11 +139,44 @@ mod tests {
     }
 
     #[tokio::test(flavor = "current_thread")]
-    async fn missing_walkthrough_hashes_as_empty() {
+    async fn missing_walkthrough_hashes_as_absent_not_empty() {
         let dir = tempfile::tempdir().unwrap();
-        let skill = write_skill(dir.path(), None, "{}");
-        let hashes = grader_hashes(&skill).await.unwrap();
-        assert_eq!(hashes.walkthrough_sha, hex_sha256(&[]));
+        let absent = write_skill(dir.path(), None, "{}");
+        let hashes = grader_hashes(&absent).await.unwrap();
+        assert_eq!(hashes.walkthrough_sha, sha256_hex(b"absent"));
+        assert_ne!(hashes.walkthrough_sha, sha256_hex(b""));
+
+        let empty = tempfile::tempdir().unwrap();
+        write_skill(empty.path(), Some(""), "{}");
+        let empty_hashes = grader_hashes(empty.path()).await.unwrap();
+        assert_ne!(hashes.walkthrough_sha, empty_hashes.walkthrough_sha);
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn oversized_grader_file_is_rejected() {
+        let dir = tempfile::tempdir().unwrap();
+        let evals = dir.path().join("evals");
+        std::fs::create_dir_all(&evals).unwrap();
+        std::fs::write(evals.join("evals.json"), "{}").unwrap();
+        std::fs::write(evals.join("walkthrough.sh"), vec![b'x'; 1024 * 1024 + 1]).unwrap();
+        let err = grader_hashes(dir.path()).await.unwrap_err();
+        assert!(err.to_string().contains("max"), "{err}");
+    }
+
+    #[cfg(unix)]
+    #[tokio::test(flavor = "current_thread")]
+    async fn executable_bits_change_walkthrough_hash() {
+        use std::os::unix::fs::PermissionsExt as _;
+
+        let dir = tempfile::tempdir().unwrap();
+        let skill = write_skill(dir.path(), Some("#!/bin/sh\nexit 0\n"), "{}");
+        let path = skill.join("evals/walkthrough.sh");
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let executable = grader_hashes(&skill).await.unwrap();
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o644)).unwrap();
+        let plain = grader_hashes(&skill).await.unwrap();
+        assert_ne!(executable.walkthrough_sha, plain.walkthrough_sha);
+        assert_eq!(executable.specs_sha, plain.specs_sha);
     }
 
     #[tokio::test(flavor = "current_thread")]

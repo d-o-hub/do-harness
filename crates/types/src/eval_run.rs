@@ -41,3 +41,27 @@ pub struct GraderBaseline {
     /// Unix timestamp of the bless.
     pub blessed_at: i64,
 }
+
+/// One append-only entry in a skill's bless history.
+///
+/// The `grader_baselines` row is latest-wins; this history preserves who
+/// approved each hash change and when, so a compromised or mistaken baseline
+/// can be audited after the fact.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SkillEvalBless {
+    /// Database id of the bless entry.
+    pub id: i64,
+    /// Skill whose graders were blessed.
+    pub skill_name: String,
+    /// SHA-256 (hex) of `evals/walkthrough.sh` at bless time.
+    pub walkthrough_sha: String,
+    /// SHA-256 (hex) of `evals/evals.json` at bless time.
+    pub specs_sha: String,
+    /// Identity that approved the bless.
+    pub approver: String,
+    /// Optional reason recorded with the bless.
+    pub reason: Option<String>,
+    /// Unix timestamp of the bless.
+    pub blessed_at: i64,
+}

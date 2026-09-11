@@ -12,7 +12,11 @@ use super::bless::bless_skill;
 use super::grading::check_skill;
 
 /// Runs the skill-eval benchmark for skills under `.agents/skills`.
-#[allow(clippy::too_many_lines, clippy::fn_params_excessive_bools)]
+#[allow(
+    clippy::too_many_lines,
+    clippy::too_many_arguments,
+    clippy::fn_params_excessive_bools
+)]
 pub async fn run_eval(
     root: &Path,
     skill: Option<&str>,
@@ -21,6 +25,7 @@ pub async fn run_eval(
     fail_fast: bool,
     dry_run: bool,
     format: Format,
+    approver: Option<&str>,
 ) -> Result<()> {
     let skills_root = root.join(".agents/skills");
     if list_skills {
@@ -32,6 +37,11 @@ pub async fn run_eval(
         }
         return Ok(());
     }
+    let approver = if bless {
+        Some(resolve_approver(approver)?)
+    } else {
+        None
+    };
 
     let entries = match skill {
         Some(name) => {
@@ -129,7 +139,8 @@ pub async fn run_eval(
         }
 
         if bless {
-            bless_skill(&conn, &name, &report, &hashes).await?;
+            let approver = approver.as_deref().unwrap_or("unknown");
+            bless_skill(&conn, &name, &report, &hashes, approver).await?;
         } else if let Some(floor) = do_harness_db::get_skill_bar(&conn, &name).await? {
             if let Some(rate) = report.pass_rate {
                 if rate < floor {
@@ -161,6 +172,32 @@ pub async fn run_eval(
     }
 }
 
+/// Resolves the bless approver: explicit flag, `DO_HARNESS_APPROVER`, then the
+/// git user email. An anonymous bless is rejected (fail-closed).
+fn resolve_approver(explicit: Option<&str>) -> Result<String> {
+    if let Some(value) = explicit.filter(|value| !value.trim().is_empty()) {
+        return Ok(value.trim().to_owned());
+    }
+    if let Ok(value) = std::env::var("DO_HARNESS_APPROVER") {
+        if !value.trim().is_empty() {
+            return Ok(value.trim().to_owned());
+        }
+    }
+    if let Ok(output) = std::process::Command::new("git")
+        .args(["config", "user.email"])
+        .output()
+    {
+        if output.status.success() {
+            let email = String::from_utf8_lossy(&output.stdout).trim().to_owned();
+            if !email.is_empty() {
+                return Ok(email);
+            }
+        }
+    }
+    bail!("--bless requires an approver: pass --approver <name> or set DO_HARNESS_APPROVER")
+}
+
+/// Returns skill directories that contain a `SKILL.md`, sorted by path.
 #[must_use]
 pub(super) fn discover_skills(skills_root: &Path) -> Vec<PathBuf> {
     let mut dirs = Vec::new();

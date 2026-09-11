@@ -66,10 +66,19 @@ Skill structure validation and evaluation benchmark runner.
 
 - `--skill <SKILL>`: Restrict evaluation to target skill directory.
 - `--bless`: Re-baseline grader hashes and raise pass-rate floor on green run.
+  Every bless appends an immutable `skill_eval_blesses` row recording the
+  approver and timestamp; an approver is required (`--approver`,
+  `DO_HARNESS_APPROVER`, or the git user email).
+- `--approver <NAME>`: Identity recorded with `--bless`.
 - `--list-skills`: List discovered skills under `.agents/skills`.
 - `--fail-fast`: Halt evaluation on first failing skill.
 - `--dry-run`: Perform dry-run evaluation without updating state.
 - `--format <Format>`: Output format (`text` or `json`).
+
+**Sandbox boundary:** walkthroughs and graded assertions execute in a
+`tempfile` filesystem sandbox only. There is no seccomp/netns/gVisor
+isolation; children run with the caller's privileges. Treat skill walkthroughs
+as untrusted code and wrap the whole command in an outer sandbox if needed.
 
 ### `distill`
 Extracts a heuristic from a resolved trace into a skill.

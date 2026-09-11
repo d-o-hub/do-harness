@@ -191,6 +191,10 @@ pub enum Command {
         /// Output format.
         #[arg(long, value_enum, default_value_t = Format::Text)]
         format: Format,
+        /// Approver identity recorded with `--bless` (defaults to
+        /// `DO_HARNESS_APPROVER` or the git user email).
+        #[arg(long, value_name = "NAME")]
+        approver: Option<String>,
     },
     /// Manage git hooks that run `do-harness verify`.
     Hook {

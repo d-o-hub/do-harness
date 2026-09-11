@@ -67,4 +67,9 @@ pub const MIGRATIONS: &[Migration] = &[
         name: "schema_hardening",
         sql: include_str!("../migrations/0011_schema_hardening.sql"),
     },
+    Migration {
+        version: 12,
+        name: "bless_history",
+        sql: include_str!("../migrations/0012_bless_history.sql"),
+    },
 ];

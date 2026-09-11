@@ -9,6 +9,7 @@ pub(super) async fn bless_skill(
     name: &str,
     report: &SkillReport,
     hashes: &crate::eval_integrity::GraderHashes,
+    approver: &str,
 ) -> Result<()> {
     if report.gate_failed {
         bail!("cannot bless skill '{name}': structure gate failed; fix it and rerun with --bless");
@@ -22,8 +23,15 @@ pub(super) async fn bless_skill(
         }
         _ => {}
     }
-    do_harness_db::bless_grader_baseline(conn, name, &hashes.walkthrough_sha, &hashes.specs_sha)
-        .await?;
+    do_harness_db::bless_grader_baseline(
+        conn,
+        name,
+        &hashes.walkthrough_sha,
+        &hashes.specs_sha,
+        approver,
+        None,
+    )
+    .await?;
     if report.graded > 0 {
         let best = do_harness_db::max_pass_rate(conn, name).await?;
         if let Some(floor) = crate::eval_integrity::GraderHashes::bar_floor(best) {

@@ -2,7 +2,7 @@
 
 use crate::error::{DbError, Result};
 use crate::migrate::unix_now;
-use do_harness_types::{GraderBaseline, SkillEvalRun};
+use do_harness_types::{GraderBaseline, SkillEvalBless, SkillEvalRun};
 use libsql::{Connection, params};
 
 /// Insert parameters for a new skill-eval run.
@@ -222,28 +222,79 @@ pub async fn get_grader_baseline(
     }
 }
 
-/// Upserts a skill's grader baseline to the given hashes.
+/// Upserts a skill's grader baseline and appends an immutable bless-history
+/// row recording `approver` and optional `reason`, in one transaction.
 ///
 /// # Errors
 ///
-/// Returns an error when the upsert statement fails.
+/// Returns an error when the upsert, history append, or transaction fails.
 pub async fn bless_grader_baseline(
     conn: &Connection,
     skill_name: &str,
     walkthrough_sha: &str,
     specs_sha: &str,
+    approver: &str,
+    reason: Option<&str>,
 ) -> Result<()> {
-    conn.execute(
+    let now = unix_now();
+    let tx = conn.transaction().await?;
+    tx.execute(
         "INSERT INTO grader_baselines (skill_name, walkthrough_sha, specs_sha, blessed_at) \
          VALUES (?1, ?2, ?3, ?4) \
          ON CONFLICT(skill_name) DO UPDATE SET \
            walkthrough_sha = excluded.walkthrough_sha, \
            specs_sha = excluded.specs_sha, \
            blessed_at = excluded.blessed_at",
-        params!(skill_name, walkthrough_sha, specs_sha, unix_now()),
+        params!(skill_name, walkthrough_sha, specs_sha, now),
     )
     .await?;
+    tx.execute(
+        "INSERT INTO skill_eval_blesses \
+         (skill_name, walkthrough_sha, specs_sha, approver, reason, blessed_at) \
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        params!(
+            skill_name,
+            walkthrough_sha,
+            specs_sha,
+            approver,
+            reason,
+            now
+        ),
+    )
+    .await?;
+    tx.commit().await?;
     Ok(())
+}
+
+/// Lists a skill's bless history in approval order (oldest first).
+///
+/// # Errors
+///
+/// Returns an error when the query fails.
+pub async fn list_grader_blesses(
+    conn: &Connection,
+    skill_name: &str,
+) -> Result<Vec<SkillEvalBless>> {
+    let mut rows = conn
+        .query(
+            "SELECT id, skill_name, walkthrough_sha, specs_sha, approver, reason, blessed_at \
+             FROM skill_eval_blesses WHERE skill_name = ?1 ORDER BY id",
+            params!(skill_name),
+        )
+        .await?;
+    let mut blesses = Vec::new();
+    while let Some(row) = rows.next().await? {
+        blesses.push(SkillEvalBless {
+            id: row.get(0)?,
+            skill_name: row.get(1)?,
+            walkthrough_sha: row.get(2)?,
+            specs_sha: row.get(3)?,
+            approver: row.get(4)?,
+            reason: row.get(5)?,
+            blessed_at: row.get(6)?,
+        });
+    }
+    Ok(blesses)
 }
 
 #[cfg(test)]
@@ -327,18 +378,39 @@ mod tests {
                 .unwrap()
                 .is_none()
         );
-        bless_grader_baseline(&conn, "harness", "aaa", "bbb")
-            .await
-            .unwrap();
-        bless_grader_baseline(&conn, "harness", "ccc", "ddd")
-            .await
-            .unwrap();
+        bless_grader_baseline(
+            &conn,
+            "harness",
+            "aaa",
+            "bbb",
+            "approver@example.test",
+            None,
+        )
+        .await
+        .unwrap();
+        bless_grader_baseline(
+            &conn,
+            "harness",
+            "ccc",
+            "ddd",
+            "approver@example.test",
+            None,
+        )
+        .await
+        .unwrap();
         let baseline = get_grader_baseline(&conn, "harness")
             .await
             .unwrap()
             .unwrap();
         assert_eq!(baseline.walkthrough_sha, "ccc");
         assert_eq!(baseline.specs_sha, "ddd");
+
+        // Latest-wins baseline, append-only history: both blesses remain.
+        let history = list_grader_blesses(&conn, "harness").await.unwrap();
+        assert_eq!(history.len(), 2);
+        assert_eq!(history[0].walkthrough_sha, "aaa");
+        assert_eq!(history[1].walkthrough_sha, "ccc");
+        assert_eq!(history[1].approver, "approver@example.test");
     }
 
     #[tokio::test(flavor = "current_thread")]
