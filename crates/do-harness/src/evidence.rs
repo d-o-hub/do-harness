@@ -12,6 +12,7 @@ pub const EVIDENCE_SCHEMA_VERSION: u32 = 1;
 
 /// Single sensor result in the evidence artifact.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct EvidenceSensor {
     pub name: String,
     pub verdict: String, // "pass" | "fail" | "skip"
@@ -22,6 +23,7 @@ pub struct EvidenceSensor {
 
 /// Aggregated summary of sensor verdicts.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct EvidenceSummary {
     pub pass: usize,
     pub fail: usize,
@@ -31,6 +33,7 @@ pub struct EvidenceSummary {
 
 /// Schema-versioned evidence document.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct EvidenceDocument {
     pub schema_version: u32,
     pub tool: &'static str,
@@ -237,5 +240,24 @@ mod tests {
         assert_eq!(value["schema_version"], 1);
         assert_eq!(value["tool"], "do-harness");
         assert_eq!(value["sensors"][0]["verdict"], "pass");
+    }
+
+    /// Evidence types are a stability contract: stale payloads carrying
+    /// unknown fields are rejected at the deserialization boundary.
+    #[test]
+    fn unknown_fields_are_rejected() {
+        let sensor = r#"{"name":"check","verdict":"pass","exit_code":0,
+             "duration_ms":1,"recorded":false,"bogus":true}"#;
+        assert!(serde_json::from_str::<EvidenceSensor>(sensor).is_err());
+
+        let summary = r#"{"pass":1,"fail":0,"skip":0,"verdict":"pass","bogus":true}"#;
+        assert!(serde_json::from_str::<EvidenceSummary>(summary).is_err());
+
+        let document = r#"{"schema_version":1,"tool":"do-harness",
+             "harness_version":"0.1.0","git_sha":null,"started_at":0,
+             "finished_at":0,"root":"/","task_id":null,"sensor_pack":"rust",
+             "sensors":[],"summary":{"pass":0,"fail":0,"skip":0,"verdict":"pass"},
+             "bogus":true}"#;
+        assert!(serde_json::from_str::<EvidenceDocument>(document).is_err());
     }
 }

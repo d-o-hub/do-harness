@@ -13,6 +13,7 @@ use crate::{ForwardDecision, McpLikeToolCall};
 
 /// A single audit record persisted as JSONL.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct AuditRecord {
     /// Monotonic sequence.
     pub seq: u64,
@@ -217,6 +218,15 @@ mod tests {
         AuditLog::verify(&path).expect("verify");
         let log2 = AuditLog::open(&path).expect("reopen");
         assert_eq!(log2.next_seq(), 3);
+    }
+
+    /// Audit records are a stability contract: unknown fields are rejected.
+    #[test]
+    fn test_audit_record_rejects_unknown_fields() {
+        let record = r#"{"seq":1,"prev_hash":"GENESIS","chain_hash":"x",
+             "created_at":0,"tool":"t","params":null,"decision":"allow",
+             "reason":null,"bogus":true}"#;
+        assert!(serde_json::from_str::<AuditRecord>(record).is_err());
     }
 
     #[test]

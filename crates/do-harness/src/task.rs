@@ -6,12 +6,12 @@ use std::path::Path;
 
 use anyhow::{Context, Result};
 use do_harness_types::{Beat, Projection, TaskBoard, TaskRecord, TaskState, WorkflowEvent};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::report::Format;
 
 /// Snapshot of the task list written to `plans/tasks.json`.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct TaskSnapshot {
     /// Unix timestamp of the export.

@@ -412,3 +412,19 @@ async fn check_gate_is_not_satisfied_by_a_test_beat() {
     insert_ok_beat(dir.path(), id, "check").await;
     advance_task(dir.path(), id).await.unwrap();
 }
+
+/// `TaskSnapshot` is a stability contract: it round-trips and rejects stale
+/// payloads that carry unknown fields.
+#[test]
+fn task_snapshot_round_trips_and_rejects_unknown_fields() {
+    let snapshot = TaskSnapshot {
+        exported_at: 1_700_000_000,
+        tasks: vec![],
+    };
+    let json = serde_json::to_string(&snapshot).unwrap();
+    let parsed: TaskSnapshot = serde_json::from_str(&json).unwrap();
+    assert_eq!(parsed.exported_at, snapshot.exported_at);
+    assert!(
+        serde_json::from_str::<TaskSnapshot>(r#"{"exported_at":0,"tasks":[],"extra":1}"#).is_err()
+    );
+}
