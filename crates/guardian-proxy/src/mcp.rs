@@ -67,10 +67,10 @@ impl McpIngress {
 
     /// Runs the mediation pipeline for a tool call.
     ///
-    /// Returns `Ok(Some(reason))` when the call is denied (audit and metrics
+    /// Returns `Ok(Some(denial))` when the call is denied (audit and metrics
     /// already recorded), `Ok(None)` on allow, and `Err` for infrastructure
     /// failures; only `Ok(None)` may be forwarded.
-    async fn mediate(&self, call: &McpLikeToolCall) -> Result<Option<String>, McpError> {
+    async fn mediate(&self, call: &McpLikeToolCall) -> Result<Option<CallToolResponse>, McpError> {
         let Some(mediator) = &self.state.mediator else {
             return Err(McpError::internal_error("mediator unavailable", None));
         };
@@ -98,7 +98,10 @@ impl McpIngress {
         }
         record_audit(&self.state, call, &decision).await;
         match decision {
-            ForwardDecision::Deny { reason } => Ok(Some(reason)),
+            ForwardDecision::Deny { reason } => {
+                let text = ContentBlock::text(format!("denied by governance: {reason}"));
+                Ok(Some(CallToolResult::error(vec![text]).into()))
+            }
             ForwardDecision::Allow => Ok(None),
         }
     }
@@ -144,9 +147,8 @@ impl ServerHandler for McpIngress {
             request.name.to_string(),
             request.arguments.clone().map(Value::Object),
         );
-        if let Some(reason) = self.mediate(&call).await? {
-            let text = ContentBlock::text(format!("denied by governance: {reason}"));
-            return Ok(CallToolResult::error(vec![text]).into());
+        if let Some(denial) = self.mediate(&call).await? {
+            return Ok(denial);
         }
         let params = serde_json::to_value(&request).map_err(|err| {
             McpError::internal_error(format!("serialize tools/call: {err}"), None)

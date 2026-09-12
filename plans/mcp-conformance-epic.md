@@ -1,6 +1,6 @@
 # Epic: MCP Conformance for guardian-proxy
 
-> **Status:** decided via spike (2026-09-12); slices 1–3 complete (`feat-mcp-ingress-scaffold`, `feat-mcp-tools-forwarding`, `feat-mcp-protocol-security`)
+> **Status:** decided via spike (2026-09-12); slices 1–4 complete (ingress, forwarding, protocol security, conformance suite)
 > **Related:** spec 2026-07-28, `plans/agt-governance-epic.md` criterion (b), issue #40
 > **Method:** `spike-and-resolve` → `vertical-event-slice` per slice
 > **Owner:** orchestrator swarm
@@ -162,3 +162,23 @@ unchanged. Hand-rolled and re-scope rejected.
   `agt-governance,mcp-surface` combined check, `cargo deny check` clean,
   `do-harness verify` 12/12; trace 27 + `fail-closed-proxy` heuristic 20.
   Next slice: `test-mcp-conformance-suite`.
+
+## Slice completion — test-mcp-conformance-suite (2026-09-12)
+
+- New integration suite `crates/guardian-proxy/tests/mcp_conformance.rs`
+  (feature-gated) drives the proxy through real TCP listeners with a raw
+  `reqwest` client and an in-process upstream: round trip with audit-chain and
+  metrics assertions, 1 MiB body → 413 with zero upstream calls, and degraded
+  mode returning a JSON-RPC error without forwarding.
+- Deny coverage gap closed: `McpIngress::mediate` now returns the mapped
+  denial response, so a direct unit test exercises deny → tool-level error +
+  deny metric + deny audit record (the typed `arguments` shape cannot express
+  the stub's denied input).
+- `mcp/tests.rs` split at the LOC ceiling: negative-path tests moved to
+  `mcp/tests/security.rs` (354 + 187 lines).
+- `init.rs` decomposed while the loc sensor warned at 452 lines: portable
+  skill scaffolding moved to `crates/do-harness/src/init/skills.rs`.
+- Evidence: feature-off 29 / feature-on 44 lib + 3 integration tests, clippy
+  `-D warnings` off/on, `cargo deny check` clean, `do-harness verify` 12/12;
+  traces 28 + harness heuristic 21 + `fail-closed-proxy` heuristic 22.
+  Next slice: `docs-mcp-surface`.
