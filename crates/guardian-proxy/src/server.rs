@@ -19,7 +19,7 @@ use crate::{AuditLog, McpLikeToolCall, ProxyMediator, state::AppState};
 /// Maximum accepted request body (JSON tool call): one mebibyte.
 pub(crate) const MAX_REQUEST_BYTES: usize = 1024 * 1024;
 /// Maximum buffered upstream response body: one mebibyte.
-const MAX_UPSTREAM_BYTES: usize = 1024 * 1024;
+pub(crate) const MAX_UPSTREAM_BYTES: usize = 1024 * 1024;
 /// Response header advertising whether governance is enforced or stubbed.
 const GOVERNANCE_HEADER: &str = "x-do-harness-governance";
 
@@ -95,7 +95,11 @@ async fn metrics_handler(State(state): State<AppState>, headers: HeaderMap) -> R
     Json(state.metrics.snapshot()).into_response()
 }
 
-async fn record_audit(state: &AppState, call: &McpLikeToolCall, decision: &crate::ForwardDecision) {
+pub(crate) async fn record_audit(
+    state: &AppState,
+    call: &McpLikeToolCall,
+    decision: &crate::ForwardDecision,
+) {
     let Some(audit) = state.audit.clone() else {
         return;
     };

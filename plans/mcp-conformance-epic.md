@@ -1,6 +1,6 @@
 # Epic: MCP Conformance for guardian-proxy
 
-> **Status:** decided via spike (2026-09-12); slice 1 `feat-mcp-ingress-scaffold` complete
+> **Status:** decided via spike (2026-09-12); slices 1–2 complete (`feat-mcp-ingress-scaffold`, `feat-mcp-tools-forwarding`)
 > **Related:** spec 2026-07-28, `plans/agt-governance-epic.md` criterion (b), issue #40
 > **Method:** `spike-and-resolve` → `vertical-event-slice` per slice
 > **Owner:** orchestrator swarm
@@ -117,3 +117,27 @@ unchanged. Hand-rolled and re-scope rejected.
 - Note: rmcp's MSRV 1.88 applies only when the feature is enabled; the CI MSRV
   job (1.85, default features) is expected to stay green — confirm on the next
   CI run. Next slice: `feat-mcp-tools-forwarding`.
+
+## Slice completion — feat-mcp-tools-forwarding (2026-09-12)
+
+- `crates/guardian-proxy/src/mcp/forward.rs`: raw JSON-RPC forwarding with
+  `Mcp-Method`/`Mcp-Name` headers, 1 MiB request/response caps, upstream
+  JSON-RPC error mapping, and an SSE `data:` scan for conformant servers that
+  answer `text/event-stream`; all failure classes are protocol errors.
+- `mcp.rs` handler: `get_info` advertises the `tools` capability;
+  `list_tools` and `on_custom_request` pass through after a readiness check;
+  `call_tool` runs `decide` → metrics (allow/deny/stub/mediator-error) →
+  `record_audit`, forwards only on `Allow` with `params.arguments` intact, maps
+  `Deny` to a caller-visible tool-level error result, and maps degraded/
+  mediator/upstream faults to protocol errors. Denied and degraded calls never
+  reach upstream (asserted).
+- `server.rs`: `record_audit` and `MAX_UPSTREAM_BYTES` widened to `pub(crate)`
+  for reuse; legacy behavior unchanged.
+- Tests: `mcp::tests` now 9 cases (discover, missing protocol header, legacy
+  precedence, `tools/list` forwarding, mediated `tools/call` with `Mcp-Name`
+  assertion + metrics snapshot, degraded zero-upstream-calls, custom-method
+  passthrough, audit chain intact with `tool`/`decision` fields, unreachable
+  upstream). Feature-off 29 / feature-on 37.
+- Evidence: clippy `-D warnings` off/on, `agt-governance,mcp-surface` combined
+  check, `cargo deny check` clean, `do-harness verify` 12/12; trace 26 +
+  `fail-closed-proxy` heuristic 19. Next slice: `feat-mcp-protocol-security`.

@@ -1,0 +1,2 @@
+# Heuristics
+- **when mirroring a mediation pipeline onto an MCP path, run decide -> metrics -> audit before forwarding, map deny to a caller-visible tool error and infrastructure faults to protocol errors, forward upstream with Mcp-Method/Mcp-Name headers and a body cap, and scan SSE data lines for the final response**: fail-closed decide-audit-forward mediation on a JSON-RPC/MCP ingress where the upstream may answer JSON or SSE (from trace 26)
