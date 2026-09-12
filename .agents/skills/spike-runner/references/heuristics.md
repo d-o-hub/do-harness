@@ -1,3 +1,4 @@
 # Heuristics
 - **probe proxy transport (axum HTTP vs mcp-sdk stdio) at compile-time before wiring gate**: Axum HTTP for v1, defer MCP stdio; fail-closed via ProxyMediator identical for both (from trace 8)
 - **send User-Agent (and Accept) headers on external API probes**: unauthenticated crates.io API returns 403 without User-Agent; always set `-A` identifier plus `Accept: application/json` on crates.io / api.github.com spikes (from trace 10)
+- **before adopting an official SDK for an intermediary, probe its server trait for raw-method passthrough hooks, verify its tower service mounts on the current axum, and price MSRV plus duplicate-version transitive costs behind a feature flag**: SDK adoption spikes where protocol conformance is needed but the crate must stay optional and dependency-direction clean (from trace 24)
