@@ -4,11 +4,12 @@
 # Sensor: scripts/check-audit.sh
 # Enforcement policy (fail-open locally, fail-closed on demand):
 #   - cargo-audit missing AND (CI=true OR DO_HARNESS_REQUIRE_TOOLS=1) -> FAIL.
-#   - cargo-audit missing otherwise -> WARN skip (keeps offline
+#   - cargo-audit missing otherwise -> SKIP (keeps offline
 #     `do-harness verify --fail-fast` usable; advisory scanning is still
 #     enforced by the CI pipeline).
-# NOTE: a WARN skip exits 0 and is indistinguishable from a pass downstream.
-# Set DO_HARNESS_REQUIRE_TOOLS=1 in any context where a skip must not
+# NOTE: a SKIP exits 0 and is flagged by the runner as a warned sensor (the
+# evidence artifact records it as `warn`, so `--strict` and `status` reject
+# it). Set DO_HARNESS_REQUIRE_TOOLS=1 in any context where a skip must not
 # masquerade as green (pre-push, release gates). CI sets it explicitly in
 # .github/workflows/verify.yml alongside CI=true.
 # Note: cargo-deny (deps sensor) also checks advisories; this sensor is the
@@ -27,7 +28,7 @@ if ! cargo audit --version >/dev/null 2>&1; then
         echo "FAIL: cargo-audit is required when CI=true or DO_HARNESS_REQUIRE_TOOLS=1."
         exit 1
     fi
-    echo "WARN: cargo-audit not installed; skipping RustSec scan."
+    echo "SKIP: cargo-audit not installed; skipping RustSec scan."
     exit 0
 fi
 

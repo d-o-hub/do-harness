@@ -27,6 +27,10 @@ pub struct SensorResult {
     /// Whether this sensor failure was allowed/advisory (soft failure).
     #[serde(default)]
     pub allow_failure: bool,
+    /// Whether a passing sensor reported a `SKIP:` marker because a tool or
+    /// runtime was unavailable; evidence records this as a non-pass.
+    #[serde(default)]
+    pub warned: bool,
     /// Captured combined output; excluded from serialization.
     #[serde(skip)]
     pub output: String,
@@ -58,12 +62,10 @@ const OUTPUT_TAIL_LINES: usize = 80;
 /// go to stderr, prefixed with six spaces.
 pub fn print_report(report: &VerifyReport, format: Format) {
     for sensor in &report.sensors {
-        let verdict = if sensor.ok {
-            "PASS"
-        } else if sensor.allow_failure {
-            "WARN"
-        } else {
-            "FAIL"
+        let verdict = match (sensor.ok, sensor.warned, sensor.allow_failure) {
+            (true, false, _) => "PASS",
+            (false, _, false) => "FAIL",
+            (true, true, _) | (false, _, true) => "WARN",
         };
         if format == Format::Json {
             eprintln!("{verdict}  {}", sensor.name);
@@ -129,6 +131,7 @@ mod tests {
                 exit_code: Some(1),
                 duration_ms: 42,
                 allow_failure: false,
+                warned: false,
                 output: "hidden".to_owned(),
             }],
             signal_set: None,
@@ -139,6 +142,7 @@ mod tests {
         assert!(value.get("root").is_some());
         assert!(value.get("failed").is_some());
         assert!(value["sensors"][0].get("exit_code").is_some());
+        assert!(value["sensors"][0].get("warned").is_some());
         assert!(value["sensors"][0].get("output").is_none());
     }
 }

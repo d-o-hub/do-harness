@@ -47,11 +47,11 @@ when-changed = ["Cargo.toml", "Cargo.lock", "crates/**/Cargo.toml", "deny.toml",
 [[sensors]]
 name = "shell"
 argv = ["bash", "scripts/check-shell.sh"]
-when-changed = ["scripts/**", "crates/do-harness/templates/scripts/**"]
+when-changed = ["scripts/**", "crates/do-harness/templates/scripts/**", ".agents/skills/**", "crates/do-harness/templates/skills/**"]
 
 [[sensors]]
 name = "check-agt"
-argv = ["cargo", "check", "-p", "guardian-proxy", "--features", "agt-governance"]
+argv = ["cargo", "test", "-p", "guardian-proxy", "--features", "agt-governance"]
 when-changed = ["crates/guardian-proxy/**", "Cargo.toml", "Cargo.lock"]
 
 [[sensors]]

@@ -51,9 +51,9 @@ jobs:
       - name: Build harness CLI
         run: cargo build --release -p do-harness
       - name: Check adjacent guardian-proxy crate
-        run: cargo check -p guardian-proxy && cargo check -p guardian-proxy --features agt-governance
+        run: cargo check -p guardian-proxy
       - name: Test adjacent guardian-proxy crate
-        run: cargo test -p guardian-proxy
+        run: cargo test -p guardian-proxy && cargo test -p guardian-proxy --features agt-governance
       - name: Run sensors
         env:
           # check-audit.sh / check-deps.sh / check-shell.sh fail closed when

@@ -30,5 +30,5 @@ EOF
 for _ in 1 2 3 4 5; do
   "$bin" --root "$root" task advance "$id" >/dev/null
 done
-"$bin" --root "$root" task done "$id" >/dev/null
+"$bin" --root "$root" task "done" "$id" >/dev/null
 "$bin" --root "$root" task list

@@ -354,6 +354,34 @@ fn allow_failure_sensor_does_not_fail_gate_but_surfaces_output() {
     assert!(report.sensors[0].output.contains("something wrong"));
 }
 
+/// A passing sensor whose output carries a `SKIP:` marker is warned, not
+/// failed: the local gate stays green while evidence records the skip.
+#[test]
+fn skip_marker_warns_without_failing_gate() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let cfg = config_with(&[(
+        "skippy",
+        &["bash", "-c", "echo 'SKIP: tool missing'; exit 0"],
+    )]);
+    let report = verify(
+        &cfg,
+        dir.path(),
+        &VerifyOpts {
+            fail_fast: false,
+            only: vec![],
+            exclude: vec![],
+            blocked: vec![],
+            ..Default::default()
+        },
+    )
+    .expect("verify");
+
+    assert!(report.ok);
+    assert!(report.failed.is_empty());
+    assert!(report.sensors[0].ok);
+    assert!(report.sensors[0].warned);
+}
+
 /// Restricting retries to `transient_exit_codes` does not retry non-transient exit codes.
 #[test]
 fn transient_exit_codes_restricts_retries() {

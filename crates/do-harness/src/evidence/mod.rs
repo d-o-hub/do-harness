@@ -27,7 +27,7 @@ pub struct EvidenceSensor {
     pub name: String,
     /// Exact argv executed (including the program).
     pub argv: Vec<String>,
-    /// `"pass"` | `"fail"` | `"skip"`.
+    /// `"pass"` | `"fail"` | `"warn"` | `"skip"`.
     pub verdict: String,
     /// Process exit code, when the sensor ran.
     pub exit_code: Option<i32>,
@@ -166,15 +166,12 @@ impl EvidenceDocument {
 
         for spec in selected_specs {
             if let Some(res) = report.sensors.iter().find(|r| r.name == spec.name) {
-                let verdict = if res.ok || res.allow_failure {
-                    if res.ok {
-                        pass_count += 1;
-                        "pass"
-                    } else {
-                        // allow_failure soft failure is still a non-pass in strict terms if failed
-                        fail_count += 1;
-                        "fail"
-                    }
+                let verdict = if res.ok && res.warned {
+                    fail_count += 1;
+                    "warn"
+                } else if res.ok {
+                    pass_count += 1;
+                    "pass"
                 } else {
                     fail_count += 1;
                     "fail"

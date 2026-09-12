@@ -75,17 +75,16 @@ pub fn verify(cfg: &Config, root: &Path, opts: &VerifyOpts) -> Result<VerifyRepo
     for spec in selection.specs {
         // Blocked synthesis: sensor is halted by fail-fast policy (ok=false, exit_code=None, duration_ms=0).
         let result = if opts.blocked.contains(&spec.name) {
-            SensorResult {
-                name: spec.name.clone(),
-                ok: false,
-                exit_code: None,
-                duration_ms: 0,
-                allow_failure: spec.allow_failure,
-                output: format!(
+            sensor_result(
+                spec,
+                false,
+                None,
+                0,
+                format!(
                     "halted: sensor '{}' has failed {} consecutive times; resolve the underlying issue before re-running",
                     spec.name, FAIL_FAST_STRIKES
                 ),
-            }
+            )
         } else {
             run_sensor(spec, root)
         };
@@ -216,18 +215,41 @@ pub fn resolve_selection<'a>(
     })
 }
 
+/// Builds a [`SensorResult`] for `spec`, deriving `warned` from a passing run
+/// whose output carries a `SKIP:` marker (a tool or runtime was unavailable).
+fn sensor_result(
+    spec: &SensorSpec,
+    ok: bool,
+    exit_code: Option<i32>,
+    duration_ms: u64,
+    output: String,
+) -> SensorResult {
+    let warned = ok
+        && output
+            .lines()
+            .any(|line| line.trim_start().starts_with("SKIP:"));
+    SensorResult {
+        name: spec.name.clone(),
+        ok,
+        exit_code,
+        duration_ms,
+        allow_failure: spec.allow_failure,
+        warned,
+        output,
+    }
+}
+
 /// Runs a single sensor attempt from `root`, enforcing timeouts if configured.
 fn run_sensor_attempt(spec: &SensorSpec, root: &Path) -> SensorResult {
     let start = Instant::now();
     let Some((program, rest)) = spec.argv.split_first() else {
-        return SensorResult {
-            name: spec.name.clone(),
-            ok: false,
-            exit_code: None,
-            duration_ms: 0,
-            allow_failure: spec.allow_failure,
-            output: format!("sensor '{}' has an empty argv", spec.name),
-        };
+        return sensor_result(
+            spec,
+            false,
+            None,
+            0,
+            format!("sensor '{}' has an empty argv", spec.name),
+        );
     };
 
     let timeout_duration = spec.timeout.map(Duration::from_secs);
@@ -239,26 +261,24 @@ fn run_sensor_attempt(spec: &SensorSpec, root: &Path) -> SensorResult {
         let duration_ms = u64::try_from(start.elapsed().as_millis()).unwrap_or(u64::MAX);
 
         match output {
-            Ok(output) => SensorResult {
-                name: spec.name.clone(),
-                ok: output.status.success(),
-                exit_code: output.status.code(),
+            Ok(output) => sensor_result(
+                spec,
+                output.status.success(),
+                output.status.code(),
                 duration_ms,
-                allow_failure: spec.allow_failure,
-                output: format!(
+                format!(
                     "{}\n{}",
                     String::from_utf8_lossy(&output.stdout),
                     String::from_utf8_lossy(&output.stderr)
                 ),
-            },
-            Err(err) => SensorResult {
-                name: spec.name.clone(),
-                ok: false,
-                exit_code: None,
+            ),
+            Err(err) => sensor_result(
+                spec,
+                false,
+                None,
                 duration_ms,
-                allow_failure: spec.allow_failure,
-                output: format!("failed to spawn {program}: {err}"),
-            },
+                format!("failed to spawn {program}: {err}"),
+            ),
         }
     }
 }
@@ -282,14 +302,13 @@ fn run_sensor_with_timeout(
         Ok(child) => child,
         Err(err) => {
             let duration_ms = u64::try_from(start.elapsed().as_millis()).unwrap_or(u64::MAX);
-            return SensorResult {
-                name: spec.name.clone(),
-                ok: false,
-                exit_code: None,
+            return sensor_result(
+                spec,
+                false,
+                None,
                 duration_ms,
-                allow_failure: spec.allow_failure,
-                output: format!("failed to spawn {program}: {err}"),
-            };
+                format!("failed to spawn {program}: {err}"),
+            );
         }
     };
 
@@ -319,18 +338,17 @@ fn run_sensor_with_timeout(
                 let stderr = stderr_handle
                     .and_then(|h| h.join().ok())
                     .unwrap_or_default();
-                return SensorResult {
-                    name: spec.name.clone(),
-                    ok: status.success(),
-                    exit_code: status.code(),
+                return sensor_result(
+                    spec,
+                    status.success(),
+                    status.code(),
                     duration_ms,
-                    allow_failure: spec.allow_failure,
-                    output: format!(
+                    format!(
                         "{}\n{}",
                         String::from_utf8_lossy(&stdout),
                         String::from_utf8_lossy(&stderr)
                     ),
-                };
+                );
             }
             Ok(None) => {
                 if start.elapsed() >= timeout {
@@ -338,18 +356,17 @@ fn run_sensor_with_timeout(
                     let _ = child.wait();
                     let duration_ms =
                         u64::try_from(start.elapsed().as_millis()).unwrap_or(u64::MAX);
-                    return SensorResult {
-                        name: spec.name.clone(),
-                        ok: false,
-                        exit_code: None,
+                    return sensor_result(
+                        spec,
+                        false,
+                        None,
                         duration_ms,
-                        allow_failure: spec.allow_failure,
-                        output: format!(
+                        format!(
                             "sensor '{}' timed out after {}s",
                             spec.name,
                             timeout.as_secs()
                         ),
-                    };
+                    );
                 }
                 thread::sleep(Duration::from_millis(10));
             }
@@ -357,14 +374,13 @@ fn run_sensor_with_timeout(
                 let _ = child.kill();
                 let _ = child.wait();
                 let duration_ms = u64::try_from(start.elapsed().as_millis()).unwrap_or(u64::MAX);
-                return SensorResult {
-                    name: spec.name.clone(),
-                    ok: false,
-                    exit_code: None,
+                return sensor_result(
+                    spec,
+                    false,
+                    None,
                     duration_ms,
-                    allow_failure: spec.allow_failure,
-                    output: format!("error waiting for child {program}: {err}"),
-                };
+                    format!("error waiting for child {program}: {err}"),
+                );
             }
         }
     }

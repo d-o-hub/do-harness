@@ -84,6 +84,7 @@ fn soft_failure_is_recorded_as_fail_not_pass() {
             exit_code: Some(1),
             duration_ms: 5,
             allow_failure: true,
+            warned: false,
             output: "boom".into(),
         }],
     };
@@ -107,6 +108,60 @@ fn soft_failure_is_recorded_as_fail_not_pass() {
     assert_eq!(doc.sensors[0].verdict, "fail");
     assert_eq!(doc.summary.fail, 1);
     assert_eq!(doc.summary.pass, 0);
+    assert!(!doc.is_strict_clean());
+}
+
+/// A passing sensor that reported a `SKIP:` marker is recorded as `warn`:
+/// the local gate stays green, but `--strict` and `status` reject it.
+#[test]
+fn warned_sensor_is_recorded_as_warn_and_fails_summary() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut cfg = crate::config::rust_default();
+    cfg.sensors = vec![crate::config::SensorSpec {
+        name: "tool".into(),
+        argv: vec!["true".into()],
+        retry: None,
+        timeout: None,
+        allow_failure: false,
+        transient_exit_codes: vec![],
+        when_changed: vec![],
+    }];
+    let report = VerifyReport {
+        ok: true,
+        root: dir.path().display().to_string(),
+        failed: vec![],
+        signal_set: None,
+        sensors: vec![crate::report::SensorResult {
+            name: "tool".into(),
+            ok: true,
+            exit_code: Some(0),
+            duration_ms: 5,
+            allow_failure: false,
+            warned: true,
+            output: "SKIP: tool missing".into(),
+        }],
+    };
+    let meta = RunMeta {
+        cfg: &cfg,
+        root: dir.path(),
+        set: None,
+        selected: &["tool".to_owned()],
+        fingerprints: crate::fingerprint::Fingerprints {
+            workspace: "sha256:w".into(),
+            policy: "sha256:p".into(),
+            config: "sha256:c".into(),
+        },
+        changed: false,
+        skipped: Vec::new(),
+        task: None,
+        started_at: 0,
+        finished_at: 1,
+    };
+    let doc = EvidenceDocument::from_run(&report, &meta);
+    assert_eq!(doc.sensors[0].verdict, "warn");
+    assert_eq!(doc.summary.pass, 0);
+    assert_eq!(doc.summary.fail, 1);
+    assert_eq!(doc.summary.verdict, "fail");
     assert!(!doc.is_strict_clean());
 }
 

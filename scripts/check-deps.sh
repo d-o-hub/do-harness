@@ -10,7 +10,7 @@
 # Enforcement policy (fail-open locally, fail-closed on demand), mirroring
 # scripts/check-audit.sh: a missing cargo-deny must not silently green-light
 # the sensor where real gates are required. Set DO_HARNESS_REQUIRE_TOOLS=1
-# (or CI=true) to turn a missing tool into a FAIL instead of a WARN skip.
+# (or CI=true) to turn a missing tool into a FAIL instead of a SKIP.
 
 set -euo pipefail
 
@@ -27,7 +27,7 @@ if grep -qE 'do-harness-(db|core|adapters|cli)' "$TYPES_MANIFEST"; then
 fi
 
 # Real closure check: cargo tree resolves the full normal-dependency graph.
-# A tree failure is a hard error under required-tools mode, a WARN otherwise.
+# A tree failure is a hard error under required-tools mode, a SKIP otherwise.
 if closure="$(cd "$ROOT" && cargo tree -p do-harness-types --edges normal --prefix none 2>/dev/null)"; then
     if echo "$closure" | grep -qE '^(do-harness-db|do-harness|guardian-proxy|libsql)( |$)'; then
         echo "FAIL: do-harness-types closure must not contain storage or adapters."
@@ -37,7 +37,7 @@ elif require_tools; then
     echo "FAIL: cargo tree failed under required-tools mode."
     FAIL=1
 else
-    echo "WARN: cargo tree unavailable; skipping transitive closure check."
+    echo "SKIP: cargo tree unavailable; skipping transitive closure check."
 fi
 
 if closure="$(cd "$ROOT" && cargo tree -p guardian-proxy --edges normal --prefix none 2>/dev/null)"; then
@@ -49,7 +49,7 @@ elif require_tools; then
     echo "FAIL: cargo tree failed under required-tools mode."
     FAIL=1
 else
-    echo "WARN: cargo tree unavailable; skipping guardian-proxy closure check."
+    echo "SKIP: cargo tree unavailable; skipping guardian-proxy closure check."
 fi
 
 if command -v cargo-deny >/dev/null 2>&1; then
@@ -58,7 +58,7 @@ elif require_tools; then
     echo "FAIL: cargo-deny is required when CI=true or DO_HARNESS_REQUIRE_TOOLS=1."
     FAIL=1
 else
-    echo "WARN: cargo-deny not installed; skipping deny check."
+    echo "SKIP: cargo-deny not installed; skipping deny check."
 fi
 
 if (( FAIL )); then
