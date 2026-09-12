@@ -17,11 +17,13 @@
   preserves approvals; the new head must be re-validated).
 - Never `git push --force` an independent PR; only stacks need the rebase below.
 
-## Stacked PR after the parent merges (squash)
+## Stacked PR after the parent merges (squash or rebase)
 
-Squash-merging the parent leaves the child's branch containing the parent's old
-commits, which re-appear in the child diff. Rebase the child onto the new default
-branch:
+Merging the parent leaves the child's branch containing the parent's old
+commits, which re-appear in the child diff. If the parent branch is
+auto-deleted, GitHub retargets the child to the default branch and usually
+reports `CONFLICTING` / `DIRTY` until it is rebased. Rebase the child onto the
+new default branch:
 
 ```bash
 git fetch origin
@@ -31,8 +33,11 @@ git push --force-with-lease origin CHILD_BRANCH
 ```
 
 `OLD_PARENT_SHA` is the parent head recorded in the state file before the parent
-merge. After the force-push, the child has a new head SHA: re-run checks,
-conversations, and review before merging. Force-push only own or bot branches.
+merge. The rebase is required after a rebase merge as well as a squash merge:
+both rewrite the parent's commits, so the child's recorded head is no longer an
+ancestor of the default branch. After the force-push, the child has a new head
+SHA: re-run checks, conversations, and review before merging. Force-push only
+own or bot branches.
 
 If the rebase conflicts beyond trivial textual overlap, abort and escalate.
 
@@ -41,6 +46,9 @@ If the rebase conflicts beyond trivial textual overlap, abort and escalate.
 ```bash
 gh pr merge PR --squash --match-head-commit HEAD_SHA
 ```
+
+Use the repository's configured merge method (squash or rebase) and always pin
+the validated head with `--match-head-commit`.
 
 Requirements before running it:
 

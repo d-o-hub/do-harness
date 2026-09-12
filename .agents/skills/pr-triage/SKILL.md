@@ -4,6 +4,8 @@ description: Triage all open GitHub pull requests with gh and git. Use when aske
 metadata:
   short-description: Triage open GitHub PRs end to end
 ---
+## Guides
+See references/heuristics.md for distilled heuristics.
 
 # PR Triage
 
