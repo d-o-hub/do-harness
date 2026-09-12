@@ -53,7 +53,7 @@ jobs:
       - name: Check adjacent guardian-proxy crate
         run: cargo check -p guardian-proxy
       - name: Test adjacent guardian-proxy crate
-        run: cargo test -p guardian-proxy && cargo test -p guardian-proxy --features agt-governance
+        run: cargo test -p guardian-proxy && cargo test -p guardian-proxy --features agt-governance && cargo test -p guardian-proxy --features mcp-surface
       - name: Run sensors
         env:
           # check-audit.sh / check-deps.sh / check-shell.sh fail closed when

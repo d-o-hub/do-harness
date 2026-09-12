@@ -36,6 +36,12 @@ http-body-util = "0.1"
 # `cargo deny check` + `cargo audit`; see plans/agt-governance-epic.md
 # (chore-agt-promotion gate) before removing the pin.
 agent-governance = "=3.2.2"
+# Exact pin (same policy as agent-governance): rmcp 3.x is the official Rust
+# MCP SDK and still evolving. Only guardian-proxy's optional `mcp-surface`
+# feature enables it. Update with `cargo update -p rmcp --precise <ver>` and
+# re-run `cargo deny check` + `cargo audit`; see plans/mcp-conformance-epic.md
+# before bumping.
+rmcp = { version = "=3.3.0", features = ["server", "transport-streamable-http-server", "macros"] }
 
 # Dev-profile tuning lives here (Cargo only honors [profile.*] in manifests,
 # never in .cargo/config.toml).

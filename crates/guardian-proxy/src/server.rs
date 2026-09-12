@@ -17,7 +17,7 @@ use serde_json::Value;
 use crate::{AuditLog, McpLikeToolCall, ProxyMediator, state::AppState};
 
 /// Maximum accepted request body (JSON tool call): one mebibyte.
-const MAX_REQUEST_BYTES: usize = 1024 * 1024;
+pub(crate) const MAX_REQUEST_BYTES: usize = 1024 * 1024;
 /// Maximum buffered upstream response body: one mebibyte.
 const MAX_UPSTREAM_BYTES: usize = 1024 * 1024;
 /// Response header advertising whether governance is enforced or stubbed.
@@ -48,13 +48,22 @@ pub fn create_router_degraded(error: String) -> Router {
 }
 
 /// Creates a router from explicit state (shares the state's metrics handle).
+///
+/// With the `mcp-surface` feature, the MCP Streamable HTTP endpoint is mounted
+/// at `/mcp` (modern protocol revision only); the legacy flat routes keep
+/// precedence for their exact paths.
 pub fn create_router_with_state(state: AppState) -> Router {
-    Router::new()
+    #[cfg(feature = "mcp-surface")]
+    let mcp_state = state.clone();
+    let router = Router::new()
         .route("/health", get(health_handler))
         .route("/metrics", get(metrics_handler))
         .route("/mcp/tools/call", post(tool_call_handler))
         .layer(DefaultBodyLimit::max(MAX_REQUEST_BYTES))
-        .with_state(state)
+        .with_state(state);
+    #[cfg(feature = "mcp-surface")]
+    let router = crate::mcp::mount(router, mcp_state);
+    router
 }
 
 async fn health_handler(State(state): State<AppState>) -> Response {

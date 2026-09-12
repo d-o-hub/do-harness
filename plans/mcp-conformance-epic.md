@@ -1,6 +1,6 @@
 # Epic: MCP Conformance for guardian-proxy
 
-> **Status:** decided via spike (2026-09-12); implementation not started
+> **Status:** decided via spike (2026-09-12); slice 1 `feat-mcp-ingress-scaffold` complete
 > **Related:** spec 2026-07-28, `plans/agt-governance-epic.md` criterion (b), issue #40
 > **Method:** `spike-and-resolve` → `vertical-event-slice` per slice
 > **Owner:** orchestrator swarm
@@ -87,3 +87,33 @@ unchanged. Hand-rolled and re-scope rejected.
 - [ ] `cargo deny check` clean with no `reqwest` duplicate
 - [ ] conformance suite covers allow/deny/audit/metrics + negative header/version paths
 - [ ] AGT epic criterion (b) re-worded; `chore-agt-promotion` still gated on GA
+
+## Slice completion — feat-mcp-ingress-scaffold (2026-09-12)
+
+- `Cargo.toml`: `rmcp = "=3.3.0"` (features `server`,
+  `transport-streamable-http-server`, `macros`) with the same exact-pin
+  exemption comment as `agent-governance`; `crates/guardian-proxy/Cargo.toml`
+  adds an optional dep plus `mcp-surface` feature (off by default, so default
+  builds keep MSRV 1.85).
+- `crates/guardian-proxy/src/mcp.rs`: `McpIngress` handler
+  (`ServerInfo.server_info = guardian-proxy <crate version>`) advertising only
+  `2026-07-28`; `service()` configures stateless modern mode, JSON responses,
+  required per-request protocol metadata, and the 1 MiB body cap; `mount()`
+  nests the tower service at `/mcp`.
+- `server.rs`: `create_router_with_state` mounts the endpoint when the feature
+  is on; the explicit legacy `/mcp/tools/call` route keeps precedence (proved
+  by the feature-on legacy suite).
+- Tests: `mcp::tests` 3 cases (discover returns `supportedVersions`, missing
+  `MCP-Protocol-Version` is 400, legacy route still 503 degraded);
+  `test_mcp_endpoint_absent_without_feature` asserts 404 with the feature off.
+  Feature-off 29 tests / feature-on 31.
+- CI/sensors: new `check-mcp` sensor (`cargo test -p guardian-proxy --features
+  mcp-surface`) added to the verification and release sets (`do-harness.toml`);
+  `verify.yml` test step now covers the feature.
+- Evidence: `cargo clippy -p guardian-proxy --all-targets -- -D warnings`
+  off/on green; `cargo check -p guardian-proxy --features
+  agt-governance,mcp-surface` green; `cargo deny check` clean (no duplicate
+  versions); `do-harness verify` 12/12; trace 25 + harness heuristic 18.
+- Note: rmcp's MSRV 1.88 applies only when the feature is enabled; the CI MSRV
+  job (1.85, default features) is expected to stay green — confirm on the next
+  CI run. Next slice: `feat-mcp-tools-forwarding`.

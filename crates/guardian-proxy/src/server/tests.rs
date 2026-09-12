@@ -378,3 +378,18 @@ async fn test_responses_advertise_governance_mode() {
     };
     assert_eq!(mode, expected);
 }
+
+#[cfg(not(feature = "mcp-surface"))]
+#[tokio::test(flavor = "current_thread")]
+async fn test_mcp_endpoint_absent_without_feature() {
+    let mediator = test_mediator_with_upstream("http://127.0.0.1:9");
+    let router = create_router(mediator);
+    let req = Request::builder()
+        .uri("/mcp")
+        .method("POST")
+        .header("content-type", "application/json")
+        .body(AxumBody::from("{}"))
+        .expect("request");
+    let resp = router.oneshot(req).await.expect("response");
+    assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+}

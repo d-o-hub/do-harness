@@ -25,8 +25,11 @@ toml.workspace = true
 tower.workspace = true
 agent-governance = { workspace = true, optional = true }
 serde_yaml = { workspace = true, optional = true }
+rmcp = { workspace = true, optional = true }
 thiserror.workspace = true
 
 [features]
 default = []
 agt-governance = ["dep:agent-governance", "dep:serde_yaml"]
+# rmcp requires Rust 1.88; default builds and the MSRV job stay on 1.85.
+mcp-surface = ["dep:rmcp"]

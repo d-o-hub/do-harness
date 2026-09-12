@@ -60,6 +60,9 @@ pub use metrics::{MetricsSnapshot, ProxyMetrics};
 mod state;
 pub use state::AppState;
 
+#[cfg(feature = "mcp-surface")]
+pub mod mcp;
+
 mod server;
 pub use server::{
     create_router, create_router_degraded, create_router_with_audit, create_router_with_state,
