@@ -100,5 +100,11 @@
     "rationale": "Agent runtimes consume selection, applicability, freshness, and evidence semantics instead of reconstructing them",
     "sensor": "do-harness verify --set / explain / status",
     "category": "architecture"
+  },
+  {
+    "invariant": "guardian-proxy speaks MCP 2026-07-28 only behind the optional mcp-surface feature; rmcp stays optional and the flat route is deprecated with a successor link",
+    "rationale": "Official SDK conformance at the ingress without forcing MSRV 1.88 or duplicate dependencies on default builds; default-on and route removal are a separate promotion decision",
+    "sensor": "cargo test -p guardian-proxy --features mcp-surface",
+    "category": "architecture"
   }
 ]

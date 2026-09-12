@@ -106,7 +106,7 @@ Created `.agents/skills/fail-closed-proxy/` (`SKILL.md` decide-audit-forward met
 | `api.github.com/.../releases/latest` | `tag=v4.1.0`, `prerelease=false` | Toolkit repo ships v4.x without the old "Public Preview" banner, but with **no GA declaration** for the SDK |
 | Web (Agent 365 GA 2026-05-01) | Enterprise control plane GA at `$15/user/mo` | **Different product** — does not satisfy criterion (a) for the open-source toolkit SDK |
 
-**Result:** criterion (a) **not satisfied** — `VERDICT=NOT_GA`. Decision stands: adapter stays behind `agt-governance`. Criterion (b) is only partially satisfied: `guardian-proxy` provides tool-call mediation, but its flat `{tool,params}` route is not MCP (no JSON-RPC, mirrored headers, `server/discover`, or `Origin` validation); real conformance is tracked in `plans/mcp-conformance-epic.md` (spike decided 2026-09-12: adopt `rmcp` behind an optional `mcp-surface` feature). Both criteria must hold. Scratchpad removed per spike method. Re-evaluate at the next AGT release.
+**Result:** criterion (a) **not satisfied** — `VERDICT=NOT_GA`. Decision stands: adapter stays behind `agt-governance`. Criterion (b) is now satisfied by the optional `mcp-surface` ingress: `guardian-proxy` speaks MCP `2026-07-28` (discover, tools/list passthrough, mediated tools/call, protocol/Origin/header validation) behind the off-by-default feature, per slices 1–4 of `plans/mcp-conformance-epic.md`; default-on remains the `chore-mcp-promotion` decision. Both criteria must hold. Scratchpad removed per spike method. Re-evaluate at the next AGT release.
 
 ## GA watch automation (tasks 19–21)
 
@@ -126,7 +126,7 @@ Manual `bash scripts/check-agt-ga.sh`:
 
 ## Next action
 
-All implementation slices done (tasks 3–5, 8–12, 14–16), GA re-check spike (task 17), hygiene (task 18), and GA watch automation (tasks 19–21). Earlier work also removed the duplicated CLI adapter (task 30) and hardened sensors/evidence (2026-09-12 sweep). The next implementation workstream is **MCP conformance** (`plans/mcp-conformance-epic.md`, slices `feat-mcp-ingress-scaffold` onward) so criterion (b) becomes honestly satisfied. Remaining `chore-agt-promotion` stays a decision gate pending AGT GA and invariants review — no promotion until criteria `(a) GA` and `(b) MCP surface conformant` both hold. When the watch opens a GA tracking issue, run promotion review against this epic.
+All implementation slices done (tasks 3–5, 8–12, 14–16), GA re-check spike (task 17), hygiene (task 18), and GA watch automation (tasks 19–21). Earlier work also removed the duplicated CLI adapter (task 30) and hardened sensors/evidence (2026-09-12 sweep). MCP conformance landed through the docs slice (`plans/mcp-conformance-epic.md`, slices 1–5): criterion (b) is satisfied behind the optional `mcp-surface` feature; the remaining `chore-mcp-promotion` decides default-on, MSRV 1.88, and flat-route removal. `chore-agt-promotion` stays a decision gate pending AGT GA and invariants review — no promotion until criteria `(a) GA` and `(b) MCP surface conformant` both hold. When the watch opens a GA tracking issue, run promotion review against this epic.
 
 ## Slice completion — chore-remove-doharness-policy (2026-09-11, task 30)
 

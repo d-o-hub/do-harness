@@ -26,11 +26,16 @@ dev-loop verification controls**. In particular:
   evidence are marked partial.
 
 > **Adjacent optional runtime:** `crates/guardian-proxy` is a separate,
-> off-by-default, fail-closed sidecar (requires the `agt-governance` feature).
-> It validates upstreams against an SSRF policy, caps request/response bodies,
-> times out upstream calls, denies all traffic when mediation is unavailable,
-> and can bind decisions to a hash-chained JSONL audit log with cross-process
-> file locking (`crates/guardian-proxy/README.md`). It is **not** part of the
+> off-by-default, fail-closed sidecar (governance enforcement is optional via
+> the `agt-governance` feature; without it decisions are a permissive stub, so
+> the feature is required wherever enforcement is claimed). With the optional
+> `mcp-surface` feature it also serves an MCP Streamable HTTP ingress (protocol
+> `2026-07-28`) that mediates `tools/call` through the same decision path and
+> enforces Host/Origin checks plus mirrored-header validation. It validates
+> upstreams against an SSRF policy, caps request/response bodies, times out
+> upstream calls, denies all traffic when mediation is unavailable, and can
+> bind decisions to a hash-chained JSONL audit log with cross-process file
+> locking (`crates/guardian-proxy/README.md`). It is **not** part of the
 > dev-harness compliance boundary and its threat model is documented separately
 > in [`docs/threat-model-proxy.md`](threat-model-proxy.md).
 

@@ -22,6 +22,14 @@ pub(crate) const MAX_REQUEST_BYTES: usize = 1024 * 1024;
 pub(crate) const MAX_UPSTREAM_BYTES: usize = 1024 * 1024;
 /// Response header advertising whether governance is enforced or stubbed.
 const GOVERNANCE_HEADER: &str = "x-do-harness-governance";
+/// Response header marking the flat REST route as deprecated.
+const DEPRECATION_HEADER: &str = "deprecation";
+/// Successor link header name, advertised while `mcp-surface` is enabled.
+#[cfg(feature = "mcp-surface")]
+const SUCCESSOR_LINK_HEADER: &str = "link";
+/// Successor route for the deprecated flat tool-call endpoint.
+#[cfg(feature = "mcp-surface")]
+const SUCCESSOR_LINK: &str = "</mcp>; rel=\"successor-version\"";
 
 /// Creates the `axum` router for the proxy.
 ///
@@ -132,11 +140,11 @@ async fn tool_call_handler(
 ) -> Response {
     if let Some(error) = &state.init_error {
         let body = serde_json::json!({"error": format!("governance unavailable: {error}")});
-        return governance_header((StatusCode::SERVICE_UNAVAILABLE, Json(body)).into_response());
+        return tag_response((StatusCode::SERVICE_UNAVAILABLE, Json(body)).into_response());
     }
     let Some(mediator) = &state.mediator else {
         let body = serde_json::json!({"error": "mediator unavailable"});
-        return governance_header((StatusCode::SERVICE_UNAVAILABLE, Json(body)).into_response());
+        return tag_response((StatusCode::SERVICE_UNAVAILABLE, Json(body)).into_response());
     };
 
     // Decision mapping is explicit and fail-closed: only an explicit Allow is
@@ -151,7 +159,7 @@ async fn tool_call_handler(
             state.metrics.inc_deny();
             record_audit(&state, &call, &denied).await;
             let body = serde_json::json!({"error": format!("mediator error: {e}")});
-            return governance_header((StatusCode::FORBIDDEN, Json(body)).into_response());
+            return tag_response((StatusCode::FORBIDDEN, Json(body)).into_response());
         }
     };
 
@@ -171,11 +179,11 @@ async fn tool_call_handler(
         }
         crate::ForwardDecision::Allow => forward_to_upstream(&state, &call, &headers).await,
     };
-    governance_header(response)
+    tag_response(response)
 }
 
-/// Tags a response with whether governance is enforced or stubbed.
-fn governance_header(mut response: Response) -> Response {
+/// Tags a legacy tool-call response with governance mode and deprecation.
+fn tag_response(mut response: Response) -> Response {
     let mode = if cfg!(feature = "agt-governance") {
         "enforced"
     } else {
@@ -184,6 +192,14 @@ fn governance_header(mut response: Response) -> Response {
     response
         .headers_mut()
         .insert(GOVERNANCE_HEADER, HeaderValue::from_static(mode));
+    response
+        .headers_mut()
+        .insert(DEPRECATION_HEADER, HeaderValue::from_static("true"));
+    #[cfg(feature = "mcp-surface")]
+    response.headers_mut().insert(
+        SUCCESSOR_LINK_HEADER,
+        HeaderValue::from_static(SUCCESSOR_LINK),
+    );
     response
 }
 

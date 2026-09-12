@@ -191,9 +191,9 @@ Alternative for users of the pre-commit framework: this repo ships `.pre-commit-
 
 ## CI
 
-GitHub Actions: see `.github/workflows/verify.yml` — lints shell sensors, builds `do-harness`, checks the adjacent `guardian-proxy` crate with the optional `agt-governance` feature off and on (`cargo check -p guardian-proxy` / `--features agt-governance`) and tests it (`cargo test -p guardian-proxy`), runs `verify --set verification --format json --strict` and `status --set verification`, dogfoods `init && verify` on fresh rust/generic workspaces, and runs `do-harness eval`.
+GitHub Actions: see `.github/workflows/verify.yml` — lints shell sensors, builds `do-harness`, checks the adjacent `guardian-proxy` crate with the optional features off and on (`cargo check -p guardian-proxy` / `--features agt-governance` / `--features mcp-surface`) and tests it (`cargo test -p guardian-proxy` plus both feature builds), runs `verify --set verification --format json --strict` and `status --set verification`, dogfoods `init && verify` on fresh rust/generic workspaces, and runs `do-harness eval`.
 
-> **Runtime proxy note:** `do-harness` itself stays a dev-loop harness (no traffic proxy). The adjacent `crates/guardian-proxy` is an *optional* fail-closed sidecar (off by default, requires `agt-governance`) and the only tool-call mediation surface, via its `ProxyMediator` gate — see `crates/guardian-proxy/README.md` when present.
+> **Runtime proxy note:** `do-harness` itself stays a dev-loop harness (no traffic proxy). The adjacent `crates/guardian-proxy` is an *optional* fail-closed sidecar (off by default; governance via `agt-governance`, MCP Streamable HTTP ingress via `mcp-surface`) and the only tool-call mediation surface, via its `ProxyMediator` gate — see `crates/guardian-proxy/README.md` when present.
 
 ## DeepSeek Harness integration
 

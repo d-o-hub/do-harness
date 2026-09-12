@@ -1,6 +1,6 @@
 # Epic: MCP Conformance for guardian-proxy
 
-> **Status:** decided via spike (2026-09-12); slices 1–4 complete (ingress, forwarding, protocol security, conformance suite)
+> **Status:** decided via spike (2026-09-12); slices 1–5 complete (ingress, forwarding, protocol security, conformance suite, docs); `chore-mcp-promotion` decision remains
 > **Related:** spec 2026-07-28, `plans/agt-governance-epic.md` criterion (b), issue #40
 > **Method:** `spike-and-resolve` → `vertical-event-slice` per slice
 > **Owner:** orchestrator swarm
@@ -69,6 +69,8 @@ unchanged. Hand-rolled and re-scope rejected.
 - Multi-upstream aggregation, tool-name namespacing, OAuth, Tasks/Apps
   extensions, SSE streaming (`json_response` mode first; SSE is optional for
   servers).
+- `x-mcp-header` parameter mirroring: only the standard `Mcp-Method`/`Mcp-Name`
+  headers are forwarded; tools requiring `Mcp-Param-*` fail closed upstream.
 
 ## Risks and rollback
 
@@ -182,3 +184,25 @@ unchanged. Hand-rolled and re-scope rejected.
   `-D warnings` off/on, `cargo deny check` clean, `do-harness verify` 12/12;
   traces 28 + harness heuristic 21 + `fail-closed-proxy` heuristic 22.
   Next slice: `docs-mcp-surface`.
+
+## Slice completion — docs-mcp-surface (2026-09-12)
+
+- `crates/guardian-proxy/README.md` documents the `mcp-surface` endpoint,
+  header/Origin requirements, caps, and the legacy route's deprecation; the
+  root README's CI and runtime-proxy notes mention both optional features.
+- `docs/threat-model-proxy.md` adds MCP trust boundaries, five threat rows
+  (DNS rebinding/Origin, header/body divergence, version confusion, policy
+  ordering, oversized payloads), and residual risks (unauthenticated endpoint,
+  empty `allowed_origins`, `Mcp-Param-*` gap, SSE scanned not streamed).
+- `docs/compliance.md` corrects the "requires `agt-governance`" wording and
+  notes the optional MCP ingress decision path.
+- Flat route deprecation is executable: every legacy tool-call response carries
+  `Deprecation: true`, plus `Link: </mcp>; rel="successor-version"` when
+  `mcp-surface` is enabled (covered by a feature-conditional test).
+- `plans/invariants.json` gains the optional `mcp-surface` architecture
+  decision; seeded to libSQL with `do-harness seed`.
+- `plans/agt-governance-epic.md` re-words criterion (b): satisfied behind the
+  feature, with default-on as the `chore-mcp-promotion` decision.
+- Evidence: feature-off 30 / feature-on 45 lib + 3 integration tests, clippy
+  `-D warnings` off/on, `do-harness verify` 12/12, `do-harness seed` upsert.
+  Next slice: `chore-mcp-promotion` (decision gate).

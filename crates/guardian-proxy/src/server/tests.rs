@@ -395,3 +395,28 @@ async fn test_mcp_endpoint_absent_without_feature() {
     let resp = router.oneshot(req).await.expect("response");
     assert_eq!(resp.status(), StatusCode::NOT_FOUND);
 }
+
+#[tokio::test(flavor = "current_thread")]
+async fn test_legacy_route_advertises_deprecation() {
+    let router = create_router_degraded("test".to_string());
+    let req = Request::builder()
+        .uri("/mcp/tools/call")
+        .method("POST")
+        .header("content-type", "application/json")
+        .body(AxumBody::from(r#"{"tool":"x","params":{}}"#))
+        .expect("request");
+    let resp = router.oneshot(req).await.expect("response");
+    assert_eq!(
+        resp.headers()
+            .get("deprecation")
+            .and_then(|value| value.to_str().ok()),
+        Some("true")
+    );
+    #[cfg(feature = "mcp-surface")]
+    assert_eq!(
+        resp.headers()
+            .get("link")
+            .and_then(|value| value.to_str().ok()),
+        Some("</mcp>; rel=\"successor-version\"")
+    );
+}
