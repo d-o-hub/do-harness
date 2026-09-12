@@ -11,6 +11,8 @@ metadata:
   version: "0.1.0"
   tags: proxy fail-closed axum audit metrics mediation
 ---
+## Guides
+See references/heuristics.md for distilled heuristics.
 
 # Fail-Closed Proxy Skill
 
