@@ -1,6 +1,7 @@
 //! Unit tests for `do-harness init` (`init.rs`).
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
+use super::skills::SKILLS;
 use super::*;
 
 /// Default init options with an explicit language.
