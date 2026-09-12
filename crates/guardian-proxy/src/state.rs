@@ -30,6 +30,8 @@ pub struct AppState {
     pub init_error: Option<String>,
     /// Bearer token required on `GET /metrics` when set.
     pub metrics_token: Option<String>,
+    /// Browser origins allowed on the MCP endpoint (RFC 6454 match).
+    pub allowed_origins: Vec<String>,
 }
 
 impl AppState {
@@ -37,6 +39,7 @@ impl AppState {
     #[must_use]
     pub fn new(mediator: Arc<ProxyMediator>) -> Self {
         let upstream = mediator.upstream().to_string();
+        let allowed_origins = mediator.allowed_origins().to_vec();
         Self {
             mediator: Some(mediator),
             upstream,
@@ -45,6 +48,7 @@ impl AppState {
             metrics: Arc::new(ProxyMetrics::new()),
             init_error: None,
             metrics_token: None,
+            allowed_origins,
         }
     }
 
@@ -52,6 +56,7 @@ impl AppState {
     #[must_use]
     pub fn with_audit(mediator: Arc<ProxyMediator>, audit: AuditLog) -> Self {
         let upstream = mediator.upstream().to_string();
+        let allowed_origins = mediator.allowed_origins().to_vec();
         Self {
             mediator: Some(mediator),
             upstream,
@@ -60,6 +65,7 @@ impl AppState {
             metrics: Arc::new(ProxyMetrics::new()),
             init_error: None,
             metrics_token: None,
+            allowed_origins,
         }
     }
 
@@ -74,6 +80,7 @@ impl AppState {
             metrics: Arc::new(ProxyMetrics::new()),
             init_error: Some(error),
             metrics_token: None,
+            allowed_origins: crate::default_allowed_origins(),
         }
     }
 }

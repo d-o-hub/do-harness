@@ -17,6 +17,7 @@ fn test_mediator_with_upstream(upstream: &str) -> Arc<ProxyMediator> {
         upstream_allowlist: vec![],
         allow_private_upstreams: true,
         metrics_token: None,
+        allowed_origins: vec![],
     };
     Arc::new(ProxyMediator::new(cfg).expect("mediator"))
 }
@@ -238,6 +239,7 @@ async fn test_metrics_counts_allow_deny_and_upstream_failure() {
         metrics: Arc::clone(&metrics),
         init_error: None,
         metrics_token: None,
+        allowed_origins: vec![],
     };
     let router2 = create_router_with_state(state2);
     let allow_body = serde_json::to_string(&json!({"tool":"data.read","params":{"path":"/tmp/x"}}))

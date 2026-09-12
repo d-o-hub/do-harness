@@ -188,6 +188,7 @@ pub fn service(state: AppState) -> StreamableHttpService<McpIngress, LocalSessio
         .with_legacy_session_mode(false)
         .with_json_response(true)
         .with_stateless_protocol_metadata_required(true)
+        .with_allowed_origins(state.allowed_origins.clone())
         .with_max_request_body_bytes(MAX_REQUEST_BYTES);
     let manager = LocalSessionManager::default().into();
     StreamableHttpService::new(move || Ok(McpIngress::new(state.clone())), manager, config)

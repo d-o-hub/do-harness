@@ -1,6 +1,6 @@
 # Epic: MCP Conformance for guardian-proxy
 
-> **Status:** decided via spike (2026-09-12); slices 1–2 complete (`feat-mcp-ingress-scaffold`, `feat-mcp-tools-forwarding`)
+> **Status:** decided via spike (2026-09-12); slices 1–3 complete (`feat-mcp-ingress-scaffold`, `feat-mcp-tools-forwarding`, `feat-mcp-protocol-security`)
 > **Related:** spec 2026-07-28, `plans/agt-governance-epic.md` criterion (b), issue #40
 > **Method:** `spike-and-resolve` → `vertical-event-slice` per slice
 > **Owner:** orchestrator swarm
@@ -141,3 +141,24 @@ unchanged. Hand-rolled and re-scope rejected.
 - Evidence: clippy `-D warnings` off/on, `agt-governance,mcp-surface` combined
   check, `cargo deny check` clean, `do-harness verify` 12/12; trace 26 +
   `fail-closed-proxy` heuristic 19. Next slice: `feat-mcp-protocol-security`.
+
+## Slice completion — feat-mcp-protocol-security (2026-09-12)
+
+- `ProxyConfig` gains `allowed_origins` (RFC 6454 exact match) with loopback
+  defaults (`http://localhost`, `https://localhost`, `http://127.0.0.1`,
+  `https://127.0.0.1`); an empty list disables Origin validation, and requests
+  without `Origin` always pass. `ProxyMediator::allowed_origins()` feeds
+  `AppState` and `StreamableHttpServerConfig::with_allowed_origins`, so the
+  spec MUST is enforced instead of rmcp's ignore-Origin default.
+- Negative-path coverage added in `mcp::tests` (now 15 cases): allowed origin
+  200 vs disallowed 403; unsupported protocol version → 400 `-32022` with the
+  supported list; header/body version mismatch → 400 (`-32020` when a JSON-RPC
+  body is present); `Mcp-Name` mismatch → 400 `-32020` with zero upstream
+  calls; unknown method `x-vendor/missing` forwarded, upstream `-32601`
+  propagated as HTTP 404; notification accepted with 202.
+- Example config documents the new key
+  (`crates/guardian-proxy/guardian-proxy.example.toml`).
+- Evidence: feature-off 29 / feature-on 43 tests, clippy `-D warnings` off/on,
+  `agt-governance,mcp-surface` combined check, `cargo deny check` clean,
+  `do-harness verify` 12/12; trace 27 + `fail-closed-proxy` heuristic 20.
+  Next slice: `test-mcp-conformance-suite`.

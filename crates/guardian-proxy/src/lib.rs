@@ -31,6 +31,27 @@ pub struct ProxyConfig {
     /// Optional bearer token required on `GET /metrics`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub metrics_token: Option<String>,
+    /// Browser origins allowed on the MCP endpoint, matched per RFC 6454
+    /// `(scheme, host, port)`. Requests without an `Origin` header always
+    /// pass; an empty list disables Origin validation.
+    #[serde(default = "default_allowed_origins")]
+    pub allowed_origins: Vec<String>,
+}
+
+/// Loopback browser origins accepted on the MCP endpoint by default.
+///
+/// Browser clients on other ports must add their exact origin; non-browser
+/// MCP clients do not send `Origin` and are unaffected.
+pub(crate) fn default_allowed_origins() -> Vec<String> {
+    [
+        "http://localhost",
+        "https://localhost",
+        "http://127.0.0.1",
+        "https://127.0.0.1",
+    ]
+    .iter()
+    .map(|origin| (*origin).to_string())
+    .collect()
 }
 
 /// Decision for a proxied tool call.

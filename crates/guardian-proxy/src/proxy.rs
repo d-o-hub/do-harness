@@ -97,6 +97,12 @@ impl ProxyMediator {
         &self.config.upstream
     }
 
+    /// Returns the browser origins allowed on the MCP endpoint.
+    #[must_use]
+    pub fn allowed_origins(&self) -> &[String] {
+        &self.config.allowed_origins
+    }
+
     /// Decides whether to allow the call (fail-closed).
     ///
     /// Decision mapping is explicit: only an explicit governance allow maps to
@@ -233,6 +239,7 @@ mod tests {
             upstream_allowlist: vec![],
             allow_private_upstreams: true,
             metrics_token: None,
+            allowed_origins: vec![],
         }
     }
 
