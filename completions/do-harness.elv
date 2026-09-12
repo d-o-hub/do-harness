@@ -38,6 +38,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand ls 'List sensor names'
             cand explain 'Explain which sensors the current change selects, without running them'
             cand status 'Report verification evidence freshness without running sensors'
+            cand pr 'Deterministic PR analysis (read-only; works in any git repository)'
             cand init-db 'Apply pending database migrations'
             cand seed 'Seed invariants from plans/invariants.json'
             cand init 'Scaffold a harness workspace in a target directory'
@@ -191,6 +192,72 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand --help 'Print help (see more with ''--help'')'
             cand -V 'Print version'
             cand --version 'Print version'
+        }
+        &'do-harness;pr'= {
+            cand --root 'Workspace root override (default: walk up from cwd)'
+            cand --config 'Explicit path to do-harness.toml'
+            cand --color 'Color output (auto, always, never)'
+            cand --output 'Default output file path'
+            cand -v 'Verbosity level (-v, -vv)'
+            cand --verbose 'Verbosity level (-v, -vv)'
+            cand -q 'Suppress non-error messages'
+            cand --quiet 'Suppress non-error messages'
+            cand --dry-run 'Dry run without side effects'
+            cand -h 'Print help'
+            cand --help 'Print help'
+            cand -V 'Print version'
+            cand --version 'Print version'
+            cand no-effect 'Report whether a PR or revision range introduces any effective change'
+            cand review 'Emit the semantic residual: changed units evidence could not prove'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'do-harness;pr;no-effect'= {
+            cand --base 'Base revision (local mode; requires --head)'
+            cand --head 'Head revision (local mode; requires --base)'
+            cand --format 'Output format'
+            cand --root 'Workspace root override (default: walk up from cwd)'
+            cand --config 'Explicit path to do-harness.toml'
+            cand --color 'Color output (auto, always, never)'
+            cand --output 'Default output file path'
+            cand -v 'Verbosity level (-v, -vv)'
+            cand --verbose 'Verbosity level (-v, -vv)'
+            cand -q 'Suppress non-error messages'
+            cand --quiet 'Suppress non-error messages'
+            cand --dry-run 'Dry run without side effects'
+            cand -h 'Print help (see more with ''--help'')'
+            cand --help 'Print help (see more with ''--help'')'
+            cand -V 'Print version'
+            cand --version 'Print version'
+        }
+        &'do-harness;pr;review'= {
+            cand --base 'Base revision (local mode; requires --head)'
+            cand --head 'Head revision (local mode; requires --base)'
+            cand --format 'Output format'
+            cand --root 'Workspace root override (default: walk up from cwd)'
+            cand --config 'Explicit path to do-harness.toml'
+            cand --color 'Color output (auto, always, never)'
+            cand --output 'Default output file path'
+            cand --recompute 'Ignore the cached report and recompute from scratch'
+            cand -v 'Verbosity level (-v, -vv)'
+            cand --verbose 'Verbosity level (-v, -vv)'
+            cand -q 'Suppress non-error messages'
+            cand --quiet 'Suppress non-error messages'
+            cand --dry-run 'Dry run without side effects'
+            cand -h 'Print help (see more with ''--help'')'
+            cand --help 'Print help (see more with ''--help'')'
+            cand -V 'Print version'
+            cand --version 'Print version'
+        }
+        &'do-harness;pr;help'= {
+            cand no-effect 'Report whether a PR or revision range introduces any effective change'
+            cand review 'Emit the semantic residual: changed units evidence could not prove'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'do-harness;pr;help;no-effect'= {
+        }
+        &'do-harness;pr;help;review'= {
+        }
+        &'do-harness;pr;help;help'= {
         }
         &'do-harness;init-db'= {
             cand --root 'Workspace root override (default: walk up from cwd)'
@@ -865,6 +932,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand list 'List sensor names'
             cand explain 'Explain which sensors the current change selects, without running them'
             cand status 'Report verification evidence freshness without running sensors'
+            cand pr 'Deterministic PR analysis (read-only; works in any git repository)'
             cand init-db 'Apply pending database migrations'
             cand seed 'Seed invariants from plans/invariants.json'
             cand init 'Scaffold a harness workspace in a target directory'
@@ -892,6 +960,14 @@ set edit:completion:arg-completer[do-harness] = {|@words|
         &'do-harness;help;explain'= {
         }
         &'do-harness;help;status'= {
+        }
+        &'do-harness;help;pr'= {
+            cand no-effect 'Report whether a PR or revision range introduces any effective change'
+            cand review 'Emit the semantic residual: changed units evidence could not prove'
+        }
+        &'do-harness;help;pr;no-effect'= {
+        }
+        &'do-harness;help;pr;review'= {
         }
         &'do-harness;help;init-db'= {
         }

@@ -127,8 +127,10 @@ For CI, invoke `do-harness verify --format json --evidence .do-harness/evidence.
 | `metrics [--format text\|json]` | Report sensor stats, strike counts, and eval pass-rate history |
 | `compliance [--format text\|json]` | Print compliance mapping to OWASP Agentic Top 10, NIST AI RMF, and EU AI Act |
 | `init [--language rust\|generic] [--force]` | Scaffold a harness workspace in the current directory |
-| `hook install [--force]` / `hook uninstall` / `hook status` | Manage `.git/hooks/pre-commit` + `pre-push` |
+| `hook install [--force]` / `hook uninstall` / `hook status` / `hook diff` | Manage git hooks (`.git/hooks/pre-commit`, `commit-msg`, `pre-push`) |
 | `doctor` | Run diagnostic checks on binary resolution, git hook health, and state-database migration skew (fails when the database outruns the binary) |
+| `pr no-effect <PR\|--base REV --head REV>` | Report whether a PR or revision range introduces any effective change, from the merge-base tree delta (read-only; works in any git repo) |
+| `pr review <PR\|--base REV --head REV> [--recompute]` | Emit the semantic residual evidence could not prove, with skipped units and revocable `false_proven` claims (read-only) |
 
 Global flags: `--root <path>`, `--config <path>`.
 
@@ -177,9 +179,10 @@ source of truth.
 
 ## Hooks
 
-`do-harness hook install` writes both hooks into `.git/hooks/`:
+`do-harness hook install` writes three managed hooks into `.git/hooks/`:
 
 - **pre-commit**: runs `verify --fail-fast --only fmt --only loc`
+- **commit-msg**: runs `scripts/check-commitlint.sh --message` against the prepared message (fail-closed: blocks the commit when the repo or script is missing)
 - **pre-push**: runs the full `verify` suite
 
 Managed hooks carry a marker identifying them as do-harness-owned; re-running `hook install` overwrites them, and `--force` overwrites any pre-existing hook at the same path. `hook uninstall` removes only managed hooks. `hook status` reports which hooks are present and whether they are managed.
@@ -188,9 +191,9 @@ Alternative for users of the pre-commit framework: this repo ships `.pre-commit-
 
 ## CI
 
-GitHub Actions: see `.github/workflows/verify.yml` — lints shell sensors, builds `do-harness`, checks the optional `agt-governance` feature (`cargo check -p do-harness --features agt-governance`) and the adjacent `guardian-proxy` crate (`cargo check -p guardian-proxy` / `--features agt-governance`), runs `verify --format json`, dogfoods `init && verify` on fresh rust/generic workspaces, and runs `do-harness eval`.
+GitHub Actions: see `.github/workflows/verify.yml` — lints shell sensors, builds `do-harness`, checks the adjacent `guardian-proxy` crate with the optional `agt-governance` feature off and on (`cargo check -p guardian-proxy` / `--features agt-governance`) and tests it (`cargo test -p guardian-proxy`), runs `verify --set verification --format json --strict` and `status --set verification`, dogfoods `init && verify` on fresh rust/generic workspaces, and runs `do-harness eval`.
 
-> **Runtime proxy note:** `do-harness` itself stays a dev-loop harness (no traffic proxy). The adjacent `crates/guardian-proxy` is an *optional* fail-closed sidecar (off by default, requires `agt-governance`) that reuses the same `McpMediator` gate — see `crates/guardian-proxy/README.md` when present.
+> **Runtime proxy note:** `do-harness` itself stays a dev-loop harness (no traffic proxy). The adjacent `crates/guardian-proxy` is an *optional* fail-closed sidecar (off by default, requires `agt-governance`) and the only tool-call mediation surface, via its `ProxyMediator` gate — see `crates/guardian-proxy/README.md` when present.
 
 ## DeepSeek Harness integration
 

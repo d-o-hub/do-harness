@@ -7,7 +7,7 @@
 | Proxy audit log | `ProxyConfig.audit_log` (e.g. `guardian-audit.jsonl`) | Operator-defined; append-only hash chain, `fsync` per append | rotate by copying and starting a new file; `--verify-audit` checks a file at any time |
 | CI evidence | `.do-harness/evidence.json` artifact | GitHub Actions artifact retention (default 90 days), one artifact per run | `actions/upload-artifact` in `.github/workflows/verify.yml` |
 | Cargo.lock hash | `.do-harness/Cargo.lock.sha256` artifact | Same as CI evidence | Uploaded alongside the evidence artifact |
-| Interaction traces | `.do-harness/agent_state.db` (`traces`) | Local; clear per session with `do-harness trace` if needed | no automatic prune yet |
+| Interaction traces | `.do-harness/agent_state.db` (`traces`) | Local, retained in full — `trace` only adds, lists, or lists sessions | no clear/prune command yet; `maintenance --prune-beats` prunes beats only |
 
 The local database holds no CI secrets; CI uploads only the evidence artifact
 and the lockfile hash, never the database.

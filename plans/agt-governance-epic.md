@@ -49,10 +49,10 @@ Microsoft's Agent Governance Toolkit publishes `agent-governance` + `agent-gover
 
 ## Verification checklist
 
-- [x] `cargo check --workspace` (feature off) clean — verified 2026-09-02 on `main` post-#33 (`1276ce2`)
-- [x] `cargo check -p do-harness --features agt-governance` clean — verified 2026-09-02 post-task 4 (`cargo check` + `cargo clippy` pass, `cargo test --features agt-governance` 3/3)
-- [x] `plans/agt-governance-epic.md` stays in sync with `crates/do-harness/src/policy/agt.rs` when adapter exists — restored `policy/agt.rs:1` + `policy/mod.rs:1` with `#[cfg(feature="agt-governance")]`, `Cargo.toml:12` feature, `verify.yml:44` feature-on check
-- [x] SHA pin `c57d9d9a...` stays (`#31`), no tag reversion — verified in `verify.yml`
+- [x] `cargo check --workspace` (feature off) clean — verified 2026-09-02 on `main` post-#33 (`1276ce2`), still run by the CI `msrv` job (`cargo check --workspace --locked`)
+- [x] `cargo check -p guardian-proxy` + `cargo check -p guardian-proxy --features agt-governance` + `cargo test -p guardian-proxy` clean — run by `.github/workflows/verify.yml` after the CLI feature was removed (task 30)
+- [x] `plans/agt-governance-epic.md` stays in sync with `crates/guardian-proxy/src/proxy.rs` (`ProxyMediator`/`AgtGateWrapper`) now that `crates/do-harness/src/policy/` is deleted (task 30)
+- [x] SHA pin `c57d9d9a...` stays (`#31`), no tag reversion — verified in `contributor-check.yml`; `agent-governance` stays pinned `=3.2.2` in the workspace manifest until GA
 
 ## Spike findings — AGT API stability 3.x→4.x→5.x (2026-09-02, task 3)
 
@@ -106,7 +106,7 @@ Created `.agents/skills/fail-closed-proxy/` (`SKILL.md` decide-audit-forward met
 | `api.github.com/.../releases/latest` | `tag=v4.1.0`, `prerelease=false` | Toolkit repo ships v4.x without the old "Public Preview" banner, but with **no GA declaration** for the SDK |
 | Web (Agent 365 GA 2026-05-01) | Enterprise control plane GA at `$15/user/mo` | **Different product** — does not satisfy criterion (a) for the open-source toolkit SDK |
 
-**Result:** criterion (a) **not satisfied** — `VERDICT=NOT_GA`. Decision stands: adapter stays behind `agt-governance` (criterion (b) surface wired is satisfied via `McpMediator` + `guardian-proxy`, but both must hold). Scratchpad removed per spike method. Re-evaluate at the next AGT release.
+**Result:** criterion (a) **not satisfied** — `VERDICT=NOT_GA`. Decision stands: adapter stays behind `agt-governance` (criterion (b) surface wired is satisfied via `ProxyMediator` + `guardian-proxy`, but both must hold). Scratchpad removed per spike method. Re-evaluate at the next AGT release.
 
 ## GA watch automation (tasks 19–21)
 
@@ -115,6 +115,14 @@ Manual re-spikes (task 17) are replaced by a scheduled informational watch:
 - `scripts/check-agt-ga.sh` — prints crate/release evidence plus `VERDICT=GA|NOT_GA|UNKNOWN`. `GA` requires **both** the `crates.io` description to drop `preview` **and** the latest toolkit release notes to declare GA (non-prerelease); any fetch/parse failure yields `UNKNOWN`, never `GA`. Accepts `--crate-json/--release-json` fixtures for hermetic testing. Not a `verify` sensor by design (network-dependent).
 - Spike finding (task 19): `crates.io` returns `403` without a `User-Agent` header — the script sends one.
 - `.github/workflows/agt-ga-watch.yml` — monthly `cron` + `workflow_dispatch`; `contents: read, issues: write`. On `GA` it opens (or reuses) an `[agt-ga-watch]` tracking issue for human promotion review; `NOT_GA`/`UNKNOWN` only log and never fail the run. The watch never removes the `agt-governance` feature flag itself.
+
+### GA watch run — 2026-09-12
+
+Manual `bash scripts/check-agt-ga.sh`:
+
+- crate: `version=3.2.2 description=Public Preview — Rust SDK for the Agent Governance Toolkit (policy, trust, audit, identity)`
+- release: `tag=v4.1.0 prerelease=false`
+- `VERDICT=NOT_GA` — criterion (a) still unsatisfied.
 
 ## Next action
 

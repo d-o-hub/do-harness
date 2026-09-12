@@ -239,7 +239,7 @@ retained in full locally (it is small) but CI only uploads the current
 ### `compliance`
 Compliance mapping to OWASP Agentic Top 10, NIST AI RMF, EU AI Act, and SOC 2.
 
-- `--framework <FRAMEWORK>`: Filter framework (`owasp`, `nist`, `eu`, `soc2`).
+- `--framework <FRAMEWORK>`: Filter framework (`owasp`, `nist`, `eu`, `soc`).
 - `--format <Format>`: Output format (`text` or `json`).
 
 ### `audit-chain`

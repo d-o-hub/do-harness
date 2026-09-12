@@ -42,7 +42,7 @@ dev-loop verification controls**. In particular:
 |---|---|---|---|---|---|
 | **Computational sensors** (`verify`) | Deterministic checks strictly supersede LLM self-assessment | ASI04, ASI05, ASI09 | MEASURE 1 | Art. 15 | [`sensors/mod.rs`](../crates/do-harness/src/sensors/mod.rs), [`do-harness.toml`](../do-harness.toml) |
 | **Task-completion gate** (`task done`) | Re-checks named sensor beats inside the write transaction | ASI02, ASI08, ASI10 | MANAGE 1 | Art. 14 | [`repo_workflow.rs`](../crates/db/src/repo_workflow.rs), [`task.rs`](../crates/do-harness/src/task.rs) |
-| **Evidence artifact** (`verify --evidence`) | Schema-versioned run record with argv + output hashes and a hash chain | ASI09 | MEASURE 1, MEASURE 3 | Art. 12 | [`evidence.rs`](../crates/do-harness/src/evidence.rs) |
+| **Evidence artifact** (`verify --evidence`) | Schema-versioned run record with argv + output hashes and a hash chain | ASI09 | MEASURE 1, MEASURE 3 | Art. 12 | [`evidence/mod.rs`](../crates/do-harness/src/evidence/mod.rs) |
 | **Hash-chained event log** (`.do-harness/agent_state.db`) | Append-only workflow events with `UNIQUE(seq)` and verified chain | ASI06 | GOVERN 2, MEASURE 3 | Art. 12 | [`repo_workflow.rs`](../crates/db/src/repo_workflow.rs), [`0011_schema_hardening.sql`](../crates/db/migrations/0011_schema_hardening.sql) |
 | **Fail-closed semantics** | Deny-by-default on unmet gates, unknown sensors, or DB skew | ASI08, ASI10 | GOVERN 1, MANAGE 1 | Art. 9 (dev-loop) | [`sensors/mod.rs`](../crates/do-harness/src/sensors/mod.rs), [`dbcheck.rs`](../crates/do-harness/src/dbcheck.rs) |
 
@@ -62,7 +62,7 @@ dev-loop verification controls**. In particular:
 | **ASI08** | Cascading Agent Failures | ✅ Dev-Loop | Per-sensor strike counters and fail-fast halt after 3 consecutive failures; blocked sensors are synthesized as failures. [`telemetry.rs`](../crates/do-harness/src/telemetry.rs) |
 | **ASI09** | Human-Agent Trust Exploitation | ✅ Dev-Loop | Computational sensors override self-assessment; `task done` rejects unverified claims. [`sensors/mod.rs`](../crates/do-harness/src/sensors/mod.rs), [`repo_workflow.rs`](../crates/db/src/repo_workflow.rs) |
 | **ASI10** | Rogue Agents | ✅ Dev-Loop | Terminal transitions require passing gates re-checked inside the command transaction. [`repo_workflow.rs`](../crates/db/src/repo_workflow.rs) |
-| **do-harness Traceability extension** | *Non-standard; not an OWASP ASI category* | ✅ Dev-Loop | Hash-chained workflow events and hash-chained evidence artifacts. [`repo_workflow.rs`](../crates/db/src/repo_workflow.rs), [`evidence.rs`](../crates/do-harness/src/evidence.rs) |
+| **do-harness Traceability extension** | *Non-standard; not an OWASP ASI category* | ✅ Dev-Loop | Hash-chained workflow events and hash-chained evidence artifacts. [`repo_workflow.rs`](../crates/db/src/repo_workflow.rs), [`evidence/mod.rs`](../crates/do-harness/src/evidence/mod.rs) |
 
 ---
 
@@ -98,7 +98,7 @@ are not a claim of conformity for any high-risk AI system under Regulation (EU)
 |---|---|---|
 | **Article 9** | Risk management system | Continuous `verify` sensors, fail-fast strike halting, and fail-closed task gates. [`sensors/mod.rs`](../crates/do-harness/src/sensors/mod.rs) |
 | **Article 10** | Data & data governance | Strongly typed schema contracts and dependency auditing. [`crates/types`](../crates/types), [`check-deps.sh`](../scripts/check-deps.sh) |
-| **Article 12** | Technical documentation & record-keeping | Evidence artifacts and hash-chained event logs with enforced uniqueness. [`evidence.rs`](../crates/do-harness/src/evidence.rs), [`repo_workflow.rs`](../crates/db/src/repo_workflow.rs) |
+| **Article 12** | Technical documentation & record-keeping | Evidence artifacts and hash-chained event logs with enforced uniqueness. [`evidence/mod.rs`](../crates/do-harness/src/evidence/mod.rs), [`repo_workflow.rs`](../crates/db/src/repo_workflow.rs) |
 | **Article 14** | Human oversight | `task done` requires passing beats; `eval --bless` records an approver identity in append-only history. [`repo_eval.rs`](../crates/db/src/repo_eval.rs) |
 | **Article 15** | Accuracy, robustness and cybersecurity | `cargo check`/`test`/`clippy`, `forbid(unsafe_code)`, LOC caps, SSRF-guarded optional proxy. [`do-harness.toml`](../do-harness.toml), [`crates/guardian-proxy`](../crates/guardian-proxy) |
 
