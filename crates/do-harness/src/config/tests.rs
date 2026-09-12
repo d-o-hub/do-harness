@@ -266,3 +266,53 @@ fn rust_default_ships_signal_sets() {
     assert_eq!(cfg.signal_sets.get("release").unwrap().len(), 8);
     cfg.validate().expect("built-in default must validate");
 }
+
+/// The built-in pack pins `--all-targets` on clippy and narrows the cargo
+/// sensors with `when-changed` globs so `verify --changed` is meaningful.
+#[test]
+fn rust_pack_pins_all_targets_and_when_changed() {
+    let sensors = rust_pack();
+    let sensor = |name: &str| {
+        sensors
+            .iter()
+            .find(|spec| spec.name == name)
+            .unwrap_or_else(|| panic!("missing built-in sensor {name}"))
+    };
+
+    assert!(
+        sensor("clippy")
+            .argv
+            .iter()
+            .any(|arg| arg == "--all-targets"),
+        "clippy must analyze all targets"
+    );
+    for name in ["fmt", "check", "clippy", "test"] {
+        assert!(
+            !sensor(name).when_changed.is_empty(),
+            "{name} must declare when-changed globs"
+        );
+    }
+    assert_eq!(
+        sensor("fmt").when_changed,
+        vec!["**/*.rs", "Cargo.toml", "Cargo.lock", "rust-toolchain.toml"]
+    );
+    assert_eq!(
+        sensor("check").when_changed,
+        vec!["**/*.rs", "Cargo.toml", "Cargo.lock"]
+    );
+    assert_eq!(
+        sensor("clippy").when_changed,
+        sensor("check").when_changed.clone()
+    );
+    assert_eq!(
+        sensor("test").when_changed,
+        sensor("check").when_changed.clone()
+    );
+    assert_eq!(sensor("loc").when_changed, vec!["**/*.rs"]);
+    for name in ["deps", "audit", "commitlint"] {
+        assert!(
+            sensor(name).when_changed.is_empty(),
+            "{name} is a blanket sensor"
+        );
+    }
+}

@@ -4,6 +4,8 @@
 # Sensor: scripts/check-audit.sh
 # Missing cargo-audit fails closed when CI=true or DO_HARNESS_REQUIRE_TOOLS=1,
 # and is a WARN skip otherwise so offline local runs stay usable.
+# Note: cargo-deny (deps sensor) also checks advisories; this sensor is the
+# independent second gate using cargo-audit's own DB handling.
 set -euo pipefail
 
 require_tools() { [[ "${CI:-}" == "true" || "${DO_HARNESS_REQUIRE_TOOLS:-}" == "1" ]]; }

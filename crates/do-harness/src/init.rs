@@ -97,6 +97,7 @@ struct SkillSpec {
     skill_md: &'static str,
     evals: &'static str,
     walkthrough: Option<&'static str>,
+    references: &'static [(&'static str, &'static str)],
 }
 
 const SKILLS: &[SkillSpec] = &[SkillSpec {
@@ -106,6 +107,10 @@ const SKILLS: &[SkillSpec] = &[SkillSpec {
     walkthrough: Some(include_str!(
         "../templates/skills/harness/evals/walkthrough.sh"
     )),
+    references: &[(
+        "references/heuristics.md",
+        include_str!("../templates/skills/harness/references/heuristics.md"),
+    )],
 }];
 
 /// skill-creator ships its scaffolding script and the structure gate so that a
@@ -115,6 +120,10 @@ const SKILL_CREATOR_INIT: &str =
     include_str!("../templates/skills/skill-creator/scripts/init_skill.py");
 const SKILL_CREATOR_QUICK_VALIDATE: &str =
     include_str!("../templates/skills/skill-creator/scripts/quick_validate.py");
+const SKILL_CREATOR_OPENAI_YAML: &str =
+    include_str!("../templates/skills/skill-creator/references/openai_yaml.md");
+const SKILL_CREATOR_GENERATE_YAML: &str =
+    include_str!("../templates/skills/skill-creator/scripts/generate_openai_yaml.py");
 
 /// Scaffolds a harness workspace in `root`, then initializes the state
 /// database and seeds the invariants.
@@ -269,6 +278,15 @@ fn scaffold_skills(root: &Path, opts: &InitOpts, report: &mut InitReport) -> Res
                 &root.join(format!("{skill_dir}/evals/walkthrough.sh")),
             )?;
         }
+        for (rel, contents) in spec.references {
+            write_if_absent(
+                root,
+                &format!("{skill_dir}/{rel}"),
+                contents,
+                opts.force,
+                report,
+            )?;
+        }
     }
 
     write_if_absent(
@@ -289,6 +307,20 @@ fn scaffold_skills(root: &Path, opts: &InitOpts, report: &mut InitReport) -> Res
         root,
         ".agents/skills/skill-creator/scripts/quick_validate.py",
         SKILL_CREATOR_QUICK_VALIDATE,
+        opts.force,
+        report,
+    )?;
+    write_if_absent(
+        root,
+        ".agents/skills/skill-creator/references/openai_yaml.md",
+        SKILL_CREATOR_OPENAI_YAML,
+        opts.force,
+        report,
+    )?;
+    write_if_absent(
+        root,
+        ".agents/skills/skill-creator/scripts/generate_openai_yaml.py",
+        SKILL_CREATOR_GENERATE_YAML,
         opts.force,
         report,
     )?;

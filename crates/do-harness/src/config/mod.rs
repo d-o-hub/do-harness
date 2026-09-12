@@ -84,8 +84,9 @@ pub const SUPPORTED_LANGUAGES: &[&str] = &["rust", "generic"];
 static RUST_SENSORS: std::sync::LazyLock<Vec<SensorSpec>> = std::sync::LazyLock::new(rust_pack);
 
 /// Builds a built-in sensor spec with the pack-default execution policy
-/// (no retries, no timeout, mandatory pass).
-fn spec(name: &str, argv: &[&str]) -> SensorSpec {
+/// (no retries, no timeout, mandatory pass) and the given `when-changed`
+/// applicability globs (empty means always applicable).
+fn spec(name: &str, argv: &[&str], when_changed: &[&str]) -> SensorSpec {
     SensorSpec {
         name: name.to_owned(),
         argv: argv.iter().map(|arg| (*arg).to_owned()).collect(),
@@ -93,24 +94,38 @@ fn spec(name: &str, argv: &[&str]) -> SensorSpec {
         timeout: None,
         allow_failure: false,
         transient_exit_codes: Vec::new(),
-        when_changed: Vec::new(),
+        when_changed: when_changed.iter().map(|glob| (*glob).to_owned()).collect(),
     }
 }
 
 /// Builds the built-in Rust sensor pack.
 pub fn rust_pack() -> Vec<SensorSpec> {
+    const RUST_INPUTS: &[&str] = &["**/*.rs", "Cargo.toml", "Cargo.lock"];
     vec![
-        spec("fmt", &["cargo", "fmt", "--all", "--", "--check"]),
-        spec("check", &["cargo", "check", "--workspace"]),
+        spec(
+            "fmt",
+            &["cargo", "fmt", "--all", "--", "--check"],
+            &["**/*.rs", "Cargo.toml", "Cargo.lock", "rust-toolchain.toml"],
+        ),
+        spec("check", &["cargo", "check", "--workspace"], RUST_INPUTS),
         spec(
             "clippy",
-            &["cargo", "clippy", "--workspace", "--", "-D", "warnings"],
+            &[
+                "cargo",
+                "clippy",
+                "--workspace",
+                "--all-targets",
+                "--",
+                "-D",
+                "warnings",
+            ],
+            RUST_INPUTS,
         ),
-        spec("test", &["cargo", "test", "--workspace"]),
-        spec("loc", &["bash", "scripts/check-loc.sh"]),
-        spec("deps", &["bash", "scripts/check-deps.sh"]),
-        spec("audit", &["bash", "scripts/check-audit.sh"]),
-        spec("commitlint", &["bash", "scripts/check-commitlint.sh"]),
+        spec("test", &["cargo", "test", "--workspace"], RUST_INPUTS),
+        spec("loc", &["bash", "scripts/check-loc.sh"], &["**/*.rs"]),
+        spec("deps", &["bash", "scripts/check-deps.sh"], &[]),
+        spec("audit", &["bash", "scripts/check-audit.sh"], &[]),
+        spec("commitlint", &["bash", "scripts/check-commitlint.sh"], &[]),
     ]
 }
 
@@ -227,7 +242,8 @@ fn validate_globs(sensor: &str, patterns: &[String]) -> Result<()> {
     Ok(())
 }
 
-/// Returns the built-in Rust configuration with the seven-pack of sensors.
+/// Returns the built-in Rust configuration with the full sensor pack and the
+/// feedback/verification/release signal sets.
 pub fn rust_default() -> Config {
     let sensors = RUST_SENSORS.to_vec();
     let names: Vec<String> = sensors.iter().map(|s| s.name.clone()).collect();
