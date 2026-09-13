@@ -1,0 +1,20 @@
+{
+  "name": "do-harness-linux-x64",
+  "version": "0.1.0",
+  "description": "Prebuilt do-harness binary for Linux x64 (static musl)",
+  "license": "MIT",
+  "homepage": "https://github.com/d-o-hub/do-harness",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/d-o-hub/do-harness.git"
+  },
+  "os": [
+    "linux"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "files": [
+    "bin/"
+  ]
+}

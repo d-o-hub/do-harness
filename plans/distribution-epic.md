@@ -64,6 +64,21 @@ for the not-yet-published deps; `cargo-binstall 1.23.0 binstall do-harness
 --manifest-path crates/do-harness/Cargo.toml --dry-run` resolved the real
 `v0.1.0` `x86_64-unknown-linux-musl` asset and binary path from GitHub.
 
+## Follow-up: zero-install npm wrapper
+
+| Slice | Exit criteria | Task |
+|-------|---------------|------|
+| Wrapper packages | Meta package with pinned platform `optionalDependencies`, a stdio-inheriting shim, and four platform package templates | 47 |
+| Publish assembly | `scripts/publish-npm.sh` stages platform packages from release artifacts, patches versions, skips published versions, and supports a tokenless `--dry-run` | 48 |
+| Release wiring | Tag-gated `npm-publish` job (platform-first, then meta) plus shim tests and a dry-run assembly step in CI; docs list `npx do-harness` | 49 |
+
+Evidence: `node --test integrations/npm/test/*.test.mjs` (mapping, arg
+passthrough, exit-code propagation, missing/unsupported-platform guidance);
+`scripts/publish-npm.sh --dist <dir> --dry-run` assembles all five packages;
+a real local `npm install` of packed meta + platform tarballs ran
+`node_modules/.bin/do-harness version` and `npx --no-install do-harness
+version` against the release binary.
+
 ## Non-goals
 
 - No npm/npx wrapper; the installer and crates.io are the acquisition paths.

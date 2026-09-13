@@ -4,6 +4,13 @@ A compiled agent-execution harness CLI: feedforward guides (AGENTS.md, `.agents/
 
 ## Install
 
+Zero-install with npx (Node 18+; resolves the prebuilt platform binary):
+
+```bash
+npx do-harness init
+npx do-harness verify --set verification --changed --strict
+```
+
 Prebuilt binaries for Linux (x86_64/aarch64, static musl) and macOS
 (x86_64/arm64) are published as GitHub Releases with SHA-256 checksums:
 

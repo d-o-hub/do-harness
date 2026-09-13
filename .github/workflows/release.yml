@@ -15,7 +15,7 @@ on:
   workflow_dispatch:
     inputs:
       publish:
-        description: "Also publish the workspace version to crates.io"
+        description: "Also publish the workspace version to crates.io and npm"
         type: boolean
         default: false
 
@@ -266,3 +266,36 @@ jobs:
           publish do-harness-types
           publish do-harness-db
           publish do-harness
+
+  npm-publish:
+    # The npm wrapper ships the same prebuilt binaries as the GitHub release,
+    # so it is gated on the same preconditions. Platform packages publish
+    # first, then the meta package whose optionalDependencies pin them.
+    needs: [preflight, build]
+    if: github.event_name == 'push' || inputs.publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    env:
+      # Create a granular access token with publish rights at
+      # https://www.npmjs.com/settings/<user>/tokens and store it as the
+      # NPM_TOKEN repository secret (see docs/releasing.md).
+      NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+    steps:
+      # actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      # actions/download-artifact@v4 (v4.3.0)
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          path: dist
+          merge-multiple: true
+      # actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      - name: Publish npm packages
+        run: bash scripts/publish-npm.sh --dist dist

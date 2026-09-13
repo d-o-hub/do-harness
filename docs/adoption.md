@@ -6,6 +6,15 @@ generated contract.
 
 ## Install
 
+Zero-install with npx (Node 18+, no binary on `PATH` required):
+
+```bash
+npx do-harness init
+npx do-harness verify --set verification --changed --strict
+```
+
+Or install a pinned prebuilt binary:
+
 ```bash
 # Latest release (tag resolved from the releases/latest redirect).
 curl -fsSL https://raw.githubusercontent.com/d-o-hub/do-harness/main/scripts/install.sh | sh
