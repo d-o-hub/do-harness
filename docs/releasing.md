@@ -11,6 +11,10 @@ verification set and every build target dogfoods green.
   <https://crates.io/settings/tokens> (scope: publish new crates and versions)
   and store it under **Settings → Secrets and variables → Actions**. The
   publish job fails loudly when the secret is missing.
+- Add the `NPM_TOKEN` repository secret: create a granular access token with
+  publish rights at
+  <https://www.npmjs.com/settings/~your-user~/tokens> and store it the same
+  way. The npm-publish job fails loudly when it is missing.
 - For `cargo binstall` support, no extra setup is needed: the CLI manifest
   declares `[package.metadata.binstall]`, and the release assets match the
   cargo-binstall defaults (`do-harness-v<version>-<target>.tar.gz` containing
@@ -37,6 +41,8 @@ verification set and every build target dogfoods green.
    - `release` — publishes the tarballs plus `checksums.txt` via
      `gh release create --verify-tag`.
    - `publish` — publishes the three crates to crates.io in dependency order.
+   - `npm-publish` — publishes the four platform packages, then the
+     `do-harness` meta package, to npm.
 
 ## crates.io publishing
 
@@ -61,17 +67,52 @@ cargo publish --dry-run -p do-harness-types
 # published, their dry runs work too.
 ```
 
+## npm publishing
+
+`integrations/npm/` holds the meta package (`do-harness`, a zero-policy
+launcher) and four platform package templates. The npm-publish job downloads
+the build artifacts, stages each platform package with its binary, and
+publishes platform-first so the meta package's pinned `optionalDependencies`
+resolve. Versions already on npm are skipped, so a partial run can be re-run.
+
+Validate the assembly locally without a token:
+
+```bash
+dist=$(mktemp -d)
+for target in x86_64-unknown-linux-musl aarch64-unknown-linux-musl \
+    x86_64-apple-darwin aarch64-apple-darwin; do
+  name="do-harness-v0.2.0-${target}"
+  mkdir -p "$dist/pkg/$name"
+  cp target/release/do-harness "$dist/pkg/$name/do-harness"
+  tar -czf "$dist/${name}.tar.gz" -C "$dist/pkg" "$name"
+done
+bash scripts/publish-npm.sh --dist "$dist" --dry-run
+```
+
+The wrapper shim resolves the platform package relative to itself and execs
+the binary with inherited stdio; `node --test integrations/npm/test/*.test.mjs`
+covers resolution, arg passthrough, exit-code propagation, and the
+missing/unsupported-platform diagnostics.
+
 ## Install channels
 
 | Channel | Command |
 |---------|---------|
+| npx (zero install) | `npx do-harness init` |
+| npm dev dependency | `npm install -D do-harness && npx do-harness verify` |
 | Prebuilt installer | `curl -fsSL .../scripts/install.sh \| sh -s -- --version v0.2.0` |
 | cargo-binstall | `cargo binstall do-harness` |
 | crates.io source build | `cargo install do-harness --version 0.2.0` |
 | Vendored source | `cargo install --path vendor/do-harness/crates/do-harness` |
+
+For git hooks with an npm install, point `DO_HARNESS_BIN` at
+`node_modules/.bin/do-harness` (the shim forwards arguments to the platform
+binary) or install the CLI onto `PATH` with the shell installer.
 
 ## Rollback
 
 GitHub release assets can be deleted and the tag re-pointed if a build fails
 before publication. crates.io versions are immutable: a bad version must be
 yanked (`cargo yank --version <v>`) and superseded by a new patch release.
+npm versions can be unpublished within 72 hours of publish, or deprecated
+(`npm deprecate do-harness@<v> "reason"`) and superseded.

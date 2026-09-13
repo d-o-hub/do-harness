@@ -1,5 +1,5 @@
 {
-  "exported_at": 1789322094,
+  "exported_at": 1789325101,
   "tasks": [
     {
       "id": 1,
@@ -506,12 +506,45 @@
       "precondition": null,
       "created_at": 1789321976,
       "updated_at": 1789322094
+    },
+    {
+      "id": 47,
+      "parent_id": null,
+      "title": "feat: npm meta and platform wrapper packages (distribution)",
+      "method": "vertical-event-slice",
+      "subtask_index": 5,
+      "status": "done",
+      "precondition": null,
+      "created_at": 1789325002,
+      "updated_at": 1789325046
+    },
+    {
+      "id": 48,
+      "parent_id": null,
+      "title": "feat: npm publish assembly script with tokenless dry run (distribution)",
+      "method": "vertical-event-slice",
+      "subtask_index": 5,
+      "status": "done",
+      "precondition": null,
+      "created_at": 1789325002,
+      "updated_at": 1789325075
+    },
+    {
+      "id": 49,
+      "parent_id": null,
+      "title": "ci: tag-gated npm publish job, shim tests, and docs (distribution)",
+      "method": "vertical-event-slice",
+      "subtask_index": 5,
+      "status": "done",
+      "precondition": null,
+      "created_at": 1789325002,
+      "updated_at": 1789325101
     }
   ],
   "summary": {
     "pending": 0,
     "in_progress": 0,
-    "done": 46,
+    "done": 49,
     "failed": 0
   }
 }
