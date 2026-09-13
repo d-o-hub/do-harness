@@ -1,5 +1,5 @@
 {
-  "exported_at": 1789325101,
+  "exported_at": 1789326675,
   "tasks": [
     {
       "id": 1,
@@ -539,12 +539,23 @@
       "precondition": null,
       "created_at": 1789325002,
       "updated_at": 1789325101
+    },
+    {
+      "id": 50,
+      "parent_id": null,
+      "title": "docs: record skills-over-mcp agent integration decision (distribution)",
+      "method": "vertical-event-slice",
+      "subtask_index": 5,
+      "status": "done",
+      "precondition": null,
+      "created_at": 1789326640,
+      "updated_at": 1789326675
     }
   ],
   "summary": {
     "pending": 0,
     "in_progress": 0,
-    "done": 49,
+    "done": 50,
     "failed": 0
   }
 }

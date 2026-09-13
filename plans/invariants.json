@@ -112,5 +112,11 @@
     "rationale": "rand 0.8.5 is reachable only through the optional pre-GA agent-governance feature, never compiled in default builds, and the unsoundness needs a custom logger re-entering ThreadRng during reseed; agent-governance pins rand =0.8.5 so no upgrade is possible before GA",
     "sensor": "scripts/check-audit.sh (--ignore RUSTSEC-2026-0097)",
     "category": "supply-chain"
+  },
+  {
+    "invariant": "Agent runtimes integrate through the scaffolded skills + AGENTS.md and the CLI JSON contracts; no do-harness MCP wrapper ships while guardian-proxy remains the only MCP surface",
+    "rationale": "Skills are the feedforward layer and the CLI validates fixed argv and emits parseable JSON; MCP only exposes tools and cannot enforce the completion gate, which needs runtime lifecycle hooks (DSH bundle pattern), while host-side sensor execution would change the trust model",
+    "sensor": "do-harness eval",
+    "category": "architecture"
   }
 ]

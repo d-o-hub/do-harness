@@ -83,7 +83,11 @@ version` against the release binary.
 
 - No npm/npx wrapper; the installer and crates.io are the acquisition paths.
 - No Windows targets (managed hooks are bash).
-- No CLI-native MCP surface; an out-of-tree wrapper can follow the DSH bundle
-  pattern.
+- No do-harness MCP wrapper: agents integrate through the scaffolded skills +
+  `AGENTS.md` and the CLI's JSON contracts. MCP stays guardian-proxy-only
+  (`mcp-surface`) until a concrete MCP-only runtime requires host-side
+  execution; completion gating belongs to runtime lifecycle hooks (DSH bundle
+  pattern), and an MCP server cannot enforce it. Decision recorded in
+  `plans/invariants.json` (sensor: `do-harness eval`).
 - No auto-update and no version-bump tooling: the first release is fixed at
   `v0.1.0`.
