@@ -1,6 +1,6 @@
 # Epic: Distribution and External Adoption
 
-> **Status:** implementation complete (pending first `v0.1.0` tag)
+> **Status:** released as `v0.1.0` (2026-09-13)
 > **Related:** prebuilt releases, `scripts/install.sh`, pinned agent
 > instructions, release evidence
 > **Created:** 2026-09-13
@@ -40,8 +40,15 @@ generated agent contract self-bootstrapping.
   and tampered-artifact rejection with a checksum-mismatch diagnostic.
 - CI: `verify.yml` builds the release binary and runs the installer e2e.
 - Release: `release.yml` preflight re-verifies the tagged commit with the full
-  verification set; the first `v0.1.0` dry run (`workflow_dispatch`) validates
-  the ARM/macOS matrix before the tag is pushed.
+  verification set. The first `v0.1.0` run failed on every target because the
+  matrix dogfood ran `init` without `cargo-deny`/`cargo-audit`, whose sensors
+  fail closed under `CI=true`; PR #60 installed both tools and the re-tagged
+  run published four tarballs + `checksums.txt` (release job gated on all
+  builds passing).
+- Published release verified end-to-end with the real installer: pinned
+  (`--version v0.1.0`) and latest-resolution installs both produced
+  `do-harness 0.1.0 (3e04dd2)`, and the installed binary passed
+  `init && verify --set verification --strict` (8/8 sensors).
 
 ## Non-goals
 
