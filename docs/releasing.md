@@ -75,6 +75,11 @@ the build artifacts, stages each platform package with its binary, and
 publishes platform-first so the meta package's pinned `optionalDependencies`
 resolve. Versions already on npm are skipped, so a partial run can be re-run.
 
+Committed `integrations/npm/**/package.json` versions are placeholders for
+local tooling: `scripts/publish-npm.sh` patches the meta version and all four
+`optionalDependencies` pins to the workspace version in the staging directory,
+so a stale committed value can never be published.
+
 Validate the assembly locally without a token:
 
 ```bash
