@@ -122,7 +122,8 @@ pub async fn init_workspace(root: &Path, opts: &InitOpts) -> Result<InitReport> 
 
     validate_existing_invariants(root, opts)?;
 
-    write_if_absent(root, "AGENTS.md", AGENTS_TEMPLATE, opts.force, &mut report)?;
+    let agents_contract = AGENTS_TEMPLATE.replace("{{VERSION}}", env!("CARGO_PKG_VERSION"));
+    write_if_absent(root, "AGENTS.md", &agents_contract, opts.force, &mut report)?;
     let config = match report.language {
         Language::Rust => {
             let sensors = detect::included_specs(report.language, &report.candidates);

@@ -41,6 +41,19 @@ async fn init_rust_scaffolds_full_workspace() {
 }
 
 #[tokio::test(flavor = "current_thread")]
+async fn init_agents_contract_embeds_pinned_installer() {
+    let dir = tempfile::tempdir().unwrap();
+
+    init_workspace(dir.path(), &opts(Some(Language::Rust)))
+        .await
+        .unwrap();
+
+    let agents = fs::read_to_string(dir.path().join("AGENTS.md")).unwrap();
+    assert!(agents.contains(&format!("--version v{}", env!("CARGO_PKG_VERSION"))));
+    assert!(!agents.contains("{{VERSION}}"));
+}
+
+#[tokio::test(flavor = "current_thread")]
 async fn init_generic_has_no_loc_script() {
     let dir = tempfile::tempdir().unwrap();
 
