@@ -1,11 +1,9 @@
-#!/usr/bin/env bash
+#!/bin/sh
 # install.sh — install a prebuilt do-harness release binary.
 #
-# Usage:
-#   curl -fsSL https://raw.githubusercontent.com/d-o-hub/do-harness/main/scripts/install.sh | sh
-#   curl -fsSL https://raw.githubusercontent.com/d-o-hub/do-harness/main/scripts/install.sh \
-#     | sh -s -- --version v0.1.0 --bin-dir "$HOME/.local/bin"
-#
+# POSIX sh on purpose: the documented invocation pipes this script into `sh`,
+# which is dash on Debian/Ubuntu. Do not use bashisms ([[ ]], local, pipefail).
+
 # Reproducibility: pin DO_HARNESS_VERSION (or --version). Without a pin the
 # latest release tag is resolved from the GitHub `releases/latest` redirect
 # (no API call, no rate limit).
@@ -14,7 +12,10 @@
 # origin as the artifact, so it detects corruption and truncated downloads,
 # not a compromised release origin. For a stronger guarantee, verify the
 # checksums out of band before installing.
-set -euo pipefail
+# pipefail is deliberately absent (POSIX): the only pipes feed awk from the
+# checksum tools, and a failed checksum tool yields an empty digest that the
+# explicit mismatch guard below rejects.
+set -eu
 
 REPO="${DO_HARNESS_REPO:-d-o-hub/do-harness}"
 DEFAULT_BASE_URL="https://github.com/${REPO}/releases/download"
@@ -49,7 +50,7 @@ die() {
     exit 1
 }
 
-while [[ $# -gt 0 ]]; do
+while [ $# -gt 0 ]; do
     case "$1" in
         --version)
             VERSION="${2:?--version requires a value}"
@@ -74,19 +75,18 @@ while [[ $# -gt 0 ]]; do
 done
 
 detect_target() {
-    local os arch
-    os="$(uname -s)"
-    arch="$(uname -m)"
-    case "$os" in
+    uname_os="$(uname -s)"
+    uname_arch="$(uname -m)"
+    case "$uname_os" in
         Linux)
-            case "$arch" in
+            case "$uname_arch" in
                 x86_64 | amd64) echo "x86_64-unknown-linux-musl" ;;
                 aarch64 | arm64) echo "aarch64-unknown-linux-musl" ;;
                 *) return 1 ;;
             esac
             ;;
         Darwin)
-            case "$arch" in
+            case "$uname_arch" in
                 x86_64) echo "x86_64-apple-darwin" ;;
                 arm64 | aarch64) echo "aarch64-apple-darwin" ;;
                 *) return 1 ;;
@@ -97,12 +97,14 @@ detect_target() {
 }
 
 resolve_latest() {
-    local url tag
-    url="$(curl -fsSL -o /dev/null -w '%{url_effective}' "$LATEST_URL")" ||
+    latest_url="$(curl -fsSL -o /dev/null -w '%{url_effective}' "$LATEST_URL")" ||
         die "could not resolve the latest release from ${LATEST_URL}"
-    tag="${url##*/}"
-    [[ "$tag" == v* ]] || die "unexpected latest release URL: ${url}"
-    printf '%s\n' "$tag"
+    latest_tag="${latest_url##*/}"
+    case "$latest_tag" in
+        v*) ;;
+        *) die "unexpected latest release URL: ${latest_url}" ;;
+    esac
+    printf '%s\n' "$latest_tag"
 }
 
 sha256_of() {
@@ -120,10 +122,13 @@ command -v curl >/dev/null 2>&1 || die "curl is required to download releases"
 target="$(detect_target)" ||
     die "unsupported platform $(uname -s)/$(uname -m); install from source with 'cargo install --path crates/do-harness'"
 
-if [[ -z "$VERSION" ]]; then
+if [ -z "$VERSION" ]; then
     VERSION="$(resolve_latest)"
 fi
-[[ "$VERSION" == v* ]] || VERSION="v${VERSION}"
+case "$VERSION" in
+    v*) ;;
+    *) VERSION="v${VERSION}" ;;
+esac
 
 asset="do-harness-${VERSION}-${target}.tar.gz"
 tmp="$(mktemp -d)"
@@ -135,14 +140,14 @@ curl -fsSL -o "$tmp/checksums.txt" "${BASE_URL}/${VERSION}/checksums.txt" ||
     die "download failed: ${BASE_URL}/${VERSION}/checksums.txt"
 
 expected="$(awk -v name="$asset" '$2 == name { print $1 }' "$tmp/checksums.txt")"
-[[ -n "$expected" ]] || die "${asset} is not listed in checksums.txt"
+[ -n "$expected" ] || die "${asset} is not listed in checksums.txt"
 actual="$(sha256_of "$tmp/$asset")"
-[[ "$actual" == "$expected" ]] ||
+[ "$actual" = "$expected" ] ||
     die "checksum mismatch for ${asset} (expected ${expected}, got ${actual})"
 
 tar -xzf "$tmp/$asset" -C "$tmp"
 src="$tmp/do-harness-${VERSION}-${target}/do-harness"
-[[ -f "$src" ]] || die "archive ${asset} did not contain do-harness"
+[ -f "$src" ] || die "archive ${asset} did not contain do-harness"
 
 mkdir -p "$BIN_DIR"
 install -m 0755 "$src" "$BIN_DIR/do-harness"

@@ -89,6 +89,25 @@ got="$("$tmp/bin/do-harness" version --format json | sed -n 's/.*"version": "\([
     exit 1
 }
 
+# Documented curl-pipeline contract: the README pipes the script into `sh`,
+# which is dash on Debian/Ubuntu. Exercise that exact execution mode (script
+# on stdin, arguments after -s --) to catch bashisms the file-mode run above
+# cannot see.
+pipe_ok() {
+    local bin_dir="$1" log="$2"
+    sh -s -- --version "$VERSION" --base-url "$base" --bin-dir "$bin_dir" <"$ROOT/scripts/install.sh" >"$log" 2>&1
+}
+
+if ! pipe_ok "$tmp/bin-piped" "$tmp/piped.log"; then
+    cat "$tmp/piped.log" >&2
+    echo "FAIL: piped (sh -s) installation exited non-zero" >&2
+    exit 1
+fi
+[[ -x "$tmp/bin-piped/do-harness" ]] || {
+    echo "FAIL: piped install did not place an executable at $tmp/bin-piped/do-harness" >&2
+    exit 1
+}
+
 # Tampering with the artifact must fail checksum verification before install.
 printf 'tamper' >>"$dist/${name}.tar.gz"
 if install_ok "$tmp/bin-tampered" "$tmp/tamper.log"; then
@@ -105,4 +124,4 @@ grep -q "checksum mismatch" "$tmp/tamper.log" || {
     exit 1
 }
 
-echo "test-install OK: verified, installed, and rejected a tampered artifact"
+echo "test-install OK: verified, installed (bash file mode + sh pipeline mode), and rejected a tampered artifact"
