@@ -1,0 +1,186 @@
+name: release
+
+# Publishing contract:
+#   - `v*` tag push: preflight verifies the tagged commit, the matrix builds
+#     and dogfoods each target, then the release job publishes the tarballs
+#     plus `checksums.txt` as a GitHub Release. The tag must equal the
+#     `[workspace.package].version` in Cargo.toml.
+#   - `workflow_dispatch`: dry run — build and dogfood every target but never
+#     publish. Use it to validate the matrix without cutting a release.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      # actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          # Full history so commitlint and git metadata see the tagged commit.
+          fetch-depth: 0
+          # No push/fetch credentials persisted: this workflow never pushes.
+          persist-credentials: false
+      - name: Resolve pinned toolchain
+        id: toolchain
+        run: |
+          channel="$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)"
+          echo "channel=$channel" >> "$GITHUB_OUTPUT"
+      - name: Resolve workspace version
+        id: version
+        run: |
+          version="$(sed -n '/^\[workspace.package\]/,/^\[/ s/^version *= *"\(.*\)"/\1/p' Cargo.toml)"
+          test -n "$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Assert the tag matches the workspace version
+        if: github.event_name == 'push'
+        run: |
+          expected="v${{ steps.version.outputs.version }}"
+          test "$expected" = "${GITHUB_REF_NAME}" || {
+            echo "FAIL: tag ${GITHUB_REF_NAME} does not match workspace version ${expected}" >&2
+            exit 1
+          }
+      # dtolnay/rust-toolchain@master (SHA within master history per action docs)
+      - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772
+        with:
+          toolchain: ${{ steps.toolchain.outputs.channel }}
+          components: rustfmt, clippy
+      # Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
+      # taiki-e/install-action@v2
+      - uses: taiki-e/install-action@ba47c86ac325773530516bb756137ac718732518
+        with:
+          tool: cargo-deny,cargo-audit
+      - name: Build harness CLI
+        run: cargo build --release -p do-harness
+      - name: Verify the tagged commit
+        env:
+          # check-audit.sh / check-deps.sh / check-shell.sh fail closed when
+          # CI=true; cargo-audit and cargo-deny are installed above.
+          CI: "true"
+          DO_HARNESS_REQUIRE_TOOLS: "1"
+        run: ./target/release/do-harness verify --set verification --format json --strict
+
+  build:
+    needs: preflight
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Static musl binaries run on any glibc distribution and in minimal
+          # containers. `musl-tools` provides musl-gcc for the cc crate.
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+            musl: true
+          # Native ARM runner (free for public repositories). If the label is
+          # unavailable, fall back to `cross`/`cargo-zigbuild` on ubuntu-latest.
+          - target: aarch64-unknown-linux-musl
+            os: ubuntu-24.04-arm
+            musl: true
+          # Both Darwin targets build on the arm64 runner; the x86_64 target
+          # cross-compiles with Apple clang.
+          - target: x86_64-apple-darwin
+            os: macos-14
+            musl: false
+          - target: aarch64-apple-darwin
+            os: macos-14
+            musl: false
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      # actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Resolve pinned toolchain
+        id: toolchain
+        run: |
+          channel="$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)"
+          echo "channel=$channel" >> "$GITHUB_OUTPUT"
+      - name: Resolve workspace version
+        id: version
+        run: |
+          version="$(sed -n '/^\[workspace.package\]/,/^\[/ s/^version *= *"\(.*\)"/\1/p' Cargo.toml)"
+          test -n "$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      # dtolnay/rust-toolchain@master (SHA within master history per action docs)
+      - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772
+        with:
+          toolchain: ${{ steps.toolchain.outputs.channel }}
+          targets: ${{ matrix.target }}
+      # Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
+        with:
+          key: ${{ matrix.target }}
+      - name: Install musl toolchain
+        if: matrix.musl
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq musl-tools
+      - name: Build release binary
+        run: cargo build --release --locked -p do-harness --target ${{ matrix.target }}
+      - name: Smoke-test the binary
+        run: |
+          ./target/${{ matrix.target }}/release/do-harness version --format json
+      - name: Dogfood init + verify with the release binary
+        run: |
+          tmp="$(mktemp -d)"
+          ./target/${{ matrix.target }}/release/do-harness --root "$tmp" init
+          ./target/${{ matrix.target }}/release/do-harness --root "$tmp" verify --format json --strict
+      - name: Package the release artifact
+        run: |
+          version="${{ steps.version.outputs.version }}"
+          name="do-harness-v${version}-${{ matrix.target }}"
+          mkdir -p "dist/$name"
+          cp "target/${{ matrix.target }}/release/do-harness" "dist/$name/"
+          cp LICENSE README.md "dist/$name/"
+          tar -czf "dist/${name}.tar.gz" -C dist "$name"
+          rm -rf "dist/$name"
+          ls -l dist
+      # actions/upload-artifact@v4 (v4.6.2)
+      - name: Upload the release artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: ${{ matrix.target }}
+          path: dist/*.tar.gz
+          if-no-files-found: error
+
+  release:
+    needs: build
+    # Dispatch is a dry run; only a tag push publishes.
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      # Least privilege: read source, write the release and its assets.
+      contents: write
+    steps:
+      # actions/download-artifact@v4 (v4.3.0)
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Generate checksums
+        run: |
+          cd dist
+          sha256sum do-harness-*.tar.gz > checksums.txt
+          cat checksums.txt
+      - name: Publish the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            --verify-tag \
+            --generate-notes \
+            --title "do-harness ${GITHUB_REF_NAME}" \
+            dist/do-harness-*.tar.gz dist/checksums.txt
