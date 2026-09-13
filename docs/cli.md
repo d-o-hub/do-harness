@@ -126,6 +126,10 @@ derived from the included subset), writes the portable skill subset
 - `VACUOUS` — the generic pack has zero sensors; the pass is explicitly not
   evidence.
 
+The generated `AGENTS.md` embeds a pinned installer command so an agent
+landing in the repository can obtain the exact CLI version it was initialized
+with.
+
 Missing required tooling (e.g. `cargo fmt` or `cargo clippy`) is surfaced and
 omitted from the generated config. Missing optional tools (`cargo-deny`,
 `cargo-audit`) degrade the script-backed `deps`/`audit` sensors, which fail

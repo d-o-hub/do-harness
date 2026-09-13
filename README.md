@@ -4,7 +4,24 @@ A compiled agent-execution harness CLI: feedforward guides (AGENTS.md, `.agents/
 
 ## Install
 
-Requirements: Rust 1.85+.
+Prebuilt binaries for Linux (x86_64/aarch64, static musl) and macOS
+(x86_64/arm64) are published as GitHub Releases with SHA-256 checksums:
+
+```bash
+# latest release (resolved from the releases/latest redirect)
+curl -fsSL https://raw.githubusercontent.com/d-o-hub/do-harness/main/scripts/install.sh | sh
+
+# pinned, reproducible install
+curl -fsSL https://raw.githubusercontent.com/d-o-hub/do-harness/main/scripts/install.sh \
+  | sh -s -- --version v0.1.0
+```
+
+The installer verifies the artifact against the release `checksums.txt` before
+installing to `$HOME/.local/bin` (override with `--bin-dir` /
+`DO_HARNESS_INSTALL_DIR`). Checksums share the release origin, so they detect
+corruption and truncated downloads, not a compromised origin.
+
+Building from source requires Rust 1.85+:
 
 ```bash
 cargo build --release -p do-harness
@@ -12,7 +29,7 @@ cargo build --release -p do-harness
 
 The binary lands at `target/release/do-harness`.
 
-To install it on `PATH` (for use in other repositories):
+To install a source checkout on `PATH` (for use in other repositories):
 
 ```bash
 cargo install --path crates/do-harness
@@ -22,12 +39,14 @@ cargo install --path crates/do-harness
 
 The harness is designed to be adopted by any codebase, Rust or not:
 
-1. Install the CLI onto `PATH` as the primary adoption flow:
+1. Install the CLI onto `PATH` as the primary adoption flow — the prebuilt
+   installer for any stack, or `cargo install --path` for a vendored or
+   air-gapped checkout:
 
    ```bash
-   # From do-harness source or vendored path:
-   cargo install --path crates/do-harness
-   # or when vendored inside an adopting repository:
+   curl -fsSL https://raw.githubusercontent.com/d-o-hub/do-harness/main/scripts/install.sh \
+     | sh -s -- --version v0.1.0
+   # or, from a vendored checkout:
    cargo install --path vendor/do-harness/crates/do-harness
    ```
 
@@ -87,8 +106,11 @@ For local developer setup scripts or CI workflows in adopting repositories:
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Install CLI to Cargo bin path (outside workspace target/)
-cargo install --path vendor/do-harness/crates/do-harness
+# Prebuilt binary (pinned):
+curl -fsSL https://raw.githubusercontent.com/d-o-hub/do-harness/main/scripts/install.sh \
+  | sh -s -- --version v0.1.0
+# ...or a vendored checkout (installs outside the workspace target/):
+# cargo install --path vendor/do-harness/crates/do-harness
 
 # Initialize and verify harness setup
 do-harness hook install
@@ -96,14 +118,22 @@ do-harness doctor
 do-harness verify
 ```
 
+See [docs/adoption.md](docs/adoption.md) for per-ecosystem quickstarts,
+air-gapped mirrors, and the agent evidence loop.
+
 The green path is dogfooded, not assumed: `crates/do-harness/tests/dogfood.rs`
 runs the real binary on fresh temp workspaces and asserts the rust pack goes
 green after `init`, goes red once the crate is removed, and that the generic
 pack's pass is vacuous. CI repeats `init && verify` on every push (see
 `.github/workflows/verify.yml`).
 
-For CI, invoke `do-harness verify --format json --evidence .do-harness/evidence.json --strict` (exit 0/1/2) with the CLI on
-`PATH` — no build step required.
+For CI, install the pinned binary first, then invoke `do-harness verify --format json --evidence .do-harness/evidence.json --strict` (exit 0/1/2) — no build step required.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/d-o-hub/do-harness/main/scripts/install.sh \
+  | sh -s -- --version v0.1.0
+export PATH="$HOME/.local/bin:$PATH"
+```
 
 ## Commands
 

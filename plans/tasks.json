@@ -1,5 +1,5 @@
 {
-  "exported_at": 1789144573,
+  "exported_at": 1789317049,
   "tasks": [
     {
       "id": 1,
@@ -429,12 +429,56 @@
       "precondition": null,
       "created_at": 1789144534,
       "updated_at": 1789144573
+    },
+    {
+      "id": 40,
+      "parent_id": null,
+      "title": "feat: tag-triggered release workflow with checksums (distribution)",
+      "method": "vertical-event-slice",
+      "subtask_index": 5,
+      "status": "done",
+      "precondition": null,
+      "created_at": 1789316976,
+      "updated_at": 1789316997
+    },
+    {
+      "id": 41,
+      "parent_id": null,
+      "title": "feat: checksum-verified install script (distribution)",
+      "method": "vertical-event-slice",
+      "subtask_index": 5,
+      "status": "done",
+      "precondition": null,
+      "created_at": 1789316976,
+      "updated_at": 1789317016
+    },
+    {
+      "id": 42,
+      "parent_id": null,
+      "title": "docs: pinned installer in generated AGENTS.md and adoption guide (distribution)",
+      "method": "vertical-event-slice",
+      "subtask_index": 5,
+      "status": "done",
+      "precondition": null,
+      "created_at": 1789316976,
+      "updated_at": 1789317033
+    },
+    {
+      "id": 43,
+      "parent_id": null,
+      "title": "test: installer e2e evidence and release support policy (distribution)",
+      "method": "vertical-event-slice",
+      "subtask_index": 5,
+      "status": "done",
+      "precondition": null,
+      "created_at": 1789316976,
+      "updated_at": 1789317049
     }
   ],
   "summary": {
     "pending": 0,
     "in_progress": 0,
-    "done": 39,
+    "done": 43,
     "failed": 0
   }
 }
