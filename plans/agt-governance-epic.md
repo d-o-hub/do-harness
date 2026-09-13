@@ -126,7 +126,7 @@ Manual `bash scripts/check-agt-ga.sh`:
 
 ## Next action
 
-All implementation slices done (tasks 3–5, 8–12, 14–16), GA re-check spike (task 17), hygiene (task 18), and GA watch automation (tasks 19–21). Earlier work also removed the duplicated CLI adapter (task 30) and hardened sensors/evidence (2026-09-12 sweep). MCP conformance landed through the docs slice (`plans/mcp-conformance-epic.md`, slices 1–5): criterion (b) is satisfied behind the optional `mcp-surface` feature; the remaining `chore-mcp-promotion` decides default-on, MSRV 1.88, and flat-route removal. `chore-agt-promotion` stays a decision gate pending AGT GA and invariants review — no promotion until criteria `(a) GA` and `(b) MCP surface conformant` both hold. When the watch opens a GA tracking issue, run promotion review against this epic.
+All implementation slices done (tasks 3–5, 8–12, 14–16), GA re-check spike (task 17), hygiene (task 18), and GA watch automation (tasks 19–21). Earlier work also removed the duplicated CLI adapter (task 30) and hardened sensors/evidence (2026-09-12 sweep). MCP conformance landed through the docs slice (`plans/mcp-conformance-epic.md`, slices 1–5): criterion (b) is satisfied behind the optional `mcp-surface` feature, and `chore-mcp-promotion` (2026-09-13) decided to keep it off by default with MSRV 1.85 because flat-route removal is coupled to a default-enabled successor. `chore-agt-promotion` stays a decision gate pending AGT GA and invariants review — no promotion until criteria `(a) GA` and `(b) MCP surface conformant` both hold. When the watch opens a GA tracking issue, run promotion review against this epic.
 
 ## Slice completion — chore-remove-doharness-policy (2026-09-11, task 30)
 

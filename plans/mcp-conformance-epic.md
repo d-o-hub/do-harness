@@ -1,6 +1,6 @@
 # Epic: MCP Conformance for guardian-proxy
 
-> **Status:** decided via spike (2026-09-12); slices 1–5 complete (ingress, forwarding, protocol security, conformance suite, docs); `chore-mcp-promotion` decision remains
+> **Status:** decided via spike (2026-09-12); slices 1–5 complete; `chore-mcp-promotion` decided 2026-09-13 (keep off-by-default)
 > **Related:** spec 2026-07-28, `plans/agt-governance-epic.md` criterion (b), issue #40
 > **Method:** `spike-and-resolve` → `vertical-event-slice` per slice
 > **Owner:** orchestrator swarm
@@ -206,3 +206,26 @@ unchanged. Hand-rolled and re-scope rejected.
 - Evidence: feature-off 30 / feature-on 45 lib + 3 integration tests, clippy
   `-D warnings` off/on, `do-harness verify` 12/12, `do-harness seed` upsert.
   Next slice: `chore-mcp-promotion` (decision gate).
+
+## Promotion review — chore-mcp-promotion (2026-09-13)
+
+**Decision: keep `mcp-surface` off by default; keep the flat route deprecated
+but present; do not bump MSRV. Revisit when a default-MCP consumer appears or
+at AGT GA promotion.**
+
+| Factor | Finding |
+|---|---|
+| Surface completeness | slices 1–5 green: 30 tests off / 45 lib + 3 integration on, `cargo deny check` clean, `verify` 12/12 |
+| MSRV | every `rmcp` 3.x release (3.0–3.3) requires Rust 1.88; the workspace declares 1.85 (README, CI MSRV job), which holds only while the feature is off |
+| Dependency weight | `rmcp` adds ~77 crates when enabled; the feature-on check/test sensors keep it honest |
+| Route removal is coupled to default-on | with `mcp-surface` off, `/mcp/tools/call` is the only tool-call ingress; removing it now would leave default builds with no mediation endpoint |
+| Deprecation age | `Deprecation: true` + successor `Link` shipped 2026-09-12; removal before a release boundary would make the signal meaningless |
+| Consumers | no consumers outside this workspace; `guardian-proxy` is not published |
+| AGT | GA watch run 2026-09-13: `VERDICT=NOT_GA`; `chore-agt-promotion` stays blocked |
+
+Consequences: criterion (b) stays satisfied behind the feature (parity with
+`agt-governance`), the MSRV promise is unchanged, and no breaking removal
+happens without a default-enabled successor. Revisit triggers: (a) a consumer
+needs MCP by default, (b) AGT reaches GA and promotion review runs, (c) a
+release boundary after which the flat route can be removed together with
+default-on.
