@@ -5,6 +5,23 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
+repository.workspace = true
+readme = "README.md"
+keywords = ["agents", "harness", "verification", "sensors", "ci"]
+categories = [
+    "command-line-utilities",
+    "development-tools",
+    "development-tools::testing",
+]
+
+# Prebuilt binaries are published as GitHub release assets named
+# `do-harness-v<version>-<target>.tar.gz` with an inner
+# `do-harness-v<version>-<target>/do-harness` layout, which matches the
+# cargo-binstall defaults once `repository` is set. QuickInstall ships
+# third-party binaries, so it is disabled on supply-chain grounds; compile
+# from source stays available as the last-resort strategy.
+[package.metadata.binstall]
+disabled-strategies = ["quick-install"]
 
 [lints]
 workspace = true
