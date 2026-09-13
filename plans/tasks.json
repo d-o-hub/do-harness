@@ -1,5 +1,5 @@
 {
-  "exported_at": 1789317049,
+  "exported_at": 1789322094,
   "tasks": [
     {
       "id": 1,
@@ -473,12 +473,45 @@
       "precondition": null,
       "created_at": 1789316976,
       "updated_at": 1789317049
+    },
+    {
+      "id": 44,
+      "parent_id": null,
+      "title": "fix: make the cli crate packageable for crates.io (distribution)",
+      "method": "vertical-event-slice",
+      "subtask_index": 5,
+      "status": "done",
+      "precondition": null,
+      "created_at": 1789321976,
+      "updated_at": 1789322047
+    },
+    {
+      "id": 45,
+      "parent_id": null,
+      "title": "feat: crates.io metadata and cargo-binstall support (distribution)",
+      "method": "vertical-event-slice",
+      "subtask_index": 5,
+      "status": "done",
+      "precondition": null,
+      "created_at": 1789321976,
+      "updated_at": 1789322069
+    },
+    {
+      "id": 46,
+      "parent_id": null,
+      "title": "feat: ordered crates.io publish job and release docs (distribution)",
+      "method": "vertical-event-slice",
+      "subtask_index": 5,
+      "status": "done",
+      "precondition": null,
+      "created_at": 1789321976,
+      "updated_at": 1789322094
     }
   ],
   "summary": {
     "pending": 0,
     "in_progress": 0,
-    "done": 43,
+    "done": 46,
     "failed": 0
   }
 }

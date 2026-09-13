@@ -83,7 +83,7 @@ const CHECK_LOC: &str = include_str!("../templates/scripts/check-loc.sh");
 const CHECK_COMMITLINT: &str = include_str!("../templates/scripts/check-commitlint.sh");
 const CHECK_DEPS: &str = include_str!("../templates/scripts/check-deps.sh");
 const CHECK_AUDIT: &str = include_str!("../templates/scripts/check-audit.sh");
-const CRATE_MANIFEST: &str = include_str!("../templates/crate/Cargo.toml");
+const CRATE_MANIFEST: &str = include_str!("../templates/crate/Cargo.toml.template");
 const CRATE_LIB: &str = include_str!("../templates/crate/src/lib.rs");
 
 /// Scaffolds a harness workspace in `root`, then initializes the state

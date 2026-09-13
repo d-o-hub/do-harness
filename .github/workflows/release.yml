@@ -6,11 +6,18 @@ name: release
 #     plus `checksums.txt` as a GitHub Release. The tag must equal the
 #     `[workspace.package].version` in Cargo.toml.
 #   - `workflow_dispatch`: dry run — build and dogfood every target but never
-#     publish. Use it to validate the matrix without cutting a release.
+#     publish binaries. Set `publish` to also publish the workspace version to
+#     crates.io (bootstrap path for a version whose tag predates the publish
+#     job); binary release still requires a tag push.
 on:
   push:
     tags: ["v*"]
   workflow_dispatch:
+    inputs:
+      publish:
+        description: "Also publish the workspace version to crates.io"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -192,3 +199,70 @@ jobs:
             --generate-notes \
             --title "do-harness ${GITHUB_REF_NAME}" \
             dist/do-harness-*.tar.gz dist/checksums.txt
+
+  publish:
+    # crates.io versions are immutable, so publishing is gated on the same
+    # preconditions as the binary release: a version tag whose commit passed
+    # preflight and whose full build matrix (and dogfood) succeeded. The
+    # dispatch path is the bootstrap/re-run escape hatch.
+    needs: [preflight, build]
+    if: github.event_name == 'push' || inputs.publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    env:
+      # Create a token at https://crates.io/settings/tokens and store it as
+      # the CARGO_REGISTRY_TOKEN repository secret (see docs/releasing.md).
+      CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+    steps:
+      # actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Resolve pinned toolchain
+        id: toolchain
+        run: |
+          channel="$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)"
+          echo "channel=$channel" >> "$GITHUB_OUTPUT"
+      # dtolnay/rust-toolchain@master (SHA within master history per action docs)
+      - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772
+        with:
+          toolchain: ${{ steps.toolchain.outputs.channel }}
+      # Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
+        with:
+          key: publish
+      - name: Publish crates in dependency order
+        run: |
+          set -euo pipefail
+          if [ -z "${CARGO_REGISTRY_TOKEN:-}" ]; then
+            echo "FAIL: CARGO_REGISTRY_TOKEN is not configured (see docs/releasing.md)" >&2
+            exit 1
+          fi
+          version="$(sed -n '/^\[workspace.package\]/,/^\[/ s/^version *= *"\(.*\)"/\1/p' Cargo.toml)"
+          test -n "$version"
+          published() {
+            curl -fsS -A "do-harness-release-workflow (https://github.com/d-o-hub/do-harness)" \
+              -o /dev/null "https://crates.io/api/v1/crates/$1/$2"
+          }
+          publish() {
+            local crate="$1" attempt=1
+            if published "$crate" "$version"; then
+              echo "$crate $version is already on crates.io; skipping"
+              return 0
+            fi
+            until cargo publish --locked -p "$crate"; do
+              if [ "$attempt" -ge 8 ]; then
+                echo "FAIL: could not publish $crate after $attempt attempts" >&2
+                return 1
+              fi
+              attempt=$((attempt + 1))
+              echo "retrying $crate in 15s (registry index propagation)"
+              sleep 15
+            done
+          }
+          publish do-harness-types
+          publish do-harness-db
+          publish do-harness

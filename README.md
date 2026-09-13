@@ -21,6 +21,15 @@ installing to `$HOME/.local/bin` (override with `--bin-dir` /
 `DO_HARNESS_INSTALL_DIR`). Checksums share the release origin, so they detect
 corruption and truncated downloads, not a compromised origin.
 
+Rust users can also install from crates.io (source build) or fetch the
+prebuilt release through `cargo-binstall`:
+
+```bash
+cargo install do-harness --version 0.1.0
+# or, using the published release assets:
+cargo binstall do-harness
+```
+
 Building from source requires Rust 1.85+:
 
 ```bash

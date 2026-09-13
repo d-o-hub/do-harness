@@ -26,6 +26,14 @@ Supported platforms: Linux x86_64/aarch64 (static musl) and macOS
 x86_64/arm64. Other platforms install from source:
 `cargo install --path crates/do-harness` (Rust 1.85+).
 
+Rust toolchains can install from crates.io instead, either building from
+source or fetching the release artifact:
+
+```bash
+cargo install do-harness --version 0.1.0
+cargo binstall do-harness          # prebuilt, no compile
+```
+
 ### Air-gapped and vendored installs
 
 - Mirror the release assets and pass `--base-url <URL>`; the layout is
