@@ -80,8 +80,11 @@ VERSION="${VERSION#v}"
 
 if (( ! DRY_RUN )); then
     TOKEN="${NODE_AUTH_TOKEN:-${NPM_TOKEN:-}}"
-    [[ -n "$TOKEN" ]] || die "NODE_AUTH_TOKEN or NPM_TOKEN is not configured"
-    export NODE_AUTH_TOKEN="$TOKEN"
+    if [[ -n "$TOKEN" ]]; then
+        export NODE_AUTH_TOKEN="$TOKEN"
+    elif ! npm whoami >/dev/null 2>&1; then
+        die "not authenticated: run 'npm login' or set NODE_AUTH_TOKEN/NPM_TOKEN"
+    fi
 fi
 
 # target triple : platform package directory : npm package name
