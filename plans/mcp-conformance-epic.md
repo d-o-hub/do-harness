@@ -117,8 +117,9 @@ unchanged. Hand-rolled and re-scope rejected.
   agt-governance,mcp-surface` green; `cargo deny check` clean (no duplicate
   versions); `do-harness verify` 12/12; trace 25 + harness heuristic 18.
 - Note: rmcp's MSRV 1.88 applies only when the feature is enabled; the CI MSRV
-  job (1.85, default features) is expected to stay green — confirm on the next
-  CI run. Next slice: `feat-mcp-tools-forwarding`.
+  job (1.85, default features) stayed green on the first post-merge run
+  (`verify` run 34758546116, 2026-09-13: `msrv` success).
+  Next slice: `feat-mcp-tools-forwarding`.
 
 ## Slice completion — feat-mcp-tools-forwarding (2026-09-12)
 
