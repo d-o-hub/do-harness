@@ -126,6 +126,14 @@ jobs:
       - name: Install musl toolchain
         if: matrix.musl
         run: sudo apt-get update -qq && sudo apt-get install -y -qq musl-tools
+      # The dogfood `init` executes the generated contract, whose deps/audit
+      # sensors fail closed when CI=true. Install the optional tools the
+      # generated pack probes, mirroring verify.yml's dogfood environment.
+      # taiki-e/install-action@v2
+      - name: Install cargo-deny and cargo-audit
+        uses: taiki-e/install-action@ba47c86ac325773530516bb756137ac718732518
+        with:
+          tool: cargo-deny,cargo-audit
       - name: Build release binary
         run: cargo build --release --locked -p do-harness --target ${{ matrix.target }}
       - name: Smoke-test the binary
