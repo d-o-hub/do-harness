@@ -106,5 +106,11 @@
     "rationale": "Official SDK conformance at the ingress without forcing MSRV 1.88 or duplicate dependencies on default builds; default-on and route removal are a separate promotion decision",
     "sensor": "cargo test -p guardian-proxy --features mcp-surface",
     "category": "architecture"
+  },
+  {
+    "invariant": "RUSTSEC-2026-0097 (rand 0.8.5 unsound with a custom logger) is an accepted risk while agent-governance 3.2.2 pins rand exactly",
+    "rationale": "rand 0.8.5 is reachable only through the optional pre-GA agent-governance feature, never compiled in default builds, and the unsoundness needs a custom logger re-entering ThreadRng during reseed; agent-governance pins rand =0.8.5 so no upgrade is possible before GA",
+    "sensor": "scripts/check-audit.sh (--ignore RUSTSEC-2026-0097)",
+    "category": "supply-chain"
   }
 ]
