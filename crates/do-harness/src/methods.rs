@@ -20,7 +20,10 @@ struct MethodFile {
 }
 
 /// Embedded fallback catalog matching `plans/methods.json`.
-const BUILTIN_CATALOG: &str = include_str!("../../../plans/methods.json");
+///
+/// The asset is a symlink to the canonical `plans/methods.json` so the two can
+/// never drift; `cargo package` dereferences it into the published crate.
+const BUILTIN_CATALOG: &str = include_str!("../assets/methods.json");
 
 /// Loads the HTN method catalog from `plans/methods.json` under `root`.
 ///

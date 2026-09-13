@@ -43,7 +43,10 @@ pub async fn audit_chain_cmd(root: &Path, format: Format) -> Result<()> {
 }
 
 /// Embedded compliance document (`docs/compliance.md`).
-const COMPLIANCE_DOC: &str = include_str!("../../../docs/compliance.md");
+///
+/// The asset is a symlink to the canonical document so the two can never
+/// drift; `cargo package` dereferences it into the published crate.
+const COMPLIANCE_DOC: &str = include_str!("../assets/compliance.md");
 
 /// Prints compliance mapping information with optional framework filtering.
 pub fn print_compliance_filtered(framework: Option<&str>, format: Format) {
