@@ -50,10 +50,23 @@ generated agent contract self-bootstrapping.
   `do-harness 0.1.0 (3e04dd2)`, and the installed binary passed
   `init && verify --set verification --strict` (8/8 sensors).
 
+## Follow-up: crates.io and cargo-binstall
+
+| Slice | Exit criteria | Task |
+|-------|---------------|------|
+| Packageable assets | The CLI crate embeds `docs/compliance.md` and `plans/methods.json` through symlinked assets; the greenfield scaffold is not a nested package; `cargo package -p do-harness` verifies | 44 |
+| Registry metadata | `repository`/`keywords`/`categories` on all three crates, symlinked README/LICENSE, and `[package.metadata.binstall]` with QuickInstall disabled | 45 |
+| Publish job + docs | Tag-gated, dependency-ordered, idempotent crates.io publish job with index-propagation retries; `docs/releasing.md`; README/adoption install options | 46 |
+
+Evidence: `cargo publish --dry-run -p do-harness-types` uploads (dry run);
+`cargo package` verifies `do-harness-db` and `do-harness` with local patches
+for the not-yet-published deps; `cargo-binstall 1.23.0 binstall do-harness
+--manifest-path crates/do-harness/Cargo.toml --dry-run` resolved the real
+`v0.1.0` `x86_64-unknown-linux-musl` asset and binary path from GitHub.
+
 ## Non-goals
 
-- No crates.io publish or `cargo-binstall` metadata (candidate follow-up).
-- No npm/npx wrapper; the installer is the single acquisition path.
+- No npm/npx wrapper; the installer and crates.io are the acquisition paths.
 - No Windows targets (managed hooks are bash).
 - No CLI-native MCP surface; an out-of-tree wrapper can follow the DSH bundle
   pattern.
