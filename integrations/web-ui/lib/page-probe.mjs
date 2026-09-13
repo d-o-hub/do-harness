@@ -140,6 +140,15 @@ export function pageProbe(options = {}) {
     for (const el of all) {
       if (!hasDirectText(el)) continue;
       if (el.closest("[aria-hidden='true'], [role='presentation']")) continue;
+      // SVG graphics are excluded: <text> font-size is in SVG user units, not
+      // rendered CSS pixels (a 6-unit wordmark scales with the viewBox), and
+      // SVG text accessibility goes through the <svg>'s own role/label.
+      if (el.closest("svg")) continue;
+      // Skip links: visually-hidden-by-design (sr-only / clip pattern). They
+      // become visible targets on focus, which is their contract.
+      if (el.classList.contains("sr-only")) continue;
+      const clip = getComputedStyle(el).clipPath;
+      if (clip && clip.includes("inset(50")) continue;
       const rect = rectOf(el);
       if (rect.width <= 0 || rect.height <= 0) continue; // display:none / collapsed
       if (allowlisted(el)) continue;
@@ -301,6 +310,10 @@ export function pageProbe(options = {}) {
     ).slice(0, MAX_TABBABLES);
     const previousFocus = document.activeElement;
     for (const el of tabbables) {
+      // sr-only / clip-pattern elements are hidden-by-design until focused.
+      if (el.classList.contains("sr-only")) continue;
+      const clip = getComputedStyle(el).clipPath;
+      if (clip && clip.includes("inset(50")) continue;
       const rect = rectOf(el);
       if (rect.width <= 0 || rect.height <= 0) continue;
       if (rect.width < MIN_TARGET_PX || rect.height < MIN_TARGET_PX) {
