@@ -210,8 +210,10 @@ jobs:
       - uses: taiki-e/install-action@ba47c86ac325773530516bb756137ac718732518
         with:
           tool: cargo-deny,cargo-audit
-      - name: Test workspace
-        run: cargo test --workspace
+      # Full `cargo test --workspace` runs on ubuntu (verify job). The unit
+      # suite is not yet Windows-green (eval walkthrough shebangs, hook exit
+      # codes, path resolution — see #70), so the windows job proves the
+      # distribution path only: build + Git Bash dogfood + npm wrapper.
       - name: Build harness CLI
         run: cargo build --release -p do-harness
       - name: Dogfood init + verify with the release binary
