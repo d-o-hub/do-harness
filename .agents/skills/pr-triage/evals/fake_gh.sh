@@ -72,6 +72,7 @@ case "$cmd" in
         fields=$(opt_value --json "$@") || fields=""
         sha=$(git rev-parse "refs/pull/$pr/head")
         case "$fields" in
+          *mergeCommit*) printf '%s\n' "$sha" ;;
           *baseRefName*) printf 'main\t%s\n' "$sha" ;;
           *headRefOid*) printf '%s\n' "$sha" ;;
           *) printf '{"number":%s,"baseRefName":"main","headRefOid":"%s"}\n' "$pr" "$sha" ;;
@@ -97,6 +98,21 @@ case "$cmd" in
       *name*) printf 'repo\n' ;;
       *) printf '{"owner":{"login":"owner"},"name":"repo"}\n' ;;
     esac
+    ;;
+
+  run)
+    sub="${1:-}"
+    shift || true
+    if [ "$sub" != "list" ]; then
+      echo "fake gh: unsupported run subcommand '$sub'" >&2
+      exit 1
+    fi
+    expr=$(jq_arg "$@") || { echo "fake gh: run list requires --jq" >&2; exit 1; }
+    mode="${FAKE_GH_RUNS:-pass}"
+    if [ "$mode" = "none" ]; then
+      exit 0
+    fi
+    jq -r "$expr" "$fixtures/runs-$mode.json"
     ;;
 
   api)

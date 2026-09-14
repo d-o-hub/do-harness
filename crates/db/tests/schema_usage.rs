@@ -27,6 +27,7 @@ use libsql::{Connection, params::Params};
 const PROD_SOURCES: &[&str] = &[
     "/src/repo.rs",
     "/src/repo_eval.rs",
+    "/src/repo_eval/bars.rs",
     "/src/repo_exec.rs",
     "/src/repo_skill_eval.rs",
     "/src/repo_heuristic.rs",

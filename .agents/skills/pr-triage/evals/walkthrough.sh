@@ -83,6 +83,24 @@ if [ -z "$("$skill/scripts/state.sh" get 42)" ]; then
   echo cleared > "$root/state_cleared.txt"
 fi
 
+# 5b. Bounded waits: `checks.sh --wait` and `post-merge.sh` classify
+# pass/fail/pending/not-yet-registered without unbounded sleeps.
+set +e
+FAKE_GH_CHECKS=pending "$skill/scripts/checks.sh" 9 --wait 1 > "$root/checks_wait.out"
+checks_wait_exit=$?
+FAKE_GH_RUNS=pass "$skill/scripts/post-merge.sh" 7 > "$root/post_merge_pass.out"
+post_merge_pass_exit=$?
+FAKE_GH_RUNS=fail "$skill/scripts/post-merge.sh" 7 > "$root/post_merge_fail.out"
+post_merge_fail_exit=$?
+FAKE_GH_RUNS=pending "$skill/scripts/post-merge.sh" 7 1 > "$root/post_merge_pending.out"
+post_merge_pending_exit=$?
+FAKE_GH_RUNS=none "$skill/scripts/post-merge.sh" 7 1 > "$root/post_merge_none.out"
+post_merge_none_exit=$?
+set -e
+printf 'checks_wait_exit=%s\npost_merge_pass_exit=%s\npost_merge_fail_exit=%s\npost_merge_pending_exit=%s\npost_merge_none_exit=%s\n' \
+  "$checks_wait_exit" "$post_merge_pass_exit" "$post_merge_fail_exit" "$post_merge_pending_exit" "$post_merge_none_exit" \
+  > "$root/wait_summary.txt"
+
 # 6. Harness command: a git repo at the sandbox root for `cli:` assertions.
 cd "$root"
 git init -q "$root"
