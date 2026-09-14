@@ -22,6 +22,7 @@ import {
   minimumRatio,
 } from "./lib/contrast.mjs";
 import { normalizeViewport, normalizeMatrix, DEFAULT_VIEWPORT_MATRIX } from "./lib/audit.mjs";
+import { classifyConsoleMessage } from "./lib/console-audit.mjs";
 
 const rect = (x, y, w, h) => ({ x, y, width: w, height: h });
 
@@ -108,4 +109,42 @@ test("viewport matrix: normalizes, validates, and rejects garbage", () => {
   assert.throws(() => normalizeMatrix([]), RangeError);
   assert.ok(DEFAULT_VIEWPORT_MATRIX.some((v) => v.width === 320)); // reflow floor
   assert.ok(DEFAULT_VIEWPORT_MATRIX.some((v) => v.width === 360)); // Android majority
+});
+
+test("console classification: errors vs discounted noise", () => {
+  const error = (over = {}) => classifyConsoleMessage({ kind: "console", type: "error", text: "boom", ...over });
+  assert.equal(error(), "error");
+  assert.equal(classifyConsoleMessage({ kind: "pageerror", text: "TypeError: x" }), "error");
+  // HTTP errors that are user-facing defects
+  assert.equal(
+    classifyConsoleMessage({ kind: "response-error", status: 500, url: "/api/books" }),
+    "error",
+  );
+  // dev-mode warnings and framework chatter are noise
+  assert.equal(classifyConsoleMessage({ kind: "console", type: "warning", text: "x" }), "noise");
+  assert.equal(error({ text: "[vite] hmr update" }), "noise");
+  // favicon/sourcemap 404s are noise
+  assert.equal(
+    classifyConsoleMessage({ kind: "response-error", status: 404, url: "/favicon.ico" }),
+    "noise",
+  );
+  // auth/backend-availability statuses are noise
+  assert.equal(
+    classifyConsoleMessage({ kind: "response-error", status: 401, url: "/api/me" }),
+    "noise",
+  );
+  // a real 404 route is an error
+  assert.equal(
+    classifyConsoleMessage({ kind: "response-error", status: 404, url: "/api/books/missing" }),
+    "error",
+  );
+  // aborted api fetches are noise; failed static assets are errors
+  assert.equal(
+    classifyConsoleMessage({ kind: "response-failed", text: "net::ERR_FAILED", url: "/api/health" }),
+    "noise",
+  );
+  assert.equal(
+    classifyConsoleMessage({ kind: "response-failed", text: "net::ERR_FAILED", url: "/app.js" }),
+    "error",
+  );
 });
