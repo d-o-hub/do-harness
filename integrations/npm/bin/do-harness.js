@@ -9,24 +9,28 @@ const { spawnSync } = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
 
-const { BINARY_RELATIVE_PATH, platformPackage } = require("../lib/platform.js");
+const { binaryName, platformPackage } = require("../lib/platform.js");
 
 const pkg = platformPackage(process.platform, process.arch);
 if (!pkg) {
   console.error(
     `do-harness: no prebuilt binary for ${process.platform}/${process.arch}.`,
   );
-  console.error("Install with the shell installer or from source instead:");
   console.error(
-    "  curl -fsSL https://raw.githubusercontent.com/d-o-hub/do-harness/main/scripts/install.sh | sh",
+    "Install on a supported platform, build from source, or download a release:",
   );
+  console.error("  https://github.com/d-o-hub/do-harness/releases");
   process.exit(1);
 }
 
 let binary;
 try {
   const packageJson = require.resolve(`${pkg}/package.json`);
-  binary = path.join(path.dirname(packageJson), ...BINARY_RELATIVE_PATH);
+  binary = path.join(
+    path.dirname(packageJson),
+    "bin",
+    binaryName(process.platform),
+  );
 } catch {
   console.error(
     `do-harness: platform package ${pkg} is not installed (optional dependencies may be disabled).`,

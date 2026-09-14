@@ -89,19 +89,34 @@ jobs:
           - target: x86_64-unknown-linux-musl
             os: ubuntu-latest
             musl: true
+            binary: do-harness
+            archive: tar.gz
           # Native ARM runner (free for public repositories). If the label is
           # unavailable, fall back to `cross`/`cargo-zigbuild` on ubuntu-latest.
           - target: aarch64-unknown-linux-musl
             os: ubuntu-24.04-arm
             musl: true
+            binary: do-harness
+            archive: tar.gz
           # Both Darwin targets build on the arm64 runner; the x86_64 target
           # cross-compiles with Apple clang.
           - target: x86_64-apple-darwin
             os: macos-14
             musl: false
+            binary: do-harness
+            archive: tar.gz
           - target: aarch64-apple-darwin
             os: macos-14
             musl: false
+            binary: do-harness
+            archive: tar.gz
+          # Windows ships a zip (Explorer-friendly; cargo-binstall tries every
+          # supported archive format, so the zip is discovered by default).
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            musl: false
+            binary: do-harness.exe
+            archive: zip
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     steps:
@@ -112,11 +127,13 @@ jobs:
           persist-credentials: false
       - name: Resolve pinned toolchain
         id: toolchain
+        shell: bash
         run: |
           channel="$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)"
           echo "channel=$channel" >> "$GITHUB_OUTPUT"
       - name: Resolve workspace version
         id: version
+        shell: bash
         run: |
           version="$(sed -n '/^\[workspace.package\]/,/^\[/ s/^version *= *"\(.*\)"/\1/p' Cargo.toml)"
           test -n "$version"
@@ -144,21 +161,28 @@ jobs:
       - name: Build release binary
         run: cargo build --release --locked -p do-harness --target ${{ matrix.target }}
       - name: Smoke-test the binary
+        shell: bash
         run: |
-          ./target/${{ matrix.target }}/release/do-harness version --format json
+          ./target/${{ matrix.target }}/release/${{ matrix.binary }} version --format json
       - name: Dogfood init + verify with the release binary
+        shell: bash
         run: |
           tmp="$(mktemp -d)"
-          ./target/${{ matrix.target }}/release/do-harness --root "$tmp" init
-          ./target/${{ matrix.target }}/release/do-harness --root "$tmp" verify --format json --strict
+          ./target/${{ matrix.target }}/release/${{ matrix.binary }} --root "$tmp" init
+          ./target/${{ matrix.target }}/release/${{ matrix.binary }} --root "$tmp" verify --format json --strict
       - name: Package the release artifact
+        shell: bash
         run: |
           version="${{ steps.version.outputs.version }}"
           name="do-harness-v${version}-${{ matrix.target }}"
           mkdir -p "dist/$name"
-          cp "target/${{ matrix.target }}/release/do-harness" "dist/$name/"
+          cp "target/${{ matrix.target }}/release/${{ matrix.binary }}" "dist/$name/"
           cp LICENSE README.md "dist/$name/"
-          tar -czf "dist/${name}.tar.gz" -C dist "$name"
+          if [[ "${{ matrix.archive }}" == "zip" ]]; then
+            (cd dist && 7z a "${name}.zip" "$name" >/dev/null)
+          else
+            tar -czf "dist/${name}.tar.gz" -C dist "$name"
+          fi
           rm -rf "dist/$name"
           ls -l dist
       # actions/upload-artifact@v4 (v4.6.2)
@@ -166,7 +190,7 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: ${{ matrix.target }}
-          path: dist/*.tar.gz
+          path: dist/*
           if-no-files-found: error
 
   release:
@@ -187,7 +211,7 @@ jobs:
       - name: Generate checksums
         run: |
           cd dist
-          sha256sum do-harness-*.tar.gz > checksums.txt
+          sha256sum do-harness-* > checksums.txt
           cat checksums.txt
       - name: Publish the GitHub Release
         env:
@@ -198,7 +222,7 @@ jobs:
             --verify-tag \
             --generate-notes \
             --title "do-harness ${GITHUB_REF_NAME}" \
-            dist/do-harness-*.tar.gz dist/checksums.txt
+            dist/do-harness-* dist/checksums.txt
 
   publish:
     # crates.io versions are immutable, so publishing is gated on the same

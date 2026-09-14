@@ -79,6 +79,19 @@ a real local `npm install` of packed meta + platform tarballs ran
 `node_modules/.bin/do-harness version` and `npx --no-install do-harness
 version` against the release binary.
 
+## Follow-up: Windows x86_64
+
+| Slice | Exit criteria | Task |
+|-------|---------------|------|
+| Release artifact | `x86_64-pc-windows-msvc` builds on `windows-latest`, dogfoods `init && verify` under Git Bash, and ships as a zip in the release + checksums | 51 |
+| Hooks and npm | Hook fallback resolves `do-harness.exe`; `win32-x64` platform package + shim `.exe` handling; publish assembly accepts the zip | 52 |
+| CI and docs | `windows-latest` job runs workspace tests, dogfood, and the npm shim tests; docs list the Windows install paths | 53 |
+
+Evidence: local `cargo check -p do-harness --target x86_64-pc-windows-gnu`
+green; hook unit test asserts the `.exe` fallback; npm tests assert the
+`win32-x64` mapping and `.exe` binary name; the PR's windows job is the
+end-to-end proof.
+
 ## Non-goals
 
 - No npm/npx wrapper; the installer and crates.io are the acquisition paths.
