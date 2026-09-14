@@ -55,11 +55,16 @@ impl Baselines {
     ///
     /// # Errors
     ///
-    /// Returns an error when the file exists but cannot be read or parsed.
+    /// Returns an error when the file exists but cannot be read or parsed
+    /// (fail-closed: an unreadable ratchet must not silently disable).
     pub async fn load(root: &Path) -> Result<Self> {
         let path = root.join(BASELINES_PATH);
-        let Ok(bytes) = tokio::fs::read(&path).await else {
-            return Ok(Self::default());
+        let bytes = match tokio::fs::read(&path).await {
+            Ok(bytes) => bytes,
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(Self::default()),
+            Err(err) => {
+                return Err(err).with_context(|| format!("failed to read {}", path.display()));
+            }
         };
         serde_json::from_slice(&bytes)
             .with_context(|| format!("invalid baseline file {}", path.display()))
