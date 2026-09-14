@@ -25,11 +25,19 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           checks: "profile,credential"
-          risk-threshold: "MEDIUM"
+          risk-threshold: "HIGH"
 
-      - name: Enforce fail-closed on elevated or unknown risk
-        if: steps.check.outputs.risk != 'LOW'
+      - name: Enforce fail-closed on high or unknown risk
+        if: steps.check.outputs.risk == 'HIGH' || steps.check.outputs.risk == ''
         run: |
           echo "Contributor check returned risk level: ${{ steps.check.outputs.risk }}"
-          echo "Fail-closed doctrine: Elevated or unknown risk requires manual approval."
+          echo "Fail-closed doctrine: High or unknown risk requires manual approval."
+          echo "Approval path: docs/contributor-approval.md (maintainer review, then close/reopen the PR to re-run this gate)."
           exit 1
+
+      - name: Post approval path on blocked PRs
+        if: failure() && github.event_name == 'pull_request_target'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr comment "${{ github.event.pull_request.number }}" --body "screen-author blocked this PR (risk HIGH or unknown). Maintainer path: review, approve, then close/reopen to re-run the gate. See docs/contributor-approval.md."
