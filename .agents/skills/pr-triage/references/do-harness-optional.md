@@ -4,13 +4,18 @@
 
 ## Probe
 
-Use it only when both checks succeed:
+Use it only when both checks succeed. `DO_HARNESS_BIN` points at a
+dev-checkout binary, mirroring git-hook resolution; otherwise fall back to
+`PATH`:
 
 ```bash
-command -v do-harness >/dev/null 2>&1 && do-harness pr review --help >/dev/null 2>&1
+harness_bin="${DO_HARNESS_BIN:-do-harness}"
+command -v "$harness_bin" >/dev/null 2>&1 && "$harness_bin" pr review --help >/dev/null 2>&1
 ```
 
-If either fails, silently fall back to `gh pr diff`.
+If either fails, silently fall back to `gh pr diff`. `scripts/preflight.sh`
+performs the same probe and reports which binary it found; substitute
+`$harness_bin` for `do-harness` in the commands below.
 
 ## Commands
 
