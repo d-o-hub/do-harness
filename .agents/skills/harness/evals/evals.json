@@ -4,8 +4,9 @@
     {
       "id": 1,
       "prompt": "Adopt the harness in an empty greenfield repository. What must be proven before any work starts?",
-      "expected_output": "do-harness init scaffolds the workspace plus a minimal rust crate, then do-harness verify must actually execute every sensor and exit 0 — the green path is computed, never assumed. A subsequently failing sensor records its error signature for the fail-fast lifecycle.",
+      "expected_output": "do-harness init scaffolds the workspace plus a minimal rust crate, then do-harness verify must actually execute every sensor and exit 0 \u2014 the green path is computed, never assumed. A subsequently failing sensor records its error signature for the fail-fast lifecycle.",
       "files": [],
+      "dim": "efficiency",
       "assertions": [
         "walk:",
         "exists:Cargo.toml",
@@ -22,8 +23,21 @@
       "prompt": "The same test has failed 3 consecutive times for the same subtask. What now?",
       "expected_output": "Apply the fail-fast policy: halt, record the error signature, and surface a diagnostic to the developer.",
       "files": [],
+      "dim": "effectiveness",
       "assertions": [
-        "The fail-fast policy halts rather than retrying indefinitely"
+        "contains:.agents/skills/harness/SKILL.md|3 consecutive times",
+        "contains:.agents/skills/harness/SKILL.md|halt"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Explain what a for-loop is. No repository or workspace is involved.",
+      "expected_output": "No harness action: general knowledge needs no init, no sensors run, and no workspace is touched.",
+      "files": [],
+      "dim": "discoverability",
+      "assertions": [
+        "contains:harness_negative.txt|no init",
+        "contains:.agents/skills/harness/SKILL.md|never assumed"
       ]
     }
   ]

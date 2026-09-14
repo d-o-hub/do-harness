@@ -45,5 +45,12 @@ if python3 "$root/.agents/skills/skill-creator/scripts/quick_validate.py" "$inva
   echo "invalid skill should have failed validation" >&2
   exit 1
 fi
+echo "gate rejected BAD_NAME" > "$root/skill_creator_gate_proof"
+
+# Negative case: free-form prose needs no skill scaffold, so init_skill is
+# never invoked and no stray skill directory leaks.
+cat > "$root/skill_creator_negative.txt" << 'TXT'
+negative: haiku prose needs no skill, init_skill not invoked
+TXT
 
 rm -rf "$tmp_dir"

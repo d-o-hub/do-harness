@@ -43,3 +43,19 @@ mod t {
 RUST
 rustc --edition 2021 --test -o "$root/model_artifact" "$root/model.rs"
 rm -f "$root/model_artifact"
+# Checklist residue pins the repo-local invariants every slice must obey;
+# the minimal rustc demo above cannot pull serde/thiserror, so the checklist
+# carries what compilation alone cannot prove.
+cat > "$root/slice_checklist.md" << 'MD'
+# event slice checklist
+- events serde Serialize/Deserialize with deny_unknown_fields
+- errors: thiserror enums in libraries, anyhow only in binaries, no unwrap in library code
+- forbid(unsafe_code) at crate roots
+- max 500 LOC per file, split across commands/events/handlers/projections
+- events are immutable facts, corrected via a new event
+MD
+# Negative case: prose with no domain behavior emits no Command, Event, or
+# Projection and no extra model file.
+cat > "$root/model_negative.txt" << 'TXT'
+negative: meeting summary prose needs no Command Event Projection, no model emitted
+TXT

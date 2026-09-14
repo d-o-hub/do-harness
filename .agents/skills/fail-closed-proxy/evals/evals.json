@@ -6,6 +6,7 @@
       "prompt": "Add a tool-call mediation endpoint that denies invalid params and forwards only allowed calls. What statuses and order apply?",
       "expected_output": "Decide-audit-forward: deny maps to 403, upstream failures map to 502, audit is best-effort and never flips the decision.",
       "files": [],
+      "dim": "correctness",
       "assertions": [
         "walk:",
         "exists:proxy-checklist.md",
@@ -19,10 +20,23 @@
       "prompt": "The proxy needs observability without affecting routing. Which counters and endpoint apply?",
       "expected_output": "ProxyMetrics counters (allow, deny, mediator_errors, upstream_ok, upstream_failures, audit_write_failures) exposed as JSON at GET /metrics; counters never affect decisions.",
       "files": [],
+      "dim": "efficiency",
       "assertions": [
         "exists:proxy-checklist.md",
         "contains:proxy-checklist.md|GET /metrics",
         "contains:proxy-checklist.md|audit_write_failures"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "A well-formed call from an authorized tool arrives. A second call carries non-object params. Which forwards and which denies?",
+      "expected_output": "The well-formed allow forwards; the malformed call denies with 403 and is audit-logged without flipping any decision.",
+      "files": [],
+      "dim": "security",
+      "assertions": [
+        "contains:proxy_negative.txt|well-formed allow forwards",
+        "contains:proxy-checklist.md|never allow on error",
+        "contains:proxy-checklist.md|hash-chained"
       ]
     }
   ]

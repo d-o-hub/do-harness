@@ -21,3 +21,9 @@ rm -rf "$root/Cargo.toml" "$root/src"
 # Self-correction: minimal fix (restore the crate), then prove green again.
 "$bin" --root "$root" init >/dev/null
 "$bin" --root "$root" verify
+
+# Negative case: a general-knowledge question needs no workspace at all, so
+# init scaffolds nothing and no crate residue is attributable to it.
+cat > "$root/harness_negative.txt" << 'TXT'
+negative: general-knowledge question needs no init, no workspace touched
+TXT

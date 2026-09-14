@@ -6,11 +6,14 @@
       "prompt": "Model a state-change slice for creating a user with an email.",
       "expected_output": "A Command struct, an Event with serde derives and deny_unknown_fields, and a typed error enum, split across commands.rs, events.rs, and errors.rs.",
       "files": [],
+      "dim": "correctness",
       "assertions": [
         "walk:",
         "exists:model.rs",
         "contains:model.rs|impl Command",
-        "contains:model.rs|fn apply"
+        "contains:model.rs|fn apply",
+        "contains:slice_checklist.md|deny_unknown_fields",
+        "contains:slice_checklist.md|thiserror"
       ]
     },
     {
@@ -18,8 +21,21 @@
       "prompt": "Design the read-side projection for a user summary view.",
       "expected_output": "A UserSummaryView with an apply(&mut self, event) method that updates state from UserCreated events.",
       "files": [],
+      "dim": "correctness",
       "assertions": [
-        "The projection folds events into a view"
+        "contains:model.rs|UserSummaryViews",
+        "contains:model.rs|self.total += 1"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Summarize this meeting in prose. No domain behavior is involved.",
+      "expected_output": "No slice: prose without state changes emits no Command, Event, or Projection.",
+      "files": [],
+      "dim": "discoverability",
+      "assertions": [
+        "contains:model_negative.txt|no model emitted",
+        "absent:model_extra.rs"
       ]
     }
   ]

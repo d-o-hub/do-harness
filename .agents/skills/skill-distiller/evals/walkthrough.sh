@@ -33,4 +33,10 @@ EOF
   --description "fires when the borrow checker flags a missing bound" \
   --from-trace "$tid" >/dev/null
 
+# Negative case: a typo-only change has no sensor trace and passed no
+# sensors, so nothing is distilled and no heuristic is written for it.
+cat > "$root/distill_negative.txt" << 'TXT'
+negative: typo-only change has no sensor trace, no distillation; never distill a fix that did not pass computational sensors
+TXT
+
 cat ".agents/skills/skill-distiller/references/heuristics.md"

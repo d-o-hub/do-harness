@@ -52,9 +52,10 @@ Run the skill-evaluator loop:
 5. **Verdict** — `PASS`, `NEEDS_WORK`, or `FAIL` with evidence; iterate until `PASS`.
 
 ### 5. Steering Loop
-- When a sensor fires repeatedly (>2 times in one sprint), update the matching feedforward guide (AGENTS.md or the relevant skill) instead of patching symptoms.
-- If no guide exists, create one in `.agents/skills/` via this skill's steps 1-4.
-- The loop closes the harness: sensors fire -> guides update -> sensors fire less.
+- Canonical rule lives in `.agents/skills/harness` (Steering Loop): a sensor
+  firing >2 times in one sprint is a feedforward-guide defect, not a symptom
+  to patch. Follow it; do not restate it here.
+- If no guide exists, create one in `.agents/skills/` via steps 1-4.
 
 ## Gotchas
 - Never distill a fix that did not pass computational sensors — hallucinations propagate.
