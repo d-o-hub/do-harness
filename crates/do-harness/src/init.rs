@@ -32,6 +32,10 @@ pub enum Language {
     Rust,
     /// No built-in sensors; commented sensor stubs to fill in.
     Generic,
+    /// Web UI sensor pack: viewport text audit, axe accessibility, and
+    /// console noise sensors (Playwright runners plus the shipped
+    /// `scripts/web-ui/` audit library).
+    Web,
 }
 
 /// Options for [`init_workspace`].
@@ -77,6 +81,7 @@ pub struct InitReport {
 
 const AGENTS_TEMPLATE: &str = include_str!("../templates/AGENTS.md");
 const CONFIG_GENERIC: &str = include_str!("../templates/do-harness.toml.generic");
+const CONFIG_WEB: &str = include_str!("../templates/do-harness.toml.web");
 const INVARIANTS_RUST: &str = include_str!("../templates/plans/invariants.json.rust");
 const INVARIANTS_GENERIC: &str = include_str!("../templates/plans/invariants.json.generic");
 const CHECK_LOC: &str = include_str!("../templates/scripts/check-loc.sh");
@@ -130,11 +135,12 @@ pub async fn init_workspace(root: &Path, opts: &InitOpts) -> Result<InitReport> 
             generate_rust_config(&sensors)?
         }
         Language::Generic => CONFIG_GENERIC.to_owned(),
+        Language::Web => CONFIG_WEB.to_owned(),
     };
     write_if_absent(root, "do-harness.toml", &config, opts.force, &mut report)?;
     let invariants = match report.language {
         Language::Rust => INVARIANTS_RUST,
-        Language::Generic => INVARIANTS_GENERIC,
+        Language::Generic | Language::Web => INVARIANTS_GENERIC,
     };
     write_if_absent(
         root,
@@ -146,6 +152,9 @@ pub async fn init_workspace(root: &Path, opts: &InitOpts) -> Result<InitReport> 
     if report.language == Language::Rust {
         scaffold_scripts(root, opts, &mut report)?;
         scaffold_crate(root, &mut report)?;
+    }
+    if report.language == Language::Web {
+        scaffold_web_scripts(root, opts, &mut report)?;
     }
     if !opts.minimal {
         skills::scaffold_skills(root, opts, &mut report)?;
@@ -251,6 +260,61 @@ fn scaffold_scripts(root: &Path, opts: &InitOpts, report: &mut InitReport) -> Re
     ] {
         write_if_absent(root, relative, body, opts.force, report)?;
         crate::fs_perm::set_owner_exec(&root.join(relative))?;
+    }
+    Ok(())
+}
+
+/// Writes the web-pack sensor runners and the bundled web-ui audit library.
+///
+/// Everything lands under `scripts/` and is committed with the workspace so
+/// local evidence and CI run the identical audit code (the sensor↔gate parity
+/// rule from the adoption contract). Runners print "SKIP:" and exit 0 when
+/// Playwright is missing — mirroring the sensor policy — so a workspace
+/// without browsers still goes green on `init && verify`.
+fn scaffold_web_scripts(root: &Path, opts: &InitOpts, report: &mut InitReport) -> Result<()> {
+    for (relative, body) in [
+        (
+            "scripts/viewport-audit.mjs",
+            include_str!("../templates/scripts/viewport-audit.mjs"),
+        ),
+        (
+            "scripts/a11y-audit.mjs",
+            include_str!("../templates/scripts/a11y-audit.mjs"),
+        ),
+        (
+            "scripts/console-audit.mjs",
+            include_str!("../templates/scripts/console-audit.mjs"),
+        ),
+        (
+            "scripts/web-ui/audit.test.mjs",
+            include_str!("../templates/scripts/web-ui/audit.test.mjs"),
+        ),
+        (
+            "scripts/web-ui/lib/audit.mjs",
+            include_str!("../templates/scripts/web-ui/lib/audit.mjs"),
+        ),
+        (
+            "scripts/web-ui/lib/page-probe.mjs",
+            include_str!("../templates/scripts/web-ui/lib/page-probe.mjs"),
+        ),
+        (
+            "scripts/web-ui/lib/geometry.mjs",
+            include_str!("../templates/scripts/web-ui/lib/geometry.mjs"),
+        ),
+        (
+            "scripts/web-ui/lib/contrast.mjs",
+            include_str!("../templates/scripts/web-ui/lib/contrast.mjs"),
+        ),
+        (
+            "scripts/web-ui/lib/console-audit.mjs",
+            include_str!("../templates/scripts/web-ui/lib/console-audit.mjs"),
+        ),
+        (
+            "scripts/web-ui/lib/a11y-audit.mjs",
+            include_str!("../templates/scripts/web-ui/lib/a11y-audit.mjs"),
+        ),
+    ] {
+        write_if_absent(root, relative, body, opts.force, report)?;
     }
     Ok(())
 }

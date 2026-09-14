@@ -88,6 +88,7 @@ pub fn inspect(
     let declared = match existing_language {
         Some("rust") => Some(Language::Rust),
         Some("generic") => Some(Language::Generic),
+        Some("web") => Some(Language::Web),
         _ => None,
     };
     let language = match requested {
@@ -97,6 +98,7 @@ pub fn inspect(
             let name = match language {
                 Language::Rust => "rust",
                 Language::Generic => "generic",
+                Language::Web => "web",
             };
             findings.push(format!("existing do-harness.toml selects the {name} pack"));
             language
@@ -111,10 +113,13 @@ pub fn inspect(
     if language == Language::Generic && !findings.iter().any(|f| f.contains("generic")) {
         findings.push("generic pack selected (zero built-in sensors)".to_owned());
     }
+    if language == Language::Web && !findings.iter().any(|f| f.contains("web")) {
+        findings.push("web pack selected (web-ui audit sensors)".to_owned());
+    }
 
     let candidates = match language {
         Language::Rust => rust_candidates(),
-        Language::Generic => Vec::new(),
+        Language::Generic | Language::Web => Vec::new(),
     };
     Detection {
         findings,
@@ -140,7 +145,7 @@ pub fn included_specs(
                     .any(|candidate| candidate.name == spec.name && candidate.included)
             })
             .collect(),
-        Language::Generic => Vec::new(),
+        Language::Generic | Language::Web => Vec::new(),
     }
 }
 

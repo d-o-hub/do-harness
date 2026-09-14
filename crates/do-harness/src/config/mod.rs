@@ -78,7 +78,7 @@ pub struct SensorSpec {
 }
 
 /// Language pack identifiers accepted in `Config.language`.
-pub const SUPPORTED_LANGUAGES: &[&str] = &["rust", "generic"];
+pub const SUPPORTED_LANGUAGES: &[&str] = &["rust", "generic", "web"];
 
 /// The built-in Rust sensor pack, in canonical order.
 static RUST_SENSORS: std::sync::LazyLock<Vec<SensorSpec>> = std::sync::LazyLock::new(rust_pack);
