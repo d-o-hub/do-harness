@@ -66,10 +66,11 @@ pub fn for_run(
     candidates: &[&SensorSpec],
     changed: &ChangedFiles,
 ) -> Fingerprints {
+    let baseline_digest = crate::baselines::digest(root);
     Fingerprints {
         workspace: workspace_fingerprint(root, changed),
-        policy: policy_fingerprint(cfg, config_bytes, set, candidates),
-        config: config_fingerprint(cfg, config_bytes, candidates),
+        policy: policy_fingerprint(cfg, config_bytes, set, candidates, &baseline_digest),
+        config: config_fingerprint(cfg, config_bytes, candidates, &baseline_digest),
     }
 }
 
@@ -112,21 +113,23 @@ fn file_digest(root: &Path, file: &crate::changes::ChangedFile) -> String {
 /// Effective run policy hash (`sha256:…`).
 ///
 /// Covers the raw config bytes (or the built-in marker), the harness
-/// version, the selected signal set, and the full sensor definitions of the
-/// set — including applicability rules — so any policy edit invalidates old
-/// evidence.
+/// version, the selected signal set, the full sensor definitions of the
+/// set — including applicability rules — and the blessed findings baseline
+/// digest, so any policy edit (including a bless) invalidates old evidence.
 #[must_use]
 pub fn policy_fingerprint(
     cfg: &Config,
     config_bytes: Option<&[u8]>,
     set: Option<&str>,
     candidates: &[&SensorSpec],
+    baseline_digest: &str,
 ) -> String {
     let payload = serde_json::json!({
         "config": config_digest(config_bytes),
         "harness_version": env!("CARGO_PKG_VERSION"),
         "language": cfg.language,
         "signal_set": set,
+        "baselines": baseline_digest,
         "sensors": candidates.iter().copied().map(policy_sensor).collect::<Vec<_>>(),
     });
     hash_canonical(&payload)
@@ -138,11 +141,13 @@ pub fn config_fingerprint(
     cfg: &Config,
     config_bytes: Option<&[u8]>,
     candidates: &[&SensorSpec],
+    baseline_digest: &str,
 ) -> String {
     let payload = serde_json::json!({
         "config": config_digest(config_bytes),
         "harness_version": env!("CARGO_PKG_VERSION"),
         "language": cfg.language,
+        "baselines": baseline_digest,
         "sensors": candidates.iter().copied().map(policy_sensor).collect::<Vec<_>>(),
     });
     hash_canonical(&payload)
@@ -155,6 +160,7 @@ fn policy_sensor(spec: &SensorSpec) -> serde_json::Value {
         "argv": spec.argv,
         "retry": spec.retry,
         "timeout": spec.timeout,
+        "severity": spec.effective_severity(),
         "allow_failure": spec.allow_failure,
         "transient_exit_codes": spec.transient_exit_codes,
         "when_changed": spec.when_changed,
@@ -208,6 +214,7 @@ mod tests {
                 argv: vec!["true".to_owned()],
                 retry: None,
                 timeout: None,
+                severity: None,
                 allow_failure: false,
                 transient_exit_codes: Vec::new(),
                 when_changed: Vec::new(),
@@ -267,23 +274,45 @@ mod tests {
         assert_eq!(without, with);
     }
 
-    /// A config byte change alters the policy fingerprint.
+    /// A config byte change alters the policy fingerprint, and so does the
+    /// blessed baseline digest.
     #[test]
-    fn config_bytes_change_policy_fingerprint() {
+    fn config_bytes_and_baselines_change_policy_fingerprint() {
         let cfg = config();
         let candidates: Vec<&SensorSpec> = cfg.sensors.iter().collect();
-        let first = policy_fingerprint(&cfg, Some(b"a = 1\n"), Some("verification"), &candidates);
-        let same = policy_fingerprint(&cfg, Some(b"a = 1\n"), Some("verification"), &candidates);
+        let first = policy_fingerprint(
+            &cfg,
+            Some(b"a = 1\n"),
+            Some("verification"),
+            &candidates,
+            "absent",
+        );
+        let same = policy_fingerprint(
+            &cfg,
+            Some(b"a = 1\n"),
+            Some("verification"),
+            &candidates,
+            "absent",
+        );
         assert_eq!(first, same);
         let second = policy_fingerprint(
             &cfg,
             Some(b"a = 1\n# tweak\n"),
             Some("verification"),
             &candidates,
+            "absent",
         );
         assert_ne!(first, second, "config bytes must feed the policy hash");
+        let blessed = policy_fingerprint(
+            &cfg,
+            Some(b"a = 1\n"),
+            Some("verification"),
+            &candidates,
+            "deadbeef",
+        );
+        assert_ne!(first, blessed, "baseline digest must feed the policy hash");
         // The set-free config fingerprint ignores the signal-set name.
-        let free_a = config_fingerprint(&cfg, Some(b"a = 1\n"), &candidates);
+        let free_a = config_fingerprint(&cfg, Some(b"a = 1\n"), &candidates, "absent");
         assert_ne!(
             first, free_a,
             "policy and config fingerprints must differ structurally"

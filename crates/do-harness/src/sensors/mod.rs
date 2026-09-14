@@ -24,6 +24,26 @@ pub(crate) fn sensor_blocked(spec: &SensorSpec) -> SensorResult {
     )
 }
 
+/// Builds the quarantined result for a warn-severity sensor that has warned
+/// [`crate::telemetry::FAIL_FAST_STRIKES`] consecutive times: the sensor is
+/// skipped with an advisory verdict instead of halting the run.
+pub(crate) fn sensor_quarantined(spec: &SensorSpec) -> SensorResult {
+    use crate::telemetry::FAIL_FAST_STRIKES;
+    let mut result = exec::sensor_result(
+        spec,
+        false,
+        None,
+        0,
+        format!(
+            "quarantined: sensor '{}' has warned {} consecutive times; resolve the finding or run `do-harness errors clear` to re-enable it",
+            spec.name, FAIL_FAST_STRIKES
+        ),
+    );
+    result.allow_failure = true;
+    result.warned = true;
+    result
+}
+
 /// Options controlling a verify run.
 ///
 /// Each boolean maps 1:1 to an independent CLI flag (`--fail-fast`,
@@ -47,6 +67,11 @@ pub struct VerifyOpts {
     pub jobs: Option<usize>,
     /// Sensor names halted by the fail-fast policy (not executed).
     pub blocked: Vec<String>,
+    /// Warn-severity sensor names skipped after repeated warnings
+    /// (quarantined; not executed, advisory verdict).
+    pub quarantined: Vec<String>,
+    /// Blessed findings ratchet baselines keyed by sensor name.
+    pub baselines: crate::baselines::Baselines,
     /// Persist sensor beats to the state database.
     pub record: bool,
     /// Task id scoping persisted beats when `record` is set.
@@ -55,6 +80,10 @@ pub struct VerifyOpts {
     pub evidence: Option<PathBuf>,
     /// Fail the run when the evidence artifact is not strictly clean.
     pub strict: bool,
+    /// Write blessed baselines after the run (requires `record`).
+    pub bless: bool,
+    /// Approver identity recorded with `bless`.
+    pub approver: Option<String>,
     /// Report output format.
     pub format: Format,
     /// Explicit config file override.
@@ -88,7 +117,18 @@ pub fn verify(cfg: &Config, root: &Path, opts: &VerifyOpts) -> Result<VerifyRepo
 
     let jobs = parallel::effective_jobs(cfg.jobs, opts.jobs)?;
     let cancel = AtomicBool::new(false);
-    let results = parallel::run_parallel(selection.specs, root, opts, jobs, &cancel);
+    let mut results = parallel::run_parallel(selection.specs, root, opts, jobs, &cancel);
+
+    // `--strict` promotes advisory failures to hard failures, except in the
+    // fast `feedback` loop where warn severity stays advisory by contract.
+    let promote = opts.strict && opts.set.as_deref() != Some("feedback");
+    if promote {
+        for result in &mut results {
+            if !result.ok {
+                result.allow_failure = false;
+            }
+        }
+    }
 
     let failed: Vec<String> = results
         .iter()

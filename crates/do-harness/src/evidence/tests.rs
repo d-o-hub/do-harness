@@ -58,10 +58,11 @@ fn strict_clean_checks() {
     assert!(!doc_no_exit.is_strict_clean());
 }
 
-/// `allow_failure` softens the local gate only: evidence must still record
-/// the sensor as failed so `--strict` cannot bless a weak run.
+/// `allow_failure` softens the local gate only: evidence records the sensor
+/// as `warn` and the summary stays non-pass, so `--strict` cannot bless a
+/// weak run.
 #[test]
-fn soft_failure_is_recorded_as_fail_not_pass() {
+fn soft_failure_is_recorded_as_warn_not_pass() {
     let dir = tempfile::tempdir().unwrap();
     let mut cfg = crate::config::rust_default();
     cfg.sensors = vec![crate::config::SensorSpec {
@@ -69,6 +70,7 @@ fn soft_failure_is_recorded_as_fail_not_pass() {
         argv: vec!["true".into()],
         retry: None,
         timeout: None,
+        severity: None,
         allow_failure: true,
         transient_exit_codes: vec![],
         when_changed: vec![],
@@ -83,8 +85,11 @@ fn soft_failure_is_recorded_as_fail_not_pass() {
             ok: false,
             exit_code: Some(1),
             duration_ms: 5,
+            severity: crate::config::SensorSeverity::Warn,
             allow_failure: true,
             warned: false,
+            findings: None,
+            baseline: None,
             output: "boom".into(),
         }],
     };
@@ -105,7 +110,7 @@ fn soft_failure_is_recorded_as_fail_not_pass() {
         finished_at: 1,
     };
     let doc = EvidenceDocument::from_run(&report, &meta);
-    assert_eq!(doc.sensors[0].verdict, "fail");
+    assert_eq!(doc.sensors[0].verdict, "warn");
     assert_eq!(doc.summary.fail, 1);
     assert_eq!(doc.summary.pass, 0);
     assert!(!doc.is_strict_clean());
@@ -122,6 +127,7 @@ fn warned_sensor_is_recorded_as_warn_and_fails_summary() {
         argv: vec!["true".into()],
         retry: None,
         timeout: None,
+        severity: None,
         allow_failure: false,
         transient_exit_codes: vec![],
         when_changed: vec![],
@@ -136,8 +142,11 @@ fn warned_sensor_is_recorded_as_warn_and_fails_summary() {
             ok: true,
             exit_code: Some(0),
             duration_ms: 5,
+            severity: crate::config::SensorSeverity::Error,
             allow_failure: false,
             warned: true,
+            findings: None,
+            baseline: None,
             output: "SKIP: tool missing".into(),
         }],
     };

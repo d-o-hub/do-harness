@@ -47,6 +47,10 @@ Runs computational sensors defined in `do-harness.toml`.
 - `--task <ID>`: Scope recorded beats to task ID. Requires `--record`.
 - `--evidence <FILE>`: Write machine-readable evidence artifact JSON.
 - `--strict`: Exit non-zero if any sensors were skipped or evidence checks fail. Default evidence artifact path: `.do-harness/evidence.json`.
+- `--bless`: Lower or initialize blessed findings baselines from this run
+  (requires `--record`; a bless never raises a baseline).
+- `--approver <NAME>`: Approver identity recorded with `--bless` (defaults to
+  `DO_HARNESS_APPROVER` or the git user email). Requires `--bless`.
 
 A sensor is the execution primitive (one `argv` command). A signal set is a
 development decision composed from sensors: `feedback` for the edit/fix loop,
@@ -63,10 +67,28 @@ A `verify --set <name>` run writes its evidence artifact to
 clobber verification evidence. Runs without `--set` keep the legacy rule
 (artifact only for `--evidence` or `--strict`).
 
-A sensor configured with `allow_failure = true` keeps the local `verify` gate
-green (it prints `WARN`), but its evidence verdict is still `fail` and
-`--strict` rejects it: softness applies to the developer loop, never to the
-evidence artifact.
+Each sensor carries a gate severity. `severity = "error"` (the default) fails
+the run; `severity = "warn"` makes failures advisory: a non-strict run prints
+`WARN` and stays green, while `--strict` promotes the failure outside the
+`feedback` set. The deprecated `allow_failure = true` alias maps to
+`severity = "warn"`; setting both inconsistently is a config error.
+
+A sensor may print a `FINDINGS: <n>` marker (last occurrence wins) to opt into
+the findings ratchet. Blessed ceilings live in the committed
+`plans/baselines.json` (`{"sensors": {"<name>": <max>}}`), which `verify`
+reads and `verify --record --bless` only ever lowers or initializes. A count
+above the baseline is a hard regression (fails even warn-severity sensors); a
+non-zero count within the baseline prints `WARN` with the findings/baseline
+delta. `verify --record` persists observed maxima and bless history to the
+state database; `status` goes stale when the baseline file changes because its
+digest is part of the policy fingerprint.
+
+Advisory failures are recorded in evidence as `warn` (never `pass`), so the
+evidence summary stays non-pass and `--strict` rejects it: softness applies to
+the developer loop, never to the evidence artifact. Warn-severity sensors that
+warn `3` consecutive times under `--record` are quarantined — skipped with an
+advisory `WARN` verdict instead of halting the run — until a passing run or
+`errors clear` resets their strikes.
 
 Evidence schema v3 records each sensor's exact `argv` and a SHA-256 of its
 captured output, the selected `signal_set`, the post-run workspace

@@ -43,6 +43,20 @@ pub struct HooksConfig {
     pub pre_push: Vec<String>,
 }
 
+/// Gate severity for a sensor.
+///
+/// `error` failures fail the verify gate; `warn` failures are advisory in
+/// non-strict runs and only fail under `--strict` (except in `feedback`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum SensorSeverity {
+    /// A failure fails the gate.
+    #[default]
+    Error,
+    /// A failure is advisory (warn-only).
+    Warn,
+}
+
 /// A single computational sensor.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -57,7 +71,10 @@ pub struct SensorSpec {
     /// Optional process execution timeout budget in seconds.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub timeout: Option<u64>,
-    /// Whether failure of this sensor is advisory/warn-only and should not fail the verify gate.
+    /// Gate severity (`error` default, `warn` advisory).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub severity: Option<SensorSeverity>,
+    /// Deprecated alias for `severity = "warn"`.
     #[serde(
         default,
         rename = "allow_failure",
@@ -82,6 +99,18 @@ pub struct SensorSpec {
     pub when_changed: Vec<String>,
 }
 
+impl SensorSpec {
+    /// Effective severity after folding in the deprecated `allow_failure`
+    /// alias: warn when either source says warn, error otherwise.
+    #[must_use]
+    pub fn effective_severity(&self) -> SensorSeverity {
+        match (self.severity, self.allow_failure) {
+            (Some(SensorSeverity::Warn), _) | (None, true) => SensorSeverity::Warn,
+            _ => SensorSeverity::Error,
+        }
+    }
+}
+
 /// Language pack identifiers accepted in `Config.language`.
 pub const SUPPORTED_LANGUAGES: &[&str] = &["rust", "generic", "web"];
 
@@ -97,6 +126,7 @@ fn spec(name: &str, argv: &[&str], when_changed: &[&str]) -> SensorSpec {
         argv: argv.iter().map(|arg| (*arg).to_owned()).collect(),
         retry: None,
         timeout: None,
+        severity: None,
         allow_failure: false,
         transient_exit_codes: Vec::new(),
         when_changed: when_changed.iter().map(|glob| (*glob).to_owned()).collect(),
@@ -199,6 +229,13 @@ impl Config {
             .collect();
         for sensor in &self.sensors {
             validate_globs(&sensor.name, &sensor.when_changed)?;
+            if sensor.allow_failure && sensor.severity == Some(SensorSeverity::Error) {
+                anyhow::bail!(
+                    "sensor '{}' sets both allow_failure = true and severity = \"error\"; \
+                     use one severity source",
+                    sensor.name
+                );
+            }
         }
         for (set, names) in &self.signal_sets {
             if !is_valid_set_name(set) {

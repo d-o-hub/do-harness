@@ -156,7 +156,7 @@ export PATH="$HOME/.local/bin:$PATH"
 
 | Command | Description |
 |---------|-------------|
-| `verify` | Run all sensors (flags: `--fail-fast`, `--format text\|json`, `--set SET`, `--changed`, `--only NAME` repeatable; `--record` persists beats + error signatures; `--evidence PATH` writes evidence artifact; `--strict` fails on weak evidence) |
+| `verify` | Run all sensors (flags: `--fail-fast`, `--format text\|json`, `--set SET`, `--changed`, `--only NAME` repeatable; `--record` persists beats + error signatures; `--evidence PATH` writes evidence artifact; `--strict` fails on weak evidence; `--bless` lowers/initializes `plans/baselines.json` findings ratchets, with `--approver NAME`) |
 | `list` | Print sensor names (`--format text\|json`, `--sets` for signal-set names) |
 | `explain` | Explain which sensors the current change selects, without running them (`--set SET`, `--changed`) |
 | `status` | Report evidence freshness (`green\|red\|stale\|missing`) for `--set SET` without running sensors |

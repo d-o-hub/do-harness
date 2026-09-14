@@ -1,6 +1,6 @@
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
-.TH do-harness 1  "do-harness 0.1.0 (532ebd3 2026-09-12)" 
+.TH do-harness 1  "do-harness 0.1.0 (cb800ed-dirty 2026-09-14)" 
 .SH NAME
 do\-harness \- do\-harness agent execution harness CLI
 .SH SYNOPSIS
@@ -88,6 +88,9 @@ Run diagnostic checks on binary resolution and git hook health
 do\-harness\-metrics(1)
 Report harness trends: sensor stats, strikes, eval pass\-rate history
 .TP
+do\-harness\-overlap(1)
+Rank skill pairs by guidance overlap (Tier\-2 distinctiveness advisory)
+.TP
 do\-harness\-maintenance(1)
 Prune old beats and compact the state database
 .TP
@@ -117,4 +120,4 @@ Exit Codes:
   1  Verification or check failure
   2  Usage, configuration, or environment error
 .SH VERSION
-v0.1.0 (532ebd3 2026\-09\-12)
+v0.1.0 (cb800ed\-dirty 2026\-09\-14)

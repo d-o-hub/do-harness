@@ -66,8 +66,12 @@ fn run_chunk(
                             ok: false,
                             exit_code: None,
                             duration_ms: 0,
-                            allow_failure: item.spec.allow_failure,
+                            severity: item.spec.effective_severity(),
+                            allow_failure: item.spec.effective_severity()
+                                == crate::config::SensorSeverity::Warn,
                             warned: false,
+                            findings: None,
+                            baseline: None,
                             output: format!(
                                 "sensor '{}' cancelled before start: fail-fast stopped this run",
                                 item.spec.name
@@ -75,8 +79,10 @@ fn run_chunk(
                         }
                     } else if opts.blocked.contains(&item.spec.name) {
                         sensor_blocked(item.spec)
+                    } else if opts.quarantined.contains(&item.spec.name) {
+                        super::sensor_quarantined(item.spec)
                     } else {
-                        let result = run_sensor(item.spec, root, cancel);
+                        let result = run_sensor(item.spec, root, cancel, &opts.baselines);
                         if opts.fail_fast && !result.ok && !result.allow_failure {
                             cancel.store(true, Ordering::SeqCst);
                         }
@@ -119,8 +125,10 @@ fn run_sequential(
     for spec in specs {
         let result = if opts.blocked.contains(&spec.name) {
             sensor_blocked(spec)
+        } else if opts.quarantined.contains(&spec.name) {
+            super::sensor_quarantined(spec)
         } else {
-            run_sensor(spec, root, cancel)
+            run_sensor(spec, root, cancel, &opts.baselines)
         };
         let hard_failed = !result.ok && !result.allow_failure;
         results.push(result);
@@ -187,6 +195,7 @@ mod tests {
             argv: argv.iter().map(|a| (*a).to_owned()).collect(),
             retry: None,
             timeout: None,
+            severity: None,
             allow_failure: false,
             transient_exit_codes: vec![],
             when_changed: vec![],
