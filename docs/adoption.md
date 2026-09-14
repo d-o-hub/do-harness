@@ -35,6 +35,23 @@ Supported platforms: Linux x86_64/aarch64 (static musl), macOS x86_64/arm64,
 and Windows x86_64 (zip release, npm, or `cargo install`). Other platforms
 install from source: `cargo install --path crates/do-harness` (Rust 1.85+).
 
+### Windows
+
+Prebuilt Windows x86_64 binaries ship as a zip release asset (see the
+release workflow); until the first release that includes them, install from
+source or run the Linux binary under WSL.
+
+Source builds on Windows need: the Visual Studio Build Tools C++ workload
+(MSVC `link.exe` + Windows SDK libraries) and LLVM/Clang (`libclang` for the
+`libsql` → `bindgen` → `clang-sys` chain). With Git Bash, ensure `link.exe`
+resolves to MSVC, not coreutils `/usr/bin/link` (which fails with a confusing
+"extra operand" error) — check with `command -v link` / `where link`.
+
+Sensor portability: `[[sensors]]` `argv` is shell-agnostic, but the shipped
+rust-pack helpers are POSIX shell scripts — run hooks and dogfood under Git
+Bash on Windows. Managed git hooks resolve `do-harness.exe` via the `.exe`
+fallback.
+
 Rust toolchains can install from crates.io instead, either building from
 source or fetching the release artifact:
 
