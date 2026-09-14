@@ -23,6 +23,7 @@ import {
 } from "./lib/contrast.mjs";
 import { normalizeViewport, normalizeMatrix, DEFAULT_VIEWPORT_MATRIX } from "./lib/audit.mjs";
 import { classifyConsoleMessage } from "./lib/console-audit.mjs";
+import { cellKey, classifyBaseline, digestOf } from "./lib/visual-audit.mjs";
 
 const rect = (x, y, w, h) => ({ x, y, width: w, height: h });
 
@@ -100,6 +101,29 @@ test("contrast: minimum ratio follows the large-text rule", () => {
   assert.equal(minimumRatio({ fontSizePx: 24, bold: false }), 3);
   assert.equal(minimumRatio({ fontSizePx: 19, bold: true }), 3);
   assert.equal(minimumRatio({ fontSizePx: 19, bold: false }), 4.5);
+});
+
+test("visual: cell keys are deterministic, slugged, and collision-safe", () => {
+  const vp = { label: "mobile-md", width: 360, height: 800 };
+  assert.equal(cellKey("/login", vp), cellKey("/login", vp));
+  const keyA = cellKey("/books?id=1", vp);
+  const keyB = cellKey("/books?id=2", vp);
+  assert.notEqual(keyA, keyB); // query strings must not collide
+  assert.match(keyA, /^mobile-md-[0-9a-f]{12}$/);
+  assert.equal(cellKey("/x", { label: "weird label!!", width: 1, height: 1 }).startsWith("weird-label-"), true);
+});
+
+test("visual: baseline classification covers all three states", () => {
+  const digest = digestOf(Buffer.from("png-bytes"));
+  assert.equal(classifyBaseline({ hasBaseline: false }), "new");
+  assert.equal(
+    classifyBaseline({ hasBaseline: true, baselineDigest: digest, currentDigest: digest }),
+    "unchanged",
+  );
+  assert.equal(
+    classifyBaseline({ hasBaseline: true, baselineDigest: "sha256:other", currentDigest: digest }),
+    "changed",
+  );
 });
 
 test("viewport matrix: normalizes, validates, and rejects garbage", () => {
