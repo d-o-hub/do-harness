@@ -10,6 +10,7 @@ import platform from "../lib/platform.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const npmRoot = path.resolve(here, "..");
+const isWindows = process.platform === "win32";
 
 test("platformPackage maps supported platforms", () => {
   assert.equal(platform.platformPackage("linux", "x64"), "do-harness-linux-x64");
@@ -25,8 +26,16 @@ test("platformPackage maps supported platforms", () => {
     platform.platformPackage("darwin", "arm64"),
     "do-harness-darwin-arm64",
   );
-  assert.equal(platform.platformPackage("win32", "x64"), null);
+  assert.equal(platform.platformPackage("win32", "x64"), "do-harness-win32-x64");
+  assert.equal(platform.platformPackage("win32", "arm64"), null);
+  assert.equal(platform.platformPackage("freebsd", "x64"), null);
   assert.equal(platform.platformPackage("linux", "ia32"), null);
+});
+
+test("binaryName appends .exe only on Windows", () => {
+  assert.equal(platform.binaryName("win32"), "do-harness.exe");
+  assert.equal(platform.binaryName("linux"), "do-harness");
+  assert.equal(platform.binaryName("darwin"), "do-harness");
 });
 
 /** Stages a node_modules tree containing the shim and an optional platform package. */
@@ -47,21 +56,22 @@ function stage({ withPlatform, binary = null }) {
   const pkg = platform.platformPackage(process.platform, process.arch);
   if (withPlatform && pkg) {
     const platformDir = path.join(tmp, "node_modules", pkg);
+    const name = platform.binaryName(process.platform);
     fs.mkdirSync(path.join(platformDir, "bin"), { recursive: true });
     fs.writeFileSync(
       path.join(platformDir, "package.json"),
       JSON.stringify({ name: pkg, version: "0.1.0" }),
     );
-    fs.writeFileSync(path.join(platformDir, "bin", "do-harness"), binary);
-    fs.chmodSync(path.join(platformDir, "bin", "do-harness"), 0o755);
+    fs.writeFileSync(path.join(platformDir, "bin", name), binary);
+    fs.chmodSync(path.join(platformDir, "bin", name), 0o755);
   }
 
   return { tmp, shim: path.join(metaDir, "bin", "do-harness.js") };
 }
 
 test("shim execs the platform binary with args and propagates the exit code", (t) => {
-  if (!platform.platformPackage(process.platform, process.arch)) {
-    t.skip(`unsupported host ${process.platform}/${process.arch}`);
+  if (!platform.platformPackage(process.platform, process.arch) || isWindows) {
+    t.skip(`no POSIX fake binary on ${process.platform}/${process.arch}`);
     return;
   }
   const { shim } = stage({
@@ -93,9 +103,9 @@ test("shim fails with guidance when the platform package is missing", (t) => {
   assert.match(result.stderr, /--include=optional/);
 });
 
-test("shim rejects unsupported platforms with installer guidance", () => {
+test("shim rejects unsupported platforms with release guidance", () => {
   const { shim } = stage({ withPlatform: false });
-  const preload = path.join(here, "fake-win32.cjs");
+  const preload = path.join(here, "fake-unsupported.cjs");
 
   const result = spawnSync(
     process.execPath,
@@ -104,6 +114,6 @@ test("shim rejects unsupported platforms with installer guidance", () => {
   );
 
   assert.equal(result.status, 1);
-  assert.match(result.stderr, /no prebuilt binary for win32/);
-  assert.match(result.stderr, /install\.sh/);
+  assert.match(result.stderr, /no prebuilt binary for freebsd/);
+  assert.match(result.stderr, /releases/);
 });
