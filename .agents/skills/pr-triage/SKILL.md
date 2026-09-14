@@ -1,6 +1,6 @@
 ---
 name: pr-triage
-description: Triage all open GitHub pull requests with gh and git. Use when asked to review, roast, clean up, update, resolve comments on, or merge open PRs. Reviews and roasts changes, closes PRs with no effective diff, applies roast fixes, answers and resolves review conversations, updates branches to the latest base, verifies every check including bots, and merges directly with --match-head-commit. Optionally uses do-harness to cut review tokens to the unresolved residual.
+description: Triage GitHub pull requests with gh and git. Use after opening a PR, or when asked to review, roast, clean up, update, resolve comments on, or merge open PRs. Reviews and roasts changes, closes PRs with no effective diff, applies roast fixes, answers and resolves review conversations, updates branches to the latest base, verifies every check including bots, and merges directly with --match-head-commit. Optionally uses do-harness to cut review tokens to the unresolved residual.
 license: MIT
 metadata:
   short-description: Triage open GitHub PRs end to end

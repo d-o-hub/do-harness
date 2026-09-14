@@ -45,8 +45,12 @@ else
   ok "full clone"
 fi
 
-if command -v do-harness >/dev/null 2>&1 && do-harness pr review --help >/dev/null 2>&1; then
-  ok "do-harness pr review available"
+harness_bin="${DO_HARNESS_BIN:-}"
+if [ -z "$harness_bin" ] && command -v do-harness >/dev/null 2>&1; then
+  harness_bin="$(command -v do-harness)"
+fi
+if [ -n "$harness_bin" ] && "$harness_bin" pr review --help >/dev/null 2>&1; then
+  ok "do-harness pr review available ($harness_bin)"
 else
   warn "do-harness not available; falling back to full-diff review"
 fi
