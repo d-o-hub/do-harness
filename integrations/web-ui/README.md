@@ -13,6 +13,8 @@ grounded in WCAG 2.2 (1.4.3 contrast, 1.4.10 reflow, 2.4.7 focus visibility,
 | `lib/geometry.mjs` | rect math + overlap classification | yes (pure) |
 | `lib/contrast.mjs` | WCAG luminance/compositing/ratios | yes (pure) |
 | `lib/page-probe.mjs` | browser-context probe (all 5 stages) | via browser suite |
+| `lib/console-audit.mjs` | console/page-error/failed-request collector + noise classifier | classification yes |
+| `lib/a11y-audit.mjs` | axe-core adapter (WCAG 2.2 AA tags; `@axe-core/playwright` is an adopting-repo peer dep) | via browser suite |
 | `lib/audit.mjs` | matrix normalization + orchestrator | normalization yes |
 | `audit.test.mjs` | `node --test` unit tests (no browser needed) | — |
 
@@ -54,9 +56,23 @@ script so local evidence and CI cannot drift):
 name = "viewport-ux"
 argv = ["node", "scripts/viewport-audit.mjs", "--routes", "/,/login,/catalog"]
 when-changed = ["apps/web/**", "packages/ui/**"]
+
+[[sensors]]
+name = "a11y"
+argv = ["node", "scripts/a11y-audit.mjs", "--impact-floor", "serious"]
+when-changed = ["apps/web/**", "packages/ui/**"]
+
+[[sensors]]
+name = "console"
+argv = ["node", "scripts/console-audit.mjs", "--routes", "/,/login"]
+when-changed = ["apps/web/**", "apps/worker/**"]
 ```
 
 `scripts/viewport-audit.mjs` (in the adopting repo) starts a browser, calls
 `auditMatrix()`, and exits non-zero when findings exceed the ratchet
 baseline — pairing naturally with the severity/ratchet proposal in #66 and
-the evidence matrix-manifest proposal in #67.
+the evidence matrix-manifest proposal in #67. The `a11y` wrapper calls
+`auditAccessibility()` (requires `@axe-core/playwright` in the adopting
+repo's node_modules; the audit reports a SKIP-shaped result when it is
+absent), and the `console` wrapper drains `attachConsoleCollector()` after
+navigating each route, failing on classified `error` events.
