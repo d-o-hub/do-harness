@@ -22,13 +22,17 @@ ROOT="$(git rev-parse --show-toplevel)"
 ///
 /// The binary is resolved at hook runtime, in priority order:
 /// `$DO_HARNESS_BIN` when set and executable, then `do-harness` on `PATH`,
-/// then `<repo root>/target/release/do-harness`.
+/// then `<repo root>/target/release/do-harness` (also trying the `.exe`
+/// suffix so hooks work under Git Bash on Windows).
 const RESOLVE_BIN: &str = r#"if [[ -n "${DO_HARNESS_BIN:-}" && -x "$DO_HARNESS_BIN" ]]; then
   BIN="$DO_HARNESS_BIN"
 elif command -v do-harness >/dev/null 2>&1; then
   BIN="$(command -v do-harness)"
 else
   BIN="$ROOT/target/release/do-harness"
+  if [[ ! -x "$BIN" && -x "$BIN.exe" ]]; then
+    BIN="$BIN.exe"
+  fi
   if [[ ! -x "$BIN" ]]; then
     echo "do-harness: binary not found. Set DO_HARNESS_BIN, add do-harness to PATH, or build with: cargo build --release -p do-harness" >&2
     exit 2
@@ -311,6 +315,14 @@ mod tests {
         assert!(body.contains("command -v do-harness"));
         assert!(body.contains("target/release/do-harness"));
         assert!(body.contains("verify --fail-fast --record --only fmt"));
+    }
+
+    #[test]
+    fn script_body_resolves_windows_exe_suffix() {
+        // Git Bash on Windows resolves `command -v do-harness` to the `.exe`,
+        // but the explicit repo fallback must try the suffix too.
+        let body = script_body("");
+        assert!(body.contains(r#"BIN="$BIN.exe""#));
     }
 
     #[test]
