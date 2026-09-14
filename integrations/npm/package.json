@@ -25,6 +25,7 @@
     "do-harness-linux-x64": "0.1.0",
     "do-harness-linux-arm64": "0.1.0",
     "do-harness-darwin-x64": "0.1.0",
-    "do-harness-darwin-arm64": "0.1.0"
+    "do-harness-darwin-arm64": "0.1.0",
+    "do-harness-win32-x64": "0.1.0"
   }
 }
