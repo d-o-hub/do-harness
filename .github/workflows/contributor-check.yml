@@ -32,4 +32,12 @@ jobs:
         run: |
           echo "Contributor check returned risk level: ${{ steps.check.outputs.risk }}"
           echo "Fail-closed doctrine: Elevated or unknown risk requires manual approval."
+          echo "Approval path: docs/contributor-approval.md (maintainer review, then close/reopen the PR to re-run this gate)."
           exit 1
+
+      - name: Post approval path on blocked PRs
+        if: failure() && github.event_name == 'pull_request_target'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr comment "${{ github.event.pull_request.number }}" --body "screen-author blocked this PR (risk != LOW). Maintainer path: review, approve, then close/reopen to re-run the gate. See docs/contributor-approval.md."
