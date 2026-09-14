@@ -250,6 +250,36 @@ async fn rejects_invalid_when_changed_glob() {
     assert!(format!("{err:#}").contains("when-changed"));
 }
 
+/// A zero `jobs` bound is rejected at config load, not at verify time.
+#[tokio::test(flavor = "current_thread")]
+async fn rejects_zero_jobs() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let path = dir.path().join("do-harness.toml");
+    let text = "jobs = 0\n";
+    std::fs::write(&path, text).expect("write config");
+    let err = load(dir.path(), Some(&path))
+        .await
+        .expect_err("load must fail");
+    assert!(format!("{err:#}").contains("jobs"));
+}
+
+/// A positive `jobs` bound parses and reaches the loaded config.
+#[tokio::test(flavor = "current_thread")]
+async fn parses_jobs_bound() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let path = dir.path().join("do-harness.toml");
+    let text = r#"
+            jobs = 4
+
+            [[sensors]]
+            name = "real"
+            argv = ["true"]
+        "#;
+    std::fs::write(&path, text).expect("write config");
+    let cfg = load(dir.path(), Some(&path)).await.expect("load");
+    assert_eq!(cfg.jobs, Some(4));
+}
+
 /// The built-in default ships feedback/verification/release signal sets.
 #[test]
 fn rust_default_ships_signal_sets() {

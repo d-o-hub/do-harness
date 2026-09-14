@@ -1,6 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use std::collections::BTreeMap;
+use std::time::{Duration, Instant};
 
 use super::*;
 use crate::config::{Config, HooksConfig};
@@ -25,6 +26,7 @@ fn config_with(specs: &[(&str, &[&str])]) -> Config {
                 when_changed: vec![],
             })
             .collect(),
+        jobs: None,
     }
 }
 
@@ -131,6 +133,7 @@ fn verify_with_no_effective_sensors_succeeds() {
         },
         sensors: vec![],
         signal_sets: BTreeMap::new(),
+        jobs: None,
     };
     let report = verify(
         &cfg,
@@ -244,6 +247,7 @@ fn retries_failing_sensor_until_success() {
             transient_exit_codes: vec![],
             when_changed: vec![],
         }],
+        jobs: None,
     };
 
     let report = verify(
@@ -287,6 +291,7 @@ fn times_out_hanging_sensor() {
             transient_exit_codes: vec![],
             when_changed: vec![],
         }],
+        jobs: None,
     };
 
     let start = Instant::now();
@@ -332,6 +337,7 @@ fn allow_failure_sensor_does_not_fail_gate_but_surfaces_output() {
             transient_exit_codes: vec![],
             when_changed: vec![],
         }],
+        jobs: None,
     };
 
     let report = verify(
@@ -405,6 +411,7 @@ fn transient_exit_codes_restricts_retries() {
             transient_exit_codes: vec![75],
             when_changed: vec![],
         }],
+        jobs: None,
     };
 
     let report = verify(

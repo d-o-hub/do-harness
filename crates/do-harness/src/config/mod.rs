@@ -24,6 +24,11 @@ pub struct Config {
     /// Ordered computational sensors; empty means the built-in Rust pack.
     #[serde(default)]
     pub sensors: Vec<SensorSpec>,
+    /// Maximum sensors in flight during `verify` (default 1 = sequential).
+    /// Higher values run independent sensors concurrently and reassemble
+    /// results in config order; `--fail-fast` still stops later work.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub jobs: Option<usize>,
 }
 
 /// Which sensors each workflow gate runs.
@@ -171,8 +176,14 @@ pub async fn load_raw(root: &Path, explicit: Option<&Path>) -> Result<(Config, O
 
 impl Config {
     /// Rejects unsupported language pack identifiers, malformed signal-set
-    /// names, dangling sensor references, and duplicate entries in sets.
+    /// names, dangling sensor references, duplicate entries in sets, and a
+    /// zero `jobs` worker bound.
     fn validate(&self) -> Result<()> {
+        if let Some(jobs) = self.jobs {
+            if jobs == 0 {
+                anyhow::bail!("jobs must be at least 1 (got 0)");
+            }
+        }
         if let Some(language) = &self.language {
             if !SUPPORTED_LANGUAGES.contains(&language.as_str()) {
                 anyhow::bail!(
@@ -262,6 +273,7 @@ pub fn rust_default() -> Config {
         },
         signal_sets,
         sensors,
+        jobs: None,
     }
 }
 

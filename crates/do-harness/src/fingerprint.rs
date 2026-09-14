@@ -212,6 +212,7 @@ mod tests {
                 transient_exit_codes: Vec::new(),
                 when_changed: Vec::new(),
             }],
+            jobs: None,
         }
     }
 
