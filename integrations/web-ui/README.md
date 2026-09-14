@@ -15,6 +15,7 @@ grounded in WCAG 2.2 (1.4.3 contrast, 1.4.10 reflow, 2.4.7 focus visibility,
 | `lib/page-probe.mjs` | browser-context probe (all 5 stages) | via browser suite |
 | `lib/console-audit.mjs` | console/page-error/failed-request collector + noise classifier | classification yes |
 | `lib/a11y-audit.mjs` | axe-core adapter (WCAG 2.2 AA tags; `@axe-core/playwright` is an adopting-repo peer dep) | via browser suite |
+| `lib/i18n-audit.mjs` | per-locale probe diffing + RTL direction contract (3.1.1/3.1.2) | diffing + direction yes |
 | `lib/audit.mjs` | matrix normalization + orchestrator | normalization yes |
 | `audit.test.mjs` | `node --test` unit tests (no browser needed) | — |
 
