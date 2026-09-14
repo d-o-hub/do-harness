@@ -229,11 +229,12 @@ fn validate_existing_invariants(root: &Path, opts: &InitOpts) -> Result<()> {
     let Ok(existing) = fs::read_to_string(&path) else {
         return Ok(());
     };
-    serde_json::from_str::<Vec<do_harness_types::DecisionHeader>>(&existing).context(format!(
-        "pre-existing {} does not match the DecisionHeader schema; fix or remove it before \
-         running init",
-        path.display()
-    ))?;
+    do_harness_types::parse_invariants_json(&existing).map(|_| ()).map_err(|e| {
+        anyhow::anyhow!(
+            "pre-existing {} does not match the DecisionHeader schema ({e}); fix or remove it before running init",
+            path.display()
+        )
+    })?;
     Ok(())
 }
 
@@ -243,8 +244,8 @@ pub(crate) async fn seed_invariants(root: &Path, prune: bool) -> Result<usize> {
     let json = tokio::fs::read_to_string(&json_path)
         .await
         .with_context(|| format!("failed to read {}", json_path.display()))?;
-    let headers: Vec<do_harness_types::DecisionHeader> = serde_json::from_str(&json)
-        .context("invalid plans/invariants.json: does not match DecisionHeader schema")?;
+    let headers = do_harness_types::parse_invariants_json(&json)
+        .map_err(|e| anyhow::anyhow!("invalid plans/invariants.json: {e}"))?;
     let conn = do_harness_db::connect_and_migrate(root).await?;
     Ok(do_harness_db::seed_invariants(&conn, &headers, prune).await?)
 }

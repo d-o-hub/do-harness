@@ -40,3 +40,80 @@ impl DecisionHeader {
         }
     }
 }
+
+/// Accepted top-level shapes for `plans/invariants.json`.
+///
+/// Accepts either a bare `DecisionHeader` array or an object with a top-level
+/// `invariants` array (extra object keys such as `$comment` are ignored so
+/// policy tooling can annotate the file). Each header itself stays strict
+/// (`deny_unknown_fields`).
+#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize)]
+struct InvariantsWrapper {
+    invariants: Vec<DecisionHeader>,
+}
+
+/// Parses `plans/invariants.json` in either accepted shape.
+///
+/// # Errors
+///
+/// Returns an error describing the expected schema when the input matches
+/// neither a `DecisionHeader` array nor an `{"invariants": [...]}` object.
+pub fn parse_invariants_json(json: &str) -> Result<Vec<DecisionHeader>, String> {
+    if let Ok(headers) = serde_json::from_str::<Vec<DecisionHeader>>(json) {
+        return Ok(headers);
+    }
+    if let Ok(wrapper) = serde_json::from_str::<InvariantsWrapper>(json) {
+        return Ok(wrapper.invariants);
+    }
+    Err(
+        "invalid invariants.json: expected a JSON array of DecisionHeader objects \
+         ({invariant, rationale, sensor, category}) or an object with a top-level \
+         \"invariants\" array; see plans/invariants.json"
+            .to_owned(),
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used)]
+
+    use super::{DecisionHeader, parse_invariants_json};
+
+    fn header() -> DecisionHeader {
+        DecisionHeader::new(
+            "invariant".to_owned(),
+            "rationale".to_owned(),
+            "sensor".to_owned(),
+            "category".to_owned(),
+        )
+    }
+
+    #[test]
+    fn parses_bare_array() {
+        let json = serde_json::to_string(&vec![header()]).expect("serialize");
+        assert_eq!(parse_invariants_json(&json).expect("parse"), vec![header()]);
+    }
+
+    #[test]
+    fn parses_wrapper_object_with_comment() {
+        let json = serde_json::json!({
+            "$comment": "policy tooling annotation",
+            "invariants": [header()],
+        })
+        .to_string();
+        assert_eq!(parse_invariants_json(&json).expect("parse"), vec![header()]);
+    }
+
+    #[test]
+    fn rejects_headers_with_unknown_fields() {
+        let json = r#"[{"invariant":"i","rationale":"r","sensor":"s","category":"c","bogus":1}]"#;
+        assert!(parse_invariants_json(json).is_err());
+    }
+
+    #[test]
+    fn error_mentions_expected_schema() {
+        let err = parse_invariants_json("{}").expect_err("must fail");
+        assert!(err.contains("DecisionHeader"), "{err}");
+        assert!(err.contains("invariants"), "{err}");
+    }
+}

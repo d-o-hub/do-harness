@@ -11,7 +11,7 @@ use std::path::PathBuf;
 
 use anyhow::{Context, Result};
 use do_harness_db::{connect_and_migrate, find_harness_root, seed_invariants};
-use do_harness_types::DecisionHeader;
+use do_harness_types::parse_invariants_json;
 
 /// Path to the decision-header JSON file, relative to the workspace root.
 const INVARIANTS_RELATIVE_PATH: &str = "plans/invariants.json";
@@ -43,8 +43,8 @@ async fn main() -> Result<()> {
     let json_path = root.join(INVARIANTS_RELATIVE_PATH);
     let json = std::fs::read_to_string(&json_path)
         .with_context(|| format!("failed to read {}", json_path.display()))?;
-    let headers: Vec<DecisionHeader> = serde_json::from_str(&json)
-        .context("invalid invariants.json: does not match DecisionHeader schema")?;
+    let headers = parse_invariants_json(&json)
+        .map_err(|e| anyhow::anyhow!("invalid invariants.json: {e}"))?;
 
     let conn = connect_and_migrate(&root).await?;
     let written = seed_invariants(&conn, &headers, prune).await?;

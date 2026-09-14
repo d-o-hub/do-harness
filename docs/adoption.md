@@ -68,6 +68,11 @@ state. Existing files are never overwritten without `--force`, and existing
 application source is never touched. The run ends with
 `Initial verification: GREEN | RED | VACUOUS`; RED exits non-zero.
 
+`plans/invariants.json` is a JSON array of `DecisionHeader` objects
+(`{invariant, rationale, sensor, category}`), or equivalently an object with
+a top-level `invariants` array (extra keys such as `$comment` are ignored).
+Each header stays strict: unknown fields inside a header are rejected.
+
 The generic pack ships **zero sensors**: its pass is vacuous, not evidence.
 Add real checks before trusting `verify`.
 
