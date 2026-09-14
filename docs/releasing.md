@@ -37,7 +37,8 @@ verification set and every build target dogfoods green.
    - `preflight` — asserts tag == version and runs
      `verify --set verification --format json --strict` on the tagged commit.
    - `build` — Linux static-musl (x86_64/aarch64) and macOS (x86_64/arm64)
-     tarballs, each dogfooded with `init && verify`.
+     tarballs plus a Windows x86_64 zip, each dogfooded with
+     `init && verify`.
    - `release` — publishes the tarballs plus `checksums.txt` via
      `gh release create --verify-tag`.
    - `publish` — publishes the three crates to crates.io in dependency order.
@@ -70,7 +71,7 @@ cargo publish --dry-run -p do-harness-types
 ## npm publishing
 
 `integrations/npm/` holds the meta package (`do-harness`, a zero-policy
-launcher) and four platform package templates. The npm-publish job downloads
+launcher) and five platform package templates. The npm-publish job downloads
 the build artifacts, stages each platform package with its binary, and
 publishes platform-first so the meta package's pinned `optionalDependencies`
 resolve. Versions already on npm are skipped, so a partial run can be re-run.
@@ -91,6 +92,10 @@ for target in x86_64-unknown-linux-musl aarch64-unknown-linux-musl \
   cp target/release/do-harness "$dist/pkg/$name/do-harness"
   tar -czf "$dist/${name}.tar.gz" -C "$dist/pkg" "$name"
 done
+name="do-harness-v0.2.0-x86_64-pc-windows-msvc"
+mkdir -p "$dist/pkg/$name"
+cp target/release/do-harness "$dist/pkg/$name/do-harness.exe"
+(cd "$dist/pkg" && zip -qr "$dist/${name}.zip" "$name")
 bash scripts/publish-npm.sh --dist "$dist" --dry-run
 ```
 

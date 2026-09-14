@@ -1,5 +1,5 @@
 {
-  "exported_at": 1789326675,
+  "exported_at": 1789329155,
   "tasks": [
     {
       "id": 1,
@@ -550,12 +550,45 @@
       "precondition": null,
       "created_at": 1789326640,
       "updated_at": 1789326675
+    },
+    {
+      "id": 51,
+      "parent_id": null,
+      "title": "feat: windows msvc zip release artifact (distribution)",
+      "method": "vertical-event-slice",
+      "subtask_index": 5,
+      "status": "done",
+      "precondition": null,
+      "created_at": 1789329096,
+      "updated_at": 1789329119
+    },
+    {
+      "id": 52,
+      "parent_id": null,
+      "title": "feat: win32 npm package and .exe hook resolution (distribution)",
+      "method": "vertical-event-slice",
+      "subtask_index": 5,
+      "status": "done",
+      "precondition": null,
+      "created_at": 1789329096,
+      "updated_at": 1789329137
+    },
+    {
+      "id": 53,
+      "parent_id": null,
+      "title": "ci: windows-latest job and windows install docs (distribution)",
+      "method": "vertical-event-slice",
+      "subtask_index": 5,
+      "status": "done",
+      "precondition": null,
+      "created_at": 1789329096,
+      "updated_at": 1789329155
     }
   ],
   "summary": {
     "pending": 0,
     "in_progress": 0,
-    "done": 50,
+    "done": 53,
     "failed": 0
   }
 }

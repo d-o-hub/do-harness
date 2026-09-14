@@ -67,6 +67,10 @@ jobs:
             cp target/release/do-harness "$dist/pkg/$name/do-harness"
             tar -czf "$dist/${name}.tar.gz" -C "$dist/pkg" "$name"
           done
+          name="do-harness-v${version}-x86_64-pc-windows-msvc"
+          mkdir -p "$dist/pkg/$name"
+          cp target/release/do-harness "$dist/pkg/$name/do-harness.exe"
+          (cd "$dist/pkg" && zip -qr "$dist/${name}.zip" "$name")
           bash scripts/publish-npm.sh --dist "$dist" --dry-run
       - name: Check adjacent guardian-proxy crate
         run: cargo check -p guardian-proxy
@@ -177,3 +181,55 @@ jobs:
         env:
           DO_HARNESS_BIN: ${{ github.workspace }}/target/release/do-harness
         run: node --test integrations/deepseek-harness/test/*.test.mjs
+
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      # actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          # No push/fetch credentials persisted: this workflow never pushes.
+          persist-credentials: false
+      - name: Resolve pinned toolchain
+        id: toolchain
+        shell: bash
+        run: |
+          channel="$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)"
+          echo "channel=$channel" >> "$GITHUB_OUTPUT"
+      # dtolnay/rust-toolchain@master (SHA within master history per action docs)
+      - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772
+        with:
+          toolchain: ${{ steps.toolchain.outputs.channel }}
+          components: rustfmt, clippy
+      # Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
+        with:
+          key: windows
+      # taiki-e/install-action@v2
+      - uses: taiki-e/install-action@ba47c86ac325773530516bb756137ac718732518
+        with:
+          tool: cargo-deny,cargo-audit
+      # Full `cargo test --workspace` runs on ubuntu (verify job). The unit
+      # suite is not yet Windows-green (eval walkthrough shebangs, hook exit
+      # codes, path resolution — see #70), so the windows job proves the
+      # distribution path only: build + Git Bash dogfood + npm wrapper.
+      - name: Build harness CLI
+        run: cargo build --release -p do-harness
+      - name: Dogfood init + verify with the release binary
+        shell: bash
+        env:
+          # The generated pack's deps/audit sensors fail closed under CI=true;
+          # cargo-deny and cargo-audit are installed above.
+          CI: "true"
+          DO_HARNESS_REQUIRE_TOOLS: "1"
+        run: |
+          tmp="$(mktemp -d)"
+          ./target/release/do-harness.exe --root "$tmp" init
+          ./target/release/do-harness.exe --root "$tmp" verify --format json --strict
+      - name: Lint and test the npm wrapper
+        shell: bash
+        run: |
+          node --check integrations/npm/bin/do-harness.js
+          node --check integrations/npm/lib/platform.js
+          node --test integrations/npm/test/*.test.mjs
