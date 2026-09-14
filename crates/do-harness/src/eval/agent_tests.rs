@@ -138,3 +138,79 @@ async fn agent_timeout_fails_the_run() {
     assert_eq!(run.pass_rate, Some(0.0));
     assert_eq!(run.mode, do_harness_types::EvalMode::Agent);
 }
+
+async fn eval_run_agent_bless(dir: &Path, agent_cmd: &str, timeout_secs: u64) -> Result<()> {
+    run_eval(
+        dir,
+        super::EvalOpts {
+            skill: None,
+            bless: true,
+            list_skills: false,
+            fail_fast: false,
+            dry_run: false,
+            format: Format::Text,
+            approver: Some("test-approver"),
+            no_lift: false,
+            agent_cmd: Some(agent_cmd),
+            agent_timeout_secs: timeout_secs,
+            strict_fixtures: false,
+        },
+    )
+    .await
+}
+
+/// Agent runs are judged by agent floors only: a deterministic floor must not
+/// fail them, blessing ratchets the agent floor, and that floor then governs.
+#[tokio::test(flavor = "current_thread")]
+async fn agent_runs_use_agent_floors_only() {
+    use do_harness_types::EvalMode;
+
+    let dir = fixture_root(
+        VALID_SKILL_MD,
+        Some(&agent_case_json(&[
+            "exists:answer.txt",
+            "contains:answer.txt|with-guidance",
+        ])),
+    );
+    let conn = do_harness_db::connect_and_migrate(dir.path())
+        .await
+        .unwrap();
+    do_harness_db::raise_lift_floor(&conn, "test-skill", EvalMode::Deterministic, 0.9)
+        .await
+        .unwrap();
+    do_harness_db::raise_skill_bar(&conn, "test-skill", EvalMode::Deterministic, 0.99)
+        .await
+        .unwrap();
+    drop(conn);
+
+    // Deterministic floors do not apply: agent lift is 0.5, pass rate 1.0.
+    eval_run_agent(dir.path(), GUIDED_STUB, 60).await.unwrap();
+
+    eval_run_agent_bless(dir.path(), GUIDED_STUB, 60)
+        .await
+        .unwrap();
+    let conn = do_harness_db::connect_and_migrate(dir.path())
+        .await
+        .unwrap();
+    assert_eq!(
+        do_harness_db::get_lift_floor(&conn, "test-skill", EvalMode::Agent)
+            .await
+            .unwrap(),
+        Some(0.45)
+    );
+    assert_eq!(
+        do_harness_db::get_lift_floor(&conn, "test-skill", EvalMode::Deterministic)
+            .await
+            .unwrap(),
+        Some(0.9)
+    );
+    do_harness_db::raise_lift_floor(&conn, "test-skill", EvalMode::Agent, 0.6)
+        .await
+        .unwrap();
+    drop(conn);
+
+    let err = eval_run_agent(dir.path(), GUIDED_STUB, 60)
+        .await
+        .unwrap_err();
+    assert!(err.to_string().contains("test-skill"), "{err:#}");
+}

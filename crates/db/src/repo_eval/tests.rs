@@ -65,14 +65,46 @@ async fn eval_runs_append_and_list_in_order() {
 async fn skill_bar_never_lowers() {
     let dir = connect();
     let conn = open(&dir).await;
-    assert!(get_skill_bar(&conn, "harness").await.unwrap().is_none());
-    assert!(raise_skill_bar(&conn, "harness", 0.9).await.unwrap());
-    assert_eq!(get_skill_bar(&conn, "harness").await.unwrap(), Some(0.9));
+    assert!(
+        get_skill_bar(&conn, "harness", EvalMode::Deterministic)
+            .await
+            .unwrap()
+            .is_none()
+    );
+    assert!(
+        raise_skill_bar(&conn, "harness", EvalMode::Deterministic, 0.9)
+            .await
+            .unwrap()
+    );
+    assert_eq!(
+        get_skill_bar(&conn, "harness", EvalMode::Deterministic)
+            .await
+            .unwrap(),
+        Some(0.9)
+    );
     // A lower floor is refused; the stored bar stays at 0.95 after a raise.
-    assert!(!raise_skill_bar(&conn, "harness", 0.5).await.unwrap());
-    assert_eq!(get_skill_bar(&conn, "harness").await.unwrap(), Some(0.9));
-    assert!(raise_skill_bar(&conn, "harness", 0.95).await.unwrap());
-    assert_eq!(get_skill_bar(&conn, "harness").await.unwrap(), Some(0.95));
+    assert!(
+        !raise_skill_bar(&conn, "harness", EvalMode::Deterministic, 0.5)
+            .await
+            .unwrap()
+    );
+    assert_eq!(
+        get_skill_bar(&conn, "harness", EvalMode::Deterministic)
+            .await
+            .unwrap(),
+        Some(0.9)
+    );
+    assert!(
+        raise_skill_bar(&conn, "harness", EvalMode::Deterministic, 0.95)
+            .await
+            .unwrap()
+    );
+    assert_eq!(
+        get_skill_bar(&conn, "harness", EvalMode::Deterministic)
+            .await
+            .unwrap(),
+        Some(0.95)
+    );
 }
 
 #[tokio::test(flavor = "current_thread")]
@@ -264,13 +296,45 @@ async fn lift_columns_and_dim_rates_roundtrip() {
 async fn lift_floor_never_lowers() {
     let dir = connect();
     let conn = open(&dir).await;
-    assert!(get_lift_floor(&conn, "harness").await.unwrap().is_none());
-    assert!(raise_lift_floor(&conn, "harness", 0.15).await.unwrap());
-    assert_eq!(get_lift_floor(&conn, "harness").await.unwrap(), Some(0.15));
-    assert!(!raise_lift_floor(&conn, "harness", 0.10).await.unwrap());
-    assert_eq!(get_lift_floor(&conn, "harness").await.unwrap(), Some(0.15));
-    assert!(raise_lift_floor(&conn, "harness", 0.20).await.unwrap());
-    assert_eq!(get_lift_floor(&conn, "harness").await.unwrap(), Some(0.20));
+    assert!(
+        get_lift_floor(&conn, "harness", EvalMode::Deterministic)
+            .await
+            .unwrap()
+            .is_none()
+    );
+    assert!(
+        raise_lift_floor(&conn, "harness", EvalMode::Deterministic, 0.15)
+            .await
+            .unwrap()
+    );
+    assert_eq!(
+        get_lift_floor(&conn, "harness", EvalMode::Deterministic)
+            .await
+            .unwrap(),
+        Some(0.15)
+    );
+    assert!(
+        !raise_lift_floor(&conn, "harness", EvalMode::Deterministic, 0.10)
+            .await
+            .unwrap()
+    );
+    assert_eq!(
+        get_lift_floor(&conn, "harness", EvalMode::Deterministic)
+            .await
+            .unwrap(),
+        Some(0.15)
+    );
+    assert!(
+        raise_lift_floor(&conn, "harness", EvalMode::Deterministic, 0.20)
+            .await
+            .unwrap()
+    );
+    assert_eq!(
+        get_lift_floor(&conn, "harness", EvalMode::Deterministic)
+            .await
+            .unwrap(),
+        Some(0.20)
+    );
 }
 
 /// Eval mode persists per run, and an unknown stored mode degrades to the
@@ -307,4 +371,47 @@ async fn eval_mode_roundtrips_and_degrades_on_read() {
     .unwrap();
     let degraded = latest_eval_run(&conn, "harness").await.unwrap().unwrap();
     assert_eq!(degraded.mode, EvalMode::Deterministic);
+}
+
+/// Floors are mode-scoped: an agent floor never governs deterministic runs
+/// and vice versa.
+#[tokio::test(flavor = "current_thread")]
+async fn floors_are_scoped_per_eval_mode() {
+    let dir = connect();
+    let conn = open(&dir).await;
+    assert!(
+        raise_skill_bar(&conn, "harness", EvalMode::Deterministic, 0.9)
+            .await
+            .unwrap()
+    );
+    assert!(
+        raise_lift_floor(&conn, "harness", EvalMode::Agent, 0.4)
+            .await
+            .unwrap()
+    );
+
+    assert_eq!(
+        get_skill_bar(&conn, "harness", EvalMode::Deterministic)
+            .await
+            .unwrap(),
+        Some(0.9)
+    );
+    assert_eq!(
+        get_skill_bar(&conn, "harness", EvalMode::Agent)
+            .await
+            .unwrap(),
+        None
+    );
+    assert_eq!(
+        get_lift_floor(&conn, "harness", EvalMode::Agent)
+            .await
+            .unwrap(),
+        Some(0.4)
+    );
+    assert_eq!(
+        get_lift_floor(&conn, "harness", EvalMode::Deterministic)
+            .await
+            .unwrap(),
+        None
+    );
 }

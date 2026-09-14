@@ -15,7 +15,7 @@ use std::path::Path;
 use std::time::Instant;
 
 use anyhow::{Context, Result};
-use do_harness_types::EvalDim;
+use do_harness_types::{EvalDim, EvalMode};
 
 use crate::eval_assert::AssertionGrade;
 use crate::eval_walk::WalkRun;
@@ -51,6 +51,8 @@ pub(super) struct EvalCase {
 }
 
 pub(super) struct SkillReport {
+    /// Execution mode this report was produced in.
+    pub(super) mode: EvalMode,
     pub(super) gate_failed: bool,
     pub(super) line: String,
     pub(super) pass_rate: Option<f64>,
@@ -167,6 +169,7 @@ pub(super) async fn load_evals(dir: &Path) -> Result<Option<SkillEvals>> {
 /// Empty report used as the base for early exits.
 fn empty_report() -> SkillReport {
     SkillReport {
+        mode: EvalMode::Deterministic,
         gate_failed: false,
         line: String::new(),
         pass_rate: None,
@@ -255,6 +258,7 @@ pub(super) fn report_from_outcome(
         ),
     };
     SkillReport {
+        mode: EvalMode::Deterministic,
         gate_failed: false,
         line,
         pass_rate: outcome.pass_rate,

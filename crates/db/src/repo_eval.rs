@@ -273,16 +273,20 @@ pub async fn max_pass_rate(conn: &Connection, skill_name: &str) -> Result<Option
     }
 }
 
-/// Returns a skill's blessed pass-rate floor, if one has been set.
+/// Returns a skill's blessed pass-rate floor for `mode`, if one is set.
 ///
 /// # Errors
 ///
 /// Returns an error when the query fails.
-pub async fn get_skill_bar(conn: &Connection, skill_name: &str) -> Result<Option<f64>> {
+pub async fn get_skill_bar(
+    conn: &Connection,
+    skill_name: &str,
+    mode: EvalMode,
+) -> Result<Option<f64>> {
     let mut rows = conn
         .query(
-            "SELECT floor FROM skill_bars WHERE skill_name = ?1",
-            params!(skill_name),
+            "SELECT floor FROM skill_bars WHERE skill_name = ?1 AND mode = ?2",
+            params!(skill_name, mode.as_str()),
         )
         .await?;
     match rows.next().await? {
@@ -291,7 +295,7 @@ pub async fn get_skill_bar(conn: &Connection, skill_name: &str) -> Result<Option
     }
 }
 
-/// Raises a skill's pass-rate floor to `floor`, never lowering it.
+/// Raises a skill's pass-rate floor for `mode` to `floor`, never lowering it.
 ///
 /// Returns whether the bar moved (`false` when the existing floor was already
 /// at or above `floor`).
@@ -299,29 +303,39 @@ pub async fn get_skill_bar(conn: &Connection, skill_name: &str) -> Result<Option
 /// # Errors
 ///
 /// Returns an error when the upsert statement fails.
-pub async fn raise_skill_bar(conn: &Connection, skill_name: &str, floor: f64) -> Result<bool> {
+pub async fn raise_skill_bar(
+    conn: &Connection,
+    skill_name: &str,
+    mode: EvalMode,
+    floor: f64,
+) -> Result<bool> {
     let updated = conn
         .execute(
-            "INSERT INTO skill_bars (skill_name, floor, updated_at) VALUES (?1, ?2, ?3) \
-             ON CONFLICT(skill_name) DO UPDATE SET \
+            "INSERT INTO skill_bars (skill_name, mode, floor, updated_at) \
+             VALUES (?1, ?2, ?3, ?4) \
+             ON CONFLICT(skill_name, mode) DO UPDATE SET \
                floor = excluded.floor, updated_at = excluded.updated_at \
              WHERE excluded.floor > skill_bars.floor",
-            params!(skill_name, floor, unix_now()),
+            params!(skill_name, mode.as_str(), floor, unix_now()),
         )
         .await?;
     Ok(updated > 0)
 }
 
-/// Returns a skill's blessed Skill Lift floor, if one has been set.
+/// Returns a skill's blessed Skill Lift floor for `mode`, if one is set.
 ///
 /// # Errors
 ///
 /// Returns an error when the query fails.
-pub async fn get_lift_floor(conn: &Connection, skill_name: &str) -> Result<Option<f64>> {
+pub async fn get_lift_floor(
+    conn: &Connection,
+    skill_name: &str,
+    mode: EvalMode,
+) -> Result<Option<f64>> {
     let mut rows = conn
         .query(
-            "SELECT floor FROM skill_lift_floors WHERE skill_name = ?1",
-            params!(skill_name),
+            "SELECT floor FROM skill_lift_floors WHERE skill_name = ?1 AND mode = ?2",
+            params!(skill_name, mode.as_str()),
         )
         .await?;
     match rows.next().await? {
@@ -330,7 +344,7 @@ pub async fn get_lift_floor(conn: &Connection, skill_name: &str) -> Result<Optio
     }
 }
 
-/// Raises a skill's Skill Lift floor to `floor`, never lowering it.
+/// Raises a skill's Skill Lift floor for `mode` to `floor`, never lowering it.
 ///
 /// Returns whether the floor moved (`false` when the existing floor was
 /// already at or above `floor`).
@@ -338,14 +352,20 @@ pub async fn get_lift_floor(conn: &Connection, skill_name: &str) -> Result<Optio
 /// # Errors
 ///
 /// Returns an error when the upsert statement fails.
-pub async fn raise_lift_floor(conn: &Connection, skill_name: &str, floor: f64) -> Result<bool> {
+pub async fn raise_lift_floor(
+    conn: &Connection,
+    skill_name: &str,
+    mode: EvalMode,
+    floor: f64,
+) -> Result<bool> {
     let updated = conn
         .execute(
-            "INSERT INTO skill_lift_floors (skill_name, floor, updated_at) VALUES (?1, ?2, ?3) \
-             ON CONFLICT(skill_name) DO UPDATE SET \
+            "INSERT INTO skill_lift_floors (skill_name, mode, floor, updated_at) \
+             VALUES (?1, ?2, ?3, ?4) \
+             ON CONFLICT(skill_name, mode) DO UPDATE SET \
                floor = excluded.floor, updated_at = excluded.updated_at \
              WHERE excluded.floor > skill_lift_floors.floor",
-            params!(skill_name, floor, unix_now()),
+            params!(skill_name, mode.as_str(), floor, unix_now()),
         )
         .await?;
     Ok(updated > 0)

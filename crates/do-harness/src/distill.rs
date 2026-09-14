@@ -90,7 +90,16 @@ async fn raise_bar_from_recovery(conn: &do_harness_db::Connection, skill: &str) 
     let best = do_harness_db::max_pass_rate(conn, skill).await?;
     match do_harness_integrity_floor(best) {
         Some(floor) => {
-            if do_harness_db::raise_skill_bar(conn, skill, floor).await? {
+            // Recovery ratchets the deterministic floor: distill evidence
+            // comes from sensor runs, not agent sessions.
+            if do_harness_db::raise_skill_bar(
+                conn,
+                skill,
+                do_harness_types::EvalMode::Deterministic,
+                floor,
+            )
+            .await?
+            {
                 println!("Bar ratcheted for {skill}: floor now {floor:.2}");
             } else {
                 println!("Bar unchanged for {skill}: floor already at or above {floor:.2}");

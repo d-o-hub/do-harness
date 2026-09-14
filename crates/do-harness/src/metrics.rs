@@ -120,14 +120,19 @@ pub async fn run_metrics(
             }
             None => (None, None, None, None, Vec::new()),
         };
+        // Floors are mode-scoped: report the floors that govern the latest
+        // run's mode, so the numbers shown can actually fail the next run.
+        let floors_mode = mode.unwrap_or_default();
         skills.push(SkillTrend {
             latest_pass_rate: latest_by_skill.get(&summary.skill_name).copied().flatten(),
-            bar_floor: do_harness_db::get_skill_bar(&conn, &summary.skill_name).await?,
+            bar_floor: do_harness_db::get_skill_bar(&conn, &summary.skill_name, floors_mode)
+                .await?,
             name: summary.skill_name.clone(),
             best_pass_rate: summary.best_pass_rate,
             runs: summary.runs,
             lift,
-            lift_floor: do_harness_db::get_lift_floor(&conn, &summary.skill_name).await?,
+            lift_floor: do_harness_db::get_lift_floor(&conn, &summary.skill_name, floors_mode)
+                .await?,
             mode,
             skill_words,
             walk_secs,

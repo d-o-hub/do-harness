@@ -87,4 +87,9 @@ pub const MIGRATIONS: &[Migration] = &[
         name: "eval_mode",
         sql: include_str!("../migrations/0015_eval_mode.sql"),
     },
+    Migration {
+        version: 16,
+        name: "mode_scoped_floors",
+        sql: include_str!("../migrations/0016_mode_scoped_floors.sql"),
+    },
 ];

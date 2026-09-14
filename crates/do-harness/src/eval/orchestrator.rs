@@ -174,6 +174,8 @@ pub async fn run_eval(root: &Path, opts: EvalOpts<'_>) -> Result<()> {
             report
         };
 
+        report.mode = mode;
+
         if !no_lift && !report.gate_failed && report.pass_rate.is_some() {
             let baseline = if let Some(spec) = &agent_spec {
                 match load_evals(&entry).await? {
@@ -274,7 +276,7 @@ pub async fn run_eval(root: &Path, opts: EvalOpts<'_>) -> Result<()> {
         if bless {
             let approver = approver.as_deref().unwrap_or("unknown");
             bless_skill(&conn, &name, &report, &hashes, approver).await?;
-        } else if let Some(floor) = do_harness_db::get_skill_bar(&conn, &name).await? {
+        } else if let Some(floor) = do_harness_db::get_skill_bar(&conn, &name, mode).await? {
             if let Some(rate) = report.pass_rate {
                 if rate < floor {
                     println!(
@@ -285,7 +287,7 @@ pub async fn run_eval(root: &Path, opts: EvalOpts<'_>) -> Result<()> {
             }
         }
         if !bless {
-            if let Some(floor) = do_harness_db::get_lift_floor(&conn, &name).await? {
+            if let Some(floor) = do_harness_db::get_lift_floor(&conn, &name, mode).await? {
                 if let Some(lift) = report.lift {
                     if lift < floor {
                         println!(

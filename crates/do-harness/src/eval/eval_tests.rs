@@ -143,9 +143,13 @@ async fn bless_then_drift_then_bar_miss() {
             .is_some()
     );
     assert_eq!(
-        do_harness_db::get_skill_bar(&conn, "test-skill")
-            .await
-            .unwrap(),
+        do_harness_db::get_skill_bar(
+            &conn,
+            "test-skill",
+            do_harness_types::EvalMode::Deterministic
+        )
+        .await
+        .unwrap(),
         Some(0.95)
     );
     drop(conn);
@@ -452,9 +456,14 @@ async fn lift_miss_fails_below_floor() {
     let conn = do_harness_db::connect_and_migrate(dir.path())
         .await
         .unwrap();
-    do_harness_db::raise_lift_floor(&conn, "test-skill", 0.5)
-        .await
-        .unwrap();
+    do_harness_db::raise_lift_floor(
+        &conn,
+        "test-skill",
+        do_harness_types::EvalMode::Deterministic,
+        0.5,
+    )
+    .await
+    .unwrap();
     drop(conn);
 
     // With and without both score 1.0, so lift 0.0 misses the 0.5 floor.
@@ -468,9 +477,14 @@ async fn lift_at_floor_passes() {
     let conn = do_harness_db::connect_and_migrate(dir.path())
         .await
         .unwrap();
-    do_harness_db::raise_lift_floor(&conn, "test-skill", -1.0)
-        .await
-        .unwrap();
+    do_harness_db::raise_lift_floor(
+        &conn,
+        "test-skill",
+        do_harness_types::EvalMode::Deterministic,
+        -1.0,
+    )
+    .await
+    .unwrap();
     drop(conn);
 
     eval_run_with_lift(dir.path(), None).await.unwrap();
