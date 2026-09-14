@@ -1,0 +1,4 @@
+[
+  {"workflowName": "verify", "status": "completed", "conclusion": "success"},
+  {"workflowName": "CodeQL", "status": "completed", "conclusion": "success"}
+]
