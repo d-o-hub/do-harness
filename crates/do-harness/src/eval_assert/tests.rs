@@ -88,6 +88,34 @@ async fn cli_assertion_rejects_root_override() {
     }
 }
 
+/// `absent:` passes for missing paths, fails for present ones, and fails
+/// closed on an empty path (a fixture defect, never a pass).
+#[tokio::test(flavor = "current_thread")]
+async fn absent_assertion_grades_negative_cases() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("leaked.txt"), "scratch").unwrap();
+    let walk = WalkRun::absent();
+
+    let clean = grade(dir.path(), "absent:tests/spikes", &walk)
+        .await
+        .unwrap();
+    assert!(clean.passed, "{}", clean.reason);
+
+    let leaked = grade(dir.path(), "absent:leaked.txt", &walk).await.unwrap();
+    assert!(!leaked.passed, "{}", leaked.reason);
+    assert!(leaked.reason.contains("unexpectedly present"));
+
+    let empty = grade(dir.path(), "absent:", &walk).await.unwrap();
+    assert!(!empty.passed, "empty absent: must fail closed");
+}
+
+/// `absent:` is a graded prefix, so negative-case assertions count toward
+/// the denominator instead of being silently skipped as docs.
+#[test]
+fn absent_prefix_is_graded() {
+    assert!(is_graded("absent:tests/spikes"));
+}
+
 /// A walkthrough that was present but could not be launched fails its
 /// `walk:` assertions with the cause surfaced, never a silent success.
 #[tokio::test(flavor = "current_thread")]
