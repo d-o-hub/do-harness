@@ -23,6 +23,12 @@ import {
 } from "./lib/contrast.mjs";
 import { normalizeViewport, normalizeMatrix, DEFAULT_VIEWPORT_MATRIX } from "./lib/audit.mjs";
 import { classifyConsoleMessage } from "./lib/console-audit.mjs";
+import {
+  expectedDirection,
+  buildLocaleUrl,
+  keyFinding,
+  diffLocaleFindings,
+} from "./lib/i18n-audit.mjs";
 import { DEFAULT_BUDGETS, parseBudgets, evaluateBudgets } from "./lib/perf-audit.mjs";
 import { cellKey, classifyBaseline, digestOf } from "./lib/visual-audit.mjs";
 
@@ -102,6 +108,40 @@ test("contrast: minimum ratio follows the large-text rule", () => {
   assert.equal(minimumRatio({ fontSizePx: 24, bold: false }), 3);
   assert.equal(minimumRatio({ fontSizePx: 19, bold: true }), 3);
   assert.equal(minimumRatio({ fontSizePx: 19, bold: false }), 4.5);
+});
+
+test("i18n: direction map and locale URL building", () => {
+  assert.equal(expectedDirection("ar"), "rtl");
+  assert.equal(expectedDirection("he-IL"), "rtl");
+  assert.equal(expectedDirection("fa"), "rtl");
+  assert.equal(expectedDirection("de"), "ltr");
+  assert.equal(expectedDirection("pt-BR"), "ltr");
+  assert.equal(expectedDirection("zh-Hans-CN"), "ltr");
+  assert.equal(
+    buildLocaleUrl("http://app.test/catalog?sort=asc", "lang", "de"),
+    "http://app.test/catalog?sort=asc&lang=de",
+  );
+});
+
+test("i18n: locale diff isolates locale-only regressions", () => {
+  const baseline = [
+    { stage: "contrast", selector: "p", reason: "contrast 3.0:1 < 4.5:1" },
+    { stage: "target-size", selector: "button", reason: "target is 20x20px" },
+  ];
+  const german = [
+    ...baseline,
+    { stage: "reflow-overflow", selector: "html", reason: "document is 340px wide at a 320px viewport" },
+  ];
+  assert.deepEqual(
+    diffLocaleFindings(baseline, german).map((f) => f.stage),
+    ["reflow-overflow"], // expansion defect only, shared defects excluded
+  );
+  const arabic = [...german, { stage: "text-overlap", selector: "nav", reason: "overlaps another text leaf" }];
+  assert.equal(diffLocaleFindings(baseline, arabic).length, 2);
+  // identical sets produce no delta
+  assert.equal(diffLocaleFindings(baseline, [...baseline]).length, 0);
+  // keys are stable and collision-free across stages
+  assert.notEqual(keyFinding(baseline[0]), keyFinding(baseline[1]));
 });
 
 test("visual: cell keys are deterministic, slugged, and collision-safe", () => {
