@@ -133,6 +133,45 @@ async fn rejects_conflicting_severity_sources() {
     assert!(format!("{err:#}").contains("confused"));
 }
 
+/// Parses `artifacts` and `coverage-inputs` per sensor.
+#[tokio::test(flavor = "current_thread")]
+async fn parses_artifacts_and_coverage_inputs() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let path = dir.path().join("do-harness.toml");
+    let text = r#"
+            [[sensors]]
+            name = "web"
+            argv = ["true"]
+            artifacts = ["out/**/*.png", "out/report.json"]
+            coverage-inputs = ["scripts/matrix.mjs"]
+        "#;
+    std::fs::write(&path, text).expect("write config");
+    let cfg = load(dir.path(), Some(&path)).await.expect("load config");
+    assert_eq!(
+        cfg.sensors[0].artifacts,
+        vec!["out/**/*.png", "out/report.json"]
+    );
+    assert_eq!(cfg.sensors[0].coverage_inputs, vec!["scripts/matrix.mjs"]);
+}
+
+/// An invalid `artifacts` or `coverage-inputs` glob fails at config load.
+#[tokio::test(flavor = "current_thread")]
+async fn rejects_invalid_artifact_globs() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let path = dir.path().join("do-harness.toml");
+    let text = r#"
+            [[sensors]]
+            name = "web"
+            argv = ["true"]
+            artifacts = ["[unclosed"]
+        "#;
+    std::fs::write(&path, text).expect("write config");
+    let err = load(dir.path(), Some(&path))
+        .await
+        .expect_err("load must fail");
+    assert!(format!("{err:#}").contains("artifacts"));
+}
+
 /// Unknown fields in [[sensors]] are rejected by `deny_unknown_fields`.
 #[tokio::test(flavor = "current_thread")]
 async fn rejects_unknown_sensor_fields() {

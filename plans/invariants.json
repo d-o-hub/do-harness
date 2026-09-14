@@ -142,5 +142,17 @@
     "rationale": "A ratchet that can be raised silently is not a ratchet; explicit bless with a recorded approver is the only way down, and the baseline digest feeds the policy fingerprint so stale evidence cannot hide a regression",
     "sensor": "do-harness verify --record --bless",
     "category": "verification"
+  },
+  {
+    "invariant": "Evidence carries SHA-256 digests of declared sensor artifacts and machine-readable coverage manifests; a declared artifact that matches nothing degrades the run",
+    "rationale": "'Green' is meaningless without the artifacts sensors claim to produce; weak evidence records warn (never pass) so strict and status stay honest",
+    "sensor": "do-harness verify --evidence",
+    "category": "verification"
+  },
+  {
+    "invariant": "Coverage definitions (matrix modules) are fingerprinted with the policy, so editing them makes evidence stale without re-running sensors; schema bumps stay additive",
+    "rationale": "A changed route x viewport x locale matrix that keeps a green badge is a lie; policy fingerprinting catches definition changes while additive schemas keep old evidence readable",
+    "sensor": "do-harness status --set verification",
+    "category": "verification"
   }
 ]

@@ -272,14 +272,14 @@ fn status_is_deterministic() {
 
 /// Evidence carries workspace/policy fingerprints and schema v3.
 #[test]
-fn evidence_carries_fingerprints_and_schema_v3() {
+fn evidence_carries_fingerprints_and_schema_v4() {
     let (_dir, root) = fixture_repo();
 
     verify(&root, "verification", 0);
     let path = root.join(".do-harness/evidence.verification.json");
     let doc: Value =
         serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).expect("evidence json");
-    assert_eq!(doc["schema_version"], serde_json::json!(3));
+    assert_eq!(doc["schema_version"], serde_json::json!(4));
     assert_eq!(doc["signal_set"], serde_json::json!("verification"));
     for field in [
         "workspace_fingerprint",
@@ -294,4 +294,42 @@ fn evidence_carries_fingerprints_and_schema_v3() {
         );
     }
     assert!(doc["chain_hash"].as_str().is_some_and(|h| !h.is_empty()));
+}
+
+/// A committed change to a declared coverage input makes evidence stale
+/// without re-running sensors: the coverage digest feeds the policy
+/// fingerprint.
+#[test]
+fn coverage_input_change_invalidates_evidence() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path().to_path_buf();
+    std::fs::write(
+        root.join("do-harness.toml"),
+        "[signal-sets]\nverification = [\"web\"]\n\n[[sensors]]\nname = \"web\"\n\
+         argv = [\"true\"]\ncoverage-inputs = [\"matrix.mjs\"]\n",
+    )
+    .unwrap();
+    std::fs::write(root.join("matrix.mjs"), "export const matrix = [1];\n").unwrap();
+    std::fs::write(root.join("lib.rs"), "v1\n").unwrap();
+    git(&root, &["init", "-q"]);
+    git(&root, &["add", "-A"]);
+    git(&root, &["commit", "-qm", "test: base"]);
+
+    verify(&root, "verification", 0);
+    let (code, report) = status(&root, "verification");
+    assert_eq!(code, Some(0), "fresh evidence must be green: {report}");
+
+    // Committing the matrix change leaves the working tree clean, so the
+    // workspace fingerprint matches; staleness must come from the policy.
+    std::fs::write(root.join("matrix.mjs"), "export const matrix = [1, 2];\n").unwrap();
+    git(&root, &["add", "-A"]);
+    git(&root, &["commit", "-qm", "test: matrix"]);
+    let (code, report) = status(&root, "verification");
+    assert_eq!(
+        code,
+        Some(1),
+        "matrix change must invalidate evidence: {report}"
+    );
+    assert_eq!(report["state"], "stale");
+    assert_eq!(report["reason"], "policy_changed");
 }

@@ -15,6 +15,7 @@ use crate::cli::{Cli, Command};
 
 mod applicability;
 mod approver;
+mod artifacts;
 mod audit;
 mod baselines;
 mod changes;

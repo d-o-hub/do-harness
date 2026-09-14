@@ -1,13 +1,19 @@
 //! Evidence artifact writer for `do-harness verify --evidence`.
 
+use std::collections::BTreeMap;
 use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
+use crate::artifacts::EvidenceArtifact;
 use crate::config::Config;
 use crate::report::VerifyReport;
 
-pub const EVIDENCE_SCHEMA_VERSION: u32 = 3;
+pub const EVIDENCE_SCHEMA_VERSION: u32 = 4;
+
+/// Oldest schema `status` still treats as current evidence: v3 (fingerprints,
+/// no artifacts/coverage) parses into v4 with defaults.
+pub const MIN_CURRENT_SCHEMA_VERSION: u32 = 3;
 
 /// A sensor skipped by change-aware selection, with its reason.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -35,6 +41,9 @@ pub struct EvidenceSensor {
     pub duration_ms: Option<u64>,
     /// SHA-256 (hex) of the captured sensor output; empty when not run.
     pub output_sha256: String,
+    /// SHA-256 digests of artifacts the sensor declared and produced.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub artifacts: Vec<EvidenceArtifact>,
     /// Whether a beat was persisted for this sensor.
     pub recorded: bool,
 }
@@ -76,6 +85,10 @@ pub struct EvidenceDocument {
     pub sensors: Vec<EvidenceSensor>,
     /// Sensors skipped by change-aware selection, with reasons.
     pub skipped: Vec<EvidenceSkipped>,
+    /// Machine-readable coverage manifests reported by sensors via
+    /// `COVERAGE: <json>` markers, keyed by sensor name.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub coverage: BTreeMap<String, serde_json::Value>,
     pub summary: EvidenceSummary,
     /// Previous artifact's chain hash, when one existed in the same workspace.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -125,6 +138,7 @@ impl EvidenceDocument {
             "changed": self.changed,
             "sensors": self.sensors,
             "skipped": self.skipped,
+            "coverage": self.coverage,
             "summary": self.summary,
         });
         let canonical = do_harness_types::canonical_value(&payload)?;
@@ -160,29 +174,39 @@ impl EvidenceDocument {
             .collect();
 
         let mut sensors = Vec::new();
+        let mut coverage = BTreeMap::new();
         let mut pass_count = 0;
         let mut fail_count = 0;
         let mut skip_count = 0;
 
         for spec in selected_specs {
             if let Some(res) = report.sensors.iter().find(|r| r.name == spec.name) {
-                let verdict = if res.ok && res.warned {
-                    fail_count += 1;
+                let artifacts = crate::artifacts::resolve(meta.root, &spec.artifacts);
+                let mut verdict = if res.ok && res.warned {
                     "warn"
                 } else if res.ok {
-                    pass_count += 1;
                     "pass"
                 } else if res.allow_failure {
                     // Advisory failures (warn severity, below-baseline
                     // findings, quarantines) are recorded as `warn`: the
                     // local gate stays green, but the evidence summary is
                     // still non-pass so `--strict` and `status` stay honest.
-                    fail_count += 1;
                     "warn"
                 } else {
-                    fail_count += 1;
                     "fail"
                 };
+                // A declared artifact glob that matched nothing is weak
+                // evidence: record a warn so strict/status stay honest.
+                if !spec.artifacts.is_empty() && artifacts.is_empty() {
+                    verdict = "warn";
+                }
+                match verdict {
+                    "pass" => pass_count += 1,
+                    _ => fail_count += 1,
+                }
+                if let Some(value) = coverage_from_output(&res.output) {
+                    coverage.insert(spec.name.clone(), value);
+                }
 
                 sensors.push(EvidenceSensor {
                     name: spec.name.clone(),
@@ -191,6 +215,7 @@ impl EvidenceDocument {
                     exit_code: res.exit_code,
                     duration_ms: Some(res.duration_ms),
                     output_sha256: output_sha256(&res.output),
+                    artifacts,
                     recorded: true,
                 });
             } else {
@@ -202,6 +227,7 @@ impl EvidenceDocument {
                     exit_code: None,
                     duration_ms: None,
                     output_sha256: String::new(),
+                    artifacts: Vec::new(),
                     recorded: false,
                 });
             }
@@ -226,6 +252,7 @@ impl EvidenceDocument {
             changed: meta.changed,
             sensors,
             skipped: meta.skipped.clone(),
+            coverage,
             summary: EvidenceSummary {
                 pass: pass_count,
                 fail: fail_count,
@@ -270,6 +297,15 @@ fn output_sha256(output: &str) -> String {
     use sha2::{Digest, Sha256};
 
     hex::encode(Sha256::digest(output.as_bytes()))
+}
+
+/// Parses the last `COVERAGE: <json>` marker in captured output, when present.
+fn coverage_from_output(output: &str) -> Option<serde_json::Value> {
+    output.lines().rev().find_map(|line| {
+        line.trim_start()
+            .strip_prefix("COVERAGE:")
+            .and_then(|rest| serde_json::from_str(rest.trim()).ok())
+    })
 }
 
 /// Resolves git commit SHA at runtime or falls back to compile-time env var.

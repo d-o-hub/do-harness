@@ -123,6 +123,8 @@ mod tests {
             severity: None,
             allow_failure: false,
             transient_exit_codes: Vec::new(),
+            artifacts: Vec::new(),
+            coverage_inputs: Vec::new(),
             when_changed: Vec::new(),
         }
     }

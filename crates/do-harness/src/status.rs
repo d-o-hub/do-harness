@@ -140,18 +140,21 @@ impl CurrentFacts {
         let required = selection.selected_names();
         let workspace = crate::fingerprint::workspace_fingerprint(root, &changed);
         let baseline_digest = crate::baselines::digest(root);
+        let coverage_digest = crate::fingerprint::coverage_digest(root, &candidates);
         let policy = crate::fingerprint::policy_fingerprint(
             cfg,
             config_bytes,
             set,
             &candidates,
             &baseline_digest,
+            &coverage_digest,
         );
         let config = crate::fingerprint::config_fingerprint(
             cfg,
             config_bytes,
             &candidates,
             &baseline_digest,
+            &coverage_digest,
         );
         Ok(Self {
             side: CurrentSide {
