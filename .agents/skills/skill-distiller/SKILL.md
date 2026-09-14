@@ -42,6 +42,7 @@ Execute when:
 - If novel, generate a new directory `.agents/skills/<skill-name>/` with:
   - `SKILL.md`: Core guidance, invariants, and code examples (with Agent Skills frontmatter).
   - `evals/evals.json`: At least 2-3 verification cases with `id`, `prompt`, `expected_output`, and checkable `assertions`.
+- Run `do-harness overlap` after any corpus change: new or moved guidance must not push a pair past the accepted baselines in `plans/invariants.json`.
 
 ### 4. Benchmark & Evaluate
 Run the skill-evaluator loop:

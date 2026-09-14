@@ -37,6 +37,7 @@ mod hooks;
 mod init;
 mod methods;
 mod metrics;
+mod overlap;
 mod pr;
 mod report;
 mod sensors;
@@ -315,5 +316,8 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
         )
         .await
         .map_err(CliError::Usage),
+        Command::Overlap { threshold, format } => {
+            overlap::run_overlap(&root, threshold, format).map_err(CliError::Usage)
+        }
     }
 }

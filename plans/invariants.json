@@ -118,5 +118,17 @@
     "rationale": "Skills are the feedforward layer and the CLI validates fixed argv and emits parseable JSON; MCP only exposes tools and cannot enforce the completion gate, which needs runtime lifecycle hooks (DSH bundle pattern), while host-side sensor execution would change the trust model",
     "sensor": "do-harness eval",
     "category": "architecture"
+  },
+  {
+    "invariant": "htn-planner <-> spike-runner guidance overlap (~0.54 cosine) is accepted: the planner owns the spike-or-slice branch and the runner owns execution, so the method handoff vocabulary is load-bearing in both",
+    "rationale": "Removing the shared handoff terms would make each skill vaguer in isolation; the overlap check stays advisory and refires if the pair drifts further",
+    "sensor": "do-harness overlap (advisory, threshold 0.45)",
+    "category": "skills"
+  },
+  {
+    "invariant": "skill-creator <-> skill-distiller guidance overlap (~0.53 cosine) is accepted: both govern the same skill lifecycle (scaffold, gate, evaluate) from opposite ends, so lifecycle vocabulary is shared by design",
+    "rationale": "Topical overlap in lifecycle terms is not duplication of guidance; distinctiveness regressions beyond this baseline surface through the advisory check",
+    "sensor": "do-harness overlap (advisory, threshold 0.45)",
+    "category": "skills"
   }
 ]

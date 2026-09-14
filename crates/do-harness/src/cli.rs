@@ -273,6 +273,15 @@ pub enum Command {
         #[arg(long, value_name = "UNIX_SECONDS")]
         since: Option<String>,
     },
+    /// Rank skill pairs by guidance overlap (Tier-2 distinctiveness advisory).
+    Overlap {
+        /// Cosine similarity at or above which a pair prints as WARN.
+        #[arg(long, default_value_t = crate::overlap::DEFAULT_THRESHOLD)]
+        threshold: f64,
+        /// Output format.
+        #[arg(long, value_enum, default_value_t = Format::Text)]
+        format: Format,
+    },
     /// Prune old beats and compact the state database.
     Maintenance {
         /// Delete beats older than this many days (keeps the most recent per task).
