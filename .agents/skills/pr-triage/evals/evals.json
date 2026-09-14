@@ -7,6 +7,7 @@
       "expected_output": "SKILL.md and references state the guardrails, and the deterministic scripts for preflight, merge ordering, no-effect, checks, threads, and state ship with the skill.",
       "files": [],
       "dim": "effectiveness",
+      "kind": "explicit",
       "assertions": [
         "walk:",
         "contains:.agents/skills/pr-triage/SKILL.md|--match-head-commit",
@@ -24,6 +25,7 @@
       "expected_output": "Order is stack first, then oldest-first, with drafts and hold-labeled PRs excluded; the changed PR reports has-effect and the empty commit reports no-effect.",
       "files": [],
       "dim": "correctness",
+      "kind": "contextual",
       "assertions": [
         "walk:",
         "contains:pr_list_order.txt|2,5,1",
@@ -37,6 +39,7 @@
       "expected_output": "The pass case exits 0 with a PASS summary, the failure case exits 1 with FAIL, and the pending case exits 2 with PENDING.",
       "files": [],
       "dim": "correctness",
+      "kind": "contextual",
       "assertions": [
         "walk:",
         "contains:checks_summary.txt|pass_exit=0",
@@ -51,6 +54,7 @@
       "expected_output": "The unresolved thread is listed, resolution returns resolved=true, the state record is readable after set, and clearing removes it.",
       "files": [],
       "dim": "effectiveness",
+      "kind": "contextual",
       "assertions": [
         "walk:",
         "contains:threads.tsv|T_1",
@@ -65,9 +69,22 @@
       "expected_output": "The command exits 0 and reports no-effect for base and head pointing at the same revision.",
       "files": [],
       "dim": "effectiveness",
+      "kind": "contextual",
       "assertions": [
         "walk:",
         "cli:pr no-effect --base HEAD --head HEAD:contains:no-effect"
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "Summarize tomorrow's weather forecast. No pull requests are involved.",
+      "expected_output": "No PR action: non-PR requests never touch the sweep, merge, or thread machinery.",
+      "files": [],
+      "dim": "discoverability",
+      "kind": "negative",
+      "assertions": [
+        "contains:pr_negative.txt|out-of-scope",
+        "absent:pr_merge.txt"
       ]
     }
   ]

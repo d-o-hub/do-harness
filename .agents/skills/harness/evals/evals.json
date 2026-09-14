@@ -7,6 +7,7 @@
       "expected_output": "do-harness init scaffolds the workspace plus a minimal rust crate, then do-harness verify must actually execute every sensor and exit 0 \u2014 the green path is computed, never assumed. A subsequently failing sensor records its error signature for the fail-fast lifecycle.",
       "files": [],
       "dim": "efficiency",
+      "kind": "explicit",
       "assertions": [
         "walk:",
         "exists:Cargo.toml",
@@ -24,6 +25,7 @@
       "expected_output": "Apply the fail-fast policy: halt, record the error signature, and surface a diagnostic to the developer.",
       "files": [],
       "dim": "effectiveness",
+      "kind": "implicit",
       "assertions": [
         "contains:.agents/skills/harness/SKILL.md|3 consecutive times",
         "contains:.agents/skills/harness/SKILL.md|halt"
@@ -35,6 +37,7 @@
       "expected_output": "No harness action: general knowledge needs no init, no sensors run, and no workspace is touched.",
       "files": [],
       "dim": "discoverability",
+      "kind": "negative",
       "assertions": [
         "contains:harness_negative.txt|no init",
         "contains:.agents/skills/harness/SKILL.md|never assumed"

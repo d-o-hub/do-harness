@@ -17,4 +17,5 @@ test -s "$root/proxy-checklist.md"
 # healthy allow, and audit evidence never flips the decision.
 cat > "$root/proxy_negative.txt" << 'MD'
 negative: well-formed allow forwards; deny only on invalid params, governance denial, or mediator error; never allow on error
+out-of-scope: non-mediation requests never touch the decide-audit-forward path
 MD

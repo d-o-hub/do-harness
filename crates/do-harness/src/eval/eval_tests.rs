@@ -44,7 +44,7 @@ async fn persisted(dir: &Path) -> Vec<do_harness_types::SkillEval> {
         .unwrap()
 }
 
-fn single_case_json(assertions: &[&str]) -> String {
+pub(super) fn single_case_json(assertions: &[&str]) -> String {
     let list: Vec<String> = assertions.iter().map(|a| format!("\"{a}\"")).collect();
     format!(
         r#"{{
@@ -66,16 +66,39 @@ fn single_case_json(assertions: &[&str]) -> String {
 async fn eval_run(dir: &Path, skill: Option<&str>, bless: bool) -> Result<()> {
     run_eval(
         dir,
-        skill,
-        bless,
-        false,
-        false,
-        false,
-        Format::Text,
-        Some("test-approver"),
-        true,
-        None,
-        600,
+        super::EvalOpts {
+            skill,
+            bless,
+            list_skills: false,
+            fail_fast: false,
+            dry_run: false,
+            format: Format::Text,
+            approver: Some("test-approver"),
+            no_lift: true,
+            agent_cmd: None,
+            agent_timeout_secs: 600,
+            strict_fixtures: false,
+        },
+    )
+    .await
+}
+
+pub(super) async fn eval_run_strict(dir: &Path) -> Result<()> {
+    run_eval(
+        dir,
+        super::EvalOpts {
+            skill: None,
+            bless: false,
+            list_skills: false,
+            fail_fast: false,
+            dry_run: false,
+            format: Format::Text,
+            approver: Some("test-approver"),
+            no_lift: true,
+            agent_cmd: None,
+            agent_timeout_secs: 600,
+            strict_fixtures: true,
+        },
     )
     .await
 }
@@ -310,16 +333,19 @@ async fn unknown_skill_filter_errors() {
 async fn eval_run_with_lift(dir: &Path, skill: Option<&str>) -> Result<()> {
     run_eval(
         dir,
-        skill,
-        false,
-        false,
-        false,
-        false,
-        Format::Text,
-        Some("test-approver"),
-        false,
-        None,
-        600,
+        super::EvalOpts {
+            skill,
+            bless: false,
+            list_skills: false,
+            fail_fast: false,
+            dry_run: false,
+            format: Format::Text,
+            approver: Some("test-approver"),
+            no_lift: false,
+            agent_cmd: None,
+            agent_timeout_secs: 600,
+            strict_fixtures: false,
+        },
     )
     .await
 }

@@ -188,6 +188,9 @@ Skill structure validation and evaluation benchmark runner.
   `agent_stdout.txt` for assertions.
 - `--agent-timeout <SECS>`: Kill an agent run after this many seconds
   (default 600).
+- `--strict-fixtures`: Fail skills whose fixture has dataset-quality gaps
+  (no cases, an ungraded case, or no negative out-of-scope case). CI runs
+  this so thin datasets cannot silently return.
 - `--list-skills`: List discovered skills under `.agents/skills`.
 - `--fail-fast`: Halt evaluation on first failing skill.
 - `--dry-run`: Perform dry-run evaluation without updating state.

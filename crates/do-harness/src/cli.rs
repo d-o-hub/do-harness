@@ -252,6 +252,10 @@ pub enum Command {
         /// Kill an agent run after this many seconds.
         #[arg(long, value_name = "SECS", default_value_t = 600)]
         agent_timeout: u64,
+        /// Fail skills whose fixture has dataset-quality gaps (thin cases,
+        /// no negative out-of-scope case).
+        #[arg(long)]
+        strict_fixtures: bool,
     },
     /// Manage git hooks that run `do-harness verify`.
     Hook {

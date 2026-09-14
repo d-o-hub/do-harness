@@ -7,6 +7,7 @@
       "expected_output": "A method choice (Vertical Event Slice or Spike & Resolve) with ordered subtasks, preconditions, and sensor gates per subtask, persisted to plans/tasks.json or libSQL.",
       "files": [],
       "dim": "effectiveness",
+      "kind": "explicit",
       "assertions": [
         "walk:",
         "db:tasks:status=done:min=1",
@@ -20,6 +21,7 @@
       "expected_output": "Selection of the Spike & Resolve method: create a scratchpad, execute with an exit-code-0 gate, record findings, clean scratch, then transition to a vertical slice.",
       "files": [],
       "dim": "effectiveness",
+      "kind": "implicit",
       "assertions": [
         "contains:.agents/skills/htn-planner/SKILL.md|Spike & Resolve",
         "contains:.agents/skills/htn-planner/SKILL.md|Preconditions"
@@ -31,6 +33,7 @@
       "expected_output": "No plan: without a domain requirement no method precondition is met, so planning defers and no spike scratch is created.",
       "files": [],
       "dim": "discoverability",
+      "kind": "negative",
       "assertions": [
         "contains:plan_negative.txt|no method applies",
         "contains:.agents/skills/htn-planner/SKILL.md|precondition",

@@ -13,16 +13,19 @@ use crate::report::Format;
 async fn eval_run_agent(dir: &Path, agent_cmd: &str, timeout_secs: u64) -> Result<()> {
     run_eval(
         dir,
-        None,
-        false,
-        false,
-        false,
-        false,
-        Format::Text,
-        Some("test-approver"),
-        false,
-        Some(agent_cmd),
-        timeout_secs,
+        super::EvalOpts {
+            skill: None,
+            bless: false,
+            list_skills: false,
+            fail_fast: false,
+            dry_run: false,
+            format: Format::Text,
+            approver: Some("test-approver"),
+            no_lift: false,
+            agent_cmd: Some(agent_cmd),
+            agent_timeout_secs: timeout_secs,
+            strict_fixtures: false,
+        },
     )
     .await
 }

@@ -20,6 +20,7 @@ use do_harness_types::EvalDim;
 use crate::eval_assert::AssertionGrade;
 use crate::eval_walk::WalkRun;
 
+use super::fixture::{EvalKind, fixture_diagnostics};
 use super::gate::{GateVerdict, run_structure_gate};
 
 #[derive(Debug, serde::Deserialize)]
@@ -44,6 +45,9 @@ pub(super) struct EvalCase {
     /// preserving the pre-dimension meaning of the aggregate pass rate.
     #[serde(default)]
     pub(super) dim: EvalDim,
+    /// Dataset intent of this case; see [`EvalKind`].
+    #[serde(default)]
+    pub(super) kind: EvalKind,
 }
 
 pub(super) struct SkillReport {
@@ -66,6 +70,8 @@ pub(super) struct SkillReport {
     pub(super) skill_words: i64,
     /// Executor wall time in seconds (walkthrough or agent runs).
     pub(super) walk_secs: f64,
+    /// Dataset-quality findings; empty when the fixture is well-formed.
+    pub(super) fixture_warnings: Vec<String>,
 }
 
 /// Per-dimension tally with the baseline merged in.
@@ -175,6 +181,7 @@ fn empty_report() -> SkillReport {
         dims: Vec::new(),
         skill_words: 0,
         walk_secs: 0.0,
+        fixture_warnings: Vec::new(),
     }
 }
 
@@ -203,7 +210,8 @@ pub(super) async fn check_skill(
     };
     let mut outcome = grade_skill(&evals, root, &walk).await?;
     outcome.walk_secs = started.elapsed().as_secs_f64();
-    let mut report = report_from_outcome(name, &structure, outcome, skill_words(dir));
+    let warnings = fixture_diagnostics(&evals);
+    let mut report = report_from_outcome(name, &structure, outcome, skill_words(dir), warnings);
     report.lift = None;
     Ok(report)
 }
@@ -234,6 +242,7 @@ pub(super) fn report_from_outcome(
     structure: &str,
     outcome: GradeOutcome,
     words: i64,
+    fixture_warnings: Vec<String>,
 ) -> SkillReport {
     let line = match outcome.pass_rate {
         Some(rate) => format!(
@@ -269,6 +278,7 @@ pub(super) fn report_from_outcome(
             .collect(),
         skill_words: words,
         walk_secs: outcome.walk_secs,
+        fixture_warnings,
     }
 }
 

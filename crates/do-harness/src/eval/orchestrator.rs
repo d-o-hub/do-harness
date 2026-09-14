@@ -12,30 +12,59 @@ use crate::report::Format;
 
 use super::agent::{AgentSpec, check_skill_agent};
 use super::bless::bless_skill;
+use super::fixture::fixture_diagnostics;
 use super::grading::{
     GateOutcome, check_skill, check_skill_without, gate_and_parse, load_evals, report_from_outcome,
     skill_words,
 };
 
+/// Options for one `do-harness eval` invocation.
+///
+/// Deliberately a flat options bag (like `VerifyOpts`); the boolean fields
+/// are independent CLI switches, not a state machine.
+#[allow(clippy::struct_excessive_bools)]
+#[derive(Debug, Clone)]
+pub struct EvalOpts<'a> {
+    /// Restrict evaluation to this skill directory name.
+    pub skill: Option<&'a str>,
+    /// Re-baseline graders and ratchet floors on a fully green run.
+    pub bless: bool,
+    /// List available skills and exit.
+    pub list_skills: bool,
+    /// Halt on the first failing skill.
+    pub fail_fast: bool,
+    /// Skip execution (report only).
+    pub dry_run: bool,
+    /// Output format.
+    pub format: Format,
+    /// Approver identity recorded with `bless`.
+    pub approver: Option<&'a str>,
+    /// Skip the without-skill baseline run.
+    pub no_lift: bool,
+    /// External agent command run once per case instead of the walkthrough.
+    pub agent_cmd: Option<&'a str>,
+    /// Kill an agent run after this many seconds.
+    pub agent_timeout_secs: u64,
+    /// Fail skills whose fixture has dataset-quality gaps.
+    pub strict_fixtures: bool,
+}
+
 /// Runs the skill-eval benchmark for skills under `.agents/skills`.
-#[allow(
-    clippy::too_many_lines,
-    clippy::too_many_arguments,
-    clippy::fn_params_excessive_bools
-)]
-pub async fn run_eval(
-    root: &Path,
-    skill: Option<&str>,
-    bless: bool,
-    list_skills: bool,
-    fail_fast: bool,
-    dry_run: bool,
-    format: Format,
-    approver: Option<&str>,
-    no_lift: bool,
-    agent_cmd: Option<&str>,
-    agent_timeout_secs: u64,
-) -> Result<()> {
+#[allow(clippy::too_many_lines)]
+pub async fn run_eval(root: &Path, opts: EvalOpts<'_>) -> Result<()> {
+    let EvalOpts {
+        skill,
+        bless,
+        list_skills,
+        fail_fast,
+        dry_run,
+        format,
+        approver,
+        no_lift,
+        agent_cmd,
+        agent_timeout_secs,
+        strict_fixtures,
+    } = opts;
     let skills_root = root.join(".agents/skills");
     if list_skills {
         let skills = discover_skills(&skills_root);
@@ -120,7 +149,13 @@ pub async fn run_eval(
                 GateOutcome::Ready { structure, evals } => {
                     let outcome =
                         check_skill_agent(root, &entry, &name, &evals, spec, false).await?;
-                    report_from_outcome(&name, &structure, outcome, skill_words(&entry))
+                    report_from_outcome(
+                        &name,
+                        &structure,
+                        outcome,
+                        skill_words(&entry),
+                        fixture_diagnostics(&evals),
+                    )
                 }
                 GateOutcome::Failed(report)
                 | GateOutcome::NoEvals(report)
@@ -183,6 +218,19 @@ pub async fn run_eval(
             reports_json.push(report_json(&name, &report, mode));
         } else {
             println!("{}", report.line);
+        }
+
+        if !report.fixture_warnings.is_empty() {
+            for warning in &report.fixture_warnings {
+                if strict_fixtures {
+                    println!("{name}: FIXTURE-MISS: {warning}");
+                } else {
+                    println!("{name}: fixture-WARN: {warning}");
+                }
+            }
+            if strict_fixtures && !invalid.contains(&name) {
+                invalid.push(name.clone());
+            }
         }
 
         if let Some(pass_rate) = report.pass_rate {
@@ -280,8 +328,13 @@ fn finish_line(report: &mut super::grading::SkillReport, mode: EvalMode) {
     let lift = report
         .lift
         .map_or_else(|| "n/a".to_owned(), |lift| format!("{lift:+.2}"));
+    let fixture = if report.fixture_warnings.is_empty() {
+        "ok"
+    } else {
+        "warn"
+    };
     report.line = format!(
-        "{} lift={lift} words={} walk={:.1}s mode={mode}",
+        "{} lift={lift} words={} walk={:.1}s mode={mode} fixture={fixture}",
         report.line, report.skill_words, report.walk_secs
     );
 }
@@ -306,6 +359,7 @@ fn report_json(
         "without_passed": report.without_passed,
         "skill_words": report.skill_words,
         "walk_secs": report.walk_secs,
+        "fixture_warnings": report.fixture_warnings,
         "dims": report.dims.iter().map(|d| serde_json::json!({
             "dim": d.dim.as_str(),
             "graded": d.graded,

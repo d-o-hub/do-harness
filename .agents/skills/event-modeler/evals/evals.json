@@ -7,6 +7,7 @@
       "expected_output": "A Command struct, an Event with serde derives and deny_unknown_fields, and a typed error enum, split across commands.rs, events.rs, and errors.rs.",
       "files": [],
       "dim": "correctness",
+      "kind": "explicit",
       "assertions": [
         "walk:",
         "exists:model.rs",
@@ -22,6 +23,7 @@
       "expected_output": "A UserSummaryView with an apply(&mut self, event) method that updates state from UserCreated events.",
       "files": [],
       "dim": "correctness",
+      "kind": "explicit",
       "assertions": [
         "contains:model.rs|UserSummaryViews",
         "contains:model.rs|self.total += 1"
@@ -33,6 +35,7 @@
       "expected_output": "No slice: prose without state changes emits no Command, Event, or Projection.",
       "files": [],
       "dim": "discoverability",
+      "kind": "negative",
       "assertions": [
         "contains:model_negative.txt|no model emitted",
         "absent:model_extra.rs"

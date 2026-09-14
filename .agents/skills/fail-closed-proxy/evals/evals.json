@@ -7,6 +7,7 @@
       "expected_output": "Decide-audit-forward: deny maps to 403, upstream failures map to 502, audit is best-effort and never flips the decision.",
       "files": [],
       "dim": "correctness",
+      "kind": "explicit",
       "assertions": [
         "walk:",
         "exists:proxy-checklist.md",
@@ -21,6 +22,7 @@
       "expected_output": "ProxyMetrics counters (allow, deny, mediator_errors, upstream_ok, upstream_failures, audit_write_failures) exposed as JSON at GET /metrics; counters never affect decisions.",
       "files": [],
       "dim": "efficiency",
+      "kind": "explicit",
       "assertions": [
         "exists:proxy-checklist.md",
         "contains:proxy-checklist.md|GET /metrics",
@@ -33,10 +35,23 @@
       "expected_output": "The well-formed allow forwards; the malformed call denies with 403 and is audit-logged without flipping any decision.",
       "files": [],
       "dim": "security",
+      "kind": "contextual",
       "assertions": [
         "contains:proxy_negative.txt|well-formed allow forwards",
         "contains:proxy-checklist.md|never allow on error",
         "contains:proxy-checklist.md|hash-chained"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "Write a haiku about the ocean. No tool calls are being mediated.",
+      "expected_output": "No proxy action: non-mediation requests never touch the decide-audit-forward path.",
+      "files": [],
+      "dim": "discoverability",
+      "kind": "negative",
+      "assertions": [
+        "contains:proxy_negative.txt|out-of-scope",
+        "absent:proxy_allow.txt"
       ]
     }
   ]

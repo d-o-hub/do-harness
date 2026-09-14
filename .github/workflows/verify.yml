@@ -110,7 +110,7 @@ jobs:
           # instead of letting a vacuous pass masquerade as a real rust gate.
           test "$(jq -r '.sensor_pack' "$tmp/.do-harness/evidence.json")" = "generic"
       - name: Dogfood skill eval runner (shebang execution, graded residue)
-        run: ./target/release/do-harness eval
+        run: ./target/release/do-harness eval --strict-fixtures
       - name: Assert evidence integrity
         run: |
           test -f .do-harness/evidence.verification.json
