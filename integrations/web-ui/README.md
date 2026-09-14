@@ -16,6 +16,8 @@ grounded in WCAG 2.2 (1.4.3 contrast, 1.4.10 reflow, 2.4.7 focus visibility,
 | `lib/console-audit.mjs` | console/page-error/failed-request collector + noise classifier | classification yes |
 | `lib/a11y-audit.mjs` | axe-core adapter (WCAG 2.2 AA tags; `@axe-core/playwright` is an adopting-repo peer dep) | via browser suite |
 | `lib/i18n-audit.mjs` | per-locale probe diffing + RTL direction contract (3.1.1/3.1.2) | diffing + direction yes |
+| `lib/perf-audit.mjs` | Lighthouse adapter (peer dep) + CWV budget evaluation | budget evaluation yes |
+| `lib/visual-audit.mjs` | screenshot capture + digest baselines under `.do-harness/visual/` | classification yes |
 | `lib/audit.mjs` | matrix normalization + orchestrator | normalization yes |
 | `audit.test.mjs` | `node --test` unit tests (no browser needed) | — |
 
@@ -77,3 +79,23 @@ the evidence matrix-manifest proposal in #67. The `a11y` wrapper calls
 repo's node_modules; the audit reports a SKIP-shaped result when it is
 absent), and the `console` wrapper drains `attachConsoleCollector()` after
 navigating each route, failing on classified `error` events.
+
+## Visual baselines
+
+`auditVisual(page, { route, viewport })` captures a full-page screenshot per
+matrix cell (animations disabled, caret hidden) and stores blessed baselines
+as PNGs under `.do-harness/visual/` (gitignore that directory in the
+adopting repo). Classification is digest-based with zero image dependencies:
+
+- **new** — no baseline yet: a WARN-class finding; the capture is blessed on
+  this run so the next run compares.
+- **changed** — digest differs from the blessed baseline: a failure. Rerun
+  with `WEB_VISUAL_UPDATE=1` **only after verifying the change is intended**
+  (that flow is the visual equivalent of `eval --bless`).
+- **unchanged** — no finding.
+
+Because screenshots are environment-sensitive (font rendering, GPU), bless
+baselines in the same environment CI uses (pinned fonts in a container) —
+the same discipline as any snapshot test. Per-pixel diffing with masked
+regions and thresholds can layer on top; digest equality is deliberately
+the v1 contract.
