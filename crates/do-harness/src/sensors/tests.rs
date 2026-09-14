@@ -6,6 +6,8 @@ use std::time::{Duration, Instant};
 use super::*;
 use crate::config::{Config, HooksConfig};
 
+mod severity;
+
 fn config_with(specs: &[(&str, &[&str])]) -> Config {
     Config {
         language: None,
@@ -21,6 +23,7 @@ fn config_with(specs: &[(&str, &[&str])]) -> Config {
                 argv: argv.iter().map(|a| (*a).to_owned()).collect(),
                 retry: None,
                 timeout: None,
+                severity: None,
                 allow_failure: false,
                 transient_exit_codes: vec![],
                 when_changed: vec![],
@@ -243,6 +246,7 @@ fn retries_failing_sensor_until_success() {
             argv: vec!["sh".to_owned(), "-c".to_owned(), script],
             retry: Some(3),
             timeout: None,
+            severity: None,
             allow_failure: false,
             transient_exit_codes: vec![],
             when_changed: vec![],
@@ -287,6 +291,7 @@ fn times_out_hanging_sensor() {
             argv: vec!["sleep".to_owned(), "10".to_owned()],
             retry: None,
             timeout: Some(1),
+            severity: None,
             allow_failure: false,
             transient_exit_codes: vec![],
             when_changed: vec![],
@@ -333,6 +338,7 @@ fn allow_failure_sensor_does_not_fail_gate_but_surfaces_output() {
             ],
             retry: None,
             timeout: None,
+            severity: None,
             allow_failure: true,
             transient_exit_codes: vec![],
             when_changed: vec![],
@@ -407,6 +413,7 @@ fn transient_exit_codes_restricts_retries() {
             argv: vec!["sh".to_owned(), "-c".to_owned(), script],
             retry: Some(3),
             timeout: None,
+            severity: None,
             allow_failure: false,
             transient_exit_codes: vec![75],
             when_changed: vec![],

@@ -24,13 +24,23 @@ pub struct SensorResult {
     pub exit_code: Option<i32>,
     /// Wall-clock duration of the run in milliseconds.
     pub duration_ms: u64,
-    /// Whether this sensor failure was allowed/advisory (soft failure).
+    /// Effective severity as configured (`error` | `warn`).
+    pub severity: crate::config::SensorSeverity,
+    /// Whether this sensor failure was allowed/advisory (soft failure):
+    /// warn severity, a below-baseline findings count, or a quarantine.
     #[serde(default)]
     pub allow_failure: bool,
     /// Whether a passing sensor reported a `SKIP:` marker because a tool or
-    /// runtime was unavailable; evidence records this as a non-pass.
+    /// runtime was unavailable, or findings within the blessed baseline;
+    /// evidence records this as a non-pass.
     #[serde(default)]
     pub warned: bool,
+    /// Findings count reported by a `FINDINGS: <n>` marker, when present.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub findings: Option<u64>,
+    /// Blessed ratchet baseline for this sensor, when one exists.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub baseline: Option<u64>,
     /// Captured combined output; excluded from serialization.
     #[serde(skip)]
     pub output: String,
@@ -67,10 +77,11 @@ pub fn print_report(report: &VerifyReport, format: Format) {
             (false, _, false) => "FAIL",
             (true, true, _) | (false, _, true) => "WARN",
         };
+        let line = format!("{verdict}  {}{}", sensor.name, findings_suffix(sensor));
         if format == Format::Json {
-            eprintln!("{verdict}  {}", sensor.name);
+            eprintln!("{line}");
         } else {
-            println!("{verdict}  {}", sensor.name);
+            println!("{line}");
         }
         if !sensor.ok {
             let lines: Vec<&str> = sensor.output.lines().collect();
@@ -94,6 +105,21 @@ pub fn print_report(report: &VerifyReport, format: Format) {
             Ok(()) => println!(),
             Err(err) => eprintln!("error: failed to serialize report: {err}"),
         }
+    }
+}
+
+/// Human-readable findings/baseline suffix for a sensor verdict line.
+fn findings_suffix(sensor: &SensorResult) -> String {
+    let Some(findings) = sensor.findings else {
+        return String::new();
+    };
+    match sensor.baseline {
+        Some(baseline) => {
+            let delta = i64::try_from(findings).unwrap_or(i64::MAX)
+                - i64::try_from(baseline).unwrap_or(i64::MAX);
+            format!(" (findings {findings}, baseline {baseline}, delta {delta:+})")
+        }
+        None => format!(" (findings {findings})"),
     }
 }
 
@@ -130,8 +156,11 @@ mod tests {
                 ok: false,
                 exit_code: Some(1),
                 duration_ms: 42,
+                severity: crate::config::SensorSeverity::Error,
                 allow_failure: false,
                 warned: false,
+                findings: None,
+                baseline: None,
                 output: "hidden".to_owned(),
             }],
             signal_set: None,

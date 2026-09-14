@@ -7,6 +7,7 @@
 //! - [`repo`] — execution tables (tasks, invariants)
 //! - [`repo_exec`] — beats and error signatures
 //! - [`repo_scope`] — signature lifecycle (reset, list, clear)
+//! - [`repo_sensors`] — sensor findings telemetry and bless history
 //! - [`repo_trace`] — execution traces
 //! - [`repo_heuristic`] — distilled heuristics
 //! - [`repo_skill_eval`] — latest skill evaluations
@@ -26,6 +27,7 @@ pub mod repo_exec;
 pub mod repo_heuristic;
 pub mod repo_metrics;
 pub mod repo_scope;
+pub mod repo_sensors;
 pub mod repo_skill_eval;
 pub mod repo_trace;
 pub mod repo_workflow;
@@ -56,6 +58,10 @@ pub use repo_exec::{
 pub use repo_heuristic::{NewHeuristic, insert_heuristic, list_heuristics};
 pub use repo_metrics::{SensorStat, has_ok_beat, sensor_stats};
 pub use repo_scope::{clear_error_signatures, list_error_signatures, reset_error_signature};
+pub use repo_sensors::{
+    SensorBless, SensorFindings, insert_sensor_bless, list_sensor_blesses, list_sensor_findings,
+    upsert_sensor_findings,
+};
 pub use repo_skill_eval::{
     NewSkillEval, insert_skill_eval, list_all_skill_evals, list_skill_evals,
 };

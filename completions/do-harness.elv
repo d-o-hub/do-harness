@@ -50,6 +50,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand hook 'Manage git hooks that run `do-harness verify`'
             cand doctor 'Run diagnostic checks on binary resolution and git hook health'
             cand metrics 'Report harness trends: sensor stats, strikes, eval pass-rate history'
+            cand overlap 'Rank skill pairs by guidance overlap (Tier-2 distinctiveness advisory)'
             cand maintenance 'Prune old beats and compact the state database'
             cand compliance 'Print compliance mapping to OWASP Agentic Top 10, NIST AI RMF, and EU AI Act'
             cand audit-chain 'Recompute workflow event hash chain and report first divergence'
@@ -78,8 +79,10 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand --set 'Run only the sensors in this development signal set'
             cand --only 'Run only the named sensor (repeatable or comma-separated)'
             cand --exclude 'Exclude named sensors from the run'
+            cand --jobs 'Maximum sensors in flight (overrides `jobs` in do-harness.toml)'
             cand --task 'Scope records and fail-fast strikes to this task id'
             cand --evidence 'Write a machine-readable evidence artifact to path'
+            cand --approver 'Approver identity recorded with `--bless` (defaults to `DO_HARNESS_APPROVER` or the git user email)'
             cand --root 'Workspace root override (default: walk up from cwd)'
             cand --config 'Explicit path to do-harness.toml'
             cand --color 'Color output (auto, always, never)'
@@ -88,6 +91,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand --changed 'Run only sensors applicable to the working-tree change'
             cand --record 'Persist beats and error signatures into the state database'
             cand --strict 'Enforce strong evidence: exit non-zero on skips or missing timing/exit codes'
+            cand --bless 'Lower or initialize blessed findings baselines from this run (requires --record; a bless never raises a baseline)'
             cand -v 'Verbosity level (-v, -vv)'
             cand --verbose 'Verbosity level (-v, -vv)'
             cand -q 'Suppress non-error messages'
@@ -103,8 +107,10 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand --set 'Run only the sensors in this development signal set'
             cand --only 'Run only the named sensor (repeatable or comma-separated)'
             cand --exclude 'Exclude named sensors from the run'
+            cand --jobs 'Maximum sensors in flight (overrides `jobs` in do-harness.toml)'
             cand --task 'Scope records and fail-fast strikes to this task id'
             cand --evidence 'Write a machine-readable evidence artifact to path'
+            cand --approver 'Approver identity recorded with `--bless` (defaults to `DO_HARNESS_APPROVER` or the git user email)'
             cand --root 'Workspace root override (default: walk up from cwd)'
             cand --config 'Explicit path to do-harness.toml'
             cand --color 'Color output (auto, always, never)'
@@ -113,6 +119,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand --changed 'Run only sensors applicable to the working-tree change'
             cand --record 'Persist beats and error signatures into the state database'
             cand --strict 'Enforce strong evidence: exit non-zero on skips or missing timing/exit codes'
+            cand --bless 'Lower or initialize blessed findings baselines from this run (requires --record; a bless never raises a baseline)'
             cand -v 'Verbosity level (-v, -vv)'
             cand --verbose 'Verbosity level (-v, -vv)'
             cand -q 'Suppress non-error messages'
@@ -694,6 +701,8 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand --skill 'Restrict evaluation to this skill directory name'
             cand --format 'Output format'
             cand --approver 'Approver identity recorded with `--bless` (defaults to `DO_HARNESS_APPROVER` or the git user email)'
+            cand --agent-cmd 'Run this shell command once per eval case instead of the deterministic walkthrough (real Skill Lift). cwd is the sandbox root; the prompt is in `$DO_HARNESS_PROMPT` and on stdin; stdout is saved to `agent_stdout.txt` for assertions'
+            cand --agent-timeout 'Kill an agent run after this many seconds'
             cand --root 'Workspace root override (default: walk up from cwd)'
             cand --config 'Explicit path to do-harness.toml'
             cand --color 'Color output (auto, always, never)'
@@ -702,6 +711,8 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand --list-skills 'List available skills'
             cand --fail-fast 'Halt on first failing evaluation'
             cand --dry-run 'Perform dry-run evaluation'
+            cand --no-lift 'Skip the without-skill baseline run (no Skill Lift measured)'
+            cand --strict-fixtures 'Fail skills whose fixture has dataset-quality gaps (thin cases, no negative out-of-scope case)'
             cand -v 'Verbosity level (-v, -vv)'
             cand --verbose 'Verbosity level (-v, -vv)'
             cand -q 'Suppress non-error messages'
@@ -846,6 +857,23 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand -V 'Print version'
             cand --version 'Print version'
         }
+        &'do-harness;overlap'= {
+            cand --threshold 'Cosine similarity at or above which a pair prints as WARN'
+            cand --format 'Output format'
+            cand --root 'Workspace root override (default: walk up from cwd)'
+            cand --config 'Explicit path to do-harness.toml'
+            cand --color 'Color output (auto, always, never)'
+            cand --output 'Default output file path'
+            cand -v 'Verbosity level (-v, -vv)'
+            cand --verbose 'Verbosity level (-v, -vv)'
+            cand -q 'Suppress non-error messages'
+            cand --quiet 'Suppress non-error messages'
+            cand --dry-run 'Dry run without side effects'
+            cand -h 'Print help (see more with ''--help'')'
+            cand --help 'Print help (see more with ''--help'')'
+            cand -V 'Print version'
+            cand --version 'Print version'
+        }
         &'do-harness;maintenance'= {
             cand --prune-beats 'Delete beats older than this many days (keeps the most recent per task)'
             cand --keep-per-task 'Minimum most-recent beats kept per task when pruning'
@@ -944,6 +972,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand hook 'Manage git hooks that run `do-harness verify`'
             cand doctor 'Run diagnostic checks on binary resolution and git hook health'
             cand metrics 'Report harness trends: sensor stats, strikes, eval pass-rate history'
+            cand overlap 'Rank skill pairs by guidance overlap (Tier-2 distinctiveness advisory)'
             cand maintenance 'Prune old beats and compact the state database'
             cand compliance 'Print compliance mapping to OWASP Agentic Top 10, NIST AI RMF, and EU AI Act'
             cand audit-chain 'Recompute workflow event hash chain and report first divergence'
@@ -1044,6 +1073,8 @@ set edit:completion:arg-completer[do-harness] = {|@words|
         &'do-harness;help;doctor'= {
         }
         &'do-harness;help;metrics'= {
+        }
+        &'do-harness;help;overlap'= {
         }
         &'do-harness;help;maintenance'= {
         }

@@ -95,6 +95,14 @@ pub enum Command {
         /// Enforce strong evidence: exit non-zero on skips or missing timing/exit codes.
         #[arg(long)]
         strict: bool,
+        /// Lower or initialize blessed findings baselines from this run
+        /// (requires --record; a bless never raises a baseline).
+        #[arg(long, requires = "record")]
+        bless: bool,
+        /// Approver identity recorded with `--bless` (defaults to
+        /// `DO_HARNESS_APPROVER` or the git user email).
+        #[arg(long, requires = "bless", value_name = "NAME")]
+        approver: Option<String>,
     },
     /// List sensor names.
     #[command(visible_alias = "ls")]

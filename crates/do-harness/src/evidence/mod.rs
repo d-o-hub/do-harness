@@ -172,6 +172,13 @@ impl EvidenceDocument {
                 } else if res.ok {
                     pass_count += 1;
                     "pass"
+                } else if res.allow_failure {
+                    // Advisory failures (warn severity, below-baseline
+                    // findings, quarantines) are recorded as `warn`: the
+                    // local gate stays green, but the evidence summary is
+                    // still non-pass so `--strict` and `status` stay honest.
+                    fail_count += 1;
+                    "warn"
                 } else {
                     fail_count += 1;
                     "fail"

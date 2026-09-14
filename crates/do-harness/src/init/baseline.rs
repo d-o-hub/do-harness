@@ -120,6 +120,7 @@ mod tests {
             argv: argv.iter().map(ToString::to_string).collect(),
             retry: None,
             timeout: None,
+            severity: None,
             allow_failure: false,
             transient_exit_codes: Vec::new(),
             when_changed: Vec::new(),

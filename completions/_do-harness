@@ -63,8 +63,10 @@ json\:"Machine-readable JSON output"))' \
 '--set=[Run only the sensors in this development signal set]:SET:_default' \
 '*--only=[Run only the named sensor (repeatable or comma-separated)]:SENSOR:_default' \
 '*--exclude=[Exclude named sensors from the run]:SENSOR:_default' \
+'--jobs=[Maximum sensors in flight (overrides \`jobs\` in do-harness.toml)]:N:_default' \
 '--task=[Scope records and fail-fast strikes to this task id]:ID:_default' \
 '--evidence=[Write a machine-readable evidence artifact to path]:FILE:_files' \
+'--approver=[Approver identity recorded with \`--bless\` (defaults to \`DO_HARNESS_APPROVER\` or the git user email)]:NAME:_default' \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
 '--config=[Explicit path to do-harness.toml]:FILE:_files' \
 '--color=[Color output (auto, always, never)]:WHEN:_default' \
@@ -73,6 +75,7 @@ json\:"Machine-readable JSON output"))' \
 '--changed[Run only sensors applicable to the working-tree change]' \
 '--record[Persist beats and error signatures into the state database]' \
 '--strict[Enforce strong evidence\: exit non-zero on skips or missing timing/exit codes]' \
+'--bless[Lower or initialize blessed findings baselines from this run (requires --record; a bless never raises a baseline)]' \
 '*-v[Verbosity level (-v, -vv)]' \
 '*--verbose[Verbosity level (-v, -vv)]' \
 '-q[Suppress non-error messages]' \
@@ -91,8 +94,10 @@ json\:"Machine-readable JSON output"))' \
 '--set=[Run only the sensors in this development signal set]:SET:_default' \
 '*--only=[Run only the named sensor (repeatable or comma-separated)]:SENSOR:_default' \
 '*--exclude=[Exclude named sensors from the run]:SENSOR:_default' \
+'--jobs=[Maximum sensors in flight (overrides \`jobs\` in do-harness.toml)]:N:_default' \
 '--task=[Scope records and fail-fast strikes to this task id]:ID:_default' \
 '--evidence=[Write a machine-readable evidence artifact to path]:FILE:_files' \
+'--approver=[Approver identity recorded with \`--bless\` (defaults to \`DO_HARNESS_APPROVER\` or the git user email)]:NAME:_default' \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
 '--config=[Explicit path to do-harness.toml]:FILE:_files' \
 '--color=[Color output (auto, always, never)]:WHEN:_default' \
@@ -101,6 +106,7 @@ json\:"Machine-readable JSON output"))' \
 '--changed[Run only sensors applicable to the working-tree change]' \
 '--record[Persist beats and error signatures into the state database]' \
 '--strict[Enforce strong evidence\: exit non-zero on skips or missing timing/exit codes]' \
+'--bless[Lower or initialize blessed findings baselines from this run (requires --record; a bless never raises a baseline)]' \
 '*-v[Verbosity level (-v, -vv)]' \
 '*--verbose[Verbosity level (-v, -vv)]' \
 '-q[Suppress non-error messages]' \
@@ -337,7 +343,8 @@ _arguments "${_arguments_options[@]}" : \
 (init)
 _arguments "${_arguments_options[@]}" : \
 '--language=[Language pack to scaffold (default\: detect from the repository)]:LANG:((rust\:"Rust sensor pack (fmt/check/clippy/test/loc) plus check scripts"
-generic\:"No built-in sensors; commented sensor stubs to fill in"))' \
+generic\:"No built-in sensors; commented sensor stubs to fill in"
+web\:"Web UI sensor pack\: viewport text audit, axe accessibility, and console noise sensors (Playwright runners plus the shipped \`scripts/web-ui/\` audit library)"))' \
 '--format=[Output format]:FORMAT:((text\:"Human-readable text output"
 json\:"Machine-readable JSON output"))' \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
@@ -868,6 +875,8 @@ _arguments "${_arguments_options[@]}" : \
 '--format=[Output format]:FORMAT:((text\:"Human-readable text output"
 json\:"Machine-readable JSON output"))' \
 '--approver=[Approver identity recorded with \`--bless\` (defaults to \`DO_HARNESS_APPROVER\` or the git user email)]:NAME:_default' \
+'--agent-cmd=[Run this shell command once per eval case instead of the deterministic walkthrough (real Skill Lift). cwd is the sandbox root; the prompt is in \`\$DO_HARNESS_PROMPT\` and on stdin; stdout is saved to \`agent_stdout.txt\` for assertions]:COMMAND:_default' \
+'--agent-timeout=[Kill an agent run after this many seconds]:SECS:_default' \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
 '--config=[Explicit path to do-harness.toml]:FILE:_files' \
 '--color=[Color output (auto, always, never)]:WHEN:_default' \
@@ -876,6 +885,8 @@ json\:"Machine-readable JSON output"))' \
 '--list-skills[List available skills]' \
 '--fail-fast[Halt on first failing evaluation]' \
 '--dry-run[Perform dry-run evaluation]' \
+'--no-lift[Skip the without-skill baseline run (no Skill Lift measured)]' \
+'--strict-fixtures[Fail skills whose fixture has dataset-quality gaps (thin cases, no negative out-of-scope case)]' \
 '*-v[Verbosity level (-v, -vv)]' \
 '*--verbose[Verbosity level (-v, -vv)]' \
 '-q[Suppress non-error messages]' \
@@ -1049,6 +1060,26 @@ json\:"Machine-readable JSON output"))' \
 '--sensor=[Filter by sensor name]:SENSOR:_default' \
 '--skill=[Filter by skill name]:SKILL:_default' \
 '--since=[Filter metrics since a Unix timestamp in seconds]:UNIX_SECONDS:_default' \
+'--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
+'--config=[Explicit path to do-harness.toml]:FILE:_files' \
+'--color=[Color output (auto, always, never)]:WHEN:_default' \
+'--output=[Default output file path]:FILE:_files' \
+'*-v[Verbosity level (-v, -vv)]' \
+'*--verbose[Verbosity level (-v, -vv)]' \
+'-q[Suppress non-error messages]' \
+'--quiet[Suppress non-error messages]' \
+'--dry-run[Dry run without side effects]' \
+'-h[Print help (see more with '\''--help'\'')]' \
+'--help[Print help (see more with '\''--help'\'')]' \
+'-V[Print version]' \
+'--version[Print version]' \
+&& ret=0
+;;
+(overlap)
+_arguments "${_arguments_options[@]}" : \
+'--threshold=[Cosine similarity at or above which a pair prints as WARN]:THRESHOLD:_default' \
+'--format=[Output format]:FORMAT:((text\:"Human-readable text output"
+json\:"Machine-readable JSON output"))' \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
 '--config=[Explicit path to do-harness.toml]:FILE:_files' \
 '--color=[Color output (auto, always, never)]:WHEN:_default' \
@@ -1378,6 +1409,10 @@ _arguments "${_arguments_options[@]}" : \
 _arguments "${_arguments_options[@]}" : \
 && ret=0
 ;;
+(overlap)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
 (maintenance)
 _arguments "${_arguments_options[@]}" : \
 && ret=0
@@ -1433,6 +1468,7 @@ _do-harness_commands() {
 'hook:Manage git hooks that run \`do-harness verify\`' \
 'doctor:Run diagnostic checks on binary resolution and git hook health' \
 'metrics:Report harness trends\: sensor stats, strikes, eval pass-rate history' \
+'overlap:Rank skill pairs by guidance overlap (Tier-2 distinctiveness advisory)' \
 'maintenance:Prune old beats and compact the state database' \
 'compliance:Print compliance mapping to OWASP Agentic Top 10, NIST AI RMF, and EU AI Act' \
 'audit-chain:Recompute workflow event hash chain and report first divergence' \
@@ -1540,6 +1576,7 @@ _do-harness__subcmd__help_commands() {
 'hook:Manage git hooks that run \`do-harness verify\`' \
 'doctor:Run diagnostic checks on binary resolution and git hook health' \
 'metrics:Report harness trends\: sensor stats, strikes, eval pass-rate history' \
+'overlap:Rank skill pairs by guidance overlap (Tier-2 distinctiveness advisory)' \
 'maintenance:Prune old beats and compact the state database' \
 'compliance:Print compliance mapping to OWASP Agentic Top 10, NIST AI RMF, and EU AI Act' \
 'audit-chain:Recompute workflow event hash chain and report first divergence' \
@@ -1666,6 +1703,11 @@ _do-harness__subcmd__help__subcmd__man_commands() {
 _do-harness__subcmd__help__subcmd__metrics_commands() {
     local commands; commands=()
     _describe -t commands 'do-harness help metrics commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__help__subcmd__overlap_commands] )) ||
+_do-harness__subcmd__help__subcmd__overlap_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness help overlap commands' commands "$@"
 }
 (( $+functions[_do-harness__subcmd__help__subcmd__pr_commands] )) ||
 _do-harness__subcmd__help__subcmd__pr_commands() {
@@ -1885,6 +1927,11 @@ _do-harness__subcmd__man_commands() {
 _do-harness__subcmd__metrics_commands() {
     local commands; commands=()
     _describe -t commands 'do-harness metrics commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__overlap_commands] )) ||
+_do-harness__subcmd__overlap_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness overlap commands' commands "$@"
 }
 (( $+functions[_do-harness__subcmd__pr_commands] )) ||
 _do-harness__subcmd__pr_commands() {

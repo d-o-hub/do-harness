@@ -14,7 +14,9 @@ use clap::{CommandFactory, Parser};
 use crate::cli::{Cli, Command};
 
 mod applicability;
+mod approver;
 mod audit;
+mod baselines;
 mod changes;
 mod cli;
 mod commands;
@@ -188,6 +190,8 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
             task,
             evidence,
             strict,
+            bless,
+            approver,
         } => {
             let opts = sensors::VerifyOpts {
                 fail_fast,
@@ -200,6 +204,8 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
                 task,
                 evidence,
                 strict,
+                bless,
+                approver,
                 format,
                 config: cli.config.clone(),
                 ..Default::default()

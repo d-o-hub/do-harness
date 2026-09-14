@@ -15,8 +15,11 @@ async fn record_verify_persists_beats_and_signatures() {
             ok: false,
             exit_code: Some(1),
             duration_ms: 1,
+            severity: crate::config::SensorSeverity::Error,
             allow_failure: false,
             warned: false,
+            findings: None,
+            baseline: None,
             output: "boom".to_owned(),
         }],
         signal_set: None,
@@ -52,8 +55,11 @@ async fn record_verify_skips_signatures_when_all_pass() {
             ok: true,
             exit_code: Some(0),
             duration_ms: 1,
+            severity: crate::config::SensorSeverity::Error,
             allow_failure: false,
             warned: false,
+            findings: None,
+            baseline: None,
             output: String::new(),
         }],
         signal_set: None,
@@ -88,8 +94,11 @@ async fn record_verify_skips_blocked_sensor_signature() {
             ok: false,
             exit_code: None,
             duration_ms: 0,
+            severity: crate::config::SensorSeverity::Error,
             allow_failure: false,
             warned: false,
+            findings: None,
+            baseline: None,
             output: "halted: ...".to_owned(),
         }],
         signal_set: None,
@@ -112,9 +121,9 @@ async fn record_verify_skips_blocked_sensor_signature() {
     );
 }
 
-/// `blocked_sensors` halts names at the strike threshold and ignores the rest.
+/// `struck_sensors` halts names at the strike threshold and ignores the rest.
 #[tokio::test(flavor = "current_thread")]
-async fn blocked_sensors_halts_only_struck_out_names() {
+async fn struck_sensors_halts_only_struck_out_names() {
     let dir = tempfile::tempdir().unwrap();
     let conn = do_harness_db::connect_and_migrate(dir.path())
         .await
@@ -131,10 +140,10 @@ async fn blocked_sensors_halts_only_struck_out_names() {
     }
 
     let names = vec!["struck".to_owned(), "close".to_owned(), "fresh".to_owned()];
-    let blocked = blocked_sensors(dir.path(), &names, None).await.unwrap();
+    let blocked = struck_sensors(dir.path(), &names, None).await.unwrap();
     assert_eq!(blocked, vec!["struck".to_owned()]);
     assert!(
-        blocked_sensors(dir.path(), &[], None)
+        struck_sensors(dir.path(), &[], None)
             .await
             .unwrap()
             .is_empty()
@@ -174,8 +183,11 @@ async fn record_verify_resets_strikes_on_pass() {
             ok: true,
             exit_code: Some(0),
             duration_ms: 1,
+            severity: crate::config::SensorSeverity::Error,
             allow_failure: false,
             warned: false,
+            findings: None,
+            baseline: None,
             output: String::new(),
         }],
         signal_set: None,
@@ -192,7 +204,7 @@ async fn record_verify_resets_strikes_on_pass() {
             .is_none()
     );
     assert!(
-        blocked_sensors(dir.path(), &["fmt".to_owned()], None)
+        struck_sensors(dir.path(), &["fmt".to_owned()], None)
             .await
             .unwrap()
             .is_empty()
@@ -229,8 +241,11 @@ async fn record_verify_scopes_to_task() {
             ok: false,
             exit_code: Some(1),
             duration_ms: 1,
+            severity: crate::config::SensorSeverity::Error,
             allow_failure: false,
             warned: false,
+            findings: None,
+            baseline: None,
             output: "E0308".to_owned(),
         }],
         signal_set: None,

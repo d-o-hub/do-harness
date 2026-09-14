@@ -2,6 +2,8 @@
 
 use std::path::Path;
 
+use crate::baselines::{Baselines, BlessOutcome};
+use crate::config::SensorSeverity;
 use crate::evidence::EvidenceSkipped;
 use crate::sensors::VerifyOpts;
 use crate::{CliError, config, evidence, report, sensors, telemetry};
@@ -20,17 +22,44 @@ pub(crate) async fn run(root: &Path, mut opts: VerifyOpts) -> std::result::Resul
              pass --task <id> to scope them to a task"
         );
     }
+    if opts.bless && !opts.record {
+        return Err(CliError::Usage(anyhow::anyhow!(
+            "--bless requires --record (a bless writes state)"
+        )));
+    }
+    opts.baselines = Baselines::load(root).await.map_err(CliError::Usage)?;
     if opts.record {
-        opts.blocked = telemetry::blocked_sensors(root, &cfg.sensor_names(), opts.task)
+        let struck = telemetry::struck_sensors(root, &cfg.sensor_names(), opts.task)
             .await
             .map_err(CliError::Usage)?;
+        for name in struck {
+            let severity = cfg
+                .effective_sensors()
+                .iter()
+                .find(|spec| spec.name == name)
+                .map(config::SensorSpec::effective_severity);
+            if severity == Some(SensorSeverity::Warn) {
+                opts.quarantined.push(name);
+            } else {
+                opts.blocked.push(name);
+            }
+        }
     }
     match sensors::verify(&cfg, root, &opts) {
         Ok(report) => {
+            let skipped: Vec<String> = opts
+                .blocked
+                .iter()
+                .chain(&opts.quarantined)
+                .cloned()
+                .collect();
             if opts.record {
-                telemetry::record_verify(root, &report, &opts.blocked, opts.task)
+                telemetry::record_verify(root, &report, &skipped, opts.task)
                     .await
                     .map_err(CliError::Usage)?;
+            }
+            if opts.bless {
+                bless_baselines(root, &report, &opts).await?;
             }
             report::print_report(&report, opts.format);
 
@@ -55,6 +84,80 @@ pub(crate) async fn run(root: &Path, mut opts: VerifyOpts) -> std::result::Resul
         }
         Err(err) => Err(CliError::Usage(err)),
     }
+}
+
+/// Applies `--bless` to the run's observed findings counts: initializes or
+/// lowers blessed baselines (never raises), writes the committed file, and
+/// appends an audit record to the state database.
+async fn bless_baselines(
+    root: &Path,
+    report: &report::VerifyReport,
+    opts: &VerifyOpts,
+) -> std::result::Result<(), CliError> {
+    let approver =
+        crate::approver::resolve(opts.approver.as_deref(), root).map_err(CliError::Usage)?;
+    let observed: Vec<(String, u64)> = report
+        .sensors
+        .iter()
+        .filter_map(|sensor| {
+            sensor
+                .findings
+                .map(|findings| (sensor.name.clone(), findings))
+        })
+        .collect();
+    if observed.is_empty() {
+        eprintln!("warning: --bless found no FINDINGS markers; baselines unchanged");
+        return Ok(());
+    }
+    let mut baselines = opts.baselines.clone();
+    let mut changed = false;
+    let conn = do_harness_db::connect_and_migrate(root)
+        .await
+        .map_err(|e| CliError::Usage(e.into()))?;
+    let now = do_harness_db::unix_now();
+    for (name, count) in &observed {
+        match baselines.bless(name, *count) {
+            BlessOutcome::Initialized(to) => {
+                changed = true;
+                do_harness_db::insert_sensor_bless(&conn, name, to_i64(to), None, &approver, now)
+                    .await
+                    .map_err(|e| CliError::Usage(e.into()))?;
+                eprintln!("{name}: baseline initialized at {to}");
+            }
+            BlessOutcome::Lowered { from, to } => {
+                changed = true;
+                do_harness_db::insert_sensor_bless(
+                    &conn,
+                    name,
+                    to_i64(to),
+                    Some(to_i64(from)),
+                    &approver,
+                    now,
+                )
+                .await
+                .map_err(|e| CliError::Usage(e.into()))?;
+                eprintln!("{name}: baseline lowered {from} -> {to}");
+            }
+            BlessOutcome::Unchanged(baseline) => {
+                eprintln!("{name}: baseline unchanged at {baseline}");
+            }
+            BlessOutcome::Refused { baseline, observed } => {
+                eprintln!(
+                    "warning: {name}: observed {observed} exceeds baseline {baseline}; \
+                     a bless never raises a baseline"
+                );
+            }
+        }
+    }
+    if changed {
+        baselines.save(root).await.map_err(CliError::Usage)?;
+    }
+    Ok(())
+}
+
+/// Converts a findings count to the database integer type.
+fn to_i64(value: u64) -> i64 {
+    i64::try_from(value).unwrap_or(i64::MAX)
 }
 
 /// Writes the evidence artifact for runs that own one.

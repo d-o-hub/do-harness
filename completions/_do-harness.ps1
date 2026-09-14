@@ -53,6 +53,7 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('hook', 'hook', [CompletionResultType]::ParameterValue, 'Manage git hooks that run `do-harness verify`')
             [CompletionResult]::new('doctor', 'doctor', [CompletionResultType]::ParameterValue, 'Run diagnostic checks on binary resolution and git hook health')
             [CompletionResult]::new('metrics', 'metrics', [CompletionResultType]::ParameterValue, 'Report harness trends: sensor stats, strikes, eval pass-rate history')
+            [CompletionResult]::new('overlap', 'overlap', [CompletionResultType]::ParameterValue, 'Rank skill pairs by guidance overlap (Tier-2 distinctiveness advisory)')
             [CompletionResult]::new('maintenance', 'maintenance', [CompletionResultType]::ParameterValue, 'Prune old beats and compact the state database')
             [CompletionResult]::new('compliance', 'compliance', [CompletionResultType]::ParameterValue, 'Print compliance mapping to OWASP Agentic Top 10, NIST AI RMF, and EU AI Act')
             [CompletionResult]::new('audit-chain', 'audit-chain', [CompletionResultType]::ParameterValue, 'Recompute workflow event hash chain and report first divergence')
@@ -83,8 +84,10 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('--set', '--set', [CompletionResultType]::ParameterName, 'Run only the sensors in this development signal set')
             [CompletionResult]::new('--only', '--only', [CompletionResultType]::ParameterName, 'Run only the named sensor (repeatable or comma-separated)')
             [CompletionResult]::new('--exclude', '--exclude', [CompletionResultType]::ParameterName, 'Exclude named sensors from the run')
+            [CompletionResult]::new('--jobs', '--jobs', [CompletionResultType]::ParameterName, 'Maximum sensors in flight (overrides `jobs` in do-harness.toml)')
             [CompletionResult]::new('--task', '--task', [CompletionResultType]::ParameterName, 'Scope records and fail-fast strikes to this task id')
             [CompletionResult]::new('--evidence', '--evidence', [CompletionResultType]::ParameterName, 'Write a machine-readable evidence artifact to path')
+            [CompletionResult]::new('--approver', '--approver', [CompletionResultType]::ParameterName, 'Approver identity recorded with `--bless` (defaults to `DO_HARNESS_APPROVER` or the git user email)')
             [CompletionResult]::new('--root', '--root', [CompletionResultType]::ParameterName, 'Workspace root override (default: walk up from cwd)')
             [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Explicit path to do-harness.toml')
             [CompletionResult]::new('--color', '--color', [CompletionResultType]::ParameterName, 'Color output (auto, always, never)')
@@ -93,6 +96,7 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('--changed', '--changed', [CompletionResultType]::ParameterName, 'Run only sensors applicable to the working-tree change')
             [CompletionResult]::new('--record', '--record', [CompletionResultType]::ParameterName, 'Persist beats and error signatures into the state database')
             [CompletionResult]::new('--strict', '--strict', [CompletionResultType]::ParameterName, 'Enforce strong evidence: exit non-zero on skips or missing timing/exit codes')
+            [CompletionResult]::new('--bless', '--bless', [CompletionResultType]::ParameterName, 'Lower or initialize blessed findings baselines from this run (requires --record; a bless never raises a baseline)')
             [CompletionResult]::new('-v', '-v', [CompletionResultType]::ParameterName, 'Verbosity level (-v, -vv)')
             [CompletionResult]::new('--verbose', '--verbose', [CompletionResultType]::ParameterName, 'Verbosity level (-v, -vv)')
             [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Suppress non-error messages')
@@ -109,8 +113,10 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('--set', '--set', [CompletionResultType]::ParameterName, 'Run only the sensors in this development signal set')
             [CompletionResult]::new('--only', '--only', [CompletionResultType]::ParameterName, 'Run only the named sensor (repeatable or comma-separated)')
             [CompletionResult]::new('--exclude', '--exclude', [CompletionResultType]::ParameterName, 'Exclude named sensors from the run')
+            [CompletionResult]::new('--jobs', '--jobs', [CompletionResultType]::ParameterName, 'Maximum sensors in flight (overrides `jobs` in do-harness.toml)')
             [CompletionResult]::new('--task', '--task', [CompletionResultType]::ParameterName, 'Scope records and fail-fast strikes to this task id')
             [CompletionResult]::new('--evidence', '--evidence', [CompletionResultType]::ParameterName, 'Write a machine-readable evidence artifact to path')
+            [CompletionResult]::new('--approver', '--approver', [CompletionResultType]::ParameterName, 'Approver identity recorded with `--bless` (defaults to `DO_HARNESS_APPROVER` or the git user email)')
             [CompletionResult]::new('--root', '--root', [CompletionResultType]::ParameterName, 'Workspace root override (default: walk up from cwd)')
             [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Explicit path to do-harness.toml')
             [CompletionResult]::new('--color', '--color', [CompletionResultType]::ParameterName, 'Color output (auto, always, never)')
@@ -119,6 +125,7 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('--changed', '--changed', [CompletionResultType]::ParameterName, 'Run only sensors applicable to the working-tree change')
             [CompletionResult]::new('--record', '--record', [CompletionResultType]::ParameterName, 'Persist beats and error signatures into the state database')
             [CompletionResult]::new('--strict', '--strict', [CompletionResultType]::ParameterName, 'Enforce strong evidence: exit non-zero on skips or missing timing/exit codes')
+            [CompletionResult]::new('--bless', '--bless', [CompletionResultType]::ParameterName, 'Lower or initialize blessed findings baselines from this run (requires --record; a bless never raises a baseline)')
             [CompletionResult]::new('-v', '-v', [CompletionResultType]::ParameterName, 'Verbosity level (-v, -vv)')
             [CompletionResult]::new('--verbose', '--verbose', [CompletionResultType]::ParameterName, 'Verbosity level (-v, -vv)')
             [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Suppress non-error messages')
@@ -753,6 +760,8 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('--skill', '--skill', [CompletionResultType]::ParameterName, 'Restrict evaluation to this skill directory name')
             [CompletionResult]::new('--format', '--format', [CompletionResultType]::ParameterName, 'Output format')
             [CompletionResult]::new('--approver', '--approver', [CompletionResultType]::ParameterName, 'Approver identity recorded with `--bless` (defaults to `DO_HARNESS_APPROVER` or the git user email)')
+            [CompletionResult]::new('--agent-cmd', '--agent-cmd', [CompletionResultType]::ParameterName, 'Run this shell command once per eval case instead of the deterministic walkthrough (real Skill Lift). cwd is the sandbox root; the prompt is in `$DO_HARNESS_PROMPT` and on stdin; stdout is saved to `agent_stdout.txt` for assertions')
+            [CompletionResult]::new('--agent-timeout', '--agent-timeout', [CompletionResultType]::ParameterName, 'Kill an agent run after this many seconds')
             [CompletionResult]::new('--root', '--root', [CompletionResultType]::ParameterName, 'Workspace root override (default: walk up from cwd)')
             [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Explicit path to do-harness.toml')
             [CompletionResult]::new('--color', '--color', [CompletionResultType]::ParameterName, 'Color output (auto, always, never)')
@@ -761,6 +770,8 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('--list-skills', '--list-skills', [CompletionResultType]::ParameterName, 'List available skills')
             [CompletionResult]::new('--fail-fast', '--fail-fast', [CompletionResultType]::ParameterName, 'Halt on first failing evaluation')
             [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Perform dry-run evaluation')
+            [CompletionResult]::new('--no-lift', '--no-lift', [CompletionResultType]::ParameterName, 'Skip the without-skill baseline run (no Skill Lift measured)')
+            [CompletionResult]::new('--strict-fixtures', '--strict-fixtures', [CompletionResultType]::ParameterName, 'Fail skills whose fixture has dataset-quality gaps (thin cases, no negative out-of-scope case)')
             [CompletionResult]::new('-v', '-v', [CompletionResultType]::ParameterName, 'Verbosity level (-v, -vv)')
             [CompletionResult]::new('--verbose', '--verbose', [CompletionResultType]::ParameterName, 'Verbosity level (-v, -vv)')
             [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Suppress non-error messages')
@@ -919,6 +930,24 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('--version', '--version', [CompletionResultType]::ParameterName, 'Print version')
             break
         }
+        'do-harness;overlap' {
+            [CompletionResult]::new('--threshold', '--threshold', [CompletionResultType]::ParameterName, 'Cosine similarity at or above which a pair prints as WARN')
+            [CompletionResult]::new('--format', '--format', [CompletionResultType]::ParameterName, 'Output format')
+            [CompletionResult]::new('--root', '--root', [CompletionResultType]::ParameterName, 'Workspace root override (default: walk up from cwd)')
+            [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Explicit path to do-harness.toml')
+            [CompletionResult]::new('--color', '--color', [CompletionResultType]::ParameterName, 'Color output (auto, always, never)')
+            [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Default output file path')
+            [CompletionResult]::new('-v', '-v', [CompletionResultType]::ParameterName, 'Verbosity level (-v, -vv)')
+            [CompletionResult]::new('--verbose', '--verbose', [CompletionResultType]::ParameterName, 'Verbosity level (-v, -vv)')
+            [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Suppress non-error messages')
+            [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Suppress non-error messages')
+            [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Dry run without side effects')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            [CompletionResult]::new('-V', '-V ', [CompletionResultType]::ParameterName, 'Print version')
+            [CompletionResult]::new('--version', '--version', [CompletionResultType]::ParameterName, 'Print version')
+            break
+        }
         'do-harness;maintenance' {
             [CompletionResult]::new('--prune-beats', '--prune-beats', [CompletionResultType]::ParameterName, 'Delete beats older than this many days (keeps the most recent per task)')
             [CompletionResult]::new('--keep-per-task', '--keep-per-task', [CompletionResultType]::ParameterName, 'Minimum most-recent beats kept per task when pruning')
@@ -1022,6 +1051,7 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('hook', 'hook', [CompletionResultType]::ParameterValue, 'Manage git hooks that run `do-harness verify`')
             [CompletionResult]::new('doctor', 'doctor', [CompletionResultType]::ParameterValue, 'Run diagnostic checks on binary resolution and git hook health')
             [CompletionResult]::new('metrics', 'metrics', [CompletionResultType]::ParameterValue, 'Report harness trends: sensor stats, strikes, eval pass-rate history')
+            [CompletionResult]::new('overlap', 'overlap', [CompletionResultType]::ParameterValue, 'Rank skill pairs by guidance overlap (Tier-2 distinctiveness advisory)')
             [CompletionResult]::new('maintenance', 'maintenance', [CompletionResultType]::ParameterValue, 'Prune old beats and compact the state database')
             [CompletionResult]::new('compliance', 'compliance', [CompletionResultType]::ParameterValue, 'Print compliance mapping to OWASP Agentic Top 10, NIST AI RMF, and EU AI Act')
             [CompletionResult]::new('audit-chain', 'audit-chain', [CompletionResultType]::ParameterValue, 'Recompute workflow event hash chain and report first divergence')
@@ -1159,6 +1189,9 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             break
         }
         'do-harness;help;metrics' {
+            break
+        }
+        'do-harness;help;overlap' {
             break
         }
         'do-harness;help;maintenance' {

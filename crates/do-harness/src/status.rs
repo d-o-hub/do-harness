@@ -139,8 +139,20 @@ impl CurrentFacts {
         let selection = crate::applicability::select(&candidates, &changed);
         let required = selection.selected_names();
         let workspace = crate::fingerprint::workspace_fingerprint(root, &changed);
-        let policy = crate::fingerprint::policy_fingerprint(cfg, config_bytes, set, &candidates);
-        let config = crate::fingerprint::config_fingerprint(cfg, config_bytes, &candidates);
+        let baseline_digest = crate::baselines::digest(root);
+        let policy = crate::fingerprint::policy_fingerprint(
+            cfg,
+            config_bytes,
+            set,
+            &candidates,
+            &baseline_digest,
+        );
+        let config = crate::fingerprint::config_fingerprint(
+            cfg,
+            config_bytes,
+            &candidates,
+            &baseline_digest,
+        );
         Ok(Self {
             side: CurrentSide {
                 workspace_fingerprint: workspace.clone(),

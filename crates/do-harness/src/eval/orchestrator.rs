@@ -76,7 +76,7 @@ pub async fn run_eval(root: &Path, opts: EvalOpts<'_>) -> Result<()> {
         return Ok(());
     }
     let approver = if bless {
-        Some(resolve_approver(approver)?)
+        Some(crate::approver::resolve(approver, root)?)
     } else {
         None
     };
@@ -369,31 +369,6 @@ fn report_json(
             "without_passed": d.without_passed,
         })).collect::<Vec<_>>(),
     })
-}
-
-/// Resolves the bless approver: explicit flag, `DO_HARNESS_APPROVER`, then the
-/// git user email. An anonymous bless is rejected (fail-closed).
-fn resolve_approver(explicit: Option<&str>) -> Result<String> {
-    if let Some(value) = explicit.filter(|value| !value.trim().is_empty()) {
-        return Ok(value.trim().to_owned());
-    }
-    if let Ok(value) = std::env::var("DO_HARNESS_APPROVER") {
-        if !value.trim().is_empty() {
-            return Ok(value.trim().to_owned());
-        }
-    }
-    if let Ok(output) = crate::changes::git_command(Path::new("."))
-        .args(["config", "user.email"])
-        .output()
-    {
-        if output.status.success() {
-            let email = String::from_utf8_lossy(&output.stdout).trim().to_owned();
-            if !email.is_empty() {
-                return Ok(email);
-            }
-        }
-    }
-    bail!("--bless requires an approver: pass --approver <name> or set DO_HARNESS_APPROVER")
 }
 
 /// Returns skill directories that contain a `SKILL.md`, sorted by path.

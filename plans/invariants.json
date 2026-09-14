@@ -130,5 +130,17 @@
     "rationale": "Topical overlap in lifecycle terms is not duplication of guidance; distinctiveness regressions beyond this baseline surface through the advisory check",
     "sensor": "do-harness overlap (advisory, threshold 0.45)",
     "category": "skills"
+  },
+  {
+    "invariant": "Warn-severity sensor failures are advisory in non-strict runs and never promote inside the feedback set; evidence still records them as warn, never pass",
+    "rationale": "Noisy checks can be adopted before they are clean without weakening the verification contract: strict promotion and non-pass evidence keep the completion gate honest while the fast loop stays usable",
+    "sensor": "do-harness verify --strict",
+    "category": "verification"
+  },
+  {
+    "invariant": "Blessed findings baselines in plans/baselines.json only ever lower; a regression above the blessed ceiling fails even warn-severity sensors",
+    "rationale": "A ratchet that can be raised silently is not a ratchet; explicit bless with a recorded approver is the only way down, and the baseline digest feeds the policy fingerprint so stale evidence cannot hide a regression",
+    "sensor": "do-harness verify --record --bless",
+    "category": "verification"
   }
 ]

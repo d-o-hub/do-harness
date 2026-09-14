@@ -13,7 +13,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use crate::config::SensorSpec;
+use crate::baselines::Baselines;
+use crate::config::{SensorSeverity, SensorSpec};
 use crate::report::SensorResult;
 
 /// Poll interval for child exit, timeout, and cancel checks.
@@ -24,8 +25,18 @@ fn elapsed_ms(start: Instant) -> u64 {
     u64::try_from(start.elapsed().as_millis()).unwrap_or(u64::MAX)
 }
 
+/// Parses the last `FINDINGS: <n>` marker in captured output, when present.
+fn parse_findings(output: &str) -> Option<u64> {
+    output.lines().rev().find_map(|line| {
+        line.trim_start()
+            .strip_prefix("FINDINGS:")
+            .and_then(|rest| rest.trim().parse::<u64>().ok())
+    })
+}
+
 /// Builds a [`SensorResult`] for `spec`, deriving `warned` from a passing run
-/// whose output carries a `SKIP:` marker (a tool or runtime was unavailable).
+/// whose output carries a `SKIP:` marker (a tool or runtime was unavailable)
+/// and `findings` from the last `FINDINGS: <n>` marker.
 pub(crate) fn sensor_result(
     spec: &SensorSpec,
     ok: bool,
@@ -33,6 +44,7 @@ pub(crate) fn sensor_result(
     duration_ms: u64,
     output: String,
 ) -> SensorResult {
+    let severity = spec.effective_severity();
     let warned = ok
         && output
             .lines()
@@ -42,10 +54,46 @@ pub(crate) fn sensor_result(
         ok,
         exit_code,
         duration_ms,
-        allow_failure: spec.allow_failure,
+        severity,
+        allow_failure: severity == SensorSeverity::Warn,
         warned,
+        findings: parse_findings(&output),
+        baseline: None,
         output,
     }
+}
+
+/// Applies the blessed findings ratchet to a completed result.
+///
+/// With a baseline for the sensor: a count above the baseline is a hard
+/// regression (fails even warn-severity sensors), a count within the
+/// baseline is advisory, and zero findings change nothing. Without a
+/// baseline the exit code and configured severity decide.
+fn apply_ratchet(
+    mut result: SensorResult,
+    spec: &SensorSpec,
+    baselines: &Baselines,
+) -> SensorResult {
+    let Some(findings) = result.findings else {
+        return result;
+    };
+    let Some(baseline) = baselines.get(&spec.name) else {
+        return result;
+    };
+    result.baseline = Some(baseline);
+    if findings > baseline {
+        result.ok = false;
+        result.allow_failure = false;
+        result.warned = false;
+        result.output = format!(
+            "{}\nratchet regression: findings {findings} exceed blessed baseline {baseline}",
+            result.output
+        );
+    } else if findings > 0 {
+        result.allow_failure = true;
+        result.warned = true;
+    }
+    result
 }
 
 /// Spawns the sensor command with piped stdio, reporting a spawn failure as
@@ -185,10 +233,16 @@ pub(crate) fn run_sensor_attempt(
     }
 }
 
-/// Runs a single sensor command from `root`, retrying on transient failures.
+/// Runs a single sensor command from `root`, retrying on transient failures
+/// and applying the blessed findings ratchet to the final result.
 ///
 /// A set cancel flag stops further attempts after the attempt in flight.
-pub(crate) fn run_sensor(spec: &SensorSpec, root: &Path, cancel: &AtomicBool) -> SensorResult {
+pub(crate) fn run_sensor(
+    spec: &SensorSpec,
+    root: &Path,
+    cancel: &AtomicBool,
+    baselines: &Baselines,
+) -> SensorResult {
     let max_retries = spec
         .retry
         .unwrap_or(if spec.transient_exit_codes.is_empty() {
@@ -201,11 +255,11 @@ pub(crate) fn run_sensor(spec: &SensorSpec, root: &Path, cancel: &AtomicBool) ->
     loop {
         let result = run_sensor_attempt(spec, root, cancel);
         if result.ok {
-            return result;
+            return apply_ratchet(result, spec, baselines);
         }
 
         if attempts >= max_retries || (attempts > 0 && cancel.load(Ordering::SeqCst)) {
-            return result;
+            return apply_ratchet(result, spec, baselines);
         }
 
         if !spec.transient_exit_codes.is_empty() {
@@ -213,7 +267,7 @@ pub(crate) fn run_sensor(spec: &SensorSpec, root: &Path, cancel: &AtomicBool) ->
                 .exit_code
                 .is_some_and(|code| spec.transient_exit_codes.contains(&code));
             if !is_transient {
-                return result;
+                return apply_ratchet(result, spec, baselines);
             }
         }
 

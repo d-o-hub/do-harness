@@ -32,6 +32,7 @@ const PROD_SOURCES: &[&str] = &[
     "/src/repo_heuristic.rs",
     "/src/repo_trace.rs",
     "/src/repo_scope.rs",
+    "/src/repo_sensors.rs",
     "/src/repo_workflow.rs",
 ];
 

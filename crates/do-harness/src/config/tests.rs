@@ -71,6 +71,68 @@ async fn parses_transient_failure_sensor_options() {
     assert_eq!(sensor.transient_exit_codes, vec![75, 429]);
 }
 
+/// Parses `severity` and folds the deprecated `allow_failure` alias into it.
+#[tokio::test(flavor = "current_thread")]
+async fn parses_severity_and_allow_failure_alias() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let path = dir.path().join("do-harness.toml");
+    let text = r#"
+            [[sensors]]
+            name = "strict"
+            argv = ["true"]
+            severity = "error"
+
+            [[sensors]]
+            name = "noisy"
+            argv = ["true"]
+            severity = "warn"
+
+            [[sensors]]
+            name = "legacy"
+            argv = ["true"]
+            allow_failure = true
+
+            [[sensors]]
+            name = "default"
+            argv = ["true"]
+        "#;
+    std::fs::write(&path, text).expect("write config");
+    let cfg = load(dir.path(), Some(&path)).await.expect("load config");
+    let sensor = |name: &str| {
+        cfg.sensors
+            .iter()
+            .find(|s| s.name == name)
+            .unwrap_or_else(|| panic!("missing {name}"))
+    };
+    assert_eq!(sensor("strict").effective_severity(), SensorSeverity::Error);
+    assert_eq!(sensor("noisy").effective_severity(), SensorSeverity::Warn);
+    assert_eq!(sensor("legacy").effective_severity(), SensorSeverity::Warn);
+    assert_eq!(
+        sensor("default").effective_severity(),
+        SensorSeverity::Error
+    );
+}
+
+/// `allow_failure = true` combined with an explicit `severity = "error"` is
+/// contradictory and rejected at config load.
+#[tokio::test(flavor = "current_thread")]
+async fn rejects_conflicting_severity_sources() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let path = dir.path().join("do-harness.toml");
+    let text = r#"
+            [[sensors]]
+            name = "confused"
+            argv = ["true"]
+            allow_failure = true
+            severity = "error"
+        "#;
+    std::fs::write(&path, text).expect("write config");
+    let err = load(dir.path(), Some(&path))
+        .await
+        .expect_err("load must fail");
+    assert!(format!("{err:#}").contains("confused"));
+}
+
 /// Unknown fields in [[sensors]] are rejected by `deny_unknown_fields`.
 #[tokio::test(flavor = "current_thread")]
 async fn rejects_unknown_sensor_fields() {

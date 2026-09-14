@@ -92,4 +92,9 @@ pub const MIGRATIONS: &[Migration] = &[
         name: "mode_scoped_floors",
         sql: include_str!("../migrations/0016_mode_scoped_floors.sql"),
     },
+    Migration {
+        version: 17,
+        name: "sensor_baselines",
+        sql: include_str!("../migrations/0017_sensor_baselines.sql"),
+    },
 ];

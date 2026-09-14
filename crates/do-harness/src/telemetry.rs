@@ -14,31 +14,35 @@ const MAX_SIGNATURE_MESSAGE: usize = 500;
 pub const FAIL_FAST_STRIKES: i64 = 3;
 
 /// Returns the sensor names whose `sensor:<name>` error signature for `task_id`
-/// has `attempt_count >= FAIL_FAST_STRIKES`; these are halted by verify.
+/// has `attempt_count >= FAIL_FAST_STRIKES`.
+///
+/// The caller partitions the result by severity: error-severity sensors are
+/// halted, warn-severity sensors are quarantined.
 ///
 /// # Errors
 ///
 /// Returns an error when the state database cannot be initialized or queried.
-pub async fn blocked_sensors(
+pub async fn struck_sensors(
     root: &Path,
     names: &[String],
     task_id: Option<i64>,
 ) -> Result<Vec<String>> {
     let conn = do_harness_db::connect_and_migrate(root).await?;
-    let mut blocked = Vec::new();
+    let mut struck = Vec::new();
     for name in names {
         let sig =
             do_harness_db::get_error_signature(&conn, &format!("sensor:{name}"), task_id).await?;
         if sig.is_some_and(|s| s.attempt_count >= FAIL_FAST_STRIKES) {
-            blocked.push(name.clone());
+            struck.push(name.clone());
         }
     }
-    Ok(blocked)
+    Ok(struck)
 }
 
 /// Records each sensor result atomically, scoped to `task_id`: the beat and
 /// its error-signature update (bump on failure, reset on pass) commit in one
-/// transaction. Halted sensors are skipped.
+/// transaction, and any observed findings count is upserted. Skipped sensors
+/// (halted or quarantined) are omitted.
 ///
 /// # Errors
 ///
@@ -46,7 +50,7 @@ pub async fn blocked_sensors(
 pub async fn record_verify(
     root: &Path,
     report: &VerifyReport,
-    blocked: &[String],
+    skipped: &[String],
     task_id: Option<i64>,
 ) -> Result<()> {
     let conn = do_harness_db::connect_and_migrate(root).await?;
@@ -60,12 +64,18 @@ pub async fn record_verify(
         .sensors
         .iter()
         .zip(&messages)
-        .filter(|(sensor, _)| !blocked.contains(&sensor.name))
+        .filter(|(sensor, _)| !skipped.contains(&sensor.name))
         .map(|(sensor, message)| do_harness_db::SensorOutcome {
             beat: do_harness_db::NewBeat {
                 task_id,
                 beat_type: "sensor",
-                status: if sensor.ok { "ok" } else { "failed" },
+                status: if sensor.ok {
+                    "ok"
+                } else if sensor.allow_failure {
+                    "warn"
+                } else {
+                    "failed"
+                },
                 sensor_exit_code: sensor.exit_code,
                 sensor_name: Some(&sensor.name),
                 started_at: now,
@@ -76,6 +86,16 @@ pub async fn record_verify(
         })
         .collect();
     do_harness_db::record_verify_batch(&conn, &outcomes).await?;
+
+    for sensor in &report.sensors {
+        if skipped.contains(&sensor.name) {
+            continue;
+        }
+        if let Some(findings) = sensor.findings {
+            let findings = i64::try_from(findings).unwrap_or(i64::MAX);
+            do_harness_db::upsert_sensor_findings(&conn, &sensor.name, findings, now).await?;
+        }
+    }
     Ok(())
 }
 
