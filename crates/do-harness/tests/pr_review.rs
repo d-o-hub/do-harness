@@ -7,6 +7,8 @@ use std::process::Command;
 
 use serde_json::Value;
 
+mod support;
+
 fn git(dir: &Path, args: &[&str]) {
     let mut command = Command::new("git");
     command.current_dir(dir);
@@ -138,8 +140,7 @@ fn policy_is_read_from_the_merge_base_not_the_head() {
         "policy base",
     );
     let base_sha = String::from_utf8(
-        Command::new("git")
-            .current_dir(dir.path())
+        support::git_command(dir.path())
             .args(["rev-parse", "HEAD"])
             .output()
             .expect("rev-parse")
