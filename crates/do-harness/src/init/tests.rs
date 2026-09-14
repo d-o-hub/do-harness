@@ -81,11 +81,13 @@ async fn init_web_scaffolds_sensors_library_and_runners() {
     assert!(config.contains("name = \"viewport-ux\""));
     assert!(config.contains("name = \"a11y\""));
     assert!(config.contains("name = \"console\""));
+    assert!(config.contains("name = \"perf\""));
     // Sensor runners + the bundled audit library land under scripts/.
     for path in [
         "scripts/viewport-audit.mjs",
         "scripts/a11y-audit.mjs",
         "scripts/console-audit.mjs",
+        "scripts/perf-audit.mjs",
         "scripts/web-ui/audit.test.mjs",
         "scripts/web-ui/lib/audit.mjs",
         "scripts/web-ui/lib/page-probe.mjs",
@@ -93,6 +95,7 @@ async fn init_web_scaffolds_sensors_library_and_runners() {
         "scripts/web-ui/lib/contrast.mjs",
         "scripts/web-ui/lib/console-audit.mjs",
         "scripts/web-ui/lib/a11y-audit.mjs",
+        "scripts/web-ui/lib/perf-audit.mjs",
     ] {
         assert!(dir.path().join(path).exists(), "missing {path}");
     }
