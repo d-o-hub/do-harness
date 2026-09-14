@@ -15,7 +15,7 @@ pre-push = []
 
 [signal-sets]
 feedback = ["web-ui-tests"]
-verification = ["web-ui-tests", "viewport-ux", "a11y", "console"]
+verification = ["web-ui-tests", "viewport-ux", "a11y", "console", "perf"]
 
 [[sensors]]
 name = "web-ui-tests"
@@ -36,6 +36,11 @@ when-changed = ["apps/web/**", "packages/ui/**", "src/**", "scripts/web-ui/**"]
 name = "console"
 argv = ["node", "scripts/console-audit.mjs"]
 when-changed = ["apps/web/**", "src/**", "scripts/web-ui/**"]
+
+[[sensors]]
+name = "perf"
+argv = ["node", "scripts/perf-audit.mjs"]
+when-changed = ["apps/web/**", "src/**", "packages/ui/**", "scripts/web-ui/**", "**/vite.config.*", "**/next.config.*"]
 
 # Add your repo's own sensors below (typecheck/lint/test wrap the same
 # commands CI runs — see docs/adoption.md "Configure sensors for your stack").

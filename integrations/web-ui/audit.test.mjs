@@ -23,6 +23,7 @@ import {
 } from "./lib/contrast.mjs";
 import { normalizeViewport, normalizeMatrix, DEFAULT_VIEWPORT_MATRIX } from "./lib/audit.mjs";
 import { classifyConsoleMessage } from "./lib/console-audit.mjs";
+import { DEFAULT_BUDGETS, parseBudgets, evaluateBudgets } from "./lib/perf-audit.mjs";
 
 const rect = (x, y, w, h) => ({ x, y, width: w, height: h });
 
@@ -109,6 +110,39 @@ test("viewport matrix: normalizes, validates, and rejects garbage", () => {
   assert.throws(() => normalizeMatrix([]), RangeError);
   assert.ok(DEFAULT_VIEWPORT_MATRIX.some((v) => v.width === 320)); // reflow floor
   assert.ok(DEFAULT_VIEWPORT_MATRIX.some((v) => v.width === 360)); // Android majority
+});
+
+test("perf: budgets parse strictly and merge over defaults", () => {
+  assert.deepEqual(parseBudgets("{}"), DEFAULT_BUDGETS);
+  assert.deepEqual(parseBudgets('{"lcpMs": 1800}'), { ...DEFAULT_BUDGETS, lcpMs: 1800 });
+  assert.throws(() => parseBudgets("{bad json"), TypeError);
+  assert.throws(() => parseBudgets('{"unknown": 1}'), TypeError);
+  assert.throws(() => parseBudgets('{"cls": -0.1}'), TypeError);
+  assert.throws(() => parseBudgets('{"cls": "0.1"}'), TypeError);
+});
+
+test("perf: budget evaluation flags exactly the breached metrics", () => {
+  const clean = evaluateBudgets(
+    { performanceScore: 0.95, lcpMs: 2000, cls: 0.05, tbtMs: 300 },
+    DEFAULT_BUDGETS,
+  );
+  assert.equal(clean.length, 0);
+  const breached = evaluateBudgets(
+    { performanceScore: 0.7, lcpMs: 4100, cls: 0.3, tbtMs: 700 },
+    DEFAULT_BUDGETS,
+  );
+  assert.deepEqual(
+    breached.map((f) => f.rule),
+    ["performanceScore", "lcpMs", "cls", "tbtMs"],
+  );
+  // boundaries: exactly-at-budget is not a breach
+  const boundary = evaluateBudgets(
+    { performanceScore: 0.9, lcpMs: 2500, cls: 0.1, tbtMs: 600 },
+    DEFAULT_BUDGETS,
+  );
+  assert.equal(boundary.length, 0);
+  // missing/null metrics are not reported (lighthouse returns null for N/A)
+  assert.equal(evaluateBudgets({ performanceScore: null }, DEFAULT_BUDGETS).length, 0);
 });
 
 test("console classification: errors vs discounted noise", () => {
