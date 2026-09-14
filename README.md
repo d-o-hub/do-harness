@@ -170,7 +170,7 @@ export PATH="$HOME/.local/bin:$PATH"
 | `errors list [--task ID] [--format text\|json]` / `errors clear [--sensor NAME] [--task ID]` | Inspect and clear fail-fast error signatures |
 | `trace add --session S [--task ID] [--command C] [--error-diff D] [--resolution-steps R]` / `trace list --session S [--format text\|json]` | Record and read execution traces per session |
 | `distill --skill NAME --pattern P [--description D] [--from-trace ID] [--to-fixture]` | Distill a resolved trace into a skill (refuses without resolution steps); `--to-fixture` raises the skill's pass-rate bar |
-| `eval [--skill NAME] [--bless]` | Validate skills via skill-creator's quick_validate.py and persist skill_evals; `--bless` re-baselines graders and raises the pass-rate bar after a fully green run |
+| `eval [--skill NAME] [--bless] [--agent-cmd CMD]` | Validate skills via skill-creator's quick_validate.py and persist skill_evals; `--bless` re-baselines graders and raises the pass-rate bar after a fully green run; `--agent-cmd` runs an external agent per case for true Skill Lift |
 | `metrics [--format text\|json]` | Report sensor stats, strike counts, and eval pass-rate history |
 | `compliance [--format text\|json]` | Print compliance mapping to OWASP Agentic Top 10, NIST AI RMF, and EU AI Act |
 | `init [--language rust\|generic] [--force]` | Scaffold a harness workspace in the current directory |

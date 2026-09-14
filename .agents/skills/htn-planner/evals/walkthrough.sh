@@ -32,3 +32,9 @@ for _ in 1 2 3 4 5; do
 done
 "$bin" --root "$root" task "done" "$id" >/dev/null
 "$bin" --root "$root" task list
+
+# Negative case: an out-of-scope question matches no method catalog entry,
+# so no method is selected and no spike scratch leaks into the workspace.
+cat > "$root/plan_negative.txt" << 'TXT'
+negative: general-knowledge question matches no method, no method applies, planning deferred until a domain requirement exists
+TXT

@@ -72,4 +72,24 @@ pub const MIGRATIONS: &[Migration] = &[
         name: "bless_history",
         sql: include_str!("../migrations/0012_bless_history.sql"),
     },
+    Migration {
+        version: 13,
+        name: "eval_lift_and_dims",
+        sql: include_str!("../migrations/0013_eval_lift_and_dims.sql"),
+    },
+    Migration {
+        version: 14,
+        name: "lift_floors",
+        sql: include_str!("../migrations/0014_lift_floors.sql"),
+    },
+    Migration {
+        version: 15,
+        name: "eval_mode",
+        sql: include_str!("../migrations/0015_eval_mode.sql"),
+    },
+    Migration {
+        version: 16,
+        name: "mode_scoped_floors",
+        sql: include_str!("../migrations/0016_mode_scoped_floors.sql"),
+    },
 ];

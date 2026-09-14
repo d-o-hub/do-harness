@@ -6,6 +6,8 @@
       "prompt": "Validate that quick_validate.py correctly gates a valid skill and that init_skill.py scaffolds a new skill that passes the gate.",
       "expected_output": "quick_validate passes on a valid skill, init_skill creates a new skill directory with SKILL.md that also passes the gate, with residue files proving both.",
       "files": [],
+      "dim": "effectiveness",
+      "kind": "explicit",
       "assertions": [
         "walk:",
         "exists:skill_creator_residue",
@@ -18,8 +20,23 @@
       "prompt": "An invalid skill frontmatter should be rejected by quick_validate.py",
       "expected_output": "A skill with missing name or invalid naming fails the structure gate, demonstrating fail-closed validation.",
       "files": [],
+      "dim": "security",
+      "kind": "implicit",
       "assertions": [
-        "Invalid frontmatter is rejected by the gate"
+        "contains:skill_creator_gate_proof|rejected",
+        "contains:.agents/skills/skill-creator/scripts/quick_validate.py|hyphen-case"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Write a haiku about the sea. No reusable workflow is involved.",
+      "expected_output": "No skill: one-off prose needs no scaffold, so init_skill is never invoked and no skill directory leaks.",
+      "files": [],
+      "dim": "discoverability",
+      "kind": "negative",
+      "assertions": [
+        "contains:skill_creator_negative.txt|init_skill not invoked",
+        "absent:tmp_skills"
       ]
     }
   ]

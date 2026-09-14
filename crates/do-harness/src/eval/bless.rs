@@ -35,10 +35,23 @@ pub(super) async fn bless_skill(
     if report.graded > 0 {
         let best = do_harness_db::max_pass_rate(conn, name).await?;
         if let Some(floor) = crate::eval_integrity::GraderHashes::bar_floor(best) {
-            if do_harness_db::raise_skill_bar(conn, name, floor).await? {
-                println!("{name}: blessed; bar floor raised to {floor:.2}");
+            if do_harness_db::raise_skill_bar(conn, name, report.mode, floor).await? {
+                println!(
+                    "{name}: blessed; {} bar floor raised to {floor:.2}",
+                    report.mode
+                );
             } else {
-                println!("{name}: blessed; bar floor unchanged");
+                println!("{name}: blessed; {} bar floor unchanged", report.mode);
+            }
+        }
+        if let Some(floor) = crate::eval_integrity::GraderHashes::lift_floor(report.lift) {
+            if do_harness_db::raise_lift_floor(conn, name, report.mode, floor).await? {
+                println!(
+                    "{name}: blessed; {} lift floor raised to {floor:+.2}",
+                    report.mode
+                );
+            } else {
+                println!("{name}: blessed; {} lift floor unchanged", report.mode);
             }
         }
     } else {

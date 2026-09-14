@@ -16,7 +16,9 @@ not contain.
 1. Skill directory (potentially untrusted, e.g. a contributed skill) →
    walkthrough subprocess.
 2. Walkthrough subprocess → filesystem and network.
-3. Database (baselines/bless history) → eval gate.
+3. User-supplied `--agent-cmd` command → filesystem and network (runs with
+   the caller's privileges, one run per eval case).
+4. Database (baselines/bless history) → eval gate.
 
 ## Threats and mitigations
 
@@ -28,12 +30,14 @@ not contain.
 | Oversized grader exhausts memory | Grader files larger than 1 MiB are rejected | `eval_integrity.rs` |
 | Failure detail leaks unbounded output | Captured stderr is truncated to a 500-char tail (observability, **not** containment) | `eval_walk.rs` |
 | Malicious `cli:` assertion runs arbitrary argv | Reserved root flags are rejected, but the command itself is not sandboxed | `eval_assert.rs` |
+| Runaway or hung agent command (`--agent-cmd`) | Explicit user-supplied command; killed after `--agent-timeout` seconds; stdout/stderr captured and bounded | `eval/agent.rs` |
 
 ## Explicit non-goals (residual risk)
 
 - **No syscall sandbox.** There is no seccomp filter, network namespace,
-  cgroup, or gVisor. A walkthrough can read environment variables, open
-  sockets, and touch any path the caller can.
-- Therefore: run `do-harness eval` only on skills you trust, or wrap the whole
-  command in an outer sandbox (container/VM) in CI. The sandbox exists to keep
-  *residue* hermetic, not to contain hostile code.
+  cgroup, or gVisor. A walkthrough or `--agent-cmd` command can read
+  environment variables, open sockets, and touch any path the caller can.
+- Therefore: run `do-harness eval` only on skills you trust, and only pass
+  `--agent-cmd` commands you would run by hand, or wrap the whole command in
+  an outer sandbox (container/VM) in CI. The sandbox exists to keep *residue*
+  hermetic, not to contain hostile code.

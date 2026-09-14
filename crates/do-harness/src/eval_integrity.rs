@@ -39,6 +39,14 @@ impl GraderHashes {
     pub fn bar_floor(best_ever: Option<f64>) -> Option<f64> {
         best_ever.map(|best| (best - BAR_TOLERANCE).clamp(0.0, 1.0))
     }
+
+    /// The lift floor implied by the blessed lift: `lift - tolerance`,
+    /// clamped to `[-1, 1]`. A zero-lift skill still fails if it starts
+    /// harming runs beyond tolerance.
+    #[must_use]
+    pub fn lift_floor(blessed_lift: Option<f64>) -> Option<f64> {
+        blessed_lift.map(|lift| (lift - BAR_TOLERANCE).clamp(-1.0, 1.0))
+    }
 }
 
 /// Maximum bytes hashed for a grader file; a larger file is rejected rather
@@ -206,5 +214,14 @@ mod tests {
         // A low best-ever clamps at zero rather than going negative.
         assert_eq!(GraderHashes::bar_floor(Some(0.02)), Some(0.0));
         assert_eq!(GraderHashes::bar_floor(None), None);
+    }
+
+    #[test]
+    fn lift_floor_applies_tolerance_and_clamps() {
+        assert_eq!(GraderHashes::lift_floor(Some(1.0)), Some(0.95));
+        assert_eq!(GraderHashes::lift_floor(Some(0.0)), Some(-0.05));
+        // Lift ranges to -1: a deeply negative lift clamps at the floor.
+        assert_eq!(GraderHashes::lift_floor(Some(-0.99)), Some(-1.0));
+        assert_eq!(GraderHashes::lift_floor(None), None);
     }
 }

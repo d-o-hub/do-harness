@@ -91,3 +91,8 @@ git config user.name "Eval"
 printf 'x\n' > root_file.txt
 git add root_file.txt
 git commit -q -m root
+
+# 7. Negative case: out-of-scope requests never touch PR machinery.
+cat > "$root/pr_negative.txt" << 'TXT'
+out-of-scope: non-PR requests never touch the sweep, merge, or thread machinery
+TXT

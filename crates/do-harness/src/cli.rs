@@ -240,6 +240,22 @@ pub enum Command {
         /// `DO_HARNESS_APPROVER` or the git user email).
         #[arg(long, value_name = "NAME")]
         approver: Option<String>,
+        /// Skip the without-skill baseline run (no Skill Lift measured).
+        #[arg(long)]
+        no_lift: bool,
+        /// Run this shell command once per eval case instead of the
+        /// deterministic walkthrough (real Skill Lift). cwd is the sandbox
+        /// root; the prompt is in `$DO_HARNESS_PROMPT` and on stdin; stdout
+        /// is saved to `agent_stdout.txt` for assertions.
+        #[arg(long, value_name = "COMMAND")]
+        agent_cmd: Option<String>,
+        /// Kill an agent run after this many seconds.
+        #[arg(long, value_name = "SECS", default_value_t = 600)]
+        agent_timeout: u64,
+        /// Fail skills whose fixture has dataset-quality gaps (thin cases,
+        /// no negative out-of-scope case).
+        #[arg(long)]
+        strict_fixtures: bool,
     },
     /// Manage git hooks that run `do-harness verify`.
     Hook {
@@ -269,6 +285,15 @@ pub enum Command {
         /// Filter metrics since a Unix timestamp in seconds.
         #[arg(long, value_name = "UNIX_SECONDS")]
         since: Option<String>,
+    },
+    /// Rank skill pairs by guidance overlap (Tier-2 distinctiveness advisory).
+    Overlap {
+        /// Cosine similarity at or above which a pair prints as WARN.
+        #[arg(long, default_value_t = crate::overlap::DEFAULT_THRESHOLD)]
+        threshold: f64,
+        /// Output format.
+        #[arg(long, value_enum, default_value_t = Format::Text)]
+        format: Format,
     },
     /// Prune old beats and compact the state database.
     Maintenance {

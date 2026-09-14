@@ -49,6 +49,8 @@ async fn documentation_only_assertions_are_not_graded() {
             expected_output: "done".into(),
             files: vec![],
             assertions: vec!["this is a human note".to_owned()],
+            dim: do_harness_types::EvalDim::default(),
+            kind: super::fixture::EvalKind::default(),
         }],
     };
     let dir = tempfile::tempdir().unwrap();

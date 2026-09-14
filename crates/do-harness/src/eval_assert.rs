@@ -10,6 +10,10 @@
 //!
 //! ```text
 //! exists:PATH                    PATH exists, relative to the workspace root.
+//! absent:PATH                     PATH does not exist, relative to the workspace
+//!                                root. Grades negative (Discoverability) cases:
+//!                                the skill must stay unloaded and leave no
+//!                                scratch behind for out-of-scope prompts.
 //! contains:PATH|NEEDLE           PATH exists and its text contains NEEDLE.
 //!                                ('|' separates path/needle; paths cannot
 //!                                contain '|' on POSIX.)
@@ -48,6 +52,7 @@ pub struct AssertionGrade {
 #[must_use]
 pub fn is_graded(spec: &str) -> bool {
     spec.starts_with("exists:")
+        || spec.starts_with("absent:")
         || spec.starts_with("contains:")
         || spec.starts_with("db:")
         || spec.starts_with("cli:")
@@ -67,6 +72,9 @@ pub fn is_graded(spec: &str) -> bool {
 pub async fn grade(root: &Path, spec: &str, walk: &WalkRun) -> Result<AssertionGrade> {
     if let Some(path) = spec.strip_prefix("exists:") {
         return Ok(grade_exists(root, path));
+    }
+    if let Some(path) = spec.strip_prefix("absent:") {
+        return Ok(grade_absent(root, path));
     }
     if let Some(rest) = spec.strip_prefix("contains:") {
         return Ok(grade_contains(root, rest).await);
@@ -90,6 +98,25 @@ fn grade_exists(root: &Path, path: &str) -> AssertionGrade {
         pass(format!("exists: {} found", path.display()))
     } else {
         fail(format!("exists: missing at {}", path.display()))
+    }
+}
+
+/// The `absent:PATH` grader: passes when PATH does not exist.
+///
+/// Empty paths fail closed: an empty `absent:` can never name a real
+/// out-of-scope artifact, so it is a fixture defect, not a pass.
+fn grade_absent(root: &Path, path: &str) -> AssertionGrade {
+    if path.is_empty() {
+        return fail("absent: PATH is empty".to_owned());
+    }
+    let path = root.join(path);
+    if path.exists() {
+        fail(format!(
+            "absent: unexpectedly present at {}",
+            path.display()
+        ))
+    } else {
+        pass(format!("absent: {} correctly absent", path.display()))
     }
 }
 

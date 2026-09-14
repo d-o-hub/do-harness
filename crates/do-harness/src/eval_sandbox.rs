@@ -43,6 +43,25 @@ impl Sandbox {
         &self.root
     }
 
+    /// Strips the guidance payload (`SKILL.md` + `references/`) from the
+    /// mirrored skill, leaving `evals/` (the task) and `scripts/` (the
+    /// tooling) so the identical walkthrough and assertions can run as the
+    /// without-skill baseline. Skill Lift is the with-skill score minus the
+    /// score measured here.
+    pub(super) fn strip_guidance(&self, name: &str) -> Result<()> {
+        let skill = self.root.join(".agents").join("skills").join(name);
+        for payload in [skill.join("SKILL.md"), skill.join("references")] {
+            if payload.is_file() || payload.is_symlink() {
+                fs::remove_file(&payload)
+                    .with_context(|| format!("failed to strip {}", payload.display()))?;
+            } else if payload.is_dir() {
+                fs::remove_dir_all(&payload)
+                    .with_context(|| format!("failed to strip {}", payload.display()))?;
+            }
+        }
+        Ok(())
+    }
+
     /// Path of the copied skill-creator gate script within the sandbox.
     pub(super) fn gate_script(&self) -> PathBuf {
         self.root

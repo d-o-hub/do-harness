@@ -37,6 +37,7 @@ mod hooks;
 mod init;
 mod methods;
 mod metrics;
+mod overlap;
 mod pr;
 mod report;
 mod sensors;
@@ -278,15 +279,25 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
             dry_run,
             format,
             approver,
+            no_lift,
+            agent_cmd,
+            agent_timeout,
+            strict_fixtures,
         } => eval::run_eval(
             &root,
-            skill.as_deref(),
-            bless,
-            list_skills,
-            fail_fast,
-            dry_run,
-            format,
-            approver.as_deref(),
+            eval::EvalOpts {
+                skill: skill.as_deref(),
+                bless,
+                list_skills,
+                fail_fast,
+                dry_run,
+                format,
+                approver: approver.as_deref(),
+                no_lift,
+                agent_cmd: agent_cmd.as_deref(),
+                agent_timeout_secs: agent_timeout,
+                strict_fixtures,
+            },
         )
         .await
         .map_err(CliError::Verify),
@@ -313,5 +324,8 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
         )
         .await
         .map_err(CliError::Usage),
+        Command::Overlap { threshold, format } => {
+            overlap::run_overlap(&root, threshold, format).map_err(CliError::Usage)
+        }
     }
 }

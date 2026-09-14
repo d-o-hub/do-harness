@@ -20,6 +20,29 @@ pub struct SkillTrend {
     pub runs: i64,
     /// Blessed bar floor, when set.
     pub bar_floor: Option<f64>,
+    /// Latest Skill Lift in points (with minus without), when measured.
+    pub lift: Option<f64>,
+    /// Blessed lift floor, when set.
+    pub lift_floor: Option<f64>,
+    /// Execution mode of the latest run: deterministic or agent.
+    pub mode: Option<do_harness_types::EvalMode>,
+    /// Context-cost proxy of the latest run: skill words loaded.
+    pub skill_words: Option<i64>,
+    /// Execution-cost proxy of the latest run: walkthrough seconds.
+    pub walk_secs: Option<f64>,
+    /// Per-dimension rates of the latest run.
+    pub dims: Vec<DimTrend>,
+}
+
+/// Per-dimension rate within the latest run of a skill.
+#[derive(Debug, Clone, Serialize)]
+pub struct DimTrend {
+    /// Dimension wire name.
+    pub dim: String,
+    /// With-skill pass rate, when the dimension graded anything.
+    pub rate: Option<f64>,
+    /// Without-skill pass rate, when the baseline graded anything.
+    pub without_rate: Option<f64>,
 }
 
 /// The full metrics snapshot.
@@ -72,12 +95,48 @@ pub async fn run_metrics(
                 continue;
             }
         }
+        let latest_run = do_harness_db::latest_eval_run(&conn, &summary.skill_name).await?;
+        let (lift, mode, skill_words, walk_secs, dims) = match latest_run {
+            Some(run) => {
+                let lift = match (run.pass_rate, run.without_pass_rate) {
+                    (Some(with), Some(without)) => Some(with - without),
+                    _ => None,
+                };
+                // The baseline grades the same assertions, so the with-run
+                // denominator serves both rates.
+                let mut dims = Vec::new();
+                for rate in do_harness_db::dim_rates_for_run(&conn, run.id).await? {
+                    dims.push(DimTrend {
+                        rate: dim_rate(rate.passed, rate.graded),
+                        without_rate: rate.without_passed.and_then(|passed| {
+                            (rate.graded > 0)
+                                .then(|| dim_rate(passed, rate.graded))
+                                .flatten()
+                        }),
+                        dim: rate.dim,
+                    });
+                }
+                (lift, Some(run.mode), run.skill_words, run.walk_secs, dims)
+            }
+            None => (None, None, None, None, Vec::new()),
+        };
+        // Floors are mode-scoped: report the floors that govern the latest
+        // run's mode, so the numbers shown can actually fail the next run.
+        let floors_mode = mode.unwrap_or_default();
         skills.push(SkillTrend {
             latest_pass_rate: latest_by_skill.get(&summary.skill_name).copied().flatten(),
-            bar_floor: do_harness_db::get_skill_bar(&conn, &summary.skill_name).await?,
-            name: summary.skill_name,
+            bar_floor: do_harness_db::get_skill_bar(&conn, &summary.skill_name, floors_mode)
+                .await?,
+            name: summary.skill_name.clone(),
             best_pass_rate: summary.best_pass_rate,
             runs: summary.runs,
+            lift,
+            lift_floor: do_harness_db::get_lift_floor(&conn, &summary.skill_name, floors_mode)
+                .await?,
+            mode,
+            skill_words,
+            walk_secs,
+            dims,
         });
     }
     skills.sort_by(|a, b| a.name.cmp(&b.name));
@@ -92,6 +151,12 @@ pub async fn run_metrics(
         Format::Json => println!("{}", serde_json::to_string(&snapshot)?),
     }
     Ok(())
+}
+
+/// Pass rate for small assertion counts; `None` when nothing was graded.
+#[allow(clippy::cast_precision_loss)]
+fn dim_rate(passed: i64, graded: i64) -> Option<f64> {
+    (graded > 0).then(|| passed as f64 / graded as f64)
 }
 
 fn print_text(snapshot: &MetricsSnapshot) {
@@ -129,9 +194,33 @@ fn print_text(snapshot: &MetricsSnapshot) {
         let bar = trend
             .bar_floor
             .map_or_else(|| "unset".to_owned(), |floor| format!("{floor:.2}"));
+        let lift = trend
+            .lift
+            .map_or_else(|| "n/a".to_owned(), |lift| format!("{lift:+.2}"));
+        let lift_floor = trend
+            .lift_floor
+            .map_or_else(|| "unset".to_owned(), |floor| format!("{floor:+.2}"));
+        let words = trend
+            .skill_words
+            .map_or_else(|| "-".to_owned(), |words| format!("{words}"));
+        let walk = trend
+            .walk_secs
+            .map_or_else(|| "-".to_owned(), |secs| format!("{secs:.1}s"));
+        let mode = trend
+            .mode
+            .map_or_else(|| "-".to_owned(), |mode| mode.to_string());
         println!(
-            "  {:<16} latest={latest} best={best} runs={} bar={bar}",
+            "  {:<16} latest={latest} best={best} runs={} bar={bar} lift={lift} lift_floor={lift_floor} words={words} walk={walk} mode={mode}",
             trend.name, trend.runs
         );
+        for dim in &trend.dims {
+            let rate = dim
+                .rate
+                .map_or_else(|| "-".to_owned(), |rate| format!("{rate:.2}"));
+            let without = dim
+                .without_rate
+                .map_or_else(|| "-".to_owned(), |rate| format!("{rate:.2}"));
+            println!("    {:<16} with={rate} without={without}", dim.dim);
+        }
     }
 }
