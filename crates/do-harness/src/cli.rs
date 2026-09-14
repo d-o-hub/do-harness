@@ -240,6 +240,9 @@ pub enum Command {
         /// `DO_HARNESS_APPROVER` or the git user email).
         #[arg(long, value_name = "NAME")]
         approver: Option<String>,
+        /// Skip the without-skill baseline run (no Skill Lift measured).
+        #[arg(long)]
+        no_lift: bool,
     },
     /// Manage git hooks that run `do-harness verify`.
     Hook {

@@ -20,8 +20,38 @@ pub struct SkillEvalRun {
     /// Fraction of graded assertions that passed; `None` when the skill has
     /// no graded assertions.
     pub pass_rate: Option<f64>,
+    /// Fraction that passed in the without-skill baseline run (guidance
+    /// stripped); `None` when lift was not measured (`--no-lift` or runs
+    /// recorded before lift existed). Skill Lift is `pass_rate` minus this.
+    pub without_pass_rate: Option<f64>,
+    /// Context-cost proxy: words in the installed `SKILL.md` plus
+    /// `references/`. Tracks whether a skill improves results by hogging
+    /// the context window.
+    pub skill_words: Option<i64>,
+    /// Execution-cost proxy: walkthrough wall time in seconds.
+    pub walk_secs: Option<f64>,
     /// Unix timestamp when the run was recorded.
     pub ran_at: i64,
+}
+
+/// Per-dimension breakdown of one [`SkillEvalRun`].
+///
+/// One row per dimension that had at least one graded assertion; dimensions
+/// with no coverage are absent rather than zero so "unevaluated" stays
+/// distinguishable from "failed".
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SkillEvalDimRate {
+    /// Database id of the parent run.
+    pub run_id: i64,
+    /// Dimension wire name (`correctness`, `discoverability`, ...).
+    pub dim: String,
+    /// Graded assertions in this dimension (with-skill run).
+    pub graded: i64,
+    /// Passing assertions in this dimension (with-skill run).
+    pub passed: i64,
+    /// Passing assertions in the without-skill baseline run, when measured.
+    pub without_passed: Option<i64>,
 }
 
 /// Tamper-evidence baseline for a skill's graders.

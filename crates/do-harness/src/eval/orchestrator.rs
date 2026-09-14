@@ -9,7 +9,7 @@ use crate::eval_sandbox::Sandbox;
 use crate::report::Format;
 
 use super::bless::bless_skill;
-use super::grading::check_skill;
+use super::grading::{check_skill, check_skill_without};
 
 /// Runs the skill-eval benchmark for skills under `.agents/skills`.
 #[allow(
@@ -26,6 +26,7 @@ pub async fn run_eval(
     dry_run: bool,
     format: Format,
     approver: Option<&str>,
+    no_lift: bool,
 ) -> Result<()> {
     let skills_root = root.join(".agents/skills");
     if list_skills {
@@ -93,7 +94,7 @@ pub async fn run_eval(
         }
 
         let sandbox = Sandbox::for_skill(root, &entry, &name)?;
-        let report = check_skill(
+        let mut report = check_skill(
             sandbox.root(),
             sandbox.root().join(".agents/skills").join(&name).as_path(),
             &name,
@@ -102,15 +103,39 @@ pub async fn run_eval(
         .await?;
         drop(sandbox);
 
+        if !no_lift && !report.gate_failed && report.pass_rate.is_some() {
+            let bare = Sandbox::for_skill(root, &entry, &name)?;
+            bare.strip_guidance(&name)?;
+            let bare_dir = bare.root().join(".agents/skills").join(&name);
+            match check_skill_without(bare.root(), &bare_dir).await {
+                Ok(baseline) => {
+                    report.without_graded = baseline.graded;
+                    report.without_passed = baseline.passed;
+                    report.without_pass_rate = baseline.pass_rate;
+                    if let (Some(with), Some(without)) = (report.pass_rate, baseline.pass_rate) {
+                        report.lift = Some(with - without);
+                    }
+                    let without_by_dim: std::collections::HashMap<_, _> = baseline
+                        .dims
+                        .into_iter()
+                        .map(|d| (d.dim, d.passed))
+                        .collect();
+                    // A dimension missing from the baseline graded nothing
+                    // there, so its baseline stays unmeasured (None).
+                    for dim in &mut report.dims {
+                        dim.without_passed = without_by_dim.get(&dim.dim).copied();
+                    }
+                }
+                Err(err) => {
+                    eprintln!("warning: without-skill baseline for '{name}' failed: {err:#}");
+                }
+            }
+            drop(bare);
+        }
+        finish_line(&mut report);
+
         if format == Format::Json {
-            reports_json.push(serde_json::json!({
-                "name": name,
-                "line": report.line,
-                "pass_rate": report.pass_rate,
-                "graded": report.graded,
-                "passed": report.passed,
-                "gate_failed": report.gate_failed,
-            }));
+            reports_json.push(report_json(&name, &report));
         } else {
             println!("{}", report.line);
         }
@@ -126,16 +151,30 @@ pub async fn run_eval(
                 },
             )
             .await?;
-            do_harness_db::insert_skill_eval_run(
+            let run_id = do_harness_db::insert_skill_eval_run(
                 &conn,
                 &do_harness_db::NewSkillEvalRun {
                     skill_name: &name,
                     graded: i64::from(report.graded),
                     passed: i64::from(report.passed),
                     pass_rate: Some(pass_rate),
+                    without_pass_rate: report.without_pass_rate,
+                    skill_words: Some(report.skill_words),
+                    walk_secs: Some(report.walk_secs),
                 },
             )
             .await?;
+            let dim_rates: Vec<do_harness_db::NewSkillEvalDimRate<'_>> = report
+                .dims
+                .iter()
+                .map(|d| do_harness_db::NewSkillEvalDimRate {
+                    dim: d.dim.as_str(),
+                    graded: i64::from(d.graded),
+                    passed: i64::from(d.passed),
+                    without_passed: d.without_passed.map(i64::from),
+                })
+                .collect();
+            do_harness_db::insert_dim_rates(&conn, run_id, &dim_rates).await?;
         }
 
         if bless {
@@ -148,6 +187,20 @@ pub async fn run_eval(
                         "{name}: BAR-MISS: pass_rate {rate:.2} below blessed floor {floor:.2}"
                     );
                     invalid.push(name.clone());
+                }
+            }
+        }
+        if !bless {
+            if let Some(floor) = do_harness_db::get_lift_floor(&conn, &name).await? {
+                if let Some(lift) = report.lift {
+                    if lift < floor {
+                        println!(
+                            "{name}: LIFT-MISS: lift {lift:+.2} below blessed floor {floor:+.2}"
+                        );
+                        if !invalid.contains(&name) {
+                            invalid.push(name.clone());
+                        }
+                    }
                 }
             }
         }
@@ -170,6 +223,45 @@ pub async fn run_eval(
     } else {
         bail!("eval failed for skill(s): {}", invalid.join(", "))
     }
+}
+
+/// Appends lift and cost proxies to the human-readable report line once the
+/// baseline has been measured.
+fn finish_line(report: &mut super::grading::SkillReport) {
+    if report.gate_failed || report.pass_rate.is_none() {
+        return;
+    }
+    let lift = report
+        .lift
+        .map_or_else(|| "n/a".to_owned(), |lift| format!("{lift:+.2}"));
+    report.line = format!(
+        "{} lift={lift} words={} walk={:.1}s",
+        report.line, report.skill_words, report.walk_secs
+    );
+}
+
+/// Machine-readable eval report including lift, dimensions, and cost.
+fn report_json(name: &str, report: &super::grading::SkillReport) -> serde_json::Value {
+    serde_json::json!({
+        "name": name,
+        "line": report.line,
+        "pass_rate": report.pass_rate,
+        "graded": report.graded,
+        "passed": report.passed,
+        "gate_failed": report.gate_failed,
+        "lift": report.lift,
+        "without_pass_rate": report.without_pass_rate,
+        "without_graded": report.without_graded,
+        "without_passed": report.without_passed,
+        "skill_words": report.skill_words,
+        "walk_secs": report.walk_secs,
+        "dims": report.dims.iter().map(|d| serde_json::json!({
+            "dim": d.dim.as_str(),
+            "graded": d.graded,
+            "passed": d.passed,
+            "without_passed": d.without_passed,
+        })).collect::<Vec<_>>(),
+    })
 }
 
 /// Resolves the bless approver: explicit flag, `DO_HARNESS_APPROVER`, then the

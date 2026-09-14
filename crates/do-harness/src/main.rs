@@ -278,6 +278,7 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
             dry_run,
             format,
             approver,
+            no_lift,
         } => eval::run_eval(
             &root,
             skill.as_deref(),
@@ -287,6 +288,7 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
             dry_run,
             format,
             approver.as_deref(),
+            no_lift,
         )
         .await
         .map_err(CliError::Verify),

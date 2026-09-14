@@ -41,6 +41,13 @@ pub(super) async fn bless_skill(
                 println!("{name}: blessed; bar floor unchanged");
             }
         }
+        if let Some(floor) = crate::eval_integrity::GraderHashes::lift_floor(report.lift) {
+            if do_harness_db::raise_lift_floor(conn, name, floor).await? {
+                println!("{name}: blessed; lift floor raised to {floor:+.2}");
+            } else {
+                println!("{name}: blessed; lift floor unchanged");
+            }
+        }
     } else {
         println!("{name}: blessed; no graded assertions so no bar was set");
     }

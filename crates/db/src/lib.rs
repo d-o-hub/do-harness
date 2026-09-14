@@ -43,9 +43,11 @@ pub use migrate::{
 pub use query::count_where;
 pub use repo::{NewTask, get_task, latest_task_update, list_tasks, seed_invariants};
 pub use repo_eval::{
-    NewSkillEvalRun, SkillEvalSummary, bless_grader_baseline, get_grader_baseline, get_skill_bar,
-    insert_skill_eval_run, list_grader_blesses, list_skill_eval_runs, list_skill_eval_runs_page,
-    max_pass_rate, raise_skill_bar, skill_eval_summary,
+    NewSkillEvalDimRate, NewSkillEvalRun, SkillEvalSummary, bless_grader_baseline,
+    dim_rates_for_run, get_grader_baseline, get_lift_floor, get_skill_bar, insert_dim_rates,
+    insert_skill_eval_run, latest_eval_run, list_grader_blesses, list_skill_eval_runs,
+    list_skill_eval_runs_page, max_pass_rate, raise_lift_floor, raise_skill_bar,
+    skill_eval_summary,
 };
 pub use repo_exec::{
     NewBeat, SensorOutcome, bump_error_signature, get_error_signature, list_beats, list_beats_page,
