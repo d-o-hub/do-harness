@@ -38,6 +38,11 @@ Runs computational sensors defined in `do-harness.toml`.
   (fail-closed, never silently skipped).
 - `--only <SENSOR>`: Run only named sensor(s). Repeatable or comma-separated.
 - `--exclude <SENSOR>`: Exclude named sensor(s). Repeatable or comma-separated.
+- `--jobs <N>`: Run up to `N` sensors concurrently (overrides `jobs` in
+  `do-harness.toml`; default 1 = sequential). Results always report in config
+  order, so text and JSON output are deterministic. `--fail-fast` cancels
+  in-flight siblings and never starts a later chunk. A `jobs = 0` config is
+  rejected at load.
 - `--record`: Persist beats and error signatures into `.do-harness/agent_state.db`.
 - `--task <ID>`: Scope recorded beats to task ID. Requires `--record`.
 - `--evidence <FILE>`: Write machine-readable evidence artifact JSON.

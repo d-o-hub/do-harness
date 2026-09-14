@@ -41,8 +41,7 @@ fn commit_file(dir: &Path, name: &str, content: &str, message: &str) {
 }
 
 fn head_sha(dir: &Path) -> String {
-    let output = Command::new("git")
-        .current_dir(dir)
+    let output = crate::changes::git_command(dir)
         .args(["rev-parse", "HEAD"])
         .output()
         .expect("rev-parse");
