@@ -3,7 +3,7 @@
 Quick validation script for skills: Tier-1 structure + safety gate.
 
 Checks YAML frontmatter shape, license presence, description quality,
-body size (progressive disclosure), secret patterns, and shell syntax
+body size (progressive disclosure), risky-pattern matches, and shell syntax
 (bash -n always; shellcheck -S error when installed, SKIP otherwise).
 """
 
@@ -22,7 +22,7 @@ MAX_BODY_WORDS = 5000
 MAX_BODY_LINES = 500
 ALLOWED_LICENSES = {"MIT", "Apache-2.0"}
 
-SECRET_PATTERNS = (
+RISKY_PATTERNS = (
     (r"AKIA[0-9A-Z]{16}", "possible AWS access key"),
     (r"ghp_[A-Za-z0-9]{20,}", "possible GitHub token"),
     (r"gho_[A-Za-z0-9]{20,}", "possible GitHub OAuth token"),
@@ -32,8 +32,8 @@ SECRET_PATTERNS = (
 )
 
 
-def scan_secrets(skill_path):
-    """Fail-closed secret scan over skill text files; returns error or None."""
+def scan_risky_patterns(skill_path):
+    """Fail-closed risky-pattern scan over skill text files; returns error or None."""
     candidates = [skill_path / "SKILL.md"]
     for sub in ("references", "scripts", "evals"):
         d = skill_path / sub
@@ -45,10 +45,10 @@ def scan_secrets(skill_path):
         except (OSError, UnicodeDecodeError):
             continue
         for lineno, line in enumerate(text.splitlines(), 1):
-            for pattern, label in SECRET_PATTERNS:
+            for pattern, label in RISKY_PATTERNS:
                 if re.search(pattern, line):
                     rel = path.relative_to(skill_path)
-                    return f"Secret scan hit ({label}) at {rel}:{lineno}"
+                    return f"Risky-pattern hit ({label}) at {rel}:{lineno}"
     return None
 
 
@@ -194,9 +194,9 @@ def validate_skill(skill_path):
             f"SKILL.md body is too long ({lines} lines). Split detail into references/ per progressive disclosure.",
         )
 
-    secret_hit = scan_secrets(skill_path)
-    if secret_hit is not None:
-        return False, secret_hit
+    pattern_hit = scan_risky_patterns(skill_path)
+    if pattern_hit is not None:
+        return False, pattern_hit
 
     shell_ok, shell_note = lint_shell(skill_path)
     if not shell_ok:
