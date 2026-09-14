@@ -39,11 +39,11 @@ verification set and every build target dogfoods green.
    - `build` — Linux static-musl (x86_64/aarch64) and macOS (x86_64/arm64)
      tarballs plus a Windows x86_64 zip, each dogfooded with
      `init && verify`.
-   - `release` — publishes the tarballs plus `checksums.txt` via
-     `gh release create --verify-tag`.
-   - `publish` — publishes the three crates to crates.io in dependency order.
-   - `npm-publish` — publishes the four platform packages, then the
-     `do-harness` meta package, to npm.
+    - `release` — publishes the tarballs, the windows zip, plus `checksums.txt`
+      via `gh release create --verify-tag`.
+    - `publish` — publishes the three crates to crates.io in dependency order.
+    - `npm-publish` — publishes the five platform packages, then the
+      `do-harness` meta package, to npm.
 
 ## crates.io publishing
 
