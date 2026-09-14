@@ -109,6 +109,7 @@ mod tests {
             hooks: crate::config::HooksConfig::default(),
             signal_sets: std::collections::BTreeMap::new(),
             sensors,
+            jobs: None,
         }
     }
 

@@ -139,6 +139,7 @@ mod tests {
                     when_changed: Vec::new(),
                 })
                 .collect(),
+            jobs: None,
         }
     }
 

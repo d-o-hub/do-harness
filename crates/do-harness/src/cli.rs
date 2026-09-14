@@ -80,6 +80,9 @@ pub enum Command {
         /// Exclude named sensors from the run.
         #[arg(long = "exclude", action = ArgAction::Append, value_name = "SENSOR")]
         exclude: Vec<String>,
+        /// Maximum sensors in flight (overrides `jobs` in do-harness.toml).
+        #[arg(long, value_name = "N")]
+        jobs: Option<usize>,
         /// Persist beats and error signatures into the state database.
         #[arg(long)]
         record: bool,

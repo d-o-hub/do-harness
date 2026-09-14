@@ -210,6 +210,7 @@ fn generate_rust_config(sensors: &[crate::config::SensorSpec]) -> Result<String>
         },
         signal_sets,
         sensors: sensors.to_vec(),
+        jobs: None,
     };
     let body = toml::to_string(&cfg).context("failed to render generated config")?;
     Ok(format!(
