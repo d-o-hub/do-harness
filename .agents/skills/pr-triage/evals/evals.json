@@ -17,7 +17,8 @@
     "contains:.agents/skills/pr-triage/references/review-contract.md|failure mode",
     "exists:.agents/skills/pr-triage/scripts/preflight.sh",
     "exists:.agents/skills/pr-triage/scripts/state.sh",
-    "exists:.agents/skills/pr-triage/scripts/post-merge.sh"
+    "exists:.agents/skills/pr-triage/scripts/post-merge.sh",
+    "contains:.agents/skills/pr-triage/SKILL.md|post-merge.sh"
    ]
   },
   {

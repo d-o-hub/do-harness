@@ -9,6 +9,8 @@ license: Apache-2.0
 metadata:
   short-description: Create or update a skill
 ---
+## Guides
+See references/heuristics.md for distilled heuristics.
 
 # Skill Creator
 
