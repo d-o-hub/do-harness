@@ -87,12 +87,13 @@ if (( ! DRY_RUN )); then
     fi
 fi
 
-# target triple : platform package directory : npm package name
+# target triple : platform dir : npm package : archive : binary
 TARGETS=(
-    "x86_64-unknown-linux-musl:linux-x64:do-harness-linux-x64"
-    "aarch64-unknown-linux-musl:linux-arm64:do-harness-linux-arm64"
-    "x86_64-apple-darwin:darwin-x64:do-harness-darwin-x64"
-    "aarch64-apple-darwin:darwin-arm64:do-harness-darwin-arm64"
+    "x86_64-unknown-linux-musl:linux-x64:do-harness-linux-x64:tar.gz:do-harness"
+    "aarch64-unknown-linux-musl:linux-arm64:do-harness-linux-arm64:tar.gz:do-harness"
+    "x86_64-apple-darwin:darwin-x64:do-harness-darwin-x64:tar.gz:do-harness"
+    "aarch64-apple-darwin:darwin-arm64:do-harness-darwin-arm64:tar.gz:do-harness"
+    "x86_64-pc-windows-msvc:win32-x64:do-harness-win32-x64:zip:do-harness.exe"
 )
 
 TMP="$(mktemp -d)"
@@ -112,15 +113,22 @@ publish_dir() {
 }
 
 for entry in "${TARGETS[@]}"; do
-    IFS=: read -r target platform pkg <<<"$entry"
-    tarball="$DIST/do-harness-v${VERSION}-${target}.tar.gz"
-    [[ -f "$tarball" ]] || die "missing release artifact: $tarball"
+    IFS=: read -r target platform pkg archive binary <<<"$entry"
     stage="$TMP/$pkg"
     mkdir -p "$stage/bin"
     cp "$NPM_DIR/platforms/$platform/package.json" "$stage/package.json"
-    tar -xzf "$tarball" -C "$TMP" "do-harness-v${VERSION}-${target}/do-harness"
-    cp "$TMP/do-harness-v${VERSION}-${target}/do-harness" "$stage/bin/do-harness"
-    chmod 0755 "$stage/bin/do-harness"
+    if [[ "$archive" == "zip" ]]; then
+        artifact="$DIST/do-harness-v${VERSION}-${target}.zip"
+        [[ -f "$artifact" ]] || die "missing release artifact: $artifact"
+        unzip -p "$artifact" "do-harness-v${VERSION}-${target}/${binary}" \
+            >"$stage/bin/${binary}"
+    else
+        artifact="$DIST/do-harness-v${VERSION}-${target}.tar.gz"
+        [[ -f "$artifact" ]] || die "missing release artifact: $artifact"
+        tar -xzf "$artifact" -C "$TMP" "do-harness-v${VERSION}-${target}/${binary}"
+        cp "$TMP/do-harness-v${VERSION}-${target}/${binary}" "$stage/bin/${binary}"
+    fi
+    chmod 0755 "$stage/bin/${binary}"
     (cd "$stage" && npm pkg set version="$VERSION" >/dev/null)
     publish_dir "$stage" "$pkg"
 done
@@ -138,6 +146,7 @@ fi
         "optionalDependencies.do-harness-linux-x64=$VERSION" \
         "optionalDependencies.do-harness-linux-arm64=$VERSION" \
         "optionalDependencies.do-harness-darwin-x64=$VERSION" \
-        "optionalDependencies.do-harness-darwin-arm64=$VERSION" >/dev/null
+        "optionalDependencies.do-harness-darwin-arm64=$VERSION" \
+        "optionalDependencies.do-harness-win32-x64=$VERSION" >/dev/null
 )
 publish_dir "$stage" "do-harness"

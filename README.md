@@ -11,8 +11,9 @@ npx do-harness init
 npx do-harness verify --set verification --changed --strict
 ```
 
-Prebuilt binaries for Linux (x86_64/aarch64, static musl) and macOS
-(x86_64/arm64) are published as GitHub Releases with SHA-256 checksums:
+Prebuilt binaries for Linux (x86_64/aarch64, static musl), macOS
+(x86_64/arm64), and Windows (x86_64, zip) are published as GitHub Releases
+with SHA-256 checksums:
 
 ```bash
 # latest release (resolved from the releases/latest redirect)

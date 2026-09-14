@@ -31,9 +31,9 @@ with `--bin-dir <DIR>` or `DO_HARNESS_INSTALL_DIR`; pin with `--version` or
 detect corruption, not a compromised origin; verify them out of band when that
 matters.
 
-Supported platforms: Linux x86_64/aarch64 (static musl) and macOS
-x86_64/arm64. Other platforms install from source:
-`cargo install --path crates/do-harness` (Rust 1.85+).
+Supported platforms: Linux x86_64/aarch64 (static musl), macOS x86_64/arm64,
+and Windows x86_64 (zip release, npm, or `cargo install`). Other platforms
+install from source: `cargo install --path crates/do-harness` (Rust 1.85+).
 
 Rust toolchains can install from crates.io instead, either building from
 source or fetching the release artifact:

@@ -12,9 +12,9 @@ The wrapper contains no verification policy. It resolves the prebuilt binary
 for the current platform from a platform package installed through
 `optionalDependencies` and execs it with inherited stdio.
 
-Supported platforms: Linux x64/arm64 (static musl) and macOS x64/arm64.
-Windows is not shipped. On unsupported platforms use the shell installer or
-build from source:
+Supported platforms: Linux x64/arm64 (static musl), macOS x64/arm64, and
+Windows x64. Other platforms install from source or download a release;
+Linux/macOS can use the shell installer:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/d-o-hub/do-harness/main/scripts/install.sh | sh
