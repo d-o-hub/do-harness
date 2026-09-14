@@ -97,6 +97,22 @@ pub struct SensorSpec {
         skip_serializing_if = "Vec::is_empty"
     )]
     pub when_changed: Vec<String>,
+    /// Repository-relative glob patterns of artifacts this sensor produces
+    /// (screenshots, reports, JSON findings). Matches are SHA-256 digested
+    /// into the evidence artifact; a declared glob that matches nothing makes
+    /// the run non-strict.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub artifacts: Vec<String>,
+    /// Repository-relative glob patterns of files that define what this
+    /// sensor covers (e.g. a viewport/locale matrix module). Their content is
+    /// part of the policy fingerprint, so changing the definition makes
+    /// evidence stale without re-running sensors.
+    #[serde(
+        default,
+        rename = "coverage-inputs",
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub coverage_inputs: Vec<String>,
 }
 
 impl SensorSpec {
@@ -130,6 +146,8 @@ fn spec(name: &str, argv: &[&str], when_changed: &[&str]) -> SensorSpec {
         allow_failure: false,
         transient_exit_codes: Vec::new(),
         when_changed: when_changed.iter().map(|glob| (*glob).to_owned()).collect(),
+        artifacts: Vec::new(),
+        coverage_inputs: Vec::new(),
     }
 }
 
@@ -228,7 +246,9 @@ impl Config {
             .map(|s| s.name.as_str())
             .collect();
         for sensor in &self.sensors {
-            validate_globs(&sensor.name, &sensor.when_changed)?;
+            validate_globs(&sensor.name, "when-changed", &sensor.when_changed)?;
+            validate_globs(&sensor.name, "artifacts", &sensor.artifacts)?;
+            validate_globs(&sensor.name, "coverage-inputs", &sensor.coverage_inputs)?;
             if sensor.allow_failure && sensor.severity == Some(SensorSeverity::Error) {
                 anyhow::bail!(
                     "sensor '{}' sets both allow_failure = true and severity = \"error\"; \
@@ -268,9 +288,9 @@ fn is_valid_set_name(set: &str) -> bool {
             .all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '_' || c == '-')
 }
 
-/// Rejects `when-changed` patterns that cannot compile, so a typo fails at
-/// config load instead of silently changing applicability at verify time.
-fn validate_globs(sensor: &str, patterns: &[String]) -> Result<()> {
+/// Rejects glob patterns that cannot compile, so a typo fails at config load
+/// instead of silently changing applicability or evidence at verify time.
+fn validate_globs(sensor: &str, field: &str, patterns: &[String]) -> Result<()> {
     if patterns.is_empty() {
         return Ok(());
     }
@@ -280,13 +300,13 @@ fn validate_globs(sensor: &str, patterns: &[String]) -> Result<()> {
             .literal_separator(true)
             .build()
             .with_context(|| {
-                format!("sensor '{sensor}' has an invalid when-changed pattern '{pattern}'")
+                format!("sensor '{sensor}' has an invalid {field} pattern '{pattern}'")
             })?;
         builder.add(glob);
     }
     builder
         .build()
-        .with_context(|| format!("sensor '{sensor}' has unusable when-changed patterns"))?;
+        .with_context(|| format!("sensor '{sensor}' has unusable {field} patterns"))?;
     Ok(())
 }
 

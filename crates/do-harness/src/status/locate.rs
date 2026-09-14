@@ -103,13 +103,17 @@ pub(super) fn find_covering_evidence(
 
 /// Whether `document` can satisfy `set`: exact set match, or a config-share
 /// superset covering every required sensor. Freshness (red vs stale) is
-/// decided by the caller from the fingerprints.
+/// decided by the caller from the fingerprints. Schema v3 artifacts parse
+/// into v4 with defaults and stay current; only pre-fingerprint schemas are
+/// legacy.
 pub(super) fn qualifies(
     document: &EvidenceDocument,
     set: Option<&str>,
     required: &[String],
 ) -> bool {
-    if document.schema_version != crate::evidence::EVIDENCE_SCHEMA_VERSION {
+    if !(crate::evidence::MIN_CURRENT_SCHEMA_VERSION..=crate::evidence::EVIDENCE_SCHEMA_VERSION)
+        .contains(&document.schema_version)
+    {
         return false;
     }
     if document.signal_set.as_deref() == set {
@@ -136,5 +140,5 @@ pub(super) fn is_legacy_evidence(bytes: &[u8]) -> bool {
                 .get("schema_version")
                 .and_then(serde_json::Value::as_u64)
         })
-        .is_some_and(|version| version < u64::from(crate::evidence::EVIDENCE_SCHEMA_VERSION))
+        .is_some_and(|version| version < u64::from(crate::evidence::MIN_CURRENT_SCHEMA_VERSION))
 }

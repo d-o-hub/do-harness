@@ -67,11 +67,55 @@ pub fn for_run(
     changed: &ChangedFiles,
 ) -> Fingerprints {
     let baseline_digest = crate::baselines::digest(root);
+    let coverage_digest = coverage_digest(root, candidates);
     Fingerprints {
         workspace: workspace_fingerprint(root, changed),
-        policy: policy_fingerprint(cfg, config_bytes, set, candidates, &baseline_digest),
-        config: config_fingerprint(cfg, config_bytes, candidates, &baseline_digest),
+        policy: policy_fingerprint(
+            cfg,
+            config_bytes,
+            set,
+            candidates,
+            &baseline_digest,
+            &coverage_digest,
+        ),
+        config: config_fingerprint(
+            cfg,
+            config_bytes,
+            candidates,
+            &baseline_digest,
+            &coverage_digest,
+        ),
     }
+}
+
+/// Content digest of every sensor's `coverage-inputs` matches.
+///
+/// Coverage definitions (e.g. a viewport/locale matrix module) live outside
+/// `do-harness.toml`; hashing them into the policy fingerprint means editing
+/// the definition makes prior evidence stale without re-running sensors.
+#[must_use]
+pub fn coverage_digest(root: &Path, candidates: &[&SensorSpec]) -> String {
+    let mut entries: Vec<(String, String, String)> = Vec::new();
+    for spec in candidates {
+        if spec.coverage_inputs.is_empty() {
+            continue;
+        }
+        for artifact in crate::artifacts::resolve(root, &spec.coverage_inputs) {
+            entries.push((spec.name.clone(), artifact.path, artifact.sha256));
+        }
+    }
+    entries.sort();
+    let payload = serde_json::json!({
+        "coverage_inputs": entries
+            .iter()
+            .map(|(sensor, path, sha256)| serde_json::json!({
+                "sensor": sensor,
+                "path": path,
+                "sha256": sha256,
+            }))
+            .collect::<Vec<_>>(),
+    });
+    hash_canonical(&payload)
 }
 
 /// Content hash of the working-tree manifest (`sha256:…`).
@@ -114,8 +158,9 @@ fn file_digest(root: &Path, file: &crate::changes::ChangedFile) -> String {
 ///
 /// Covers the raw config bytes (or the built-in marker), the harness
 /// version, the selected signal set, the full sensor definitions of the
-/// set — including applicability rules — and the blessed findings baseline
-/// digest, so any policy edit (including a bless) invalidates old evidence.
+/// set — including applicability, artifact, and coverage rules — the blessed
+/// findings baseline digest, and the coverage-inputs digest, so any policy
+/// edit (including a bless or matrix change) invalidates old evidence.
 #[must_use]
 pub fn policy_fingerprint(
     cfg: &Config,
@@ -123,6 +168,7 @@ pub fn policy_fingerprint(
     set: Option<&str>,
     candidates: &[&SensorSpec],
     baseline_digest: &str,
+    coverage_digest: &str,
 ) -> String {
     let payload = serde_json::json!({
         "config": config_digest(config_bytes),
@@ -130,6 +176,7 @@ pub fn policy_fingerprint(
         "language": cfg.language,
         "signal_set": set,
         "baselines": baseline_digest,
+        "coverage": coverage_digest,
         "sensors": candidates.iter().copied().map(policy_sensor).collect::<Vec<_>>(),
     });
     hash_canonical(&payload)
@@ -142,12 +189,14 @@ pub fn config_fingerprint(
     config_bytes: Option<&[u8]>,
     candidates: &[&SensorSpec],
     baseline_digest: &str,
+    coverage_digest: &str,
 ) -> String {
     let payload = serde_json::json!({
         "config": config_digest(config_bytes),
         "harness_version": env!("CARGO_PKG_VERSION"),
         "language": cfg.language,
         "baselines": baseline_digest,
+        "coverage": coverage_digest,
         "sensors": candidates.iter().copied().map(policy_sensor).collect::<Vec<_>>(),
     });
     hash_canonical(&payload)
@@ -164,6 +213,8 @@ fn policy_sensor(spec: &SensorSpec) -> serde_json::Value {
         "allow_failure": spec.allow_failure,
         "transient_exit_codes": spec.transient_exit_codes,
         "when_changed": spec.when_changed,
+        "artifacts": spec.artifacts,
+        "coverage_inputs": spec.coverage_inputs,
     })
 }
 
@@ -217,6 +268,8 @@ mod tests {
                 severity: None,
                 allow_failure: false,
                 transient_exit_codes: Vec::new(),
+                artifacts: Vec::new(),
+                coverage_inputs: Vec::new(),
                 when_changed: Vec::new(),
             }],
             jobs: None,
@@ -274,49 +327,59 @@ mod tests {
         assert_eq!(without, with);
     }
 
-    /// A config byte change alters the policy fingerprint, and so does the
-    /// blessed baseline digest.
+    /// Config bytes, the blessed baseline, and the coverage digest all feed
+    /// the policy fingerprint.
     #[test]
-    fn config_bytes_and_baselines_change_policy_fingerprint() {
+    fn config_baselines_and_coverage_change_policy_fingerprint() {
         let cfg = config();
         let candidates: Vec<&SensorSpec> = cfg.sensors.iter().collect();
-        let first = policy_fingerprint(
-            &cfg,
-            Some(b"a = 1\n"),
-            Some("verification"),
-            &candidates,
-            "absent",
-        );
-        let same = policy_fingerprint(
-            &cfg,
-            Some(b"a = 1\n"),
-            Some("verification"),
-            &candidates,
-            "absent",
-        );
-        assert_eq!(first, same);
-        let second = policy_fingerprint(
-            &cfg,
-            Some(b"a = 1\n# tweak\n"),
-            Some("verification"),
-            &candidates,
-            "absent",
-        );
+        let call = |config: &[u8], baseline: &str, coverage: &str| {
+            policy_fingerprint(
+                &cfg,
+                Some(config),
+                Some("verification"),
+                &candidates,
+                baseline,
+                coverage,
+            )
+        };
+        let first = call(b"a = 1\n", "absent", "coverage-none");
+        assert_eq!(first, call(b"a = 1\n", "absent", "coverage-none"));
+        let second = call(b"a = 1\n# tweak\n", "absent", "coverage-none");
         assert_ne!(first, second, "config bytes must feed the policy hash");
-        let blessed = policy_fingerprint(
+        let blessed = call(b"a = 1\n", "deadbeef", "coverage-none");
+        assert_ne!(first, blessed, "baseline digest must feed the policy hash");
+        let coverage = call(b"a = 1\n", "absent", "coverage-changed");
+        assert_ne!(first, coverage, "coverage digest must feed the policy hash");
+        // The set-free config fingerprint ignores the signal-set name.
+        let free_a = config_fingerprint(
             &cfg,
             Some(b"a = 1\n"),
-            Some("verification"),
             &candidates,
-            "deadbeef",
+            "absent",
+            "coverage-none",
         );
-        assert_ne!(first, blessed, "baseline digest must feed the policy hash");
-        // The set-free config fingerprint ignores the signal-set name.
-        let free_a = config_fingerprint(&cfg, Some(b"a = 1\n"), &candidates, "absent");
         assert_ne!(
             first, free_a,
             "policy and config fingerprints must differ structurally"
         );
+    }
+
+    /// `coverage_digest` changes when a declared coverage input changes.
+    #[test]
+    fn coverage_digest_tracks_declared_inputs() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("matrix.mjs"), "v1\n").unwrap();
+        let mut cfg = config();
+        cfg.sensors[0].coverage_inputs = vec!["matrix.mjs".to_owned()];
+        let candidates: Vec<&SensorSpec> = cfg.sensors.iter().collect();
+        let before = coverage_digest(dir.path(), &candidates);
+        let repeat = coverage_digest(dir.path(), &candidates);
+        assert_eq!(before, repeat, "coverage digest must be deterministic");
+
+        std::fs::write(dir.path().join("matrix.mjs"), "v2\n").unwrap();
+        let after = coverage_digest(dir.path(), &candidates);
+        assert_ne!(before, after, "matrix edit must change the coverage digest");
     }
 
     /// Discovery failure yields a stable marker, never a crash.

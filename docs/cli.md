@@ -90,20 +90,31 @@ warn `3` consecutive times under `--record` are quarantined — skipped with an
 advisory `WARN` verdict instead of halting the run — until a passing run or
 `errors clear` resets their strikes.
 
-Evidence schema v3 records each sensor's exact `argv` and a SHA-256 of its
+Evidence schema v4 records each sensor's exact `argv` and a SHA-256 of its
 captured output, the selected `signal_set`, the post-run workspace
 fingerprint (content hashes of staged, unstaged, deleted, renamed, and
 relevant untracked files — never mtimes, and never harness-owned
 `.do-harness/` state), the policy fingerprint (raw config bytes, harness
-version, set, and full sensor definitions including `when-changed`), and the
-change-aware `skipped` sensors with reasons. Artifacts chain to the previous
-file at the same path (`chain_hash`/`prev_hash`) so tampering or reordering
-is detectable. CI uploads only the artifact and a `Cargo.lock` hash; the
-local database is not uploaded and can be pruned with `maintenance`.
+version, set, full sensor definitions including `when-changed`, plus the
+blessed findings baseline and coverage-inputs digests), and the
+change-aware `skipped` sensors with reasons. Sensors that declare
+`artifacts = ["glob", ...]` get every match SHA-256 digested into the sensor
+record (a declared glob that matches nothing degrades the sensor to `warn`);
+sensors that print a `COVERAGE: <json>` marker get the manifest aggregated
+under `coverage` by sensor name. Sensors that declare
+`coverage-inputs = [...]` feed those files into the policy fingerprint, so
+editing the matrix definition makes evidence stale without re-running.
+Artifacts chain to the previous file at the same path
+(`chain_hash`/`prev_hash`) so tampering or reordering is detectable. CI
+uploads only the artifact and a `Cargo.lock` hash; the local database is not
+uploaded and can be pruned with `maintenance`. Schema v3 artifacts (no
+artifacts/coverage) stay readable and current; pre-fingerprint (v2 or older)
+artifacts are legacy (missing).
 
-Schema v2 artifacts (no fingerprints) are still chain-linked when a v3 run
+Schema v2 artifacts (no fingerprints) are still chain-linked when a v4 run
 overwrites them, but `status` treats them as legacy (missing), never as
-current evidence.
+current evidence. Schema v3 artifacts parse into v4 with empty
+`artifacts`/`coverage` and stay current.
 
 ### `status`
 Reports verification evidence freshness for a signal set without executing

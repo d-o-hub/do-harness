@@ -25,6 +25,8 @@ fn severity_config(name: &str, argv: &[&str], severity: SensorSeverity) -> Confi
             severity: Some(severity),
             allow_failure: false,
             transient_exit_codes: vec![],
+            artifacts: Vec::new(),
+            coverage_inputs: Vec::new(),
             when_changed: vec![],
         }],
         jobs: None,

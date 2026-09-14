@@ -198,6 +198,8 @@ mod tests {
             severity: None,
             allow_failure: false,
             transient_exit_codes: vec![],
+            artifacts: Vec::new(),
+            coverage_inputs: Vec::new(),
             when_changed: vec![],
         }
     }
