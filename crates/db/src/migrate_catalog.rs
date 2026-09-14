@@ -82,4 +82,9 @@ pub const MIGRATIONS: &[Migration] = &[
         name: "lift_floors",
         sql: include_str!("../migrations/0014_lift_floors.sql"),
     },
+    Migration {
+        version: 15,
+        name: "eval_mode",
+        sql: include_str!("../migrations/0015_eval_mode.sql"),
+    },
 ];

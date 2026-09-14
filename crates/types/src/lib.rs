@@ -26,7 +26,7 @@ pub use chain::{canonical_payload, canonical_value, chain_hash};
 pub use decision::{DecisionHeader, parse_invariants_json};
 pub use error_signature::ErrorSignature;
 pub use eval_dim::EvalDim;
-pub use eval_run::{GraderBaseline, SkillEvalBless, SkillEvalDimRate, SkillEvalRun};
+pub use eval_run::{EvalMode, GraderBaseline, SkillEvalBless, SkillEvalDimRate, SkillEvalRun};
 pub use event::{Command, DomainEvent, Projection};
 pub use heuristic::Heuristic;
 pub use htn::{Method, Precondition, Subtask, TaskState, TaskStateParseError};

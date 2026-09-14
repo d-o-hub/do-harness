@@ -24,6 +24,8 @@ pub struct SkillTrend {
     pub lift: Option<f64>,
     /// Blessed lift floor, when set.
     pub lift_floor: Option<f64>,
+    /// Execution mode of the latest run: deterministic or agent.
+    pub mode: Option<do_harness_types::EvalMode>,
     /// Context-cost proxy of the latest run: skill words loaded.
     pub skill_words: Option<i64>,
     /// Execution-cost proxy of the latest run: walkthrough seconds.
@@ -94,7 +96,7 @@ pub async fn run_metrics(
             }
         }
         let latest_run = do_harness_db::latest_eval_run(&conn, &summary.skill_name).await?;
-        let (lift, skill_words, walk_secs, dims) = match latest_run {
+        let (lift, mode, skill_words, walk_secs, dims) = match latest_run {
             Some(run) => {
                 let lift = match (run.pass_rate, run.without_pass_rate) {
                     (Some(with), Some(without)) => Some(with - without),
@@ -114,9 +116,9 @@ pub async fn run_metrics(
                         dim: rate.dim,
                     });
                 }
-                (lift, run.skill_words, run.walk_secs, dims)
+                (lift, Some(run.mode), run.skill_words, run.walk_secs, dims)
             }
-            None => (None, None, None, Vec::new()),
+            None => (None, None, None, None, Vec::new()),
         };
         skills.push(SkillTrend {
             latest_pass_rate: latest_by_skill.get(&summary.skill_name).copied().flatten(),
@@ -126,6 +128,7 @@ pub async fn run_metrics(
             runs: summary.runs,
             lift,
             lift_floor: do_harness_db::get_lift_floor(&conn, &summary.skill_name).await?,
+            mode,
             skill_words,
             walk_secs,
             dims,
@@ -198,8 +201,11 @@ fn print_text(snapshot: &MetricsSnapshot) {
         let walk = trend
             .walk_secs
             .map_or_else(|| "-".to_owned(), |secs| format!("{secs:.1}s"));
+        let mode = trend
+            .mode
+            .map_or_else(|| "-".to_owned(), |mode| mode.to_string());
         println!(
-            "  {:<16} latest={latest} best={best} runs={} bar={bar} lift={lift} lift_floor={lift_floor} words={words} walk={walk}",
+            "  {:<16} latest={latest} best={best} runs={} bar={bar} lift={lift} lift_floor={lift_floor} words={words} walk={walk} mode={mode}",
             trend.name, trend.runs
         );
         for dim in &trend.dims {

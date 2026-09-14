@@ -63,7 +63,9 @@ flow, walkthrough env contract) get exact scripts; judgment calls
    carrying the cause on failure.
 5. Validate: `scripts/quick_validate.py <skill-dir>`, then
    `do-harness eval --skill <name>`; re-bless graders explicitly:
-   `do-harness eval --bless --skill <name>`.
+   `do-harness eval --bless --skill <name>`. Fixtures are
+   executor-agnostic: `eval --agent-cmd <command>` runs an agent per case
+   and grades the same assertions, which measures true Skill Lift.
 6. Iterate from eval evidence. New reusable patterns go through
    `.agents/skills/skill-distiller`, never straight into prose.
 

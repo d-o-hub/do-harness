@@ -181,15 +181,23 @@ Skill structure validation and evaluation benchmark runner.
   approver and timestamp; an approver is required (`--approver`,
   `DO_HARNESS_APPROVER`, or the git user email).
 - `--approver <NAME>`: Identity recorded with `--bless`.
+- `--no-lift`: Skip the without-skill baseline run (no Skill Lift measured).
+- `--agent-cmd <COMMAND>`: Run this shell command once per eval case instead
+  of the deterministic walkthrough (true Skill Lift). cwd is the sandbox root;
+  the prompt is in `$DO_HARNESS_PROMPT` and on stdin; stdout is saved to
+  `agent_stdout.txt` for assertions.
+- `--agent-timeout <SECS>`: Kill an agent run after this many seconds
+  (default 600).
 - `--list-skills`: List discovered skills under `.agents/skills`.
 - `--fail-fast`: Halt evaluation on first failing skill.
 - `--dry-run`: Perform dry-run evaluation without updating state.
 - `--format <Format>`: Output format (`text` or `json`).
 
-**Sandbox boundary:** walkthroughs and graded assertions execute in a
-`tempfile` filesystem sandbox only. There is no seccomp/netns/gVisor
-isolation; children run with the caller's privileges. Treat skill walkthroughs
-as untrusted code and wrap the whole command in an outer sandbox if needed.
+**Sandbox boundary:** walkthroughs, agent commands, and graded assertions
+execute in a `tempfile` filesystem sandbox only. There is no seccomp/netns/
+gVisor isolation; children run with the caller's privileges. Treat skill
+walkthroughs and `--agent-cmd` commands as untrusted code and wrap the whole
+command in an outer sandbox if needed.
 
 ### `distill`
 Extracts a heuristic from a resolved trace into a skill.

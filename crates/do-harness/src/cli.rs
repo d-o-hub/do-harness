@@ -243,6 +243,15 @@ pub enum Command {
         /// Skip the without-skill baseline run (no Skill Lift measured).
         #[arg(long)]
         no_lift: bool,
+        /// Run this shell command once per eval case instead of the
+        /// deterministic walkthrough (real Skill Lift). cwd is the sandbox
+        /// root; the prompt is in `$DO_HARNESS_PROMPT` and on stdin; stdout
+        /// is saved to `agent_stdout.txt` for assertions.
+        #[arg(long, value_name = "COMMAND")]
+        agent_cmd: Option<String>,
+        /// Kill an agent run after this many seconds.
+        #[arg(long, value_name = "SECS", default_value_t = 600)]
+        agent_timeout: u64,
     },
     /// Manage git hooks that run `do-harness verify`.
     Hook {

@@ -1,16 +1,14 @@
-//! Every run grades twice: once with the skill installed and once with the
-//! guidance payload (`SKILL.md` + `references/`) stripped. The delta is the
-//! Skill Lift in points. Cases carry an optional `dim` (one of the five
-//! [`do_harness_types::EvalDim`] wire names, defaulting to `effectiveness`)
-//! so lift also breaks down per dimension instead of hiding behind the
-//! aggregate pass rate.
+//! Evaluation JSON contracts, structure gating, and assertion grading.
 //!
-//! Self-referential walkthroughs — those that invoke the skill body as the
-//! subject under test (e.g. validating the skill copy itself, or distilling
-//! into the skill itself) — fail the without-run by construction and report
-//! lift `+1.00`. That is honest (every check depends on the skill existing)
-//! but uninformative about guidance value; read their per-dimension rows,
-//! not the headline, when comparing skills.
+//! Two executors produce residue for the same fixture: the deterministic
+//! `evals/walkthrough.sh` (one sandbox per skill) and, with
+//! `eval --agent-cmd`, an external agent command (one sandbox per case; see
+//! [`super::agent`]). Both grade through [`grade_skill`], so the assertion
+//! DSL and dimension tallies stay identical across modes.
+//!
+//! Cases carry an optional `dim` (one of the five [`do_harness_types::EvalDim`]
+//! wire names, defaulting to `effectiveness`) so results break down per
+//! dimension instead of hiding behind the aggregate pass rate.
 
 use std::io;
 use std::path::Path;
@@ -32,7 +30,7 @@ pub(super) struct SkillEvals {
     pub(super) evals: Vec<EvalCase>,
 }
 
-#[derive(Debug, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct EvalCase {
     #[allow(dead_code)]
@@ -46,14 +44,6 @@ pub(super) struct EvalCase {
     /// preserving the pre-dimension meaning of the aggregate pass rate.
     #[serde(default)]
     pub(super) dim: EvalDim,
-}
-
-/// Per-dimension tally within one grading pass.
-#[derive(Debug, Clone)]
-pub(super) struct DimOutcome {
-    pub(super) dim: EvalDim,
-    pub(super) graded: u32,
-    pub(super) passed: u32,
 }
 
 pub(super) struct SkillReport {
@@ -74,7 +64,7 @@ pub(super) struct SkillReport {
     pub(super) dims: Vec<DimReport>,
     /// Words in the installed `SKILL.md` plus `references/`.
     pub(super) skill_words: i64,
-    /// Walkthrough wall time in seconds (with-skill run).
+    /// Executor wall time in seconds (walkthrough or agent runs).
     pub(super) walk_secs: f64,
 }
 
@@ -87,13 +77,90 @@ pub(super) struct DimReport {
     pub(super) without_passed: Option<u32>,
 }
 
-pub(super) async fn check_skill(
-    root: &Path,
+/// Result of the Tier-1 structure gate plus fixture parsing.
+pub(super) enum GateOutcome {
+    /// Structure gate failed; eval is skipped (fail-closed).
+    Failed(SkillReport),
+    /// The skill ships no evals: nothing to grade.
+    NoEvals(SkillReport),
+    /// The fixture does not parse: nothing to grade.
+    InvalidEvals(SkillReport),
+    /// Ready to execute with the parsed fixture.
+    Ready {
+        structure: String,
+        evals: SkillEvals,
+    },
+}
+
+/// Runs `quick_validate.py` against `dir`, then parses `evals/evals.json`.
+///
+/// Both executors share this so gate failures, missing fixtures, and invalid
+/// fixtures report identically.
+pub(super) async fn gate_and_parse(
     dir: &Path,
     name: &str,
     gate_script: &Path,
-) -> Result<SkillReport> {
-    let empty = || SkillReport {
+) -> Result<GateOutcome> {
+    let (verdict, gate_msg) = {
+        let dir = dir.to_path_buf();
+        let gate_script = gate_script.to_path_buf();
+        tokio::task::spawn_blocking(move || run_structure_gate(&dir, &gate_script))
+            .await
+            .with_context(|| format!("structure gate task failed for '{name}'"))?
+    };
+    if verdict == GateVerdict::Fail {
+        return Ok(GateOutcome::Failed(SkillReport {
+            gate_failed: true,
+            line: format!("{name}: structure=invalid: {gate_msg} evals=skipped"),
+            ..empty_report()
+        }));
+    }
+    let structure = match verdict {
+        GateVerdict::Pass => "ok".to_owned(),
+        GateVerdict::Unavailable => format!("unknown (gate unavailable: {gate_msg})"),
+        GateVerdict::Fail => unreachable!("handled above"),
+    };
+
+    let evals_path = dir.join("evals/evals.json");
+    let content = match tokio::fs::read_to_string(&evals_path).await {
+        Ok(content) => content,
+        Err(err) if err.kind() == io::ErrorKind::NotFound => {
+            let mut report = empty_report();
+            report.line = format!("{name}: structure={structure} evals=none");
+            return Ok(GateOutcome::NoEvals(report));
+        }
+        Err(err) => {
+            return Err(err).with_context(|| format!("failed to read {}", evals_path.display()));
+        }
+    };
+    match serde_json::from_str::<SkillEvals>(&content) {
+        Ok(evals) => Ok(GateOutcome::Ready { structure, evals }),
+        Err(err) => {
+            let mut report = empty_report();
+            report.line = format!("{name}: structure={structure} evals-invalid: {err}");
+            Ok(GateOutcome::InvalidEvals(report))
+        }
+    }
+}
+
+/// Reads and parses a skill's `evals/evals.json`; `None` when absent.
+pub(super) async fn load_evals(dir: &Path) -> Result<Option<SkillEvals>> {
+    let evals_path = dir.join("evals/evals.json");
+    let content = match tokio::fs::read_to_string(&evals_path).await {
+        Ok(content) => content,
+        Err(err) if err.kind() == io::ErrorKind::NotFound => return Ok(None),
+        Err(err) => {
+            return Err(err).with_context(|| format!("failed to read {}", evals_path.display()));
+        }
+    };
+    serde_json::from_str::<SkillEvals>(&content)
+        .map(Some)
+        .with_context(|| format!("failed to parse {}", evals_path.display()))
+}
+
+/// Empty report used as the base for early exits.
+fn empty_report() -> SkillReport {
+    SkillReport {
         gate_failed: false,
         line: String::new(),
         pass_rate: None,
@@ -108,89 +175,22 @@ pub(super) async fn check_skill(
         dims: Vec::new(),
         skill_words: 0,
         walk_secs: 0.0,
-    };
-
-    let (verdict, gate_msg) = {
-        let dir = dir.to_path_buf();
-        let gate_script = gate_script.to_path_buf();
-        tokio::task::spawn_blocking(move || run_structure_gate(&dir, &gate_script))
-            .await
-            .with_context(|| format!("structure gate task failed for '{name}'"))?
-    };
-    if verdict == GateVerdict::Fail {
-        return Ok(SkillReport {
-            gate_failed: true,
-            line: format!("{name}: structure=invalid: {gate_msg} evals=skipped"),
-            ..empty()
-        });
     }
-    let structure = match verdict {
-        GateVerdict::Pass => "ok".to_owned(),
-        GateVerdict::Unavailable => format!("unknown (gate unavailable: {gate_msg})"),
-        GateVerdict::Fail => unreachable!("handled above"),
-    };
-
-    let outcome = grade_evals_in(dir, root, name).await?;
-    let Some(outcome) = outcome else {
-        let mut report = empty();
-        report.line = format!("{name}: structure={structure} evals=none");
-        return Ok(report);
-    };
-    let words = skill_words(dir);
-    let mut report = report_from_outcome(name, &structure, outcome, words);
-    report.lift = None;
-    Ok(report)
 }
 
-/// Grades the same evals with the guidance payload stripped (no structure
-/// gate: `SKILL.md` is absent by design). The caller pairs this baseline
-/// with the with-skill report to compute Skill Lift.
-pub(super) async fn check_skill_without(root: &Path, dir: &Path) -> Result<GradeOutcome> {
-    let evals_path = dir.join("evals/evals.json");
-    let content = tokio::fs::read_to_string(&evals_path)
-        .await
-        .with_context(|| format!("failed to read {}", evals_path.display()))?;
-    let parsed: SkillEvals = serde_json::from_str(&content)
-        .with_context(|| format!("failed to parse {}", evals_path.display()))?;
-    let walk = {
-        let dir = dir.to_path_buf();
-        let root = root.to_path_buf();
-        tokio::task::spawn_blocking(move || crate::eval_walk::run_walkthrough(&dir, &root))
-            .await
-            .with_context(|| "without-skill walkthrough task failed")?
-    };
-    grade_skill(&parsed, root, &walk).await
-}
-
-/// Parses `evals.json`, runs the walkthrough timed, and grades. Returns
-/// `None` when the skill ships no evals, or an `evals-invalid` outcome when
-/// the fixture does not parse (unknown dims included).
-async fn grade_evals_in(dir: &Path, root: &Path, name: &str) -> Result<Option<TimedOutcome>> {
-    let evals_path = dir.join("evals/evals.json");
-    let content = match tokio::fs::read_to_string(&evals_path).await {
-        Ok(content) => content,
-        Err(err) if err.kind() == io::ErrorKind::NotFound => return Ok(None),
-        Err(err) => {
-            return Err(err).with_context(|| format!("failed to read {}", evals_path.display()));
-        }
-    };
-
-    let parsed = match serde_json::from_str::<SkillEvals>(&content) {
-        Ok(parsed) => parsed,
-        Err(err) => {
-            return Ok(Some(TimedOutcome {
-                outcome: GradeOutcome {
-                    passed: 0,
-                    graded: 0,
-                    pass_rate: None,
-                    prompt: None,
-                    expected_outcome: None,
-                    dims: Vec::new(),
-                    invalid: Some(format!("evals-invalid: {err}")),
-                },
-                walk_secs: 0.0,
-            }));
-        }
+/// Deterministic path: gate, parse, run the walkthrough once, grade every
+/// case against its residue.
+pub(super) async fn check_skill(
+    root: &Path,
+    dir: &Path,
+    name: &str,
+    gate_script: &Path,
+) -> Result<SkillReport> {
+    let (structure, evals) = match gate_and_parse(dir, name, gate_script).await? {
+        GateOutcome::Failed(report)
+        | GateOutcome::NoEvals(report)
+        | GateOutcome::InvalidEvals(report) => return Ok(report),
+        GateOutcome::Ready { structure, evals } => (structure, evals),
     };
 
     let started = Instant::now();
@@ -201,41 +201,40 @@ async fn grade_evals_in(dir: &Path, root: &Path, name: &str) -> Result<Option<Ti
             .await
             .with_context(|| format!("walkthrough task failed for '{name}'"))?
     };
-    let walk_secs = started.elapsed().as_secs_f64();
-    let outcome = grade_skill(&parsed, root, &walk).await?;
-    Ok(Some(TimedOutcome { outcome, walk_secs }))
+    let mut outcome = grade_skill(&evals, root, &walk).await?;
+    outcome.walk_secs = started.elapsed().as_secs_f64();
+    let mut report = report_from_outcome(name, &structure, outcome, skill_words(dir));
+    report.lift = None;
+    Ok(report)
 }
 
-struct TimedOutcome {
-    outcome: GradeOutcome,
-    walk_secs: f64,
+/// Grades the same evals with the guidance payload stripped (no structure
+/// gate: `SKILL.md` is absent by design). The caller pairs this baseline
+/// with the with-skill report to compute Skill Lift.
+pub(super) async fn check_skill_without(root: &Path, dir: &Path) -> Result<GradeOutcome> {
+    let evals = load_evals(dir)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("no evals at {}", dir.display()))?;
+    let started = Instant::now();
+    let walk = {
+        let dir = dir.to_path_buf();
+        let root = root.to_path_buf();
+        tokio::task::spawn_blocking(move || crate::eval_walk::run_walkthrough(&dir, &root))
+            .await
+            .with_context(|| "without-skill walkthrough task failed")?
+    };
+    let mut outcome = grade_skill(&evals, root, &walk).await?;
+    outcome.walk_secs = started.elapsed().as_secs_f64();
+    Ok(outcome)
 }
 
-fn report_from_outcome(
+/// Builds the report line and `SkillReport` from a graded outcome.
+pub(super) fn report_from_outcome(
     name: &str,
     structure: &str,
-    timed: TimedOutcome,
+    outcome: GradeOutcome,
     words: i64,
 ) -> SkillReport {
-    let outcome = timed.outcome;
-    if let Some(invalid) = outcome.invalid.as_deref() {
-        return SkillReport {
-            gate_failed: false,
-            line: format!("{name}: structure={structure} {invalid}"),
-            pass_rate: None,
-            graded: 0,
-            passed: 0,
-            prompt: None,
-            expected_outcome: None,
-            lift: None,
-            without_pass_rate: None,
-            without_graded: 0,
-            without_passed: 0,
-            dims: Vec::new(),
-            skill_words: words,
-            walk_secs: timed.walk_secs,
-        };
-    }
     let line = match outcome.pass_rate {
         Some(rate) => format!(
             "{name}: structure={structure} evals={}/{} pass_rate={rate:.2}",
@@ -269,13 +268,13 @@ fn report_from_outcome(
             })
             .collect(),
         skill_words: words,
-        walk_secs: timed.walk_secs,
+        walk_secs: outcome.walk_secs,
     }
 }
 
 /// Words in `SKILL.md` plus every `references/**/*.md`: the context the
 /// skill costs whenever it loads.
-fn skill_words(dir: &Path) -> i64 {
+pub(super) fn skill_words(dir: &Path) -> i64 {
     let mut words = 0i64;
     let body = std::fs::read_to_string(dir.join("SKILL.md")).unwrap_or_default();
     words =
@@ -301,6 +300,14 @@ fn skill_words(dir: &Path) -> i64 {
     words
 }
 
+/// Per-dimension tally within one grading pass.
+#[derive(Debug, Clone)]
+pub(super) struct DimOutcome {
+    pub(super) dim: EvalDim,
+    pub(super) graded: u32,
+    pub(super) passed: u32,
+}
+
 pub(super) struct GradeOutcome {
     pub(super) passed: u32,
     pub(super) graded: u32,
@@ -308,10 +315,63 @@ pub(super) struct GradeOutcome {
     pub(super) prompt: Option<String>,
     pub(super) expected_outcome: Option<String>,
     pub(super) dims: Vec<DimOutcome>,
-    /// Set when the fixture itself is unparsable; grading is skipped.
-    pub(super) invalid: Option<String>,
+    /// Executor wall time for this pass, in seconds.
+    pub(super) walk_secs: f64,
 }
 
+impl GradeOutcome {
+    /// Empty accumulator for per-case agent grading.
+    pub(super) fn empty() -> Self {
+        GradeOutcome {
+            passed: 0,
+            graded: 0,
+            pass_rate: None,
+            prompt: None,
+            expected_outcome: None,
+            dims: Vec::new(),
+            walk_secs: 0.0,
+        }
+    }
+
+    /// Folds one graded case into the accumulator and recomputes the rate.
+    pub(super) fn merge_case(&mut self, case: GradeOutcome) {
+        self.passed += case.passed;
+        self.graded += case.graded;
+        if self.prompt.is_none() {
+            self.prompt = case.prompt;
+            self.expected_outcome = case.expected_outcome;
+        }
+        for add in case.dims {
+            match self.dims.iter_mut().find(|d| d.dim == add.dim) {
+                Some(existing) => {
+                    existing.graded += add.graded;
+                    existing.passed += add.passed;
+                }
+                None => self.dims.push(add),
+            }
+        }
+        self.dims.sort_by_key(|d| {
+            EvalDim::all()
+                .iter()
+                .position(|candidate| *candidate == d.dim)
+                .unwrap_or(usize::MAX)
+        });
+        self.pass_rate = (self.graded > 0).then(|| f64::from(self.passed) / f64::from(self.graded));
+    }
+}
+
+/// Wraps `evals` into a single-case suite for per-case agent grading.
+pub(super) fn single_case(evals: &SkillEvals, case: &EvalCase) -> SkillEvals {
+    SkillEvals {
+        skill_name: evals.skill_name.clone(),
+        evals: vec![case.clone()],
+    }
+}
+
+/// Grades every graded assertion in `evals` against `root`'s residue.
+///
+/// A failed executor ([`WalkRun::success`] false) fails every graded
+/// assertion with the executor's detail as the reason.
 pub(super) async fn grade_skill(
     evals: &SkillEvals,
     root: &Path,
@@ -343,7 +403,7 @@ pub(super) async fn grade_skill(
                 let reason = walk
                     .detail
                     .clone()
-                    .unwrap_or_else(|| "walkthrough.sh exited non-zero".to_owned());
+                    .unwrap_or_else(|| "executor exited non-zero".to_owned());
                 AssertionGrade {
                     passed: false,
                     reason,
@@ -376,6 +436,6 @@ pub(super) async fn grade_skill(
         prompt,
         expected_outcome,
         dims,
-        invalid: None,
+        walk_secs: 0.0,
     })
 }

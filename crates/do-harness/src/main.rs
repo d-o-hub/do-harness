@@ -280,6 +280,8 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
             format,
             approver,
             no_lift,
+            agent_cmd,
+            agent_timeout,
         } => eval::run_eval(
             &root,
             skill.as_deref(),
@@ -290,6 +292,8 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
             format,
             approver.as_deref(),
             no_lift,
+            agent_cmd.as_deref(),
+            agent_timeout,
         )
         .await
         .map_err(CliError::Verify),

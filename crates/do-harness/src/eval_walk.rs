@@ -78,7 +78,8 @@ pub fn run_walkthrough(skill_dir: &Path, root: &Path) -> WalkRun {
     match spawn_walkthrough(&script, root, &bin) {
         Ok(output) => {
             let success = output.status.success();
-            let detail = (!success).then(|| format_stderr_tail(&output.stderr));
+            let detail = (!success)
+                .then(|| format!("walkthrough.sh failed: {}", stderr_tail(&output.stderr)));
             WalkRun {
                 present: true,
                 success,
@@ -118,15 +119,18 @@ fn spawn_walkthrough(script: &Path, root: &Path, bin: &Path) -> std::io::Result<
 
 /// Bounds failed-run stderr to its last [`STDERR_TAIL_CHARS`] characters so
 /// eval output carries the cause without dumping unbounded logs.
-fn format_stderr_tail(stderr: &[u8]) -> String {
+///
+/// Shared with the agent runner in [`crate::eval::agent`], which prefixes
+/// its own context.
+pub(crate) fn stderr_tail(stderr: &[u8]) -> String {
     let text = String::from_utf8_lossy(stderr);
     let trimmed = text.trim_end();
     let count = trimmed.chars().count();
     if count <= STDERR_TAIL_CHARS {
-        return format!("walkthrough.sh failed: {trimmed}");
+        return trimmed.to_owned();
     }
     let tail: String = trimmed.chars().skip(count - STDERR_TAIL_CHARS).collect();
-    format!("walkthrough.sh failed: …{tail}")
+    format!("…{tail}")
 }
 
 #[cfg(test)]

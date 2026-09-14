@@ -2,7 +2,7 @@
 
 use crate::error::{DbError, Result};
 use crate::migrate::unix_now;
-use do_harness_types::{GraderBaseline, SkillEvalBless, SkillEvalDimRate, SkillEvalRun};
+use do_harness_types::{EvalMode, GraderBaseline, SkillEvalBless, SkillEvalDimRate, SkillEvalRun};
 use libsql::{Connection, params};
 
 /// Insert parameters for a new skill-eval run.
@@ -10,6 +10,8 @@ use libsql::{Connection, params};
 pub struct NewSkillEvalRun<'a> {
     /// Skill the evaluation belongs to.
     pub skill_name: &'a str,
+    /// How the run executed (deterministic walkthrough or agent command).
+    pub mode: EvalMode,
     /// Number of graded assertions in the run.
     pub graded: i64,
     /// Number of graded assertions that passed.
@@ -22,7 +24,7 @@ pub struct NewSkillEvalRun<'a> {
     pub without_pass_rate: Option<f64>,
     /// Context-cost proxy: words in `SKILL.md` plus `references/`.
     pub skill_words: Option<i64>,
-    /// Execution-cost proxy: walkthrough wall time in seconds.
+    /// Execution-cost proxy: walkthrough or agent wall time in seconds.
     pub walk_secs: Option<f64>,
 }
 
@@ -48,12 +50,13 @@ pub async fn insert_skill_eval_run(conn: &Connection, run: &NewSkillEvalRun<'_>)
     let mut rows = conn
         .query(
             "INSERT INTO skill_eval_runs \
-             (skill_name, graded, passed, pass_rate, without_pass_rate, \
+             (skill_name, mode, graded, passed, pass_rate, without_pass_rate, \
               skill_words, walk_secs, ran_at) \
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8) \
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9) \
              RETURNING id",
             params!(
                 run.skill_name,
+                run.mode.as_str(),
                 run.graded,
                 run.passed,
                 run.pass_rate,
@@ -97,7 +100,7 @@ pub async fn list_skill_eval_runs_page(
 ) -> Result<Vec<SkillEvalRun>> {
     let mut rows = conn
         .query(
-            "SELECT id, skill_name, graded, passed, pass_rate, without_pass_rate, \
+            "SELECT id, skill_name, mode, graded, passed, pass_rate, without_pass_rate, \
               skill_words, walk_secs, ran_at \
              FROM skill_eval_runs WHERE skill_name = ?1 ORDER BY id LIMIT ?2 OFFSET ?3",
             params!(skill_name, limit, offset),
@@ -105,19 +108,29 @@ pub async fn list_skill_eval_runs_page(
         .await?;
     let mut runs = Vec::new();
     while let Some(row) = rows.next().await? {
-        runs.push(SkillEvalRun {
-            id: row.get(0)?,
-            skill_name: row.get(1)?,
-            graded: row.get(2)?,
-            passed: row.get(3)?,
-            pass_rate: row.get(4)?,
-            without_pass_rate: row.get(5)?,
-            skill_words: row.get(6)?,
-            walk_secs: row.get(7)?,
-            ran_at: row.get(8)?,
-        });
+        runs.push(run_from_row(&row)?);
     }
     Ok(runs)
+}
+
+/// Maps one `skill_eval_runs` row (`id`, `skill_name`, `mode`, `graded`,
+/// `passed`, `pass_rate`, `without_pass_rate`, `skill_words`, `walk_secs`,
+/// `ran_at`) to a [`SkillEvalRun`]. An unknown mode string degrades to the
+/// default rather than failing the read.
+fn run_from_row(row: &libsql::Row) -> Result<SkillEvalRun> {
+    let mode_raw: String = row.get(2)?;
+    Ok(SkillEvalRun {
+        id: row.get(0)?,
+        skill_name: row.get(1)?,
+        mode: mode_raw.parse().unwrap_or_default(),
+        graded: row.get(3)?,
+        passed: row.get(4)?,
+        pass_rate: row.get(5)?,
+        without_pass_rate: row.get(6)?,
+        skill_words: row.get(7)?,
+        walk_secs: row.get(8)?,
+        ran_at: row.get(9)?,
+    })
 }
 
 /// Returns a skill's most recent eval run, if any.
@@ -128,24 +141,14 @@ pub async fn list_skill_eval_runs_page(
 pub async fn latest_eval_run(conn: &Connection, skill_name: &str) -> Result<Option<SkillEvalRun>> {
     let mut rows = conn
         .query(
-            "SELECT id, skill_name, graded, passed, pass_rate, without_pass_rate, \
+            "SELECT id, skill_name, mode, graded, passed, pass_rate, without_pass_rate, \
               skill_words, walk_secs, ran_at \
              FROM skill_eval_runs WHERE skill_name = ?1 ORDER BY id DESC LIMIT 1",
             params!(skill_name),
         )
         .await?;
     match rows.next().await? {
-        Some(row) => Ok(Some(SkillEvalRun {
-            id: row.get(0)?,
-            skill_name: row.get(1)?,
-            graded: row.get(2)?,
-            passed: row.get(3)?,
-            pass_rate: row.get(4)?,
-            without_pass_rate: row.get(5)?,
-            skill_words: row.get(6)?,
-            walk_secs: row.get(7)?,
-            ran_at: row.get(8)?,
-        })),
+        Some(row) => Ok(Some(run_from_row(&row)?)),
         None => Ok(None),
     }
 }

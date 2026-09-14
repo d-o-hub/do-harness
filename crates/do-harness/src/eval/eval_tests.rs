@@ -10,7 +10,7 @@ use anyhow::Result;
 use super::*;
 use crate::report::Format;
 
-const VALID_SKILL_MD: &str = "---\nname: test-skill\ndescription: A fixture skill used by the eval-runner tests.\nlicense: MIT\n---\n\n# Test Skill\n";
+pub(super) const VALID_SKILL_MD: &str = "---\nname: test-skill\ndescription: A fixture skill used by the eval-runner tests.\nlicense: MIT\n---\n\n# Test Skill\n";
 
 fn gate_script_path() -> PathBuf {
     let repo_root = Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -21,7 +21,7 @@ fn gate_script_path() -> PathBuf {
     repo_root.join(".agents/skills/skill-creator/scripts/quick_validate.py")
 }
 
-fn fixture_root(skill_md: &str, evals: Option<&str>) -> tempfile::TempDir {
+pub(super) fn fixture_root(skill_md: &str, evals: Option<&str>) -> tempfile::TempDir {
     let dir = tempfile::tempdir().unwrap();
     let skills_root = dir.path().join(".agents/skills");
     let scripts = skills_root.join("skill-creator/scripts");
@@ -74,6 +74,8 @@ async fn eval_run(dir: &Path, skill: Option<&str>, bless: bool) -> Result<()> {
         Format::Text,
         Some("test-approver"),
         true,
+        None,
+        600,
     )
     .await
 }
@@ -316,6 +318,8 @@ async fn eval_run_with_lift(dir: &Path, skill: Option<&str>) -> Result<()> {
         Format::Text,
         Some("test-approver"),
         false,
+        None,
+        600,
     )
     .await
 }
@@ -353,6 +357,7 @@ async fn lift_measures_guidance_dependence_and_persists_dims() {
         .unwrap()
         .unwrap();
     // With skill 2/2; without skill the SKILL.md assertion fails: 1/2.
+    assert_eq!(run.mode, do_harness_types::EvalMode::Deterministic);
     assert_eq!(run.pass_rate, Some(1.0));
     assert_eq!(run.without_pass_rate, Some(0.5));
     assert!(run.skill_words.unwrap_or(0) > 0);

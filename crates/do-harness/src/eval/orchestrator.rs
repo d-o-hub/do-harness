@@ -2,14 +2,20 @@
 
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 use anyhow::{Context, Result, bail};
+use do_harness_types::EvalMode;
 
 use crate::eval_sandbox::Sandbox;
 use crate::report::Format;
 
+use super::agent::{AgentSpec, check_skill_agent};
 use super::bless::bless_skill;
-use super::grading::{check_skill, check_skill_without};
+use super::grading::{
+    GateOutcome, check_skill, check_skill_without, gate_and_parse, load_evals, report_from_outcome,
+    skill_words,
+};
 
 /// Runs the skill-eval benchmark for skills under `.agents/skills`.
 #[allow(
@@ -27,6 +33,8 @@ pub async fn run_eval(
     format: Format,
     approver: Option<&str>,
     no_lift: bool,
+    agent_cmd: Option<&str>,
+    agent_timeout_secs: u64,
 ) -> Result<()> {
     let skills_root = root.join(".agents/skills");
     if list_skills {
@@ -58,6 +66,16 @@ pub async fn run_eval(
     let conn = do_harness_db::connect_and_migrate(root).await?;
     let mut invalid = Vec::new();
     let mut reports_json = Vec::new();
+
+    let mode = if agent_cmd.is_some() {
+        EvalMode::Agent
+    } else {
+        EvalMode::Deterministic
+    };
+    let agent_spec = agent_cmd.map(|command| AgentSpec {
+        command: command.to_owned(),
+        timeout: Duration::from_secs(agent_timeout_secs.max(1)),
+    });
 
     for entry in entries {
         let name = entry
@@ -93,21 +111,49 @@ pub async fn run_eval(
             continue;
         }
 
-        let sandbox = Sandbox::for_skill(root, &entry, &name)?;
-        let mut report = check_skill(
-            sandbox.root(),
-            sandbox.root().join(".agents/skills").join(&name).as_path(),
-            &name,
-            &sandbox.gate_script(),
-        )
-        .await?;
-        drop(sandbox);
+        let mut report = if let Some(spec) = &agent_spec {
+            let gate_script = skills_root
+                .join("skill-creator")
+                .join("scripts")
+                .join("quick_validate.py");
+            match gate_and_parse(&entry, &name, &gate_script).await? {
+                GateOutcome::Ready { structure, evals } => {
+                    let outcome =
+                        check_skill_agent(root, &entry, &name, &evals, spec, false).await?;
+                    report_from_outcome(&name, &structure, outcome, skill_words(&entry))
+                }
+                GateOutcome::Failed(report)
+                | GateOutcome::NoEvals(report)
+                | GateOutcome::InvalidEvals(report) => report,
+            }
+        } else {
+            let sandbox = Sandbox::for_skill(root, &entry, &name)?;
+            let report = check_skill(
+                sandbox.root(),
+                sandbox.root().join(".agents/skills").join(&name).as_path(),
+                &name,
+                &sandbox.gate_script(),
+            )
+            .await?;
+            drop(sandbox);
+            report
+        };
 
         if !no_lift && !report.gate_failed && report.pass_rate.is_some() {
-            let bare = Sandbox::for_skill(root, &entry, &name)?;
-            bare.strip_guidance(&name)?;
-            let bare_dir = bare.root().join(".agents/skills").join(&name);
-            match check_skill_without(bare.root(), &bare_dir).await {
+            let baseline = if let Some(spec) = &agent_spec {
+                match load_evals(&entry).await? {
+                    Some(evals) => check_skill_agent(root, &entry, &name, &evals, spec, true).await,
+                    None => Err(anyhow::anyhow!("evals vanished for '{name}'")),
+                }
+            } else {
+                let bare = Sandbox::for_skill(root, &entry, &name)?;
+                bare.strip_guidance(&name)?;
+                let bare_dir = bare.root().join(".agents/skills").join(&name);
+                let result = check_skill_without(bare.root(), &bare_dir).await;
+                drop(bare);
+                result
+            };
+            match baseline {
                 Ok(baseline) => {
                     report.without_graded = baseline.graded;
                     report.without_passed = baseline.passed;
@@ -130,12 +176,11 @@ pub async fn run_eval(
                     eprintln!("warning: without-skill baseline for '{name}' failed: {err:#}");
                 }
             }
-            drop(bare);
         }
-        finish_line(&mut report);
+        finish_line(&mut report, mode);
 
         if format == Format::Json {
-            reports_json.push(report_json(&name, &report));
+            reports_json.push(report_json(&name, &report, mode));
         } else {
             println!("{}", report.line);
         }
@@ -155,6 +200,7 @@ pub async fn run_eval(
                 &conn,
                 &do_harness_db::NewSkillEvalRun {
                     skill_name: &name,
+                    mode,
                     graded: i64::from(report.graded),
                     passed: i64::from(report.passed),
                     pass_rate: Some(pass_rate),
@@ -225,9 +271,9 @@ pub async fn run_eval(
     }
 }
 
-/// Appends lift and cost proxies to the human-readable report line once the
-/// baseline has been measured.
-fn finish_line(report: &mut super::grading::SkillReport) {
+/// Appends lift, cost proxies, and the eval mode to the human-readable
+/// report line once the baseline has been measured.
+fn finish_line(report: &mut super::grading::SkillReport, mode: EvalMode) {
     if report.gate_failed || report.pass_rate.is_none() {
         return;
     }
@@ -235,15 +281,20 @@ fn finish_line(report: &mut super::grading::SkillReport) {
         .lift
         .map_or_else(|| "n/a".to_owned(), |lift| format!("{lift:+.2}"));
     report.line = format!(
-        "{} lift={lift} words={} walk={:.1}s",
+        "{} lift={lift} words={} walk={:.1}s mode={mode}",
         report.line, report.skill_words, report.walk_secs
     );
 }
 
-/// Machine-readable eval report including lift, dimensions, and cost.
-fn report_json(name: &str, report: &super::grading::SkillReport) -> serde_json::Value {
+/// Machine-readable eval report including mode, lift, dimensions, and cost.
+fn report_json(
+    name: &str,
+    report: &super::grading::SkillReport,
+    mode: EvalMode,
+) -> serde_json::Value {
     serde_json::json!({
         "name": name,
+        "mode": mode.as_str(),
         "line": report.line,
         "pass_rate": report.pass_rate,
         "graded": report.graded,

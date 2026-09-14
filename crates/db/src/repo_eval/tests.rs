@@ -22,6 +22,7 @@ async fn eval_runs_append_and_list_in_order() {
         &conn,
         &NewSkillEvalRun {
             skill_name: "harness",
+            mode: EvalMode::Deterministic,
             graded: 4,
             passed: 3,
             pass_rate: Some(0.75),
@@ -36,6 +37,7 @@ async fn eval_runs_append_and_list_in_order() {
         &conn,
         &NewSkillEvalRun {
             skill_name: "harness",
+            mode: EvalMode::Deterministic,
             graded: 4,
             passed: 4,
             pass_rate: Some(1.0),
@@ -127,6 +129,7 @@ async fn max_pass_rate_tracks_history() {
         &conn,
         &NewSkillEvalRun {
             skill_name: "harness",
+            mode: EvalMode::Deterministic,
             graded: 2,
             passed: 1,
             pass_rate: Some(0.5),
@@ -141,6 +144,7 @@ async fn max_pass_rate_tracks_history() {
         &conn,
         &NewSkillEvalRun {
             skill_name: "harness",
+            mode: EvalMode::Deterministic,
             graded: 2,
             passed: 2,
             pass_rate: Some(1.0),
@@ -166,6 +170,7 @@ async fn skill_eval_summary_aggregates_history() {
             &conn,
             &NewSkillEvalRun {
                 skill_name: "harness",
+                mode: EvalMode::Deterministic,
                 graded: 4,
                 passed: 3,
                 pass_rate: Some(rate),
@@ -198,6 +203,7 @@ async fn lift_columns_and_dim_rates_roundtrip() {
         &conn,
         &NewSkillEvalRun {
             skill_name: "harness",
+            mode: EvalMode::Deterministic,
             graded: 10,
             passed: 8,
             pass_rate: Some(0.8),
@@ -231,6 +237,7 @@ async fn lift_columns_and_dim_rates_roundtrip() {
 
     let latest = latest_eval_run(&conn, "harness").await.unwrap().unwrap();
     assert_eq!(latest.id, run_id);
+    assert_eq!(latest.mode, EvalMode::Deterministic);
     assert_eq!(latest.without_pass_rate, Some(0.4));
     assert_eq!(latest.skill_words, Some(754));
     assert_eq!(latest.walk_secs, Some(12.5));
@@ -264,4 +271,40 @@ async fn lift_floor_never_lowers() {
     assert_eq!(get_lift_floor(&conn, "harness").await.unwrap(), Some(0.15));
     assert!(raise_lift_floor(&conn, "harness", 0.20).await.unwrap());
     assert_eq!(get_lift_floor(&conn, "harness").await.unwrap(), Some(0.20));
+}
+
+/// Eval mode persists per run, and an unknown stored mode degrades to the
+/// default on read instead of failing the query.
+#[tokio::test(flavor = "current_thread")]
+async fn eval_mode_roundtrips_and_degrades_on_read() {
+    let dir = connect();
+    let conn = open(&dir).await;
+    insert_skill_eval_run(
+        &conn,
+        &NewSkillEvalRun {
+            skill_name: "harness",
+            mode: EvalMode::Agent,
+            graded: 2,
+            passed: 2,
+            pass_rate: Some(1.0),
+            without_pass_rate: Some(0.0),
+            skill_words: Some(100),
+            walk_secs: Some(2.0),
+        },
+    )
+    .await
+    .unwrap();
+    let latest = latest_eval_run(&conn, "harness").await.unwrap().unwrap();
+    assert_eq!(latest.mode, EvalMode::Agent);
+
+    conn.execute(
+        "INSERT INTO skill_eval_runs \
+         (skill_name, mode, graded, passed, pass_rate, ran_at) \
+         VALUES ('harness', 'bogus', 1, 1, 1.0, 0)",
+        libsql::params!(),
+    )
+    .await
+    .unwrap();
+    let degraded = latest_eval_run(&conn, "harness").await.unwrap().unwrap();
+    assert_eq!(degraded.mode, EvalMode::Deterministic);
 }
