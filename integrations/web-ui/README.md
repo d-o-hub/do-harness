@@ -19,7 +19,10 @@ grounded in WCAG 2.2 (1.4.3 contrast, 1.4.10 reflow, 2.4.7 focus visibility,
 | `lib/perf-audit.mjs` | Lighthouse adapter (peer dep) + CWV budget evaluation | budget evaluation yes |
 | `lib/visual-audit.mjs` | screenshot capture + digest baselines under `.do-harness/visual/` | classification yes |
 | `lib/audit.mjs` | matrix normalization + orchestrator | normalization yes |
+| `lib/annotate.mjs` | transient outline/label screenshots for rect-bearing findings | via browser suite |
 | `audit.test.mjs` | `node --test` unit tests (no browser needed) | — |
+| `audit.browser.test.mjs` | rendered Playwright regression suite + committed fixtures | optional |
+| `fixtures/*.html` | clean and intentional-defect pages used by the browser suite | n/a |
 
 ## The five audit stages
 
@@ -46,14 +49,38 @@ grounded in WCAG 2.2 (1.4.3 contrast, 1.4.10 reflow, 2.4.7 focus visibility,
 
 ## Running the tests
 
+Headless unit tests cover every pure helper and run without browser dependencies:
+
 ```bash
 node --test integrations/web-ui/audit.test.mjs
 ```
 
-Browser-dependent probes need Playwright browsers; a future
-`audit.browser.test.mjs` SKIPs when they are unavailable, matching the
-do-harness sensor policy ("SKIP: tool unavailable") rather than failing CI
-that has no browsers installed.
+The rendered suite serves the committed fixtures through a local HTTP server,
+then exercises real Playwright layout, paint, overlap, contrast, and visual
+baseline behavior:
+
+```bash
+node --test integrations/web-ui/audit.browser.test.mjs
+```
+
+It SKIPs when Playwright or its browser is unavailable, matching the
+do-harness sensor policy ("SKIP: tool unavailable"). CI installs both and
+runs this suite as a required browser regression check.
+
+## Annotated finding artifacts
+
+`auditMatrix(page, { annotate: true, findingsDir })` draws transient,
+viewport-coordinate outlines and labels over every rect-bearing finding,
+writes one PNG per route × viewport cell, and removes the overlays before the
+page is reused. The returned JSON includes `annotationArtifacts` paths.
+`scripts/viewport-audit.mjs` exposes the same behavior with
+`WEB_AUDIT_ANNOTATE=1` and `WEB_AUDIT_FINDINGS_DIR=...`. Finding images are
+kept outside `.do-harness/visual/`, so annotations never alter visual
+baselines.
+
+The browser fixtures assert that a clean page stays clean, positioned sibling
+and descendant overlays are reported, layered contrast reports only the
+intentional low-contrast chip, and annotation screenshots are valid PNGs.
 
 ## Wiring as a do-harness sensor
 

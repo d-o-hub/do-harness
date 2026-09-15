@@ -13,7 +13,7 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     permissions:
       # Least privilege: read source, write only the evidence artifact.
       contents: read
@@ -57,6 +57,13 @@ jobs:
           node --check integrations/npm/bin/do-harness.js
           node --check integrations/npm/lib/platform.js
           node --test integrations/npm/test/*.test.mjs
+      - name: Browser-test web UI pack
+        run: |
+          mkdir -p target/web-ui-browser-deps
+          npm init -y --prefix target/web-ui-browser-deps >/dev/null
+          npm install --prefix target/web-ui-browser-deps --no-save --no-package-lock --no-audit --no-fund playwright@1.50.1
+          target/web-ui-browser-deps/node_modules/.bin/playwright install --with-deps chromium
+          NODE_PATH="$GITHUB_WORKSPACE/target/web-ui-browser-deps/node_modules" node --test integrations/web-ui/audit.browser.test.mjs
       - name: Package npm wrapper (assembly dry run)
         run: |
           version="$(sed -n '/^\[workspace.package\]/,/^\[/ s/^version *= *"\(.*\)"/\1/p' Cargo.toml)"

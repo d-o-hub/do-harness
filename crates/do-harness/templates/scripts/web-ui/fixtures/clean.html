@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>web-ui audit control page</title>
+<style>
+  body { margin: 0; padding: 24px; background: #fff; color: #111;
+         font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  h1 { margin: 0 0 16px; font-size: 28px; }
+  /* In-flow siblings whose boxes overlap on one baseline. */
+  .tight { margin-right: -10px; }
+  .nudged { position: relative; }
+</style>
+</head>
+<body>
+  <main>
+    <h1>Control page</h1>
+    <p><span class="tight">overlapping inline siblings</span><span class="nudged">stay exempt</span></p>
+    <p>A sentence with an <a href="#nowhere">inline link</a> inside it.</p>
+  </main>
+</body>
+</html>

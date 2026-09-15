@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>web-ui audit descendant-overlay fixture</title>
+<style>
+  body { margin: 0; padding: 24px; background: #fff; color: #111;
+         font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  h1 { position: relative; margin: 0; font-size: 28px; max-width: 480px; }
+  /* Intentional defect: a positioned descendant overriding its heading. */
+  .badge { position: absolute; top: 0; left: 0; background: #b00020; color: #fff;
+           padding: 4px 8px; font-size: 14px; }
+</style>
+</head>
+<body>
+  <main>
+    <h1><span class="badge">new</span>Quarterly report</h1>
+  </main>
+</body>
+</html>

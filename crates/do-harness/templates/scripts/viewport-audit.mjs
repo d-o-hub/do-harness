@@ -7,6 +7,8 @@
 // 0 (verify reports WARN; --strict/status stay honest), while real findings
 // exit 1 with the JSON report on stderr for the failure tail.
 
+import { createRequire } from "node:module";
+
 const routes = (process.env.WEB_AUDIT_ROUTES ?? "")
   .split(",")
   .map((s) => s.trim())
@@ -21,22 +23,25 @@ const allowlist = (process.env.WEB_AUDIT_ALLOWLIST ?? "")
   .split(",")
   .map((s) => s.trim())
   .filter(Boolean);
-
+const require = createRequire(import.meta.url);
 let chromium;
 try {
-  ({ chromium } = await import("playwright"));
+  ({ chromium } = require("playwright"));
 } catch {
   console.log("SKIP: playwright is not installed in this workspace");
   process.exit(0);
 }
 
 const { auditMatrix } = await import("./web-ui/lib/audit.mjs");
+const annotate = ["1", "true"].includes((process.env.WEB_AUDIT_ANNOTATE ?? "").toLowerCase());
 const browser = await chromium.launch();
 try {
   const page = await browser.newPage();
   const report = await auditMatrix(page, {
     routes: routes.map((route) => new URL(route, base).toString()),
     allowlist,
+    annotate,
+    findingsDir: process.env.WEB_AUDIT_FINDINGS_DIR,
   });
   if (report.findingCount > maxFindings) {
     console.error(JSON.stringify(report, null, 2));
@@ -46,6 +51,9 @@ try {
   console.log(
     `OK: viewport-ux clean across ${report.cells.length} cells (${report.findingCount} findings <= ${maxFindings})`,
   );
+  if (report.annotationArtifacts.length > 0) {
+    console.log(`ANNOTATIONS: ${report.annotationArtifacts.join(",")}`);
+  }
 } finally {
   await browser.close();
 }

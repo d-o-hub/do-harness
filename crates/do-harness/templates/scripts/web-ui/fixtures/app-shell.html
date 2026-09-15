@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>web-ui audit app-shell fixture</title>
+<style>
+  body { margin: 0; padding: 0 0 96px; background: #fff; color: #111;
+         font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { position: sticky; top: 0; background: #fff; border-bottom: 1px solid #ddd;
+           padding: 12px 24px; }
+  header nav a { color: #0645ad; margin-right: 16px; }
+  main { padding: 24px; max-width: 640px; }
+  h1 { margin: 0 0 16px; font-size: 28px; }
+  /* Intentional defect: a flyout rendered out of flow over the copy. */
+  .flyout { position: absolute; top: 64px; left: 24px; z-index: 5;
+            background: #fff; border: 1px solid #ccc; padding: 6px 10px; font-size: 15px; }
+</style>
+</head>
+<body>
+  <header>
+    <nav>
+      <a href="#one">Overview</a>
+      <a href="#two">Decisions</a>
+      <a href="#three">Traces</a>
+    </nav>
+  </header>
+  <main>
+    <h1>App shell fixture</h1>
+    <ul class="flyout"><li>Open workspace</li><li>Pin trace</li></ul>
+    <p>The release checklist lives here: sensors run, evidence is written, and the
+       status command reports freshness for the active signal set.</p>
+    <p>Read the <a href="#docs">adoption guide</a> before wiring hooks.</p>
+  </main>
+</body>
+</html>

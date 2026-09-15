@@ -310,8 +310,16 @@ fn scaffold_web_scripts(root: &Path, opts: &InitOpts, report: &mut InitReport) -
             include_str!("../templates/scripts/web-ui/audit.test.mjs"),
         ),
         (
+            "scripts/web-ui/audit.browser.test.mjs",
+            include_str!("../templates/scripts/web-ui/audit.browser.test.mjs"),
+        ),
+        (
             "scripts/web-ui/lib/audit.mjs",
             include_str!("../templates/scripts/web-ui/lib/audit.mjs"),
+        ),
+        (
+            "scripts/web-ui/lib/annotate.mjs",
+            include_str!("../templates/scripts/web-ui/lib/annotate.mjs"),
         ),
         (
             "scripts/web-ui/lib/page-probe.mjs",
@@ -344,6 +352,26 @@ fn scaffold_web_scripts(root: &Path, opts: &InitOpts, report: &mut InitReport) -
         (
             "scripts/web-ui/lib/i18n-audit.mjs",
             include_str!("../templates/scripts/web-ui/lib/i18n-audit.mjs"),
+        ),
+        (
+            "scripts/web-ui/fixtures/clean.html",
+            include_str!("../templates/scripts/web-ui/fixtures/clean.html"),
+        ),
+        (
+            "scripts/web-ui/fixtures/overlap.html",
+            include_str!("../templates/scripts/web-ui/fixtures/overlap.html"),
+        ),
+        (
+            "scripts/web-ui/fixtures/overlap-descendant.html",
+            include_str!("../templates/scripts/web-ui/fixtures/overlap-descendant.html"),
+        ),
+        (
+            "scripts/web-ui/fixtures/contrast.html",
+            include_str!("../templates/scripts/web-ui/fixtures/contrast.html"),
+        ),
+        (
+            "scripts/web-ui/fixtures/app-shell.html",
+            include_str!("../templates/scripts/web-ui/fixtures/app-shell.html"),
         ),
     ] {
         write_if_absent(root, relative, body, opts.force, report)?;
