@@ -32,7 +32,7 @@ Microsoft's Agent Governance Toolkit publishes `agent-governance` + `agent-gover
 | `feat-guardian-http` | vertical slice | `axum` router `GET /health` + `POST /mcp/tools/call` with fail-closed forwarding via `reqwest` | **done task 10** |
 | `feat-guardian-audit` | vertical slice | Hash-chained JSONL decision log (`AuditLog`, `ProxyConfig.audit_log`) with `Allow`/`Deny` evidence + tamper detection | **done task 11** |
 | `feat-guardian-operability` | vertical slice | Example config + `--verify-audit` fail-closed CLI + `cargo test -p guardian-proxy` CI gate | **done task 12** |
-| `chore-agt-promotion` | decision | GA + surface satisfied → remove feature flag or keep off-by-default per invariants review | Decision memo §4 — pending GA |
+| `chore-agt-promotion` | decision | GA + surface satisfied → remove feature flag or keep off-by-default per invariants review | Decision memo §4 — **hold 2026-09-15** (criterion (a) unsatisfied; see Promotion review below) |
 | `chore-remove-doharness-policy` | refactor | Delete duplicated `do-harness/src/policy/` (`AgtGate`/`McpMediator`) now that `guardian-proxy` is the sole tool-call mediation surface; drop the `agt-governance` feature from the CLI crate | #34 item 10 — **done task 30** |
 
 ## Non-goals
@@ -134,7 +134,20 @@ Manual `bash scripts/check-agt-ga.sh`:
 
 ## Next action
 
-All implementation slices done (tasks 3–5, 8–12, 14–16), GA re-check spike (task 17), hygiene (task 18), and GA watch automation (tasks 19–21). Earlier work also removed the duplicated CLI adapter (task 30) and hardened sensors/evidence (2026-09-12 sweep). MCP conformance landed through the docs slice (`plans/mcp-conformance-epic.md`, slices 1–5): criterion (b) is satisfied behind the optional `mcp-surface` feature, and `chore-mcp-promotion` (2026-09-13) decided to keep it off by default with MSRV 1.85 because flat-route removal is coupled to a default-enabled successor. `chore-agt-promotion` stays a decision gate pending AGT GA and invariants review — no promotion until criteria `(a) GA` and `(b) MCP surface conformant` both hold. When the watch opens a GA tracking issue, run promotion review against this epic.
+The `chore-agt-promotion` review is complete as a **hold** on 2026-09-15. The MCP/tool-call mediation criterion (b) is satisfied behind `mcp-surface`, but AGT criterion (a) remains unsatisfied: `bash scripts/check-agt-ga.sh` reports `VERDICT=NOT_GA` because `agent-governance` 3.2.2 still describes itself as Public Preview. Keep `agt-governance` off by default and rerun this review when the GA watch reports `VERDICT=GA`; do not remove the feature flag or alter production Rust until both criteria hold.
+
+## Promotion review — chore-agt-promotion (2026-09-15)
+
+**Decision: hold `agt-governance` off by default.** The authoritative GA gate is not satisfied; no Cargo feature or production Rust change was made.
+
+| Factor | Finding |
+|---|---|
+| AGT GA criterion (a) | `bash scripts/check-agt-ga.sh` → `VERDICT=NOT_GA`; crates.io reports `agent-governance` 3.2.2 as `Public Preview — Rust SDK for the Agent Governance Toolkit (policy, trust, audit, identity)`; latest toolkit release is `v4.1.0`, non-prerelease, but does not establish SDK GA |
+| MCP surface criterion (b) | Satisfied behind optional `mcp-surface`; its default-on decision remains separate |
+| Feature-on engineering gates | `cargo check -p guardian-proxy --features agt-governance` passed; `cargo test -p guardian-proxy --features agt-governance` passed with 31 tests and 0 failures; `check-agt` passed |
+| Repository verification | `do-harness verify --set verification --format json --strict` passed 12/12; `target/release/do-harness status --set verification` reported `green` |
+| Consequence | Default builds keep `agent-governance` absent, preserving the accepted RUSTSEC-2026-0097 scope and pre-GA dependency boundary |
+
 
 ## Slice completion — chore-remove-doharness-policy (2026-09-11, task 30)
 

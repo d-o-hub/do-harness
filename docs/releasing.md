@@ -11,10 +11,17 @@ verification set and every build target dogfoods green.
   <https://crates.io/settings/tokens> (scope: publish new crates and versions)
   and store it under **Settings → Secrets and variables → Actions**. The
   publish job fails loudly when the secret is missing.
-- Add the `NPM_TOKEN` repository secret: create a granular access token with
-  publish rights at
-  <https://www.npmjs.com/settings/~your-user~/tokens> and store it the same
-  way. The npm-publish job fails loudly when it is missing.
+- Configure an npm Trusted Publisher for each of the six packages on
+  <https://www.npmjs.com>: package **Settings → Trusted Publisher → GitHub
+  Actions**, organization/user `d-o-hub`, repository `do-harness`, workflow
+  filename `release.yml`. Allow direct `npm publish` because the workflow
+  publishes directly rather than staging. The job uses GitHub OIDC
+  (`id-token: write`) and needs no `NPM_TOKEN` secret.
+- Trusted publishing requires Node >= 22.14.0 and npm >= 11.5.1; the release
+  job pins Node 24 and checks both versions. npm generates provenance
+  automatically for these public GitHub Actions publishes. After a successful
+  migration, revoke unused publish tokens and enable npm's **require
+  two-factor authentication and disallow tokens** setting.
 - For `cargo binstall` support, no extra setup is needed: the CLI manifest
   declares `[package.metadata.binstall]`, and the release assets match the
   cargo-binstall defaults (`do-harness-v<version>-<target>.tar.gz` containing
@@ -77,7 +84,7 @@ publishes platform-first so the meta package's pinned `optionalDependencies`
 resolve. Versions already on npm are skipped, so a partial run can be re-run.
 
 Committed `integrations/npm/**/package.json` versions are placeholders for
-local tooling: `scripts/publish-npm.sh` patches the meta version and all four
+local tooling: `scripts/publish-npm.sh` patches the meta version and all five
 `optionalDependencies` pins to the workspace version in the staging directory,
 so a stale committed value can never be published.
 

@@ -1,0 +1,3 @@
+interface:
+  display_name: "GitHub npm Publishing"
+  short_description: "Publish npm packages with GitHub OIDC"

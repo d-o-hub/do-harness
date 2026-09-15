@@ -1,6 +1,6 @@
 # Epic: Distribution and External Adoption
 
-> **Status:** released as `v0.1.0` (2026-09-13); `v0.1.1` (2026-09-15) ships the first Windows zip (crates.io/npm publish pending repo secrets)
+> **Status:** released as `v0.1.0` (2026-09-13); `v0.1.1` (2026-09-15) ships the first Windows zip (crates.io publish pending `CARGO_REGISTRY_TOKEN`; npm bootstrap published four platform packages, while `do-harness-win32-x64@0.1.1` is blocked by npm spam detection and the meta package is withheld)
 > **Related:** prebuilt releases, `scripts/install.sh`, pinned agent
 > instructions, release evidence
 > **Created:** 2026-09-13
@@ -68,7 +68,7 @@ for the not-yet-published deps; `cargo-binstall 1.23.0 binstall do-harness
 
 | Slice | Exit criteria | Task |
 |-------|---------------|------|
-| Wrapper packages | Meta package with pinned platform `optionalDependencies`, a stdio-inheriting shim, and four platform package templates | 47 |
+| Wrapper packages | Meta package with pinned platform `optionalDependencies`, a stdio-inheriting shim, and five platform package templates | 47 |
 | Publish assembly | `scripts/publish-npm.sh` stages platform packages from release artifacts, patches versions, skips published versions, and supports a tokenless `--dry-run` | 48 |
 | Release wiring | Tag-gated `npm-publish` job (platform-first, then meta) plus shim tests and a dry-run assembly step in CI; docs list `npx do-harness` | 49 |
 
@@ -108,10 +108,20 @@ reports `0.1.1 (32120c3 2026-09-15)`; the zip path
 (`DO_HARNESS_TARGET=x86_64-pc-windows-msvc`) extracts a checksum-verified
 `do-harness.exe` (PE32+ x86-64).
 
-crates.io and npm publication are blocked on the one-time
-`CARGO_REGISTRY_TOKEN`/`NPM_TOKEN` repository secrets (both publish jobs fail
-closed when unset); once added they are re-runnable without a new tag via
-`gh workflow run release.yml -f publish=true` (both jobs are idempotent).
+crates.io publication remains blocked on the one-time
+`CARGO_REGISTRY_TOKEN` repository secret. npm bootstrap publication used the
+authenticated `d-o-hub` account: `do-harness-linux-x64`,
+`do-harness-linux-arm64`, `do-harness-darwin-x64`, and
+`do-harness-darwin-arm64` are published at `0.1.1`. npm rejected
+`do-harness-win32-x64@0.1.1` with HTTP 403 (`Package name triggered spam
+detection`), so the meta package was not published because its pinned Windows
+optional dependency is unavailable. File npm support for the exact package
+name before retrying; do not rename only one package.
+
+After npm clears the name, configure the trusted publisher for all six
+packages (organization/user `d-o-hub`, repository `do-harness`, workflow
+`release.yml`, direct publish), then rerun the idempotent publish path through
+GitHub Actions with `gh workflow run release.yml -f publish=true`.
 
 ## Non-goals
 

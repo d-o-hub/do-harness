@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # publish-npm.sh — assemble and publish the npm wrapper packages.
 #
-# The meta package `do-harness` depends on four platform packages; each
+# The meta package `do-harness` depends on five platform packages; each
 # platform package contains the prebuilt binary from a release tarball.
 # Publishing is idempotent (versions already on npm are skipped) and ordered
 # platform-first so the meta package's optionalDependencies resolve.
@@ -82,8 +82,13 @@ if (( ! DRY_RUN )); then
     TOKEN="${NODE_AUTH_TOKEN:-${NPM_TOKEN:-}}"
     if [[ -n "$TOKEN" ]]; then
         export NODE_AUTH_TOKEN="$TOKEN"
+    elif [[ -n "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" &&
+        -n "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}" ]]; then
+        # npm 11.5.1+ exchanges the GitHub Actions OIDC token during publish.
+        # `npm whoami` cannot validate this mode before the publish operation.
+        echo "Using GitHub Actions OIDC trusted publishing"
     elif ! npm whoami >/dev/null 2>&1; then
-        die "not authenticated: run 'npm login' or set NODE_AUTH_TOKEN/NPM_TOKEN"
+        die "not authenticated: configure npm trusted publishing or set NODE_AUTH_TOKEN"
     fi
 fi
 
@@ -99,9 +104,30 @@ TARGETS=(
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
+package_version_exists() {
+    local pkg="$1" version="$2"
+    local registry="${NPM_CONFIG_REGISTRY:-https://registry.npmjs.org}"
+    local status
+    status="$(curl -sS --retry 2 --retry-delay 1 -L \
+        -o /dev/null -w '%{http_code}' "${registry%/}/$pkg/$version")" || {
+        die "could not query npm registry for $pkg@$version"
+    }
+    case "$status" in
+        200)
+            return 0
+            ;;
+        404)
+            return 1
+            ;;
+        *)
+            die "npm registry returned HTTP $status for $pkg@$version"
+            ;;
+    esac
+}
+
 publish_dir() {
     local dir="$1" pkg="$2"
-    if (( ! DRY_RUN )) && npm view "$pkg@$VERSION" version >/dev/null 2>&1; then
+    if (( ! DRY_RUN )) && package_version_exists "$pkg" "$VERSION"; then
         echo "$pkg@$VERSION is already on npm; skipping"
         return 0
     fi

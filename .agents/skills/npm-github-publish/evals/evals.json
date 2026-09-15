@@ -1,0 +1,59 @@
+{
+  "skill_name": "npm-github-publish",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Migrate our GitHub Actions npm release from NPM_TOKEN to trusted publishing. What permissions, versions, and npm configuration are required?",
+      "expected_output": "Use a per-package GitHub trusted publisher, id-token: write, Node >= 22.14.0, npm >= 11.5.1, no publish token, and direct npm publish only when the npm configuration allows it.",
+      "files": [],
+      "dim": "correctness",
+      "kind": "explicit",
+      "assertions": [
+        "walk:",
+        "exists:npm-publish-checklist.md",
+        "contains:npm-publish-checklist.md|id-token: write",
+        "contains:npm-publish-checklist.md|npm >= 11.5.1",
+        "contains:npm-publish-checklist.md|no NPM_TOKEN"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "An existing release script calls npm whoami before every package publish and fails in GitHub OIDC jobs. What should replace that check?",
+      "expected_output": "Detect GitHub OIDC credentials, avoid npm whoami as an OIDC probe, and use anonymous registry metadata GETs for exact-version idempotency.",
+      "files": [],
+      "dim": "security",
+      "kind": "implicit",
+      "assertions": [
+        "contains:npm-publish-script.txt|npm whoami is not an OIDC probe",
+        "contains:npm-publish-script.txt|registry metadata GET",
+        "contains:npm-publish-script.txt|exact package/version"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Our release contains five platform packages and a meta package with optionalDependencies. Design a safe rerunnable GitHub publish order and verification path.",
+      "expected_output": "Build and verify first, publish each exact platform version before the meta package, keep dry-run assembly, and fail closed on OIDC errors.",
+      "files": [],
+      "dim": "effectiveness",
+      "kind": "contextual",
+      "assertions": [
+        "contains:npm-publish-context.txt|platform packages first",
+        "contains:npm-publish-context.txt|meta package last",
+        "contains:npm-publish-context.txt|npm publish --dry-run",
+        "contains:npm-publish-context.txt|fail closed"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "Write a haiku about autumn. There is no package release or GitHub workflow task.",
+      "expected_output": "Do not load the npm publishing workflow for unrelated prose.",
+      "files": [],
+      "dim": "discoverability",
+      "kind": "negative",
+      "assertions": [
+        "contains:npm-publish-negative.txt|out-of-scope",
+        "absent:npm_publish_action.txt"
+      ]
+    }
+  ]
+}

@@ -301,11 +301,7 @@ jobs:
     timeout-minutes: 20
     permissions:
       contents: read
-    env:
-      # Create a granular access token with publish rights at
-      # https://www.npmjs.com/settings/<user>/tokens and store it as the
-      # NPM_TOKEN repository secret (see docs/releasing.md).
-      NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      id-token: write
     steps:
       # actions/checkout@v4
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -321,5 +317,28 @@ jobs:
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org
+      - name: Check npm trusted publishing prerequisites
+        run: |
+          node_version="$(node --version | sed 's/^v//')"
+          npm_version="$(npm --version)"
+          node_major="${node_version%%.*}"
+          node_minor="${node_version#*.}"
+          node_minor="${node_minor%%.*}"
+          if (( node_major < 22 || (node_major == 22 && node_minor < 14) )); then
+            echo "FAIL: npm trusted publishing requires Node >= 22.14.0 (got v$node_version)" >&2
+            exit 1
+          fi
+          npm_major="${npm_version%%.*}"
+          npm_minor="${npm_version#*.}"
+          npm_minor="${npm_minor%%.*}"
+          npm_patch="${npm_version#*.*.}"
+          npm_patch="${npm_patch%%.*}"
+          if (( npm_major < 11 ||
+            (npm_major == 11 && (npm_minor < 5 ||
+              (npm_minor == 5 && npm_patch < 1))) )); then
+            echo "FAIL: npm trusted publishing requires npm >= 11.5.1 (got $npm_version)" >&2
+            exit 1
+          fi
+          printf 'Using Node v%s and npm %s for GitHub OIDC publishing\n' "$node_version" "$npm_version"
       - name: Publish npm packages
         run: bash scripts/publish-npm.sh --dist dist

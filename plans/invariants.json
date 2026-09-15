@@ -109,7 +109,7 @@
   },
   {
     "invariant": "RUSTSEC-2026-0097 (GHSA-cq8v-f236-94qc; rand 0.8.5 unsound with a custom logger) is an accepted risk while agent-governance 3.2.2 pins rand exactly",
-    "rationale": "rand 0.8.5 is reachable only through the optional pre-GA agent-governance feature, never compiled in default builds, and the unsoundness needs a custom logger re-entering ThreadRng during reseed; agent-governance pins rand =0.8.5 so no upgrade is possible before GA",
+    "rationale": "rand 0.8.5 is reachable only through the optional pre-GA agent-governance feature, never compiled in default builds, and the unsoundness needs a custom logger re-entering ThreadRng during reseed; agent-governance pins rand =0.8.5 so no upgrade is possible before GA. The 2026-09-15 chore-agt-promotion hold is backed by bash scripts/check-agt-ga.sh reporting VERDICT=NOT_GA while agent-governance 3.2.2 remains Public Preview; revisit the pin and audit ignore when the GA promotion criteria hold",
     "sensor": "scripts/check-audit.sh (--ignore RUSTSEC-2026-0097)",
     "category": "supply-chain"
   },
