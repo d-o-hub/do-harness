@@ -49,6 +49,16 @@ harness_bin="${DO_HARNESS_BIN:-}"
 if [ -z "$harness_bin" ] && command -v do-harness >/dev/null 2>&1; then
   harness_bin="$(command -v do-harness)"
 fi
+if [ -z "$harness_bin" ]; then
+  repo_root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+  for candidate in "$repo_root/target/release/do-harness" \
+    "$repo_root/target/release/do-harness.exe"; do
+    if [ -x "$candidate" ]; then
+      harness_bin="$candidate"
+      break
+    fi
+  done
+fi
 if [ -n "$harness_bin" ] && "$harness_bin" pr review --help >/dev/null 2>&1; then
   ok "do-harness pr review available ($harness_bin)"
 else
