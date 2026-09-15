@@ -10,6 +10,7 @@ import {
   rectsIntersect,
   intersectionArea,
   rectContains,
+  isOutOfFlow,
   classifyPair,
   collectOverlaps,
   horizontalOverflowPx,
@@ -62,6 +63,37 @@ test("classifyPair: genuine cross-line overlap is flagged", () => {
   assert.equal(classifyPair(rect(0, 0, 60, 24), rect(10, 12, 60, 24)), "overlap");
   // same-line pair (full vertical overlap, slight horizontal nudge)
   assert.equal(classifyPair(rect(0, 0, 40, 20), rect(39, 0, 40, 20)), "same-line");
+});
+
+test("classifyPair: out-of-flow pairs keep no same-line exemption", () => {
+  const sameBaseline = [rect(8, 8, 168, 23), rect(90, 8, 190, 23)];
+  // in-flow pair on one baseline: exempt
+  assert.equal(classifyPair(...sameBaseline), "same-line");
+  // either side absolutely/fixed-positioned: genuine overlap
+  assert.equal(classifyPair(...sameBaseline, { positionedA: true }), "overlap");
+  assert.equal(classifyPair(...sameBaseline, { positionedB: true }), "overlap");
+  assert.equal(
+    classifyPair(...sameBaseline, { positionedA: true, positionedB: true }),
+    "overlap",
+  );
+  // relative/sticky/static lay out in flow: no positioned hint to pass
+  assert.equal(isOutOfFlow("absolute"), true);
+  assert.equal(isOutOfFlow("fixed"), true);
+  assert.equal(isOutOfFlow("relative"), false);
+  assert.equal(isOutOfFlow("sticky"), false);
+  assert.equal(isOutOfFlow("static"), false);
+  assert.equal(isOutOfFlow(""), false);
+});
+
+test("collectOverlaps: positioned leaves are flagged on a shared baseline", () => {
+  const leaves = [
+    { rect: rect(8, 8, 168, 23), path: "promo-a", text: "sale" },
+    { rect: rect(90, 8, 190, 23), path: "promo-b", text: "go", positioned: true },
+  ];
+  const found = collectOverlaps(leaves);
+  assert.equal(found.length, 1);
+  assert.equal(found[0].a, "promo-a");
+  assert.equal(found[0].b, "promo-b");
 });
 
 test("collectOverlaps: skips contained pairs, flags overlaps, caps output", () => {

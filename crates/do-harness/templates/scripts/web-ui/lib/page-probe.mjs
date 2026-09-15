@@ -79,14 +79,19 @@ export function pageProbe(options = {}) {
       inner.y + inner.height <= outer.y + outer.height + TEXT_GAP_EPSILON
     );
   }
-  function classifyPair(a, b) {
+  function isOutOfFlow(position) {
+    return position === "absolute" || position === "fixed";
+  }
+  function classifyPair(a, b, { positionedA = false, positionedB = false } = {}) {
     if (rectContains(a, b) || rectContains(b, a)) return "contained";
     if (!rectsIntersect(a, b)) return "none";
     // Same-line exemption mirrors ../lib/geometry.mjs isSameLine: vertical
-    // overlap >= 70% of the shorter leaf's height.
+    // overlap >= 70% of the shorter leaf's height — withheld when either
+    // side is out-of-flow (absolute/fixed elements share no line box).
     const verticalOverlap =
       Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y);
-    if (verticalOverlap >= 0.7 * Math.min(a.height, b.height)) return "same-line";
+    if (!positionedA && !positionedB && verticalOverlap >= 0.7 * Math.min(a.height, b.height))
+      return "same-line";
     return "overlap";
   }
 
@@ -259,7 +264,13 @@ export function pageProbe(options = {}) {
     const findings = [];
     for (let i = 0; i < leaves.length && findings.length < maxFindings; i++) {
       for (let j = i + 1; j < leaves.length && findings.length < maxFindings; j++) {
-        if (classifyPair(leaves[i].rect, leaves[j].rect) !== "overlap") continue;
+        if (
+          classifyPair(leaves[i].rect, leaves[j].rect, {
+            positionedA: isOutOfFlow(leaves[i].style.position),
+            positionedB: isOutOfFlow(leaves[j].style.position),
+          }) !== "overlap"
+        )
+          continue;
         findings.push({
           stage: "text-overlap",
           selector: leaves[i].path,
@@ -312,8 +323,12 @@ export function pageProbe(options = {}) {
     for (const el of tabbables) {
       // sr-only / clip-pattern elements are hidden-by-design until focused.
       if (el.classList.contains("sr-only")) continue;
-      const clip = getComputedStyle(el).clipPath;
+      const style = getComputedStyle(el);
+      const clip = style.clipPath;
       if (clip && clip.includes("inset(50")) continue;
+      // WCAG 2.5.8 exempts inline targets (links inside a sentence or block
+      // of text); flagging them would fail virtually every real page.
+      if (style.display === "inline") continue;
       const rect = rectOf(el);
       if (rect.width <= 0 || rect.height <= 0) continue;
       if (rect.width < MIN_TARGET_PX || rect.height < MIN_TARGET_PX) {
@@ -326,7 +341,6 @@ export function pageProbe(options = {}) {
       }
       if (options.checkFocusVisibility === false) continue;
       el.focus({ preventScroll: true });
-      const style = getComputedStyle(el);
       const top = document.elementsFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2)[0];
       const visibleAfterFocus =
         rect.y >= 0 &&
