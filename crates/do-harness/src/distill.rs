@@ -83,6 +83,22 @@ pub async fn distill(
     if to_fixture {
         raise_bar_from_recovery(&conn, skill).await?;
     }
+
+    // Durable link: the event names the tracked reference the heuristic landed
+    // in, so the trace -> guide path survives even though the event file is
+    // gitignored local state.
+    let guides = [
+        crate::events::GuideRef::reference(skill, "heuristics.md"),
+        crate::events::GuideRef::skill(skill),
+    ];
+    let payload = serde_json::json!({
+        "trigger": "resolved-trace",
+        "heuristic_id": id,
+        "pattern": pattern,
+        "from_trace": trace_id,
+        "to_fixture": to_fixture,
+    });
+    crate::events::write_event(root, "distill", payload, &guides).await?;
     Ok(())
 }
 

@@ -112,6 +112,50 @@ and `do-harness@0.1.1` is withheld. A dry run is not proof that the name will
 pass registry similarity checks; npm CLI issue
 [#9188](https://github.com/npm/cli/issues/9188) documents that limitation.
 
+## Sequence checks are executable
+
+Do not trust prose for the release order. The order and its consistency checks
+live in `scripts/check-npm-sequence.sh`, which validates the publisher's
+platform-before-meta order, the meta `optionalDependencies` pins, the runtime
+platform map, and the runbook's step order:
+
+```bash
+bash .agents/skills/npm-github-publish/scripts/check-npm-sequence.sh --root .
+bash .agents/skills/npm-github-publish/scripts/check-npm-sequence.sh --self-test
+```
+
+`--self-test` mutates a synthesized fixture to prove every check can still
+fail; a check that cannot fail is decorative, so a green `--root` run alone is
+not evidence. Update this script — not another paragraph — when the order
+changes.
+
+## Anti-patterns (negative knowledge)
+
+These are recorded failures, not passing fixes. They are graded by negative
+assertions (`absent:` / `not-contains:`), so they are provable even though no
+positive fix ever passed:
+
+- **Interactive 2FA approval is per-package and non-reusable.** Every
+  bootstrap `npm publish` can emit its own browser approval URL; one approval
+  does not authorize the next package. Never assume a prior approval covers the
+  remaining packages, and never script a publish sequence around a single
+  approval.
+- **A package must exist before it can have a Trusted Publisher.** npm exposes
+  **Settings → Trusted Publisher** only for published packages, so
+  "configure all six, then publish" is an impossible instruction. Bootstrap
+  each package first, then configure, then let Actions/OIDC publish subsequent
+  versions.
+- **`npm publish --dry-run` is not a name-availability check.** It validates
+  staged payload assembly but skips the registry's similarity/spam screening,
+  so a passing dry run is not proof a new name will be accepted. Probe the
+  registry and keep the publisher idempotent instead.
+- **Never rename one reference.** Changing only the platform manifest, only the
+  meta `optionalDependencies`, or only the runtime map produces a wrapper that
+  silently resolves nothing on that platform.
+- **Never unpublish live siblings to make a rename possible.** Immutable
+  versions cannot be reused, and the four published platform packages are
+  depended on by the meta package.
+
 References: [Trusted publishing](https://docs.npmjs.com/trusted-publishers),
 [package name guidelines](https://docs.npmjs.com/package-name-guidelines/),
 [threats and mitigations](https://docs.npmjs.com/threats-and-mitigations/),

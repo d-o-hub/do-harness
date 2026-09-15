@@ -118,6 +118,12 @@ not a release bug:
 so a passing dry run is not proof that a new name will be accepted
 ([npm/cli#9188](https://github.com/npm/cli/issues/9188)).
 
+The bootstrap -> configure -> OIDC order is executable, not prose:
+`.agents/skills/npm-github-publish/scripts/check-npm-sequence.sh --root .`
+validates the publisher order, the meta `optionalDependencies`, the platform
+map, and this runbook's step order. Run `--self-test` to confirm each check can
+still fail.
+
 Validate the assembly locally without a token:
 
 ```bash

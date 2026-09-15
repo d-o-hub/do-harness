@@ -6,6 +6,7 @@ use std::fs;
 use super::gate::{GateVerdict, run_structure_gate};
 use super::grading::{EvalCase, SkillEvals, grade_skill};
 use super::orchestrator::discover_skills;
+use crate::eval_sandbox::referenced_paths;
 use crate::eval_walk::WalkRun;
 
 /// `discover_skills` returns only directories with a `SKILL.md`, sorted.
@@ -36,6 +37,50 @@ fn run_structure_gate_is_unavailable_when_script_missing() {
     let (verdict, message) = run_structure_gate(dir.path(), &missing);
     assert_eq!(verdict, GateVerdict::Unavailable);
     assert!(message.contains("not found"));
+}
+
+/// Only concrete repo paths a skill names are mirrored; bare tree prefixes are
+/// ignored, because a whole-tree copy is the difference between a sandbox that
+/// costs kilobytes and one that costs hundreds of kilobytes per eval case.
+/// `integrations/<pkg>` is the one deliberate widening: a package dir is a
+/// self-contained tool closure a named repo script reads.
+#[test]
+fn referenced_paths_selects_concrete_files_only() {
+    let dir = tempfile::tempdir().unwrap();
+    let skill = dir.path().join("demo");
+    fs::create_dir_all(skill.join("evals")).unwrap();
+    fs::write(
+        skill.join("SKILL.md"),
+        "Run `bash scripts/publish-npm.sh --dist dist` and read docs/releasing.md.\n\
+         The wrapper lives in integrations/npm/platforms/linux-x64/package.json.\n\
+         See integrations/ for the layout and scripts/ generally.\n",
+    )
+    .unwrap();
+    let found = referenced_paths(&skill);
+    assert!(
+        found.contains(&"scripts/publish-npm.sh".to_owned()),
+        "{found:?}"
+    );
+    assert!(found.contains(&"docs/releasing.md".to_owned()), "{found:?}");
+    // The package root, not the leaf file: the script reads sibling files.
+    assert!(found.contains(&"integrations/npm".to_owned()), "{found:?}");
+    assert!(
+        !found.contains(&"integrations/npm/platforms/linux-x64/package.json".to_owned()),
+        "{found:?}"
+    );
+    // Bare prefixes must not be mirrored.
+    assert!(!found.contains(&"scripts".to_owned()), "{found:?}");
+    assert!(!found.contains(&"integrations".to_owned()), "{found:?}");
+}
+
+/// A skill that names no repo paths mirrors none, so its sandbox stays free of
+/// the non-hidden entries that would flip `init`'s language detection.
+#[test]
+fn referenced_paths_is_empty_for_a_self_contained_skill() {
+    let dir = tempfile::tempdir().unwrap();
+    fs::create_dir_all(dir.path().join("evals")).unwrap();
+    fs::write(dir.path().join("SKILL.md"), "No repo paths named here.\n").unwrap();
+    assert!(referenced_paths(dir.path()).is_empty());
 }
 
 /// Documentation assertions (no reserved prefix) are never graded.

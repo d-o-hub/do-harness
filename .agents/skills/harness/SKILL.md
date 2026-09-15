@@ -73,6 +73,27 @@ When any sensor fires repeatedly (>2 times in one sprint):
 3. If no guide exists, create one in `.agents/skills/` using the `skill-distiller` skill.
 4. The loop closes: sensors fire -> guides update -> sensors fire less.
 
+The trigger is recorded, not remembered. `verify --record` maintains a strike
+counter per error signature, and the steering loop is wired to it:
+
+```bash
+do-harness errors list --format json              # see attempt_count per signature
+do-harness distill --from-strikes --dry-run       # what the threshold would scaffold
+do-harness distill --from-strikes                 # write starter skills + fixtures
+```
+
+`--from-strikes` scaffolds a starter skill (generated from the recorded
+signature, never hand-written) plus a failing fixture, and emits an event naming
+the tracked guide it created. The generator refuses to overwrite an existing
+skill. Its defaults reuse the fail-fast threshold, so a guide defect is
+scaffolded at the same count that halts the sensor.
+
+Distilled learnings land in tracked artifacts: SKILL.md, `references/`,
+repository documentation, or the roadmap under `plans/`. The event tree
+(`.agents/events/`) is gitignored local state, so the event records *which
+tracked guide changed* — the link is traceable even though the event file
+itself is not durable evidence.
+
 ## Swarm Handoff Protocol
 
 Handoffs between parallel swarm agents are accepted only on computational evidence: the receiving agent verifies the expected artifacts exist (files, directories, DB rows), and the handing-off agent reports exact verification outputs (commands run, exit codes).

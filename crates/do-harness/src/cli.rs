@@ -196,16 +196,27 @@ pub enum Command {
     Distill {
         /// Skill the heuristic belongs to.
         #[arg(long, value_name = "SKILL")]
-        skill: String,
+        skill: Option<String>,
         /// Generalized pattern to record.
         #[arg(long)]
-        pattern: String,
+        pattern: Option<String>,
         /// When the pattern applies.
         #[arg(long)]
         description: Option<String>,
         /// Source trace id; required as evidence of a resolved fix.
-        #[arg(long = "from-trace", required = true, value_name = "ID")]
+        #[arg(long = "from-trace", value_name = "ID")]
         from_trace: Option<i64>,
+        /// Generate a starter skill scaffold from recorded sensor strikes
+        /// (AGENTS.md §6 steering loop) instead of distilling from a trace.
+        #[arg(long = "from-strikes")]
+        from_strikes: bool,
+        /// Strike count at or above which a signature sculpts a scaffold
+        /// (default: the fail-fast threshold).
+        #[arg(long = "min-strikes", value_name = "N")]
+        min_strikes: Option<i64>,
+        /// Scope strike lookup to this task id.
+        #[arg(long, value_name = "ID", requires = "from_strikes")]
+        task: Option<i64>,
         /// Raise the skill's pass-rate bar after this recovery.
         #[arg(long = "to-fixture")]
         to_fixture: bool,

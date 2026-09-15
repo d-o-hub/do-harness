@@ -61,3 +61,50 @@ Run the skill-evaluator loop:
 ## Gotchas
 - Never distill a fix that did not pass computational sensors — hallucinations propagate.
 - Strip secrets and machine-specific paths from traces before writing them into a skill.
+
+## Negative Knowledge (Anti-Patterns)
+
+The "only distill verified fixes" rule governs *positive* patterns. Negative
+knowledge — a trap that was actually hit and not solved — is equally valuable
+and is stored as a `kind: gotchas` eval case, whose assertions prove the wrong
+action was **not** taken:
+
+```json
+{
+  "kind": "gotchas",
+  "assertions": [
+    "absent:.do-harness/blessed-to-pass",
+    "not-contains:recovery-log.md|relaxed the sensor"
+  ]
+}
+```
+
+`eval --strict-fixtures` rejects a `gotchas` case with no negative
+(`absent:` / `not-contains:`) assertion, so an anti-pattern cannot be recorded
+as a positive-only claim it never earned.
+
+Anti-patterns live in the skill's `## Anti-patterns` section, each naming the
+observed wrong action and why it failed. Seed them from real incidents — an
+unsolved blocker, a repeated correction, a revert — never from speculation.
+
+The npm publishing work is the seed example. Its four recorded anti-patterns
+(per-package non-reusable 2FA approval, no Trusted Publisher before a package
+exists, `npm publish --dry-run` not checking name similarity, and never
+renaming a single reference or unpublishing live siblings) live in
+`.agents/skills/npm-github-publish/SKILL.md`. They are graded with `absent:`
+and `not-contains:` assertions that run against the real publisher's output,
+so they stay provable without any positive npm fix having landed.
+
+## Strike-Driven Scaffolding
+
+A sensor that strikes 3+ times has no verified fix yet, so distilling from it
+positively would fabricate one. Use the recorded signature instead:
+
+```bash
+do-harness distill --from-strikes
+```
+
+This generates the starter pair (SKILL.md generated from the signature + a
+failing `gotchas` fixture) via the same skill-creator layout. The starter is
+legitimately red: its `exists:` assertion names the recovery log the author has
+not written yet. Completing the guide turns it green.

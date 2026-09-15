@@ -38,6 +38,19 @@
         "contains:distill_negative.txt|no distillation",
         "contains:.agents/skills/skill-distiller/SKILL.md|did not pass computational sensors"
       ]
+    },
+    {
+      "id": 4,
+      "prompt": "A release blocker was hit and never resolved. Should we distill it as a fix, and how do we record it so it still grades?",
+      "expected_output": "Record it as negative knowledge: a kind=gotchas case whose assertions prove the wrong action was NOT taken (absent:/not-contains:), never as a fabricated positive fix.",
+      "files": [],
+      "dim": "correctness",
+      "kind": "gotchas",
+      "assertions": [
+        "contains:.agents/skills/skill-distiller/SKILL.md|not-contains:",
+        "contains:.agents/skills/skill-distiller/SKILL.md|Anti-patterns",
+        "not-contains:distill_negative.txt|fabricated a positive fix"
+      ]
     }
   ]
 }

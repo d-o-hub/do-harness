@@ -12,9 +12,7 @@
         "walk:",
         "exists:model.rs",
         "contains:model.rs|impl Command",
-        "contains:model.rs|fn apply",
-        "contains:slice_checklist.md|deny_unknown_fields",
-        "contains:slice_checklist.md|thiserror"
+        "contains:.agents/skills/event-modeler/SKILL.md|hard constraint of 500 LOC per file"
       ]
     },
     {
@@ -26,7 +24,8 @@
       "kind": "explicit",
       "assertions": [
         "contains:model.rs|UserSummaryViews",
-        "contains:model.rs|self.total += 1"
+        "contains:model.rs|self.total += 1",
+        "contains:.agents/skills/event-modeler/SKILL.md|deny_unknown_fields"
       ]
     },
     {
@@ -38,7 +37,8 @@
       "kind": "negative",
       "assertions": [
         "contains:model_negative.txt|no model emitted",
-        "absent:model_extra.rs"
+        "absent:model_extra.rs",
+        "not-contains:.agents/skills/event-modeler/SKILL.md|unvalidated payloads are acceptable"
       ]
     }
   ]

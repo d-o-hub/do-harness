@@ -24,6 +24,7 @@ mod commands;
 mod config;
 mod dbcheck;
 mod distill;
+mod distill_strikes;
 mod doctor;
 mod errors;
 mod eval;
@@ -31,6 +32,7 @@ mod eval_assert;
 mod eval_integrity;
 mod eval_sandbox;
 mod eval_walk;
+mod events;
 mod evidence;
 mod explain;
 mod fingerprint;
@@ -260,21 +262,54 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
             pattern,
             description,
             from_trace,
+            from_strikes,
+            min_strikes,
+            task,
             to_fixture,
             dry_run,
             format,
-        } => distill::distill(
-            &root,
-            &skill,
-            &pattern,
-            description.as_deref(),
-            from_trace,
-            to_fixture,
-            dry_run,
-            format,
-        )
-        .await
-        .map_err(CliError::Usage),
+        } => {
+            if from_strikes {
+                distill_strikes::scaffold_from_strikes(
+                    &root,
+                    skill.as_deref(),
+                    task,
+                    min_strikes.unwrap_or(telemetry::FAIL_FAST_STRIKES),
+                    dry_run,
+                    format,
+                )
+                .await
+                .map_err(CliError::Usage)?;
+                return Ok(());
+            }
+            let Some(skill) = skill else {
+                return Err(CliError::Usage(anyhow::anyhow!(
+                    "distill requires --skill (or --from-strikes to scaffold from recorded strikes)"
+                )));
+            };
+            let Some(pattern) = pattern else {
+                return Err(CliError::Usage(anyhow::anyhow!(
+                    "distill requires --pattern describing the generalized fix"
+                )));
+            };
+            let Some(from_trace) = from_trace else {
+                return Err(CliError::Usage(anyhow::anyhow!(
+                    "distill requires evidence: pass --from-trace <id> of a resolved trace (see do-harness trace add)"
+                )));
+            };
+            distill::distill(
+                &root,
+                &skill,
+                &pattern,
+                description.as_deref(),
+                Some(from_trace),
+                to_fixture,
+                dry_run,
+                format,
+            )
+            .await
+            .map_err(CliError::Usage)
+        }
         Command::Errors { action } => commands::errors_cmd(&root, action)
             .await
             .map_err(CliError::Usage),

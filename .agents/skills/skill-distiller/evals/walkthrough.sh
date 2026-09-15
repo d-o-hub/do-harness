@@ -37,6 +37,7 @@ EOF
 # sensors, so nothing is distilled and no heuristic is written for it.
 cat > "$root/distill_negative.txt" << 'TXT'
 negative: typo-only change has no sensor trace, no distillation; never distill a fix that did not pass computational sensors
+anti-pattern: an unresolved blocker is recorded as negative knowledge, graded by absent: and not-contains: assertions
 TXT
 
 cat ".agents/skills/skill-distiller/references/heuristics.md"

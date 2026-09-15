@@ -90,6 +90,30 @@
     "category": "verification"
   },
   {
+    "invariant": "Distilled learnings land in tracked artifacts (SKILL.md, references/, docs/, plans/); the gitignored .agents/events tree is never the only record, and each event names the tracked guide it updated",
+    "rationale": "An event in a gitignored tree is not durable evidence and nothing durable read it, so distillation could regress invisibly; requiring a companion guide reference makes the trace -> guide path followable from committed content alone",
+    "sensor": "do-harness distill (events::write_event rejects an empty or untracked guide list)",
+    "category": "skills"
+  },
+  {
+    "invariant": "Anti-patterns are recordable as kind=gotchas eval cases whose assertions are negative (absent:/not-contains:), and strict fixture validation rejects a gotchas case without one",
+    "rationale": "The 'never distill a fix that did not pass a sensor' rule is correct for positive patterns but would exclude high-value unsolved lessons such as the npm registry-name block; negative assertions let those be proven without fabricating a fix",
+    "sensor": "do-harness eval --strict-fixtures",
+    "category": "skills"
+  },
+  {
+    "invariant": "A sensor signature reaching the fail-fast threshold also scaffolds a starter skill and a red fixture via do-harness distill --from-strikes, generated from the recorded signature and never overwriting an existing skill",
+    "rationale": "AGENTS.md section 6 required distillation after repeated sensor fires but the recorded strike counters were wired to no action, leaving the steering loop an honor system with untracked output",
+    "sensor": "do-harness errors list + do-harness distill --from-strikes",
+    "category": "skills"
+  },
+  {
+    "invariant": "Fragile multi-step release sequences are enforced by an executable check the skill runs, and the prose points at that check instead of restating the order",
+    "rationale": "The npm bootstrap -> configure Trusted Publisher -> OIDC order was corrected twice in docs/releasing.md because prose cannot fail; check-npm-sequence.sh carries negative self-test controls so a check that cannot fail is detectable",
+    "sensor": "bash .agents/skills/npm-github-publish/scripts/check-npm-sequence.sh --self-test",
+    "category": "skills"
+  },
+  {
     "invariant": "A change is complete only when current verification evidence for its signal set is green (do-harness status)",
     "rationale": "Git SHA alone cannot detect uncommitted edits, so completion depends on workspace/policy fingerprints, not commit identity",
     "sensor": "do-harness status --set verification (green|red|stale|missing)",

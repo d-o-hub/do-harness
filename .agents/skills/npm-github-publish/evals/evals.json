@@ -11,9 +11,9 @@
       "assertions": [
         "walk:",
         "exists:npm-publish-checklist.md",
-        "contains:npm-publish-checklist.md|id-token: write",
-        "contains:npm-publish-checklist.md|npm >= 11.5.1",
-        "contains:npm-publish-checklist.md|no NPM_TOKEN"
+        "contains:.agents/skills/npm-github-publish/SKILL.md|id-token: write",
+        "contains:.agents/skills/npm-github-publish/SKILL.md|npm >= 11.5.1",
+        "contains:.agents/skills/npm-github-publish/SKILL.md|NPM_TOKEN"
       ]
     },
     {
@@ -24,9 +24,9 @@
       "dim": "security",
       "kind": "implicit",
       "assertions": [
-        "contains:npm-publish-script.txt|npm whoami is not an OIDC probe",
-        "contains:npm-publish-script.txt|registry metadata GET",
-        "contains:npm-publish-script.txt|exact package/version"
+        "contains:.agents/skills/npm-github-publish/SKILL.md|whoami",
+        "contains:.agents/skills/npm-github-publish/SKILL.md|unauthenticated HTTP `GET`",
+        "contains:.agents/skills/npm-github-publish/SKILL.md|exact package/version"
       ]
     },
     {
@@ -37,10 +37,10 @@
       "dim": "effectiveness",
       "kind": "contextual",
       "assertions": [
-        "contains:npm-publish-context.txt|platform packages first",
-        "contains:npm-publish-context.txt|meta package last",
-        "contains:npm-publish-context.txt|npm publish --dry-run",
-        "contains:npm-publish-context.txt|fail closed"
+        "contains:.agents/skills/npm-github-publish/SKILL.md|platform packages, stage and publish each exact version first",
+        "contains:.agents/skills/npm-github-publish/SKILL.md|meta package last",
+        "contains:.agents/skills/npm-github-publish/SKILL.md|dry-run",
+        "contains:.agents/skills/npm-github-publish/SKILL.md|never fall"
       ]
     },
     {
@@ -52,21 +52,57 @@
       "kind": "negative",
       "assertions": [
         "contains:npm-publish-negative.txt|out-of-scope",
-        "absent:npm_publish_action.txt"
+        "absent:npm_publish_action.txt",
+        "absent:npm-publish-force-rename.txt"
       ]
     },
     {
       "id": 5,
-      "prompt": "A new Windows platform package returns npm HTTP 403 'Package name triggered spam detection' while four sibling packages are live. Should we keep retrying, rename it, or wait?",
-      "expected_output": "Treat it as a registry-side policy block: stop blind retries, contact npm Support first, keep the blocked platform and meta package withheld, and use a coordinated scoped or sufficiently distinct rename only if Support cannot clear the name.",
+      "prompt": "A new Windows platform package returns npm HTTP 403 'Package name triggered spam detection' while four sibling packages are already live. Rerun the release and show what the publisher does for each package.",
+      "expected_output": "Treat it as a registry-side policy block: the publisher must skip the live siblings, never re-attempt an immutable version, keep the blocked platform and meta package withheld, and prefer npm Support over a blind retry or unilateral rename.",
       "files": [],
       "dim": "security",
-      "kind": "contextual",
+      "kind": "gotchas",
       "assertions": [
-        "contains:npm-spam-response.txt|contact npm Support",
-        "contains:npm-spam-response.txt|meta package withheld",
-        "contains:npm-spam-response.txt|scoped or sufficiently distinct",
-        "contains:npm-spam-response.txt|Never rename only one reference"
+        "walk:",
+        "exists:npm-publish-run.txt",
+        "contains:npm-publish-run.txt|do-harness-linux-x64@0.1.1 is already on npm; skipping",
+        "contains:npm-publish-run.txt|do-harness-darwin-arm64@0.1.1 is already on npm; skipping",
+        "not-contains:npm-publish-run.txt|You cannot publish over the previously published versions",
+        "not-contains:npm-publish-run.txt|npm error"
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "Four platform packages are live but the Windows package and the meta package were never published. Rerun the release and confirm the meta package is not attempted before its pinned dependency.",
+      "expected_output": "The rerun skips the four live versions and still attempts Windows before the meta package, because the meta package's optionalDependencies must resolve.",
+      "files": [],
+      "dim": "effectiveness",
+      "kind": "gotchas",
+      "assertions": [
+        "walk:",
+        "exists:npm-publish-run.txt",
+        "contains:npm-publish-run.txt|+ do-harness-win32-x64@0.1.1",
+        "contains:npm-publish-run.txt|+ do-harness@0.1.1",
+        "not-contains:npm-publish-run.txt|do-harness-win32-x64@0.1.1 is already on npm",
+        "not-contains:npm-publish-run.txt|do-harness@0.1.1 is already on npm"
+      ]
+    },
+    {
+      "id": 7,
+      "prompt": "Prove the release order is enforced by a check rather than by prose, and that the check itself is falsifiable.",
+      "expected_output": "Run the skill's check-npm-sequence.sh against the workspace and its --self-test mutation controls; both must exit 0, and a check that cannot fail is a defect.",
+      "files": [],
+      "dim": "correctness",
+      "kind": "gotchas",
+      "assertions": [
+        "walk:",
+        "exists:npm-sequence-guard.txt",
+        "contains:npm-sequence-guard.txt|OK: publisher order: platform packages before the meta package",
+        "contains:npm-sequence-guard.txt|bad-docs-order: OK: configure-before-bootstrap rejected",
+        "contains:npm-sequence-guard.txt|guard-root-exit=0",
+        "contains:npm-sequence-guard.txt|guard-self-test-exit=0",
+        "not-contains:npm-sequence-guard.txt|FAIL: good"
       ]
     }
   ]

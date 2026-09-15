@@ -17,6 +17,11 @@
 //! contains:PATH|NEEDLE           PATH exists and its text contains NEEDLE.
 //!                                ('|' separates path/needle; paths cannot
 //!                                contain '|' on POSIX.)
+//! not-contains:PATH|NEEDLE       PATH exists and its text does NOT contain
+//!                                NEEDLE. Grades anti-pattern (Gotchas) cases:
+//!                                the visible artifact must prove the wrong
+//!                                action was not taken, which `absent:` alone
+//!                                cannot express.
 //! db:TABLE:COLUMN=VALUE:min=CNT  agent_state.db has >= CNT rows in TABLE where
 //!                                COLUMN = VALUE.
 //! cli:ARGV:contains:TEXT         `do-harness ARGV` (split on spaces) exits 0
@@ -54,6 +59,7 @@ pub fn is_graded(spec: &str) -> bool {
     spec.starts_with("exists:")
         || spec.starts_with("absent:")
         || spec.starts_with("contains:")
+        || spec.starts_with("not-contains:")
         || spec.starts_with("db:")
         || spec.starts_with("cli:")
         || spec.starts_with("walk:")
@@ -77,7 +83,10 @@ pub async fn grade(root: &Path, spec: &str, walk: &WalkRun) -> Result<AssertionG
         return Ok(grade_absent(root, path));
     }
     if let Some(rest) = spec.strip_prefix("contains:") {
-        return Ok(grade_contains(root, rest).await);
+        return Ok(grade_contains(root, rest, false).await);
+    }
+    if let Some(rest) = spec.strip_prefix("not-contains:") {
+        return Ok(grade_contains(root, rest, true).await);
     }
     if let Some(rest) = spec.strip_prefix("db:") {
         return grade_db(root, rest).await;
@@ -120,25 +129,41 @@ fn grade_absent(root: &Path, path: &str) -> AssertionGrade {
     }
 }
 
-/// The `contains:PATH|NEEDLE` grader.
-async fn grade_contains(root: &Path, rest: &str) -> AssertionGrade {
+/// The `contains:PATH|NEEDLE` and `not-contains:PATH|NEEDLE` grader.
+///
+/// `negate` inverts the verdict, which is how negative-knowledge cases prove
+/// the wrong action was *not* taken on an artifact that must still exist.
+async fn grade_contains(root: &Path, rest: &str, negate: bool) -> AssertionGrade {
+    let prefix = if negate { "not-contains" } else { "contains" };
     let Some((path, needle)) = rest.split_once('|') else {
-        return fail("contains: expected contains:PATH|NEEDLE".to_owned());
+        return fail(format!("{prefix}: expected {prefix}:PATH|NEEDLE"));
     };
+    if needle.is_empty() {
+        return fail(format!("{prefix}: NEEDLE is empty"));
+    }
     let abs = root.join(path);
     match tokio::fs::read_to_string(&abs).await {
         Ok(contents) => {
-            if contents.contains(needle) {
-                pass(format!("contains: {} has '{}'", abs.display(), needle))
-            } else {
-                fail(format!(
+            let found = contents.contains(needle);
+            match (negate, found) {
+                (false, true) => pass(format!("contains: {} has '{}'", abs.display(), needle)),
+                (false, false) => fail(format!(
                     "contains: '{}' not found in {}",
                     needle,
                     abs.display()
-                ))
+                )),
+                (true, false) => pass(format!(
+                    "not-contains: {} correctly omits '{}'",
+                    abs.display(),
+                    needle
+                )),
+                (true, true) => fail(format!(
+                    "not-contains: forbidden '{needle}' found in {}",
+                    abs.display()
+                )),
             }
         }
-        Err(err) => fail(format!("contains: cannot read {}: {err}", abs.display())),
+        Err(err) => fail(format!("{prefix}: cannot read {}: {err}", abs.display())),
     }
 }
 

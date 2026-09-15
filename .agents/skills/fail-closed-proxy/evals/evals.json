@@ -12,8 +12,7 @@
         "walk:",
         "exists:proxy-checklist.md",
         "contains:proxy-checklist.md|fail-closed",
-        "contains:proxy-checklist.md|403",
-        "contains:proxy-checklist.md|502"
+        "contains:.agents/skills/fail-closed-proxy/SKILL.md|forward only on allow"
       ]
     },
     {
@@ -26,7 +25,8 @@
       "assertions": [
         "exists:proxy-checklist.md",
         "contains:proxy-checklist.md|GET /metrics",
-        "contains:proxy-checklist.md|audit_write_failures"
+        "contains:proxy-checklist.md|audit_write_failures",
+        "contains:.agents/skills/fail-closed-proxy/SKILL.md|audit_write_failures"
       ]
     },
     {
@@ -39,7 +39,8 @@
       "assertions": [
         "contains:proxy_negative.txt|well-formed allow forwards",
         "contains:proxy-checklist.md|never allow on error",
-        "contains:proxy-checklist.md|hash-chained"
+        "contains:proxy-checklist.md|hash-chained",
+        "contains:.agents/skills/fail-closed-proxy/SKILL.md|Decisions never depend on observability"
       ]
     },
     {
@@ -51,7 +52,8 @@
       "kind": "negative",
       "assertions": [
         "contains:proxy_negative.txt|out-of-scope",
-        "absent:proxy_allow.txt"
+        "absent:proxy_allow.txt",
+        "not-contains:.agents/skills/fail-closed-proxy/SKILL.md|allow on mediator error"
       ]
     }
   ]
