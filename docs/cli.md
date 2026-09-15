@@ -44,7 +44,9 @@ Runs computational sensors defined in `do-harness.toml`.
   in-flight siblings and never starts a later chunk. A `jobs = 0` config is
   rejected at load.
 - `--record`: Persist beats and error signatures into `.do-harness/agent_state.db`.
-- `--task <ID>`: Scope recorded beats to task ID. Requires `--record`.
+- `--task <ID>`: Scope recorded beats to task ID. Requires `--record`. An
+  unscoped `--record` prints a global-namespace advisory; managed git hooks
+  export `DO_HARNESS_HOOK=1` (a hook has no task context) and skip it.
 - `--evidence <FILE>`: Write machine-readable evidence artifact JSON.
 - `--strict`: Exit non-zero if any sensors were skipped or evidence checks fail. Default evidence artifact path: `.do-harness/evidence.json`.
 - `--bless`: Lower or initialize blessed findings baselines from this run

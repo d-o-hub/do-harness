@@ -35,11 +35,13 @@ fn install_writes_both_hooks_with_expected_arguments() {
     assert!(pre_commit_body.contains(MARKER));
     assert!(pre_commit_body.contains("#!/usr/bin/env bash"));
     assert!(pre_commit_body.contains("verify --fail-fast --record --only fmt --only loc"));
+    assert!(pre_commit_body.contains("export DO_HARNESS_HOOK=1"));
     assert!(pre_commit_body.contains("cargo build --release -p do-harness"));
 
     let pre_push_body = read(&hook_path(&git_dir, "pre-push"));
     assert!(pre_push_body.contains(MARKER));
     assert!(pre_push_body.contains("verify --fail-fast --record"));
+    assert!(pre_push_body.contains("export DO_HARNESS_HOOK=1"));
     assert!(!pre_push_body.contains("--only"));
 
     let commit_msg_body_text = read(&hook_path(&git_dir, "commit-msg"));
@@ -47,6 +49,7 @@ fn install_writes_both_hooks_with_expected_arguments() {
     assert!(commit_msg_body_text.contains("scripts/check-commitlint.sh"));
     assert!(commit_msg_body_text.contains("--message \"$1\""));
     assert!(!commit_msg_body_text.contains("verify --fail-fast"));
+    assert!(!commit_msg_body_text.contains("DO_HARNESS_HOOK"));
 }
 
 #[cfg(unix)]
