@@ -15,12 +15,24 @@ const PM_YARN: &str = "yarn";
 const PM_NPM: &str = "npm";
 
 fn detect_pm(path: &Path) -> &'static str {
-    let pnpm_lock = path.join("pnpm-lock.yaml").exists();
-    let pnpm_ws = path.join("pnpm-workspace.yaml").exists();
-    let yarn_lock = path.join("yarn.lock").exists();
-    if pnpm_lock || pnpm_ws || probe(PM_PNPM) {
+    let pinned =
+        if path.join("pnpm-lock.yaml").exists() || path.join("pnpm-workspace.yaml").exists() {
+            Some(PM_PNPM)
+        } else if path.join("yarn.lock").exists() {
+            Some(PM_YARN)
+        } else if path.join("package-lock.json").exists() {
+            Some(PM_NPM)
+        } else {
+            None
+        };
+    // Prefer the pinned manager when its binary is installed; otherwise use
+    // the first installed manager so generated sensors always execute instead
+    // of failing on a missing runner.
+    if pinned.is_some_and(probe) {
+        pinned.unwrap_or(PM_NPM)
+    } else if probe(PM_PNPM) {
         PM_PNPM
-    } else if yarn_lock || probe(PM_YARN) {
+    } else if probe(PM_YARN) {
         PM_YARN
     } else {
         PM_NPM
