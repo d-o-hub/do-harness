@@ -21,7 +21,7 @@ curl -fsSL https://raw.githubusercontent.com/d-o-hub/do-harness/main/scripts/ins
 
 # Pinned and reproducible (recommended for CI and agent instructions).
 curl -fsSL https://raw.githubusercontent.com/d-o-hub/do-harness/main/scripts/install.sh \
-  | sh -s -- --version v0.1.0
+  | sh -s -- --version v0.1.1
 ```
 
 The installer places `do-harness` in `$HOME/.local/bin` by default. Override
@@ -38,9 +38,8 @@ install from source: `cargo install --path crates/do-harness` (Rust 1.85+).
 ### Windows
 
 Prebuilt Windows x86_64 (`x86_64-pc-windows-msvc`) binaries ship as a zip
-release asset starting after `v0.1.0` — `v0.1.0` published Linux/macOS
-tarballs only, so until a later tag is published, install from source or run
-the Linux binary under WSL. `install.sh` detects Git Bash (`MINGW*`/`MSYS*`/
+release asset in `v0.1.1`. The initial `v0.1.0` release published Linux/macOS
+tarballs only. `install.sh` detects Git Bash (`MINGW*`/`MSYS*`/
 `CYGWIN*`) and installs `do-harness.exe` from the zip (needs `unzip` or `7z`
 to extract). The `windows-latest` CI job proves the installer (including the
 zip path), `hook install`/`status`, `doctor`, and the npm `win32-x64`
@@ -61,7 +60,7 @@ Rust toolchains can install from crates.io instead, either building from
 source or fetching the release artifact:
 
 ```bash
-cargo install do-harness --version 0.1.0
+cargo install do-harness --version 0.1.1
 cargo binstall do-harness          # prebuilt, no compile
 ```
 
@@ -150,7 +149,7 @@ GitHub Actions:
 - name: Install do-harness
   run: |
     curl -fsSL https://raw.githubusercontent.com/d-o-hub/do-harness/main/scripts/install.sh \
-      | sh -s -- --version v0.1.0
+      | sh -s -- --version v0.1.1
     echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 - name: Verify
   run: do-harness verify --set verification --format json --strict
@@ -161,7 +160,7 @@ GitLab CI:
 ```yaml
 verify:
   script:
-    - curl -fsSL https://raw.githubusercontent.com/d-o-hub/do-harness/main/scripts/install.sh | sh -s -- --version v0.1.0
+    - curl -fsSL https://raw.githubusercontent.com/d-o-hub/do-harness/main/scripts/install.sh | sh -s -- --version v0.1.1
     - export PATH="$HOME/.local/bin:$PATH"
     - do-harness verify --set verification --format json --strict
 ```

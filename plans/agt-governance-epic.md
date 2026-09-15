@@ -124,6 +124,14 @@ Manual `bash scripts/check-agt-ga.sh`:
 - release: `tag=v4.1.0 prerelease=false`
 - `VERDICT=NOT_GA` — criterion (a) still unsatisfied.
 
+### GA watch run — 2026-09-15
+
+Manual `bash scripts/check-agt-ga.sh`:
+
+- crate: `version=3.2.2 description=Public Preview — Rust SDK for the Agent Governance Toolkit (policy, trust, audit, identity)`
+- release: `tag=v4.1.0 prerelease=false`
+- `VERDICT=NOT_GA` — criterion (a) remains unsatisfied; no promotion review is opened.
+
 ## Next action
 
 All implementation slices done (tasks 3–5, 8–12, 14–16), GA re-check spike (task 17), hygiene (task 18), and GA watch automation (tasks 19–21). Earlier work also removed the duplicated CLI adapter (task 30) and hardened sensors/evidence (2026-09-12 sweep). MCP conformance landed through the docs slice (`plans/mcp-conformance-epic.md`, slices 1–5): criterion (b) is satisfied behind the optional `mcp-surface` feature, and `chore-mcp-promotion` (2026-09-13) decided to keep it off by default with MSRV 1.85 because flat-route removal is coupled to a default-enabled successor. `chore-agt-promotion` stays a decision gate pending AGT GA and invariants review — no promotion until criteria `(a) GA` and `(b) MCP surface conformant` both hold. When the watch opens a GA tracking issue, run promotion review against this epic.

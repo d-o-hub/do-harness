@@ -12,8 +12,8 @@ npx do-harness verify --set verification --changed --strict
 ```
 
 Prebuilt binaries for Linux (x86_64/aarch64, static musl), macOS
-(x86_64/arm64), and Windows (x86_64, zip; starting after `v0.1.0`, which
-shipped Linux/macOS only) are published as GitHub Releases
+(x86_64/arm64), and Windows (x86_64, zip; included starting with `v0.1.1`;
+`v0.1.0` shipped Linux/macOS only) are published as GitHub Releases
 with SHA-256 checksums:
 
 ```bash
@@ -22,7 +22,7 @@ curl -fsSL https://raw.githubusercontent.com/d-o-hub/do-harness/main/scripts/ins
 
 # pinned, reproducible install
 curl -fsSL https://raw.githubusercontent.com/d-o-hub/do-harness/main/scripts/install.sh \
-  | sh -s -- --version v0.1.0
+  | sh -s -- --version v0.1.1
 ```
 
 The installer verifies the artifact against the release `checksums.txt` before
@@ -34,7 +34,7 @@ Rust users can also install from crates.io (source build) or fetch the
 prebuilt release through `cargo-binstall`:
 
 ```bash
-cargo install do-harness --version 0.1.0
+cargo install do-harness --version 0.1.1
 # or, using the published release assets:
 cargo binstall do-harness
 ```
@@ -63,7 +63,7 @@ The harness is designed to be adopted by any codebase, Rust or not:
 
    ```bash
    curl -fsSL https://raw.githubusercontent.com/d-o-hub/do-harness/main/scripts/install.sh \
-     | sh -s -- --version v0.1.0
+     | sh -s -- --version v0.1.1
    # or, from a vendored checkout:
    cargo install --path vendor/do-harness/crates/do-harness
    ```
@@ -126,7 +126,7 @@ set -euo pipefail
 
 # Prebuilt binary (pinned):
 curl -fsSL https://raw.githubusercontent.com/d-o-hub/do-harness/main/scripts/install.sh \
-  | sh -s -- --version v0.1.0
+  | sh -s -- --version v0.1.1
 # ...or a vendored checkout (installs outside the workspace target/):
 # cargo install --path vendor/do-harness/crates/do-harness
 
@@ -149,7 +149,7 @@ For CI, install the pinned binary first, then invoke `do-harness verify --format
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/d-o-hub/do-harness/main/scripts/install.sh \
-  | sh -s -- --version v0.1.0
+  | sh -s -- --version v0.1.1
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
