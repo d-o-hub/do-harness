@@ -118,10 +118,13 @@ detection`), so the meta package was not published because its pinned Windows
 optional dependency is unavailable. File npm support for the exact package
 name before retrying; do not rename only one package.
 
-After npm clears the name, configure the trusted publisher for all six
-packages (organization/user `d-o-hub`, repository `do-harness`, workflow
-`release.yml`, direct publish), then rerun the idempotent publish path through
-GitHub Actions with `gh workflow run release.yml -f publish=true`.
+After npm clears the name, bootstrap-publish
+`do-harness-win32-x64@0.1.1` and then `do-harness@0.1.1` with the
+authenticated account. Only after each package exists can its trusted publisher
+be configured: use organization/user `d-o-hub`, repository `do-harness`,
+workflow `release.yml`, and direct publish for all six packages. Future
+versions use the GitHub Actions OIDC path; a tag push is the normal trigger,
+and `gh workflow run release.yml -f publish=true` is the idempotent rerun path.
 
 ## Non-goals
 

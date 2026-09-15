@@ -11,7 +11,13 @@ verification set and every build target dogfoods green.
   <https://crates.io/settings/tokens> (scope: publish new crates and versions)
   and store it under **Settings → Secrets and variables → Actions**. The
   publish job fails loudly when the secret is missing.
-- Configure an npm Trusted Publisher for each of the six packages on
+- npm Trusted Publisher setup is per existing package. If a package has not
+  been published yet, perform a one-time authenticated bootstrap publish first;
+  npm exposes its **Settings → Trusted Publisher** page only afterward. For the
+  current `v0.1.1` bootstrap, the four Linux/macOS platform packages exist;
+  `do-harness-win32-x64` was rejected by npm spam detection and `do-harness`
+  is withheld until that dependency exists.
+- Once each package exists, configure its Trusted Publisher on
   <https://www.npmjs.com>: package **Settings → Trusted Publisher → GitHub
   Actions**, organization/user `d-o-hub`, repository `do-harness`, workflow
   filename `release.yml`. Allow direct `npm publish` because the workflow
