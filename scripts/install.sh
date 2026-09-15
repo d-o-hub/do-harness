@@ -42,6 +42,7 @@ Environment:
   DO_HARNESS_INSTALL_DIR  Same as --bin-dir.
   DO_HARNESS_BASE_URL     Same as --base-url.
   DO_HARNESS_REPO         GitHub owner/repo for latest resolution.
+  DO_HARNESS_TARGET       Override the detected release target (tests).
 EOF
 }
 
@@ -92,6 +93,12 @@ detect_target() {
                 *) return 1 ;;
             esac
             ;;
+        MINGW* | MSYS* | CYGWIN* | Windows_NT)
+            case "$uname_arch" in
+                x86_64 | amd64) echo "x86_64-pc-windows-msvc" ;;
+                *) return 1 ;;
+            esac
+            ;;
         *) return 1 ;;
     esac
 }
@@ -119,8 +126,12 @@ sha256_of() {
 
 command -v curl >/dev/null 2>&1 || die "curl is required to download releases"
 
-target="$(detect_target)" ||
-    die "unsupported platform $(uname -s)/$(uname -m); install from source with 'cargo install --path crates/do-harness'"
+if [ -n "${DO_HARNESS_TARGET:-}" ]; then
+    target="$DO_HARNESS_TARGET"
+else
+    target="$(detect_target)" ||
+        die "unsupported platform $(uname -s)/$(uname -m); install from source with 'cargo install --path crates/do-harness'"
+fi
 
 if [ -z "$VERSION" ]; then
     VERSION="$(resolve_latest)"
@@ -130,7 +141,11 @@ case "$VERSION" in
     *) VERSION="v${VERSION}" ;;
 esac
 
-asset="do-harness-${VERSION}-${target}.tar.gz"
+case "$target" in
+    x86_64-pc-windows-msvc) archive_ext="zip"; bin_name="do-harness.exe" ;;
+    *) archive_ext="tar.gz"; bin_name="do-harness" ;;
+esac
+asset="do-harness-${VERSION}-${target}.${archive_ext}"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
@@ -145,16 +160,28 @@ actual="$(sha256_of "$tmp/$asset")"
 [ "$actual" = "$expected" ] ||
     die "checksum mismatch for ${asset} (expected ${expected}, got ${actual})"
 
-tar -xzf "$tmp/$asset" -C "$tmp"
-src="$tmp/do-harness-${VERSION}-${target}/do-harness"
-[ -f "$src" ] || die "archive ${asset} did not contain do-harness"
+if [ "$archive_ext" = "zip" ]; then
+    if command -v unzip >/dev/null 2>&1; then
+        unzip -q "$tmp/$asset" -d "$tmp" ||
+            die "failed to extract ${asset} (unzip)"
+    elif command -v 7z >/dev/null 2>&1; then
+        7z x "-o$tmp" "$tmp/$asset" >/dev/null ||
+            die "failed to extract ${asset} (7z)"
+    else
+        die "neither unzip nor 7z is available to extract ${asset}"
+    fi
+else
+    tar -xzf "$tmp/$asset" -C "$tmp"
+fi
+src="$tmp/do-harness-${VERSION}-${target}/${bin_name}"
+[ -f "$src" ] || die "archive ${asset} did not contain ${bin_name}"
 
 mkdir -p "$BIN_DIR"
-install -m 0755 "$src" "$BIN_DIR/do-harness"
+install -m 0755 "$src" "$BIN_DIR/$bin_name"
 
-echo "Installed do-harness ${VERSION} (${target}) to ${BIN_DIR}/do-harness"
+echo "Installed do-harness ${VERSION} (${target}) to ${BIN_DIR}/${bin_name}"
 case ":$PATH:" in
     *":$BIN_DIR:"*) ;;
     *) echo "Add it to PATH: export PATH=\"${BIN_DIR}:\$PATH\"" ;;
 esac
-"$BIN_DIR/do-harness" version
+"$BIN_DIR/$bin_name" version

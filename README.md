@@ -12,7 +12,8 @@ npx do-harness verify --set verification --changed --strict
 ```
 
 Prebuilt binaries for Linux (x86_64/aarch64, static musl), macOS
-(x86_64/arm64), and Windows (x86_64, zip) are published as GitHub Releases
+(x86_64/arm64), and Windows (x86_64, zip; starting after `v0.1.0`, which
+shipped Linux/macOS only) are published as GitHub Releases
 with SHA-256 checksums:
 
 ```bash

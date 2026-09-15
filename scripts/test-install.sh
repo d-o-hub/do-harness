@@ -108,6 +108,62 @@ fi
     exit 1
 }
 
+# Windows zip path (hermetic via DO_HARNESS_TARGET, so Linux CI covers it):
+# stage a windows-msvc zip with do-harness.exe, verify install + tamper
+# rejection. Skipped when zip/unzip tooling is unavailable.
+win_target="x86_64-pc-windows-msvc"
+win_name="do-harness-${VERSION}-${win_target}"
+windist="$tmp/windist/$VERSION"
+winbase="file://$tmp/windist"
+mkdir -p "$windist" "$tmp/winpkg/$win_name"
+cp "$BIN" "$tmp/winpkg/$win_name/do-harness.exe"
+win_staged=0
+if command -v zip >/dev/null 2>&1; then
+    if (cd "$tmp/winpkg" && zip -qr "$windist/${win_name}.zip" "$win_name"); then
+        win_staged=1
+    fi
+fi
+if [[ "$win_staged" == "0" ]] && command -v python3 >/dev/null 2>&1; then
+    if python3 - "$tmp/winpkg" "$windist/${win_name}.zip" "$win_name" <<'EOF'
+import os
+import sys
+import zipfile
+src, dest, top = sys.argv[1], sys.argv[2], sys.argv[3]
+with zipfile.ZipFile(dest, "w", zipfile.ZIP_DEFLATED) as z:
+    for root, _, files in os.walk(os.path.join(src, top)):
+        for f in files:
+            full = os.path.join(root, f)
+            z.write(full, os.path.relpath(full, src))
+EOF
+    then
+        win_staged=1
+    fi
+fi
+if [[ "$win_staged" == "1" ]] && { command -v unzip >/dev/null 2>&1 || command -v 7z >/dev/null 2>&1; }; then
+    printf '%s  %s\n' "$(sha256_of "$windist/${win_name}.zip")" "${win_name}.zip" >"$windist/checksums.txt"
+    if ! DO_HARNESS_TARGET="$win_target" bash "$ROOT/scripts/install.sh" --version "$VERSION" --base-url "$winbase" --bin-dir "$tmp/bin-win" >"$tmp/win-install.log" 2>&1; then
+        cat "$tmp/win-install.log" >&2
+        echo "FAIL: windows installer exited non-zero" >&2
+        exit 1
+    fi
+    [[ -x "$tmp/bin-win/do-harness.exe" ]] || {
+        echo "FAIL: windows installer did not place an executable at $tmp/bin-win/do-harness.exe" >&2
+        exit 1
+    }
+    printf 'tamper' >>"$windist/${win_name}.zip"
+    if DO_HARNESS_TARGET="$win_target" bash "$ROOT/scripts/install.sh" --version "$VERSION" --base-url "$winbase" --bin-dir "$tmp/bin-win-tampered" >"$tmp/win-tamper.log" 2>&1; then
+        echo "FAIL: tampered windows artifact was accepted" >&2
+        exit 1
+    fi
+    grep -q "checksum mismatch" "$tmp/win-tamper.log" || {
+        cat "$tmp/win-tamper.log" >&2
+        echo "FAIL: expected a checksum mismatch diagnostic for the windows zip" >&2
+        exit 1
+    }
+else
+    echo "SKIP: zip/python3 staging or unzip/7z extraction unavailable, skipping windows zip case"
+fi
+
 # Tampering with the artifact must fail checksum verification before install.
 printf 'tamper' >>"$dist/${name}.tar.gz"
 if install_ok "$tmp/bin-tampered" "$tmp/tamper.log"; then
@@ -124,4 +180,4 @@ grep -q "checksum mismatch" "$tmp/tamper.log" || {
     exit 1
 }
 
-echo "test-install OK: verified, installed (bash file mode + sh pipeline mode), and rejected a tampered artifact"
+echo "test-install OK: verified, installed (bash file mode + sh pipeline mode + windows zip), and rejected a tampered artifact"

@@ -37,9 +37,14 @@ install from source: `cargo install --path crates/do-harness` (Rust 1.85+).
 
 ### Windows
 
-Prebuilt Windows x86_64 binaries ship as a zip release asset (see the
-release workflow); until the first release that includes them, install from
-source or run the Linux binary under WSL.
+Prebuilt Windows x86_64 (`x86_64-pc-windows-msvc`) binaries ship as a zip
+release asset starting after `v0.1.0` — `v0.1.0` published Linux/macOS
+tarballs only, so until a later tag is published, install from source or run
+the Linux binary under WSL. `install.sh` detects Git Bash (`MINGW*`/`MSYS*`/
+`CYGWIN*`) and installs `do-harness.exe` from the zip (needs `unzip` or `7z`
+to extract). The `windows-latest` CI job proves the installer (including the
+zip path), `hook install`/`status`, `doctor`, and the npm `win32-x64`
+wrapper on every push.
 
 Source builds on Windows need: the Visual Studio Build Tools C++ workload
 (MSVC `link.exe` + Windows SDK libraries) and LLVM/Clang (`libclang` for the

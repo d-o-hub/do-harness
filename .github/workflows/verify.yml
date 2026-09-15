@@ -213,7 +213,8 @@ jobs:
       # Full `cargo test --workspace` runs on ubuntu (verify job). The unit
       # suite is not yet Windows-green (eval walkthrough shebangs, hook exit
       # codes, path resolution — see #70), so the windows job proves the
-      # distribution path only: build + Git Bash dogfood + npm wrapper.
+      # distribution path only: build + Git Bash dogfood + installer +
+      # hooks/doctor + npm wrapper.
       - name: Build harness CLI
         run: cargo build --release -p do-harness
       - name: Dogfood init + verify with the release binary
@@ -227,6 +228,20 @@ jobs:
           tmp="$(mktemp -d)"
           ./target/release/do-harness.exe --root "$tmp" init
           ./target/release/do-harness.exe --root "$tmp" verify --format json --strict
+      - name: Test the installer (including the windows zip path)
+        shell: bash
+        run: bash scripts/test-install.sh --bin ./target/release/do-harness.exe
+      - name: Prove hook install + status and doctor on Windows
+        shell: bash
+        run: |
+          scratch="$(mktemp -d)"
+          git init -q "$scratch"
+          ./target/release/do-harness.exe --root "$scratch" init
+          bin="$PWD/target/release/do-harness.exe"
+          cd "$scratch"
+          DO_HARNESS_BIN="$bin" "$bin" hook install
+          DO_HARNESS_BIN="$bin" "$bin" hook status
+          DO_HARNESS_BIN="$bin" "$bin" doctor
       - name: Lint and test the npm wrapper
         shell: bash
         run: |
