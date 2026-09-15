@@ -34,9 +34,10 @@ fn version_flags_and_subcommand_match() {
         out2, out3,
         "--version and version subcommand stdout must match"
     );
+    let expected_prefix = concat!("do-harness ", env!("CARGO_PKG_VERSION"));
     assert!(
-        out1.starts_with("do-harness 0.1.0"),
-        "version output should start with 'do-harness 0.1.0', got:\n{out1}"
+        out1.starts_with(expected_prefix),
+        "version output should start with '{expected_prefix}', got:\n{out1}"
     );
 }
 
@@ -47,7 +48,10 @@ fn version_json_format() {
 
     let value: Value = serde_json::from_str(&stdout).expect("version json is valid JSON");
     assert_eq!(value["name"], serde_json::json!("do-harness"));
-    assert_eq!(value["version"], serde_json::json!("0.1.0"));
+    assert_eq!(
+        value["version"],
+        serde_json::json!(env!("CARGO_PKG_VERSION"))
+    );
     assert!(value.get("commit").is_some());
     assert!(value.get("commit_date").is_some());
     assert!(value.get("dirty").is_some());
@@ -76,5 +80,8 @@ fn version_works_outside_workspace() {
 
     let value: Value = serde_json::from_str(&json_out).expect("version json is valid JSON");
     assert_eq!(value["name"], serde_json::json!("do-harness"));
-    assert_eq!(value["version"], serde_json::json!("0.1.0"));
+    assert_eq!(
+        value["version"],
+        serde_json::json!(env!("CARGO_PKG_VERSION"))
+    );
 }
