@@ -17,8 +17,11 @@ current, and merge directly when all gates pass. Never use auto-merge.
 Read [references/merge-order.md](references/merge-order.md) before merging
 stacks, [references/check-policy.md](references/check-policy.md) before judging
 checks, [references/review-contract.md](references/review-contract.md) before
-reviewing, and [references/do-harness-optional.md](references/do-harness-optional.md)
-when `do-harness` is installed.
+reviewing, [references/do-harness-optional.md](references/do-harness-optional.md)
+when `do-harness` is installed, and
+[references/gh-resilience.md](references/gh-resilience.md) before any
+`gh pr create` / `gh pr edit` or when a `gh` command fails in API plumbing
+rather than in the diff.
 
 ## Inputs
 
@@ -41,7 +44,7 @@ Run these steps in order. Stop the sweep on any escalation and report it.
    suffix or the `dependabot`/`renovate` logins). For any other author: review
    and post findings as a PR comment, then move on. Never update the branch,
    resolve threads, push fixes, or merge a PR you do not own.
-4. **State check.** Read `gh pr view PR --json headRefOid,baseRefOid`. Run
+4. **State check.** Read `gh pr view PR --json headRefOid,baseRefName`. Run
    `scripts/state.sh get PR`; if a record exists for the same head and base,
    and `scripts/checks.sh` reports pass and `scripts/threads.sh list` has no
    unresolved threads, skip to the next PR.
@@ -61,7 +64,11 @@ Run these steps in order. Stop the sweep on any escalation and report it.
    wait (30 second polls, then a deadline) so you never sleep between calls;
    fix failures you caused; apply
    [references/check-policy.md](references/check-policy.md) to skipped or
-   neutral checks. Never merge with a failing or unknown check.
+   neutral checks. A check that fails in CI plumbing (upload, runner,
+   rerun-forbidden) with zero diff causation is infrastructure, not a
+   finding: follow [references/gh-resilience.md](references/gh-resilience.md)
+   (empty retrigger commit, one cycle, then escalate). Never merge with a
+   failing or unknown check.
 9. **Conversations.** Run `scripts/threads.sh list PR`. For each unresolved
    thread: fix the code or reply with a concrete answer, then
    `scripts/threads.sh resolve THREAD_ID`. Reply to top-level issue comments
@@ -95,6 +102,11 @@ Run these steps in order. Stop the sweep on any escalation and report it.
 
 - No auto-merge; `--match-head-commit` always; re-read the head SHA immediately
   before any merge or close.
+- Route mutating `gh` calls (`pr create`, `pr edit`, `pr close`,
+  `update-branch`) through `scripts/retry.sh`; set PR bodies via the REST
+  API and read PRs/issues with explicit `--json` fields (see
+  [references/gh-resilience.md](references/gh-resilience.md)). Never retry a
+  deterministic API failure.
 - Every wait is bounded by a deadline and lives in a script
   (`checks.sh --wait`, `post-merge.sh`); an empty run or check list means not
   yet registered, never done. Never sleep between agent calls.

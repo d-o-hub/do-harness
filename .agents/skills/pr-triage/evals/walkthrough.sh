@@ -101,6 +101,42 @@ printf 'checks_wait_exit=%s\npost_merge_pass_exit=%s\npost_merge_fail_exit=%s\np
   "$checks_wait_exit" "$post_merge_pass_exit" "$post_merge_fail_exit" "$post_merge_pending_exit" "$post_merge_none_exit" \
   > "$root/wait_summary.txt"
 
+# 5c. Retry helper: transient HTTP 502 replays until success; a deterministic
+# API failure returns after exactly one attempt with its exit code. Attempt
+# counts travel through RETRY_COUNTER in the environment.
+export RETRY_COUNTER="$root/retry_counter"
+rm -f "$RETRY_COUNTER"
+cat > "$root/bin/flaky" <<'EOF'
+#!/bin/sh
+n=$(cat "$RETRY_COUNTER" 2>/dev/null || echo 0)
+n=$((n + 1))
+echo "$n" > "$RETRY_COUNTER"
+if [ "$n" -lt 3 ]; then echo "HTTP 502: 502 Bad Gateway" >&2; exit 1; fi
+echo created
+EOF
+chmod +x "$root/bin/flaky"
+cat > "$root/bin/deterministic" <<'EOF'
+#!/bin/sh
+n=$(cat "$RETRY_COUNTER" 2>/dev/null || echo 0)
+n=$((n + 1))
+echo "$n" > "$RETRY_COUNTER"
+echo "GraphQL: Projects (classic) is being deprecated" >&2
+exit 1
+EOF
+chmod +x "$root/bin/deterministic"
+set +e
+"$skill/scripts/retry.sh" --attempts 5 --delay 0 -- flaky > "$root/retry_flaky.out" 2> "$root/retry_flaky.err"
+flaky_exit=$?
+flaky_runs=$(cat "$RETRY_COUNTER")
+rm -f "$RETRY_COUNTER"
+"$skill/scripts/retry.sh" --attempts 5 --delay 0 -- deterministic > "$root/retry_det.out" 2> "$root/retry_det.err"
+det_exit=$?
+det_runs=$(cat "$RETRY_COUNTER" 2>/dev/null || echo 0)
+set -e
+printf 'flaky_exit=%s\nflaky_out=%s\nflaky_runs=%s\ndet_exit=%s\ndet_runs=%s\n' \
+  "$flaky_exit" "$(cat "$root/retry_flaky.out")" "$flaky_runs" "$det_exit" "$det_runs" \
+  > "$root/retry_summary.txt"
+
 # 6. Harness command: a git repo at the sandbox root for `cli:` assertions.
 cd "$root"
 git init -q "$root"
