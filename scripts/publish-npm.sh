@@ -127,7 +127,7 @@ package_version_exists() {
 
 publish_dir() {
     local dir="$1" pkg="$2"
-    if (( ! DRY_RUN )) && package_version_exists "$pkg" "$VERSION"; then
+    if package_version_exists "$pkg" "$VERSION"; then
         echo "$pkg@$VERSION is already on npm; skipping"
         return 0
     fi

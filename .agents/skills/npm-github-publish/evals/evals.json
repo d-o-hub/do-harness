@@ -54,6 +54,20 @@
         "contains:npm-publish-negative.txt|out-of-scope",
         "absent:npm_publish_action.txt"
       ]
+    },
+    {
+      "id": 5,
+      "prompt": "A new Windows platform package returns npm HTTP 403 'Package name triggered spam detection' while four sibling packages are live. Should we keep retrying, rename it, or wait?",
+      "expected_output": "Treat it as a registry-side policy block: stop blind retries, contact npm Support first, keep the blocked platform and meta package withheld, and use a coordinated scoped or sufficiently distinct rename only if Support cannot clear the name.",
+      "files": [],
+      "dim": "security",
+      "kind": "contextual",
+      "assertions": [
+        "contains:npm-spam-response.txt|contact npm Support",
+        "contains:npm-spam-response.txt|meta package withheld",
+        "contains:npm-spam-response.txt|scoped or sufficiently distinct",
+        "contains:npm-spam-response.txt|Never rename only one reference"
+      ]
     }
   ]
 }

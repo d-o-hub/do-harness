@@ -25,6 +25,14 @@ cat > "$root/npm-publish-context.txt" <<'MD'
 - OIDC or artifact failures fail closed; never guess a publish token.
 MD
 
+cat > "$root/npm-spam-response.txt" <<'MD'
+# npm registry spam-rejection response
+- A registry 403 "Package name triggered spam detection" is a policy block; stop blind retries and contact npm Support with the exact package, version, account, repository, and error.
+- Keep the blocked platform and meta package withheld until Support clears the name.
+- If Support declines, choose a scoped or sufficiently distinct replacement and update every package map, optionalDependency, publish target, test, and document together.
+- Never rename only one reference, unpublish live siblings, or treat npm publish --dry-run as proof of similarity clearance.
+MD
+
 cat > "$root/npm-publish-negative.txt" <<'MD'
 out-of-scope: unrelated prose does not trigger a package release workflow
 MD
@@ -32,5 +40,6 @@ MD
 test -s "$root/npm-publish-checklist.md"
 test -s "$root/npm-publish-script.txt"
 test -s "$root/npm-publish-context.txt"
+test -s "$root/npm-spam-response.txt"
 test -s "$root/npm-publish-negative.txt"
 test ! -e "$root/npm_publish_action.txt"
