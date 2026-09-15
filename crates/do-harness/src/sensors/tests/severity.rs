@@ -4,10 +4,9 @@
 
 use std::collections::BTreeMap;
 
-use super::super::{VerifyOpts, verify};
-use super::config_with;
+use super::*;
 use crate::baselines::Baselines;
-use crate::config::{Config, HooksConfig, SensorSeverity, SensorSpec};
+use crate::config::SensorSeverity;
 
 /// Builds a config with one sensor of the given severity and a `feedback`
 /// signal set naming it.
