@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>web-ui audit intentional-overlap fixture</title>
+<style>
+  body { margin: 0; padding: 24px; background: #fff; color: #111;
+         font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .card { position: relative; max-width: 480px; }
+  /* Intentional defect: an out-of-flow badge painted across the heading. */
+  .badge { position: absolute; top: 0; left: 0; background: #b00020; color: #fff;
+           padding: 4px 8px; font-size: 14px; }
+  h1 { margin: 0; font-size: 28px; }
+  .tight { margin-right: -10px; }
+  .nudged { position: relative; }
+</style>
+</head>
+<body>
+  <main>
+    <div class="card">
+      <span class="badge">new</span>
+      <h1>Quarterly report</h1>
+    </div>
+    <p><span class="tight">overlapping inline siblings</span><span class="nudged">stay exempt</span></p>
+    <p>A sentence with an <a href="#nowhere">inline link</a> inside it.</p>
+  </main>
+</body>
+</html>

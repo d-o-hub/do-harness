@@ -8,6 +8,8 @@
 //   if (report.findings.length) throw new Error(JSON.stringify(report, null, 2));
 
 import { pageProbe } from "./page-probe.mjs";
+import { annotateFindings } from "./annotate.mjs";
+import { cellKey } from "./visual-audit.mjs";
 
 /**
  * Default 2026 viewport matrix: WCAG 1.4.10 reflow floor (320) through large
@@ -60,7 +62,7 @@ export function normalizeMatrix(matrix = DEFAULT_VIEWPORT_MATRIX) {
  * Run the text audit on an already-loaded page at a single viewport.
  * Returns a serializable report; findings carry route/viewport context.
  * @param {import('playwright').Page} page
- * @param {{ route: string, viewport: {label, width, height}, allowlist?: string[], maxFindings?: number, checkFocusVisibility?: boolean }} options
+ * @param {{ route: string, viewport: {label, width, height}, allowlist?: string[], maxFindings?: number, checkFocusVisibility?: boolean, annotate?: boolean, findingsDir?: string }} options
  */
 export async function auditPage(page, options) {
   const viewport = normalizeViewport(options.viewport);
@@ -72,19 +74,30 @@ export async function auditPage(page, options) {
     checkFocusVisibility: options.checkFocusVisibility ?? true,
     viewport: { width: viewport.width, height: viewport.height },
   });
+  const route = options.route ?? page.url();
+  const findings = probe.findings.map((f) => ({ ...f, route, viewport: viewport.label }));
+  const annotationArtifacts = [];
+  if (options.annotate === true && findings.length > 0) {
+    const annotation = await annotateFindings(page, findings, {
+      key: cellKey(route, viewport),
+      outDir: options.findingsDir,
+    });
+    if (annotation?.path) annotationArtifacts.push(annotation.path);
+  }
   return {
-    route: options.route ?? page.url(),
+    route,
     viewport,
     textLeaves: probe.textLeaves,
     truncated: probe.truncated,
-    findings: probe.findings.map((f) => ({ ...f, route: options.route ?? page.url(), viewport: viewport.label })),
+    findings,
+    annotationArtifacts,
   };
 }
 
 /**
  * Run the audit across a full route x viewport matrix.
  * @param {import('playwright').Page} page
- * @param {{ routes: string[], matrix?: Array<{label,width,height}>, allowlist?: string[] }} options
+ * @param {{ routes: string[], matrix?: Array<{label,width,height}>, allowlist?: string[], annotate?: boolean, findingsDir?: string }} options
  */
 export async function auditMatrix(page, options) {
   const matrix = normalizeMatrix(options.matrix);
@@ -92,7 +105,15 @@ export async function auditMatrix(page, options) {
   for (const route of options.routes) {
     await page.goto(route, { waitUntil: "networkidle" });
     for (const viewport of matrix) {
-      reports.push(await auditPage(page, { route, viewport, allowlist: options.allowlist }));
+      reports.push(
+        await auditPage(page, {
+          route,
+          viewport,
+          allowlist: options.allowlist,
+          annotate: options.annotate,
+          findingsDir: options.findingsDir,
+        }),
+      );
     }
   }
   return {
@@ -100,5 +121,6 @@ export async function auditMatrix(page, options) {
     routes: options.routes,
     cells: reports,
     findingCount: reports.reduce((n, r) => n + r.findings.length, 0),
+    annotationArtifacts: reports.flatMap((r) => r.annotationArtifacts),
   };
 }

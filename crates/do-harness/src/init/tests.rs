@@ -93,7 +93,9 @@ async fn init_web_scaffolds_sensors_library_and_runners() {
         "scripts/visual-audit.mjs",
         "scripts/i18n-audit.mjs",
         "scripts/web-ui/audit.test.mjs",
+        "scripts/web-ui/audit.browser.test.mjs",
         "scripts/web-ui/lib/audit.mjs",
+        "scripts/web-ui/lib/annotate.mjs",
         "scripts/web-ui/lib/page-probe.mjs",
         "scripts/web-ui/lib/geometry.mjs",
         "scripts/web-ui/lib/contrast.mjs",
@@ -102,6 +104,11 @@ async fn init_web_scaffolds_sensors_library_and_runners() {
         "scripts/web-ui/lib/perf-audit.mjs",
         "scripts/web-ui/lib/visual-audit.mjs",
         "scripts/web-ui/lib/i18n-audit.mjs",
+        "scripts/web-ui/fixtures/clean.html",
+        "scripts/web-ui/fixtures/overlap.html",
+        "scripts/web-ui/fixtures/overlap-descendant.html",
+        "scripts/web-ui/fixtures/contrast.html",
+        "scripts/web-ui/fixtures/app-shell.html",
     ] {
         assert!(dir.path().join(path).exists(), "missing {path}");
     }
@@ -126,7 +133,9 @@ fn web_ui_templates_match_integrations() {
         .expect("crate lives at crates/<name>");
     for relative in [
         "audit.test.mjs",
+        "audit.browser.test.mjs",
         "lib/audit.mjs",
+        "lib/annotate.mjs",
         "lib/page-probe.mjs",
         "lib/geometry.mjs",
         "lib/contrast.mjs",
@@ -135,6 +144,11 @@ fn web_ui_templates_match_integrations() {
         "lib/perf-audit.mjs",
         "lib/visual-audit.mjs",
         "lib/i18n-audit.mjs",
+        "fixtures/clean.html",
+        "fixtures/overlap.html",
+        "fixtures/overlap-descendant.html",
+        "fixtures/contrast.html",
+        "fixtures/app-shell.html",
     ] {
         let source = workspace.join("integrations/web-ui").join(relative);
         let template = workspace

@@ -33,6 +33,7 @@ import {
 } from "./lib/i18n-audit.mjs";
 import { DEFAULT_BUDGETS, parseBudgets, evaluateBudgets } from "./lib/perf-audit.mjs";
 import { cellKey, classifyBaseline, digestOf } from "./lib/visual-audit.mjs";
+import { findingLabel, annotationsForFindings, MAX_ANNOTATIONS } from "./lib/annotate.mjs";
 
 const rect = (x, y, w, h) => ({ x, y, width: w, height: h });
 
@@ -243,6 +244,42 @@ test("visual: baseline classification covers all three states", () => {
     classifyBaseline({ hasBaseline: true, baselineDigest: "sha256:other", currentDigest: digest }),
     "changed",
   );
+});
+
+test("annotations: labels include stage, selector, partner, and bounded text", () => {
+  assert.equal(findingLabel({ stage: "contrast", selector: "main > p" }), "contrast · main > p");
+  assert.equal(
+    findingLabel({
+      stage: "text-overlap",
+      selector: "main > span",
+      overlapsWith: "main > h1",
+    }),
+    "text-overlap · main > span · ↔ main > h1",
+  );
+  const label = findingLabel({ stage: "contrast", selector: "x".repeat(200) });
+  assert.equal(label.length, 72);
+  assert.ok(label.endsWith("…"));
+});
+
+test("annotations: rect-bearing findings are filtered and capped", () => {
+  assert.deepEqual(annotationsForFindings([]), []);
+  assert.deepEqual(annotationsForFindings([{ stage: "reflow-overflow", selector: "html" }]), []);
+  assert.deepEqual(
+    annotationsForFindings([{ rect: { x: Infinity, y: 0, width: 10, height: 10 } }]),
+    [],
+  );
+  assert.deepEqual(
+    annotationsForFindings([{ rect: rect(0, 0, 10, 10) }], { max: 0 }),
+    [],
+  );
+  const many = Array.from({ length: MAX_ANNOTATIONS + 5 }, (_, i) => ({
+    stage: "text-overlap",
+    selector: `#n${i}`,
+    rect: rect(0, 0, 10, 10),
+  }));
+  const annotations = annotationsForFindings(many);
+  assert.equal(annotations.length, MAX_ANNOTATIONS);
+  assert.equal(annotations[0].label, "text-overlap · #n0");
 });
 
 test("viewport matrix: normalizes, validates, and rejects garbage", () => {

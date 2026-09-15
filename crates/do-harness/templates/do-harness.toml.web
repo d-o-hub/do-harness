@@ -23,7 +23,7 @@ verification = ["web-ui-tests", "viewport-ux", "a11y", "console", "perf", "visua
 
 [[sensors]]
 name = "web-ui-tests"
-argv = ["node", "--test", "scripts/web-ui/audit.test.mjs"]
+argv = ["node", "--test", "scripts/web-ui/audit.test.mjs", "scripts/web-ui/audit.browser.test.mjs"]
 when-changed = ["scripts/web-ui/**"]
 
 [[sensors]]

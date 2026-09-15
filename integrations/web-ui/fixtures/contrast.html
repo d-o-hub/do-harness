@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>web-ui audit contrast fixture</title>
+<style>
+  body { margin: 0; padding: 24px; background: #fff; color: #111;
+         font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  h1 { margin: 0 0 16px; font-size: 28px; }
+  /* Correct: the element's own surface carries the contrast. */
+  .badge { display: inline-block; background: #b00020; color: #fff;
+           padding: 4px 8px; font-size: 14px; }
+  /* Correct: translucent surface composited over the page background. */
+  .veil { display: inline-block; background: rgba(0, 0, 0, 0.6); color: #fff;
+          padding: 4px 8px; font-size: 14px; }
+  /* Intentional defect: low-contrast text on its own light surface. */
+  .chip { display: inline-block; background: #f0f0f0; color: #999;
+          padding: 4px 8px; font-size: 14px; }
+</style>
+</head>
+<body>
+  <main>
+    <h1>Contrast fixture</h1>
+    <p><span class="badge">white on brand red</span>
+       <span class="veil">white on a 60% veil</span>
+       <span class="chip">grey on light grey</span></p>
+  </main>
+</body>
+</html>
