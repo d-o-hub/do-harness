@@ -97,6 +97,37 @@ check_platform_map() {
   ok "platform map resolves every platform package"
 }
 
+# Each platform manifest's own `name` must equal the package name in the
+# publisher's TARGETS table. A partial rename that touches only the manifest
+# would otherwise publish a package the meta pins and the shim maps never
+# reference -- the "rename one reference" failure, which every other check
+# still passes because they read the publisher, not the manifest.
+check_manifest_names() {
+  local root="$1" publisher="$1/scripts/publish-npm.sh" bad=0
+  [[ -f "$publisher" ]] || { fail "missing $publisher"; return 1; }
+  local entry dir pkg expected actual
+  while IFS= read -r entry; do
+    [[ -n "$entry" ]] || continue
+    dir="$(printf '%s' "$entry" | cut -d: -f2)"
+    pkg="$(printf '%s' "$entry" | cut -d: -f3)"
+    local manifest="$root/integrations/npm/platforms/$dir/package.json"
+    if [[ ! -f "$manifest" ]]; then
+      fail "platform manifest missing for $dir ($manifest)"
+      bad=1
+      continue
+    fi
+    expected="$pkg"
+    actual="$(sed -n 's/^[[:space:]]*"name":[[:space:]]*"\([^"]*\)".*/\1/p' "$manifest" | head -1)"
+    if [[ "$actual" != "$expected" ]]; then
+      fail "platforms/$dir/package.json name '$actual' != publisher package '$expected'"
+      bad=1
+    fi
+  done < <(sed -n '/^TARGETS=(/,/^)/p' "$publisher" \
+    | sed -n 's/^[[:space:]]*"\(.*\)".*$/\1/p')
+  (( bad == 0 )) || return 1
+  ok "platform manifests match the publisher package names"
+}
+
 # The twice-corrected contradiction: the runbook must not ask for Trusted
 # Publisher configuration before explaining the bootstrap publication.
 check_docs_order() {
@@ -127,6 +158,7 @@ check_docs_order() {
 run_checks() {
   local root="$1" rc=0
   check_publisher_order "$root" || rc=1
+  check_manifest_names "$root" || rc=1
   check_optional_deps "$root" || rc=1
   check_platform_map "$root" || rc=1
   check_docs_order "$root" || rc=1
@@ -137,7 +169,7 @@ run_checks() {
 # copy so a mutation cannot leak into the control.
 write_fixture() {
   local dir="$1"
-  mkdir -p "$dir"/{scripts,docs,integrations/npm/lib}
+  mkdir -p "$dir"/{scripts,docs,integrations/npm/lib,integrations/npm/platforms/linux-x64}
   cat > "$dir/scripts/publish-npm.sh" <<'SH'
 TARGETS=(
     "x86_64-unknown-linux-musl:linux-x64:do-harness-linux-x64:tar.gz:do-harness"
@@ -147,6 +179,8 @@ for entry in "${TARGETS[@]}"; do
 done
 publish_dir "$stage" "do-harness"
 SH
+  printf '{\n  "name": "do-harness-linux-x64",\n  "version": "0.1.1"\n}\n' \
+    > "$dir/integrations/npm/platforms/linux-x64/package.json"
   printf '{"optionalDependencies": {"do-harness-linux-x64": "0.1.1"}}\n' \
     > "$dir/integrations/npm/package.json"
   printf '"do-harness-linux-x64"\n' > "$dir/integrations/npm/lib/platform.js"
@@ -212,7 +246,7 @@ SH
     printf 'bad-optional-deps: OK: an unpinned platform package is rejected\n'
   fi
 
-  # Mutation 4: drop a platform package from the runtime map.
+  # Mutation 3: drop a platform package from the runtime map.
   write_fixture "$tmp/map-miss"
   printf '// empty\n' > "$tmp/map-miss/integrations/npm/lib/platform.js"
   if check_platform_map "$tmp/map-miss" >/dev/null 2>&1; then
@@ -220,6 +254,18 @@ SH
     rc=1
   else
     printf 'bad-platform-map: OK: an unresolved platform package is rejected\n'
+  fi
+
+  # Mutation 5: rename ONLY the platform manifest. Publisher, meta pins, and
+  # shim map stay consistent, so only the name check can catch it.
+  write_fixture "$tmp/manifest-rename"
+  printf '{\n  "name": "do-harness-windows-x64",\n  "version": "0.1.1"\n}\n' \
+    > "$tmp/manifest-rename/integrations/npm/platforms/linux-x64/package.json"
+  if check_manifest_names "$tmp/manifest-rename" >/dev/null 2>&1; then
+    printf 'bad-manifest-name: FAIL: a manifest-only rename was accepted\n'
+    rc=1
+  else
+    printf 'bad-manifest-name: OK: a manifest-only rename is rejected\n'
   fi
 
   mkdir -p "$tmp/empty"

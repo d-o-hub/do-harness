@@ -106,6 +106,35 @@ Use this decision path:
    before the meta package. Never unpublish the four live siblings to make a
    rename possible.
 
+   Cross-reference consistency is checked, not trusted:
+
+   ```bash
+   bash .agents/skills/npm-github-publish/scripts/check-npm-sequence.sh --root .
+   ```
+
+   It fails if a platform manifest's `name` disagrees with the publisher's
+   target table, if a platform package is unpinned by the meta package, or if
+   the shim map no longer resolves it — so a partial rename cannot land. Its
+   `--self-test` includes a manifest-only rename control that proves that
+   specific failure is detected.
+
+Renaming to a scope (npm's guidance for names similarity-blocked) carries two
+extra requirements that do not apply to an unscoped swap:
+
+- **Scoped packages default to private.** A scoped replacement needs explicit
+  public access or it publishes a private package: set `publishConfig.access`
+  to `public` in the staged manifest or pass `--access public`. This is a
+  silent failure mode, not an error.
+- **The registry probe already handles scoped names.** The publisher's
+  `https://registry.npmjs.org/<pkg>/<version>` GET resolves a scoped
+  `@scope/name` correctly without percent-encoding the slash (verified against
+  a live scoped package: existing version 200 with the scoped `name` in the
+  body, absent version 404). Do not "fix" it by encoding the slash.
+
+Verify a replacement name is actually publishable before committing to the
+migration; npm has no rename operation, so a name that is rejected or already
+taken forces another migration.
+
 For `d-o-hub/do-harness`, the conservative decision is Support-first: four
 platform packages are live at `0.1.1`, `do-harness-win32-x64@0.1.1` is blocked,
 and `do-harness@0.1.1` is withheld. A dry run is not proof that the name will
