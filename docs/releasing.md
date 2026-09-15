@@ -94,6 +94,30 @@ local tooling: `scripts/publish-npm.sh` patches the meta version and all five
 `optionalDependencies` pins to the workspace version in the staging directory,
 so a stale committed value can never be published.
 
+The publisher probes each exact version in live and `--dry-run` modes, so a
+partial rerun validates only the unpublished packages and never re-attempts an
+immutable version.
+
+If the registry rejects a new platform package with HTTP 403
+`Package name triggered spam detection`, treat it as a registry policy block,
+not a release bug:
+
+1. Stop the ordered release and leave the blocked platform package and the meta
+   package unpublished.
+2. Ask npm Support (<https://www.npmjs.com/support>, `support@npmjs.com`) to
+   review the exact name, including its purpose and repository.
+3. After clearance, rerun `scripts/publish-npm.sh`; it skips live siblings and
+   publishes the platform package before the meta package.
+4. Rename only if Support cannot clear the name, and only as a coordinated
+   change across `integrations/npm/lib/platform.js`, the platform manifest, the
+   meta `optionalDependencies`, the publisher target table, tests, and docs.
+   Prefer the `@d-o-hub` scope or a sufficiently distinct name; never unpublish
+   the live siblings.
+
+`npm publish --dry-run` does not perform the registry's name-similarity check,
+so a passing dry run is not proof that a new name will be accepted
+([npm/cli#9188](https://github.com/npm/cli/issues/9188)).
+
 Validate the assembly locally without a token:
 
 ```bash
