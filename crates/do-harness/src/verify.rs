@@ -8,6 +8,24 @@ use crate::evidence::EvidenceSkipped;
 use crate::sensors::VerifyOpts;
 use crate::{CliError, config, evidence, report, sensors, telemetry};
 
+/// Marker exported by managed git hooks (`hook install`); see
+/// `hook_script::EXEC_VERIFY`.
+const HOOK_MARKER: &str = "DO_HARNESS_HOOK";
+
+/// Whether the unscoped-record advisory should be printed.
+///
+/// A hook-driven `--record` has no task context — a git hook runs outside any
+/// task — so its beats land in the global namespace by design and the
+/// `--task` advice would be unactionable noise. Manual and agent runs keep the
+/// advisory so the scoping hint is not silently lost.
+fn warn_unscoped_record(
+    record: bool,
+    task: Option<i64>,
+    hook_marker: Option<&std::ffi::OsStr>,
+) -> bool {
+    record && task.is_none() && hook_marker.is_none()
+}
+
 /// Runs the `verify` subcommand: sensors, optional beat recording, report.
 pub(crate) async fn run(root: &Path, mut opts: VerifyOpts) -> std::result::Result<(), CliError> {
     let started_at = std::time::SystemTime::now()
@@ -16,7 +34,11 @@ pub(crate) async fn run(root: &Path, mut opts: VerifyOpts) -> std::result::Resul
     let (cfg, config_bytes) = config::load_raw(root, opts.config.as_deref())
         .await
         .map_err(CliError::Usage)?;
-    if opts.record && opts.task.is_none() {
+    if warn_unscoped_record(
+        opts.record,
+        opts.task,
+        std::env::var_os(HOOK_MARKER).as_deref(),
+    ) {
         eprintln!(
             "warning: verify --record without --task records beats in the global namespace; \
              pass --task <id> to scope them to a task"
@@ -261,4 +283,19 @@ async fn write_evidence(
         return Err(CliError::Verify(anyhow::anyhow!("weak evidence")));
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::warn_unscoped_record;
+    use std::ffi::OsStr;
+
+    #[test]
+    fn hook_runs_skip_the_unscoped_record_advisory() {
+        let marker = Some(OsStr::new("1"));
+        assert!(warn_unscoped_record(true, None, None));
+        assert!(!warn_unscoped_record(true, None, marker));
+        assert!(!warn_unscoped_record(true, Some(42), None));
+        assert!(!warn_unscoped_record(false, None, None));
+    }
 }

@@ -45,7 +45,13 @@ fi
 
 /// Final `exec` line for the verify-based pre-commit/pre-push hooks; the
 /// per-sensor `--only` arguments are appended by [`only_args`].
-const EXEC_VERIFY: &str = r#"exec "$BIN" --root "$ROOT" verify --fail-fast --record"#;
+///
+/// The `DO_HARNESS_HOOK` export marks the run as hook-driven: a git hook has
+/// no task context, so `verify --record` records its beats in the global
+/// namespace there by design and skips the `--task` advisory that targets
+/// manual/agent runs (see `verify::warn_unscoped_record`).
+const EXEC_VERIFY: &str = r#"export DO_HARNESS_HOOK=1
+exec "$BIN" --root "$ROOT" verify --fail-fast --record"#;
 
 /// Builds the pre-commit/pre-push hook body by concatenating the prologue,
 /// binary-resolution block, the verify exec line, and the sensor arguments.
