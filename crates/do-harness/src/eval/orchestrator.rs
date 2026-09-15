@@ -177,6 +177,7 @@ pub async fn run_eval(root: &Path, opts: EvalOpts<'_>) -> Result<()> {
         report.mode = mode;
 
         if !no_lift && !report.gate_failed && report.pass_rate.is_some() {
+            let mut contaminated = false;
             let baseline = if let Some(spec) = &agent_spec {
                 match load_evals(&entry).await? {
                     Some(evals) => check_skill_agent(root, &entry, &name, &evals, spec, true).await,
@@ -187,10 +188,26 @@ pub async fn run_eval(root: &Path, opts: EvalOpts<'_>) -> Result<()> {
                 bare.strip_guidance(&name)?;
                 let bare_dir = bare.root().join(".agents/skills").join(&name);
                 let result = check_skill_without(bare.root(), &bare_dir).await;
+                // The walkthrough may have regenerated the guidance it was
+                // supposed to run without (e.g. `do-harness init` re-scaffolding
+                // SKILL.md). Such a baseline grades a copy of the guidance, so
+                // its score cannot be subtracted meaningfully.
+                contaminated = bare.guidance_present(&name);
                 drop(bare);
                 result
             };
             match baseline {
+                Ok(baseline) if contaminated => {
+                    report.without_graded = baseline.graded;
+                    report.without_passed = baseline.passed;
+                    report.without_pass_rate = baseline.pass_rate;
+                    eprintln!(
+                        "warning: skill '{name}' baseline regenerated its guidance \
+                         (SKILL.md/references reappeared during the without-skill run); \
+                         lift is not measurable and is reported as n/a"
+                    );
+                    report.lift_contaminated = true;
+                }
                 Ok(baseline) => {
                     report.without_graded = baseline.graded;
                     report.without_passed = baseline.passed;
@@ -327,9 +344,15 @@ fn finish_line(report: &mut super::grading::SkillReport, mode: EvalMode) {
     if report.gate_failed || report.pass_rate.is_none() {
         return;
     }
-    let lift = report
-        .lift
-        .map_or_else(|| "n/a".to_owned(), |lift| format!("{lift:+.2}"));
+    let lift = if report.lift_contaminated {
+        // Distinct from `n/a`: the baseline ran but is unusable, which is a
+        // defect in the fixture/executor rather than a missing measurement.
+        "contaminated".to_owned()
+    } else {
+        report
+            .lift
+            .map_or_else(|| "n/a".to_owned(), |lift| format!("{lift:+.2}"))
+    };
     let fixture = if report.fixture_warnings.is_empty() {
         "ok"
     } else {
@@ -356,6 +379,7 @@ fn report_json(
         "passed": report.passed,
         "gate_failed": report.gate_failed,
         "lift": report.lift,
+        "lift_contaminated": report.lift_contaminated,
         "without_pass_rate": report.without_pass_rate,
         "without_graded": report.without_graded,
         "without_passed": report.without_passed,

@@ -39,6 +39,39 @@ fn run_structure_gate_is_unavailable_when_script_missing() {
     assert!(message.contains("not found"));
 }
 
+/// `strip_guidance` must make the payload observably absent, and
+/// `guidance_present` must report it back the moment anything restores it.
+///
+/// The without-skill baseline is only meaningful while the guidance is gone; a
+/// walkthrough that re-scaffolds `SKILL.md` (e.g. via `do-harness init`) would
+/// otherwise produce a baseline that grades a copy of the guidance and reports
+/// a false `+0.00` lift.
+#[test]
+fn strip_guidance_is_observable_and_detects_regeneration() {
+    let real = tempfile::tempdir().unwrap();
+    let skill = real.path().join(".agents/skills/demo");
+    fs::create_dir_all(skill.join("references")).unwrap();
+    fs::write(skill.join("SKILL.md"), "---\nname: demo\n---\nbody\n").unwrap();
+    fs::write(skill.join("references/notes.md"), "notes\n").unwrap();
+
+    let sandbox = crate::eval_sandbox::Sandbox::for_skill(real.path(), &skill, "demo").unwrap();
+    assert!(sandbox.guidance_present("demo"));
+
+    sandbox.strip_guidance("demo").unwrap();
+    assert!(
+        !sandbox.guidance_present("demo"),
+        "stripped guidance must read as absent"
+    );
+
+    // Simulate an executor regenerating the payload mid-baseline.
+    let regenerated = sandbox.root().join(".agents/skills/demo/SKILL.md");
+    fs::write(&regenerated, "---\nname: demo\n---\nbody\n").unwrap();
+    assert!(
+        sandbox.guidance_present("demo"),
+        "regenerated guidance must be detected"
+    );
+}
+
 /// Only concrete repo paths a skill names are mirrored; bare tree prefixes are
 /// ignored, because a whole-tree copy is the difference between a sandbox that
 /// costs kilobytes and one that costs hundreds of kilobytes per eval case.

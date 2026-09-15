@@ -114,6 +114,18 @@
     "category": "skills"
   },
   {
+    "invariant": "A without-skill baseline that regenerates the guidance it stripped reports lift as contaminated, never as a numeric zero",
+    "rationale": "do-harness init inside a walkthrough re-scaffolds SKILL.md, so the baseline graded a copy of the guidance and understated the skill as a false +0.00 (observed on the harness skill); distinguishing contaminated from n/a keeps an executor defect from reading as a measured result",
+    "sensor": "do-harness eval (lift=contaminated; lift_contaminated in --format json)",
+    "category": "skills"
+  },
+  {
+    "invariant": "A skill's sandbox mirrors only the repository paths its own files name, never whole trees",
+    "rationale": "Agent mode builds one sandbox per eval case, so mirroring integrations/ wholesale moved ~456 KiB per case for files no assertion read; the payload is now ~26 KiB for the npm skill and exactly nothing for skills that name no repo paths, which also keeps do-harness init detection unchanged inside those sandboxes",
+    "sensor": "cargo test -p do-harness (referenced_paths tests)",
+    "category": "verification"
+  },
+  {
     "invariant": "A change is complete only when current verification evidence for its signal set is green (do-harness status)",
     "rationale": "Git SHA alone cannot detect uncommitted edits, so completion depends on workspace/policy fingerprints, not commit identity",
     "sensor": "do-harness status --set verification (green|red|stale|missing)",

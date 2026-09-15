@@ -64,6 +64,11 @@ pub(super) struct SkillReport {
     /// With-skill minus without-skill pass rate in points; `None` when lift
     /// was not measured or either side graded nothing.
     pub(super) lift: Option<f64>,
+    /// The without-skill baseline regenerated its own guidance, so the
+    /// subtraction would be meaningless. Reported distinctly from "not
+    /// measured" because it is a fixture/executor defect to fix, not an
+    /// absent measurement.
+    pub(super) lift_contaminated: bool,
     pub(super) without_pass_rate: Option<f64>,
     pub(super) without_graded: u32,
     pub(super) without_passed: u32,
@@ -179,6 +184,7 @@ fn empty_report() -> SkillReport {
         prompt: None,
         expected_outcome: None,
         lift: None,
+        lift_contaminated: false,
         without_pass_rate: None,
         without_graded: 0,
         without_passed: 0,
@@ -268,6 +274,7 @@ pub(super) fn report_from_outcome(
         prompt: outcome.prompt,
         expected_outcome: outcome.expected_outcome,
         lift: None,
+        lift_contaminated: false,
         without_pass_rate: None,
         without_graded: 0,
         without_passed: 0,

@@ -89,6 +89,21 @@ impl Sandbox {
         Ok(())
     }
 
+    /// Whether the skill's guidance payload is present again.
+    ///
+    /// The without-skill baseline strips guidance before running, but a
+    /// walkthrough that bootstraps a workspace (for example `do-harness init`)
+    /// can regenerate `SKILL.md` from the scaffolded template. The baseline
+    /// then grades a copy of the very guidance it was supposed to measure
+    /// without, so lift collapses toward zero and understates the skill. The
+    /// caller checks this after the baseline run and reports lift as
+    /// unmeasurable rather than publishing a contaminated number.
+    pub(super) fn guidance_present(&self, name: &str) -> bool {
+        let skill = self.root.join(".agents").join("skills").join(name);
+        let skill_md = skill.join("SKILL.md");
+        skill_md.is_file() || skill_md.is_symlink() || skill.join("references").is_dir()
+    }
+
     /// Path of the copied skill-creator gate script within the sandbox.
     pub(super) fn gate_script(&self) -> PathBuf {
         self.root
