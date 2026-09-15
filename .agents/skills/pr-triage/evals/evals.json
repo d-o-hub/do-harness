@@ -112,6 +112,35 @@
     "contains:pr_negative.txt|out-of-scope",
     "absent:pr_merge.txt"
    ]
+  },
+  {
+   "id": 8,
+   "prompt": "Run a local GitHub webhook receiver beside a PR sweep: prove a signed delivery is persisted and wakes a long-poll, an unsigned delivery is rejected, and the bounded check waits wake on events and fall back to polling when the receiver is unreachable.",
+   "expected_output": "The receiver answers /health 200, persists only the signed delivery (202 vs 401), reports woke=false on an idle wait and woke=true when a delivery lands; checks.sh --wait exits 0 with PASS via an event wake, still exits 0 by polling with an unreachable URL, and post-merge.sh exits 0.",
+   "files": [],
+   "dim": "correctness",
+   "kind": "implicit",
+   "assertions": [
+    "walk:",
+    "contains:webhook_summary.txt|health_status=200",
+    "contains:webhook_summary.txt|signed_status=202",
+    "contains:webhook_summary.txt|unsigned_status=401",
+    "contains:webhook_summary.txt|event_lines=1",
+    "contains:webhook_summary.txt|wait_idle_woke=false",
+    "contains:webhook_summary.txt|wait_wake_woke=true",
+    "contains:webhook_summary.txt|checks_event_exit=0",
+    "contains:webhook_summary.txt|checks_event_summary=PASS",
+    "contains:webhook_summary.txt|checks_fallback_exit=0",
+    "contains:webhook_summary.txt|checks_fallback_summary=PASS",
+    "contains:webhook_summary.txt|post_merge_event_exit=0",
+    "contains:webhook_checks_event.err|event wait armed",
+    "contains:webhook_checks_event.err|event wake",
+    "contains:webhook_checks_fallback.err|falling back to polling",
+    "contains:.agents/skills/pr-triage/SKILL.md|--events-url",
+    "contains:.agents/skills/pr-triage/SKILL.md|Webhook deliveries are untrusted hints",
+    "contains:.agents/skills/pr-triage/references/webhook-fast-path.md|PR_TRIAGE_EVENT_CHUNK",
+    "contains:.agents/skills/pr-triage/references/check-policy.md|safety chunk"
+   ]
   }
  ]
 }
