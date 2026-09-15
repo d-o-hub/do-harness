@@ -128,7 +128,7 @@ impl SensorSpec {
 }
 
 /// Language pack identifiers accepted in `Config.language`.
-pub const SUPPORTED_LANGUAGES: &[&str] = &["rust", "generic", "web"];
+pub const SUPPORTED_LANGUAGES: &[&str] = &["rust", "generic", "web", "node"];
 
 /// The built-in Rust sensor pack, in canonical order.
 static RUST_SENSORS: std::sync::LazyLock<Vec<SensorSpec>> = std::sync::LazyLock::new(rust_pack);
@@ -341,7 +341,7 @@ impl Config {
         if !self.sensors.is_empty() {
             return &self.sensors;
         }
-        if self.language.as_deref() == Some("generic") {
+        if matches!(self.language.as_deref(), Some("generic" | "web" | "node")) {
             return &[];
         }
         &RUST_SENSORS

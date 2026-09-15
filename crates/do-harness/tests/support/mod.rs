@@ -12,6 +12,7 @@ use std::process::Command;
 /// silently target the parent repository instead of the fixture.
 pub fn git_command(root: &Path) -> Command {
     let mut command = Command::new("git");
+    command.arg("-c").arg("core.hooksPath=.git/hooks");
     command.current_dir(root);
     for key in [
         "GIT_DIR",

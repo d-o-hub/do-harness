@@ -81,14 +81,24 @@ pub fn inspect(
     if has_git {
         findings.push("Git repository".to_owned());
     }
-    if has_package_json && !has_cargo {
-        findings.push("package.json (no supported pack; generic sensors)".to_owned());
+    if has_package_json {
+        findings.push("package.json".to_owned());
+        let has_pnpm_ws = root.join("pnpm-workspace.yaml").exists();
+        let has_turbo = root.join("turbo.json").exists();
+        if has_pnpm_ws && has_turbo {
+            findings.push("pnpm+turbo workspace".to_owned());
+        } else if has_pnpm_ws {
+            findings.push("pnpm workspace".to_owned());
+        } else if has_turbo {
+            findings.push("turbo workspace".to_owned());
+        }
     }
 
     let declared = match existing_language {
         Some("rust") => Some(Language::Rust),
         Some("generic") => Some(Language::Generic),
         Some("web") => Some(Language::Web),
+        Some("node") => Some(Language::Node),
         _ => None,
     };
     let language = match requested {
@@ -99,6 +109,7 @@ pub fn inspect(
                 Language::Rust => "rust",
                 Language::Generic => "generic",
                 Language::Web => "web",
+                Language::Node => "node",
             };
             findings.push(format!("existing do-harness.toml selects the {name} pack"));
             language
@@ -116,9 +127,16 @@ pub fn inspect(
     if language == Language::Web && !findings.iter().any(|f| f.contains("web")) {
         findings.push("web pack selected (web-ui audit sensors)".to_owned());
     }
+    if language == Language::Node && !findings.iter().any(|f| f.contains("node")) {
+        findings.push("node pack selected (JS/TS sensors)".to_owned());
+    }
 
     let candidates = match language {
         Language::Rust => rust_candidates(),
+        Language::Node => {
+            let (c, _) = super::node::probe_node(root);
+            c
+        }
         Language::Generic | Language::Web => Vec::new(),
     };
     Detection {
@@ -133,6 +151,7 @@ pub fn inspect(
 /// Generic has no built-in sensors, so it always returns an empty list.
 #[must_use]
 pub fn included_specs(
+    root: &Path,
     language: Language,
     candidates: &[Candidate],
 ) -> Vec<crate::config::SensorSpec> {
@@ -145,6 +164,17 @@ pub fn included_specs(
                     .any(|candidate| candidate.name == spec.name && candidate.included)
             })
             .collect(),
+        Language::Node => {
+            let (_, specs) = super::node::probe_node(root);
+            specs
+                .into_iter()
+                .filter(|spec| {
+                    candidates
+                        .iter()
+                        .any(|candidate| candidate.name == spec.name && candidate.included)
+                })
+                .collect()
+        }
         Language::Generic | Language::Web => Vec::new(),
     }
 }
@@ -306,7 +336,8 @@ mod tests {
             candidate("check", false, false, ""),
             candidate("clippy", true, true, "optional tool missing"),
         ];
-        let specs = included_specs(Language::Rust, &candidates);
+        let dummy = std::path::Path::new(".");
+        let specs = included_specs(dummy, Language::Rust, &candidates);
         let names: Vec<&str> = specs.iter().map(|s| s.name.as_str()).collect();
         assert_eq!(names, vec!["fmt", "clippy"]);
     }
