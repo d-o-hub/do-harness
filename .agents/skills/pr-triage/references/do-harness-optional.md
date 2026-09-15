@@ -4,16 +4,26 @@
 
 ## Probe
 
-Use it only when both checks succeed. `DO_HARNESS_BIN` points at a
-dev-checkout binary, mirroring git-hook resolution; otherwise fall back to
-`PATH`:
+Use it only when the probe succeeds. Resolution mirrors git-hook order:
+`DO_HARNESS_BIN`, then `do-harness` on `PATH`, then the repo-local
+`<repo>/target/release/do-harness[.exe]` dev-checkout build:
 
 ```bash
-harness_bin="${DO_HARNESS_BIN:-do-harness}"
+harness_bin="${DO_HARNESS_BIN:-}"
+if [ -z "$harness_bin" ] && command -v do-harness >/dev/null 2>&1; then
+  harness_bin="$(command -v do-harness)"
+fi
+if [ -z "$harness_bin" ]; then
+  repo_root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+  for candidate in "$repo_root/target/release/do-harness" \
+    "$repo_root/target/release/do-harness.exe"; do
+    [ -x "$candidate" ] && harness_bin="$candidate" && break
+  done
+fi
 command -v "$harness_bin" >/dev/null 2>&1 && "$harness_bin" pr review --help >/dev/null 2>&1
 ```
 
-If either fails, silently fall back to `gh pr diff`. `scripts/preflight.sh`
+If the probe fails, silently fall back to `gh pr diff`. `scripts/preflight.sh`
 performs the same probe and reports which binary it found; substitute
 `$harness_bin` for `do-harness` in the commands below.
 
