@@ -341,10 +341,7 @@ impl Config {
         if !self.sensors.is_empty() {
             return &self.sensors;
         }
-        if matches!(
-            self.language.as_deref(),
-            Some("generic" | "web" | "node")
-        ) {
+        if matches!(self.language.as_deref(), Some("generic" | "web" | "node")) {
             return &[];
         }
         &RUST_SENSORS

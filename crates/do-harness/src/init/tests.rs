@@ -329,7 +329,11 @@ async fn init_no_seed_skips_seeding() {
 #[tokio::test(flavor = "current_thread")]
 async fn init_node_pnpm_turbo_workspace_first_run_is_green() {
     let dir = tempfile::tempdir().unwrap();
-    fs::write(dir.path().join("pnpm-workspace.yaml"), "packages:\n  - 'apps/*'\n").unwrap();
+    fs::write(
+        dir.path().join("pnpm-workspace.yaml"),
+        "packages:\n  - 'apps/*'\n",
+    )
+    .unwrap();
     fs::write(
         dir.path().join("turbo.json"),
         r#"{"tasks": {"typecheck": {}, "lint": {}, "test": {}, "build": {}}}"#,
