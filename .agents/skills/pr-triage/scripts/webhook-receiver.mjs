@@ -263,7 +263,12 @@ function wakeWaiters(event, index) {
 
 function handleWait(url, res) {
   const sinceRaw = Number.parseInt(url.searchParams.get("since") ?? "0", 10);
-  const since = Number.isFinite(sinceRaw) && sinceRaw >= 0 ? sinceRaw : 0;
+  const requestedSince = Number.isFinite(sinceRaw) && sinceRaw >= 0 ? sinceRaw : 0;
+  // A cursor ahead of this instance's counter means the receiver restarted
+  // (indexes are per-process), so it cannot name a delivery any more: treat it
+  // as "everything from now on" instead of stalling the client until its old
+  // index is reached again.
+  const since = Math.min(requestedSince, received);
   const timeoutRaw = Number.parseInt(url.searchParams.get("timeout") ?? "", 10);
   const timeout = Number.isFinite(timeoutRaw)
     ? Math.min(MAX_TIMEOUT_SECS, Math.max(1, timeoutRaw))
