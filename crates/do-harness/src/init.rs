@@ -298,6 +298,14 @@ fn scaffold_web_scripts(root: &Path, opts: &InitOpts, report: &mut InitReport) -
             include_str!("../templates/scripts/perf-audit.mjs"),
         ),
         (
+            "scripts/visual-audit.mjs",
+            include_str!("../templates/scripts/visual-audit.mjs"),
+        ),
+        (
+            "scripts/i18n-audit.mjs",
+            include_str!("../templates/scripts/i18n-audit.mjs"),
+        ),
+        (
             "scripts/web-ui/audit.test.mjs",
             include_str!("../templates/scripts/web-ui/audit.test.mjs"),
         ),
@@ -328,6 +336,14 @@ fn scaffold_web_scripts(root: &Path, opts: &InitOpts, report: &mut InitReport) -
         (
             "scripts/web-ui/lib/perf-audit.mjs",
             include_str!("../templates/scripts/web-ui/lib/perf-audit.mjs"),
+        ),
+        (
+            "scripts/web-ui/lib/visual-audit.mjs",
+            include_str!("../templates/scripts/web-ui/lib/visual-audit.mjs"),
+        ),
+        (
+            "scripts/web-ui/lib/i18n-audit.mjs",
+            include_str!("../templates/scripts/web-ui/lib/i18n-audit.mjs"),
         ),
     ] {
         write_if_absent(root, relative, body, opts.force, report)?;

@@ -82,12 +82,16 @@ async fn init_web_scaffolds_sensors_library_and_runners() {
     assert!(config.contains("name = \"a11y\""));
     assert!(config.contains("name = \"console\""));
     assert!(config.contains("name = \"perf\""));
+    assert!(config.contains("name = \"visual\""));
+    assert!(config.contains("name = \"i18n\""));
     // Sensor runners + the bundled audit library land under scripts/.
     for path in [
         "scripts/viewport-audit.mjs",
         "scripts/a11y-audit.mjs",
         "scripts/console-audit.mjs",
         "scripts/perf-audit.mjs",
+        "scripts/visual-audit.mjs",
+        "scripts/i18n-audit.mjs",
         "scripts/web-ui/audit.test.mjs",
         "scripts/web-ui/lib/audit.mjs",
         "scripts/web-ui/lib/page-probe.mjs",
@@ -96,6 +100,8 @@ async fn init_web_scaffolds_sensors_library_and_runners() {
         "scripts/web-ui/lib/console-audit.mjs",
         "scripts/web-ui/lib/a11y-audit.mjs",
         "scripts/web-ui/lib/perf-audit.mjs",
+        "scripts/web-ui/lib/visual-audit.mjs",
+        "scripts/web-ui/lib/i18n-audit.mjs",
     ] {
         assert!(dir.path().join(path).exists(), "missing {path}");
     }
@@ -106,6 +112,43 @@ async fn init_web_scaffolds_sensors_library_and_runners() {
         .status()
         .expect("node is available in CI and dev environments");
     assert!(status.success(), "shipped web-ui unit tests must pass");
+}
+
+/// The vendored web-ui templates must stay identical to `integrations/web-ui`
+/// (the dev-side source of truth): scaffolded adopters would otherwise run
+/// stale audit code. Update both trees together when the library changes.
+#[test]
+fn web_ui_templates_match_integrations() {
+    let crate_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let workspace = crate_dir
+        .parent()
+        .and_then(|p| p.parent())
+        .expect("crate lives at crates/<name>");
+    for relative in [
+        "audit.test.mjs",
+        "lib/audit.mjs",
+        "lib/page-probe.mjs",
+        "lib/geometry.mjs",
+        "lib/contrast.mjs",
+        "lib/console-audit.mjs",
+        "lib/a11y-audit.mjs",
+        "lib/perf-audit.mjs",
+        "lib/visual-audit.mjs",
+        "lib/i18n-audit.mjs",
+    ] {
+        let source = workspace.join("integrations/web-ui").join(relative);
+        let template = workspace
+            .join("crates/do-harness/templates/scripts/web-ui")
+            .join(relative);
+        let source_body =
+            fs::read_to_string(&source).unwrap_or_else(|_| panic!("missing {relative}"));
+        let template_body =
+            fs::read_to_string(&template).unwrap_or_else(|_| panic!("unvendored {relative}"));
+        assert_eq!(
+            source_body, template_body,
+            "template drift: {relative} — copy integrations/web-ui/{relative} over the template"
+        );
+    }
 }
 
 #[tokio::test(flavor = "current_thread")]
