@@ -42,5 +42,10 @@ and must be fixed or escalated. Never invent a skip reason.
 ## Waiting
 
 Poll `scripts/checks.sh` while the verdict is `PENDING`. Use a bounded wait
-(default 30 minutes, then escalate). A check that never reports is `UNKNOWN`;
-do not merge around it.
+(default 30 minutes, then escalate). When a webhook receiver is armed
+(`--events-url` / `PR_TRIAGE_EVENTS_URL`; see
+[webhook-fast-path.md](webhook-fast-path.md)) the wait wakes on
+`check_run`/`workflow_run` deliveries and re-classifies, and a safety chunk
+(default 300 seconds, `PR_TRIAGE_EVENT_CHUNK`) re-classifies even without
+events. Missing deliveries must degrade to polling, never to done. A check
+that never reports is `UNKNOWN`; do not merge around it.

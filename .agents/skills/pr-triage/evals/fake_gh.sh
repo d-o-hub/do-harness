@@ -4,6 +4,9 @@
 # Covers only the commands the skill scripts issue:
 #   pr list / pr view, repo view, api check-runs / status / graphql / compare.
 # Fixtures come from FAKE_GH_FIXTURES; check-run mode from FAKE_GH_CHECKS.
+# FAKE_GH_CHECKS_SEQUENCE (comma list, e.g. "pending,pass") advances one mode
+# per check-runs call and clamps at the last entry; its cursor lives in
+# FAKE_GH_SEQ_FILE (default: a file under ${TMPDIR:-/tmp}).
 set -euo pipefail
 
 fixtures="${FAKE_GH_FIXTURES:?FAKE_GH_FIXTURES required}"
@@ -131,6 +134,16 @@ case "$cmd" in
         ;;
       *"/check-runs"*)
         mode="${FAKE_GH_CHECKS:-pass}"
+        if [ -n "${FAKE_GH_CHECKS_SEQUENCE:-}" ]; then
+          seq_file="${FAKE_GH_SEQ_FILE:-${TMPDIR:-/tmp}/fake-gh-checks-sequence.state}"
+          step=$(cat "$seq_file" 2>/dev/null || echo 0)
+          case "$step" in ''|*[!0-9]*) step=0 ;; esac
+          mode=$(awk -F, -v n="$((step + 1))" '{ if (n > NF) n = NF; print $n }' \
+            <<<"$FAKE_GH_CHECKS_SEQUENCE")
+          if [ "$((step + 1))" -lt "$(awk -F, '{ print NF }' <<<"$FAKE_GH_CHECKS_SEQUENCE")" ]; then
+            printf '%s\n' "$((step + 1))" > "$seq_file"
+          fi
+        fi
         jq -r "$expr" "$fixtures/check-runs-$mode.json"
         ;;
       *"/status"*)

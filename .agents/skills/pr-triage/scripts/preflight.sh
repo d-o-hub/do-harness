@@ -55,6 +55,34 @@ else
   warn "do-harness not available; falling back to full-diff review"
 fi
 
+# Webhook fast path (warn-only): the wait scripts work without it, polling.
+if command -v node >/dev/null 2>&1; then
+  ok "node $(node --version)"
+else
+  warn "node not found; webhook fast path unavailable"
+fi
+
+if command -v curl >/dev/null 2>&1; then
+  ok "$(curl --version | head -n1)"
+else
+  warn "curl not found; webhook fast path unavailable"
+fi
+
+if gh webhook forward --help >/dev/null 2>&1; then
+  ok "gh webhook forward available"
+else
+  warn "gh webhook forward unavailable (install with: gh extension install cli/gh-webhook)"
+fi
+
+if [ -n "${PR_TRIAGE_EVENTS_URL:-}" ]; then
+  if command -v curl >/dev/null 2>&1 &&
+    [ "$(curl -s --max-time 2 "$PR_TRIAGE_EVENTS_URL/health" 2>/dev/null || true)" = "ok" ]; then
+    ok "webhook receiver reachable ($PR_TRIAGE_EVENTS_URL)"
+  else
+    warn "webhook receiver unreachable ($PR_TRIAGE_EVENTS_URL); waits will poll"
+  fi
+fi
+
 if [ "$fail" -ne 0 ]; then
   printf 'preflight FAILED\n' >&2
   exit 1

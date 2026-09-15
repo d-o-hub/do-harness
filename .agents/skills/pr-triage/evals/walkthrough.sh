@@ -137,6 +137,128 @@ printf 'flaky_exit=%s\nflaky_out=%s\nflaky_runs=%s\ndet_exit=%s\ndet_runs=%s\n' 
   "$flaky_exit" "$(cat "$root/retry_flaky.out")" "$flaky_runs" "$det_exit" "$det_runs" \
   > "$root/retry_summary.txt"
 
+# 5d. Webhook fast path: a real receiver answers /health, persists signed
+# deliveries (rejecting unsigned ones), wakes long-polls, and drives the wait
+# scripts with events instead of sleeps; an unreachable receiver falls back to
+# polling. Node and curl are required for this section (present in CI).
+command -v node >/dev/null 2>&1 || {
+  echo "pr-triage evals require node for the webhook fast path" >&2
+  exit 1
+}
+command -v curl >/dev/null 2>&1 || {
+  echo "pr-triage evals require curl for the webhook fast path" >&2
+  exit 1
+}
+
+webhook_root="$root/webhook"
+mkdir -p "$webhook_root"
+port=$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1]); s.close()')
+node "$skill/scripts/webhook-receiver.mjs" --port "$port" \
+  --events "$webhook_root/events.jsonl" --secret evalsecret \
+  > "$webhook_root/receiver.out" 2> "$webhook_root/receiver.err" &
+receiver_pid=$!
+trap 'kill "$receiver_pid" 2>/dev/null || true' EXIT
+
+up=""
+for _ in $(seq 1 50); do
+  if [ "$(curl -s --max-time 1 "http://127.0.0.1:$port/health")" = "ok" ]; then
+    up=1
+    break
+  fi
+  sleep 0.1
+done
+if [ -z "$up" ]; then
+  echo "webhook receiver failed to become healthy" >&2
+  cat "$webhook_root/receiver.err" >&2
+  exit 1
+fi
+events_url="http://127.0.0.1:$port"
+health_status=$(curl -s -o /dev/null -w '%{http_code}' "$events_url/health")
+
+check_payload='{"action":"completed","check_run":{"id":7,"name":"CI","conclusion":"success","check_suite":{"head_sha":"abc","pull_requests":[{"number":9}]}}}'
+sign() {
+  printf '%s' "$1" | python3 -c 'import hmac,hashlib,sys; print("sha256="+hmac.new(b"evalsecret", sys.stdin.buffer.read(), hashlib.sha256).hexdigest())'
+}
+woke_value() {
+  case "$1" in
+    *'"woke":true'*) printf 'true' ;;
+    *'"woke":false'*) printf 'false' ;;
+    *) printf 'unknown' ;;
+  esac
+}
+
+signed_status=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$events_url/events" \
+  -H "X-GitHub-Event: check_run" -H "X-Hub-Signature-256: $(sign "$check_payload")" -d "$check_payload")
+unsigned_status=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$events_url/events" \
+  -H "X-GitHub-Event: check_run" -d "$check_payload")
+event_lines=$(wc -l < "$webhook_root/events.jsonl" | tr -d ' ')
+
+# Idle wait (cursor past the one persisted event) times out without a wake; a
+# wait started first is then woken by a matching signed delivery.
+wait_idle_woke=$(woke_value "$(curl -s "$events_url/wait?since=1&timeout=1")")
+curl -s "$events_url/wait?since=1&timeout=5" > "$webhook_root/wait_wake.json" &
+wait_pid=$!
+sleep 0.5
+curl -s -o /dev/null -X POST "$events_url/events" \
+  -H "X-GitHub-Event: check_run" -H "X-Hub-Signature-256: $(sign "$check_payload")" -d "$check_payload"
+wait "$wait_pid"
+wait_wake_woke=$(woke_value "$(cat "$webhook_root/wait_wake.json")")
+
+# Event-driven wait: pending first, then a signed delivery wakes the wait and
+# the re-classification sees pass; stderr must show the wake, not a fallback.
+export FAKE_GH_SEQ_FILE="$root/fake_gh_sequence.state"
+rm -f "$FAKE_GH_SEQ_FILE"
+checks_event_start=$(python3 -c 'import time; print(int(time.time()*1000))')
+set +e
+FAKE_GH_CHECKS_SEQUENCE=pending,pass "$skill/scripts/checks.sh" 9 --wait 20 --events-url "$events_url" \
+  > "$webhook_root/checks_event.out" 2> "$root/webhook_checks_event.err" &
+checks_event_pid=$!
+sleep 0.5
+curl -s -o /dev/null -X POST "$events_url/events" \
+  -H "X-GitHub-Event: check_run" -H "X-Hub-Signature-256: $(sign "$check_payload")" -d "$check_payload"
+wait "$checks_event_pid"
+checks_event_exit=$?
+set -e
+checks_event_elapsed_ms=$(( $(python3 -c 'import time; print(int(time.time()*1000))') - checks_event_start ))
+checks_event_summary=$(awk -F'\t' '$1 == "summary" { print $2 }' "$webhook_root/checks_event.out")
+if grep -q 'falling back' "$root/webhook_checks_event.err"; then
+  echo "checks.sh fell back to polling during the event-driven run" >&2
+  cat "$root/webhook_checks_event.err" >&2
+  exit 1
+fi
+
+# Unreachable receiver: the same pending-then-pass sequence still finishes by
+# polling, and post-merge.sh is unaffected.
+rm -f "$FAKE_GH_SEQ_FILE"
+set +e
+FAKE_GH_CHECKS_SEQUENCE=pending,pass "$skill/scripts/checks.sh" 9 --wait 5 --events-url "http://127.0.0.1:9" \
+  > "$webhook_root/checks_fallback.out" 2> "$root/webhook_checks_fallback.err"
+checks_fallback_exit=$?
+FAKE_GH_RUNS=pass "$skill/scripts/post-merge.sh" 7 --events-url "$events_url" \
+  > "$webhook_root/post_merge_event.out" 2> "$webhook_root/post_merge_event.err"
+post_merge_event_exit=$?
+set -e
+checks_fallback_summary=$(awk -F'\t' '$1 == "summary" { print $2 }' "$webhook_root/checks_fallback.out")
+
+kill -TERM "$receiver_pid" 2>/dev/null || true
+wait "$receiver_pid" 2>/dev/null || true
+trap - EXIT
+
+cat > "$root/webhook_summary.txt" <<EOF
+health_status=$health_status
+signed_status=$signed_status
+unsigned_status=$unsigned_status
+event_lines=$event_lines
+wait_idle_woke=$wait_idle_woke
+wait_wake_woke=$wait_wake_woke
+checks_event_exit=$checks_event_exit
+checks_event_summary=$checks_event_summary
+checks_event_elapsed_ms=$checks_event_elapsed_ms
+checks_fallback_exit=$checks_fallback_exit
+checks_fallback_summary=$checks_fallback_summary
+post_merge_event_exit=$post_merge_event_exit
+EOF
+
 # 6. Harness command: a git repo at the sandbox root for `cli:` assertions.
 cd "$root"
 git init -q "$root"
