@@ -18,7 +18,10 @@
     "exists:.agents/skills/pr-triage/scripts/preflight.sh",
     "exists:.agents/skills/pr-triage/scripts/state.sh",
     "exists:.agents/skills/pr-triage/scripts/post-merge.sh",
-    "contains:.agents/skills/pr-triage/SKILL.md|post-merge.sh"
+    "contains:.agents/skills/pr-triage/SKILL.md|post-merge.sh",
+    "exists:.agents/skills/pr-triage/scripts/retry.sh",
+    "contains:.agents/skills/pr-triage/SKILL.md|retry.sh",
+    "exists:.agents/skills/pr-triage/references/gh-resilience.md"
    ]
   },
   {
@@ -80,6 +83,22 @@
    "assertions": [
     "walk:",
     "cli:pr no-effect --base HEAD --head HEAD:contains:no-effect"
+   ]
+  },
+  {
+   "id": 7,
+   "prompt": "Replay a gh call that fails twice with HTTP 502 then succeeds, and run a call that fails deterministically with a GraphQL deprecation error. Prove bounded replay and fail-fast.",
+   "expected_output": "The flaky call exits 0 with its stdout preserved after 3 attempts; the deterministic call exits 1 after exactly 1 attempt.",
+   "files": [],
+   "dim": "correctness",
+   "kind": "explicit",
+   "assertions": [
+    "walk:",
+    "contains:retry_summary.txt|flaky_exit=0",
+    "contains:retry_summary.txt|flaky_out=created",
+    "contains:retry_summary.txt|flaky_runs=3",
+    "contains:retry_summary.txt|det_exit=1",
+    "contains:retry_summary.txt|det_runs=1"
    ]
   },
   {
