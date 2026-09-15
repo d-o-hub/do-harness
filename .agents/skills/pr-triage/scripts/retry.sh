@@ -11,8 +11,9 @@
 # Projects-classic projectCards error, "already exists", rerun-forbidden)
 # return immediately with the command's exit code — retrying those can
 # duplicate side effects (e.g. a second PR) without ever succeeding.
-# On success only the command's stdout is printed; attempt diagnostics go
-# to stderr. Exit: the final attempt's exit code.
+# On success the command's stdout is printed and attempt diagnostics go to
+# stderr; on final failure both captured streams are replayed (stdout, then
+# stderr) so the cause survives. Exit: the final attempt's exit code.
 set -euo pipefail
 
 attempts=5
