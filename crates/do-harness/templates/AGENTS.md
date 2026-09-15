@@ -51,6 +51,7 @@ checks failed. `missing` means no current evidence exists yet.
 ## Adoption notes
 
 - `do-harness init` writes this file non-destructively; `--force` overwrites.
+- Sensors wrap the repository's own scripts to keep local evidence and CI identical.
 - The generic pack ships zero sensors: its pass is vacuous, not evidence.
 - Git hooks: `do-harness hook install`. CI:
   `do-harness verify --set verification --format json --strict`.

@@ -13,6 +13,7 @@ use anyhow::{Context, Result};
 
 pub mod baseline;
 pub mod detect;
+pub mod node;
 pub mod report;
 mod skills;
 
@@ -36,6 +37,8 @@ pub enum Language {
     /// console noise sensors (Playwright runners plus the shipped
     /// `scripts/web-ui/` audit library).
     Web,
+    /// Node/Web JS/TS language pack (typecheck, lint, test, build).
+    Node,
 }
 
 /// Options for [`init_workspace`].
@@ -131,8 +134,12 @@ pub async fn init_workspace(root: &Path, opts: &InitOpts) -> Result<InitReport> 
     write_if_absent(root, "AGENTS.md", &agents_contract, opts.force, &mut report)?;
     let config = match report.language {
         Language::Rust => {
-            let sensors = detect::included_specs(report.language, &report.candidates);
+            let sensors = detect::included_specs(root, report.language, &report.candidates);
             generate_rust_config(&sensors)?
+        }
+        Language::Node => {
+            let sensors = detect::included_specs(root, report.language, &report.candidates);
+            node::generate_node_config(&sensors)?
         }
         Language::Generic => CONFIG_GENERIC.to_owned(),
         Language::Web => CONFIG_WEB.to_owned(),
@@ -140,7 +147,7 @@ pub async fn init_workspace(root: &Path, opts: &InitOpts) -> Result<InitReport> 
     write_if_absent(root, "do-harness.toml", &config, opts.force, &mut report)?;
     let invariants = match report.language {
         Language::Rust => INVARIANTS_RUST,
-        Language::Generic | Language::Web => INVARIANTS_GENERIC,
+        Language::Generic | Language::Web | Language::Node => INVARIANTS_GENERIC,
     };
     write_if_absent(
         root,
