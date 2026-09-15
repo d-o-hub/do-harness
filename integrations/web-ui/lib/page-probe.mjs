@@ -52,6 +52,13 @@ export function pageProbe(options = {}) {
       Math.round(fg[2] * a + bg[2] * (1 - a)),
     ];
   }
+  // Background layers are collected leaf-first and composited outer-first
+  // (mirror of ../lib/contrast.mjs compositeLayers).
+  function compositeLayers(layers, canvas = [255, 255, 255]) {
+    let bg = canvas;
+    for (let i = layers.length - 1; i >= 0; i--) bg = compositeOver(layers[i], bg);
+    return bg;
+  }
   function contrastRatio(fg, bg) {
     const lf = relativeLuminance(fg);
     const lb = relativeLuminance(bg);
@@ -196,21 +203,21 @@ export function pageProbe(options = {}) {
     for (const leaf of leaves) {
       const fg = parseColor(leaf.style.color);
       if (!fg) continue;
-      // Resolve the effective background: nearest ancestor with an opaque
-      // background, alpha-compositing the text color chain onto it.
-      let bg = [255, 255, 255];
-      let node = leaf.el.parentElement;
-      let resolved = false;
+      // Resolve the effective background: the element's own background paints
+      // behind its text first (badge, button, chip), then translucent surfaces
+      // composite over the nearest opaque ancestor; no opaque layer anywhere
+      // means the white canvas.
+      const layers = [];
+      let node = leaf.el;
       while (node && node.nodeType === 1) {
-        const bgStyle = parseColor(getComputedStyle(node).backgroundColor);
-        if (bgStyle && bgStyle[3] > 0) {
-          bg = bgStyle.slice(0, 3);
-          resolved = true;
-          break;
+        const layer = parseColor(getComputedStyle(node).backgroundColor);
+        if (layer && layer[3] > 0) {
+          layers.push(layer);
+          if (layer[3] >= 1) break;
         }
         node = node.parentElement;
       }
-      if (!resolved) bg = [255, 255, 255]; // assume white canvas
+      const bg = compositeLayers(layers);
       const effectiveFg = compositeOver(fg, bg);
       const ratio = contrastRatio(effectiveFg, bg);
       const bold = Number.parseInt(leaf.style.fontWeight, 10) >= 700;

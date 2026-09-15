@@ -18,6 +18,7 @@ import {
 import {
   relativeLuminance,
   compositeOver,
+  compositeLayers,
   parseColor,
   contrastRatio,
   minimumRatio,
@@ -174,6 +175,17 @@ test("contrast: minimum ratio follows the large-text rule", () => {
   assert.equal(minimumRatio({ fontSizePx: 24, bold: false }), 3);
   assert.equal(minimumRatio({ fontSizePx: 19, bold: true }), 3);
   assert.equal(minimumRatio({ fontSizePx: 19, bold: false }), 4.5);
+});
+
+test("compositeLayers: text resolves against its own surface, then ancestors", () => {
+  // badge: white text on the element's own opaque brand red — 8.3:1, clean
+  assert.ok(contrastRatio([255, 255, 255], compositeLayers([[176, 0, 32, 1]])) >= 4.5);
+  // 60% black veil over the white canvas is grey, not white
+  assert.deepEqual(compositeLayers([[0, 0, 0, 0.6]]), [102, 102, 102]);
+  // the leaf's own translucent surface composites over the ancestor below it
+  assert.deepEqual(compositeLayers([[0, 0, 0, 0.5], [255, 0, 0, 1]]), [128, 0, 0]);
+  // no background anywhere up the tree: the white canvas assumption
+  assert.deepEqual(compositeLayers([]), [255, 255, 255]);
 });
 
 test("i18n: direction map and locale URL building", () => {
