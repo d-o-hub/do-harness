@@ -31,6 +31,22 @@ export function compositeOver(fg, bg) {
   ];
 }
 
+/**
+ * Composite a stack of background layers onto a canvas color. Layers are
+ * ordered from the text outwards (the leaf element's own background first,
+ * then its ancestors), so the probe passes what it collects while walking up
+ * the tree. Translucent surfaces (rgba() backgrounds, 60% veils) resolve
+ * against what is actually behind them instead of being treated as opaque.
+ * @param {Array<[number, number, number, number]>} layers
+ * @param {[number, number, number]} [canvas]
+ * @returns {[number, number, number]}
+ */
+export function compositeLayers(layers, canvas = [255, 255, 255]) {
+  let bg = canvas;
+  for (let i = layers.length - 1; i >= 0; i--) bg = compositeOver(layers[i], bg);
+  return bg;
+}
+
 /** Parse `rgb(...)`, `rgba(...)`, and 6/3-digit hex into [r,g,b,a]. */
 export function parseColor(css) {
   if (typeof css !== "string") return null;

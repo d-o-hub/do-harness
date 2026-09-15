@@ -27,7 +27,8 @@ grounded in WCAG 2.2 (1.4.3 contrast, 1.4.10 reflow, 2.4.7 focus visibility,
    `visibility:hidden`, `opacity:0`, transparent color, or `font-size < 8px`.
    (`display:none` content is skipped silently — collapsed UI is normal.)
 2. **contrast** — WCAG 1.4.3: effective color (alpha-composited over the
-   nearest opaque ancestor background) vs 4.5:1, or 3:1 for large text.
+   element's own background first, then the nearest opaque ancestor) vs
+   4.5:1, or 3:1 for large text.
 3. **occluded-text** — `document.elementsFromPoint()` sampling at the text
    center + inset corners; catches z-index overlays and sticky headers that
    bounding-box intersection cannot.
