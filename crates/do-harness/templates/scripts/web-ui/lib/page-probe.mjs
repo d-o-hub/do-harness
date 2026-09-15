@@ -82,8 +82,14 @@ export function pageProbe(options = {}) {
   function isOutOfFlow(position) {
     return position === "absolute" || position === "fixed";
   }
-  function classifyPair(a, b, { positionedA = false, positionedB = false } = {}) {
-    if (rectContains(a, b) || rectContains(b, a)) return "contained";
+  function classifyPair(a, b, { positionedA = false, positionedB = false, domRelated = null } = {}) {
+    const contained = rectContains(a, b) || rectContains(b, a);
+    // Containment is the wrapping-text proxy (mirrors ../lib/geometry.mjs
+    // isAncestorOrDescendant), so it only exempts in-flow pairs the caller
+    // reports as DOM related: an absolutely positioned badge sitting inside a
+    // heading's box is an overlay, whether it is a sibling or a descendant.
+    const related = domRelated === null ? contained : domRelated;
+    if (related && contained && !positionedA && !positionedB) return "contained";
     if (!rectsIntersect(a, b)) return "none";
     // Same-line exemption mirrors ../lib/geometry.mjs isSameLine: vertical
     // overlap >= 70% of the shorter leaf's height — withheld when either
@@ -268,6 +274,8 @@ export function pageProbe(options = {}) {
           classifyPair(leaves[i].rect, leaves[j].rect, {
             positionedA: isOutOfFlow(leaves[i].style.position),
             positionedB: isOutOfFlow(leaves[j].style.position),
+            domRelated:
+              leaves[i].el.contains(leaves[j].el) || leaves[j].el.contains(leaves[i].el),
           }) !== "overlap"
         )
           continue;

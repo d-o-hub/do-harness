@@ -76,14 +76,29 @@ export function isOutOfFlow(position) {
 }
 
 /**
- * Classify a pair of text-leaf rects. Pass each leaf's computed `position`
- * via `options` (`{ positionedA, positionedB }`): when either side is
- * out-of-flow the same-line exemption is withheld, because absolutely- or
- * fixed-positioned elements cannot share a line box with anything.
+ * Classify a pair of text-leaf rects.
+ *
+ * Pass each leaf's computed `position` via `{ positionedA, positionedB }`:
+ * when either side is out-of-flow the same-line exemption is withheld,
+ * because absolutely- or fixed-positioned elements cannot share a line box
+ * with anything.
+ *
+ * Pass `domRelated` when the caller knows the DOM: the `isAncestorOrDescendant`
+ * containment proxy is exact for related leaves and over-approximate for
+ * unrelated ones (an absolutely positioned badge fully inside a heading's box
+ * is a *sibling*, i.e. an overlay defect, not wrapping text). Out-of-flow
+ * leaves are never treated as wrapping, even when they are DOM descendants:
+ * a badge inside its heading overrides it rather than flowing with it.
+ * @param {{ positionedA?: boolean, positionedB?: boolean, domRelated?: boolean | null }} [options]
  * @returns {"overlap" | "same-line" | "contained" | "none"}
  */
-export function classifyPair(a, b, { positionedA = false, positionedB = false } = {}) {
-  if (isAncestorOrDescendant(a, b)) return "contained";
+export function classifyPair(
+  a,
+  b,
+  { positionedA = false, positionedB = false, domRelated = null } = {},
+) {
+  const related = domRelated === null ? isAncestorOrDescendant(a, b) : domRelated;
+  if (related && isAncestorOrDescendant(a, b) && !positionedA && !positionedB) return "contained";
   if (!rectsIntersect(a, b)) return "none";
   if (!positionedA && !positionedB && isSameLine(a, b)) return "same-line";
   return "overlap";
@@ -105,11 +120,14 @@ export function horizontalOverflowPx(rect, viewport) {
  * route per viewport, and the audit stops collecting after `maxFindings` so a
  * catastrophically broken page cannot produce quadratic output blowup.
  * Leaves may carry `positioned: true` (computed absolute/fixed position) to
- * withhold the same-line exemption for that pair — see `classifyPair`.
+ * withhold the same-line exemption for that pair — see `classifyPair`. Pass
+ * `isDomRelated(a, b)` when leaves carry DOM handles: without it the
+ * containment exemption falls back to the rect proxy, which suppresses
+ * overlays that happen to sit inside another leaf's box.
  * @param {Array<{ rect: Rect, path: string, text: string, positioned?: boolean }>} leaves
- * @param {{ maxFindings?: number }} [options]
+ * @param {{ maxFindings?: number, isDomRelated?: (a: unknown, b: unknown) => boolean }} [options]
  */
-export function collectOverlaps(leaves, { maxFindings = 50 } = {}) {
+export function collectOverlaps(leaves, { maxFindings = 50, isDomRelated } = {}) {
   /** @type {Array<{ a: string, b: string, areaPx: number, aText: string, bText: string }>} */
   const findings = [];
   for (let i = 0; i < leaves.length && findings.length < maxFindings; i++) {
@@ -117,6 +135,9 @@ export function collectOverlaps(leaves, { maxFindings = 50 } = {}) {
       const kind = classifyPair(leaves[i].rect, leaves[j].rect, {
         positionedA: leaves[i].positioned === true,
         positionedB: leaves[j].positioned === true,
+        domRelated: isDomRelated
+          ? isDomRelated(leaves[i], leaves[j]) === true
+          : null,
       });
       if (kind !== "overlap") continue;
       findings.push({

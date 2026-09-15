@@ -96,6 +96,40 @@ test("collectOverlaps: positioned leaves are flagged on a shared baseline", () =
   assert.equal(found[0].b, "promo-b");
 });
 
+test("classifyPair: containment exempts only DOM-related in-flow leaves", () => {
+  const outer = rect(0, 0, 300, 40);
+  const inner = rect(4, 4, 60, 24); // fully inside `outer`
+  // wrapping text (a heading and its own inline run): exempt
+  assert.equal(classifyPair(outer, inner, { domRelated: true }), "contained");
+  // rect proxy still applies when the caller cannot know the DOM
+  assert.equal(classifyPair(outer, inner), "contained");
+  // a positioned descendant overrides its own container: an overlay
+  assert.equal(
+    classifyPair(outer, inner, { domRelated: true, positionedB: true }),
+    "overlap",
+  );
+  // sibling leaves in flow still share a line box: same-line exemption holds
+  assert.equal(classifyPair(outer, inner, { domRelated: false }), "same-line");
+  // …but the same unrelated pair crossing a line boundary is an overlap
+  assert.equal(classifyPair(outer, rect(4, 30, 60, 24), { domRelated: false }), "overlap");
+});
+
+test("collectOverlaps: overlay inside another leaf's box is flagged", () => {
+  const heading = { rect: rect(0, 0, 300, 40), path: "h1", text: "Quarterly report" };
+  const badge = { rect: rect(4, 4, 60, 24), path: "span.badge", text: "new", positioned: true };
+  const unrelated = () => false;
+  const found = collectOverlaps([heading, badge], { isDomRelated: unrelated });
+  assert.equal(found.length, 1);
+  assert.equal(found[0].a, "h1");
+  assert.equal(found[0].b, "span.badge");
+  // wrapping text (related, in flow) stays exempt
+  const wrapping = [
+    { rect: rect(0, 0, 300, 40), path: "h1-wrap", text: "Quarterly report" },
+    { rect: rect(4, 4, 290, 30), path: "h1-inner", text: "Quarterly report" },
+  ];
+  assert.equal(collectOverlaps(wrapping, { isDomRelated: () => true }).length, 0);
+});
+
 test("collectOverlaps: skips contained pairs, flags overlaps, caps output", () => {
   const leaves = [
     { rect: rect(0, 0, 50, 20), path: "h1", text: "title" },
