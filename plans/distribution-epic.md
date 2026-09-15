@@ -1,6 +1,6 @@
 # Epic: Distribution and External Adoption
 
-> **Status:** released as `v0.1.0` (2026-09-13)
+> **Status:** released as `v0.1.0` (2026-09-13); `v0.1.1` (2026-09-15) ships the first Windows zip (crates.io/npm publish pending repo secrets)
 > **Related:** prebuilt releases, `scripts/install.sh`, pinned agent
 > instructions, release evidence
 > **Created:** 2026-09-13
@@ -92,15 +92,36 @@ green; hook unit test asserts the `.exe` fallback; npm tests assert the
 `win32-x64` mapping and `.exe` binary name; the PR's windows job is the
 end-to-end proof.
 
+### Published — v0.1.1 (2026-09-15)
+
+`v0.1.1` (tag on `32120c3`, release run
+[34993196353](https://github.com/d-o-hub/do-harness/actions/runs/34993196353))
+is the first release shipping the Windows x86_64 zip. The published release
+carries six assets — the four Linux/macOS tarballs,
+`do-harness-v0.1.1-x86_64-pc-windows-msvc.zip`, and `checksums.txt` — and all
+five artifacts verify against the published SHA-256 digests (`sha256sum -c
+checksums.txt`, all `OK`).
+
+`install.sh --version v0.1.1` verified end-to-end: the Linux install reports
+`Installed do-harness v0.1.1 (x86_64-unknown-linux-musl)` and the binary
+reports `0.1.1 (32120c3 2026-09-15)`; the zip path
+(`DO_HARNESS_TARGET=x86_64-pc-windows-msvc`) extracts a checksum-verified
+`do-harness.exe` (PE32+ x86-64).
+
+crates.io and npm publication are blocked on the one-time
+`CARGO_REGISTRY_TOKEN`/`NPM_TOKEN` repository secrets (both publish jobs fail
+closed when unset); once added they are re-runnable without a new tag via
+`gh workflow run release.yml -f publish=true` (both jobs are idempotent).
+
 ## Non-goals
 
-- No npm/npx wrapper; the installer and crates.io are the acquisition paths.
-- No Windows targets (managed hooks are bash).
+- No npm/npx wrapper; the installer and crates.io are the acquisition paths. (Superseded by the npm-wrapper follow-up.)
+- No Windows targets (managed hooks are bash). (Superseded by the Windows x86_64 follow-up.)
 - No do-harness MCP wrapper: agents integrate through the scaffolded skills +
   `AGENTS.md` and the CLI's JSON contracts. MCP stays guardian-proxy-only
   (`mcp-surface`) until a concrete MCP-only runtime requires host-side
   execution; completion gating belongs to runtime lifecycle hooks (DSH bundle
   pattern), and an MCP server cannot enforce it. Decision recorded in
   `plans/invariants.json` (sensor: `do-harness eval`).
-- No auto-update and no version-bump tooling: the first release is fixed at
-  `v0.1.0`.
+- No auto-update and no version-bump tooling: releases are tag-driven per
+  `docs/releasing.md`; `v0.1.1` shipped the first Windows zip.
