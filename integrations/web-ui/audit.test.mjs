@@ -10,6 +10,7 @@ import {
   rectsIntersect,
   intersectionArea,
   rectContains,
+  isOutOfFlow,
   classifyPair,
   collectOverlaps,
   horizontalOverflowPx,
@@ -62,6 +63,71 @@ test("classifyPair: genuine cross-line overlap is flagged", () => {
   assert.equal(classifyPair(rect(0, 0, 60, 24), rect(10, 12, 60, 24)), "overlap");
   // same-line pair (full vertical overlap, slight horizontal nudge)
   assert.equal(classifyPair(rect(0, 0, 40, 20), rect(39, 0, 40, 20)), "same-line");
+});
+
+test("classifyPair: out-of-flow pairs keep no same-line exemption", () => {
+  const sameBaseline = [rect(8, 8, 168, 23), rect(90, 8, 190, 23)];
+  // in-flow pair on one baseline: exempt
+  assert.equal(classifyPair(...sameBaseline), "same-line");
+  // either side absolutely/fixed-positioned: genuine overlap
+  assert.equal(classifyPair(...sameBaseline, { positionedA: true }), "overlap");
+  assert.equal(classifyPair(...sameBaseline, { positionedB: true }), "overlap");
+  assert.equal(
+    classifyPair(...sameBaseline, { positionedA: true, positionedB: true }),
+    "overlap",
+  );
+  // relative/sticky/static lay out in flow: no positioned hint to pass
+  assert.equal(isOutOfFlow("absolute"), true);
+  assert.equal(isOutOfFlow("fixed"), true);
+  assert.equal(isOutOfFlow("relative"), false);
+  assert.equal(isOutOfFlow("sticky"), false);
+  assert.equal(isOutOfFlow("static"), false);
+  assert.equal(isOutOfFlow(""), false);
+});
+
+test("collectOverlaps: positioned leaves are flagged on a shared baseline", () => {
+  const leaves = [
+    { rect: rect(8, 8, 168, 23), path: "promo-a", text: "sale" },
+    { rect: rect(90, 8, 190, 23), path: "promo-b", text: "go", positioned: true },
+  ];
+  const found = collectOverlaps(leaves);
+  assert.equal(found.length, 1);
+  assert.equal(found[0].a, "promo-a");
+  assert.equal(found[0].b, "promo-b");
+});
+
+test("classifyPair: containment exempts only DOM-related in-flow leaves", () => {
+  const outer = rect(0, 0, 300, 40);
+  const inner = rect(4, 4, 60, 24); // fully inside `outer`
+  // wrapping text (a heading and its own inline run): exempt
+  assert.equal(classifyPair(outer, inner, { domRelated: true }), "contained");
+  // rect proxy still applies when the caller cannot know the DOM
+  assert.equal(classifyPair(outer, inner), "contained");
+  // a positioned descendant overrides its own container: an overlay
+  assert.equal(
+    classifyPair(outer, inner, { domRelated: true, positionedB: true }),
+    "overlap",
+  );
+  // sibling leaves in flow still share a line box: same-line exemption holds
+  assert.equal(classifyPair(outer, inner, { domRelated: false }), "same-line");
+  // …but the same unrelated pair crossing a line boundary is an overlap
+  assert.equal(classifyPair(outer, rect(4, 30, 60, 24), { domRelated: false }), "overlap");
+});
+
+test("collectOverlaps: overlay inside another leaf's box is flagged", () => {
+  const heading = { rect: rect(0, 0, 300, 40), path: "h1", text: "Quarterly report" };
+  const badge = { rect: rect(4, 4, 60, 24), path: "span.badge", text: "new", positioned: true };
+  const unrelated = () => false;
+  const found = collectOverlaps([heading, badge], { isDomRelated: unrelated });
+  assert.equal(found.length, 1);
+  assert.equal(found[0].a, "h1");
+  assert.equal(found[0].b, "span.badge");
+  // wrapping text (related, in flow) stays exempt
+  const wrapping = [
+    { rect: rect(0, 0, 300, 40), path: "h1-wrap", text: "Quarterly report" },
+    { rect: rect(4, 4, 290, 30), path: "h1-inner", text: "Quarterly report" },
+  ];
+  assert.equal(collectOverlaps(wrapping, { isDomRelated: () => true }).length, 0);
 });
 
 test("collectOverlaps: skips contained pairs, flags overlaps, caps output", () => {

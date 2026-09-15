@@ -32,11 +32,16 @@ grounded in WCAG 2.2 (1.4.3 contrast, 1.4.10 reflow, 2.4.7 focus visibility,
    center + inset corners; catches z-index overlays and sticky headers that
    bounding-box intersection cannot.
 4. **text-overlap** — pairwise rect intersection among text leaves,
-   excluding ancestor/descendant pairs and same-line inline siblings.
+   excluding ancestor/descendant pairs and same-line in-flow siblings.
+   The same-line exemption is withheld when either leaf is
+   `position:absolute`/`fixed` (`isOutOfFlow`): out-of-flow elements never
+   share a line box, so a baseline collision with one is the genuine
+   badge-over-heading defect. `relative`/`sticky` stay exempt.
 5. **reflow/scroll** — horizontal document overflow (1.4.10) and
    unintentionally horizontally-scrollable containers (`pre`/`code`/`table`
    and `.audit-allow-horizontal-scroll` are allowlisted), plus focus
-   traversal visibility (2.4.7) and target size (2.5.8).
+   traversal visibility (2.4.7) and target size (2.5.8, which exempts
+   `display:inline` targets by the success criterion itself).
 
 ## Running the tests
 
