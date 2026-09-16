@@ -139,9 +139,18 @@ For `d-o-hub/do-harness`, the decision is **Windows via GitHub release only**:
 four Linux/macOS platform packages are live at `0.1.1`,
 `do-harness-win32-x64@0.1.1` is refused by npm's name screening, and
 `do-harness@0.1.1` is withheld. Windows installs from the release zip (or the
-installer, or a cargo channel); `npx do-harness` is Linux/macOS-only. A dry run
-is not proof that a name will pass registry similarity checks; npm CLI issue
-[#9188](https://github.com/npm/cli/issues/9188) documents that limitation.
+installer, or a cargo channel); `npx do-harness` is Linux/macOS-only.
+
+Encode the decision where the publish loop can see it, rather than letting the
+403 abort the run. `scripts/publish-npm.sh` keeps an `UNAVAILABLE_PKGS` list:
+those targets are skipped with an explicit log line and the meta package is
+withheld while the list is non-empty. Without it a tag push reports a red
+publish job that looks like a release failure while actually being the intended
+decision. Keep the list in step with `UNAVAILABLE_PACKAGES` in
+`integrations/npm/lib/platform.js`; the sequence guard fails if they disagree.
+
+A dry run is not proof that a name will pass registry similarity checks; npm CLI
+issue [#9188](https://github.com/npm/cli/issues/9188) documents that limitation.
 
 Two facts that keep this documented failure precise:
 

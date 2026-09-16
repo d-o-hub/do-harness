@@ -63,8 +63,12 @@ verification set and every build target dogfoods green.
     - `release` — publishes the tarballs, the windows zip, plus `checksums.txt`
       via `gh release create --verify-tag`.
     - `publish` — publishes the three crates to crates.io in dependency order.
-    - `npm-publish` — publishes the five platform packages, then the
-      `do-harness` meta package, to npm.
+    - `npm-publish` — publishes the available platform packages, then the
+      `do-harness` meta package. It skips `UNAVAILABLE_PKGS` (currently
+      `do-harness-win32-x64`, which npm refuses) and withholds the meta
+      package while any pinned platform package is unavailable, so the job
+      reports the documented decision and stays green instead of aborting on a
+      registry 403. See "Windows has no npm channel" above.
 
 ## crates.io publishing
 
@@ -96,6 +100,16 @@ launcher) and five platform package templates. The npm-publish job downloads
 the build artifacts, stages each platform package with its binary, and
 publishes platform-first so the meta package's pinned `optionalDependencies`
 resolve. Versions already on npm are skipped, so a partial run can be re-run.
+
+The publisher's `UNAVAILABLE_PKGS` list names platform packages the registry
+refuses. They are skipped with an explicit log line, and the meta package is
+withheld while any of them is listed — a pin that cannot resolve would give
+Windows users a successful install followed by a run-time failure. Before this
+list existed, the loop aborted on the 403 and every tag push ended with a red
+`npm-publish` job that looked like a release failure while actually being the
+documented decision. Keep `UNAVAILABLE_PKGS` in step with
+`UNAVAILABLE_PACKAGES` in `integrations/npm/lib/platform.js`; the skill's
+`check-npm-sequence.sh --root .` fails if the two disagree.
 
 Committed `integrations/npm/**/package.json` versions are placeholders for
 local tooling: `scripts/publish-npm.sh` patches the meta version and all five

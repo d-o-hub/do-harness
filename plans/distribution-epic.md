@@ -141,6 +141,13 @@ platform path, not a pending gap:
 - `integrations/npm/lib/platform.js` lists the package in
   `UNAVAILABLE_PACKAGES`, and the shim exits 1 with release guidance instead of
   the misleading `--include=optional` hint.
+- `scripts/publish-npm.sh` lists it in `UNAVAILABLE_PKGS`, skips it with an
+  explicit log line, and withholds the meta package. Before that list, the
+  publish loop aborted on the registry 403, so every tag push produced a red
+  `npm-publish` job (the `v0.1.1` run shows exactly this) even though the
+  release itself was correct. The job now exits 0 and its log states the
+  decision; a genuine failure (a missing artifact, an invalid version) still
+  fails the run.
 - `integrations/npm/test/shim.test.mjs` pins that guidance with a
   host-independent test, verified to fail when the branch is removed.
 

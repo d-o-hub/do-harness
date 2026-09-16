@@ -101,6 +101,31 @@ TARGETS=(
     "x86_64-pc-windows-msvc:win32-x64:do-harness-win32-x64:zip:do-harness.exe"
 )
 
+# Platform packages the npm registry refuses, so publishing them is expected to
+# fail rather than a regression. `do-harness-win32-x64` is rejected by npm's
+# name screening (HTTP 403 "Package name triggered spam detection"), and the
+# Windows binary ships as a GitHub release zip instead — see the decision in
+# plans/distribution-epic.md.
+#
+# Skipping them explicitly keeps the job green and its log honest. Before this
+# list existed the loop aborted on the 403, the meta package was never
+# attempted, and every tag push reported a red npm-publish job that looked like
+# a release failure while actually being the documented decision in action.
+#
+# Keep in sync with `UNAVAILABLE_PACKAGES` in integrations/npm/lib/platform.js
+# (the shim uses it for run-time guidance) and docs/releasing.md.
+UNAVAILABLE_PKGS=(
+    "do-harness-win32-x64"
+)
+
+is_unavailable() {
+    local pkg="$1" entry
+    for entry in "${UNAVAILABLE_PKGS[@]}"; do
+        [[ "$entry" == "$pkg" ]] && return 0
+    done
+    return 1
+}
+
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
@@ -140,6 +165,10 @@ publish_dir() {
 
 for entry in "${TARGETS[@]}"; do
     IFS=: read -r target platform pkg archive binary <<<"$entry"
+    if is_unavailable "$pkg"; then
+        echo "$pkg is unavailable on npm (registry name rejection); Windows ships as a GitHub release zip"
+        continue
+    fi
     stage="$TMP/$pkg"
     mkdir -p "$stage/bin"
     cp "$NPM_DIR/platforms/$platform/package.json" "$stage/package.json"
@@ -175,4 +204,16 @@ fi
         "optionalDependencies.do-harness-darwin-arm64=$VERSION" \
         "optionalDependencies.do-harness-win32-x64=$VERSION" >/dev/null
 )
-publish_dir "$stage" "do-harness"
+
+# The meta package pins every platform package, including ones npm refuses. A
+# pin that cannot resolve would give Windows users a successful install
+# followed by a run-time failure, so the meta package is withheld while any
+# pinned platform package is unavailable — see the decision in
+# plans/distribution-epic.md. Withholding is deliberate and reported here,
+# rather than reached as a side effect of an aborted publish.
+if (( ${#UNAVAILABLE_PKGS[@]} > 0 )); then
+    echo "do-harness (meta) withheld: pins ${UNAVAILABLE_PKGS[*]}, which npm does not accept"
+    echo "  Windows installs from the GitHub release zip; see docs/releasing.md."
+else
+    publish_dir "$stage" "do-harness"
+fi

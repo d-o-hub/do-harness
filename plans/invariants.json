@@ -114,6 +114,12 @@
     "category": "skills"
   },
   {
+    "invariant": "Platform packages the registry refuses are declared in the publisher's UNAVAILABLE_PKGS list, which skips them and withholds the meta package; the list must agree with the shim's UNAVAILABLE_PACKAGES",
+    "rationale": "Without the list the publish loop aborted on npm's 403 for do-harness-win32-x64, so every tag push showed a red npm-publish job (visible in the v0.1.1 run) while the release was correct, and the meta package was never attempted as a deliberate step; declaring the package keeps genuine failures red and the documented decision green",
+    "sensor": "bash .agents/skills/npm-github-publish/scripts/check-npm-sequence.sh --root .",
+    "category": "distribution"
+  },
+  {
     "invariant": "Windows binaries ship through GitHub Releases only; the npm meta package is withheld while do-harness-win32-x64 is unavailable, and the shim exits with release guidance for that platform",
     "rationale": "npm's registry name screening refuses do-harness-win32-x64 (HTTP 403), and an unpublished optional dependency is neither a publish nor an install error (verified), so publishing the meta package would give Windows users a successful install followed by a run-time failure; listing the package in UNAVAILABLE_PACKAGES makes the shim name the channel that works instead of suggesting --include=optional",
     "sensor": "node --test integrations/npm/test/*.test.mjs",

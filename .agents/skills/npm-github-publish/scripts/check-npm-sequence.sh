@@ -41,16 +41,17 @@ publisher_packages() {
 }
 
 # The meta package must publish after the platform loop, so its pinned
-# optionalDependencies already exist on the registry.
+# optionalDependencies already exist on the registry. It is also withheld
+# while any pinned platform package is unavailable, so the guard accepts
+# either shape: a bare meta publish, or one nested in the withholding `if`.
 check_publisher_order() {
   local root="$1" publisher="$1/scripts/publish-npm.sh"
   [[ -f "$publisher" ]] || { fail "missing $publisher"; return 1; }
   local loop meta
   # Anchors are deliberately `$`-free: shellcheck SC2016 rejects quoting a
-  # literal `$` in grep patterns, and `^publish_dir ` (column 0) is unique to
-  # the meta step because the in-loop call is indented.
+  # literal `$` in grep patterns.
   loop="$(grep -nF -m1 'for entry in ' "$publisher" | cut -d: -f1)"
-  meta="$(grep -nE -m1 '^publish_dir ' "$publisher" | cut -d: -f1)"
+  meta="$(grep -nF -m1 '"do-harness"' "$publisher" | grep -F 'publish_dir' | cut -d: -f1 | tail -1)"
   if [[ -z "$loop" || -z "$meta" ]]; then
     fail "publisher is missing the platform loop or the meta publish step"
     return 1
@@ -61,6 +62,45 @@ check_publisher_order() {
     return 1
   fi
   ok "publisher order: platform packages before the meta package"
+}
+
+# An unavailable platform package must be skipped explicitly and must block the
+# meta package, so a tag push reports the documented decision instead of
+# aborting on a registry 403 (which made the job red while the release was
+# fine). The list is the publisher's counterpart to the shim's
+# UNAVAILABLE_PACKAGES.
+check_unavailable_handling() {
+  local root="$1" publisher="$1/scripts/publish-npm.sh"
+  [[ -f "$publisher" ]] || { fail "missing $publisher"; return 1; }
+  if ! grep -qF 'UNAVAILABLE_PKGS=(' "$publisher"; then
+    fail "publisher declares no UNAVAILABLE_PKGS list"
+    return 1
+  fi
+  if ! grep -qF 'is_unavailable ' "$publisher"; then
+    fail "publisher does not skip unavailable packages in the target loop"
+    return 1
+  fi
+  # The list must be non-empty: an empty list means the meta package publishes
+  # with a pin that cannot resolve.
+  local count
+  count="$(sed -n '/^UNAVAILABLE_PKGS=(/,/^)/p' "$publisher" \
+    | sed -n 's/^[[:space:]]*"\([^"]*\)".*$/\1/p' | grep -c . || true)"
+  if (( count == 0 )); then
+    fail "UNAVAILABLE_PKGS is empty but the meta package still pins Windows"
+    return 1
+  fi
+  # Both consumers must agree, or the shim would offer a package the publisher
+  # never uploads (or vice versa).
+  local map="$root/integrations/npm/lib/platform.js" pkg
+  while IFS= read -r pkg; do
+    [[ -n "$pkg" ]] || continue
+    if ! grep -qF "\"$pkg\"" "$map"; then
+      fail "$pkg is unavailable in the publisher but not in platform.js"
+      return 1
+    fi
+  done < <(sed -n '/^UNAVAILABLE_PKGS=(/,/^)/p' "$publisher" \
+    | sed -n 's/^[[:space:]]*"\([^"]*\)".*$/\1/p')
+  ok "publisher skips unavailable packages and withholds the meta package"
 }
 
 # Every platform package must be pinned by the meta package, or an install
@@ -158,6 +198,7 @@ check_docs_order() {
 run_checks() {
   local root="$1" rc=0
   check_publisher_order "$root" || rc=1
+  check_unavailable_handling "$root" || rc=1
   check_manifest_names "$root" || rc=1
   check_optional_deps "$root" || rc=1
   check_platform_map "$root" || rc=1
@@ -174,8 +215,13 @@ write_fixture() {
 TARGETS=(
     "x86_64-unknown-linux-musl:linux-x64:do-harness-linux-x64:tar.gz:do-harness"
 )
+UNAVAILABLE_PKGS=(
+    "do-harness-win32-x64"
+)
 for entry in "${TARGETS[@]}"; do
-    :
+    if is_unavailable "$pkg"; then
+        continue
+    fi
 done
 publish_dir "$stage" "do-harness"
 SH
@@ -184,6 +230,8 @@ SH
   printf '{"optionalDependencies": {"do-harness-linux-x64": "0.1.1"}}\n' \
     > "$dir/integrations/npm/package.json"
   printf '"do-harness-linux-x64"\n' > "$dir/integrations/npm/lib/platform.js"
+  printf 'const UNAVAILABLE_PACKAGES = new Set(["do-harness-win32-x64"]);\n' \
+    >> "$dir/integrations/npm/lib/platform.js"
   printf '# Releasing\nbootstrap publish first\nconfigure its Trusted Publisher\ncheck-npm-sequence.sh\n' \
     > "$dir/docs/releasing.md"
 }
@@ -266,6 +314,50 @@ SH
     rc=1
   else
     printf 'bad-manifest-name: OK: a manifest-only rename is rejected\n'
+  fi
+
+  # Mutation 6: an empty unavailable list must be rejected — the meta package
+  # would then publish pinning a package npm refuses.
+  write_fixture "$tmp/no-unavailable"
+  python3 - "$tmp/no-unavailable/scripts/publish-npm.sh" <<'PY'
+import re, sys, pathlib
+p = pathlib.Path(sys.argv[1])
+s = p.read_text()
+s = s.replace('UNAVAILABLE_PKGS=(\n    "do-harness-win32-x64"\n)\n', "UNAVAILABLE_PKGS=()\n")
+p.write_text(s)
+PY
+  if check_unavailable_handling "$tmp/no-unavailable" >/dev/null 2>&1; then
+    printf 'bad-empty-unavailable: FAIL: an empty unavailable list was accepted\n'
+    rc=1
+  else
+    printf 'bad-empty-unavailable: OK: an empty unavailable list is rejected\n'
+  fi
+
+  # Mutation 7: the shim and the publisher must agree, or one offers a package
+  # the other never uploads.
+  write_fixture "$tmp/disagree"
+  printf '"do-harness-linux-x64"\n' > "$tmp/disagree/integrations/npm/lib/platform.js"
+  if check_unavailable_handling "$tmp/disagree" >/dev/null 2>&1; then
+    printf 'bad-consumer-disagreement: FAIL: publisher/shim disagreement accepted\n'
+    rc=1
+  else
+    printf 'bad-consumer-disagreement: OK: publisher/shim disagreement rejected\n'
+  fi
+
+  # Mutation 8: dropping the skip from the loop must be rejected.
+  write_fixture "$tmp/no-skip"
+  python3 - "$tmp/no-skip/scripts/publish-npm.sh" <<'PY'
+import sys, pathlib
+p = pathlib.Path(sys.argv[1])
+s = p.read_text()
+s = s.replace('    if is_unavailable "$pkg"; then\n        continue\n    fi\n', "")
+p.write_text(s)
+PY
+  if check_unavailable_handling "$tmp/no-skip" >/dev/null 2>&1; then
+    printf 'bad-missing-skip: FAIL: a missing loop skip was accepted\n'
+    rc=1
+  else
+    printf 'bad-missing-skip: OK: a missing loop skip is rejected\n'
   fi
 
   mkdir -p "$tmp/empty"

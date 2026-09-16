@@ -74,18 +74,19 @@
     },
     {
       "id": 6,
-      "prompt": "Four platform packages are live but the Windows package and the meta package were never published. Rerun the release and confirm the meta package is not attempted before its pinned dependency.",
-      "expected_output": "The rerun skips the four live versions and still attempts Windows before the meta package, because the meta package's optionalDependencies must resolve.",
+      "prompt": "Four platform packages are live but the Windows package is refused by the registry and the meta package was never published. Rerun the release and confirm the publisher reports that decision instead of failing.",
+      "expected_output": "The rerun skips the four live versions, reports do-harness-win32-x64 as unavailable rather than attempting it, and withholds the meta package because its pinned dependency cannot resolve.",
       "files": [],
       "dim": "effectiveness",
       "kind": "gotchas",
       "assertions": [
         "walk:",
         "exists:npm-publish-run.txt",
-        "contains:npm-publish-run.txt|+ do-harness-win32-x64@0.1.1",
-        "contains:npm-publish-run.txt|+ do-harness@0.1.1",
-        "not-contains:npm-publish-run.txt|do-harness-win32-x64@0.1.1 is already on npm",
-        "not-contains:npm-publish-run.txt|do-harness@0.1.1 is already on npm"
+        "contains:npm-publish-run.txt|is already on npm; skipping",
+        "contains:npm-publish-run.txt|do-harness-win32-x64 is unavailable on npm",
+        "contains:npm-publish-run.txt|do-harness (meta) withheld",
+        "not-contains:npm-publish-run.txt|+ do-harness@0.1.1",
+        "not-contains:npm-publish-run.txt|npm error"
       ]
     },
     {
