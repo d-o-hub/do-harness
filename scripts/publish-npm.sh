@@ -21,6 +21,7 @@ VERSION=""
 DIST=""
 DRY_RUN=0
 TAG="latest"
+OTP=""
 
 die() {
     echo "publish-npm.sh: $*" >&2
@@ -38,6 +39,7 @@ Options:
   --version <X.Y.Z>  npm version to publish. Default: workspace version.
   --tag <TAG>        npm dist-tag. Default: latest.
   --dry-run          Assemble and `npm publish --dry-run` (no token needed).
+  --otp <CODE>       One-time password for a 2FA account (bootstrap publish).
   -h, --help         Show this help.
 EOF
 }
@@ -59,6 +61,10 @@ while [[ $# -gt 0 ]]; do
         --dry-run)
             DRY_RUN=1
             shift
+            ;;
+        --otp)
+            OTP="${2:?--otp requires a value}"
+            shift 2
             ;;
         -h | --help)
             usage
@@ -155,6 +161,8 @@ publish_dir() {
     fi
     if (( DRY_RUN )); then
         (cd "$dir" && npm publish --dry-run --tag "$TAG")
+    elif [[ -n "$OTP" ]]; then
+        (cd "$dir" && npm publish --tag "$TAG" --otp "$OTP")
     else
         (cd "$dir" && npm publish --tag "$TAG")
     fi

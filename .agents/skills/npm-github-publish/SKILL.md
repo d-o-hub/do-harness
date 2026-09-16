@@ -221,6 +221,20 @@ positive fix ever passed:
   does not authorize the next package. Never assume a prior approval covers the
   remaining packages, and never script a publish sequence around a single
   approval.
+- **A browser approval URL expires in minutes, so it is a poor fit for
+  automation.** `npm publish --auth-type=web` prints an `npmjs.com/auth/cli/...`
+  URL and waits, but the window is short: an agent-driven or hands-off run will
+  usually see the process exit before a human approves it. When a scripted
+  bootstrap is needed on a 2FA account, pass a one-time password explicitly
+  (`--otp <code>`) or use a token scoped so no OTP is required. Reserve the
+  browser flow for a human at a terminal, and never treat its expiry as a
+  broken credential.
+- **A `404 Not Found - PUT` on publish means "no trust relationship", not
+  "bad credentials".** When the package name does not exist yet, npm cannot
+  have a Trusted Publisher for it and answers the PUT with 404. This is the
+  expected state for a package that still needs its one-time bootstrap. An
+  authentication problem looks different: `E401`/`ENEEDAUTH` for a missing or
+  invalid token, or `EOTP` when 2FA is required and unfulfilled.
 - **A package must exist before it can have a Trusted Publisher.** npm exposes
   **Settings → Trusted Publisher** only for published packages, so
   "configure all six, then publish" is an impossible instruction. Bootstrap
