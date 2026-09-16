@@ -49,7 +49,7 @@ unchanged. Hand-rolled and re-scope rejected.
 | `feat-mcp-protocol-security` | vertical-event-slice | `supported_protocol_versions = [2026-07-28]`, `discover` served; `allowed_origins` config with localhost default; negative-path tests for protocol-version mismatch, header mismatch (`-32020`), unsupported version (`-32022`), unknown method (404/`-32601`), notification `202` |
 | `test-mcp-conformance-suite` | vertical-event-slice | hermetic end-to-end suite over Streamable HTTP (raw `reqwest` requests, **no** `rmcp` client dev-dep) with in-process upstream: allow/deny/audit/metrics on the MCP path, 1 MiB cap, body/header mismatch, degraded mode |
 | `docs-mcp-surface` | vertical-event-slice | README/`docs/threat-model-proxy.md`/`docs/compliance.md`/`docs/cli.md` describe the MCP endpoint and feature; flat REST route marked deprecated; AGT epic criterion (b) re-wording; `plans/invariants.json` entry for the optional-feature rule seeded to libSQL |
-| `chore-mcp-promotion` | decision | mcp-surface default-on, flat REST route removed, MSRV 1.85→1.88 bump ratified; requires invariants review. No code until this gate. **hold** (2026-09-13): keep `mcp-surface` off by default; the flat tool-call route stays deprecated and the default-on decision remains open |
+| `chore-mcp-promotion` | decision | mcp-surface default-on, flat REST route removed, MSRV 1.85→1.88 bump ratified; requires invariants review. No code until this gate |
 
 ## Budgets
 

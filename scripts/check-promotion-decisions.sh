@@ -62,6 +62,12 @@ check_decision() {
     # The verdict may live in the table row or in the epic's status line: a
     # decision recorded before the table convention settled says
     # "(keep off-by-default)" up top and leaves the row descriptive.
+    #
+    # Read both rather than editing an epic to add a marker. A decision record
+    # is a historical artifact owned by its own epic; reshaping another epic's
+    # prose so this parser can read it is scope creep with a real cost, and it
+    # is unnecessary — `chore-mcp-promotion` resolves correctly from its status
+    # line alone.
     local verdict="" haystack
     haystack="$(printf '%s\n%s\n' "$row" "$(sed -n '1,5p' "$epic")")"
     if grep -qiE '\*\*(hold|promote)\*\*' <<<"$haystack"; then
