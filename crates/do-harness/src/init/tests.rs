@@ -398,7 +398,11 @@ async fn init_node_pnpm_turbo_workspace_first_run_is_green() {
     .unwrap();
     fs::write(
         dir.path().join("package.json"),
-        r#"{"name": "ws", "scripts": {"typecheck": "true", "lint": "true", "test": "true", "build": "true"}}"#,
+        // Script bodies must succeed on every platform: `true` is a POSIX
+        // shell builtin with no Windows executable, so `npm run typecheck`
+        // would fail there and the baseline would read Red. A node no-op is
+        // portable.
+        r#"{"name": "ws", "scripts": {"typecheck": "node -e \"\"", "lint": "node -e \"\"", "test": "node -e \"\"", "build": "node -e \"\""}}"#,
     )
     .unwrap();
 

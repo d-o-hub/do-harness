@@ -92,8 +92,41 @@ pub fn resolve_program(program: &str) -> PathBuf {
     PathBuf::from(program)
 }
 
-/// Whether a failed direct execution of a script means "run it through bash".
+/// Terminates a child and everything it spawned.
 ///
+/// `Child::kill` on Windows calls `TerminateProcess` on the direct child only.
+/// A shell wrapper (`bash -c "…"`) is a *parent* of the real work, so killing
+/// it orphans the grandchild, which then keeps the inherited stdout/stderr pipe
+/// open — a reader draining that pipe blocks forever, which is how a
+/// `--fail-fast` cancellation or an agent timeout could hang indefinitely on
+/// Windows.
+///
+/// On Windows this uses `taskkill /T /F`, which walks the process tree. On
+/// POSIX, killing the direct child is sufficient because the shell substitutes
+/// `exec` for the final command in a simple pipeline, so the child *is* the
+/// work. A failure to run `taskkill` falls back to `Child::kill` so termination
+/// is always attempted.
+pub fn kill_tree(child: &mut std::process::Child) {
+    if cfg!(windows) {
+        {
+            let pid = child.id();
+            let killed = Command::new("taskkill")
+                .args(["/PID", &pid.to_string(), "/T", "/F"])
+                .stdout(std::process::Stdio::null())
+                .stderr(std::process::Stdio::null())
+                .status()
+                .is_ok_and(|status| status.success());
+            if killed {
+                let _ = child.wait();
+                return;
+            }
+        }
+    }
+    let _ = child.kill();
+    let _ = child.wait();
+}
+
+/// Whether a failed direct execution of a script means "run it through bash".
 /// POSIX hosts report `PermissionDenied` for a non-executable script. Windows
 /// cannot execute a shebang file at all and reports a *different* error
 /// (`ERROR_BAD_EXE_FORMAT`, surfaced as `InvalidInput`/`Other` rather than

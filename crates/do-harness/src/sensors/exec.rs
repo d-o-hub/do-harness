@@ -160,8 +160,7 @@ fn kill_and_report(
     start: Instant,
     message: String,
 ) -> SensorResult {
-    let _ = child.kill();
-    let _ = child.wait();
+    crate::shell::kill_tree(child);
     sensor_result(spec, false, None, elapsed_ms(start), message)
 }
 
