@@ -215,10 +215,19 @@ fn copy_if_dir(src: &Path, dest: &Path) -> Result<()> {
 }
 
 /// Recursively copies `src` into `dest`.
+///
+/// Build/bytecode caches are skipped. They are interpreter- or machine-specific
+/// (`__pycache__` here) and cannot appear in a committed tree, so copying them
+/// would add noise and size to every sandbox — and in agent mode a sandbox is
+/// built per eval case. The eval result must not depend on whether a developer
+/// happened to run the scripts locally first.
 fn copy_dir(src: &Path, dest: &Path) -> Result<()> {
     fs::create_dir_all(dest).with_context(|| format!("failed to create {}", dest.display()))?;
     for entry in fs::read_dir(src).with_context(|| format!("failed to read {}", src.display()))? {
         let entry = entry?;
+        if is_cache_entry(&entry.file_name()) {
+            continue;
+        }
         let from = entry.path();
         let to = dest.join(entry.file_name());
         if from.is_dir() {
@@ -230,4 +239,10 @@ fn copy_dir(src: &Path, dest: &Path) -> Result<()> {
         }
     }
     Ok(())
+}
+
+/// Whether a directory entry is a regenerable build/bytecode cache.
+pub(super) fn is_cache_entry(name: &std::ffi::OsStr) -> bool {
+    let name = name.to_string_lossy();
+    name == "__pycache__" || name.ends_with(".pyc") || name.ends_with(".pyo")
 }
