@@ -132,9 +132,37 @@ Manual `bash scripts/check-agt-ga.sh`:
 - release: `tag=v4.1.0 prerelease=false`
 - `VERDICT=NOT_GA` — criterion (a) remains unsatisfied; no promotion review is opened.
 
+### GA watch run — 2026-09-16 (promotion re-review)
+
+Manual `bash scripts/check-agt-ga.sh`:
+
+- crate: `version=3.2.2 description=Public Preview — Rust SDK for the Agent Governance Toolkit (policy, trust, audit, identity)`
+- release: `tag=v4.1.0 prerelease=false`
+- `VERDICT=NOT_GA` — criterion (a) remains unsatisfied.
+
+The `chore-agt-promotion` gates were re-run in full against this tree to confirm
+the hold still reflects reality rather than stale notes. Every engineering gate
+passed and criterion (a) still fails, so the fail-closed rule selects `hold`
+again: no default-feature or production Rust change was made.
+
+| Gate | Result |
+|---|---|
+| `bash scripts/check-agt-ga.sh` | `VERDICT=NOT_GA` — criterion (a) unsatisfied (the blocking gate) |
+| `cargo check -p guardian-proxy --features agt-governance` | exit 0 |
+| `cargo test -p guardian-proxy --features agt-governance` | 31 passed, 0 failed |
+| `cargo test -p guardian-proxy` | 30 passed, 0 failed |
+| `cargo test -p guardian-proxy --no-default-features` | exit 0 — opt-out contract intact |
+| `check-agt` (`do-harness.toml`) | passed |
+| `do-harness verify --set verification --strict` | all 12 sensors passed |
+| `do-harness status --set verification` | `green` |
+
+`crates/guardian-proxy/Cargo.toml` still declares `default = []`, so the feature
+boundary matches this decision. The hold needs no artifact edit; this entry
+records that the 2026-09-15 decision was independently reproduced.
+
 ## Next action
 
-The `chore-agt-promotion` review is complete as a **hold** on 2026-09-15. The MCP/tool-call mediation criterion (b) is satisfied behind `mcp-surface`, but AGT criterion (a) remains unsatisfied: `bash scripts/check-agt-ga.sh` reports `VERDICT=NOT_GA` because `agent-governance` 3.2.2 still describes itself as Public Preview. Keep `agt-governance` off by default and rerun this review when the GA watch reports `VERDICT=GA`; do not remove the feature flag or alter production Rust until both criteria hold.
+The `chore-agt-promotion` review is complete as a **hold**, re-confirmed on 2026-09-16. The MCP/tool-call mediation criterion (b) is satisfied behind `mcp-surface`, but AGT criterion (a) remains unsatisfied: `bash scripts/check-agt-ga.sh` reports `VERDICT=NOT_GA` because `agent-governance` 3.2.2 still describes itself as Public Preview. Keep `agt-governance` off by default and rerun this review when the GA watch reports `VERDICT=GA`; do not remove the feature flag or alter production Rust until both criteria hold.
 
 ## Promotion review — chore-agt-promotion (2026-09-15)
 

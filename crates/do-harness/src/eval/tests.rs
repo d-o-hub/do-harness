@@ -106,6 +106,38 @@ fn referenced_paths_selects_concrete_files_only() {
     assert!(!found.contains(&"integrations".to_owned()), "{found:?}");
 }
 
+/// A `.github/` path a skill names is mirrored as that exact file. The release
+/// workflow carries the publish job's OIDC permissions, so a skill whose guard
+/// validates that job needs the real file in its sandbox — and a dot-prefixed
+/// path cannot flip `init::detect` the way a visible tree root would.
+#[test]
+fn referenced_paths_mirrors_named_github_file() {
+    let dir = tempfile::tempdir().unwrap();
+    let skill = dir.path().join("demo");
+    fs::create_dir_all(skill.join("evals")).unwrap();
+    fs::write(
+        skill.join("SKILL.md"),
+        "The publish job lives in .github/workflows/release.yml and holds id-token: write.\n\
+         Bare .github/workflows/ names no concrete artifact.\n",
+    )
+    .unwrap();
+    let found = referenced_paths(&skill);
+    assert!(
+        found.contains(&".github/workflows/release.yml".to_owned()),
+        "{found:?}"
+    );
+    // A token with anything below the prefix names a concrete path, so a
+    // directory-shaped token mirrors that directory. Harmless here: the entry
+    // is dot-prefixed, so it cannot influence `init`'s language detection the
+    // way a visible tree root would.
+    assert!(
+        found
+            .iter()
+            .all(|p| p.starts_with(".github/") || p.starts_with("scripts")),
+        "unexpected mirror outside the named trees: {found:?}"
+    );
+}
+
 /// A skill that names no repo paths mirrors none, so its sandbox stays free of
 /// the non-hidden entries that would flip `init`'s language detection.
 #[test]

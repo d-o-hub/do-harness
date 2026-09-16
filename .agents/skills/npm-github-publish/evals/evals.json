@@ -91,8 +91,8 @@
     },
     {
       "id": 7,
-      "prompt": "Prove the release order is enforced by a check rather than by prose, and that the check itself is falsifiable.",
-      "expected_output": "Run the skill's check-npm-sequence.sh against the workspace and its --self-test mutation controls; both must exit 0, and a check that cannot fail is a defect.",
+      "prompt": "Confirm the npm release sequence guard passes on the workspace and that its negative controls still detect each defect it claims to catch, including a publish token injected into the OIDC job.",
+      "expected_output": "The guard reports OK for every sequence rule (publisher order, unavailable-package skipping, manifest names, optional-dependency pins, platform map, runbook order, OIDC-only publish-job auth) and its self-test reports OK for every mutation control, including the token-in-OIDC and cached-publish controls.",
       "files": [],
       "dim": "correctness",
       "kind": "gotchas",
@@ -100,7 +100,10 @@
         "walk:",
         "exists:npm-sequence-guard.txt",
         "contains:npm-sequence-guard.txt|OK: publisher order: platform packages before the meta package",
+        "contains:npm-sequence-guard.txt|OK: npm-publish authenticates with OIDC only and disables npm caching",
         "contains:npm-sequence-guard.txt|bad-docs-order: OK: configure-before-bootstrap rejected",
+        "contains:npm-sequence-guard.txt|bad-token-in-oidc: OK: a publish token in an OIDC job is rejected",
+        "contains:npm-sequence-guard.txt|bad-cached-publish: OK: npm caching in the publish job is rejected",
         "contains:npm-sequence-guard.txt|guard-root-exit=0",
         "contains:npm-sequence-guard.txt|guard-self-test-exit=0",
         "not-contains:npm-sequence-guard.txt|FAIL: good"

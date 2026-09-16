@@ -135,11 +135,12 @@ fn copy_gate_scripts(real_root: &Path, skills_root: &Path) -> Result<()> {
 /// Repository-relative paths a skill's own files name, so only those are
 /// mirrored into its sandbox.
 ///
-/// Scans the skill's text for `scripts/...`, `docs/...`, and
-/// `integrations/...` tokens. Whole-tree copies are deliberately avoided (agent
+/// Scans the skill's text for `scripts/...`, `docs/...`, `integrations/...`,
+/// and `.github/...` tokens. Whole-tree copies are deliberately avoided (agent
 /// mode builds one sandbox per case), but the granularity differs by tree:
 ///
-/// * `scripts/...` and `docs/...` tokens mirror the exact named file.
+/// * `scripts/...`, `docs/...`, and `.github/...` tokens mirror the exact named
+///   file.
 /// * `integrations/<pkg>/...` mirrors `integrations/<pkg>` wholesale, because an
 ///   `integrations/` entry is a self-contained package whose manifest defines
 ///   its own file closure. A repo script the skill invokes (e.g.
@@ -149,8 +150,9 @@ fn copy_gate_scripts(real_root: &Path, skills_root: &Path) -> Result<()> {
 ///
 /// Bare tree prefixes (`scripts/`) are dropped: a whole-tree copy would pull in
 /// unrelated tools and, being non-hidden, could change what `init::detect` sees.
+/// A `.github/` file is dot-prefixed, so mirroring one never affects detection.
 pub(super) fn referenced_paths(skill_dir: &Path) -> Vec<String> {
-    const PREFIXES: [&str; 3] = ["scripts/", "docs/", "integrations/"];
+    const PREFIXES: [&str; 4] = ["scripts/", "docs/", "integrations/", ".github/"];
     let mut found: Vec<String> = Vec::new();
     let mut stack = vec![skill_dir.to_path_buf()];
     while let Some(dir) = stack.pop() {
@@ -168,8 +170,11 @@ pub(super) fn referenced_paths(skill_dir: &Path) -> Vec<String> {
             };
             for raw in text.split(|c: char| c.is_whitespace() || c == '`' || c == '"' || c == '\'')
             {
+                // `.` is deliberately absent from the trim set: a leading dot
+                // is significant (`.github/...`), and a trailing sentence
+                // period is already stripped by `trim_end_matches` below.
                 let token = raw.trim_matches(|c: char| {
-                    c == '(' || c == ')' || c == ',' || c == '.' || c == ':' || c == '|'
+                    c == '(' || c == ')' || c == ',' || c == ':' || c == '|'
                 });
                 let Some(start) = PREFIXES.iter().find_map(|prefix| token.find(prefix)) else {
                     continue;

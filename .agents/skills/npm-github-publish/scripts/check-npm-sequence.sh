@@ -41,9 +41,9 @@ publisher_packages() {
 }
 
 # The meta package must publish after the platform loop, so its pinned
-# optionalDependencies already exist on the registry. It is also withheld
-# while any pinned platform package is unavailable, so the guard accepts
-# either shape: a bare meta publish, or one nested in the withholding `if`.
+# optionalDependencies already exist on the registry. The meta publish is
+# unconditional — gating it on UNAVAILABLE_PKGS is what made `npx do-harness`
+# 404 for every Linux/macOS user.
 check_publisher_order() {
   local root="$1" publisher="$1/scripts/publish-npm.sh"
   [[ -f "$publisher" ]] || { fail "missing $publisher"; return 1; }
@@ -191,6 +191,48 @@ check_docs_order() {
   ok "runbook order: bootstrap publish before Trusted Publisher configuration"
 }
 
+# The publish job must authenticate with OIDC alone. The v0.1.1 npm-publish job
+# injected `NODE_AUTH_TOKEN: secrets.NPM_TOKEN`; because the npm CLI treats a
+# token as a fallback that only engages when OIDC does not, that job could not
+# use trusted publishing and failed with `EOTP` — an error that reads like a 2FA
+# problem rather than the credential misconfiguration it was. A token in a job
+# that also holds `id-token: write` is always a defect: it either masks the
+# trusted-publisher path or silently becomes the real credential.
+check_publish_workflow_auth() {
+  local root="$1"
+  local wf="$root/.github/workflows/release.yml"
+  # A workspace without the release workflow has no publish job to validate.
+  # Eval sandboxes mirror only the paths a skill names, so the workflow is
+  # absent there; skipping keeps the guard usable in both, and the mutation
+  # controls below still prove the check can fail.
+  if [[ ! -f "$wf" ]]; then
+    ok "no .github/workflows/release.yml in this workspace; publish-job auth not checked"
+    return 0
+  fi
+  # Locate the npm-publish job body: from its key to the next 2-space job key.
+  local body
+  body="$(awk '/^  npm-publish:/{f=1} f&&/^  [a-z-]+:$/&&!/^  npm-publish:/{exit} f' "$wf")"
+  if [[ -z "$body" ]]; then
+    fail "release.yml has no npm-publish job"
+    return 1
+  fi
+  if ! grep -q 'id-token: write' <<<"$body"; then
+    fail "npm-publish job lacks id-token: write"
+    return 1
+  fi
+  local bad
+  bad="$(grep -nE 'NODE_AUTH_TOKEN|NPM_TOKEN' <<<"$body" || true)"
+  if [[ -n "$bad" ]]; then
+    fail "npm-publish injects a publish token ($(tr '\n' ' ' <<<"$bad")) — OIDC alone must authenticate it"
+    return 1
+  fi
+  if ! grep -q 'package-manager-cache: false' <<<"$body"; then
+    fail "npm-publish enables npm caching; a poisoned cache is executable in a privileged job"
+    return 1
+  fi
+  ok "npm-publish authenticates with OIDC only and disables npm caching"
+}
+
 run_checks() {
   local root="$1" rc=0
   check_publisher_order "$root" || rc=1
@@ -199,6 +241,7 @@ run_checks() {
   check_optional_deps "$root" || rc=1
   check_platform_map "$root" || rc=1
   check_docs_order "$root" || rc=1
+  check_publish_workflow_auth "$root" || rc=1
   return "$rc"
 }
 
@@ -230,6 +273,25 @@ SH
     >> "$dir/integrations/npm/lib/platform.js"
   printf '# Releasing\nbootstrap publish first\nconfigure its Trusted Publisher\ncheck-npm-sequence.sh\n' \
     > "$dir/docs/releasing.md"
+  mkdir -p "$dir/.github/workflows"
+  cat > "$dir/.github/workflows/release.yml" <<'YML'
+name: release
+jobs:
+  npm-publish:
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/setup-node@0000000000000000000000000000000000000000
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+      - run: bash scripts/publish-npm.sh --dist dist
+  other:
+    steps:
+      - run: true
+YML
 }
 
 # Mutation controls: each perturbation must make its check fail, otherwise the
@@ -361,6 +423,57 @@ PY
     rc=1
   else
     printf 'bad-missing-skip: OK: a missing loop skip is rejected\n'
+  fi
+
+  # Mutation 9: a publish token in an OIDC job must be rejected. This is the
+  # v0.1.1 defect: the injected token forced the npm CLI's fallback path and the
+  # job failed with EOTP instead of publishing via trusted publishing.
+  write_fixture "$tmp/token-in-oidc"
+  python3 - "$tmp/token-in-oidc/.github/workflows/release.yml" <<'PY'
+import sys, pathlib
+p = pathlib.Path(sys.argv[1])
+s = p.read_text()
+s = s.replace('  npm-publish:\n',
+              '  npm-publish:\n    env:\n      NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}\n')
+p.write_text(s)
+PY
+  if check_publish_workflow_auth "$tmp/token-in-oidc" >/dev/null 2>&1; then
+    printf 'bad-token-in-oidc: FAIL: a publish token in an OIDC job was accepted\n'
+    rc=1
+  else
+    printf 'bad-token-in-oidc: OK: a publish token in an OIDC job is rejected\n'
+  fi
+
+  # Mutation 10: npm caching in the privileged publish job must be rejected.
+  write_fixture "$tmp/cached-publish"
+  python3 - "$tmp/cached-publish/.github/workflows/release.yml" <<'PY'
+import sys, pathlib
+p = pathlib.Path(sys.argv[1])
+s = p.read_text()
+s = s.replace('          package-manager-cache: false\n', '')
+p.write_text(s)
+PY
+  if check_publish_workflow_auth "$tmp/cached-publish" >/dev/null 2>&1; then
+    printf 'bad-cached-publish: FAIL: npm caching in the publish job was accepted\n'
+    rc=1
+  else
+    printf 'bad-cached-publish: OK: npm caching in the publish job is rejected\n'
+  fi
+
+  # Mutation 11: dropping OIDC permission must be rejected.
+  write_fixture "$tmp/no-id-token"
+  python3 - "$tmp/no-id-token/.github/workflows/release.yml" <<'PY'
+import sys, pathlib
+p = pathlib.Path(sys.argv[1])
+s = p.read_text()
+s = s.replace('      id-token: write\n', '')
+p.write_text(s)
+PY
+  if check_publish_workflow_auth "$tmp/no-id-token" >/dev/null 2>&1; then
+    printf 'bad-no-id-token: FAIL: a publish job without id-token was accepted\n'
+    rc=1
+  else
+    printf 'bad-no-id-token: OK: a publish job without id-token is rejected\n'
   fi
 
   mkdir -p "$tmp/empty"

@@ -33,6 +33,26 @@ when a token-authenticated npm release needs a safer OIDC migration.
    cannot silently fall back to token authentication.
 4. Keep the package `repository.url` exactly aligned with the GitHub repository.
    npm validates this relationship for GitHub trusted publishing.
+5. **Never inject a token into the publish job.** The npm CLI prefers OIDC when
+   both are present, but a token is a *fallback that only triggers when OIDC
+   fails* — so a token silently masks a broken trust relationship with a
+   different, weaker credential and can turn a clean OIDC failure into an
+   `EOTP` error that looks like a 2FA problem. A job that also holds
+   `id-token: write` must carry no publish token at all.
+6. Set `package-manager-cache: false` on `actions/setup-node` in the publish
+   job. npm's own trusted-publishing example marks caching "never use caching in
+   release builds": a poisoned npm cache is executable input to a privileged
+   publish, and the job holds `id-token: write`. The check below reads
+   `.github/workflows/release.yml` and rejects a publish job that fails either
+   rule.
+7. A package name that has never been published cannot be configured for
+   trusted publishing — npm exposes the Trusted Publisher page only for a
+   package that already exists. Bootstrap a brand-new package with one
+   authenticated `npm publish` (interactive, 2FA-approved), then configure its
+   trusted publisher; OIDC covers every later release.
+8. Never `npm unpublish` a published version to "fix" a mistake. Versions are
+   immutable in practice: unpublishing breaks every lockfile that resolved it
+   and is restricted to a short window. Publish a new patch version instead.
 
 ## Release workflow
 
@@ -69,6 +89,7 @@ steps:
     with:
       node-version: 24
       registry-url: https://registry.npmjs.org
+      package-manager-cache: false  # never cache in a privileged release job
   - run: npm --version
   - run: bash scripts/publish-npm.sh --dist dist
 ```

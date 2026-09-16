@@ -313,10 +313,17 @@ jobs:
           path: dist
           merge-multiple: true
       # actions/setup-node@v4
+      #
+      # `package-manager-cache: false` is deliberate: this job holds
+      # `id-token: write`, and npm's own trusted-publishing example disables
+      # automatic caching in release builds ("never use caching in release
+      # builds"). A poisoned npm cache is executable input to a privileged
+      # publish, so this job trades install speed for a smaller attack surface.
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org
+          package-manager-cache: false
       - name: Check npm trusted publishing prerequisites
         run: |
           node_version="$(node --version | sed 's/^v//')"
