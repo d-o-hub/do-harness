@@ -217,11 +217,13 @@ jobs:
       - uses: taiki-e/install-action@ba47c86ac325773530516bb756137ac718732518
         with:
           tool: cargo-deny,cargo-audit
-      # Full `cargo test --workspace` runs on ubuntu (verify job). The unit
-      # suite is not yet Windows-green (eval walkthrough shebangs, hook exit
-      # codes, path resolution — see #70), so the windows job proves the
-      # distribution path only: build + Git Bash dogfood + installer +
-      # hooks/doctor + npm wrapper.
+      # The full `cargo test --workspace` also runs on ubuntu (verify job);
+      # running it here too is what makes Windows a supported platform rather
+      # than a build-only target. POSIX-only tests are `#[cfg(unix)]`-gated
+      # (eval walkthrough shebangs, hook exit codes, file-mode helpers) and the
+      # runners provide Git Bash, so `sh`/`bash` sensors work as written.
+      - name: Test workspace on Windows
+        run: cargo test --workspace --release
       - name: Build harness CLI
         run: cargo build --release -p do-harness
       - name: Dogfood init + verify with the release binary
