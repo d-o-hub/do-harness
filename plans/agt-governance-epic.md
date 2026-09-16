@@ -32,7 +32,7 @@ Microsoft's Agent Governance Toolkit publishes `agent-governance` + `agent-gover
 | `feat-guardian-http` | vertical slice | `axum` router `GET /health` + `POST /mcp/tools/call` with fail-closed forwarding via `reqwest` | **done task 10** |
 | `feat-guardian-audit` | vertical slice | Hash-chained JSONL decision log (`AuditLog`, `ProxyConfig.audit_log`) with `Allow`/`Deny` evidence + tamper detection | **done task 11** |
 | `feat-guardian-operability` | vertical slice | Example config + `--verify-audit` fail-closed CLI + `cargo test -p guardian-proxy` CI gate | **done task 12** |
-| `chore-agt-promotion` | decision | GA + surface satisfied → remove feature flag or keep off-by-default per invariants review | Decision memo §4 — **hold 2026-09-15** (criterion (a) unsatisfied; see Promotion review below) |
+| `chore-agt-promotion` | decision | GA + surface satisfied → remove feature flag or keep off-by-default per invariants review | Decision memo §4 — **hold** (2026-09-15, re-confirmed 2026-09-16: all engineering gates pass, criterion (a) still `VERDICT=NOT_GA`; see Promotion review below) |
 | `chore-remove-doharness-policy` | refactor | Delete duplicated `do-harness/src/policy/` (`AgtGate`/`McpMediator`) now that `guardian-proxy` is the sole tool-call mediation surface; drop the `agt-governance` feature from the CLI crate | #34 item 10 — **done task 30** |
 
 ## Non-goals
