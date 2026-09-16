@@ -264,6 +264,11 @@ jobs:
         run: |
           scratch="$(mktemp -d)"
           git init -q "$scratch"
+          # Seed one commit: the scaffolded commitlint sensor inspects the last
+          # commit and fails in a repository with no commits, which makes init's
+          # initial verification legitimately RED (exit 1).
+          git -C "$scratch" -c user.email=ci@example.com -c user.name=ci \
+            commit -q --allow-empty -m "chore: seed"
           ./target/release/do-harness.exe --root "$scratch" init
           bin="$PWD/target/release/do-harness.exe"
           cd "$scratch"
