@@ -209,7 +209,7 @@ mod tests {
     fn lint_message(content: &str) -> bool {
         let msg = tempfile::NamedTempFile::new().unwrap();
         std::fs::write(msg.path(), content).unwrap();
-        let status = std::process::Command::new("bash")
+        let status = crate::shell::bash()
             .arg(commitlint_script())
             .args(["--message"])
             .arg(msg.path())
@@ -361,7 +361,7 @@ mod tests {
         std::fs::write(&hook, commit_msg_body()).unwrap();
         let msg = dir.join("COMMIT_EDITMSG");
         std::fs::write(&msg, "fix: typo\n").unwrap();
-        let mut command = std::process::Command::new("bash");
+        let mut command = crate::shell::bash();
         command.arg(&hook).arg(&msg).current_dir(dir);
         for key in [
             "GIT_DIR",

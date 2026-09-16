@@ -46,6 +46,7 @@ mod overlap;
 mod pr;
 mod report;
 mod sensors;
+mod shell;
 mod signals;
 mod skill_write;
 mod status;

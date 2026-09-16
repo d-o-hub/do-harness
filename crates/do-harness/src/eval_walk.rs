@@ -10,7 +10,6 @@
 //! routing it through `/bin/sh` silently breaks bash-only syntax such as
 //! `set -o pipefail` on dash-based systems.
 
-use std::io::ErrorKind;
 use std::path::Path;
 use std::process::{Command, Output};
 
@@ -106,7 +105,7 @@ fn spawn_walkthrough(script: &Path, root: &Path, bin: &Path) -> std::io::Result<
         .output();
     match attempt {
         Ok(output) => Ok(output),
-        Err(err) if err.kind() == ErrorKind::PermissionDenied => Command::new("bash")
+        Err(err) if crate::shell::needs_bash_fallback(&err) => crate::shell::bash()
             .arg(script)
             .current_dir(root)
             .env("DO_HARNESS_ROOT", root)

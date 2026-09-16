@@ -14,7 +14,7 @@
 
 use std::io::{Read, Write};
 use std::path::Path;
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -92,7 +92,7 @@ fn run_agent(spec: &AgentSpec, prompt: &str, root: &Path) -> WalkRun {
             };
         }
     };
-    let mut child = match Command::new("bash")
+    let mut child = match crate::shell::bash()
         .arg("-c")
         .arg(&spec.command)
         .current_dir(root)
