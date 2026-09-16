@@ -231,6 +231,13 @@ jobs:
         # and needs PyYAML. Ubuntu images ship it; windows-latest does not, so
         # install it explicitly instead of relying on the host image.
         run: python -m pip install --disable-pip-version-check -r .agents/skills/skill-creator/scripts/requirements.txt
+      - name: Install pnpm for the node init tests
+        # `init::tests::init_node_pnpm_turbo_workspace_first_run_is_green`
+        # declares a pnpm workspace, so its baseline can only go Green when
+        # pnpm is the resolved package manager. windows-latest ships npm/yarn
+        # but not pnpm, so provide it rather than letting the fixture run under
+        # a package manager it does not describe.
+        run: npm install --global pnpm@10
       - name: Test workspace on Windows
         # Bounded so a hung test fails in minutes rather than consuming the
         # job's full 30-minute budget with no output.
