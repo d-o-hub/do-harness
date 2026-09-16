@@ -223,6 +223,9 @@ jobs:
       # (eval walkthrough shebangs, hook exit codes, file-mode helpers) and the
       # runners provide Git Bash, so `sh`/`bash` sensors work as written.
       - name: Test workspace on Windows
+        # Bounded so a hung test fails in minutes rather than consuming the
+        # job's full 30-minute budget with no output.
+        timeout-minutes: 12
         run: cargo test --workspace --release
       - name: Build harness CLI
         run: cargo build --release -p do-harness
