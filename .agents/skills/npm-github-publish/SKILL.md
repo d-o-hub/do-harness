@@ -259,6 +259,20 @@ and npm's [registry-side spam error guidance](https://github.com/npm/npm/issues/
 - Trusted publishing does not authenticate private dependency installation or
   arbitrary npm commands. Use a separate read-only token only when private
   dependencies require it, never for the publish credential.
+- Prefer **staged publishing** where a human approval gate is wanted: `npm
+  stage publish` accepts `npm stage publish` permission independently of
+  `npm publish`, so a trusted publisher can be granted staging only and a
+  maintainer approves with 2FA before the version goes public. This is the
+  highest-assurance configuration for a release pipeline; direct publish is the
+  lower-friction alternative and is what this repository uses.
+- Granular access tokens that **bypass 2FA** are being narrowed: they are
+  losing direct-publish capability and will only be able to read private
+  packages or stage a publish pending human approval. Treat any such token as
+  transitional and migrate the release path to OIDC.
+- When a trusted-publisher configuration was created on or after 2026-09-03,
+  allowed actions must be chosen explicitly (`npm stage publish` is always
+  permitted; `npm publish` is opt-in). A configuration that suddenly refuses a
+  direct publish is usually this, not a broken OIDC exchange.
 
 ## Verification checklist
 
