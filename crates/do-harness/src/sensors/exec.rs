@@ -8,7 +8,7 @@
 
 use std::io::Read;
 use std::path::Path;
-use std::process::{Child, Command, Stdio};
+use std::process::{Child, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -112,9 +112,7 @@ fn spawn_sensor(
     rest: &[String],
     start: Instant,
 ) -> Result<Child, SensorResult> {
-    let resolved = crate::shell::resolve_program(program);
-    Command::new(resolved)
-        .args(rest)
+    crate::shell::command(program, rest)
         .current_dir(root)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())

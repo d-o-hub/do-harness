@@ -126,6 +126,61 @@ pub fn kill_tree(child: &mut std::process::Child) {
     let _ = child.wait();
 }
 
+/// Builds a `Command` for a program that may be a POSIX shell or a Windows
+/// command shim.
+///
+/// Two Windows specifics are handled here:
+///
+/// * `bash`/`sh` resolve to Git Bash (see [`resolve_program`]).
+/// * `npm`, `npx`, and `pnpm` are installed as `.cmd` batch shims. Rust's
+///   `Command::new` cannot execute those — on Windows it relies on
+///   `CreateProcess`, which runs `.exe` images but not batch files, and a
+///   bare name is not searched for a `.cmd` suffix. Spawning one therefore
+///   fails with "program not found", which would break every generated
+///   Node-pack sensor (`["npm", "run", "typecheck"]`) on Windows. Batch shims
+///   are launched through `cmd /C`, the documented way to run them.
+#[must_use]
+pub fn command(program: &str, args: &[String]) -> Command {
+    if cfg!(windows) {
+        if let Some(shim) = windows_batch_shim(program) {
+            let mut command = Command::new("cmd");
+            command.arg("/C").arg(shim);
+            command.args(args);
+            return command;
+        }
+    }
+    let mut command = Command::new(resolve_program(program));
+    command.args(args);
+    command
+}
+
+/// Finds a `.cmd`/`.bat` shim for `program` on `PATH`, if any.
+///
+/// Only consulted when `program` is a bare name: an explicit path or a name
+/// with an extension is used as given. (`Path::join` replaces the base when the
+/// component is absolute, so an unguarded join would let a caller's absolute
+/// path be probed against every `PATH` entry.)
+#[must_use]
+pub fn windows_batch_shim(program: &str) -> Option<PathBuf> {
+    let path = std::path::Path::new(program);
+    if path.extension().is_some() || path.is_absolute() || program.contains('/') {
+        return None;
+    }
+    let search = std::env::var_os("PATH")?;
+    for dir in std::env::split_paths(&search) {
+        if !dir.is_absolute() {
+            continue;
+        }
+        for ext in ["cmd", "bat"] {
+            let candidate = dir.join(format!("{program}.{ext}"));
+            if candidate.is_file() {
+                return Some(candidate);
+            }
+        }
+    }
+    None
+}
+
 /// Whether a failed direct execution of a script means "run it through bash".
 /// POSIX hosts report `PermissionDenied` for a non-executable script. Windows
 /// cannot execute a shebang file at all and reports a *different* error
@@ -201,6 +256,45 @@ mod tests {
             assert!(needs_bash_fallback(&missing));
         } else {
             assert!(!needs_bash_fallback(&missing));
+        }
+    }
+
+    /// `shell::command` must produce a runnable command for an ordinary
+    /// program on every platform, so the `.cmd`-shim path never regresses the
+    /// common case.
+    #[test]
+    fn command_runs_a_plain_program() {
+        let out = command("echo", &["shim-probe".to_owned()])
+            .output()
+            .unwrap();
+        assert!(out.status.success());
+        assert!(String::from_utf8_lossy(&out.stdout).contains("shim-probe"));
+    }
+
+    /// Names that already carry an extension never resolve through the shim
+    /// path, so an exact path or an `.exe` always wins over a PATH search.
+    ///
+    /// The positive case is environment-dependent (nvm installs `npm.cmd` even
+    /// on Linux so one tree serves both platforms), so this asserts the
+    /// invariant rather than host specifics: any hit must be an actual
+    /// `.cmd`/`.bat` file.
+    #[test]
+    fn batch_shim_lookup_only_matches_real_batch_files() {
+        assert!(windows_batch_shim("node.exe").is_none());
+        // Absolute and slash-containing names bypass the PATH search entirely.
+        assert!(windows_batch_shim("/usr/bin/node").is_none());
+        assert!(windows_batch_shim("./npm").is_none());
+        for name in ["npm", "npx", "pnpm", "definitely-absent-tool"] {
+            if let Some(found) = windows_batch_shim(name) {
+                assert!(found.is_file(), "{found:?}");
+                assert!(
+                    matches!(
+                        found.extension().and_then(|e| e.to_str()),
+                        Some("cmd" | "bat")
+                    ),
+                    "{found:?}"
+                );
+            }
         }
     }
 }
