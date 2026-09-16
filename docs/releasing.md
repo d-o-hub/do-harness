@@ -30,7 +30,10 @@ verification set and every build target dogfoods green.
   Trusted Publisher can be configured; npm exposes **Settings → Trusted
   Publisher** only for a package that already exists, so OIDC alone cannot
   create a new package name. After that bootstrap, OIDC covers every later
-  release.
+  release. Until then the CI job fails with
+  `404 Not Found - PUT https://registry.npmjs.org/<pkg>` — npm's answer when no
+  trust relationship exists for the name, not an authentication error. Do not
+  read that 404 as a broken OIDC setup.
 - Once each package exists, configure its Trusted Publisher on
   <https://www.npmjs.com>: package **Settings → Trusted Publisher → GitHub
   Actions**, organization/user `d-o-hub`, repository `do-harness`, workflow

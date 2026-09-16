@@ -1,6 +1,6 @@
 # Epic: Distribution and External Adoption
 
-> **Status:** released as `v0.1.0` (2026-09-13); `v0.1.1` (2026-09-15) ships the first Windows zip (crates.io published all three crates at `0.1.1`; npm bootstrap published four Linux/macOS platform packages — Windows is GitHub-release-only because npm rejects the `do-harness-win32-x64` name, and the meta package published 2026-09-16, making `npx do-harness` resolve)
+> **Status:** released as `v0.1.0` (2026-09-13); `v0.1.1` (2026-09-15) ships the first Windows zip (crates.io published all three crates at `0.1.1`; npm bootstrap published four Linux/macOS platform packages — Windows is GitHub-release-only because npm rejects the `do-harness-win32-x64` name, and the meta package is no longer withheld, though it still needs a one-time authenticated bootstrap before its Trusted Publisher exists, so CI's OIDC publish returns `404 Not Found - PUT` and `npx do-harness` does not resolve yet)
 > **Related:** prebuilt releases, `scripts/install.sh`, pinned agent
 > instructions, release evidence
 > **Created:** 2026-09-13
@@ -162,9 +162,13 @@ Two facts that make the documented failure mode precise:
    binary is missing, `npx do-harness` on Windows fails when the shim runs.
    That is why the shim, not the install step, carries the guidance.
 
-The meta package therefore publishes (`2026-09-16`). Withholding it cost every
-Linux/macOS user a working `npx do-harness` — the primary install path in
-`README.md` returned 404 — to avoid a Windows message the shim already prints.
+The meta package therefore publishes instead of being withheld (`2026-09-16`).
+Withholding it cost every Linux/macOS user a working `npx do-harness` — the
+primary install path in `README.md` returned 404 — to avoid a Windows message
+the shim already prints. Publishing is necessary but not yet sufficient: the
+name has never existed on npm, and a Trusted Publisher can only be configured
+for an existing package, so the OIDC job returns `404 Not Found - PUT` until a
+one-time authenticated bootstrap publish creates `do-harness` on the registry.
 The Windows pin is inert: npm filters an `optionalDependency` by its `os`/`cpu`
 before fetching it, so a Linux/macOS install never requests it (verified: clean
 install and clean `npm ls`), and a Windows install succeeds silently before the

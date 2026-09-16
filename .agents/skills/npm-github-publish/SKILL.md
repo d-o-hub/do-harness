@@ -158,11 +158,15 @@ migration; npm has no rename operation, so a name that is rejected or already
 taken forces another migration.
 
 For `d-o-hub/do-harness`, the decision is **Windows via GitHub release only**:
-four Linux/macOS platform packages are live at `0.1.1`,
-`do-harness-win32-x64@0.1.1` is refused by npm's name screening, and
-`do-harness@0.1.1` **is published** (bootstrapped 2026-09-16) so `npx
-do-harness` resolves on Linux/macOS. Windows installs from the release zip (or
-the installer, or a cargo channel); the shim exits 1 there with that guidance.
+four Linux/macOS platform packages are live at `0.1.1` and
+`do-harness-win32-x64@0.1.1` is refused by npm's name screening. The meta
+package `do-harness` is **not yet published** — it needs a one-time
+authenticated bootstrap before a Trusted Publisher can be configured for it, so
+CI's OIDC publish fails with `404 Not Found - PUT` until that bootstrap happens
+(verified: an OIDC run against the unpublished name returns 404, not an auth
+error). Once bootstrapped, `npx do-harness` resolves on Linux/macOS. Windows
+installs from the release zip (or the installer, or a cargo channel); the shim
+exits 1 there with that guidance.
 
 Encode the decision where the publish loop can see it, rather than letting the
 403 abort the run. `scripts/publish-npm.sh` keeps an `UNAVAILABLE_PKGS` list:
