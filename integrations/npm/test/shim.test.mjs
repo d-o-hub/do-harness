@@ -88,14 +88,16 @@ test("shim execs the platform binary with args and propagates the exit code", (t
 });
 
 test("shim fails with guidance when the platform package is missing", (t) => {
-  if (!platform.platformPackage(process.platform, process.arch)) {
-    t.skip(`unsupported host ${process.platform}/${process.arch}`);
-    return;
-  }
+  // Force a package that IS published but absent from the staged tree, so the
+  // assertion is host-independent and exercises the "optional dependencies
+  // disabled" path rather than the unavailable-platform path (which correctly
+  // answers differently -- see the next test).
+  const probe = "do-harness-linux-x64";
   const { shim } = stage({ withPlatform: false });
 
   const result = spawnSync(process.execPath, [shim, "version"], {
     encoding: "utf8",
+    env: { ...process.env, DO_HARNESS_TEST_PLATFORM_PACKAGE: probe },
   });
 
   assert.equal(result.status, 1);

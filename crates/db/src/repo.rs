@@ -174,7 +174,7 @@ pub async fn seed_invariants(
     prune: bool,
 ) -> Result<usize> {
     let now = unix_now();
-    let tx = conn.transaction().await?;
+    let tx = crate::tx::begin_immediate(conn).await?;
     for header in headers {
         tx.execute(
             "INSERT INTO invariants (invariant, rationale, sensor, category, created_at, updated_at) \

@@ -159,7 +159,7 @@ pub async fn bump_error_signature(
     task_id: Option<i64>,
     message: Option<&str>,
 ) -> Result<i64> {
-    let tx = conn.transaction().await?;
+    let tx = crate::tx::begin_immediate(conn).await?;
     let count = bump_error_signature_on(&tx, signature, task_id, message).await?;
     tx.commit().await?;
     Ok(count)
@@ -220,7 +220,7 @@ pub async fn record_sensor_outcome(
     message: Option<&str>,
 ) -> Result<i64> {
     let signature = format!("sensor:{}", beat.sensor_name.unwrap_or("unknown"));
-    let tx = conn.transaction().await?;
+    let tx = crate::tx::begin_immediate(conn).await?;
     insert_beat(&tx, beat).await?;
     let count = if ok {
         reset_error_signature(&tx, &signature, beat.task_id).await?;
@@ -264,7 +264,7 @@ pub async fn record_verify_batch(conn: &Connection, outcomes: &[SensorOutcome<'_
 
 /// Transaction body for [`record_verify_batch`], retried as a unit on busy.
 async fn record_verify_batch_once(conn: &Connection, outcomes: &[SensorOutcome<'_>]) -> Result<()> {
-    let tx = conn.transaction().await?;
+    let tx = crate::tx::begin_immediate(conn).await?;
     for outcome in outcomes {
         insert_beat(&tx, &outcome.beat).await?;
         let signature = format!("sensor:{}", outcome.beat.sensor_name.unwrap_or("unknown"));

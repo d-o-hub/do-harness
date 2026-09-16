@@ -286,7 +286,7 @@ async fn applied_versions(conn: &Connection) -> Result<Vec<i64>> {
 
 /// Applies a single migration within a transaction.
 async fn apply_migration(conn: &Connection, migration: &Migration) -> Result<()> {
-    let tx = conn.transaction().await?;
+    let tx = crate::tx::begin_immediate(conn).await?;
     tx.execute_batch(migration.sql).await?;
     if migration.version == 10 {
         // `&Transaction` derefs to `&Connection`, so the backfill shares the

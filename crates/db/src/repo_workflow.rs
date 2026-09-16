@@ -70,7 +70,7 @@ async fn insert_task_with_event_once(
     conn: &Connection,
     task: &NewTask<'_>,
 ) -> Result<(i64, WorkflowEvent)> {
-    let tx = conn.transaction().await?;
+    let tx = crate::tx::begin_immediate(conn).await?;
     let id = insert_task(&tx, task).await?;
     let event = WorkflowEvent::TaskAdded(TaskAdded {
         id,
@@ -111,7 +111,7 @@ async fn advance_subtask_with_event_once(
     id: i64,
     required_sensor: Option<&str>,
 ) -> Result<(i64, WorkflowEvent)> {
-    let tx = conn.transaction().await?;
+    let tx = crate::tx::begin_immediate(conn).await?;
     if let Some(sensor) = required_sensor {
         ensure_sensor_ok_on(&tx, id, sensor).await?;
     }
@@ -163,7 +163,7 @@ async fn update_task_status_with_event_once(
             return Err(DbError::InvalidTerminalState(other.as_str().to_owned()));
         }
     };
-    let tx = conn.transaction().await?;
+    let tx = crate::tx::begin_immediate(conn).await?;
     if crate::repo::get_task(&tx, id).await?.is_none() {
         return Err(DbError::NotFound(format!("task {id} not found")));
     }

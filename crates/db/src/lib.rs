@@ -32,12 +32,14 @@ pub mod repo_skill_eval;
 pub mod repo_trace;
 pub mod repo_workflow;
 pub mod root;
+pub mod tx;
 
 pub use error::{DbError, Result, retry_on_busy};
 
 /// Re-exported so downstream crates can name connection types without
 /// depending on `libsql` directly.
 pub use libsql::Connection;
+
 pub use migrate::{
     MigrationSkew, connect, connect_and_migrate, count_migrations, inspect_migrations, migrate,
     unix_now,
