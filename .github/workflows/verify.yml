@@ -247,7 +247,17 @@ jobs:
         # Bounded so a hung test fails in minutes rather than consuming the
         # job's full 30-minute budget with no output.
         timeout-minutes: 12
-        run: cargo test --workspace --release
+        run: cargo test --workspace --release --exclude do-harness-db
+      - name: Test do-harness-db on Windows
+        # The db tests each open their own temporary libSQL database. On
+        # Windows that binary crashed once with STATUS_ACCESS_VIOLATION
+        # (0xc0000005) after every test had reported `ok`, and the same code
+        # passed on the next commit, so it is intermittent rather than a
+        # deterministic failure. Serializing this crate is a cheap mitigation
+        # (the suite runs in seconds) that keeps the signal without masking a
+        # reproducible failure: any real test failure still fails the step.
+        timeout-minutes: 8
+        run: cargo test -p do-harness-db --release -- --test-threads=1
       - name: Build harness CLI
         run: cargo build --release -p do-harness
       - name: Dogfood init + verify with the release binary
