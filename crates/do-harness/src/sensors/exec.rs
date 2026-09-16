@@ -8,7 +8,7 @@
 
 use std::io::Read;
 use std::path::Path;
-use std::process::{Child, Command, Stdio};
+use std::process::{Child, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -98,6 +98,13 @@ fn apply_ratchet(
 
 /// Spawns the sensor command with piped stdio, reporting a spawn failure as
 /// a failed [`SensorResult`] instead of an error.
+///
+/// `bash`/`sh` programs are resolved through [`crate::shell`] because a bare
+/// `bash` on Windows resolves to the WSL launcher in `System32` rather than Git
+/// Bash: with no distribution installed it exits non-zero with an empty
+/// diagnostic, so a stock rust-pack sensor (`["bash", "scripts/..."]`) would
+/// fail confusingly on every Windows machine. Other programs are spawned as
+/// declared.
 fn spawn_sensor(
     spec: &SensorSpec,
     root: &Path,
@@ -105,8 +112,7 @@ fn spawn_sensor(
     rest: &[String],
     start: Instant,
 ) -> Result<Child, SensorResult> {
-    Command::new(program)
-        .args(rest)
+    crate::shell::command(program, rest)
         .current_dir(root)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -152,8 +158,7 @@ fn kill_and_report(
     start: Instant,
     message: String,
 ) -> SensorResult {
-    let _ = child.kill();
-    let _ = child.wait();
+    crate::shell::kill_tree(child);
     sensor_result(spec, false, None, elapsed_ms(start), message)
 }
 

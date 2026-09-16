@@ -1,0 +1,8 @@
+# Python dependencies for the skill tooling in `.agents/skills/skill-creator/`.
+#
+# `quick_validate.py` parses SKILL.md YAML frontmatter, so the structure gate
+# needs PyYAML. This was previously undeclared: GitHub's ubuntu image happens to
+# ship it while windows-latest does not, so the gate failed closed with
+# `ModuleNotFoundError: No module named 'yaml'` on Windows only. Installing from
+# this file on every runner removes that host assumption.
+PyYAML>=6,<7

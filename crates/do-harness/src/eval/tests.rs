@@ -6,7 +6,7 @@ use std::fs;
 use super::gate::{GateVerdict, run_structure_gate};
 use super::grading::{EvalCase, SkillEvals, grade_skill};
 use super::orchestrator::discover_skills;
-use crate::eval_sandbox::referenced_paths;
+use crate::eval_sandbox::{is_cache_entry, referenced_paths};
 use crate::eval_walk::WalkRun;
 
 /// `discover_skills` returns only directories with a `SKILL.md`, sorted.
@@ -114,6 +114,47 @@ fn referenced_paths_is_empty_for_a_self_contained_skill() {
     fs::create_dir_all(dir.path().join("evals")).unwrap();
     fs::write(dir.path().join("SKILL.md"), "No repo paths named here.\n").unwrap();
     assert!(referenced_paths(dir.path()).is_empty());
+}
+
+/// Regenerable bytecode caches must not be mirrored into a sandbox: they are
+/// interpreter-specific, cannot exist in a committed tree, and would otherwise
+/// be copied into every sandbox (one per case in agent mode).
+#[test]
+fn sandbox_copy_skips_bytecode_caches() {
+    let real = tempfile::tempdir().unwrap();
+    let skill = real.path().join(".agents/skills/demo");
+    fs::create_dir_all(skill.join("scripts/__pycache__")).unwrap();
+    fs::write(skill.join("SKILL.md"), "---\nname: demo\n---\n").unwrap();
+    fs::write(skill.join("scripts/run.py"), "print('ok')\n").unwrap();
+    fs::write(
+        skill.join("scripts/__pycache__/run.cpython-313.pyc"),
+        "bytecode",
+    )
+    .unwrap();
+
+    let sandbox = crate::eval_sandbox::Sandbox::for_skill(real.path(), &skill, "demo").unwrap();
+    let copied = sandbox.root().join(".agents/skills/demo/scripts");
+    assert!(
+        copied.join("run.py").is_file(),
+        "real sources must still be mirrored"
+    );
+    assert!(
+        !copied.join("__pycache__").exists(),
+        "bytecode cache must not be mirrored"
+    );
+}
+
+/// The cache predicate matches directories and single files, and leaves
+/// ordinary sources alone.
+#[test]
+fn cache_predicate_matches_only_generated_bytecode() {
+    use std::ffi::OsStr;
+    for name in ["__pycache__", "mod.pyc", "mod.pyo"] {
+        assert!(is_cache_entry(OsStr::new(name)), "{name}");
+    }
+    for name in ["run.py", "scripts", "quick_validate.py"] {
+        assert!(!is_cache_entry(OsStr::new(name)), "{name}");
+    }
 }
 
 /// Documentation assertions (no reserved prefix) are never graded.

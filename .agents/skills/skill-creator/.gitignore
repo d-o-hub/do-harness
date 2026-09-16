@@ -1,0 +1,9 @@
+# Python bytecode from running the skill's scripts.
+#
+# `quick_validate.py` and `init_skill.py` are executed by the skill's own
+# walkthrough and by `do-harness eval`, so CPython writes a `__pycache__`
+# directory here next to the sources. Those artifacts are interpreter- and
+# version-specific (e.g. `quick_validate.cpython-313.pyc`), must never be
+# committed, and are regenerated on demand — so the whole cache is ignored.
+__pycache__/
+*.py[cod]

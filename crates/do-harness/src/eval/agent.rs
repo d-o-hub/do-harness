@@ -14,7 +14,7 @@
 
 use std::io::{Read, Write};
 use std::path::Path;
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -92,7 +92,7 @@ fn run_agent(spec: &AgentSpec, prompt: &str, root: &Path) -> WalkRun {
             };
         }
     };
-    let mut child = match Command::new("bash")
+    let mut child = match crate::shell::bash()
         .arg("-c")
         .arg(&spec.command)
         .current_dir(root)
@@ -154,8 +154,7 @@ fn run_agent(spec: &AgentSpec, prompt: &str, root: &Path) -> WalkRun {
             }
             Ok(None) => {
                 if started.elapsed() >= spec.timeout {
-                    let _ = child.kill();
-                    let _ = child.wait();
+                    crate::shell::kill_tree(&mut child);
                     break (
                         false,
                         Some(format!("agent timed out after {}s", spec.timeout.as_secs())),

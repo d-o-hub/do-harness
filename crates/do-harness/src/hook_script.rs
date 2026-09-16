@@ -17,13 +17,22 @@ ROOT="$(git rev-parse --show-toplevel)"
 "#;
 
 /// Bash block that resolves the `do-harness` binary into `$BIN`, given that
-/// `$ROOT` is already set by the [`PROLOGUE`]. Resolution priority: the binary
-/// in `$ROOT/target/release/do-harness`.
+/// `$ROOT` is already set by the [`PROLOGUE`].
 ///
 /// The binary is resolved at hook runtime, in priority order:
 /// `$DO_HARNESS_BIN` when set and executable, then `do-harness` on `PATH`,
 /// then `<repo root>/target/release/do-harness` (also trying the `.exe`
 /// suffix so hooks work under Git Bash on Windows).
+///
+/// Two guards keep a *stale* binary from silently running old policy, which is
+/// what a globally `cargo install`ed CLI becomes in a dev checkout:
+///
+/// * If the repo build exists and is newer than the resolved binary, the repo
+///   build wins. `$DO_HARNESS_BIN` is an explicit operator choice, so it is
+///   never overridden.
+/// * Otherwise a binary older than the workspace sources warns on stderr —
+///   emitted after the resolution block so every branch is covered, not just
+///   the repo fallback.
 const RESOLVE_BIN: &str = r#"if [[ -n "${DO_HARNESS_BIN:-}" && -x "$DO_HARNESS_BIN" ]]; then
   BIN="$DO_HARNESS_BIN"
 elif command -v do-harness >/dev/null 2>&1; then
@@ -37,9 +46,14 @@ else
     echo "do-harness: binary not found. Set DO_HARNESS_BIN, add do-harness to PATH, or build with: cargo build --release -p do-harness" >&2
     exit 2
   fi
-  if [[ -n "$(find "$ROOT/crates" -name '*.rs' -newer "$BIN" -print -quit 2>/dev/null)" ]]; then
-    echo "do-harness: warning: $BIN is older than workspace sources; rebuild with: cargo build --release -p do-harness" >&2
-  fi
+fi
+REPO_BIN="$ROOT/target/release/do-harness"
+[[ -x "$REPO_BIN" ]] || { [[ -x "$REPO_BIN.exe" ]] && REPO_BIN="$REPO_BIN.exe"; }
+if [[ -z "${DO_HARNESS_BIN:-}" && -x "$REPO_BIN" && "$REPO_BIN" -nt "$BIN" ]]; then
+  BIN="$REPO_BIN"
+fi
+if [[ -n "$(find "$ROOT/crates" -name '*.rs' -newer "$BIN" -print -quit 2>/dev/null)" ]]; then
+  echo "do-harness: warning: $BIN is older than workspace sources; rebuild with: cargo build --release -p do-harness (or set DO_HARNESS_BIN)" >&2
 fi
 "#;
 
@@ -209,7 +223,7 @@ mod tests {
     fn lint_message(content: &str) -> bool {
         let msg = tempfile::NamedTempFile::new().unwrap();
         std::fs::write(msg.path(), content).unwrap();
-        let status = std::process::Command::new("bash")
+        let status = crate::shell::bash()
             .arg(commitlint_script())
             .args(["--message"])
             .arg(msg.path())
@@ -263,9 +277,15 @@ mod tests {
     #[test]
     fn resolve_falls_back_to_path() {
         let (temp, root) = fake_repo();
-        let bin = temp.path().join("bin/do-harness");
+        let bin = temp.path().join("bin").join("do-harness");
         write_exec(&bin);
-        let path = OsString::from(format!("{}:/usr/bin", temp.path().join("bin").display()));
+        // PATH entries are separated by ';' on Windows and ':' elsewhere, and
+        // the trailing POSIX-only entry must not be assumed elsewhere.
+        let path = std::env::join_paths([
+            temp.path().join("bin"),
+            std::path::PathBuf::from("/usr/bin"),
+        ])
+        .unwrap();
         let source = resolve_binary_with(&root, None, Some(path));
         assert_eq!(source, BinSource::Path(bin));
     }
@@ -331,6 +351,64 @@ mod tests {
         assert!(body.contains(r#"BIN="$BIN.exe""#));
     }
 
+    /// The staleness warning must sit outside the resolution branches, so a
+    /// stale binary found on `PATH` warns too. Previously the check lived only
+    /// in the repo-fallback branch, so a `cargo install`ed binary older than
+    /// the sources ran silently and the repo build was ignored.
+    #[test]
+    fn script_body_warns_about_a_stale_binary_from_any_source() {
+        let body = script_body("");
+        let warn = body
+            .find("older than workspace sources")
+            .expect("staleness warning missing");
+        let path_branch = body
+            .find("command -v do-harness")
+            .expect("PATH branch missing");
+        let exe_fallback = body
+            .find(r#"BIN="$BIN.exe""#)
+            .expect("exe fallback missing");
+        // It is emitted after the resolution block, not nested inside one arm.
+        assert!(
+            warn > path_branch && warn > exe_fallback,
+            "staleness check must follow the whole resolution block"
+        );
+        // The closing `fi` of the resolution block precedes the warning, so the
+        // warning is not inside any branch.
+        let resolution_end = body[..warn].rfind("\nfi\n").expect("resolution `fi`");
+        assert!(
+            resolution_end < warn,
+            "warning must be outside the resolution if/elif/else"
+        );
+    }
+
+    /// A repo build newer than the resolved binary must win, so a globally
+    /// installed stale CLI cannot run old policy in a dev checkout.
+    /// `DO_HARNESS_BIN` is an explicit choice and is never overridden.
+    #[test]
+    fn script_body_prefers_a_fresher_repo_build() {
+        let body = script_body("");
+        let prefer = body
+            .find(r#""$REPO_BIN" -nt "$BIN""#)
+            .expect("fresher-repo-build guard missing");
+        // Examine the whole `if` statement, which begins before the tested
+        // fragment; the DO_HARNESS_BIN condition is part of the same statement.
+        let start = body[..prefer].rfind("\nif [[").map_or(0, |n| n + 1);
+        let end = body[prefer..]
+            .find("\nfi")
+            .map_or(body.len(), |n| prefer + n);
+        let guard = &body[start..end];
+        assert!(
+            guard.contains("DO_HARNESS_BIN"),
+            "explicit pin must not be overridden: {guard}"
+        );
+        // And it must sit after the resolution block, before the warning.
+        let warn = body.find("older than workspace sources").unwrap();
+        assert!(
+            prefer < warn,
+            "preference applies before the staleness warning"
+        );
+    }
+
     #[test]
     fn commit_msg_body_contains_resolution_and_message_arg() {
         let body = commit_msg_body();
@@ -361,7 +439,7 @@ mod tests {
         std::fs::write(&hook, commit_msg_body()).unwrap();
         let msg = dir.join("COMMIT_EDITMSG");
         std::fs::write(&msg, "fix: typo\n").unwrap();
-        let mut command = std::process::Command::new("bash");
+        let mut command = crate::shell::bash();
         command.arg(&hook).arg(&msg).current_dir(dir);
         for key in [
             "GIT_DIR",

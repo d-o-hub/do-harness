@@ -69,15 +69,11 @@ impl AuditRecord {
     }
 }
 
-/// Reads the tail record's next `(seq, prev_hash)` from the log, or genesis.
+/// Returns the last record's `(next_seq, chain_hash)`, or genesis, from
+/// already-read bytes.
 ///
-/// Called while holding the file lock so the sequence reflects every writer's
-/// committed appends, not this handle's stale in-memory state.
-fn tail_of(path: &Path) -> Result<(u64, String)> {
-    let content = std::fs::read_to_string(path).map_err(|io| GuardianError::AuditIo {
-        path: path.display().to_string(),
-        io,
-    })?;
+/// Shared by both read paths so the chain rule has one implementation.
+fn parse_tail(content: &str) -> Result<(u64, String)> {
     match content.lines().rev().find(|line| !line.trim().is_empty()) {
         Some(line) => {
             let record: AuditRecord = serde_json::from_str(line)?;
@@ -85,6 +81,24 @@ fn tail_of(path: &Path) -> Result<(u64, String)> {
         }
         None => Ok((1, "GENESIS".to_string())),
     }
+}
+
+/// Reads the file through an already-open handle.
+///
+/// The handle must be opened for reading (and writing, to append). Seeking to
+/// the start and reading to EOF avoids re-opening the path, which Windows
+/// refuses while a write handle is held.
+fn tail_from_handle(file: &mut std::fs::File, path: &Path) -> Result<(u64, String)> {
+    use std::io::{Read as _, Seek as _, SeekFrom};
+
+    let io_err = |io: std::io::Error| GuardianError::AuditIo {
+        path: path.display().to_string(),
+        io,
+    };
+    let mut content = String::new();
+    file.seek(SeekFrom::Start(0)).map_err(io_err)?;
+    file.read_to_string(&mut content).map_err(io_err)?;
+    parse_tail(&content)
 }
 
 /// Append-only audit log writer.
@@ -171,6 +185,7 @@ impl AuditLog {
 
         let mut file = std::fs::OpenOptions::new()
             .create(true)
+            .read(true)
             .append(true)
             .open(&self.path)
             .map_err(|io| GuardianError::AuditIo {
@@ -182,7 +197,9 @@ impl AuditLog {
             io,
         })?;
 
-        let (seq, prev_hash) = match tail_of(&self.path) {
+        // Read the tail through the handle already held: re-opening the path
+        // while this write handle exists fails on Windows.
+        let (seq, prev_hash) = match tail_from_handle(&mut file, &self.path) {
             Ok(tail) => tail,
             Err(err) => {
                 let _ = fs2::FileExt::unlock(&file);

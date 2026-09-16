@@ -1,6 +1,11 @@
 name: verify
 on:
   push:
+    # A feature-branch push also fires `pull_request`, which would run this
+    # workflow twice for the same commit (and the two runs then contend for the
+    # same runners). Restrict the push trigger to `main` so every commit is
+    # verified exactly once: by `push` on main, by `pull_request` on branches.
+    branches: [main]
   pull_request:
 
 permissions:
@@ -116,6 +121,10 @@ jobs:
           # The generic pack is empty by design: assert the artifact says so
           # instead of letting a vacuous pass masquerade as a real rust gate.
           test "$(jq -r '.sensor_pack' "$tmp/.do-harness/evidence.json")" = "generic"
+      - name: Install skill tooling dependencies
+        # quick_validate.py parses YAML frontmatter and needs PyYAML; declare
+        # and install it rather than relying on the runner image shipping it.
+        run: python3 -m pip install --disable-pip-version-check -r .agents/skills/skill-creator/scripts/requirements.txt
       - name: Dogfood skill eval runner (shebang execution, graded residue)
         run: ./target/release/do-harness eval --strict-fixtures
       - name: Assert evidence integrity
@@ -217,11 +226,38 @@ jobs:
       - uses: taiki-e/install-action@ba47c86ac325773530516bb756137ac718732518
         with:
           tool: cargo-deny,cargo-audit
-      # Full `cargo test --workspace` runs on ubuntu (verify job). The unit
-      # suite is not yet Windows-green (eval walkthrough shebangs, hook exit
-      # codes, path resolution — see #70), so the windows job proves the
-      # distribution path only: build + Git Bash dogfood + installer +
-      # hooks/doctor + npm wrapper.
+      # The full `cargo test --workspace` also runs on ubuntu (verify job);
+      # running it here too is what makes Windows a supported platform rather
+      # than a build-only target. POSIX-only tests are `#[cfg(unix)]`-gated
+      # (eval walkthrough shebangs, hook exit codes, file-mode helpers) and the
+      # runners provide Git Bash, so `sh`/`bash` sensors work as written.
+      - name: Install skill tooling dependencies
+        # quick_validate.py (the skill structure gate) parses YAML frontmatter
+        # and needs PyYAML. Ubuntu images ship it; windows-latest does not, so
+        # install it explicitly instead of relying on the host image.
+        run: python -m pip install --disable-pip-version-check -r .agents/skills/skill-creator/scripts/requirements.txt
+      - name: Install pnpm for the node init tests
+        # `init::tests::init_node_pnpm_turbo_workspace_first_run_is_green`
+        # declares a pnpm workspace, so its baseline can only go Green when
+        # pnpm is the resolved package manager. windows-latest ships npm/yarn
+        # but not pnpm, so provide it rather than letting the fixture run under
+        # a package manager it does not describe.
+        run: npm install --global pnpm@10
+      - name: Test workspace on Windows
+        # Bounded so a hung test fails in minutes rather than consuming the
+        # job's full 30-minute budget with no output.
+        timeout-minutes: 12
+        run: cargo test --workspace --release --exclude do-harness-db
+      - name: Test do-harness-db on Windows
+        # The db tests each open their own temporary libSQL database. On
+        # Windows that binary crashed once with STATUS_ACCESS_VIOLATION
+        # (0xc0000005) after every test had reported `ok`, and the same code
+        # passed on the next commit, so it is intermittent rather than a
+        # deterministic failure. Serializing this crate is a cheap mitigation
+        # (the suite runs in seconds) that keeps the signal without masking a
+        # reproducible failure: any real test failure still fails the step.
+        timeout-minutes: 8
+        run: cargo test -p do-harness-db --release -- --test-threads=1
       - name: Build harness CLI
         run: cargo build --release -p do-harness
       - name: Dogfood init + verify with the release binary
@@ -243,6 +279,11 @@ jobs:
         run: |
           scratch="$(mktemp -d)"
           git init -q "$scratch"
+          # Seed one commit: the scaffolded commitlint sensor inspects the last
+          # commit and fails in a repository with no commits, which makes init's
+          # initial verification legitimately RED (exit 1).
+          git -C "$scratch" -c user.email=ci@example.com -c user.name=ci \
+            commit -q --allow-empty -m "chore: seed"
           ./target/release/do-harness.exe --root "$scratch" init
           bin="$PWD/target/release/do-harness.exe"
           cd "$scratch"

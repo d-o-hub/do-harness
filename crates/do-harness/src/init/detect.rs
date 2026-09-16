@@ -8,7 +8,6 @@
 //! fail open locally and are enforced in CI.
 
 use std::path::Path;
-use std::process::Command;
 
 use serde::Serialize;
 
@@ -244,8 +243,10 @@ fn optional_detail(present: bool, tool: &str) -> &'static str {
 
 /// Runs a `<program> --version`-style probe; never uses a shell.
 fn probe(program: &str, args: &[&str]) -> bool {
-    Command::new(program)
-        .args(args)
+    // Goes through `shell::command` so Windows `.cmd` shims (npm/npx/pnpm) and
+    // Git Bash are resolved the same way the generated sensors will be.
+    let args: Vec<String> = args.iter().map(|arg| (*arg).to_owned()).collect();
+    crate::shell::command(program, &args)
         .output()
         .is_ok_and(|output| output.status.success())
 }

@@ -7,6 +7,7 @@ body size (progressive disclosure), risky-pattern matches, and shell syntax
 (bash -n always; shellcheck -S error when installed, SKIP otherwise).
 """
 
+import os
 import re
 import shutil
 import subprocess
@@ -52,6 +53,30 @@ def scan_risky_patterns(skill_path):
     return None
 
 
+def find_bash():
+    """Locate a usable bash.
+
+    A bare `bash` on Windows can resolve to the WSL launcher in System32, which
+    is not Git Bash: `bash -n` then reports a bogus syntax error and every
+    walkthrough looks broken. Prefer the well-known Git Bash locations before
+    falling back to PATH, mirroring `crates/do-harness/src/shell.rs`.
+    """
+    if os.name == "nt":
+        roots = []
+        for var in ("ProgramFiles", "ProgramW6432", "ProgramFiles(x86)"):
+            base = os.environ.get(var)
+            if base:
+                roots.append(Path(base) / "Git")
+        local = os.environ.get("LOCALAPPDATA")
+        if local:
+            roots.append(Path(local) / "Programs" / "Git")
+        for root in roots:
+            for candidate in (root / "bin" / "bash.exe", root / "usr" / "bin" / "bash.exe"):
+                if candidate.is_file():
+                    return str(candidate)
+    return "bash"
+
+
 def lint_shell(skill_path):
     """bash -n every shell script; shellcheck -S error when installed.
 
@@ -63,9 +88,10 @@ def lint_shell(skill_path):
         d = skill_path / sub
         if d.is_dir():
             scripts.extend(p for p in d.rglob("*.sh") if p.is_file())
+    bash = find_bash()
     for script in scripts:
         proc = subprocess.run(
-            ["bash", "-n", str(script)], capture_output=True, text=True
+            [bash, "-n", str(script)], capture_output=True, text=True
         )
         if proc.returncode != 0:
             rel = script.relative_to(skill_path)
