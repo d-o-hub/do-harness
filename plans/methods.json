@@ -25,6 +25,17 @@
       "preconditions": [
         { "description": "A third-party API, crate integration, or performance boundary is uncertain and needs de-risking." }
       ]
+    },
+    {
+      "name": "decision",
+      "subtasks": [
+        { "name": "verify-decision-gate", "sensor": "check-promotions", "spike_candidate": false },
+        { "name": "record-decision-evidence", "sensor": null, "spike_candidate": false },
+        { "name": "confirm-default-boundary", "sensor": "check-agt", "spike_candidate": false }
+      ],
+      "preconditions": [
+        { "description": "A promotion-style decision (hold or promote) is recorded in an epic and mirrored in plans/invariants.json." }
+      ]
     }
   ]
 }

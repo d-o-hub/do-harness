@@ -214,5 +214,11 @@
     "rationale": "A changed route x viewport x locale matrix that keeps a green badge is a lie; policy fingerprinting catches definition changes while additive schemas keep old evidence readable",
     "sensor": "do-harness status --set verification",
     "category": "verification"
+  },
+  {
+    "invariant": "A recorded *-promotion decision must match the shipped feature defaults: a hold requires the feature off by default, a promote requires it on",
+    "rationale": "The AGT hold and the mcp-surface hold both live in epic prose while the truth is Cargo's default feature array, so the two can drift silently across a long-lived epic and nobody notices until a build behaves unlike the roadmap. The GA watch cannot be the gate: check-agt-ga.sh prints VERDICT=GA/NOT_GA/UNKNOWN and exits 0 on every verdict, so wrapping it would always pass, and calling it over the network would turn a fetch error into a verify failure; the dated live verdict stays recorded epic evidence, and this check is hermetic over in-repo artifacts",
+    "sensor": "bash scripts/check-promotion-decisions.sh",
+    "category": "governance"
   }
 ]

@@ -6,8 +6,8 @@ pre-push = []
 
 [signal-sets]
 feedback = ["fmt", "check", "clippy"]
-verification = ["fmt", "check", "clippy", "test", "loc", "skills", "deps", "shell", "check-agt", "check-mcp", "audit", "commitlint"]
-release = ["fmt", "check", "clippy", "test", "loc", "skills", "deps", "shell", "check-agt", "check-mcp", "audit", "commitlint"]
+verification = ["fmt", "check", "clippy", "test", "loc", "skills", "deps", "shell", "check-agt", "check-mcp", "check-promotions", "audit", "commitlint"]
+release = ["fmt", "check", "clippy", "test", "loc", "skills", "deps", "shell", "check-agt", "check-mcp", "check-promotions", "audit", "commitlint"]
 
 [[sensors]]
 name = "fmt"
@@ -58,6 +58,16 @@ when-changed = ["crates/guardian-proxy/**", "Cargo.toml", "Cargo.lock"]
 name = "check-mcp"
 argv = ["cargo", "test", "-p", "guardian-proxy", "--features", "mcp-surface"]
 when-changed = ["crates/guardian-proxy/**", "Cargo.toml", "Cargo.lock"]
+
+[[sensors]]
+# Hermetic coherence gate for the *-promotion decisions: a recorded hold must
+# match an off-by-default feature, and a recorded promote must match a
+# default-enabled one. It exists because a promotion decision can silently drift
+# from the shipped defaults across a long-lived epic, and because the GA watch
+# itself cannot be a sensor (it exits 0 on every verdict and needs the network).
+name = "check-promotions"
+argv = ["bash", "scripts/check-promotion-decisions.sh"]
+when-changed = ["plans/*-epic.md", "plans/invariants.json", "crates/guardian-proxy/Cargo.toml", "scripts/check-promotion-decisions.sh"]
 
 [[sensors]]
 name = "audit"
