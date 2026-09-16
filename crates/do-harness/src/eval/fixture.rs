@@ -39,7 +39,7 @@ pub(super) enum EvalKind {
 /// and no out-of-scope case can score 1.00 while measuring nothing. These
 /// diagnostics name the gaps; `eval --strict-fixtures` turns them into gate
 /// failures so the corpus cannot silently regress.
-pub(super) fn fixture_diagnostics(evals: &SkillEvals) -> Vec<String> {
+pub(super) fn fixture_diagnostics(evals: &SkillEvals, mode: AgentMode) -> Vec<String> {
     let mut out = Vec::new();
     if evals.evals.is_empty() {
         out.push("no eval cases".to_owned());
@@ -96,7 +96,59 @@ pub(super) fn fixture_diagnostics(evals: &SkillEvals) -> Vec<String> {
                 .to_owned(),
         );
     }
+    // Behavior-insensitivity, agent mode only. With `--agent-cmd` an external
+    // agent is the executor, so assertions satisfied by (a) a zero exit, (b)
+    // guidance mirrored into the sandbox, or (c) paths nothing creates would
+    // score the same for a do-nothing agent as for a real one -- the fixture
+    // would measure file presence, not behavior. In deterministic mode the
+    // walkthrough is the executor and always runs, so its residue is a genuine
+    // behavior signal and this check does not apply.
+    if mode == AgentMode::Agent
+        && !evals
+            .evals
+            .iter()
+            .any(|case| reads_executor_output(case, mode))
+    {
+        out.push(
+            "no assertion reads executor output (agent_stdout.txt) or artifact the agent \
+             must create: with --agent-cmd a do-nothing agent would score the same as a \
+             real one, so any lift from this fixture measures file presence, not behavior"
+                .to_owned(),
+        );
+    }
     out
+}
+
+/// Whether a case asserts on something only a real executor produces.
+///
+/// Mode matters. In deterministic mode the walkthrough is the executor, so
+/// `walk:` and assertions on walkthrough residue are genuine behavior signals.
+/// In agent mode the walkthrough never runs, so those same assertions are
+/// *dead* (they always fail) and only `cli:`, `db:`, `agent_stdout.txt`, and a
+/// `not-contains:` on a file the agent itself must create can discriminate a
+/// real agent from a do-nothing one.
+fn reads_executor_output(case: &super::grading::EvalCase, mode: AgentMode) -> bool {
+    case.assertions.iter().any(|spec| {
+        if spec.starts_with("cli:") || spec.starts_with("db:") {
+            return true;
+        }
+        if spec.contains("agent_stdout.txt") {
+            return true;
+        }
+        if spec.starts_with("not-contains:") {
+            return mode == AgentMode::Deterministic;
+        }
+        false
+    })
+}
+
+/// Which executor the fixture is being judged for.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum AgentMode {
+    /// The hermetic walkthrough runs and produces residue.
+    Deterministic,
+    /// No walkthrough: an external agent command runs per case.
+    Agent,
 }
 
 /// Whether a graded assertion expresses a negative expectation.

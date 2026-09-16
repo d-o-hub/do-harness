@@ -12,7 +12,7 @@ use crate::report::Format;
 
 use super::agent::{AgentSpec, check_skill_agent};
 use super::bless::bless_skill;
-use super::fixture::fixture_diagnostics;
+use super::fixture::{AgentMode, fixture_diagnostics};
 use super::grading::{
     GateOutcome, check_skill, check_skill_without, gate_and_parse, load_evals, report_from_outcome,
     skill_words,
@@ -154,7 +154,7 @@ pub async fn run_eval(root: &Path, opts: EvalOpts<'_>) -> Result<()> {
                         &structure,
                         outcome,
                         skill_words(&entry),
-                        fixture_diagnostics(&evals),
+                        fixture_diagnostics(&evals, AgentMode::Agent),
                     )
                 }
                 GateOutcome::Failed(report)

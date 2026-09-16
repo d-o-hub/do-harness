@@ -114,6 +114,18 @@
     "category": "skills"
   },
   {
+    "invariant": "Agent-lift measurement (eval --agent-cmd) and strike scaffolding (distill --from-strikes) stay opt-in: they never run in CI, hooks, or verify; the gated eval step is deterministic eval --strict-fixtures",
+    "rationale": "Agent lift spawns a real agent per case (minutes per skill) and strike scaffolding writes new files, so neither belongs in a routine gate; CI and pre-push stay bounded by deterministic walkthroughs under 3s per skill while the expensive evidence remains available on demand",
+    "sensor": ".github/workflows/verify.yml (eval --strict-fixtures only)",
+    "category": "verification"
+  },
+  {
+    "invariant": "A non-zero Skill Lift is only meaningful when the fixture grades executor behavior; assertions that read guidance shipped into the sandbox pass regardless of agent action and must be validated against a null-agent control",
+    "rationale": "A stub agent that only exits 0 and a real coding agent both scored 16/34 on the npm fixture, because walk: passes on exit 0, guidance contains: passes because SKILL.md is mirrored in, and absent: passes because nothing created the file; the delta was exactly the guidance-assertion count over the total, so lift measured file presence rather than agent skill",
+    "sensor": "do-harness eval --agent-cmd 'true' (null-agent control) compared against a real agent command",
+    "category": "skills"
+  },
+  {
     "invariant": "A without-skill baseline that regenerates the guidance it stripped reports lift as contaminated, never as a numeric zero",
     "rationale": "do-harness init inside a walkthrough re-scaffolds SKILL.md, so the baseline graded a copy of the guidance and understated the skill as a false +0.00 (observed on the harness skill); distinguishing contaminated from n/a keeps an executor defect from reading as a measured result",
     "sensor": "do-harness eval (lift=contaminated; lift_contaminated in --format json)",

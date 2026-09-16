@@ -3,7 +3,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use super::eval_tests::{VALID_SKILL_MD, eval_run_strict, fixture_root, single_case_json};
-use super::fixture::fixture_diagnostics;
+use super::fixture::{AgentMode, fixture_diagnostics as fixture_diagnostics_mode};
 use super::grading::SkillEvals;
 
 fn rich_case_json() -> String {
@@ -18,7 +18,8 @@ fn rich_case_json() -> String {
           "dim": "effectiveness",
           "kind": "explicit",
           "assertions": [
-            "contains:.agents/skills/test-skill/SKILL.md|fixture skill"
+            "contains:.agents/skills/test-skill/SKILL.md|fixture skill",
+            "cli:version:contains:do-harness"
           ]
         },
         {
@@ -67,14 +68,14 @@ fn self_answering_case_json() -> String {
 #[test]
 fn fixture_diagnostics_flags_thin_datasets() {
     let thin: SkillEvals = serde_json::from_str(&single_case_json(&["exists:."])).unwrap();
-    let warnings = fixture_diagnostics(&thin);
+    let warnings = fixture_diagnostics_mode(&thin, AgentMode::Deterministic);
     assert!(
         warnings.iter().any(|w| w.contains("no negative")),
         "{warnings:?}"
     );
 
     let ungraded: SkillEvals = serde_json::from_str(&single_case_json(&["a human note"])).unwrap();
-    let warnings = fixture_diagnostics(&ungraded);
+    let warnings = fixture_diagnostics_mode(&ungraded, AgentMode::Deterministic);
     assert!(
         warnings.iter().any(|w| w.contains("no graded assertions")),
         "{warnings:?}"
@@ -82,12 +83,12 @@ fn fixture_diagnostics_flags_thin_datasets() {
 
     let empty: SkillEvals = serde_json::from_str(r#"{"skill_name": "s", "evals": []}"#).unwrap();
     assert_eq!(
-        fixture_diagnostics(&empty),
+        fixture_diagnostics_mode(&empty, AgentMode::Deterministic),
         vec!["no eval cases".to_owned()]
     );
 
     let rich: SkillEvals = serde_json::from_str(&rich_case_json()).unwrap();
-    assert!(fixture_diagnostics(&rich).is_empty());
+    assert!(fixture_diagnostics_mode(&rich, AgentMode::Deterministic).is_empty());
 }
 
 /// A fixture whose assertions never read the skill's own guidance cannot
@@ -98,16 +99,16 @@ fn fixture_diagnostics_flags_thin_datasets() {
 #[test]
 fn fixture_diagnostics_flags_self_answering_fixtures() {
     let residue_only: SkillEvals = serde_json::from_str(&self_answering_case_json()).unwrap();
-    let warnings = fixture_diagnostics(&residue_only);
+    let warnings = fixture_diagnostics_mode(&residue_only, AgentMode::Deterministic);
     assert_eq!(warnings.len(), 1, "{warnings:?}");
     assert!(warnings[0].contains("self-answering"), "{warnings:?}");
     // Losing --strict-fixtures enforcement here is the point: the detector must
     // catch the fixture that grades its own executor's residue.
     let rich: SkillEvals = serde_json::from_str(&rich_case_json()).unwrap();
     assert!(
-        fixture_diagnostics(&rich).is_empty(),
+        fixture_diagnostics_mode(&rich, AgentMode::Deterministic).is_empty(),
         "{:?}",
-        fixture_diagnostics(&rich)
+        fixture_diagnostics_mode(&rich, AgentMode::Deterministic)
     );
 
     let guidance_reading: SkillEvals = serde_json::from_str(
@@ -139,9 +140,9 @@ fn fixture_diagnostics_flags_self_answering_fixtures() {
     )
     .unwrap();
     assert!(
-        fixture_diagnostics(&guidance_reading).is_empty(),
+        fixture_diagnostics_mode(&guidance_reading, AgentMode::Deterministic).is_empty(),
         "{:?}",
-        fixture_diagnostics(&guidance_reading)
+        fixture_diagnostics_mode(&guidance_reading, AgentMode::Deterministic)
     );
 }
 

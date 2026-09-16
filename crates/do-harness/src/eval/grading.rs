@@ -17,7 +17,7 @@ use std::time::Instant;
 use anyhow::{Context, Result};
 use do_harness_types::{EvalDim, EvalMode};
 
-use super::fixture::{EvalKind, fixture_diagnostics};
+use super::fixture::{AgentMode, EvalKind, fixture_diagnostics};
 use super::gate::{GateVerdict, run_structure_gate};
 
 mod grade_outcome;
@@ -220,7 +220,7 @@ pub(super) async fn check_skill(
     };
     let mut outcome = grade_skill(&evals, root, &walk).await?;
     outcome.walk_secs = started.elapsed().as_secs_f64();
-    let warnings = fixture_diagnostics(&evals);
+    let warnings = fixture_diagnostics(&evals, AgentMode::Deterministic);
     let mut report = report_from_outcome(name, &structure, outcome, skill_words(dir), warnings);
     report.lift = None;
     Ok(report)

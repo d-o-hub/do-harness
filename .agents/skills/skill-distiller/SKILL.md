@@ -95,6 +95,45 @@ renaming a single reference or unpublishing live siblings) live in
 and `not-contains:` assertions that run against the real publisher's output,
 so they stay provable without any positive npm fix having landed.
 
+## Measuring Skill Lift (and its limits)
+
+> **Optional and slow.** Nothing below runs in CI or in any gate: the CI eval
+> step is `do-harness eval --strict-fixtures` (deterministic walkthroughs, under
+> 3s per skill). Agent-lift measurement spawns a real agent per case — minutes,
+> not seconds — so run it deliberately when you are changing a fixture or
+> auditing a lift number, never as part of a routine loop.
+> `do-harness distill --from-strikes` is likewise optional: it writes starter
+> scaffolds on demand and is not wired into `verify`, hooks, or CI.
+
+`do-harness eval --skill <name>` reports `lift` = with-skill pass rate minus
+without-skill pass rate, where the baseline strips `SKILL.md` + `references/`
+before running the same executor.
+
+Three distinct outcomes, do not conflate them:
+
+- `lift=+0.29` — a number. Meaning depends on what the assertions read.
+- `lift=contaminated` — the baseline regenerated its own guidance (e.g. the
+  walkthrough ran `do-harness init`, which re-scaffolds `SKILL.md`), so the
+  subtraction is unusable. Fix the fixture; do not read it as a zero.
+- `lift=n/a` — not measured (no baseline, or neither side graded anything).
+
+**A non-zero lift does not prove the agent used the guidance.** Assertions of
+the form `contains:.agents/skills/<name>/SKILL.md|...` pass because the skill
+file is copied into the sandbox, not because any agent read it. Measured
+directly: a stub agent that does nothing but `exit 0`, and a real coding agent,
+both score identically on such a fixture — the delta is just the count of
+guidance-reading assertions divided by the total. Verify by running the eval
+against a do-nothing command before trusting any lift figure:
+
+```bash
+eval --skill <name> --agent-cmd 'true'    # null-agent control
+eval --skill <name> --agent-cmd <real>    # if equal, lift measures file presence only
+```
+
+To measure agent *behavior*, grade the executor's own output (`agent_stdout.txt`
+in agent mode, or artifacts the walkthrough creates) rather than files shipped
+in the sandbox.
+
 ## Strike-Driven Scaffolding
 
 A sensor that strikes 3+ times has no verified fix yet, so distilling from it
