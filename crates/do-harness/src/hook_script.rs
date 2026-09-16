@@ -263,9 +263,15 @@ mod tests {
     #[test]
     fn resolve_falls_back_to_path() {
         let (temp, root) = fake_repo();
-        let bin = temp.path().join("bin/do-harness");
+        let bin = temp.path().join("bin").join("do-harness");
         write_exec(&bin);
-        let path = OsString::from(format!("{}:/usr/bin", temp.path().join("bin").display()));
+        // PATH entries are separated by ';' on Windows and ':' elsewhere, and
+        // the trailing POSIX-only entry must not be assumed elsewhere.
+        let path = std::env::join_paths([
+            temp.path().join("bin"),
+            std::path::PathBuf::from("/usr/bin"),
+        ])
+        .unwrap();
         let source = resolve_binary_with(&root, None, Some(path));
         assert_eq!(source, BinSource::Path(bin));
     }

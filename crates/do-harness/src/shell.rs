@@ -61,6 +61,37 @@ pub fn bash() -> Command {
     Command::new(bash_program())
 }
 
+/// Resolves a program name that may be a POSIX shell.
+///
+/// Returns the resolved path for `bash` (and `sh`, which Windows does not ship
+/// either) and the name unchanged for everything else. Used where a program
+/// comes from configuration rather than from this crate, so a stock
+/// `["bash", "scripts/…"]` sensor keeps working on Windows.
+#[must_use]
+pub fn resolve_program(program: &str) -> PathBuf {
+    let stem = std::path::Path::new(program)
+        .file_stem()
+        .and_then(|stem| stem.to_str())
+        .unwrap_or(program);
+    if stem == "bash" {
+        return bash_program();
+    }
+    if stem == "sh" && cfg!(windows) {
+        // Git Bash's own `sh` sits beside its `bash`.
+        if let Some(bash) = windows_bash_candidates()
+            .into_iter()
+            .find(|candidate| candidate.is_file())
+        {
+            let sh = bash.with_file_name("sh.exe");
+            if sh.is_file() {
+                return sh;
+            }
+            return bash;
+        }
+    }
+    PathBuf::from(program)
+}
+
 /// Whether a failed direct execution of a script means "run it through bash".
 ///
 /// POSIX hosts report `PermissionDenied` for a non-executable script. Windows

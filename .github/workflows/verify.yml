@@ -116,6 +116,10 @@ jobs:
           # The generic pack is empty by design: assert the artifact says so
           # instead of letting a vacuous pass masquerade as a real rust gate.
           test "$(jq -r '.sensor_pack' "$tmp/.do-harness/evidence.json")" = "generic"
+      - name: Install skill tooling dependencies
+        # quick_validate.py parses YAML frontmatter and needs PyYAML; declare
+        # and install it rather than relying on the runner image shipping it.
+        run: python3 -m pip install --disable-pip-version-check -r .agents/skills/skill-creator/scripts/requirements.txt
       - name: Dogfood skill eval runner (shebang execution, graded residue)
         run: ./target/release/do-harness eval --strict-fixtures
       - name: Assert evidence integrity
@@ -222,6 +226,11 @@ jobs:
       # than a build-only target. POSIX-only tests are `#[cfg(unix)]`-gated
       # (eval walkthrough shebangs, hook exit codes, file-mode helpers) and the
       # runners provide Git Bash, so `sh`/`bash` sensors work as written.
+      - name: Install skill tooling dependencies
+        # quick_validate.py (the skill structure gate) parses YAML frontmatter
+        # and needs PyYAML. Ubuntu images ship it; windows-latest does not, so
+        # install it explicitly instead of relying on the host image.
+        run: python -m pip install --disable-pip-version-check -r .agents/skills/skill-creator/scripts/requirements.txt
       - name: Test workspace on Windows
         # Bounded so a hung test fails in minutes rather than consuming the
         # job's full 30-minute budget with no output.

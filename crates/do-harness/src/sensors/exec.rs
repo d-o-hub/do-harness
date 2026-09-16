@@ -98,6 +98,13 @@ fn apply_ratchet(
 
 /// Spawns the sensor command with piped stdio, reporting a spawn failure as
 /// a failed [`SensorResult`] instead of an error.
+///
+/// `bash`/`sh` programs are resolved through [`crate::shell`] because a bare
+/// `bash` on Windows resolves to the WSL launcher in `System32` rather than Git
+/// Bash: with no distribution installed it exits non-zero with an empty
+/// diagnostic, so a stock rust-pack sensor (`["bash", "scripts/..."]`) would
+/// fail confusingly on every Windows machine. Other programs are spawned as
+/// declared.
 fn spawn_sensor(
     spec: &SensorSpec,
     root: &Path,
@@ -105,7 +112,8 @@ fn spawn_sensor(
     rest: &[String],
     start: Instant,
 ) -> Result<Child, SensorResult> {
-    Command::new(program)
+    let resolved = crate::shell::resolve_program(program);
+    Command::new(resolved)
         .args(rest)
         .current_dir(root)
         .stdout(Stdio::piped())
