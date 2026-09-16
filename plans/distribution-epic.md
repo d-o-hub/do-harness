@@ -1,6 +1,6 @@
 # Epic: Distribution and External Adoption
 
-> **Status:** released as `v0.1.0` (2026-09-13); `v0.1.1` (2026-09-15) ships the first Windows zip (crates.io publish pending `CARGO_REGISTRY_TOKEN`; npm bootstrap published four Linux/macOS platform packages — Windows is GitHub-release-only because npm rejects the `do-harness-win32-x64` name, and the meta package is withheld)
+> **Status:** released as `v0.1.0` (2026-09-13); `v0.1.1` (2026-09-15) ships the first Windows zip (crates.io published all three crates at `0.1.1`; npm bootstrap published four Linux/macOS platform packages — Windows is GitHub-release-only because npm rejects the `do-harness-win32-x64` name, and the meta package is withheld)
 > **Related:** prebuilt releases, `scripts/install.sh`, pinned agent
 > instructions, release evidence
 > **Created:** 2026-09-13
@@ -108,10 +108,18 @@ reports `0.1.1 (32120c3 2026-09-15)`; the zip path
 (`DO_HARNESS_TARGET=x86_64-pc-windows-msvc`) extracts a checksum-verified
 `do-harness.exe` (PE32+ x86-64).
 
-crates.io publication remains blocked on the one-time
-`CARGO_REGISTRY_TOKEN` repository secret. npm bootstrap publication used the
-authenticated `d-o-hub` account: `do-harness-linux-x64`,
-`do-harness-linux-arm64`, `do-harness-darwin-x64`, and
+crates.io publication is **complete for `v0.1.1`**: `do-harness-types`,
+`do-harness-db`, and `do-harness` are all published at `0.1.1` (verified
+against the registry API on 2026-09-16 — each returns `200` with `0.1.1` in its
+version list, not yanked, and a resolvable download path), and
+`cargo install do-harness --version 0.1.1` installs a binary reporting
+`0.1.1`. The release run's `publish` job packaged and uploaded them in
+dependency order; its idempotency guard would have skipped anything already
+present. `CARGO_REGISTRY_TOKEN` is therefore configured, and the earlier
+"blocked on the secret" note is obsolete.
+
+npm bootstrap publication used the authenticated `d-o-hub` account:
+`do-harness-linux-x64`, `do-harness-linux-arm64`, `do-harness-darwin-x64`, and
 `do-harness-darwin-arm64` are published at `0.1.1`. npm rejected
 `do-harness-win32-x64@0.1.1` with HTTP 403 (`Package name triggered spam
 detection`), so the meta package was not published because its pinned Windows
