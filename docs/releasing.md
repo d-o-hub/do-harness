@@ -19,12 +19,18 @@ verification set and every build target dogfoods green.
   403, "Package name triggered spam detection"), so no Windows package exists
   and `npx do-harness` cannot resolve a binary on Windows. The `v0.1.1` release
   ships `do-harness-v<version>-x86_64-pc-windows-msvc.zip`; that zip (or the
-  installer, or `cargo install`) is the Windows install path. Do not publish
-  `do-harness` to npm while its Windows `optionalDependency` is unavailable —
-  the meta package installs fine and then fails at run time, which is a worse
-  failure than an absent package. `integrations/npm/lib/platform.js` records
-  the unavailable package so the shim exits with release guidance.
-  Revisit only if npm clears the name; a coordinated rename is the fallback.
+  installer, or `cargo install`) is the Windows install path.
+  `integrations/npm/lib/platform.js` records the unavailable package so the
+  shim exits with release guidance. The meta package is still published: its
+  Windows pin is inert elsewhere (npm filters an `optionalDependency` by
+  `os`/`cpu` before fetching) and a Windows `npm install` succeeds silently,
+  leaving the shim to print the actionable error. Revisit only if npm clears
+  the name; a coordinated rename is the fallback.
+- The meta package needs **one** authenticated bootstrap publish before its
+  Trusted Publisher can be configured; npm exposes **Settings → Trusted
+  Publisher** only for a package that already exists, so OIDC alone cannot
+  create a new package name. After that bootstrap, OIDC covers every later
+  release.
 - Once each package exists, configure its Trusted Publisher on
   <https://www.npmjs.com>: package **Settings → Trusted Publisher → GitHub
   Actions**, organization/user `d-o-hub`, repository `do-harness`, workflow
@@ -102,14 +108,19 @@ publishes platform-first so the meta package's pinned `optionalDependencies`
 resolve. Versions already on npm are skipped, so a partial run can be re-run.
 
 The publisher's `UNAVAILABLE_PKGS` list names platform packages the registry
-refuses. They are skipped with an explicit log line, and the meta package is
-withheld while any of them is listed — a pin that cannot resolve would give
-Windows users a successful install followed by a run-time failure. Before this
-list existed, the loop aborted on the 403 and every tag push ended with a red
-`npm-publish` job that looked like a release failure while actually being the
-documented decision. Keep `UNAVAILABLE_PKGS` in step with
-`UNAVAILABLE_PACKAGES` in `integrations/npm/lib/platform.js`; the skill's
-`check-npm-sequence.sh --root .` fails if the two disagree.
+refuses. They are skipped with an explicit log line, and the meta package
+publishes regardless — an unavailable pin is **inert**: npm filters an
+`optionalDependency` by its `os`/`cpu` before fetching it, so a Linux/macOS
+install never requests the Windows package (verified: clean install, clean
+`npm ls`), and on Windows the missing package is skipped quietly while the shim
+exits with release-zip guidance. Withholding the meta package instead made
+`npx do-harness` return 404 for every Linux/macOS user, breaking the primary
+install path documented in `README.md`. Before the list existed the loop
+aborted on the 403, so every tag push ended with a red `npm-publish` job that
+looked like a release failure while actually being the documented decision.
+Keep `UNAVAILABLE_PKGS` in step with `UNAVAILABLE_PACKAGES` in
+`integrations/npm/lib/platform.js`; the skill's `check-npm-sequence.sh --root .`
+fails if the two disagree or if the meta publish is gated on the list again.
 
 Committed `integrations/npm/**/package.json` versions are placeholders for
 local tooling: `scripts/publish-npm.sh` patches the meta version and all five
@@ -124,12 +135,13 @@ If the registry rejects a new platform package with HTTP 403
 `Package name triggered spam detection`, treat it as a registry policy block,
 not a release bug:
 
-1. Stop the ordered release and leave the blocked platform package and the meta
-   package unpublished.
+1. Leave the blocked platform package unpublished; the meta package still
+   publishes, and its pin on the blocked name stays inert on other platforms.
 2. Ask npm Support (<https://www.npmjs.com/support>, `support@npmjs.com`) to
    review the exact name, including its purpose and repository.
 3. After clearance, rerun `scripts/publish-npm.sh`; it skips live siblings and
-   publishes the platform package before the meta package.
+   publishes the platform package before the meta package. Remove the name from
+   `UNAVAILABLE_PKGS` and `UNAVAILABLE_PACKAGES` at the same time.
 4. Rename only if Support cannot clear the name, and only as a coordinated
    change across `integrations/npm/lib/platform.js`, the platform manifest, the
    meta `optionalDependencies`, the publisher target table, tests, and docs.

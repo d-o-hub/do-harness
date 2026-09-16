@@ -101,16 +101,13 @@ TARGETS=(
     "x86_64-pc-windows-msvc:win32-x64:do-harness-win32-x64:zip:do-harness.exe"
 )
 
-# Platform packages the npm registry refuses, so publishing them is expected to
-# fail rather than a regression. `do-harness-win32-x64` is rejected by npm's
-# name screening (HTTP 403 "Package name triggered spam detection"), and the
-# Windows binary ships as a GitHub release zip instead — see the decision in
-# plans/distribution-epic.md.
-#
-# Skipping them explicitly keeps the job green and its log honest. Before this
-# list existed the loop aborted on the 403, the meta package was never
-# attempted, and every tag push reported a red npm-publish job that looked like
-# a release failure while actually being the documented decision in action.
+# Platform packages the npm registry refuses are listed in UNAVAILABLE_PKGS.
+# They are skipped with an explicit log line instead of aborting the run: the
+# 403 previously killed the loop, so every tag push reported a red npm-publish
+# job that looked like a release failure while actually being the documented
+# decision. The meta package still publishes — its pin on an unavailable
+# package is filtered by `os`/`cpu` before npm fetches anything, so it is inert
+# on the platforms that do have a package. See plans/distribution-epic.md.
 #
 # Keep in sync with `UNAVAILABLE_PACKAGES` in integrations/npm/lib/platform.js
 # (the shim uses it for run-time guidance) and docs/releasing.md.
@@ -205,15 +202,16 @@ fi
         "optionalDependencies.do-harness-win32-x64=$VERSION" >/dev/null
 )
 
-# The meta package pins every platform package, including ones npm refuses. A
-# pin that cannot resolve would give Windows users a successful install
-# followed by a run-time failure, so the meta package is withheld while any
-# pinned platform package is unavailable — see the decision in
-# plans/distribution-epic.md. Withholding is deliberate and reported here,
-# rather than reached as a side effect of an aborted publish.
-if (( ${#UNAVAILABLE_PKGS[@]} > 0 )); then
-    echo "do-harness (meta) withheld: pins ${UNAVAILABLE_PKGS[*]}, which npm does not accept"
-    echo "  Windows installs from the GitHub release zip; see docs/releasing.md."
-else
-    publish_dir "$stage" "do-harness"
-fi
+# The meta package pins every platform package, including ones npm refuses.
+# Those pins are *inert* where they cannot resolve: npm filters an optional
+# dependency by its `os`/`cpu` before fetching it, so a Linux/macOS install
+# never touches the Windows pin (verified: clean install and clean `npm ls`),
+# and on Windows the absent package is skipped silently and the shim exits with
+# release-zip guidance. Keeping the pin means the moment npm clears the name,
+# Windows users get the package with no further release change.
+#
+# So the meta package publishes even while a pinned platform package is
+# unavailable — withholding it broke the documented primary install path
+# (`npx do-harness`) for every Linux/macOS user. `UNAVAILABLE_PKGS` therefore
+# affects only which platform packages are uploaded.
+publish_dir "$stage" "do-harness"

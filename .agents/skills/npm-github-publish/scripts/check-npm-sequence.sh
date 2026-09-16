@@ -64,11 +64,10 @@ check_publisher_order() {
   ok "publisher order: platform packages before the meta package"
 }
 
-# An unavailable platform package must be skipped explicitly and must block the
-# meta package, so a tag push reports the documented decision instead of
-# aborting on a registry 403 (which made the job red while the release was
-# fine). The list is the publisher's counterpart to the shim's
-# UNAVAILABLE_PACKAGES.
+# An unavailable platform package must be skipped explicitly, and the meta
+# package must still be published: withholding it breaks `npx do-harness`,
+# which is the documented primary install path. The list is the publisher's
+# counterpart to the shim's UNAVAILABLE_PACKAGES, and both must agree.
 check_unavailable_handling() {
   local root="$1" publisher="$1/scripts/publish-npm.sh"
   [[ -f "$publisher" ]] || { fail "missing $publisher"; return 1; }
@@ -80,13 +79,10 @@ check_unavailable_handling() {
     fail "publisher does not skip unavailable packages in the target loop"
     return 1
   fi
-  # The list must be non-empty: an empty list means the meta package publishes
-  # with a pin that cannot resolve.
-  local count
-  count="$(sed -n '/^UNAVAILABLE_PKGS=(/,/^)/p' "$publisher" \
-    | sed -n 's/^[[:space:]]*"\([^"]*\)".*$/\1/p' | grep -c . || true)"
-  if (( count == 0 )); then
-    fail "UNAVAILABLE_PKGS is empty but the meta package still pins Windows"
+  # The meta publish must not be gated on the unavailable list: that is what
+  # made `npx do-harness` 404 for every Linux/macOS user.
+  if ! grep -qE '^publish_dir ' "$publisher"; then
+    fail "publisher does not publish the meta package unconditionally"
     return 1
   fi
   # Both consumers must agree, or the shim would offer a package the publisher
@@ -100,7 +96,7 @@ check_unavailable_handling() {
     fi
   done < <(sed -n '/^UNAVAILABLE_PKGS=(/,/^)/p' "$publisher" \
     | sed -n 's/^[[:space:]]*"\([^"]*\)".*$/\1/p')
-  ok "publisher skips unavailable packages and withholds the meta package"
+  ok "publisher skips unavailable packages and still publishes the meta package"
 }
 
 # Every platform package must be pinned by the meta package, or an install
@@ -316,21 +312,28 @@ SH
     printf 'bad-manifest-name: OK: a manifest-only rename is rejected\n'
   fi
 
-  # Mutation 6: an empty unavailable list must be rejected — the meta package
-  # would then publish pinning a package npm refuses.
-  write_fixture "$tmp/no-unavailable"
-  python3 - "$tmp/no-unavailable/scripts/publish-npm.sh" <<'PY'
-import re, sys, pathlib
+  # Mutation 6: re-gating the meta publish on the unavailable list must be
+  # rejected — that gate is exactly what made `npx do-harness` 404 for every
+  # Linux/macOS user.
+  write_fixture "$tmp/withheld-meta"
+  python3 - "$tmp/withheld-meta/scripts/publish-npm.sh" <<'PY'
+import sys, pathlib
 p = pathlib.Path(sys.argv[1])
 s = p.read_text()
-s = s.replace('UNAVAILABLE_PKGS=(\n    "do-harness-win32-x64"\n)\n', "UNAVAILABLE_PKGS=()\n")
+s = (s.replace('publish_dir "$stage" "do-harness"',
+               'if (( ${#UNAVAILABLE_PKGS[@]} > 0 )); then\n'
+               '    echo "meta withheld"\n'
+               'else\n'
+               '    publish_dir "$stage" "do-harness"\n'
+               'fi')
+     .replace('^publish_dir ', 'publish_dir '))
 p.write_text(s)
 PY
-  if check_unavailable_handling "$tmp/no-unavailable" >/dev/null 2>&1; then
-    printf 'bad-empty-unavailable: FAIL: an empty unavailable list was accepted\n'
+  if check_unavailable_handling "$tmp/withheld-meta" >/dev/null 2>&1; then
+    printf 'bad-withheld-meta: FAIL: withholding the meta package was accepted\n'
     rc=1
   else
-    printf 'bad-empty-unavailable: OK: an empty unavailable list is rejected\n'
+    printf 'bad-withheld-meta: OK: withholding the meta package is rejected\n'
   fi
 
   # Mutation 7: the shim and the publisher must agree, or one offers a package

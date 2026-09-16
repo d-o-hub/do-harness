@@ -59,7 +59,7 @@
     {
       "id": 5,
       "prompt": "A new Windows platform package returns npm HTTP 403 'Package name triggered spam detection' while four sibling packages are already live. Rerun the release and show what the publisher does for each package.",
-      "expected_output": "Treat it as a registry-side policy block: the publisher must skip the live siblings, never re-attempt an immutable version, keep the blocked platform and meta package withheld, and prefer npm Support over a blind retry or unilateral rename.",
+      "expected_output": "Treat it as a registry-side policy block: the publisher must skip the live siblings, never re-attempt an immutable version, leave the blocked platform package unpublished while still publishing the meta package, and prefer npm Support over a blind retry or unilateral rename.",
       "files": [],
       "dim": "security",
       "kind": "gotchas",
@@ -74,8 +74,8 @@
     },
     {
       "id": 6,
-      "prompt": "Four platform packages are live but the Windows package is refused by the registry and the meta package was never published. Rerun the release and confirm the publisher reports that decision instead of failing.",
-      "expected_output": "The rerun skips the four live versions, reports do-harness-win32-x64 as unavailable rather than attempting it, and withholds the meta package because its pinned dependency cannot resolve.",
+      "prompt": "Four platform packages are live but the Windows package is refused by the registry. Rerun the release and confirm the publisher reports that decision, still publishes the meta package, and exits cleanly.",
+      "expected_output": "The rerun skips the four live versions and the refused Windows package with explicit lines, publishes do-harness@0.1.1 so `npx do-harness` resolves, and exits 0 without an npm error.",
       "files": [],
       "dim": "effectiveness",
       "kind": "gotchas",
@@ -84,8 +84,8 @@
         "exists:npm-publish-run.txt",
         "contains:npm-publish-run.txt|is already on npm; skipping",
         "contains:npm-publish-run.txt|do-harness-win32-x64 is unavailable on npm",
-        "contains:npm-publish-run.txt|do-harness (meta) withheld",
-        "not-contains:npm-publish-run.txt|+ do-harness@0.1.1",
+        "contains:npm-publish-run.txt|+ do-harness@0.1.1",
+        "not-contains:npm-publish-run.txt|(meta) withheld",
         "not-contains:npm-publish-run.txt|npm error"
       ]
     },

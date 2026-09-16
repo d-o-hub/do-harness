@@ -1,6 +1,6 @@
 # Epic: Distribution and External Adoption
 
-> **Status:** released as `v0.1.0` (2026-09-13); `v0.1.1` (2026-09-15) ships the first Windows zip (crates.io published all three crates at `0.1.1`; npm bootstrap published four Linux/macOS platform packages — Windows is GitHub-release-only because npm rejects the `do-harness-win32-x64` name, and the meta package is withheld)
+> **Status:** released as `v0.1.0` (2026-09-13); `v0.1.1` (2026-09-15) ships the first Windows zip (crates.io published all three crates at `0.1.1`; npm bootstrap published four Linux/macOS platform packages — Windows is GitHub-release-only because npm rejects the `do-harness-win32-x64` name, and the meta package published 2026-09-16, making `npx do-harness` resolve)
 > **Related:** prebuilt releases, `scripts/install.sh`, pinned agent
 > instructions, release evidence
 > **Created:** 2026-09-13
@@ -162,10 +162,15 @@ Two facts that make the documented failure mode precise:
    binary is missing, `npx do-harness` on Windows fails when the shim runs.
    That is why the shim, not the install step, carries the guidance.
 
-Publishing `do-harness` to npm remains withheld regardless: shipping a meta
-package whose Windows dependency can never resolve gives Windows users a
-successful install followed by a run-time failure, which is worse than an
-absent package. Revisit if npm clears the name (Support-first), with a
+The meta package therefore publishes (`2026-09-16`). Withholding it cost every
+Linux/macOS user a working `npx do-harness` — the primary install path in
+`README.md` returned 404 — to avoid a Windows message the shim already prints.
+The Windows pin is inert: npm filters an `optionalDependency` by its `os`/`cpu`
+before fetching it, so a Linux/macOS install never requests it (verified: clean
+install and clean `npm ls`), and a Windows install succeeds silently before the
+shim exits 1 with release-zip guidance. Keeping the pin means the moment npm
+clears the name, Windows users get the package with no further release change.
+Revisit the rename only if npm Support refuses the name (Support-first), with a
 coordinated rename as the fallback; a future release can add the Windows npm
 channel without changing this decision's documentation, since the shim reads
 `UNAVAILABLE_PACKAGES`.

@@ -90,8 +90,9 @@ Use this decision path:
 2. Contact npm Support at <https://www.npmjs.com/support> or
    `support@npmjs.com`. Ask for a review/clearance of the exact name; include
    the package's purpose, repository URL, and why it is not a typosquat.
-3. Keep the blocked platform package and the meta package withheld. The meta
-   package must not reference an unavailable optional dependency.
+3. Leave the blocked platform package unpublished. The meta package still
+   publishes: its pin on the blocked name is inert where another platform
+   package resolves, and the shim carries the release guidance on Windows.
 4. After clearance, rerun the same idempotent publisher. It skips existing
    sibling versions, publishes the cleared platform package, and publishes the
    meta package last.
@@ -138,15 +139,17 @@ taken forces another migration.
 For `d-o-hub/do-harness`, the decision is **Windows via GitHub release only**:
 four Linux/macOS platform packages are live at `0.1.1`,
 `do-harness-win32-x64@0.1.1` is refused by npm's name screening, and
-`do-harness@0.1.1` is withheld. Windows installs from the release zip (or the
-installer, or a cargo channel); `npx do-harness` is Linux/macOS-only.
+`do-harness@0.1.1` **is published** (bootstrapped 2026-09-16) so `npx
+do-harness` resolves on Linux/macOS. Windows installs from the release zip (or
+the installer, or a cargo channel); the shim exits 1 there with that guidance.
 
 Encode the decision where the publish loop can see it, rather than letting the
 403 abort the run. `scripts/publish-npm.sh` keeps an `UNAVAILABLE_PKGS` list:
-those targets are skipped with an explicit log line and the meta package is
-withheld while the list is non-empty. Without it a tag push reports a red
-publish job that looks like a release failure while actually being the intended
-decision. Keep the list in step with `UNAVAILABLE_PACKAGES` in
+those targets are skipped with an explicit log line and the meta package
+publishes regardless. Without the list a tag push reports a red publish job
+that looks like a release failure while actually being the intended decision;
+gating the meta publish on the list instead made `npx do-harness` 404 for every
+Linux/macOS user. Keep the list in step with `UNAVAILABLE_PACKAGES` in
 `integrations/npm/lib/platform.js`; the sequence guard fails if they disagree.
 
 A dry run is not proof that a name will pass registry similarity checks; npm CLI
