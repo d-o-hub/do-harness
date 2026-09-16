@@ -34,7 +34,7 @@
         { "name": "confirm-feature-boundary", "sensor": null, "spike_candidate": false }
       ],
       "preconditions": [
-        { "description": "A promotion-style decision (hold or promote) is recorded in an epic row and mirrored in plans/invariants.json. The gate is check-promotions, which validates every recorded decision against the shipped Cargo defaults; it is decision-agnostic (it names no single feature), so it serves AGT and mcp-surface alike. A drift in any recorded decision fails this gate, by design: the check is a whole-repository coherence invariant, not a per-task probe." }
+        { "description": "A promotion-style decision (hold or promote) is recorded in an epic's row or status line, and its feature-boundary consequence is recorded in plans/invariants.json. The gate is check-promotions: it validates each recorded decision against the shipped Cargo defaults, and it is decision-agnostic (it names no single feature), so it serves AGT and mcp-surface alike. Because it checks the whole catalog, a drift in any recorded decision fails the gate for every decision task, by design — it is a repository-wide coherence invariant, not a per-task probe." }
       ]
     }
   ]
