@@ -16,13 +16,20 @@
 # verification fail on a fetch error rather than on a real defect. The dated
 # live verdict stays where it belongs: recorded epic evidence.
 #
-# What this sensor enforces instead:
-#   1. Every `*-promotion` decision row in an epic resolves to a `hold` or
-#      `promote` verdict.
+# What this sensor enforces instead — coherence only, not GA:
+#   1. Every `*-promotion` decision row resolves to a `hold` or `promote`
+#      verdict.
 #   2. A `hold` verdict means the feature is off by default in Cargo.
 #   3. A `promote` verdict means the feature is on by default in Cargo.
-#   4. The decision is mirrored in plans/invariants.json (one source of truth
-#      for policy, not two).
+#   4. The AGT decision is mirrored in plans/invariants.json, so the recorded
+#      policy has one machine-readable home rather than two.
+#
+# It does NOT verify that the recorded verdict is *correct*. A hand-written
+# `hold` with no GA evaluation satisfies it, which is intentional: the
+# authoritative GA verdict is a dated, network-dependent observation recorded
+# in the epic, and this gate's job is to catch the two artifacts drifting apart
+# — not to re-derive the verdict. The gate a promotion decision must pass for
+# substance is the epic's own recorded evidence, reviewed by a human.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

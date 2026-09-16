@@ -3,8 +3,12 @@
 //! Lifecycle-hygiene tests: destructive task actions must not corrupt the
 //! append-only event log, and `--dry-run` must be a genuine no-op.
 
+use std::fs;
+
 use super::tests::write_catalog;
 use super::*;
+use crate::report::Format;
+
 /// Regression: `task remove` used to run a bare `DELETE FROM tasks`, which
 /// failed with `FOREIGN KEY constraint failed` for any task that had an event,
 /// because `workflow_events.task_id` has no cascade. Refusing is the correct
@@ -80,9 +84,9 @@ async fn remove_task_deletes_an_orphan_row() {
 async fn dry_run_add_writes_nothing() {
     let dir = tempfile::tempdir().unwrap();
     write_catalog(dir.path());
-    super::super::commands::task_cmd(
+    crate::commands::task_cmd(
         dir.path(),
-        super::super::cli::TaskAction::Add {
+        crate::cli::TaskAction::Add {
             title: "ghost".to_owned(),
             method: Some("mini".to_owned()),
             parent: None,
@@ -107,4 +111,59 @@ async fn dry_run_add_writes_nothing() {
             .is_empty(),
         "dry-run must not append a workflow event"
     );
+}
+
+/// Regression: `task export --dry-run` wrote `plans/tasks.json` before any
+/// dry-run check ran, so a routine dry run could overwrite the committed
+/// snapshot. The guard now short-circuits ahead of the write.
+#[tokio::test(flavor = "current_thread")]
+async fn dry_run_export_writes_no_file() {
+    let dir = tempfile::tempdir().unwrap();
+    fs::create_dir_all(dir.path().join("plans")).unwrap();
+    let snapshot = dir.path().join("plans/tasks.json");
+    fs::write(&snapshot, "{\"sentinel\":true}").unwrap();
+
+    crate::commands::task_cmd(
+        dir.path(),
+        crate::cli::TaskAction::Export {
+            output: None,
+            stdout: false,
+            format: Format::Json,
+        },
+        true,
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(
+        fs::read_to_string(&snapshot).unwrap(),
+        "{\"sentinel\":true}",
+        "dry-run export must not touch the snapshot"
+    );
+}
+
+/// `--dry-run` must be a faithful preview: the same call without it does write,
+/// so the guard is a real gate rather than a no-op that hides a broken path.
+#[tokio::test(flavor = "current_thread")]
+async fn export_without_dry_run_does_write() {
+    let dir = tempfile::tempdir().unwrap();
+    write_catalog(dir.path());
+    add_task(dir.path(), "real", Some("mini"), None, None)
+        .await
+        .unwrap();
+
+    crate::commands::task_cmd(
+        dir.path(),
+        crate::cli::TaskAction::Export {
+            output: None,
+            stdout: false,
+            format: Format::Json,
+        },
+        false,
+    )
+    .await
+    .unwrap();
+
+    let written = fs::read_to_string(dir.path().join("plans/tasks.json")).unwrap();
+    assert!(written.contains("\"real\""), "export must write the board");
 }

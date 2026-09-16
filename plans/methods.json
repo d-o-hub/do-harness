@@ -31,10 +31,10 @@
       "subtasks": [
         { "name": "verify-decision-gate", "sensor": "check-promotions", "spike_candidate": false },
         { "name": "record-decision-evidence", "sensor": null, "spike_candidate": false },
-        { "name": "confirm-default-boundary", "sensor": "check-agt", "spike_candidate": false }
+        { "name": "confirm-feature-boundary", "sensor": null, "spike_candidate": false }
       ],
       "preconditions": [
-        { "description": "A promotion-style decision (hold or promote) is recorded in an epic and mirrored in plans/invariants.json." }
+        { "description": "A promotion-style decision (hold or promote) is recorded in an epic row and mirrored in plans/invariants.json. The gate is check-promotions, which validates every recorded decision against the shipped Cargo defaults; it is decision-agnostic (it names no single feature), so it serves AGT and mcp-surface alike. A drift in any recorded decision fails this gate, by design: the check is a whole-repository coherence invariant, not a per-task probe." }
       ]
     }
   ]

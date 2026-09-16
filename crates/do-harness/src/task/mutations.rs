@@ -19,10 +19,12 @@ use do_harness_types::{Beat, TaskState, WorkflowEvent};
 ///
 /// Every task created through `task add` writes a `TaskAdded` event, so in
 /// practice `remove` only deletes orphan rows (the out-of-band case `doctor`
-/// already flags). For a real task the transition is `task fail`, which records
-/// who closed it and why. A first-class "cancelled" state is not modelled yet:
-/// adding one means a new `WorkflowEvent` variant, a new `TaskState`, and a
-/// projection change, so it is deliberately not faked here.
+/// already flags). For a real task the supported transition is `task fail`,
+/// which appends `TaskFailed { id }` — a terminal transition that leaves the
+/// audit trail intact, though it records no actor or reason. A first-class
+/// "cancelled" state is not modelled: adding one means a new `WorkflowEvent`
+/// variant, a new `TaskState`, and a projection change, so it is deliberately
+/// not faked here.
 pub async fn remove_task(root: &Path, id: i64) -> Result<()> {
     let conn = do_harness_db::connect_and_migrate(root).await?;
     if do_harness_db::get_task(&conn, id).await?.is_none() {
