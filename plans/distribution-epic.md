@@ -1,6 +1,6 @@
 # Epic: Distribution and External Adoption
 
-> **Status:** released as `v0.1.0` (2026-09-13); `v0.1.1` (2026-09-15) ships the first Windows zip (crates.io publish pending `CARGO_REGISTRY_TOKEN`; npm bootstrap published four platform packages, while `do-harness-win32-x64@0.1.1` is blocked by npm spam detection and the meta package is withheld)
+> **Status:** released as `v0.1.0` (2026-09-13); `v0.1.1` (2026-09-15) ships the first Windows zip (crates.io publish pending `CARGO_REGISTRY_TOKEN`; npm bootstrap published four Linux/macOS platform packages — Windows is GitHub-release-only because npm rejects the `do-harness-win32-x64` name, and the meta package is withheld)
 > **Related:** prebuilt releases, `scripts/install.sh`, pinned agent
 > instructions, release evidence
 > **Created:** 2026-09-13
@@ -115,16 +115,53 @@ authenticated `d-o-hub` account: `do-harness-linux-x64`,
 `do-harness-darwin-arm64` are published at `0.1.1`. npm rejected
 `do-harness-win32-x64@0.1.1` with HTTP 403 (`Package name triggered spam
 detection`), so the meta package was not published because its pinned Windows
-optional dependency is unavailable. File npm support for the exact package
-name before retrying; do not rename only one package.
+optional dependency is unavailable.
 
-After npm clears the name, bootstrap-publish
-`do-harness-win32-x64@0.1.1` and then `do-harness@0.1.1` with the
-authenticated account. Only after each package exists can its trusted publisher
-be configured: use organization/user `d-o-hub`, repository `do-harness`,
-workflow `release.yml`, and direct publish for all six packages. Future
-versions use the GitHub Actions OIDC path; a tag push is the normal trigger,
-and `gh workflow run release.yml -f publish=true` is the idempotent rerun path.
+### Decision — Windows ships as a GitHub release, not npm
+
+**Windows has no npm channel, and that is the shipped state.** The
+`do-harness-win32-x64` name is refused by npm's registry screening, so the
+canonical distribution for Windows is the release zip
+(`do-harness-v<version>-x86_64-pc-windows-msvc.zip`, present in `v0.1.1` with a
+`checksums.txt` digest), used directly or through `install.sh` under Git Bash.
+Source and binstall channels also work. This is documented as a supported
+platform path, not a pending gap:
+
+- `docs/adoption.md` (Windows section) and `README.md` state the npm exclusion
+  and the working channels.
+- `docs/releasing.md` records it in One-time setup and the install-channel table.
+- `integrations/npm/lib/platform.js` lists the package in
+  `UNAVAILABLE_PACKAGES`, and the shim exits 1 with release guidance instead of
+  the misleading `--include=optional` hint.
+- `integrations/npm/test/shim.test.mjs` pins that guidance with a
+  host-independent test, verified to fail when the branch is removed.
+
+Two facts that make the documented failure mode precise:
+
+1. **An unpublished optional dependency is not a publish blocker.** `npm
+   publish --dry-run` succeeds for a package whose `optionalDependencies`
+   name an absent version (verified directly), so the earlier "meta package is
+   withheld" framing overstated the constraint. npm also installs such a
+   package cleanly.
+2. **The real failure is at run time.** Because install succeeds and the
+   binary is missing, `npx do-harness` on Windows fails when the shim runs.
+   That is why the shim, not the install step, carries the guidance.
+
+Publishing `do-harness` to npm remains withheld regardless: shipping a meta
+package whose Windows dependency can never resolve gives Windows users a
+successful install followed by a run-time failure, which is worse than an
+absent package. Revisit if npm clears the name (Support-first), with a
+coordinated rename as the fallback; a future release can add the Windows npm
+channel without changing this decision's documentation, since the shim reads
+`UNAVAILABLE_PACKAGES`.
+
+If npm clears the name later: bootstrap-publish `do-harness-win32-x64@0.1.1`,
+remove it from `UNAVAILABLE_PACKAGES`, then publish `do-harness@0.1.1`. Only
+after each package exists can its trusted publisher be configured
+(organization/user `d-o-hub`, repository `do-harness`, workflow `release.yml`,
+direct publish). Future versions use the GitHub Actions OIDC path; a tag push
+is the normal trigger, and `gh workflow run release.yml -f publish=true` is
+the idempotent rerun path.
 
 ## Non-goals
 

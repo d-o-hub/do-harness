@@ -114,6 +114,12 @@
     "category": "skills"
   },
   {
+    "invariant": "Windows binaries ship through GitHub Releases only; the npm meta package is withheld while do-harness-win32-x64 is unavailable, and the shim exits with release guidance for that platform",
+    "rationale": "npm's registry name screening refuses do-harness-win32-x64 (HTTP 403), and an unpublished optional dependency is neither a publish nor an install error (verified), so publishing the meta package would give Windows users a successful install followed by a run-time failure; listing the package in UNAVAILABLE_PACKAGES makes the shim name the channel that works instead of suggesting --include=optional",
+    "sensor": "node --test integrations/npm/test/*.test.mjs",
+    "category": "distribution"
+  },
+  {
     "invariant": "Agent-lift measurement (eval --agent-cmd) and strike scaffolding (distill --from-strikes) stay opt-in: they never run in CI, hooks, or verify; the gated eval step is deterministic eval --strict-fixtures",
     "rationale": "Agent lift spawns a real agent per case (minutes per skill) and strike scaffolding writes new files, so neither belongs in a routine gate; CI and pre-push stay bounded by deterministic walkthroughs under 3s per skill while the expensive evidence remains available on demand",
     "sensor": ".github/workflows/verify.yml (eval --strict-fixtures only)",

@@ -103,6 +103,33 @@ test("shim fails with guidance when the platform package is missing", (t) => {
   assert.match(result.stderr, /--include=optional/);
 });
 
+/// A platform package that is mapped but not published on npm must not be
+/// reported as "optional dependencies may be disabled": npm installs the meta
+/// package cleanly (an absent optional dependency is not an install error), so
+/// `--include=optional` cannot help. The shim must point at the GitHub release
+/// instead.
+///
+/// The host platform is overridden through `DO_HARNESS_TEST_PLATFORM_PACKAGE`
+/// (a seam used only by tests; ignored unless set) so the assertion holds on
+/// every CI platform, including the ones where the win32 package is the real,
+/// working path.
+test("shim points unavailable npm platforms at the release channel", () => {
+  const { shim } = stage({ withPlatform: false });
+
+  const result = spawnSync(process.execPath, [shim, "version"], {
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      DO_HARNESS_TEST_PLATFORM_PACKAGE: "do-harness-win32-x64",
+    },
+  });
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /is unavailable/);
+  assert.match(result.stderr, /GitHub release/);
+  assert.doesNotMatch(result.stderr, /--include=optional/);
+});
+
 test("shim rejects unsupported platforms with release guidance", () => {
   const { shim } = stage({ withPlatform: false });
   const preload = path.join(here, "fake-unsupported.cjs");

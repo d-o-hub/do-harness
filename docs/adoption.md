@@ -32,8 +32,9 @@ detect corruption, not a compromised origin; verify them out of band when that
 matters.
 
 Supported platforms: Linux x86_64/aarch64 (static musl), macOS x86_64/arm64,
-and Windows x86_64 (zip release, npm, or `cargo install`). Other platforms
-install from source: `cargo install --path crates/do-harness` (Rust 1.85+).
+and Windows x86_64. **Windows is not installable through npm** — see below.
+Other platforms install from source: `cargo install --path crates/do-harness`
+(Rust 1.85+).
 
 ### Windows
 
@@ -42,8 +43,20 @@ release asset in `v0.1.1`. The initial `v0.1.0` release published Linux/macOS
 tarballs only. `install.sh` detects Git Bash (`MINGW*`/`MSYS*`/
 `CYGWIN*`) and installs `do-harness.exe` from the zip (needs `unzip` or `7z`
 to extract). The `windows-latest` CI job proves the installer (including the
-zip path), `hook install`/`status`, `doctor`, and the npm `win32-x64`
-wrapper on every push.
+zip path), `hook install`/`status`, and `doctor` on every push.
+
+**Windows via npm is unavailable.** The `do-harness-win32-x64` platform
+package is rejected by the npm registry's name screening (HTTP 403, "Package
+name triggered spam detection"), so `npx do-harness` and
+`npm install do-harness` cannot resolve a Windows binary. Two consequences
+worth knowing, because neither is obvious:
+
+- `npm install do-harness` still **succeeds** on Windows. An absent optional
+  dependency is not an install error, so the meta package installs and then
+  fails at run time with guidance pointing at the release zip.
+- The channel that works is a GitHub release: either the installer above, or
+  download `do-harness-v<version>-x86_64-pc-windows-msvc.zip` plus
+  `checksums.txt` and unzip `do-harness.exe` yourself.
 
 Source builds on Windows need: the Visual Studio Build Tools C++ workload
 (MSVC `link.exe` + Windows SDK libraries) and LLVM/Clang (`libclang` for the

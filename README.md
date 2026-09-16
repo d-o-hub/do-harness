@@ -4,7 +4,9 @@ A compiled agent-execution harness CLI: feedforward guides (AGENTS.md, `.agents/
 
 ## Install
 
-Zero-install with npx (Node 18+; resolves the prebuilt platform binary):
+Zero-install with npx on Linux and macOS (Node 18+; resolves the prebuilt
+platform binary). **Windows is not available through npm** — use the release
+zip below:
 
 ```bash
 npx do-harness init
@@ -14,7 +16,10 @@ npx do-harness verify --set verification --changed --strict
 Prebuilt binaries for Linux (x86_64/aarch64, static musl), macOS
 (x86_64/arm64), and Windows (x86_64, zip; included starting with `v0.1.1`;
 `v0.1.0` shipped Linux/macOS only) are published as GitHub Releases
-with SHA-256 checksums:
+with SHA-256 checksums. The Windows zip is the only supported Windows
+install path, because npm rejects the `do-harness-win32-x64` package name
+(HTTP 403, "Package name triggered spam detection"); see
+[docs/adoption.md](docs/adoption.md#windows) for details.
 
 ```bash
 # latest release (resolved from the releases/latest redirect)

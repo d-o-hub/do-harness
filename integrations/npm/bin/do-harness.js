@@ -9,9 +9,14 @@ const { spawnSync } = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
 
-const { binaryName, platformPackage } = require("../lib/platform.js");
+const { UNAVAILABLE_PACKAGES, binaryName, platformPackage } = require("../lib/platform.js");
 
-const pkg = platformPackage(process.platform, process.arch);
+// Test seam: lets the wrapper tests assert the guidance for a platform other
+// than the host (e.g. the unavailable Windows package, checked on Linux CI).
+// Ignored in normal use.
+const pkg =
+  process.env.DO_HARNESS_TEST_PLATFORM_PACKAGE ??
+  platformPackage(process.platform, process.arch);
 if (!pkg) {
   console.error(
     `do-harness: no prebuilt binary for ${process.platform}/${process.arch}.`,
@@ -32,6 +37,22 @@ try {
     binaryName(process.platform),
   );
 } catch {
+  if (UNAVAILABLE_PACKAGES.has(pkg)) {
+    // Distinct from "optional dependencies disabled": npm installed cleanly
+    // because the pinned package is not on the registry at all, so
+    // --include=optional cannot help. Point at the channel that does work.
+    console.error(
+      `do-harness: no npm package is published for ${process.platform}/${process.arch} yet (${pkg} is unavailable).`,
+    );
+    console.error(
+      "Install the prebuilt binary from the GitHub release instead (see the",
+    );
+    console.error(
+      "Windows section of docs/adoption.md), or build from source with",
+    );
+    console.error("`cargo install do-harness`.");
+    process.exit(1);
+  }
   console.error(
     `do-harness: platform package ${pkg} is not installed (optional dependencies may be disabled).`,
   );

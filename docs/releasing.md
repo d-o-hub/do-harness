@@ -13,10 +13,18 @@ verification set and every build target dogfoods green.
   publish job fails loudly when the secret is missing.
 - npm Trusted Publisher setup is per existing package. If a package has not
   been published yet, perform a one-time authenticated bootstrap publish first;
-  npm exposes its **Settings → Trusted Publisher** page only afterward. For the
-  current `v0.1.1` bootstrap, the four Linux/macOS platform packages exist;
-  `do-harness-win32-x64` was rejected by npm spam detection and `do-harness`
-  is withheld until that dependency exists.
+  npm exposes its **Settings → Trusted Publisher** page only afterward.
+- **Windows ships through GitHub Releases only, not npm.**
+  `do-harness-win32-x64` is rejected by npm's registry name screening (HTTP
+  403, "Package name triggered spam detection"), so no Windows package exists
+  and `npx do-harness` cannot resolve a binary on Windows. The `v0.1.1` release
+  ships `do-harness-v<version>-x86_64-pc-windows-msvc.zip`; that zip (or the
+  installer, or `cargo install`) is the Windows install path. Do not publish
+  `do-harness` to npm while its Windows `optionalDependency` is unavailable —
+  the meta package installs fine and then fails at run time, which is a worse
+  failure than an absent package. `integrations/npm/lib/platform.js` records
+  the unavailable package so the shim exits with release guidance.
+  Revisit only if npm clears the name; a coordinated rename is the fallback.
 - Once each package exists, configure its Trusted Publisher on
   <https://www.npmjs.com>: package **Settings → Trusted Publisher → GitHub
   Actions**, organization/user `d-o-hub`, repository `do-harness`, workflow
@@ -149,14 +157,19 @@ missing/unsupported-platform diagnostics.
 
 ## Install channels
 
-| Channel | Command |
-|---------|---------|
-| npx (zero install) | `npx do-harness init` |
-| npm dev dependency | `npm install -D do-harness && npx do-harness verify` |
-| Prebuilt installer | `curl -fsSL .../scripts/install.sh \| sh -s -- --version v0.2.0` |
-| cargo-binstall | `cargo binstall do-harness` |
-| crates.io source build | `cargo install do-harness --version 0.2.0` |
-| Vendored source | `cargo install --path vendor/do-harness/crates/do-harness` |
+| Channel | Command | Windows |
+|---------|---------|---------|
+| npx (zero install) | `npx do-harness init` | no (package unavailable) |
+| npm dev dependency | `npm install -D do-harness && npx do-harness verify` | no |
+| Prebuilt installer | `curl -fsSL .../scripts/install.sh \| sh -s -- --version v0.2.0` | yes (Git Bash) |
+| Release zip | unzip `do-harness-v<version>-x86_64-pc-windows-msvc.zip` | yes |
+| cargo-binstall | `cargo binstall do-harness` | yes |
+| crates.io source build | `cargo install do-harness --version 0.2.0` | yes |
+| Vendored source | `cargo install --path vendor/do-harness/crates/do-harness` | yes |
+
+Windows has no npm channel: the `do-harness-win32-x64` platform package is
+blocked at the registry (HTTP 403 name screening), so both npm rows above are
+Linux/macOS-only. Use the installer, the release zip, or a cargo channel.
 
 For git hooks with an npm install, point `DO_HARNESS_BIN` at
 `node_modules/.bin/do-harness` (the shim forwards arguments to the platform
