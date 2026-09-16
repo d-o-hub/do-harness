@@ -252,7 +252,7 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
         .await
         .map_err(CliError::Usage),
         Command::Seed { prune } => commands::seed(&root, prune).await.map_err(CliError::Usage),
-        Command::Task { action } => commands::task_cmd(&root, action)
+        Command::Task { action } => commands::task_cmd(&root, action, cli.dry_run)
             .await
             .map_err(CliError::Usage),
         Command::Trace { action } => commands::trace_cmd(&root, action)

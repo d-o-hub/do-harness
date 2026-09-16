@@ -196,10 +196,11 @@ Task state inspection and workflow management.
 - `task list [--status <STATUS>] [--method <METHOD>] [--parent <ID>] [--format <Format>]`: Print tasks and board summary.
 - `task show <ID> [--format <Format>]`: Display task details.
 - `task add <TITLE> [--method <METHOD>] [--parent <ID>] [--precondition <GUARD>]`: Add a new task in pending state. Method must exist in `plans/methods.json`.
-- `task advance <ID> [--dry-run]`: Advance task subtask pointer.
-- `task done <ID> [--dry-run]`: Mark task completed after all sensor gates pass.
+- `task advance <ID>`: Advance task subtask pointer.
+- `task done <ID>`: Mark task completed after all sensor gates pass.
 - `task fail <ID>`: Mark task failed.
-- `task remove <ID>`: Remove task from state database.
+- `task remove <ID>`: Remove an orphan task row that has no workflow events. A task with history is refused, because the event log is append-only and hash-chained; use `task fail` to close it instead.
+- `--dry-run` is a global flag and applies to every mutating action above (`add`, `advance`, `done`, `fail`, `remove`, `export`); each prints what it would do and writes nothing.
 
 ### `doctor`
 Diagnostic health checks covering binary resolution, git hook status, and database migration skew.

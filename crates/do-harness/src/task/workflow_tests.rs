@@ -1,7 +1,9 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use super::*;
-use do_harness_types::{DomainEvent, TaskAdded, TaskAdvanced, TaskCompleted, TaskFailed};
+use do_harness_types::{
+    DomainEvent, TaskAdded, TaskAdvanced, TaskCompleted, TaskFailed, WorkflowEvent,
+};
 
 use super::tests::{insert_ok_beat, write_catalog};
 

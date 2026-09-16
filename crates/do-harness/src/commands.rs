@@ -90,13 +90,23 @@ pub fn print_version(format: Format) {
 }
 
 /// Dispatches task-state actions.
-pub async fn task_cmd(root: &Path, action: TaskAction) -> Result<()> {
+///
+/// `dry_run` is the global `--dry-run` flag, threaded in rather than declared
+/// per subcommand so one switch governs every mutating action: `add`, `advance`,
+/// `done`, `fail`, and `remove` are all no-ops under it. `add` previously read
+/// no dry-run state at all and wrote the row anyway while the flag claimed
+/// "without side effects".
+pub async fn task_cmd(root: &Path, action: TaskAction, dry_run: bool) -> Result<()> {
     match action {
         TaskAction::Export {
             output,
             stdout,
             format,
         } => {
+            if dry_run {
+                println!("Dry run: would export the task board");
+                return Ok(());
+            }
             let count = task::export_tasks(root, output.as_deref(), stdout, format).await?;
             if !stdout {
                 let target = output.unwrap_or_else(|| PathBuf::from("plans/tasks.json"));
@@ -120,6 +130,10 @@ pub async fn task_cmd(root: &Path, action: TaskAction) -> Result<()> {
             parent,
             precondition,
         } => {
+            if dry_run {
+                println!("Dry run: would add task: {title}");
+                return Ok(());
+            }
             let (id, _event) = task::add_task(
                 root,
                 &title,
@@ -131,32 +145,40 @@ pub async fn task_cmd(root: &Path, action: TaskAction) -> Result<()> {
             println!("Added task {id}: {title}");
             Ok(())
         }
-        TaskAction::Advance { id, dry_run } => {
+        TaskAction::Advance { id, .. } => {
             if dry_run {
                 println!("Dry run: would advance task {id}");
-                Ok(())
-            } else {
-                let (index, _event) = task::advance_task(root, id).await?;
-                println!("Advanced task {id} to subtask_index={index}");
-                Ok(())
+                return Ok(());
             }
+            let (index, _event) = task::advance_task(root, id).await?;
+            println!("Advanced task {id} to subtask_index={index}");
+            Ok(())
         }
-        TaskAction::Done { id, dry_run } => {
+        TaskAction::Done { id, .. } => {
             if dry_run {
                 println!("Dry run: would mark task {id} done");
-                Ok(())
-            } else {
-                task::done_task(root, id).await?;
-                println!("Done task {id}");
-                Ok(())
+                return Ok(());
             }
+            task::done_task(root, id).await?;
+            println!("Done task {id}");
+            Ok(())
         }
         TaskAction::Fail { id } => {
+            if dry_run {
+                println!("Dry run: would mark task {id} failed");
+                return Ok(());
+            }
             task::fail_task(root, id).await?;
             println!("Failed task {id}");
             Ok(())
         }
-        TaskAction::Remove { id } => task::remove_task(root, id).await,
+        TaskAction::Remove { id } => {
+            if dry_run {
+                println!("Dry run: would remove task {id}");
+                return Ok(());
+            }
+            task::remove_task(root, id).await
+        }
     }
 }
 

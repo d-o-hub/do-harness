@@ -3,6 +3,7 @@
 use std::fs;
 
 use super::*;
+use do_harness_types::TaskState;
 
 /// Writes a minimal frozen method catalog for tests that gate on it.
 pub(super) fn write_catalog(root: &Path) {
