@@ -26,6 +26,7 @@ mediates tool calls. This model covers its HTTP surface and audit log.
 |---|---|---|
 | SSRF to cloud metadata | Link-local/metadata hosts are always rejected; loopback/private need `allow_private_upstreams`; optional exact-host allowlist | `validate_upstream` in `crates/guardian-proxy/src/proxy.rs` |
 | Fail-open on mediation error | Only an explicit `Allow` is forwarded; policy/runtime errors map to 403 | `tool_call_handler`, `ProxyMediator::decide` |
+| Unauthenticated ingress (any local process, or a port-forwarded client) | Optional `ingress_token` bearer check applied by one layer to the mediation routes before mediation, audit, and the `rmcp` transport | `require_ingress_auth`, `AppState::ingress_authorized`, `server/tests/auth.rs` |
 | Governance unavailability hidden | Mediator init failure serves a degraded router: `/health` 503, all calls denied | `AppState::degraded`, `create_router_degraded` |
 | Stub mistaken for enforcement | Startup banner, `X-Do-Harness-Governance: enforced\|stub` header, `stub_decisions` counter | `main.rs`, `server.rs`, `metrics.rs` |
 | Oversized request/response DoS | 1 MiB ingress limit (`DefaultBodyLimit`) and bounded upstream reads | `server.rs` |
@@ -51,7 +52,8 @@ mediates tool calls. This model covers its HTTP surface and audit log.
   chain detects tampering on the next read).
 - The `AgentMeshClient` (pre-GA AGT) exposes a boolean allow today; the typed
   error channel exists so a future error surface can be denied explicitly.
-- The MCP endpoint is unauthenticated like the legacy route; bind loopback and
+- The mediation ingress is open unless `ingress_token` is set (the loopback
+  default), and `/health` is always unauthenticated; bind loopback and
   terminate TLS in front of any remote deployment.
 - An empty `allowed_origins` disables Origin validation; the loopback default
   is intentional, and non-browser clients that omit `Origin` always pass.

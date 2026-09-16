@@ -31,6 +31,11 @@ pub struct ProxyConfig {
     /// Optional bearer token required on `GET /metrics`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub metrics_token: Option<String>,
+    /// Bearer token required on the mediation ingress (`POST /mcp` and the
+    /// deprecated `POST /mcp/tools/call`) when set. `None` leaves the ingress
+    /// open, which is the loopback sidecar default.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ingress_token: Option<String>,
     /// Browser origins allowed on the MCP endpoint, matched per RFC 6454
     /// `(scheme, host, port)`. Requests without an `Origin` header always
     /// pass; an empty list disables Origin validation.

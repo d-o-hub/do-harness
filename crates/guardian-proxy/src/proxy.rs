@@ -70,10 +70,12 @@ impl ProxyMediator {
     ///
     /// # Errors
     ///
-    /// Returns an error if the upstream is denied by the SSRF policy or the
-    /// governance client cannot be initialized.
+    /// Returns an error if the upstream is denied by the SSRF policy, a
+    /// configured credential is empty, or the governance client cannot be
+    /// initialized.
     pub fn new(config: ProxyConfig) -> Result<Self> {
         validate_upstream(&config)?;
+        validate_credentials(&config)?;
         #[cfg(feature = "agt-governance")]
         {
             let gate = AgtGateWrapper::new(&config.agent_id)?;
@@ -141,6 +143,24 @@ impl ProxyMediator {
             Ok(ForwardDecision::Allow)
         }
     }
+}
+
+/// Rejects an empty bearer token.
+///
+/// An empty credential would authenticate a caller that sends `Bearer ` with
+/// nothing after it, which is only ever a configuration typo.
+fn validate_credentials(config: &ProxyConfig) -> Result<()> {
+    for (field, value) in [
+        ("ingress_token", &config.ingress_token),
+        ("metrics_token", &config.metrics_token),
+    ] {
+        if value.as_deref().is_some_and(str::is_empty) {
+            return Err(crate::error::GuardianError::Config(format!(
+                "{field} must not be empty"
+            )));
+        }
+    }
+    Ok(())
 }
 
 /// SSRF guard: `Ok` only when the configured upstream is safe to call.
@@ -239,6 +259,7 @@ mod tests {
             upstream_allowlist: vec![],
             allow_private_upstreams: true,
             metrics_token: None,
+            ingress_token: None,
             allowed_origins: vec![],
         }
     }
@@ -282,6 +303,30 @@ mod tests {
 
         cfg.upstream_allowlist = vec!["API.example.com".into()];
         assert!(validate_upstream(&cfg).is_ok());
+    }
+
+    #[test]
+    fn test_empty_credential_is_rejected_at_construction() {
+        let mut cfg = test_config();
+        cfg.ingress_token = Some(String::new());
+        let err = match ProxyMediator::new(cfg) {
+            Ok(_) => panic!("empty ingress_token must be rejected"),
+            Err(err) => err.to_string(),
+        };
+        assert!(err.contains("ingress_token must not be empty"), "{err}");
+
+        let mut cfg = test_config();
+        cfg.metrics_token = Some(String::new());
+        let err = match ProxyMediator::new(cfg) {
+            Ok(_) => panic!("empty metrics_token must be rejected"),
+            Err(err) => err.to_string(),
+        };
+        assert!(err.contains("metrics_token must not be empty"), "{err}");
+
+        let mut cfg = test_config();
+        cfg.ingress_token = Some("s3cret".into());
+        cfg.metrics_token = Some("mtok".into());
+        assert!(ProxyMediator::new(cfg).is_ok());
     }
 
     #[test]

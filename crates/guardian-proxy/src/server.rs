@@ -7,8 +7,9 @@ use std::sync::Arc;
 use axum::{
     Json, Router,
     body::Body,
-    extract::{DefaultBodyLimit, State},
-    http::{HeaderMap, HeaderValue, StatusCode},
+    extract::{DefaultBodyLimit, Request, State},
+    http::{HeaderMap, HeaderValue, StatusCode, header::WWW_AUTHENTICATE},
+    middleware::{self, Next},
     response::{IntoResponse, Response},
     routing::{get, post},
 };
@@ -36,7 +37,10 @@ const SUCCESSOR_LINK: &str = "</mcp>; rel=\"successor-version\"";
 /// Routes:
 /// - `GET /health` — 200 only while the mediator is initialized; 503 degraded.
 /// - `GET /metrics` — observability counters (bearer token when configured).
-/// - `POST /mcp/tools/call` — tool-call mediation (fail-closed, forwards on Allow).
+/// - `POST /mcp/tools/call` — tool-call mediation (fail-closed, forwards on Allow),
+///   behind the optional `ingress_token` bearer check.
+/// - `POST /mcp` — the MCP ingress, carrying the same `ingress_token`
+///   requirement when the `mcp-surface` feature is enabled.
 ///
 /// Request bodies are capped at one mebibyte; upstream responses are buffered up to
 /// the same bound. There is intentionally no `POST /` alias: one mediation
@@ -61,17 +65,60 @@ pub fn create_router_degraded(error: String) -> Router {
 /// at `/mcp` (modern protocol revision only); the legacy flat routes keep
 /// precedence for their exact paths.
 pub fn create_router_with_state(state: AppState) -> Router {
-    #[cfg(feature = "mcp-surface")]
-    let mcp_state = state.clone();
-    let router = Router::new()
+    // Observability surface: `/health` stays probeable by orchestrators and
+    // `/metrics` keeps its own `metrics_token`, so neither sits behind the
+    // ingress token.
+    let public = Router::new()
         .route("/health", get(health_handler))
-        .route("/metrics", get(metrics_handler))
-        .route("/mcp/tools/call", post(tool_call_handler))
-        .layer(DefaultBodyLimit::max(MAX_REQUEST_BYTES))
-        .with_state(state);
+        .route("/metrics", get(metrics_handler));
+
+    // Mediation surface: the deprecated flat route plus, with `mcp-surface`,
+    // the nested MCP transport. Both sit behind the ingress token so an
+    // unauthenticated request never reaches mediation, audit, or `rmcp`.
+    let mediation = Router::new().route("/mcp/tools/call", post(tool_call_handler));
     #[cfg(feature = "mcp-surface")]
-    let router = crate::mcp::mount(router, mcp_state);
-    router
+    let mediation = crate::mcp::mount(mediation, state.clone());
+    // Applied last so it runs first; `DefaultBodyLimit` only sets a request
+    // extension, so its position relative to the auth layer is immaterial.
+    let mediation = mediation
+        .layer(DefaultBodyLimit::max(MAX_REQUEST_BYTES))
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            require_ingress_auth,
+        ));
+
+    public.merge(mediation).with_state(state)
+}
+
+/// Bearer-credential gate for the mediation ingress.
+///
+/// Runs after routing and before the handler or the nested MCP transport, so an
+/// unauthenticated request is rejected before mediation, audit, or upstream
+/// contact. Unauthorized requests are not counted as decisions: no allow/deny
+/// metric moves and no audit record is written.
+async fn require_ingress_auth(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    request: Request,
+    next: Next,
+) -> Response {
+    if state.ingress_authorized(&headers) {
+        return next.run(request).await;
+    }
+    unauthorized_response("missing or invalid ingress token")
+}
+
+/// Builds the RFC 9110 bearer challenge shared by both token checks.
+fn unauthorized_response(message: &str) -> Response {
+    (
+        StatusCode::UNAUTHORIZED,
+        [(
+            WWW_AUTHENTICATE,
+            HeaderValue::from_static("Bearer realm=\"guardian-proxy\""),
+        )],
+        Json(serde_json::json!({ "error": message })),
+    )
+        .into_response()
 }
 
 async fn health_handler(State(state): State<AppState>) -> Response {
@@ -86,19 +133,8 @@ async fn health_handler(State(state): State<AppState>) -> Response {
 }
 
 async fn metrics_handler(State(state): State<AppState>, headers: HeaderMap) -> Response {
-    if let Some(token) = state.metrics_token.as_deref() {
-        let authorized = headers
-            .get(axum::http::header::AUTHORIZATION)
-            .and_then(|value| value.to_str().ok())
-            .and_then(|value| value.strip_prefix("Bearer "))
-            .is_some_and(|presented| presented == token);
-        if !authorized {
-            return (
-                StatusCode::UNAUTHORIZED,
-                Json(serde_json::json!({"error":"missing or invalid metrics token"})),
-            )
-                .into_response();
-        }
+    if !state.metrics_authorized(&headers) {
+        return unauthorized_response("missing or invalid metrics token");
     }
     Json(state.metrics.snapshot()).into_response()
 }

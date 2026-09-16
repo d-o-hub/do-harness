@@ -12,6 +12,10 @@ allow_private_upstreams = true
 upstream_allowlist = []
 # Optional bearer token required on GET /metrics.
 # metrics_token = "change-me"
+# Optional bearer token required on the mediation ingress (POST /mcp and the
+# deprecated POST /mcp/tools/call). Unset leaves the ingress open, which is the
+# loopback-sidecar default.
+# ingress_token = "change-me"
 # Browser origins allowed on the MCP endpoint (RFC 6454 exact scheme/host/port
 # match). Requests without an Origin header always pass. Defaults to loopback:
 # allowed_origins = ["http://localhost", "https://localhost", "http://127.0.0.1", "https://127.0.0.1"]

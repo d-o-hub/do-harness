@@ -166,6 +166,68 @@ async fn unknown_method_maps_upstream_not_found_to_404() {
 }
 
 #[tokio::test(flavor = "current_thread")]
+async fn mcp_ingress_requires_bearer_token() {
+    let upstream = spawn_mock_upstream().await;
+    let router = create_router_with_state(state_with_ingress_token(&upstream.url, Some("s3cret")));
+
+    let denied = router
+        .clone()
+        .oneshot(mcp_request(
+            "tools/list",
+            None,
+            &json!({"_meta": meta()}),
+            true,
+        ))
+        .await
+        .expect("response");
+    assert_eq!(denied.status(), StatusCode::UNAUTHORIZED);
+    assert!(upstream.calls.lock().unwrap().is_empty());
+
+    let allowed = router
+        .oneshot(with_bearer(
+            mcp_request("tools/list", None, &json!({"_meta": meta()}), true),
+            "s3cret",
+        ))
+        .await
+        .expect("response");
+    assert_eq!(allowed.status(), StatusCode::OK);
+    let calls = upstream.calls.lock().unwrap();
+    assert_eq!(calls.len(), 1);
+    assert_eq!(calls[0]["method"], json!("tools/list"));
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn mcp_discover_requires_bearer_token() {
+    let upstream = spawn_mock_upstream().await;
+    let router = create_router_with_state(state_with_ingress_token(&upstream.url, Some("s3cret")));
+
+    // `server/discover` is answered by the transport itself, not our handler,
+    // so this proves the layer wraps the nested service.
+    let denied = router
+        .clone()
+        .oneshot(mcp_request(
+            "server/discover",
+            None,
+            &json!({"_meta": meta()}),
+            true,
+        ))
+        .await
+        .expect("response");
+    assert_eq!(denied.status(), StatusCode::UNAUTHORIZED);
+
+    let allowed = router
+        .oneshot(with_bearer(
+            mcp_request("server/discover", None, &json!({"_meta": meta()}), true),
+            "s3cret",
+        ))
+        .await
+        .expect("response");
+    assert_eq!(allowed.status(), StatusCode::OK);
+    let value = body_json(allowed).await;
+    assert_eq!(value["result"]["supportedVersions"], json!(["2026-07-28"]));
+}
+
+#[tokio::test(flavor = "current_thread")]
 async fn notification_is_accepted_with_202() {
     let router = create_router_degraded("test".to_string());
     let body = serde_json::to_string(&json!({

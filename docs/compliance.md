@@ -31,7 +31,8 @@ dev-loop verification controls**. In particular:
 > the feature is required wherever enforcement is claimed). With the optional
 > `mcp-surface` feature it also serves an MCP Streamable HTTP ingress (protocol
 > `2026-07-28`) that mediates `tools/call` through the same decision path and
-> enforces Host/Origin checks plus mirrored-header validation. It validates
+> enforces Host/Origin checks plus mirrored-header validation, and can require
+> a bearer token on the mediation ingress (`ingress_token`). It validates
 > upstreams against an SSRF policy, caps request/response bodies, times out
 > upstream calls, denies all traffic when mediation is unavailable, and can
 > bind decisions to a hash-chained JSONL audit log with cross-process file

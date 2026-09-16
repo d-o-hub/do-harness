@@ -197,7 +197,13 @@ pub fn service(state: AppState) -> StreamableHttpService<McpIngress, LocalSessio
 }
 
 /// Mounts the MCP endpoint at `/mcp` on `router`.
-pub fn mount(router: Router, state: AppState) -> Router {
+///
+/// Generic over the router's state so the endpoint can be mounted before the
+/// ingress-auth layer is applied (the nested transport itself needs no state).
+pub fn mount<S>(router: Router<S>, state: AppState) -> Router<S>
+where
+    S: Clone + Send + Sync + 'static,
+{
     router.nest_service("/mcp", service(state))
 }
 

@@ -220,5 +220,11 @@
     "rationale": "The AGT hold and the mcp-surface hold both live in epic prose while the truth is Cargo's default feature array, so the two can drift silently across a long-lived epic and nobody notices until a build behaves unlike the roadmap. The GA watch cannot be the gate: check-agt-ga.sh prints VERDICT=GA/NOT_GA/UNKNOWN and exits 0 on every verdict, so wrapping it would always pass, and calling it over the network would turn a fetch error into a verify failure; the dated live verdict stays recorded epic evidence, and this check is hermetic over in-repo artifacts",
     "sensor": "bash scripts/check-promotion-decisions.sh",
     "category": "governance"
+  },
+  {
+    "invariant": "The guardian-proxy mediation ingress (POST /mcp and POST /mcp/tools/call) requires Authorization: Bearer <ingress_token> when ingress_token is configured, enforced by one layer that runs before mediation, audit, or upstream contact; /health stays probeable and /metrics keeps its own metrics_token",
+    "rationale": "The fail-closed mediator only helps if callers cannot bypass it, and before this every tool-reachable route answered any process that could reach the port while the default stub build allowed every well-formed call; a token that is absent by default keeps the loopback sidecar usable and turns a non-loopback bind into a deliberate, credential-gated choice",
+    "sensor": "cargo test -p guardian-proxy && cargo test -p guardian-proxy --features agt-governance && cargo test -p guardian-proxy --features mcp-surface",
+    "category": "security"
   }
 ]

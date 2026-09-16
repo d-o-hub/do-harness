@@ -94,6 +94,7 @@ fn test_mediator_with_origins(upstream: &str, allowed_origins: Vec<String>) -> A
         upstream_allowlist: vec![],
         allow_private_upstreams: true,
         metrics_token: None,
+        ingress_token: None,
         allowed_origins,
     };
     Arc::new(ProxyMediator::new(config).expect("mediator"))
@@ -352,3 +353,19 @@ async fn denied_call_maps_to_tool_error_with_audit() {
 }
 
 mod security;
+
+/// Adds `Authorization: Bearer <token>` to an existing MCP request.
+fn with_bearer(mut request: Request<AxumBody>, token: &str) -> Request<AxumBody> {
+    request.headers_mut().insert(
+        "authorization",
+        axum::http::HeaderValue::from_str(&format!("Bearer {token}")).expect("header value"),
+    );
+    request
+}
+
+/// State whose MCP ingress requires `token`.
+fn state_with_ingress_token(upstream: &str, token: Option<&str>) -> crate::AppState {
+    let mut state = crate::AppState::new(test_mediator(upstream));
+    state.ingress_token = token.map(str::to_string);
+    state
+}

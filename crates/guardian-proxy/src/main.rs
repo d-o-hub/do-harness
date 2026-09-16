@@ -14,7 +14,7 @@ use clap::Parser;
 
 use std::sync::Arc;
 
-use guardian_proxy::{AuditLog, ProxyConfig, ProxyMediator, create_router_degraded};
+use guardian_proxy::{AuditLog, ProxyConfig, ProxyMediator};
 
 #[derive(Debug, Parser)]
 #[command(
@@ -56,7 +56,7 @@ async fn main() -> Result<()> {
     }
     let config = load_config(&cli.config)?;
     let bind = config.bind.clone();
-    let router = match ProxyMediator::new(config.clone()) {
+    let state = match ProxyMediator::new(config.clone()) {
         Ok(mediator) => {
             println!(
                 "guardian-proxy: bind={bind} upstream={} agent_id={} (agt-governance: {})",
@@ -69,24 +69,28 @@ async fn main() -> Result<()> {
                 }
             );
             let mediator = Arc::new(mediator);
-            let mut state = match &config.audit_log {
+            match &config.audit_log {
                 Some(path) => {
                     let audit = AuditLog::open(path)?;
                     println!("guardian-proxy: audit log at {path}");
                     guardian_proxy::AppState::with_audit(mediator, audit)
                 }
                 None => guardian_proxy::AppState::new(mediator),
-            };
-            state.metrics_token.clone_from(&config.metrics_token);
-            guardian_proxy::create_router_with_state(state)
+            }
         }
         Err(err) => {
             // Fail closed but stay observable: /health turns 503 and every
             // tool call is denied until the configuration is fixed.
             eprintln!("guardian-proxy: FAIL-CLOSED: mediator init failed: {err}");
-            create_router_degraded(err.to_string())
+            guardian_proxy::AppState::degraded(err.to_string())
         }
     };
+    // Applied on both paths: a degraded proxy must still require the
+    // configured credentials before it answers.
+    let mut state = state;
+    state.metrics_token.clone_from(&config.metrics_token);
+    state.ingress_token.clone_from(&config.ingress_token);
+    let router = guardian_proxy::create_router_with_state(state);
     let listener = tokio::net::TcpListener::bind(&bind).await?;
     println!("guardian-proxy: listening on {bind}");
     axum::serve(listener, router).await?;

@@ -5,6 +5,8 @@
 use std::sync::Arc;
 use std::time::Duration;
 
+use axum::http::HeaderMap;
+
 use crate::{AuditLog, ProxyMediator, ProxyMetrics};
 
 /// Upstream request timeout; a hung upstream must not pin a proxy task.
@@ -30,6 +32,8 @@ pub struct AppState {
     pub init_error: Option<String>,
     /// Bearer token required on `GET /metrics` when set.
     pub metrics_token: Option<String>,
+    /// Bearer token required on the mediation ingress when set.
+    pub ingress_token: Option<String>,
     /// Browser origins allowed on the MCP endpoint (RFC 6454 match).
     pub allowed_origins: Vec<String>,
 }
@@ -48,6 +52,7 @@ impl AppState {
             metrics: Arc::new(ProxyMetrics::new()),
             init_error: None,
             metrics_token: None,
+            ingress_token: None,
             allowed_origins,
         }
     }
@@ -65,6 +70,7 @@ impl AppState {
             metrics: Arc::new(ProxyMetrics::new()),
             init_error: None,
             metrics_token: None,
+            ingress_token: None,
             allowed_origins,
         }
     }
@@ -80,9 +86,45 @@ impl AppState {
             metrics: Arc::new(ProxyMetrics::new()),
             init_error: Some(error),
             metrics_token: None,
+            ingress_token: None,
             allowed_origins: crate::default_allowed_origins(),
         }
     }
+
+    /// Returns true when the request may use the mediation ingress.
+    ///
+    /// An unset `ingress_token` disables the check.
+    #[must_use]
+    pub fn ingress_authorized(&self, headers: &HeaderMap) -> bool {
+        token_authorized(self.ingress_token.as_deref(), headers)
+    }
+
+    /// Returns true when the request may read `GET /metrics`.
+    ///
+    /// An unset `metrics_token` disables the check.
+    #[must_use]
+    pub fn metrics_authorized(&self, headers: &HeaderMap) -> bool {
+        token_authorized(self.metrics_token.as_deref(), headers)
+    }
+}
+
+/// Shared bearer rule: unset disables the check, empty denies every caller.
+fn token_authorized(expected: Option<&str>, headers: &HeaderMap) -> bool {
+    match expected {
+        None => true,
+        Some("") => false,
+        // Plain comparison mirrors the check this replaced: the proxy is a
+        // loopback development sidecar and no timing side channel is claimed.
+        Some(expected) => bearer(headers).is_some_and(|presented| presented == expected),
+    }
+}
+
+/// Extracts the credential from `Authorization: Bearer <token>`.
+fn bearer(headers: &HeaderMap) -> Option<&str> {
+    headers
+        .get(axum::http::header::AUTHORIZATION)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.strip_prefix("Bearer "))
 }
 
 /// Builds the upstream client with a finite timeout.
