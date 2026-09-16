@@ -1,6 +1,11 @@
 name: verify
 on:
   push:
+    # A feature-branch push also fires `pull_request`, which would run this
+    # workflow twice for the same commit (and the two runs then contend for the
+    # same runners). Restrict the push trigger to `main` so every commit is
+    # verified exactly once: by `push` on main, by `pull_request` on branches.
+    branches: [main]
   pull_request:
 
 permissions:
