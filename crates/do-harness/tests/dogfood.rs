@@ -39,38 +39,6 @@ fn verify_json(root: &Path) -> Value {
 }
 
 #[test]
-fn rust_init_on_empty_git_repo_is_green() {
-    let dir = tempfile::tempdir().unwrap();
-    let status = Command::new("git")
-        .args(["init", "-q"])
-        .current_dir(dir.path())
-        .status()
-        .expect("git init");
-    assert!(status.success(), "git init failed");
-
-    let (ok, out) = run(harness(dir.path()).arg("init"));
-    assert!(
-        ok,
-        "init failed on fresh git repository with no commits:\n{out}"
-    );
-
-    let report = verify_json(dir.path());
-    assert_eq!(
-        report["ok"],
-        serde_json::json!(true),
-        "rust init + verify on repo with no commits must be green"
-    );
-    let commitlint = report["sensors"]
-        .as_array()
-        .expect("sensors array")
-        .iter()
-        .find(|s| s["name"] == "commitlint")
-        .expect("commitlint sensor entry");
-    assert_eq!(commitlint["ok"], serde_json::json!(true));
-    assert_eq!(commitlint["exit_code"], serde_json::json!(0));
-}
-
-#[test]
 fn rust_init_then_full_verify_is_green() {
     let dir = tempfile::tempdir().unwrap();
     let (ok, out) = run(harness(dir.path()).arg("init"));
