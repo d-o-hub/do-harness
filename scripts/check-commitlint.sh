@@ -88,7 +88,7 @@ while (( $# )); do
             shift
             ;;
         --range)
-            if [[ $# -lt 2 ]]; then
+            if [[ $# -lt 2 || -z "${2:-}" ]]; then
                 echo "check-commitlint: --range requires a git rev-list range" >&2
                 exit 2
             fi
@@ -97,6 +97,10 @@ while (( $# )); do
             ;;
         --range=*)
             RANGE="${1#--range=}"
+            if [[ -z "$RANGE" ]]; then
+                echo "check-commitlint: --range requires a git rev-list range" >&2
+                exit 2
+            fi
             shift
             ;;
         *)
@@ -112,6 +116,12 @@ fi
 if [[ -z "$RANGE" ]] && ! [[ "$COUNT" =~ ^[1-9][0-9]*$ ]]; then
     echo "check-commitlint: count must be a positive integer, got: $COUNT" >&2
     exit 2
+fi
+
+if [[ -z "$RANGE" ]] && ! git -C "$ROOT" rev-parse -q --verify HEAD >/dev/null 2>&1 &&
+    COMMIT_COUNT="$(git -C "$ROOT" rev-list --count --all 2>/dev/null)" && [[ "$COMMIT_COUNT" == "0" ]]; then
+    echo "check-commitlint OK: no commits to lint"
+    exit 0
 fi
 
 FAIL=0
