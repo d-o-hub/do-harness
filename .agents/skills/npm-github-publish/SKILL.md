@@ -11,6 +11,8 @@ metadata:
   short-description: Publish npm packages with GitHub OIDC
   tags: npm github-actions oidc trusted-publishing provenance release
 ---
+## Guides
+See references/heuristics.md for distilled heuristics.
 
 # GitHub npm publishing
 

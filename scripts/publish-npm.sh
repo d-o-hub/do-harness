@@ -23,6 +23,19 @@ DRY_RUN=0
 TAG="latest"
 OTP=""
 
+# `actions/setup-node` with `registry-url` always exports this exact dummy value
+# when no token is configured, and writes it to the temp `.npmrc` as
+# `//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}`:
+#
+#   core.exportVariable('NODE_AUTH_TOKEN',
+#     process.env.NODE_AUTH_TOKEN || 'XXXXX-XXXXX-XXXXX-XXXXX');
+#
+# Treating it as a real credential would shadow GitHub's OIDC exchange, because
+# the token branch below is checked first — making the trusted-publishing branch
+# unreachable in exactly the CI job that is supposed to use it. It must count as
+# unset, and be cleared before publishing so `.npmrc` resolves it empty.
+NODE_AUTH_TOKEN_PLACEHOLDER="XXXXX-XXXXX-XXXXX-XXXXX"
+
 die() {
     echo "publish-npm.sh: $*" >&2
     exit 1
@@ -86,6 +99,15 @@ VERSION="${VERSION#v}"
 
 if (( ! DRY_RUN )); then
     TOKEN="${NODE_AUTH_TOKEN:-${NPM_TOKEN:-}}"
+    # A bare `setup-node` placeholder is not a credential; ignore it so the OIDC
+    # branch below is reachable. Also export it as empty, so the temp `.npmrc`
+    # that setup-node generated (`_authToken=${NODE_AUTH_TOKEN}`) does not
+    # resolve to the literal dummy string and get sent as Bearer auth.
+    if [[ "$TOKEN" == "$NODE_AUTH_TOKEN_PLACEHOLDER" ]]; then
+        echo "Ignoring the setup-node placeholder NODE_AUTH_TOKEN; using OIDC"
+        TOKEN=""
+        export NODE_AUTH_TOKEN=""
+    fi
     if [[ -n "$TOKEN" ]]; then
         export NODE_AUTH_TOKEN="$TOKEN"
     elif [[ -n "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" &&

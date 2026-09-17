@@ -50,6 +50,17 @@ verification set and every build target dogfoods green.
   automatically for these public GitHub Actions publishes. After a successful
   migration, revoke unused publish tokens and enable npm's **require
   two-factor authentication and disallow tokens** setting.
+- **`actions/setup-node` exports a fake credential, and it silently defeats
+  OIDC.** With `registry-url` set, the action always runs
+  `core.exportVariable('NODE_AUTH_TOKEN', process.env.NODE_AUTH_TOKEN || 'XXXXX-XXXXX-XXXXX-XXXXX')`
+  and writes `//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}` into a temp
+  `.npmrc`. Any publisher that reads `NODE_AUTH_TOKEN` and branches on it being
+  non-empty sees that placeholder, takes the token path, and never reaches the
+  OIDC exchange — while also sending the literal string to the registry as
+  Bearer auth (`401 Unauthorized`). `scripts/publish-npm.sh` therefore treats
+  this exact value as unset *and* clears it, so the temp `.npmrc` interpolates
+  empty. `check-npm-sequence.sh` enforces both halves. Do not "fix" a 401 here
+  by setting a token: a token in a job holding `id-token: write` is the defect.
 - For `cargo binstall` support, no extra setup is needed: the CLI manifest
   declares `[package.metadata.binstall]`, and the release assets match the
   cargo-binstall defaults (`do-harness-v<version>-<target>.tar.gz` containing
