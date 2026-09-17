@@ -186,7 +186,7 @@
     "category": "skills"
   },
   {
-    "invariant": "skill-creator <-> skill-distiller guidance overlap (~0.53 cosine) is accepted: both govern the same skill lifecycle (scaffold, gate, evaluate) from opposite ends, so lifecycle vocabulary is shared by design",
+    "invariant": "skill-creator <-> skill-distiller guidance overlap (~0.63 cosine, re-measured 2026-09-17; the earlier ~0.53 reading had drifted) is accepted: both govern the same skill lifecycle (scaffold, gate, evaluate) from opposite ends, so lifecycle vocabulary is shared by design",
     "rationale": "Topical overlap in lifecycle terms is not duplication of guidance; distinctiveness regressions beyond this baseline surface through the advisory check",
     "sensor": "do-harness overlap (advisory, threshold 0.45)",
     "category": "skills"
