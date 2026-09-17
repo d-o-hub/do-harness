@@ -1,2 +1,3 @@
 # Heuristics
 - **when inserting a section into an SKILL.md, place it after the frontmatter closing delimiter and assert formatting idempotently**: prevents section text from welding to the --- delimiter (from trace 1)
+- **A skill walkthrough that runs 'init' inside the eval sandbox re-scaffolds the guidance the without-skill baseline stripped, so lift reports contaminated; use 'init --minimal' and keep walkthrough comments free of repo tree tokens that referenced_paths would mirror**: Writing or fixing a do-harness skill walkthrough whose Skill Lift reads contaminated or whose assertions regress after an init change (from trace 2)
