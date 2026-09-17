@@ -1,2 +1,3 @@
 # Heuristics
 - **treat the setup-node NODE_AUTH_TOKEN placeholder as unset and clear it, or the CI job silently takes the token branch and never attempts OIDC**: Writing or debugging a GitHub Actions npm trusted-publishing job that sets registry-url via actions/setup-node (from trace 3)
+- **configure npm trusted publishers with the native 'npm trust github <pkg> --file <wf> --repo <owner/repo> --allow-publish' command and verify with 'npm trust list', because the trust endpoint is a governance write that demands an interactive 2FA challenge and rejects bypass-2FA tokens with 403**: Bootstrapping a new npm package name and wiring its GitHub Actions trusted publisher (from trace 4)
