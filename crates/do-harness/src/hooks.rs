@@ -153,7 +153,11 @@ pub fn install(
     // If core.hooksPath points away from standard git_dir/hooks, clean up any
     // managed hooks in git_dir/hooks so they don't linger as shadowed artifacts.
     let default_hooks_dir = git_dir.join("hooks");
-    if hooks_dir != default_hooks_dir && default_hooks_dir.is_dir() {
+    if let (Ok(active), Ok(default)) = (
+        fs::canonicalize(&hooks_dir),
+        fs::canonicalize(&default_hooks_dir),
+    ) && active != default
+    {
         for name in ["pre-commit", "pre-push", "commit-msg"] {
             let path = default_hooks_dir.join(name);
             if let Ok(content) = fs::read_to_string(&path)

@@ -231,6 +231,67 @@ fn install_targets_configured_core_hookspath() {
     assert!(read(&custom_hooks.join("commit-msg")).contains(MARKER));
 }
 
+fn assert_install_preserves_default_hooks_alias(root: &Path, git_dir: &Path, alias: &str) {
+    let git_status = crate::changes::git_command(root)
+        .args(["config", "core.hooksPath", alias])
+        .status()
+        .unwrap();
+    assert!(git_status.success());
+
+    for _ in 0..2 {
+        let installed_path = install(git_dir, root, &[], &[], false).unwrap();
+        assert_eq!(installed_path, root.join(alias));
+        for name in ["pre-commit", "pre-push", "commit-msg"] {
+            assert!(read(&hook_path(git_dir, name)).contains(MARKER));
+            assert_eq!(
+                read(&installed_path.join(name)),
+                read(&hook_path(git_dir, name))
+            );
+        }
+        assert!(status(git_dir, root).is_all_installed());
+    }
+}
+
+#[test]
+fn install_preserves_default_hooks_through_parent_directory_alias() {
+    let (temp, git_dir) = fake_git_dir();
+    assert_install_preserves_default_hooks_alias(temp.path(), &git_dir, ".git/../.git/hooks");
+}
+
+#[cfg(unix)]
+#[test]
+fn install_preserves_default_hooks_through_symlink_alias() {
+    let (temp, git_dir) = fake_git_dir();
+    std::os::unix::fs::symlink(git_dir.join("hooks"), temp.path().join(".githooks")).unwrap();
+    assert_install_preserves_default_hooks_alias(temp.path(), &git_dir, ".githooks");
+}
+
+#[test]
+fn install_cleans_distinct_default_managed_hooks_and_keeps_foreign() {
+    let (temp, git_dir) = fake_git_dir();
+    let root = temp.path();
+    install(&git_dir, root, &[], &[], false).unwrap();
+    let foreign = "foreign hook\n";
+    write(&hook_path(&git_dir, "pre-push"), foreign);
+    let custom_hooks = root.join(".githooks");
+    fs::create_dir_all(&custom_hooks).unwrap();
+    let git_status = crate::changes::git_command(root)
+        .args(["config", "core.hooksPath", ".githooks"])
+        .status()
+        .unwrap();
+    assert!(git_status.success());
+
+    install(&git_dir, root, &[], &[], false).unwrap();
+
+    assert!(!hook_path(&git_dir, "pre-commit").exists());
+    assert!(!hook_path(&git_dir, "commit-msg").exists());
+    assert_eq!(read(&hook_path(&git_dir, "pre-push")), foreign);
+    for name in ["pre-commit", "pre-push", "commit-msg"] {
+        assert!(read(&custom_hooks.join(name)).contains(MARKER));
+    }
+    assert!(status(&git_dir, root).is_all_installed());
+}
+
 #[test]
 fn install_fails_closed_when_core_hookspath_dir_missing() {
     let (temp, git_dir) = fake_git_dir();
