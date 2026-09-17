@@ -53,8 +53,8 @@ fn concurrent_verify_record_and_advance_keep_chain_intact() {
 
     // Two concurrent verify --record writers plus a task advance.
     let mut children = vec![
-        spawn(root, &["verify", "--record", "--only", "loc"]),
-        spawn(root, &["verify", "--record", "--only", "loc"]),
+        spawn(root, &["verify", "--record", "--task", "1", "--only", "loc"]),
+        spawn(root, &["verify", "--record", "--task", "1", "--only", "loc"]),
         spawn(root, &["task", "advance", "1"]),
     ];
     for child in &mut children {
@@ -64,9 +64,9 @@ fn concurrent_verify_record_and_advance_keep_chain_intact() {
 
     // A second wave exercises the retry path on an already-chained log.
     let mut second = vec![
-        spawn(root, &["verify", "--record", "--only", "loc"]),
-        spawn(root, &["verify", "--record", "--only", "loc"]),
-        spawn(root, &["verify", "--record", "--only", "loc"]),
+        spawn(root, &["verify", "--record", "--task", "1", "--only", "loc"]),
+        spawn(root, &["verify", "--record", "--task", "1", "--only", "loc"]),
+        spawn(root, &["verify", "--record", "--task", "1", "--only", "loc"]),
     ];
     for child in &mut second {
         let status = child.wait().expect("wait");
