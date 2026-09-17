@@ -1,64 +1,32 @@
 # gh resilience
 
-Read before `gh pr create` / `gh pr edit`, and whenever a `gh` command or a
-check fails in API plumbing rather than in the diff.
+Read before `gh pr create` / `gh pr edit` or API plumbing failures.
 
-## Transient failures: retry, never rethink
-
-Route every mutating `gh` call through `scripts/retry.sh` (bounded attempts
-with a fixed delay, so the agent makes one call instead of sleeping between
-calls). Observed transient signatures, all safe to retry:
-
-| Signature | Example |
-|-----------|---------|
-| HTTP 502/503/504 | `pull request create failed: HTTP 502: 502 Bad Gateway (https://api.github.com/graphql)` |
-| GraphQL internal error | `GraphQL: Something went wrong while executing your query on ... Please include <tracking-id>` |
-| Connection / timeout | `Failed to connect`, `Connection reset`, `timed out` |
-| Rate limit | `HTTP 429`, `rate limit exceeded` |
-
+## Transient Failures (Retry)
+Route mutating `gh` calls through `scripts/retry.sh`:
 ```bash
 scripts/retry.sh --attempts 5 --delay 15 -- gh pr create --title ... --body ...
 ```
+Retries HTTP 502/503/504, GraphQL errors, connection timeouts, and HTTP 429 rate limits. Refuses deterministic failures.
 
-`retry.sh` replays stdout only on success, returns the final exit code, and
-refuses to retry deterministic failures — so a repeated failure after the
-bounded attempts is evidence, not a cue to try harder.
-
-## Deterministic failures: route around, do not retry
-
-- **Projects-classic `projectCards` error** (`GraphQL: Projects (classic) is
-  being deprecated ... (repository.pullRequest.projectCards)`): `gh`'s
-  default view/edit GraphQL query is broken server-side. Never retry; use
-  the REST API instead:
+## Deterministic Failures (Do Not Retry)
+- **Classic Projects `projectCards` error**: Use REST API with explicit fields:
   ```bash
   gh api -X PATCH "repos/{owner}/{repo}/pulls/<N>" -f body="..."
-  gh pr view <N> --json number,title,body,state  # explicit fields only
-  gh issue view <N> --json number,title,body     # never --comments
+  gh pr view <N> --json number,title,body,state
+  gh issue view <N> --json number,title,body
   ```
-- **Rerun forbidden** (`cannot be rerun; its workflow file may be broken`,
-  HTTP 403 `Jobs in this workflow run cannot be re-run`): the run cannot be
-  restarted. If the failure is infrastructure with zero diff causation (see
-  below), push one empty retrigger commit and continue the sweep; if the
-  retried run fails the same way, escalate instead of committing again.
+- **Rerun forbidden (HTTP 403)**: When CI failure has zero diff causation, push one empty retrigger commit; escalate if it fails again:
   ```bash
   git commit --allow-empty -m "chore(ci): retrigger checks after transient <name> failure"
   ```
-- Anything else 4xx, `already exists`, validation errors: fix the invocation.
+- **Other 4xx / validation errors**: Fix the invocation.
 
-## Duplicate-PR caution
-
-Retrying `pr create` across a 502 is safe (the mutation never committed),
-but if a retry succeeds after several attempts, confirm no duplicate was
-left behind before merging:
-
+## Duplicate-PR Caution
+After retrying `pr create`, confirm no duplicate exists before merging:
 ```bash
 gh pr list --head <branch> --json number,state
 ```
 
-## Known-transient check failure
-
-CodeQL `Analyze (rust)` failing at `Uploading results` with a
-`codeql-failed-run.sarif` post-step while extraction reports `0 files with
-errors` is SARIF-upload plumbing, not analysis. When the PR touches no Rust
-files and the default branch is green, treat it as transient: empty
-retrigger commit, one cycle, then escalate per check-policy.
+## Known-Transient Check Failure
+CodeQL `Analyze (rust)` failing at SARIF upload (with `0 files with errors`) on a non-Rust PR is plumbing: push one empty retrigger commit, wait one cycle, then escalate.
