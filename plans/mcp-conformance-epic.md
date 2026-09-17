@@ -83,12 +83,15 @@ unchanged. Hand-rolled and re-scope rejected.
 
 ## Verification checklist
 
-- [ ] `cargo test -p guardian-proxy` (feature off) and `--features mcp-surface` green
-- [ ] `cargo clippy --workspace --all-targets -- -D warnings`
-- [ ] `do-harness verify` green (including the new feature-on sensor)
-- [ ] `cargo deny check` clean with no `reqwest` duplicate
-- [ ] conformance suite covers allow/deny/audit/metrics + negative header/version paths
-- [ ] AGT epic criterion (b) re-worded; `chore-agt-promotion` still gated on GA
+Re-verified 2026-09-17 against the shipped tree. The slices had landed but the
+checklist was never ticked, so it read as open work while every item passed:
+
+- [x] `cargo test -p guardian-proxy` (feature off) and `--features mcp-surface` green — 36 and 57 passed, 0 failed
+- [x] `cargo clippy --workspace --all-targets -- -D warnings` — exit 0
+- [x] `do-harness verify` green (including the new feature-on sensor) — 13/13 sensors, `check-mcp` among them
+- [x] `cargo deny check` clean with no `reqwest` duplicate — advisories/bans/licenses/sources ok, and the `mcp-surface` closure resolves a single `reqwest v0.12.28`
+- [x] conformance suite covers allow/deny/audit/metrics + negative header/version paths — `call_tool_forwards_after_allow`, `denied_call_maps_to_tool_error_with_audit`, `audit_records_allowed_mcp_call`, `tool_call_round_trip_records_audit_and_metrics`; negatives in `src/mcp/tests/security.rs` (missing/unsupported/mismatched protocol version, tool-name mismatch, Origin denial)
+- [x] AGT epic criterion (b) re-worded; `chore-agt-promotion` still gated on GA — `plans/agt-governance-epic.md` criterion (b) wording plus the GA watch `VERDICT=NOT_GA`
 
 ## Slice completion — feat-mcp-ingress-scaffold (2026-09-12)
 
