@@ -9,8 +9,11 @@ pub type Result<T> = std::result::Result<T, DbError>;
 /// fold into their primary code, hence the mask in [`DbError::from`].
 const SQLITE_CONSTRAINT: std::ffi::c_int = 19;
 
-/// `SQLite` primary result code for a transient lock (`database is locked`).
+/// `SQLite` primary result code for a busy handler / transient lock (`database is locked`).
 const SQLITE_BUSY: std::ffi::c_int = 5;
+
+/// `SQLite` primary result code for a table/database lock contention (`database table is locked`).
+const SQLITE_LOCKED: std::ffi::c_int = 6;
 
 /// Errors produced by the do-harness persistence layer.
 ///
@@ -111,12 +114,15 @@ impl DbError {
     /// Whether this failure is transient `SQLite` lock contention.
     ///
     /// WAL plus `busy_timeout` make these rare, but a writer that loses the
-    /// race can still surface `SQLITE_BUSY`; callers wrap idempotent units of
-    /// work in [`retry_on_busy`].
+    /// race can still surface `SQLITE_BUSY` or `SQLITE_LOCKED`; callers wrap
+    /// idempotent units of work in [`retry_on_busy`].
     #[must_use]
     pub fn is_busy(&self) -> bool {
         match self {
-            DbError::Sql(libsql::Error::SqliteFailure(code, _)) => (code & 0xFF) == SQLITE_BUSY,
+            DbError::Sql(libsql::Error::SqliteFailure(code, _)) => {
+                let primary = code & 0xFF;
+                primary == SQLITE_BUSY || primary == SQLITE_LOCKED
+            }
             _ => false,
         }
     }
@@ -186,7 +192,7 @@ mod tests {
         assert!(matches!(other, DbError::Sql(_)));
     }
 
-    /// `SQLITE_BUSY` is classified as transient and other errors are not.
+    /// `SQLITE_BUSY` and `SQLITE_LOCKED` (and extended codes) are classified as transient.
     #[test]
     fn busy_is_transient_and_other_errors_are_not() {
         let busy = DbError::from(libsql::Error::SqliteFailure(
@@ -194,6 +200,25 @@ mod tests {
             "database is locked".to_owned(),
         ));
         assert!(busy.is_busy());
+
+        let busy_extended = DbError::from(libsql::Error::SqliteFailure(
+            SQLITE_BUSY | (1 << 8),
+            "database is locked (timeout)".to_owned(),
+        ));
+        assert!(busy_extended.is_busy());
+
+        let locked = DbError::from(libsql::Error::SqliteFailure(
+            SQLITE_LOCKED,
+            "database table is locked".to_owned(),
+        ));
+        assert!(locked.is_busy());
+
+        let locked_extended = DbError::from(libsql::Error::SqliteFailure(
+            SQLITE_LOCKED | (1 << 8),
+            "database table is locked (shared cache)".to_owned(),
+        ));
+        assert!(locked_extended.is_busy());
+
         let constraint = DbError::from(libsql::Error::SqliteFailure(
             SQLITE_CONSTRAINT,
             "constraint".to_owned(),
