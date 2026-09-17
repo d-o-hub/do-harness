@@ -26,25 +26,28 @@ verification set and every build target dogfoods green.
   `os`/`cpu` before fetching) and a Windows `npm install` succeeds silently,
   leaving the shim to print the actionable error. Revisit only if npm clears
   the name; a coordinated rename is the fallback.
-- The meta package needs **one** authenticated bootstrap publish before its
-  Trusted Publisher can be configured; npm exposes **Settings → Trusted
-  Publisher** only for a package that already exists, so OIDC alone cannot
-  create a new package name. After that bootstrap, OIDC covers every later
-  release. Until then the CI job fails with
-  `404 Not Found - PUT https://registry.npmjs.org/<pkg>` — npm's answer when no
-  trust relationship exists for the name, not an authentication error. Do not
-  read that 404 as a broken OIDC setup. On a 2FA account the bootstrap takes a
-  one-time password:
+- **Bootstrap is done for `do-harness` (2026-09-17).** A package must exist
+  before npm exposes its Trusted Publisher, and OIDC cannot create a new name,
+  so the first publish of any *new* package needs one authenticated publish.
+  Bootstrap publish first, then configure its Trusted Publisher:
+  `do-harness@0.1.1` was bootstrapped and configured with
+  `npm trust github do-harness --file release.yml --repo d-o-hub/do-harness
+  --allow-publish`, so every later release publishes through OIDC. Before that
+  bootstrap the CI job failed with `404 Not Found - PUT
+  https://registry.npmjs.org/<pkg>` — npm's answer when no trust relationship
+  exists for the name, not an authentication error. Do not read that 404 as a
+  broken OIDC setup. On a 2FA account the bootstrap takes a one-time password:
   `scripts/publish-npm.sh --dist <dir> --otp <code>` (the code is passed to npm
-  as `--otp` and never logged). The browser flow (`npm publish --auth-type=web`)
-  works too but its approval URL expires quickly, so prefer `--otp` for a
-  scripted bootstrap.
-- Once each package exists, configure its Trusted Publisher on
-  <https://www.npmjs.com>: package **Settings → Trusted Publisher → GitHub
-  Actions**, organization/user `d-o-hub`, repository `do-harness`, workflow
-  filename `release.yml`. Allow direct `npm publish` because the workflow
-  publishes directly rather than staging. The job uses GitHub OIDC
-  (`id-token: write`) and needs no `NPM_TOKEN` secret.
+  as `--otp` and never logged). The browser flow
+  (`npm publish --auth-type=web`) also works — it prints
+  `https://www.npmjs.com/auth/cli/<uuid>` — but the approval URL expires
+  quickly, so prefer `--otp` for a scripted bootstrap.
+- **Repeat this for every new package name** (e.g. if the Windows name is ever
+  cleared): bootstrap-publish it, then
+  `npm trust github <pkg> --file release.yml --repo d-o-hub/do-harness
+  --allow-publish`. `npm trust` requires an interactive 2FA challenge and
+  writes `createPackage` + `createStagedPackage`; `npm trust list <pkg>`
+  verifies what the registry holds.
 - Trusted publishing requires Node >= 22.14.0 and npm >= 11.5.1; the release
   job pins Node 24 and checks both versions. npm generates provenance
   automatically for these public GitHub Actions publishes. After a successful

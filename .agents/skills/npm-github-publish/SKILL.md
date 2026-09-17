@@ -223,6 +223,16 @@ positive fix ever passed:
   does not authorize the next package. Never assume a prior approval covers the
   remaining packages, and never script a publish sequence around a single
   approval.
+- **`actions/setup-node` exports a fake credential that silently defeats
+  OIDC.** With `registry-url` set it always runs
+  `core.exportVariable('NODE_AUTH_TOKEN', process.env.NODE_AUTH_TOKEN || 'XXXXX-XXXXX-XXXXX-XXXXX')`
+  and writes `_authToken=${NODE_AUTH_TOKEN}` into a temp `.npmrc`. A publisher
+  that branches on `NODE_AUTH_TOKEN` being non-empty therefore sees the
+  placeholder, takes the token path, and never reaches the OIDC exchange —
+  while also sending the literal dummy to the registry as Bearer auth
+  (`401 Unauthorized`). Treat that exact value as unset *and* clear it so the
+  temp `.npmrc` interpolates empty. A job holding `id-token: write` that also
+  passes a token is the defect, not the fix.
 - **A browser approval URL expires in minutes, so it is a poor fit for
   automation.** `npm publish --auth-type=web` prints an `npmjs.com/auth/cli/...`
   URL and waits, but the window is short: an agent-driven or hands-off run will
@@ -231,12 +241,22 @@ positive fix ever passed:
   (`--otp <code>`) or use a token scoped so no OTP is required. Reserve the
   browser flow for a human at a terminal, and never treat its expiry as a
   broken credential.
+- **`npm trust` requires an interactive 2FA challenge.** Configuring a Trusted
+  Publisher is a governance write: granular access tokens with
+  `bypass_2fa: true` are rejected `403`, and even a normal 2FA token must
+  satisfy the challenge. Prefer the native command
+  (`npm trust github <pkg> --file <wf.yml> --repo <owner/repo> --allow-publish`,
+  then `npm trust list <pkg>`) over hand-rolling
+  `POST /-/package/{package}/trust`, and never assume a fresh bootstrap left
+  trust configured — verify it.
 - **A `404 Not Found - PUT` on publish means "no trust relationship", not
   "bad credentials".** When the package name does not exist yet, npm cannot
   have a Trusted Publisher for it and answers the PUT with 404. This is the
   expected state for a package that still needs its one-time bootstrap. An
   authentication problem looks different: `E401`/`ENEEDAUTH` for a missing or
-  invalid token, or `EOTP` when 2FA is required and unfulfilled.
+  invalid token, or `EOTP` when 2FA is required and unfulfilled. On an
+  `auth-only` account a token publish of a *brand-new* name still raises
+  `EOTP`, so do not read that as a broken token.
 - **A package must exist before it can have a Trusted Publisher.** npm exposes
   **Settings → Trusted Publisher** only for published packages, so
   "configure all six, then publish" is an impossible instruction. Bootstrap

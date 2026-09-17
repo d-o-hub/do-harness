@@ -91,8 +91,8 @@
     },
     {
       "id": 7,
-      "prompt": "Confirm the npm release sequence guard passes on the workspace and that its negative controls still detect each defect it claims to catch, including a publish token injected into the OIDC job.",
-      "expected_output": "The guard reports OK for every sequence rule (publisher order, unavailable-package skipping, manifest names, optional-dependency pins, platform map, runbook order, OIDC-only publish-job auth) and its self-test reports OK for every mutation control, including the token-in-OIDC and cached-publish controls.",
+      "prompt": "Confirm the npm release sequence guard passes on the workspace and that its negative controls still detect each defect it claims to catch, including a publish token injected into the OIDC job and a publisher blind to the setup-node placeholder.",
+      "expected_output": "The guard reports OK for every sequence rule (publisher order, unavailable-package skipping, manifest names, optional-dependency pins, platform map, runbook order, OIDC-only publish-job auth, and the setup-node placeholder) and its self-test reports OK for every mutation control, including token-in-OIDC, cached-publish, and both placeholder controls.",
       "files": [],
       "dim": "correctness",
       "kind": "gotchas",
@@ -106,6 +106,26 @@
         "contains:npm-sequence-guard.txt|bad-cached-publish: OK: npm caching in the publish job is rejected",
         "contains:npm-sequence-guard.txt|guard-root-exit=0",
         "contains:npm-sequence-guard.txt|guard-self-test-exit=0",
+        "not-contains:npm-sequence-guard.txt|FAIL: good",
+        "contains:npm-sequence-guard.txt|OK: publish-npm.sh ignores the setup-node placeholder so the OIDC branch stays reachable",
+        "contains:npm-sequence-guard.txt|bad-placeholder-blind: OK: a publisher blind to the placeholder is rejected",
+        "contains:npm-sequence-guard.txt|bad-placeholder-uncleared: OK: an uncleared placeholder is rejected"
+      ]
+    },
+    {
+      "id": 8,
+      "prompt": "A GitHub Actions npm publish job holds id-token: write and uses actions/setup-node with registry-url, yet it fails with 404 Not Found - PUT and npm never prints its OIDC line. What is the cause and what is the fix?",
+      "expected_output": "setup-node exports a placeholder NODE_AUTH_TOKEN (XXXXX-XXXXX-XXXXX-XXXXX) and writes _authToken=${NODE_AUTH_TOKEN} into a temp .npmrc, so a publisher branching on that variable takes the token path and never attempts the OIDC exchange. Treat the placeholder as unset and clear it so .npmrc interpolates empty \u2014 never add a real token.",
+      "files": [],
+      "dim": "security",
+      "kind": "gotchas",
+      "assertions": [
+        "walk:",
+        "exists:npm-sequence-guard.txt",
+        "contains:.agents/skills/npm-github-publish/SKILL.md|setup-node",
+        "contains:.agents/skills/npm-github-publish/SKILL.md|XXXXX-XXXXX-XXXXX-XXXXX",
+        "contains:.agents/skills/npm-github-publish/SKILL.md|never reaches the OIDC exchange",
+        "not-contains:.agents/skills/npm-github-publish/SKILL.md|set NODE_AUTH_TOKEN to a real token to fix",
         "not-contains:npm-sequence-guard.txt|FAIL: good"
       ]
     }
