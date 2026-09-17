@@ -15,9 +15,26 @@ use std::process::Command;
 
 use serde_json::Value;
 
+fn isolated_command(program: &str) -> Command {
+    let mut command = Command::new(program);
+    for key in [
+        "GIT_DIR",
+        "GIT_WORK_TREE",
+        "GIT_INDEX_FILE",
+        "GIT_OBJECT_DIRECTORY",
+        "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+        "GIT_CEILING_DIRECTORIES",
+        "GIT_NAMESPACE",
+        "GIT_PREFIX",
+    ] {
+        command.env_remove(key);
+    }
+    command
+}
+
 /// Builds a `do-harness --root <root>` command using the real binary.
 fn harness(root: &Path) -> Command {
-    let mut cmd = Command::new(env!("CARGO_BIN_EXE_do-harness"));
+    let mut cmd = isolated_command(env!("CARGO_BIN_EXE_do-harness"));
     cmd.arg("--root").arg(root);
     cmd
 }
@@ -41,12 +58,13 @@ fn verify_json(root: &Path) -> Value {
 #[test]
 fn rust_init_on_empty_git_repo_is_green() {
     let dir = tempfile::tempdir().unwrap();
-    let status = Command::new("git")
+    let status = isolated_command("git")
         .args(["init", "-q"])
         .current_dir(dir.path())
         .status()
         .expect("git init");
     assert!(status.success(), "git init failed");
+    assert!(dir.path().join(".git").is_dir());
 
     let (ok, out) = run(harness(dir.path()).arg("init"));
     assert!(
@@ -79,13 +97,14 @@ fn commitlint_empty_history_validates_arguments_and_messages() {
     );
     let dir = tempfile::tempdir().unwrap();
     assert!(
-        Command::new("git")
+        isolated_command("git")
             .args(["init", "-q"])
             .current_dir(dir.path())
             .status()
             .unwrap()
             .success()
     );
+    assert!(dir.path().join(".git").is_dir());
     let scripts = dir.path().join("scripts");
     std::fs::create_dir(&scripts).unwrap();
     let script = scripts.join("check-commitlint.sh");
@@ -108,7 +127,7 @@ fn commitlint_empty_history_validates_arguments_and_messages() {
         (&["--message", "invalid-message"], 1),
     ];
     for (args, expected) in cases {
-        let output = Command::new("bash")
+        let output = isolated_command("bash")
             .arg(&script)
             .args(*args)
             .env_remove("DO_HARNESS_COMMITLINT_COUNT")
