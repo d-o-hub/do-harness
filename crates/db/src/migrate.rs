@@ -41,14 +41,16 @@ pub async fn connect(path: impl AsRef<Path>) -> Result<Connection> {
     // Concurrent `verify --record` writers hit SQLITE_BUSY on the default
     // delete journal; WAL lets readers proceed during a write while
     // busy_timeout turns a transient lock into a short wait instead of an
-    // immediate error. synchronous=NORMAL stays durable under WAL for this
-    // workload (checkpoint coordination preserves crash safety).
+    // immediate error. busy_timeout is set BEFORE switching journal_mode to
+    // WAL so that connection setup itself tolerates transient lock contention
+    // during initial WAL setup. synchronous=NORMAL stays durable under WAL
+    // for this workload (checkpoint coordination preserves crash safety).
     // NOTE: PRAGMA assignments can return the new value as a row, and
     // `execute` rejects row-returning SQL, so every PRAGMA goes through
     // `query` with drained rows.
     for pragma in [
+        "PRAGMA busy_timeout = 10000",
         "PRAGMA journal_mode = WAL",
-        "PRAGMA busy_timeout = 5000",
         "PRAGMA synchronous = NORMAL",
     ] {
         let mut rows = conn.query(pragma, Params::None).await?;
