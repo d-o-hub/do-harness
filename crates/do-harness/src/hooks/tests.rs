@@ -6,7 +6,18 @@ use super::*;
 /// `.git` directory path; the owning `TempDir` keeps the layout alive.
 fn fake_git_dir() -> (tempfile::TempDir, PathBuf) {
     let temp = tempfile::tempdir().unwrap();
-    let git_dir = temp.path().join(".git");
+    let root = temp.path();
+    let init_status = crate::changes::git_command(root)
+        .args(["init", "-q"])
+        .status()
+        .unwrap();
+    assert!(init_status.success());
+    let cfg_status = crate::changes::git_command(root)
+        .args(["config", "core.hooksPath", ".git/hooks"])
+        .status()
+        .unwrap();
+    assert!(cfg_status.success());
+    let git_dir = root.join(".git");
     fs::create_dir_all(git_dir.join("hooks")).unwrap();
     (temp, git_dir)
 }
@@ -25,11 +36,11 @@ fn write(path: &Path, content: &str) {
 
 #[test]
 fn install_writes_both_hooks_with_expected_arguments() {
-    let (_temp, git_dir) = fake_git_dir();
+    let (temp, git_dir) = fake_git_dir();
     let pre_commit = vec!["fmt".to_string(), "loc".to_string()];
     let pre_push: Vec<String> = Vec::new();
 
-    install(&git_dir, &pre_commit, &pre_push, false).unwrap();
+    install(&git_dir, temp.path(), &pre_commit, &pre_push, false).unwrap();
 
     let pre_commit_body = read(&hook_path(&git_dir, "pre-commit"));
     assert!(pre_commit_body.contains(MARKER));
@@ -56,11 +67,11 @@ fn install_writes_both_hooks_with_expected_arguments() {
 #[test]
 fn installed_hooks_are_executable() {
     use std::os::unix::fs::PermissionsExt;
-    let (_temp, git_dir) = fake_git_dir();
+    let (temp, git_dir) = fake_git_dir();
     let pre_commit: Vec<String> = Vec::new();
     let pre_push: Vec<String> = Vec::new();
 
-    install(&git_dir, &pre_commit, &pre_push, false).unwrap();
+    install(&git_dir, temp.path(), &pre_commit, &pre_push, false).unwrap();
 
     let mode = fs::metadata(hook_path(&git_dir, "pre-commit"))
         .unwrap()
@@ -71,19 +82,19 @@ fn installed_hooks_are_executable() {
 
 #[test]
 fn install_refuses_foreign_hook_without_force() {
-    let (_temp, git_dir) = fake_git_dir();
+    let (temp, git_dir) = fake_git_dir();
     let foreign = "#!/bin/sh\necho 'my own pre-commit hook'\n";
     write(&hook_path(&git_dir, "pre-commit"), foreign);
     let pre_commit: Vec<String> = Vec::new();
     let pre_push: Vec<String> = Vec::new();
 
-    let result = install(&git_dir, &pre_commit, &pre_push, false);
+    let result = install(&git_dir, temp.path(), &pre_commit, &pre_push, false);
 
     assert!(result.is_err());
     assert_eq!(read(&hook_path(&git_dir, "pre-commit")), foreign);
     assert!(!hook_path(&git_dir, "pre-push").exists());
 
-    install(&git_dir, &pre_commit, &pre_push, true).unwrap();
+    install(&git_dir, temp.path(), &pre_commit, &pre_push, true).unwrap();
 
     assert!(read(&hook_path(&git_dir, "pre-commit")).contains(MARKER));
     assert!(read(&hook_path(&git_dir, "pre-push")).contains(MARKER));
@@ -92,7 +103,7 @@ fn install_refuses_foreign_hook_without_force() {
 
 #[test]
 fn install_overwrites_marker_hook_without_force() {
-    let (_temp, git_dir) = fake_git_dir();
+    let (temp, git_dir) = fake_git_dir();
     write(
         &hook_path(&git_dir, "pre-commit"),
         &format!("{MARKER}\n# stale managed content\n"),
@@ -100,7 +111,7 @@ fn install_overwrites_marker_hook_without_force() {
     let pre_commit = vec!["fmt".to_string()];
     let pre_push: Vec<String> = Vec::new();
 
-    install(&git_dir, &pre_commit, &pre_push, false).unwrap();
+    install(&git_dir, temp.path(), &pre_commit, &pre_push, false).unwrap();
 
     let body = read(&hook_path(&git_dir, "pre-commit"));
     assert!(body.contains("verify --fail-fast --record --only fmt"));
@@ -109,19 +120,19 @@ fn install_overwrites_marker_hook_without_force() {
 
 #[test]
 fn uninstall_removes_managed_hooks_and_keeps_foreign() {
-    let (_temp, git_dir) = fake_git_dir();
+    let (temp, git_dir) = fake_git_dir();
     let pre_commit: Vec<String> = Vec::new();
     let pre_push: Vec<String> = Vec::new();
-    install(&git_dir, &pre_commit, &pre_push, false).unwrap();
+    install(&git_dir, temp.path(), &pre_commit, &pre_push, false).unwrap();
     let foreign = "#!/bin/sh\necho 'my own pre-push hook'\n";
     write(&hook_path(&git_dir, "pre-push"), foreign);
 
-    uninstall(&git_dir).unwrap();
+    uninstall(&git_dir, temp.path()).unwrap();
 
     assert!(!hook_path(&git_dir, "pre-commit").exists());
     assert!(!hook_path(&git_dir, "commit-msg").exists());
     assert_eq!(read(&hook_path(&git_dir, "pre-push")), foreign);
-    uninstall(&git_dir).unwrap();
+    uninstall(&git_dir, temp.path()).unwrap();
 }
 
 #[test]
@@ -142,16 +153,6 @@ fn find_git_dir_errors_outside_a_repository() {
     let nested = temp.path().join("a/b");
     fs::create_dir_all(&nested).unwrap();
 
-    // The `git rev-parse --git-dir` fallback inherits this process's
-    // environment. The usual hardening (setting GIT_DIR to a bogus path
-    // and bounding discovery with GIT_CEILING_DIRECTORIES) is unavailable
-    // here: `std::env::set_var` is unsafe on edition 2024 and the
-    // workspace forbids unsafe code. Instead we rely on the test
-    // environment being clean: `tempdir()` lives under `$TMPDIR` (unset,
-    // hence `/tmp`), and neither `/tmp` nor `/` contains a `.git` entry,
-    // so both the walk-up and the `git` fallback fail deterministically.
-    // The message assertion keeps a regression obvious if the environment
-    // changes.
     let result = find_git_dir(&nested);
 
     let error = result.expect_err("no repository should be found");
@@ -167,6 +168,7 @@ fn status_reports_no_hooks_for_empty_hooks_dir() {
     assert!(!state.pre_commit);
     assert!(!state.pre_push);
     assert!(!state.commit_msg);
+    assert!(!state.is_shadowed());
 }
 
 #[test]
@@ -174,13 +176,14 @@ fn status_reports_installed_hooks() {
     let (temp, git_dir) = fake_git_dir();
     let pre_commit: Vec<String> = Vec::new();
     let pre_push: Vec<String> = Vec::new();
-    install(&git_dir, &pre_commit, &pre_push, false).unwrap();
+    install(&git_dir, temp.path(), &pre_commit, &pre_push, false).unwrap();
 
     let state = status(&git_dir, temp.path());
 
     assert!(state.pre_commit);
     assert!(state.pre_push);
     assert!(state.commit_msg);
+    assert!(!state.is_shadowed());
 }
 
 #[test]
@@ -197,12 +200,99 @@ fn status_detects_release_binary() {
 
 #[test]
 fn install_errors_when_hooks_directory_is_missing() {
-    let temp = tempfile::tempdir().unwrap();
-    let git_dir = temp.path().join(".git");
+    let (temp, git_dir) = fake_git_dir();
+    let _ = fs::remove_dir_all(git_dir.join("hooks"));
     let pre_commit: Vec<String> = Vec::new();
     let pre_push: Vec<String> = Vec::new();
 
-    let result = install(&git_dir, &pre_commit, &pre_push, false);
+    let result = install(&git_dir, temp.path(), &pre_commit, &pre_push, false);
 
     assert!(result.is_err());
+}
+
+#[test]
+fn install_targets_configured_core_hookspath() {
+    let (temp, git_dir) = fake_git_dir();
+    let root = temp.path();
+
+    let custom_hooks = root.join(".githooks");
+    fs::create_dir_all(&custom_hooks).unwrap();
+
+    let git_status = crate::changes::git_command(root)
+        .args(["config", "core.hooksPath", ".githooks"])
+        .status()
+        .unwrap();
+    assert!(git_status.success());
+
+    let installed_path = install(&git_dir, root, &[], &[], false).unwrap();
+    assert_eq!(installed_path, custom_hooks);
+    assert!(read(&custom_hooks.join("pre-commit")).contains(MARKER));
+    assert!(read(&custom_hooks.join("pre-push")).contains(MARKER));
+    assert!(read(&custom_hooks.join("commit-msg")).contains(MARKER));
+}
+
+#[test]
+fn install_fails_closed_when_core_hookspath_dir_missing() {
+    let (temp, git_dir) = fake_git_dir();
+    let root = temp.path();
+
+    let git_status = crate::changes::git_command(root)
+        .args(["config", "core.hooksPath", ".nonexistent_githooks"])
+        .status()
+        .unwrap();
+    assert!(git_status.success());
+
+    let err = install(&git_dir, root, &[], &[], false).unwrap_err();
+    let msg = err.to_string();
+    assert!(
+        msg.contains("hooks directory not found at"),
+        "err msg: {msg}"
+    );
+    assert!(
+        msg.contains("configured via core.hooksPath=.nonexistent_githooks"),
+        "err msg: {msg}"
+    );
+}
+
+#[test]
+fn status_detects_shadowed_hooks_when_core_hookspath_set() {
+    let (temp, git_dir) = fake_git_dir();
+    let root = temp.path();
+
+    install(&git_dir, root, &[], &[], false).unwrap();
+
+    let git_status = crate::changes::git_command(root)
+        .args(["config", "core.hooksPath", ".githooks"])
+        .status()
+        .unwrap();
+    assert!(git_status.success());
+
+    let state = status(&git_dir, root);
+    assert!(!state.pre_commit);
+    assert!(state.pre_commit_shadowed);
+    assert!(state.is_shadowed());
+    assert_eq!(state.core_hooks_path.as_deref(), Some(".githooks"));
+}
+
+#[test]
+fn uninstall_cleans_both_custom_and_default_hooks() {
+    let (temp, git_dir) = fake_git_dir();
+    let root = temp.path();
+    let default_hooks = git_dir.join("hooks");
+    let custom_hooks = root.join(".githooks");
+    fs::create_dir_all(&custom_hooks).unwrap();
+
+    write(&default_hooks.join("pre-commit"), &format!("{MARKER}\n"));
+    write(&custom_hooks.join("pre-commit"), &format!("{MARKER}\n"));
+
+    let git_status = crate::changes::git_command(root)
+        .args(["config", "core.hooksPath", ".githooks"])
+        .status()
+        .unwrap();
+    assert!(git_status.success());
+
+    uninstall(&git_dir, root).unwrap();
+
+    assert!(!default_hooks.join("pre-commit").exists());
+    assert!(!custom_hooks.join("pre-commit").exists());
 }

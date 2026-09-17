@@ -48,6 +48,7 @@ fn installed_commit_msg_hook_blocks_bad_subject() {
     run(harness().arg("--root").arg(root).arg("init"));
 
     git_ok(root, &["init", "-q"]);
+    git_ok(root, &["config", "core.hooksPath", ".git/hooks"]);
     git_ok(root, &["config", "user.email", "e2e@example.test"]);
     git_ok(root, &["config", "user.name", "e2e"]);
     run(harness()
@@ -79,5 +80,82 @@ fn installed_commit_msg_hook_blocks_bad_subject() {
         good.status.success(),
         "conventional subject must commit: {}",
         String::from_utf8_lossy(&good.stderr)
+    );
+}
+
+#[test]
+fn hook_status_and_doctor_report_shadowed_hooks() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let root = dir.path();
+    run(harness().arg("--root").arg(root).arg("init"));
+
+    git_ok(root, &["init", "-q"]);
+    git_ok(root, &["config", "core.hooksPath", ".git/hooks"]);
+    git_ok(root, &["config", "user.email", "e2e@example.test"]);
+    git_ok(root, &["config", "user.name", "e2e"]);
+
+    run(harness()
+        .current_dir(root)
+        .arg("--root")
+        .arg(root)
+        .arg("hook")
+        .arg("install"));
+
+    git_ok(root, &["config", "core.hooksPath", ".githooks"]);
+
+    let status_out = harness()
+        .current_dir(root)
+        .arg("--root")
+        .arg(root)
+        .arg("hook")
+        .arg("status")
+        .output()
+        .expect("spawn status");
+    let status_stdout = String::from_utf8_lossy(&status_out.stdout);
+    assert!(
+        status_stdout.contains("shadowed by core.hooksPath=.githooks"),
+        "status stdout: {status_stdout}"
+    );
+
+    let doctor_out = harness()
+        .current_dir(root)
+        .arg("--root")
+        .arg(root)
+        .arg("doctor")
+        .output()
+        .expect("spawn doctor");
+    assert!(!doctor_out.status.success());
+    let doctor_stderr = String::from_utf8_lossy(&doctor_out.stderr);
+    let doctor_stdout = String::from_utf8_lossy(&doctor_out.stdout);
+    assert!(
+        doctor_stderr.contains("shadowed by core.hooksPath=.githooks")
+            || doctor_stdout.contains("shadowed by core.hooksPath=.githooks"),
+        "doctor output: stdout={doctor_stdout}, stderr={doctor_stderr}"
+    );
+
+    std::fs::create_dir_all(root.join(".githooks")).expect("mkdir .githooks");
+    run(harness()
+        .current_dir(root)
+        .arg("--root")
+        .arg(root)
+        .arg("hook")
+        .arg("install"));
+
+    let status_out2 = harness()
+        .current_dir(root)
+        .arg("--root")
+        .arg(root)
+        .arg("hook")
+        .arg("status")
+        .output()
+        .expect("spawn status");
+    let status_stdout2 = String::from_utf8_lossy(&status_out2.stdout);
+    assert!(
+        status_stdout2.contains("pre-commit: installed"),
+        "status stdout: {status_stdout2}"
+    );
+    assert!(
+        !status_stdout2.contains("shadowed"),
+        "status stdout should not contain shadowed: {status_stdout2}"
     );
 }
