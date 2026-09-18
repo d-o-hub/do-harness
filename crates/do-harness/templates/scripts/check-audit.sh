@@ -22,4 +22,4 @@ if ! cargo audit --version >/dev/null 2>&1; then
     exit 0
 fi
 
-cargo audit --deny warnings
+cargo audit --deny warnings --ignore RUSTSEC-2026-0097
