@@ -32,6 +32,9 @@ mapfile -t files < <(
             -maxdepth 1 -name '*.sh' -print
         find "$ROOT/.agents/skills" "$ROOT/crates/do-harness/templates/skills" \
             -name '*.sh' -print
+        if [[ -d "$ROOT/tests/fixtures" ]]; then
+            find "$ROOT/tests/fixtures" -name '*.sh' -print
+        fi
     } | sort
 )
 
