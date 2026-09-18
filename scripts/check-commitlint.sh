@@ -131,7 +131,38 @@ if [[ -n "$RANGE" ]]; then
     LOG_CMD=(git -C "$ROOT" log --no-merges --pretty=format:%s "$RANGE")
 else
     LOG_SOURCE="last $COUNT commit(s)"
-    LOG_CMD=(git -C "$ROOT" log --no-merges -n "$COUNT" --pretty=format:%s)
+    # The window judges the commits a branch adds, so it must not wander into
+    # history that already exists on the base branch. Two shapes make that easy
+    # to get wrong, and they put the branch on OPPOSITE parent indices:
+    #
+    #   * a locally created merge -- branch is parent 1, base is parent 2;
+    #   * GitHub's test-merge (`refs/pull/<n>/merge`, what CI checks out) --
+    #     BASE is parent 1 and the branch is parent 2.
+    #
+    # So neither `--first-parent` nor `--not <parent>` is correct in general:
+    # each fixes one shape and breaks the other. Excluding the base branch by
+    # name expresses the intent directly and is stable across both. When no base
+    # branch is resolvable the plain window is the historical behavior.
+    BASE_REF=""
+    for candidate in origin/main main; do
+        if git -C "$ROOT" rev-parse -q --verify "$candidate" >/dev/null 2>&1; then
+            BASE_REF="$candidate"
+            break
+        fi
+    done
+    # Only exclude a base that is genuinely elsewhere. When the base ref IS the
+    # current tip (the common case of running on `main` itself, where `main`
+    # resolves to HEAD), `HEAD --not <base>` is empty and the window would
+    # silently lint nothing, which is exactly the vacuous pass this sensor must
+    # never produce. Requiring the base to differ from HEAD keeps the window
+    # non-empty there.
+    if [[ -n "$BASE_REF" ]] &&
+        [[ "$(git -C "$ROOT" rev-parse "$BASE_REF")" != "$(git -C "$ROOT" rev-parse HEAD)" ]]; then
+        LOG_CMD=(git -C "$ROOT" log --no-merges -n "$COUNT" --pretty=format:%s HEAD --not "$BASE_REF")
+        LOG_SOURCE="last $COUNT commit(s) not on $BASE_REF"
+    else
+        LOG_CMD=(git -C "$ROOT" log --no-merges -n "$COUNT" --pretty=format:%s)
+    fi
 fi
 # Capture first: an invalid range (or any git failure) must fail closed,
 # never silently lint zero subjects. Command substitution also strips the

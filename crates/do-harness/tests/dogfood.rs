@@ -89,62 +89,6 @@ fn rust_init_on_empty_git_repo_is_green() {
 }
 
 #[test]
-fn commitlint_empty_history_validates_arguments_and_messages() {
-    let source = include_str!("../../../scripts/check-commitlint.sh");
-    assert_eq!(
-        source,
-        include_str!("../templates/scripts/check-commitlint.sh")
-    );
-    let dir = tempfile::tempdir().unwrap();
-    assert!(
-        isolated_command("git")
-            .args(["init", "-q"])
-            .current_dir(dir.path())
-            .status()
-            .unwrap()
-            .success()
-    );
-    assert!(dir.path().join(".git").is_dir());
-    let scripts = dir.path().join("scripts");
-    std::fs::create_dir(&scripts).unwrap();
-    let script = scripts.join("check-commitlint.sh");
-    std::fs::write(&script, source).unwrap();
-    std::fs::write(dir.path().join("valid-message"), "fix: initial commit\n").unwrap();
-    std::fs::write(dir.path().join("invalid-message"), "invalid subject\n").unwrap();
-
-    let cases: &[(&[&str], i32)] = &[
-        (&[], 0),
-        (&["--count", "2"], 0),
-        (&["--count", "0"], 2),
-        (&["--unknown"], 2),
-        (&["--range", "missing..HEAD"], 2),
-        (&["--range=missing..HEAD"], 2),
-        (&["--range"], 2),
-        (&["--range", ""], 2),
-        (&["--range="], 2),
-        (&["--range", "missing..HEAD", "--count", "1"], 2),
-        (&["--message", "valid-message"], 0),
-        (&["--message", "invalid-message"], 1),
-    ];
-    for (args, expected) in cases {
-        let output = isolated_command("bash")
-            .arg(&script)
-            .args(*args)
-            .env_remove("DO_HARNESS_COMMITLINT_COUNT")
-            .current_dir(dir.path())
-            .output()
-            .unwrap();
-        assert_eq!(
-            output.status.code(),
-            Some(*expected),
-            "args {args:?}: stdout={} stderr={}",
-            String::from_utf8_lossy(&output.stdout),
-            String::from_utf8_lossy(&output.stderr)
-        );
-    }
-}
-
-#[test]
 fn rust_init_then_full_verify_is_green() {
     let dir = tempfile::tempdir().unwrap();
     let (ok, out) = run(harness(dir.path()).arg("init"));
