@@ -66,6 +66,12 @@ if [[ ! -d "$ROOT/.git" ]]; then
     exit 0
 fi
 
+# Repositories with no commits yet (empty git history) have nothing to lint.
+if ! git -C "$ROOT" rev-parse -q --verify HEAD >/dev/null 2>&1 && [[ "$(git -C "$ROOT" rev-list --count --all 2>/dev/null)" -eq 0 ]]; then
+    echo "check-commitlint OK: no commits to lint"
+    exit 0
+fi
+
 # History window: --count <N> flag overrides the env default of 1,
 # --range <REV-RANGE> lints a git rev-list range instead (CI PR lint).
 COUNT="${DO_HARNESS_COMMITLINT_COUNT:-1}"

@@ -152,7 +152,7 @@ async fn connect_enables_wal_concurrency_pragmas() {
     let dir = tempfile::tempdir().unwrap();
     let conn = connect(dir.path().join("state.db")).await.unwrap();
     assert_eq!(pragma_text(&conn, "PRAGMA journal_mode").await, "wal");
-    assert_eq!(pragma_int(&conn, "PRAGMA busy_timeout").await, 5000);
+    assert_eq!(pragma_int(&conn, "PRAGMA busy_timeout").await, 10000);
     assert_eq!(pragma_int(&conn, "PRAGMA synchronous").await, 1);
 }
 
