@@ -331,7 +331,7 @@ fn scan_deploys(
         }
         for (revert_sha, revert_ts) in revert_rows {
             scan.incidents
-                .push(incident_from(tags, revert_sha, revert_ts));
+                .push(incident_from(tags.get(index + 1), revert_sha, revert_ts));
         }
 
         scan.ranges.push(RangeRecord {
@@ -352,17 +352,25 @@ fn scan_deploys(
     Ok(scan)
 }
 
-/// Attributes one revert to its restoring deploy, when a tag follows it.
+/// Attributes one revert to the deploy that restored it.
 ///
-/// Unrestored incidents are kept with `restored_by`/`restore_ts` as `None`:
-/// dropping them would make the restore metric survivorship-biased.
-fn incident_from(tags: &[git::Tag], revert_sha: String, revert_ts: i64) -> Incident {
-    let restoring = tags.iter().find(|tag| tag.deploy_ts > revert_ts);
+/// `next` is the tag that follows the failing deploy in deploy order, which is
+/// exactly the deploy whose range boundary closed the failure range — so
+/// restoration is attributed by construction rather than by a separate
+/// timestamp scan. A tag cut directly on the revert commit has
+/// `deploy_ts == revert_ts`, and a strictly-greater comparison would skip it
+/// and report the incident as unrestored (a spurious `unrestored_deploys`
+/// breach with a null MTTR) or, worse, credit a later release and inflate the
+/// restore time.
+///
+/// Unrestored incidents keep `restored_by`/`restore_ts` as `None`: dropping
+/// them would make the restore metric survivorship-biased.
+fn incident_from(next: Option<&git::Tag>, revert_sha: String, revert_ts: i64) -> Incident {
     Incident {
         revert_sha,
         revert_ts,
-        restored_by: restoring.map(|tag| tag.name.clone()),
-        restore_ts: restoring.map(|tag| tag.deploy_ts),
+        restored_by: next.map(|tag| tag.name.clone()),
+        restore_ts: next.map(|tag| tag.deploy_ts),
     }
 }
 
@@ -398,13 +406,23 @@ mod tests {
 
     #[test]
     fn incident_without_a_following_tag_is_unrestored() {
-        let tags = vec![git::Tag {
-            name: "v0.1.0".to_string(),
-            rev: "a".to_string(),
-            deploy_ts: 100,
-        }];
-        let incident = incident_from(&tags, "f".to_string(), 200);
+        let incident = incident_from(None, "f".to_string(), 200);
         assert_eq!(incident.restored_by, None);
         assert_eq!(incident.restore_ts, None);
+    }
+
+    #[test]
+    fn incident_is_restored_by_the_next_deploy_even_on_the_same_commit() {
+        // A tag cut directly on the revert commit has deploy_ts == revert_ts;
+        // it still restores the incident, because it is the deploy whose range
+        // boundary closed the failure range.
+        let next = git::Tag {
+            name: "v0.1.2".to_string(),
+            rev: "b".to_string(),
+            deploy_ts: 200,
+        };
+        let incident = incident_from(Some(&next), "f".to_string(), 200);
+        assert_eq!(incident.restored_by.as_deref(), Some("v0.1.2"));
+        assert_eq!(incident.restore_ts, Some(200));
     }
 }

@@ -111,6 +111,32 @@ impl DoraPolicy {
                 self.max_change_failure_rate
             );
         }
+        // Every remaining threshold is a floor or a ceiling that is only
+        // meaningful as a positive quantity. A negative value is not merely
+        // odd, it inverts the rule: `mttr_unrestored > max_unrestored` with
+        // `max_unrestored = -1` breaches on a window with zero incidents, so
+        // the policy would report a failure the history never had.
+        if self.min_deploys < 0 {
+            bail!("min_deploys must not be negative, got {}", self.min_deploys);
+        }
+        if self.max_lead_p90_days <= 0 {
+            bail!(
+                "max_lead_p90_days must be positive, got {}",
+                self.max_lead_p90_days
+            );
+        }
+        if self.max_mttr_hours <= 0 {
+            bail!(
+                "max_mttr_hours must be positive, got {}",
+                self.max_mttr_hours
+            );
+        }
+        if self.max_unrestored < 0 {
+            bail!(
+                "max_unrestored must not be negative, got {}",
+                self.max_unrestored
+            );
+        }
         Ok(())
     }
 
@@ -137,6 +163,32 @@ pub fn digest(root: &Path) -> String {
     }
 }
 
+/// Which way a threshold rule points.
+///
+/// The comparator is part of what a breach *means*, not a rendering detail:
+/// a ceiling rule (`observed` must be at or below `limit`) and a floor rule
+/// (`observed` must be at or above `limit`) read as opposite comparisons, so
+/// carrying it on the breach keeps the report and the rule from drifting.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Direction {
+    /// The observed value must not exceed the limit (`observed > limit` broke it).
+    Ceiling,
+    /// The observed value must reach the limit (`observed < limit` broke it).
+    Floor,
+}
+
+impl Direction {
+    /// The comparison operator that expresses the violation.
+    #[must_use]
+    pub fn operator(self) -> char {
+        match self {
+            Self::Ceiling => '>',
+            Self::Floor => '<',
+        }
+    }
+}
+
 /// One threshold breach: what was measured against the pinned limit.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -145,8 +197,23 @@ pub struct Breach {
     pub name: String,
     /// Observed value, formatted for stable JSON.
     pub observed: String,
+    /// Direction the limit is enforced in.
+    pub direction: Direction,
     /// Pinned limit the observation broke.
     pub limit: String,
+}
+
+impl Breach {
+    /// The violation as one comparable phrase (`1/2 > 0.150`).
+    #[must_use]
+    pub fn comparison(&self) -> String {
+        format!(
+            "{} {} {}",
+            self.observed,
+            self.direction.operator(),
+            self.limit
+        )
+    }
 }
 
 /// Seconds in one day.
@@ -171,6 +238,7 @@ pub fn breaches(snapshot: &DoraSnapshot, policy: &DoraPolicy) -> Vec<Breach> {
         found.push(Breach {
             name: "deploys_below_min".to_string(),
             observed: snapshot.deploy_count.to_string(),
+            direction: Direction::Floor,
             limit: policy.min_deploys.to_string(),
         });
     }
@@ -184,11 +252,13 @@ pub fn breaches(snapshot: &DoraSnapshot, policy: &DoraPolicy) -> Vec<Breach> {
         Some(p90) => found.push(Breach {
             name: "lead_p90".to_string(),
             observed: format_seconds(p90),
+            direction: Direction::Ceiling,
             limit: format_seconds(lead_limit),
         }),
         None => found.push(Breach {
             name: "lead_p90".to_string(),
             observed: "-".to_string(),
+            direction: Direction::Ceiling,
             limit: format_seconds(lead_limit),
         }),
     }
@@ -201,6 +271,7 @@ pub fn breaches(snapshot: &DoraSnapshot, policy: &DoraPolicy) -> Vec<Breach> {
         found.push(Breach {
             name: "change_failure_rate".to_string(),
             observed: format!("{}/{}", snapshot.deploys_failed, snapshot.deploy_count),
+            direction: Direction::Ceiling,
             limit: format!("{:.3}", policy.max_change_failure_rate),
         });
     }
@@ -212,11 +283,13 @@ pub fn breaches(snapshot: &DoraSnapshot, policy: &DoraPolicy) -> Vec<Breach> {
             Some(mttr) => found.push(Breach {
                 name: "mttr".to_string(),
                 observed: format_seconds(mttr),
+                direction: Direction::Ceiling,
                 limit: format_seconds(mttr_limit),
             }),
             None => found.push(Breach {
                 name: "mttr".to_string(),
                 observed: "-".to_string(),
+                direction: Direction::Ceiling,
                 limit: format_seconds(mttr_limit),
             }),
         }
@@ -226,6 +299,7 @@ pub fn breaches(snapshot: &DoraSnapshot, policy: &DoraPolicy) -> Vec<Breach> {
         found.push(Breach {
             name: "unrestored_deploys".to_string(),
             observed: snapshot.mttr_unrestored.to_string(),
+            direction: Direction::Ceiling,
             limit: policy.max_unrestored.to_string(),
         });
     }

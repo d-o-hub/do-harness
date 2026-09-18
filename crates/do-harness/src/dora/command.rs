@@ -125,10 +125,7 @@ fn emit(snapshot: &dora::DoraSnapshot, format: Format) {
     }
 
     for breach in &snapshot.breaches {
-        eprintln!(
-            "breach: {} {} > {}",
-            breach.name, breach.observed, breach.limit
-        );
+        eprintln!("breach: {} {}", breach.name, breach.comparison());
     }
     eprintln!("{FINDINGS_MARKER} {}", snapshot.breaches.len());
     // Compact so the marker stays on exactly one line.
@@ -200,11 +197,7 @@ fn render_text(snapshot: &dora::DoraSnapshot) -> String {
     } else {
         for (index, breach) in snapshot.breaches.iter().enumerate() {
             let label = if index == 0 { "breaches" } else { "" };
-            let _ = writeln!(
-                out,
-                "  {label:<18} {} {} > {}",
-                breach.name, breach.observed, breach.limit
-            );
+            let _ = writeln!(out, "  {label:<18} {} {}", breach.name, breach.comparison());
         }
     }
     out
@@ -242,8 +235,8 @@ mod tests {
               "lead_p90_seconds": 2335088, "mttr_seconds": null,
               "mttr_restored": 0, "mttr_unrestored": 1,
               "breaches": [
-                {"name": "change_failure_rate", "observed": "1/2", "limit": "0.150"},
-                {"name": "unrestored_deploys", "observed": "1", "limit": "0"}
+                {"name": "change_failure_rate", "observed": "1/2", "direction": "ceiling", "limit": "0.150"},
+                {"name": "unrestored_deploys", "observed": "1", "direction": "ceiling", "limit": "0"}
               ],
               "policy_fingerprint": "sha256:9f3c",
               "derivation": {

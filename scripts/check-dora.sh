@@ -43,7 +43,10 @@ fi
 
 if [[ ! -x "$BIN" ]]; then
     echo "FAIL: do-harness binary not found. Set DO_HARNESS_BIN, add do-harness to PATH, or build with: cargo build --release -p do-harness" >&2
-    exit 1
+    # Discovery failure, not a metric verdict: exit 2 so it is a hard failure
+    # rather than the advisory breach code (exit 1 would be indistinguishable
+    # from a threshold breach and would accrue strikes toward quarantine).
+    exit 2
 fi
 
 if [[ -n "$(find "$ROOT/crates" -name '*.rs' -newer "$BIN" -print -quit 2>/dev/null)" ]]; then
@@ -59,6 +62,13 @@ set -e
 
 # 0 = no breach, 1 = breach (advisory; gated by the blessed findings ratchet).
 if [[ "$code" -eq 0 || "$code" -eq 1 ]]; then
+    # The ratchet is the gate, so a missing ceiling is worth saying out loud:
+    # with no `dora` entry in plans/baselines.json a breach is reported but
+    # nothing turns it into a gate. That is the correct report-only behavior
+    # before the first bless, and silence here would hide it after one.
+    if [[ "$code" -eq 1 && ! -f "$ROOT/plans/baselines.json" ]]; then
+        echo "note: plans/baselines.json is absent, so this breach is reported without a ratchet ceiling; run 'verify --record --only dora --bless' to pin it" >&2
+    fi
     exit 0
 fi
 exit "$code"

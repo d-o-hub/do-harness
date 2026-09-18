@@ -102,16 +102,25 @@ pub fn enrich(root: &Path, snapshot: &mut DoraSnapshot) -> Result<()> {
     Ok(())
 }
 
-/// Release-run facts inside the measurement window.
+/// Release-run facts for the measurement window, plus deployment history.
 struct RunStats {
+    /// Release runs created inside the window.
     total: i64,
+    /// Windowed runs that concluded anything other than `success`.
     failed: i64,
+    /// Heads of *any* successful run, windowed or not.
+    ///
+    /// Tag reconciliation must not be windowed: a deploy tag whose release run
+    /// fired shortly before `window_start` would otherwise look as though it
+    /// never shipped, and the reconciliation exists to catch a tag that really
+    /// did not.
     successful_heads: Vec<String>,
+    /// Windowed run conclusion per head.
     by_head: BTreeMap<String, String>,
 }
 
 impl RunStats {
-    /// Folds windowed release runs into counters and a head lookup.
+    /// Folds release runs into windowed counters and deployment history.
     ///
     /// # Errors
     ///
@@ -132,20 +141,31 @@ impl RunStats {
             };
             let created = parse_rfc3339_utc(created_at)
                 .with_context(|| format!("unparsable gh run createdAt {created_at:?}"))?;
+            let conclusion = run.conclusion.as_deref();
+            if conclusion == Some("success") {
+                stats.successful_heads.push(run.head_sha.clone());
+            }
             if created < window_start || created > window_end {
                 continue;
             }
             stats.total += 1;
-            let conclusion = run.conclusion.as_deref();
-            if conclusion == Some("success") {
-                stats.successful_heads.push(run.head_sha.clone());
-            } else if conclusion.is_some() {
+            if conclusion.is_some_and(|value| value != "success") {
                 stats.failed += 1;
             }
-            stats.by_head.insert(
-                run.head_sha.clone(),
-                conclusion.unwrap_or("pending").to_string(),
-            );
+            // A head can have several runs. `gh run list` is newest-first, so a
+            // later insert would let the *oldest* conclusion win; prefer
+            // `success` explicitly to keep the map independent of run order.
+            let label = conclusion.unwrap_or("pending");
+            stats
+                .by_head
+                .entry(run.head_sha.clone())
+                .and_modify(|existing| {
+                    if label == "success" {
+                        existing.clear();
+                        existing.push_str(label);
+                    }
+                })
+                .or_insert_with(|| label.to_string());
         }
         Ok(stats)
     }
@@ -245,6 +265,12 @@ fn gh_json<T: serde::de::DeserializeOwned>(root: &Path, args: &[&str]) -> Result
 /// `Z`-suffixed timestamps, and accepting a wider grammar (offsets, missing
 /// seconds) would silently accept a value it mis-parses. Fractional seconds
 /// are ignored because every metric here is whole seconds.
+///
+/// Every component is range-checked with a *lower* bound as well as an upper
+/// one. `parse::<i64>()` accepts a leading `-`, so a `>`-only bound let
+/// `12:-30:00` through and subtracted time. The day is checked against the
+/// month's real length rather than `1..=31`, because Hinnant's civil-day
+/// algorithm rolls Feb 30 into March instead of rejecting it.
 #[must_use]
 fn parse_rfc3339_utc(value: &str) -> Option<i64> {
     let (date, rest) = value.split_once('T')?;
@@ -255,7 +281,10 @@ fn parse_rfc3339_utc(value: &str) -> Option<i64> {
     let year: i64 = date_parts.next()?.parse().ok()?;
     let month: i64 = date_parts.next()?.parse().ok()?;
     let day: i64 = date_parts.next()?.parse().ok()?;
-    if date_parts.next().is_some() || !(1..=12).contains(&month) || !(1..=31).contains(&day) {
+    if date_parts.next().is_some()
+        || !(1..=12).contains(&month)
+        || !(1..=days_in_month(year, month)).contains(&day)
+    {
         return None;
     }
 
@@ -263,12 +292,34 @@ fn parse_rfc3339_utc(value: &str) -> Option<i64> {
     let hour: i64 = time_parts.next()?.parse().ok()?;
     let minute: i64 = time_parts.next()?.parse().ok()?;
     let second: i64 = time_parts.next()?.parse().ok()?;
-    if time_parts.next().is_some() || hour > 23 || minute > 59 || second > 60 {
+    if time_parts.next().is_some()
+        || !(0..=23).contains(&hour)
+        || !(0..=59).contains(&minute)
+        || !(0..=60).contains(&second)
+    {
         return None;
     }
 
     let days = days_from_civil(year, month, day);
     Some(days * SECONDS_PER_DAY + hour * 3_600 + minute * 60 + second)
+}
+
+/// Length of `month` in `year` (proleptic Gregorian leap rule).
+///
+/// `month` is validated to `1..=12` before this is called, so the 30-day arms
+/// pair with the 31-day ones rather than needing a fallback.
+fn days_in_month(year: i64, month: i64) -> i64 {
+    match month {
+        4 | 6 | 9 | 11 => 30,
+        2 if is_leap_year(year) => 29,
+        2 => 28,
+        _ => 31,
+    }
+}
+
+/// Whether `year` is a leap year in the proleptic Gregorian calendar.
+fn is_leap_year(year: i64) -> bool {
+    year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)
 }
 
 /// Days since 1970-01-01 for a proleptic Gregorian date (Hinnant's

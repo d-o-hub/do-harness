@@ -90,6 +90,18 @@ pub fn matching_tags(root: &Path, glob: &str) -> Result<Vec<Tag>> {
             deploy_ts: commit_time(root, rev)?,
         });
     }
+    // `creatordate` only guarantees a stable read order; the derivation needs
+    // deployment order. For an annotated tag `creatordate` is the tagger date —
+    // when the tag object was written — so a tag back-filled after a later
+    // release would otherwise order the earlier release last and invert the
+    // predecessor relationship, turning `P..T` into `descendant..ancestor` (an
+    // empty range that silently reports zero lead-time samples). The name is a
+    // deterministic tiebreak for tags sharing a commit.
+    tags.sort_by(|left, right| {
+        left.deploy_ts
+            .cmp(&right.deploy_ts)
+            .then_with(|| left.name.cmp(&right.name))
+    });
     Ok(tags)
 }
 
