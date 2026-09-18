@@ -5,7 +5,8 @@
 //! `plans/invariants.json`), `init` (workspace scaffold), `task` (task
 //! state), `trace` (interaction traces), `distill` (heuristic extraction),
 //! `eval` (skill-eval runner), `hook` (git hook management), `pr`
-//! (deterministic PR analysis), and `version` (version information).
+//! (deterministic PR analysis), `dora` (deterministic deployment metrics),
+//! and `version` (version information).
 
 use std::process::ExitCode;
 
@@ -26,6 +27,7 @@ mod dbcheck;
 mod distill;
 mod distill_strikes;
 mod doctor;
+mod dora;
 mod errors;
 mod eval;
 mod eval_assert;
@@ -353,6 +355,13 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
         Command::AuditChain { format } => commands::audit_chain_cmd(&root, format)
             .await
             .map_err(CliError::Verify),
+        Command::Dora {
+            days,
+            format,
+            record,
+            source,
+            now,
+        } => dora::command::run(&root, days, format, record, source, now).await,
         Command::Metrics {
             format,
             sensor,

@@ -338,6 +338,24 @@ pub enum Command {
         #[arg(long, value_enum, default_value_t = Format::Text)]
         format: Format,
     },
+    /// Derive DORA deployment metrics from git history (deterministic, read-only).
+    Dora {
+        /// Rolling window in days (overrides the pinned policy for this run).
+        #[arg(long, value_name = "DAYS")]
+        days: Option<i64>,
+        /// Output format.
+        #[arg(long, value_enum, default_value_t = Format::Text)]
+        format: Format,
+        /// Persist the snapshot into the state database.
+        #[arg(long)]
+        record: bool,
+        /// Where the numbers come from.
+        #[arg(long, value_enum, default_value_t = crate::dora::Source::Git)]
+        source: crate::dora::Source,
+        /// Measurement clock as Unix seconds (default: system clock).
+        #[arg(long, value_name = "UNIX_SECONDS")]
+        now: Option<i64>,
+    },
     /// Generate shell completions.
     Completions {
         /// Target shell (bash, zsh, fish, powershell, elvish).
