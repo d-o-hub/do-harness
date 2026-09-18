@@ -3,6 +3,30 @@
 Review only the changed semantic units: the `do-harness` residual when
 available, otherwise the PR diff. Do not review unrelated files.
 
+## Review Depths
+
+When semantic routing is active (`scripts/semantic-route.sh`), review depth selects the reasoning depth. Every depth still reports concrete defects with evidence and minimal fix rather than generic commentary.
+
+### cheap
+Used for high-confidence non-behavioral changes (e.g. docs, test assertions, comments):
+- Changed-unit correctness and obvious regression
+- Tests/docs coherence with implementation
+- Minimal verification budget
+
+### focused
+Standard review depth (current default):
+- Changed-unit logic and edge cases
+- Immediate local callers and error paths
+- Standard review contract
+
+### deep
+Full reasoning review for high-risk changes (public API, security, state machines, cross-file invariants):
+- Public API compatibility and breaking contract changes
+- Cross-file invariants and state machine transitions
+- Concurrency, races, and resource lifecycle
+- Persistence, data integrity, and database schema consequences
+- Security and failure-path analysis
+
 ## What to hunt
 
 Report only defects in these categories:

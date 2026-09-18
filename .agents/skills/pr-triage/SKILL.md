@@ -1,6 +1,6 @@
 ---
 name: pr-triage
-description: Triage GitHub pull requests with gh and git. Use after opening a PR, or when asked to review, roast, clean up, update, resolve comments on, or merge open PRs. Reviews and roasts changes, closes PRs with no effective diff, applies roast fixes, answers and resolves review conversations, updates branches to the latest base, verifies every check including bots, and merges directly with --match-head-commit. Optionally uses do-harness to cut review tokens to the unresolved residual.
+description: Triage GitHub pull requests with gh and git. Use after opening a PR, or when asked to review, roast, clean up, update, resolve comments on, or merge open PRs. Reviews and roasts changes, closes PRs with no effective diff, applies roast fixes, answers and resolves review conversations, updates branches to the latest base, verifies every check including bots, and merges directly with --match-head-commit. Optionally uses do-harness to cut review tokens to the unresolved residual and semantic-route to adapt review depth.
 license: MIT
 metadata:
   short-description: Triage open GitHub PRs end to end
@@ -19,6 +19,8 @@ stacks, [references/check-policy.md](references/check-policy.md) before judging
 checks, [references/review-contract.md](references/review-contract.md) before
 reviewing, [references/do-harness-optional.md](references/do-harness-optional.md)
 when `do-harness` is installed,
+[references/semantic-routing.md](references/semantic-routing.md) when the optional
+semantic router is configured,
 [references/webhook-fast-path.md](references/webhook-fast-path.md) when a
 webhook receiver is running, and
 [references/gh-resilience.md](references/gh-resilience.md) before any
@@ -54,10 +56,10 @@ Run these steps in order. Stop the sweep on any escalation and report it.
    SHA and confirm it is unchanged, then close:
    `gh pr close PR --comment "Closed automatically: no effective change remains."`
    Record it with `scripts/state.sh set PR HEAD_SHA BASE_SHA closed-no-effect`.
-   Continue to the next PR.
+   Continue to the next PR. (Bypasses semantic router).
 6. **Machine fast path.** For a known bot author with a dependency-only diff
    (lockfile or manifest only) and `scripts/checks.sh` pass and no unresolved
-   threads, merge directly (step 11) without LLM review.
+   threads, merge directly (step 11) without LLM review. (Bypasses semantic router).
 7. **Update.** If `gh pr view PR --json mergeStateStatus --jq .mergeStateStatus`
    is `BEHIND`, run `gh pr update-branch PR`. For a stacked PR whose parent just
    merged, follow the rebase procedure in
@@ -79,14 +81,17 @@ Run these steps in order. Stop the sweep on any escalation and report it.
    `scripts/threads.sh resolve THREAD_ID`. Reply to top-level issue comments
    with `scripts/threads.sh issue-comments PR` findings; they cannot be resolved.
    Escalate comments that require a product or human decision.
-10. **Review and roast.** If the probed `do-harness` binary is available
-    (honoring `DO_HARNESS_BIN`; see
-    [references/do-harness-optional.md](references/do-harness-optional.md)),
-    run `pr review` and review its residual units only when
-    `measurement.verdict` is `reduced`; otherwise roast `gh pr diff PR`. Follow
-    [references/review-contract.md](references/review-contract.md): concrete
-    defects only, with failure mode, evidence, severity, and smallest fix.
-    Apply blocking fixes, commit, push, then return to step 7. Cap at three
+10. **Semantic routing, review, and roast.** If the probed `do-harness` binary
+    is available (honoring `DO_HARNESS_BIN`; see
+    [references/do-harness-optional.md](references/do-harness-optional.md)), run
+    `pr review`. Before reviewing, run `scripts/semantic-route.sh PR` to select
+    the review depth (`cheap`, `focused`, `deep`; defaults to `deep` on any router
+    failure, timeout, invalid judgment, or unconfigured environment).
+    Review residual units when `measurement.verdict` is `reduced`; otherwise roast
+    `gh pr diff PR`. Follow [references/review-contract.md](references/review-contract.md)
+    for the selected depth: concrete defects only, with failure mode, evidence, severity,
+    and smallest fix. Apply blocking fixes, commit, push, then return to step 7
+    (push invalidates previous route decision as head SHA changed). Cap at three
     fix cycles, then escalate.
 11. **Merge.** Merge directly, never with `--auto`:
     `gh pr merge PR --squash --match-head-commit HEAD_SHA`
@@ -101,7 +106,8 @@ Run these steps in order. Stop the sweep on any escalation and report it.
     `scripts/state.sh set PR HEAD_SHA BASE_SHA merged` (or `reverted`).
 13. **Report.** After the sweep, print one line per PR: number, decision
     (merged, closed, fixed, skipped, escalated), head SHA, and reason. Include
-    the review `measurement` (`t_raw`, `t_res`, `ratio`, `verdict`) for every PR
+    the review `measurement` (`t_raw`, `t_res`, `ratio`, `verdict`) and routing
+    metadata (`route=focused source=residual router_confidence=0.91`) for every PR
     where `do-harness pr review` ran.
 
 ## Guardrails
@@ -124,6 +130,8 @@ Run these steps in order. Stop the sweep on any escalation and report it.
   payload content; every wake re-classifies.
 - Never resolve a review thread without a fix or a concrete reply.
 - Force-push only own or bot branches, and only for the stack rebase procedure.
+- The semantic router is inferential only and cannot override failing checks,
+  unresolved conversations, proof claims, or merge/no-effect gates.
 
 ## Escalate instead of guessing
 

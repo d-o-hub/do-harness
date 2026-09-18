@@ -141,6 +141,220 @@
     "contains:.agents/skills/pr-triage/references/webhook-fast-path.md|PR_TRIAGE_EVENT_CHUNK",
     "contains:.agents/skills/pr-triage/references/check-policy.md|safety chunk"
    ]
+  },
+  {
+   "id": 9,
+   "prompt": "Route a PR when no semantic router executable is configured.",
+   "expected_output": "The wrapper takes the deterministic fallback: route deep, source residual, reason router_not_configured, and no provider is invoked.",
+   "files": [],
+   "dim": "efficiency",
+   "kind": "negative",
+   "assertions": [
+    "walk:",
+    "contains:route_unset.json|\"route\": \"deep\""
+   ]
+  },
+  {
+   "id": 10,
+   "prompt": "Route a PR when PR_TRIAGE_ROUTER names a path that does not exist.",
+   "expected_output": "The wrapper rejects the configuration before spawning anything and fails toward depth: route deep, reason executable_not_found_or_not_executable.",
+   "files": [],
+   "dim": "correctness",
+   "kind": "negative",
+   "assertions": [
+    "walk:",
+    "contains:route_missing.json|\"route\": \"deep\""
+   ]
+  },
+  {
+   "id": 11,
+   "prompt": "Route a PR when the semantic provider outlives PR_TRIAGE_ROUTER_TIMEOUT.",
+   "expected_output": "The bounded invocation gives up and falls toward depth: route deep, reason router_timeout.",
+   "files": [],
+   "dim": "correctness",
+   "kind": "negative",
+   "assertions": [
+    "walk:",
+    "contains:route_timeout.json|\"route\": \"deep\""
+   ]
+  },
+  {
+   "id": 12,
+   "prompt": "Route a PR when the semantic provider writes non-JSON to stdout.",
+   "expected_output": "Malformed output is rejected without a partial parse: route deep, reason malformed_json_output.",
+   "files": [],
+   "dim": "correctness",
+   "kind": "negative",
+   "assertions": [
+    "walk:",
+    "contains:route_malformed.json|\"route\": \"deep\""
+   ]
+  },
+  {
+   "id": 13,
+   "prompt": "Route a PR when the provider emits a judgment whose change_kind is outside the declared enum.",
+   "expected_output": "Schema validation rejects the judgment: route deep, reason invalid_judgment_schema.",
+   "files": [],
+   "dim": "correctness",
+   "kind": "negative",
+   "assertions": [
+    "walk:",
+    "contains:route_bad_schema.json|\"route\": \"deep\""
+   ]
+  },
+  {
+   "id": 14,
+   "prompt": "Route a PR when a provider confidence value falls outside [0.0, 1.0].",
+   "expected_output": "Out-of-range confidence is a schema failure: route deep, reason invalid_judgment_schema.",
+   "files": [],
+   "dim": "correctness",
+   "kind": "negative",
+   "assertions": [
+    "walk:",
+    "contains:route_out_of_range.json|\"route\": \"deep\""
+   ]
+  },
+  {
+   "id": 15,
+   "prompt": "Route a docs-only change whose provider confidence is below the threshold.",
+   "expected_output": "The confidence floor wins over the cheap path: route deep even though change_kind is docs.",
+   "files": [],
+   "dim": "correctness",
+   "kind": "negative",
+   "assertions": [
+    "walk:",
+    "contains:route_low_confidence.json|\"route\": \"deep\""
+   ]
+  },
+  {
+   "id": 16,
+   "prompt": "Route a high-confidence docs-only change with every risk signal answered no.",
+   "expected_output": "The inert docs/tests path selects the cheap route over a residual review source.",
+   "files": [],
+   "dim": "efficiency",
+   "kind": "explicit",
+   "assertions": [
+    "walk:",
+    "contains:route_docs_cheap.json|\"route\": \"cheap\""
+   ]
+  },
+  {
+   "id": 17,
+   "prompt": "Route a change whose provider judgment asserts a public contract change.",
+   "expected_output": "An affirmative contract signal escalates to the deep route regardless of change_kind.",
+   "files": [],
+   "dim": "effectiveness",
+   "kind": "explicit",
+   "assertions": [
+    "walk:",
+    "contains:route_api_deep.json|\"route\": \"deep\""
+   ]
+  },
+  {
+   "id": 18,
+   "prompt": "Route a change whose provider judgment asserts a security-sensitive change.",
+   "expected_output": "An affirmative security signal escalates to the deep route.",
+   "files": [],
+   "dim": "security",
+   "kind": "explicit",
+   "assertions": [
+    "walk:",
+    "contains:route_security_deep.json|\"route\": \"deep\""
+   ]
+  },
+  {
+   "id": 19,
+   "prompt": "Route a docs-only change when the deterministic review residual cannot prove it.",
+   "expected_output": "The wrapper falls back to the residual source when measurement.verdict is reduced.",
+   "files": [],
+   "dim": "efficiency",
+   "kind": "contextual",
+   "assertions": [
+    "walk:",
+    "contains:route_docs_cheap.json|\"source\": \"residual\""
+   ]
+  },
+  {
+   "id": 20,
+   "prompt": "Route an escaping-heavy change whose residual is larger than the raw diff.",
+   "expected_output": "The wrapper selects the raw diff rather than a larger residual when measurement.verdict is no-go.",
+   "files": [],
+   "dim": "effectiveness",
+   "kind": "contextual",
+   "assertions": [
+    "walk:",
+    "contains:route_no_go.json|\"source\": \"raw\""
+   ]
+  },
+  {
+   "id": 21,
+   "prompt": "Inspect the semantic route wrapper for attempts to claim proof authority over review outcomes.",
+   "expected_output": "The wrapper emits only status, route, source, router_confidence, and judgment; it never emits a proof verdict, so routing cannot establish that a change is proven.",
+   "files": [],
+   "dim": "security",
+   "kind": "negative",
+   "assertions": [
+    "not-contains:.agents/skills/pr-triage/scripts/semantic-route.sh|false_proven"
+   ]
+  },
+  {
+   "id": 22,
+   "prompt": "Route a diff whose payload text contains shell command substitution and a recursive delete.",
+   "expected_output": "Diff content is data: the payload is routed but never executed, so no file appears at the injected path and the wrapper reports the payload was not executed.",
+   "files": [],
+   "dim": "security",
+   "kind": "contextual",
+   "assertions": [
+    "walk:",
+    "absent:pwned",
+    "contains:route_malicious.txt|not-executed"
+   ]
+  },
+  {
+   "id": 23,
+   "prompt": "Route the same unchanged PR head twice, then advance the head.",
+   "expected_output": "A route decision is bound to head sha: the unchanged head reuses the cached decision without re-invoking the provider, and an advanced head re-invokes it.",
+   "files": [],
+   "dim": "efficiency",
+   "kind": "negative",
+   "assertions": [
+    "walk:",
+    "contains:route_summary.txt|cache_reinvoked=yes"
+   ]
+  },
+  {
+   "id": 24,
+   "prompt": "Route a PR that introduces no effective change.",
+   "expected_output": "The zero-LLM no-effect path owns that decision, so the semantic provider is never invoked.",
+   "files": [],
+   "dim": "efficiency",
+   "kind": "negative",
+   "assertions": [
+    "walk:",
+    "contains:route_zero_calls.txt|provider_calls=0"
+   ]
+  },
+  {
+   "id": 25,
+   "prompt": "Review the documented router bypasses for zero-model paths.",
+   "expected_output": "SKILL.md names the no-impact close and the bot dependency fast path as cases that bypass semantic routing.",
+   "files": [],
+   "dim": "effectiveness",
+   "kind": "explicit",
+   "assertions": [
+    "contains:.agents/skills/pr-triage/SKILL.md|Bypasses semantic router"
+   ]
+  },
+  {
+   "id": 26,
+   "prompt": "Review the semantic router's stated authority limits.",
+   "expected_output": "SKILL.md states the router cannot override failing checks, unresolved conversations, proof claims, or the merge and no-effect gates.",
+   "files": [],
+   "dim": "security",
+   "kind": "negative",
+   "assertions": [
+    "contains:.agents/skills/pr-triage/SKILL.md|cannot override failing checks"
+   ]
   }
  ]
 }
