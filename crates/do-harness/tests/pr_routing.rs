@@ -9,6 +9,14 @@
 //! The fixture provider is deterministic, so a failure here means the routing
 //! policy changed, not that a model answered differently.
 
+// POSIX-only. The benchmark materializes its corpus as git repositories and
+// drives them through `scripts/pr-routing-benchmark.sh`, whose provider is a
+// `#!` script the router wrapper spawns directly. Windows cannot execute that
+// (the windows job reports `os error 193`, "%1 is not a valid Win32
+// application"), and the script additionally requires `jq`. Gated at the file
+// level rather than per test: every case here needs the same surface, and the
+// unix CI jobs run all of them.
+#![cfg(unix)]
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use std::path::PathBuf;
