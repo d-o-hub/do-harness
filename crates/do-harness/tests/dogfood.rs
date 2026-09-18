@@ -330,3 +330,115 @@ fn generic_init_verify_is_vacuously_green() {
         "generic pack ships zero sensors; the pass is vacuous by design"
     );
 }
+
+/// A merge-tip branch is judged on its own commits, not the history it merged.
+///
+/// Regression: the sensor's default window ran `git log --no-merges -n 1`.
+/// When a branch tip is a merge, that command skips the merge and descends into
+/// the merged-in branch; because `git log` orders by commit date, the window
+/// then lands on whichever side is newest. In CI that reported the
+/// non-conventional subject of a commit already on `main`. No change on the
+/// branch could fix it, and merging `main` again could not clear it either:
+/// `--no-merges` excludes the merge, so the offending commit stayed in range as
+/// an ancestor. `--first-parent` keeps the window on the branch's own line.
+///
+/// The fixture pins commit dates so the merged-in commit is the newest, which
+/// is what makes the window reach it.
+#[test]
+fn commitlint_ignores_history_a_merge_tip_brought_in() {
+    let source = include_str!("../../../scripts/check-commitlint.sh");
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    let script_dir = root.join("scripts");
+    std::fs::create_dir(&script_dir).unwrap();
+    let script = script_dir.join("check-commitlint.sh");
+    std::fs::write(&script, source).unwrap();
+
+    let run_git = |args: &[&str], date: Option<&str>| {
+        let mut command = isolated_command("git");
+        command
+            .env("GIT_CONFIG_NOSYSTEM", "1")
+            .env("GIT_AUTHOR_NAME", "t")
+            .env("GIT_AUTHOR_EMAIL", "t@t")
+            .env("GIT_COMMITTER_NAME", "t")
+            .env("GIT_COMMITTER_EMAIL", "t@t")
+            .args(args)
+            .current_dir(root);
+        if let Some(date) = date {
+            command
+                .env("GIT_AUTHOR_DATE", date)
+                .env("GIT_COMMITTER_DATE", date);
+        }
+        let output = command.output().expect("spawn git");
+        assert!(
+            output.status.success(),
+            "git {args:?} failed:\n{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    };
+    let commit = |subject: &str, date: &str| {
+        run_git(
+            &["commit", "-q", "--allow-empty", "-m", subject],
+            Some(date),
+        );
+    };
+
+    run_git(&["init", "-q", "-b", "main"], None);
+    commit("chore: seed", "1700000000");
+    // Diverge first, so the merge is a real merge rather than a fast-forward.
+    run_git(&["checkout", "-q", "-b", "feature"], None);
+    commit("fix(feature): a conventional change", "1700000100");
+    run_git(&["checkout", "-q", "main"], None);
+    // Non-conventional on main, mirroring the real #111, and newer than the
+    // branch's own commit so `git log` visits it first.
+    commit("Fix something without a type", "1700000200");
+    run_git(&["checkout", "-q", "feature"], None);
+    run_git(
+        &[
+            "merge",
+            "-q",
+            "--no-ff",
+            "-m",
+            "Merge branch 'main' into feature",
+            "main",
+        ],
+        Some("1700000300"),
+    );
+
+    let lint = || {
+        let output = isolated_command("bash")
+            .arg(&script)
+            .env_remove("DO_HARNESS_COMMITLINT_COUNT")
+            .current_dir(root)
+            .output()
+            .unwrap();
+        (
+            output.status.success(),
+            String::from_utf8_lossy(&output.stdout).into_owned(),
+            String::from_utf8_lossy(&output.stderr).into_owned(),
+        )
+    };
+
+    let (ok, stdout, stderr) = lint();
+    assert!(
+        ok,
+        "a merge tip must not fail on the history it merged:\n{stdout}\n{stderr}"
+    );
+    assert!(
+        !stdout.contains("Fix something without a type"),
+        "the merged-in non-conventional subject must not be linted:\n{stdout}"
+    );
+    assert!(
+        stdout.contains("1 subject(s)"),
+        "the window must land on the branch's own commit:\n{stdout}"
+    );
+
+    // The branch's own bad commit must still fail, so the window is not
+    // vacuously empty.
+    commit("Bad subject on the branch", "1700000400");
+    let (ok, stdout, stderr) = lint();
+    assert!(
+        !ok,
+        "the branch's own non-conventional subject must still fail:\n{stdout}\n{stderr}"
+    );
+}

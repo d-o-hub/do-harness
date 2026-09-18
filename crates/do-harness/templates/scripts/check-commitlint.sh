@@ -131,7 +131,16 @@ if [[ -n "$RANGE" ]]; then
     LOG_CMD=(git -C "$ROOT" log --no-merges --pretty=format:%s "$RANGE")
 else
     LOG_SOURCE="last $COUNT commit(s)"
-    LOG_CMD=(git -C "$ROOT" log --no-merges -n "$COUNT" --pretty=format:%s)
+    # `--first-parent` keeps the window on this branch's own line of history.
+    # Without it, when a branch tip is a merge, `--no-merges` skips that merge
+    # and descends into the merged-in branch, so the window can land on a
+    # commit this branch never authored. Observed: a PR whose tip was
+    # "Merge branch 'main' into ..." reported the non-conventional subject of a
+    # commit already on `main`, which no change on that branch could fix, and
+    # which merging `main` again could not clear because the commit was by then
+    # an ancestor. The window exists to judge the commits a branch adds, so it
+    # must not walk into the history it merged.
+    LOG_CMD=(git -C "$ROOT" log --first-parent --no-merges -n "$COUNT" --pretty=format:%s)
 fi
 # Capture first: an invalid range (or any git failure) must fail closed,
 # never silently lint zero subjects. Command substitution also strips the
