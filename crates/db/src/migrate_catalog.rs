@@ -97,4 +97,9 @@ pub const MIGRATIONS: &[Migration] = &[
         name: "sensor_baselines",
         sql: include_str!("../migrations/0017_sensor_baselines.sql"),
     },
+    Migration {
+        version: 18,
+        name: "dora_snapshots",
+        sql: include_str!("../migrations/0018_dora_snapshots.sql"),
+    },
 ];

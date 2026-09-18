@@ -103,6 +103,23 @@ jobs:
           mkdir -p .do-harness
           sha256sum Cargo.lock > .do-harness/Cargo.lock.sha256
           cat .do-harness/Cargo.lock.sha256
+      - name: Record the DORA snapshot
+        # Records the snapshot for this run and asserts the collector's exit
+        # contract. Exit 1 is the metric verdict (a threshold breach), not a
+        # recording failure: the snapshot row is written either way, and `dora`
+        # is report-only by design. Exit 2 (usage/config/discovery) and any
+        # other code still fails the job, so a broken collector cannot hide
+        # here.
+        #
+        # This does NOT accumulate history across runs: `.do-harness/` is
+        # gitignored local state, and CI neither caches nor uploads
+        # `agent_state.db`, so the row lives only for the duration of the job.
+        # Durable history means running `dora --record` on a checkout whose
+        # state database persists.
+        run: |
+          code=0
+          ./target/release/do-harness dora --record --format json || code=$?
+          test "$code" -le 1
       - name: Lint full PR commit range
         # The commitlint sensor only checks COUNT=1 locally; PRs must lint
         # every non-merge commit (fetch-depth: 0 makes both SHAs available).

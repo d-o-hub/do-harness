@@ -8,6 +8,7 @@
 //! - [`repo_exec`] — beats and error signatures
 //! - [`repo_scope`] — signature lifecycle (reset, list, clear)
 //! - [`repo_sensors`] — sensor findings telemetry and bless history
+//! - [`repo_dora`] — append-only DORA deployment snapshots
 //! - [`repo_trace`] — execution traces
 //! - [`repo_heuristic`] — distilled heuristics
 //! - [`repo_skill_eval`] — latest skill evaluations
@@ -22,6 +23,7 @@ pub mod migrate;
 pub mod migrate_catalog;
 pub mod query;
 pub mod repo;
+pub mod repo_dora;
 pub mod repo_eval;
 pub mod repo_exec;
 pub mod repo_heuristic;
@@ -46,6 +48,7 @@ pub use migrate::{
 };
 pub use query::count_where;
 pub use repo::{NewTask, get_task, latest_task_update, list_tasks, seed_invariants};
+pub use repo_dora::{DoraSnapshotRow, NewDoraSnapshot, insert_dora_snapshot, list_dora_snapshots};
 pub use repo_eval::{
     NewSkillEvalDimRate, NewSkillEvalRun, SkillEvalSummary, bless_grader_baseline,
     dim_rates_for_run, get_grader_baseline, get_lift_floor, get_skill_bar, insert_dim_rates,

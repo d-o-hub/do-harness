@@ -34,6 +34,9 @@ _do__harness() {
             do__harness,doctor)
                 cmd="do__harness__subcmd__doctor"
                 ;;
+            do__harness,dora)
+                cmd="do__harness__subcmd__dora"
+                ;;
             do__harness,errors)
                 cmd="do__harness__subcmd__errors"
                 ;;
@@ -126,6 +129,9 @@ _do__harness() {
                 ;;
             do__harness__subcmd__help,doctor)
                 cmd="do__harness__subcmd__help__subcmd__doctor"
+                ;;
+            do__harness__subcmd__help,dora)
+                cmd="do__harness__subcmd__help__subcmd__dora"
                 ;;
             do__harness__subcmd__help,errors)
                 cmd="do__harness__subcmd__help__subcmd__errors"
@@ -383,7 +389,7 @@ _do__harness() {
 
     case "${cmd}" in
         do__harness)
-            opts="-v -q -h -V --root --config --verbose --quiet --color --output --dry-run --help --version version verify check list ls explain status pr init-db seed init task trace distill errors eval hook doctor metrics overlap maintenance compliance audit-chain completions man help"
+            opts="-v -q -h -V --root --config --verbose --quiet --color --output --dry-run --help --version version verify check list ls explain status pr init-db seed init task trace distill errors eval hook doctor metrics overlap maintenance compliance audit-chain dora completions man help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 1 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -615,7 +621,7 @@ _do__harness() {
             return 0
             ;;
         do__subcmd__harness__subcmd__distill)
-            opts="-v -q -h -V --skill --pattern --description --from-trace --to-fixture --dry-run --format --root --config --verbose --quiet --color --output --help --version"
+            opts="-v -q -h -V --skill --pattern --description --from-trace --from-strikes --min-strikes --task --to-fixture --dry-run --format --root --config --verbose --quiet --color --output --help --version"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -634,6 +640,14 @@ _do__harness() {
                     return 0
                     ;;
                 --from-trace)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --min-strikes)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --task)
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;
@@ -698,6 +712,77 @@ _do__harness() {
             case "${prev}" in
                 --format)
                     COMPREPLY=($(compgen -W "text json" -- "${cur}"))
+                    return 0
+                    ;;
+                --root)
+                    COMPREPLY=()
+                    if [[ "${BASH_VERSINFO[0]}" -ge 4 ]]; then
+                        compopt -o plusdirs
+                    fi
+                    return 0
+                    ;;
+                --config)
+                    local oldifs
+                    if [ -n "${IFS+x}" ]; then
+                        oldifs="$IFS"
+                    fi
+                    IFS=$'\n'
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    if [ -n "${oldifs+x}" ]; then
+                        IFS="$oldifs"
+                    fi
+                    if [[ "${BASH_VERSINFO[0]}" -ge 4 ]]; then
+                        compopt -o filenames
+                    fi
+                    return 0
+                    ;;
+                --color)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --output)
+                    local oldifs
+                    if [ -n "${IFS+x}" ]; then
+                        oldifs="$IFS"
+                    fi
+                    IFS=$'\n'
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    if [ -n "${oldifs+x}" ]; then
+                        IFS="$oldifs"
+                    fi
+                    if [[ "${BASH_VERSINFO[0]}" -ge 4 ]]; then
+                        compopt -o filenames
+                    fi
+                    return 0
+                    ;;
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        do__subcmd__harness__subcmd__dora)
+            opts="-v -q -h -V --days --format --record --source --now --root --config --verbose --quiet --color --output --dry-run --help --version"
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                --days)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --format)
+                    COMPREPLY=($(compgen -W "text json" -- "${cur}"))
+                    return 0
+                    ;;
+                --source)
+                    COMPREPLY=($(compgen -W "git gh" -- "${cur}"))
+                    return 0
+                    ;;
+                --now)
+                    COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;
                 --root)
@@ -1124,7 +1209,7 @@ _do__harness() {
             return 0
             ;;
         do__subcmd__harness__subcmd__help)
-            opts="version verify list explain status pr init-db seed init task trace distill errors eval hook doctor metrics overlap maintenance compliance audit-chain completions man help"
+            opts="version verify list explain status pr init-db seed init task trace distill errors eval hook doctor metrics overlap maintenance compliance audit-chain dora completions man help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -1194,6 +1279,20 @@ _do__harness() {
             return 0
             ;;
         do__subcmd__harness__subcmd__help__subcmd__doctor)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        do__subcmd__harness__subcmd__help__subcmd__dora)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -2124,7 +2223,7 @@ _do__harness() {
             fi
             case "${prev}" in
                 --language)
-                    COMPREPLY=($(compgen -W "rust generic web" -- "${cur}"))
+                    COMPREPLY=($(compgen -W "rust generic web node" -- "${cur}"))
                     return 0
                     ;;
                 --format)
