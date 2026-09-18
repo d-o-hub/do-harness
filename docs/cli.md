@@ -303,6 +303,36 @@ Verify event hash chain integrity in `.do-harness/agent_state.db`.
 
 - `--format <Format>`: Output format (`text` or `json`).
 
+### `dora`
+Derive the four DORA deployment metrics — deployment frequency, lead time for
+changes, change failure rate, and time to restore service — from git history.
+Every number is **derived from persisted history and the pinned policy in
+`plans/dora.json`**, never judged: the same input yields byte-identical output,
+and each snapshot carries its own derivation manifest (resolved window, ref
+ranges scanned, revert predicate, percentile method, incidents) so a number can
+never be read without its provenance. Read-only apart from an optional snapshot
+row.
+
+- `--days <DAYS>`: Rolling window in days (overrides `window_days` in the
+  policy for this run only; the file is never rewritten).
+- `--format <Format>`: Output format (`text` or `json`).
+- `--record`: Persist the snapshot into `.do-harness/agent_state.db`
+  (`dora_snapshots`).
+- `--source <git\|gh>`: `git` (default) is hermetic and offline; `gh` adds an
+  opt-in GitHub enrichment object (release-run reconciliation plus PR-open →
+  merge lead time) and is never used in CI, hooks, or a sensor argv.
+- `--now <UNIX_SECONDS>`: Inject the measurement clock so runs are reproducible.
+
+`policy_fingerprint` is `sha256:` + the digest of the raw `plans/dora.json`
+bytes, and `plans/dora.json` is declared as the `dora` sensor's
+`coverage-inputs`, so editing a threshold makes prior DORA evidence `stale`
+(reason `policy_changed`) instead of silently re-scoring the same history.
+
+Exit `0` when no threshold is breached, `1` when at least one is (the breach
+count travels in the `FINDINGS:` marker for the blessed ratchet), and `2` for a
+usage/config/discovery problem — including a shallow clone whose ranges cannot
+be resolved. A collector that cannot read git history never reads as healthy.
+
 ### `pr no-effect`
 Report whether a pull request or revision range introduces any effective change,
 using the merge-base tree delta. Read-only; works in any git repository without
