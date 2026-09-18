@@ -24,9 +24,12 @@ use std::process::Command;
 #[allow(dead_code)]
 mod shell;
 
-/// Builds a command with hook-inherited repository environment removed.
-fn isolated_command(program: &str) -> Command {
-    let mut command = Command::new(program);
+/// Removes hook-inherited repository environment from `command`.
+///
+/// Git exports `GIT_DIR` and friends to hooks, and this repository's own
+/// `pre-push` hook runs `cargo test`. Without this, `git -C <fixture>` still
+/// resolves the real repository, so the fixtures would lint the wrong history.
+fn isolate(command: &mut Command) -> &mut Command {
     for key in [
         "GIT_DIR",
         "GIT_WORK_TREE",
@@ -39,6 +42,13 @@ fn isolated_command(program: &str) -> Command {
     ] {
         command.env_remove(key);
     }
+    command
+}
+
+/// Builds a program command with hook-inherited repository environment removed.
+fn isolated_command(program: &str) -> Command {
+    let mut command = Command::new(program);
+    isolate(&mut command);
     command
 }
 
@@ -64,11 +74,11 @@ fn fixture() -> (tempfile::TempDir, PathBuf) {
 
 /// Runs the script in `root`, returning (success, stdout, stderr).
 fn lint(root: &Path, args: &[&str]) -> (bool, String, String) {
-    let output = shell::bash()
+    let output = isolate(&mut shell::bash())
         .arg(root.join("scripts/check-commitlint.sh"))
         .args(args)
-        .env_remove("DO_HARNESS_COMMITLINT_COUNT")
         .current_dir(root)
+        .env_remove("DO_HARNESS_COMMITLINT_COUNT")
         .output()
         .expect("spawn check-commitlint.sh");
     (
@@ -133,11 +143,11 @@ fn commitlint_empty_history_validates_arguments_and_messages() {
         (&["--message", "invalid-message"], 1),
     ];
     for (args, expected) in cases {
-        let output = shell::bash()
+        let output = isolate(&mut shell::bash())
             .arg(root.join("scripts/check-commitlint.sh"))
             .args(*args)
-            .env_remove("DO_HARNESS_COMMITLINT_COUNT")
             .current_dir(&root)
+            .env_remove("DO_HARNESS_COMMITLINT_COUNT")
             .output()
             .unwrap();
         assert_eq!(
