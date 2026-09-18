@@ -54,6 +54,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand maintenance 'Prune old beats and compact the state database'
             cand compliance 'Print compliance mapping to OWASP Agentic Top 10, NIST AI RMF, and EU AI Act'
             cand audit-chain 'Recompute workflow event hash chain and report first divergence'
+            cand dora 'Derive DORA deployment metrics from git history (deterministic, read-only)'
             cand completions 'Generate shell completions'
             cand man 'Generate man page documentation'
             cand help 'Print this message or the help of the given subcommand(s)'
@@ -617,11 +618,14 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand --pattern 'Generalized pattern to record'
             cand --description 'When the pattern applies'
             cand --from-trace 'Source trace id; required as evidence of a resolved fix'
+            cand --min-strikes 'Strike count at or above which a signature sculpts a scaffold (default: the fail-fast threshold)'
+            cand --task 'Scope strike lookup to this task id'
             cand --format 'Output format'
             cand --root 'Workspace root override (default: walk up from cwd)'
             cand --config 'Explicit path to do-harness.toml'
             cand --color 'Color output (auto, always, never)'
             cand --output 'Default output file path'
+            cand --from-strikes 'Generate a starter skill scaffold from recorded sensor strikes (AGENTS.md §6 steering loop) instead of distilling from a trace'
             cand --to-fixture 'Raise the skill''s pass-rate bar after this recovery'
             cand --dry-run 'Perform dry run without modifying skill files'
             cand -v 'Verbosity level (-v, -vv)'
@@ -924,6 +928,26 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand -V 'Print version'
             cand --version 'Print version'
         }
+        &'do-harness;dora'= {
+            cand --days 'Rolling window in days (overrides the pinned policy for this run)'
+            cand --format 'Output format'
+            cand --source 'Where the numbers come from'
+            cand --now 'Measurement clock as Unix seconds (default: system clock)'
+            cand --root 'Workspace root override (default: walk up from cwd)'
+            cand --config 'Explicit path to do-harness.toml'
+            cand --color 'Color output (auto, always, never)'
+            cand --output 'Default output file path'
+            cand --record 'Persist the snapshot into the state database'
+            cand -v 'Verbosity level (-v, -vv)'
+            cand --verbose 'Verbosity level (-v, -vv)'
+            cand -q 'Suppress non-error messages'
+            cand --quiet 'Suppress non-error messages'
+            cand --dry-run 'Dry run without side effects'
+            cand -h 'Print help (see more with ''--help'')'
+            cand --help 'Print help (see more with ''--help'')'
+            cand -V 'Print version'
+            cand --version 'Print version'
+        }
         &'do-harness;completions'= {
             cand --root 'Workspace root override (default: walk up from cwd)'
             cand --config 'Explicit path to do-harness.toml'
@@ -976,6 +1000,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand maintenance 'Prune old beats and compact the state database'
             cand compliance 'Print compliance mapping to OWASP Agentic Top 10, NIST AI RMF, and EU AI Act'
             cand audit-chain 'Recompute workflow event hash chain and report first divergence'
+            cand dora 'Derive DORA deployment metrics from git history (deterministic, read-only)'
             cand completions 'Generate shell completions'
             cand man 'Generate man page documentation'
             cand help 'Print this message or the help of the given subcommand(s)'
@@ -1081,6 +1106,8 @@ set edit:completion:arg-completer[do-harness] = {|@words|
         &'do-harness;help;compliance'= {
         }
         &'do-harness;help;audit-chain'= {
+        }
+        &'do-harness;help;dora'= {
         }
         &'do-harness;help;completions'= {
         }

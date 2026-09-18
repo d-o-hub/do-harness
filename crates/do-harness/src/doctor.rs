@@ -47,6 +47,13 @@ pub(crate) async fn run_with_status(
         ));
     }
 
+    if status.is_shadowed() {
+        let cfg = status.core_hooks_path.as_deref().unwrap_or("configured");
+        failures.push(format!(
+            "one or more managed git hooks shadowed by core.hooksPath={cfg}"
+        ));
+    }
+
     let hooks_installed = status.pre_commit && status.pre_push && status.commit_msg;
     if strict && !hooks_installed {
         failures.push("one or more managed git hooks absent in strict mode".to_owned());
@@ -103,6 +110,10 @@ pub(crate) async fn run_with_status(
                 "pre_commit": status.pre_commit,
                 "pre_push": status.pre_push,
                 "commit_msg": status.commit_msg,
+                "pre_commit_shadowed": status.pre_commit_shadowed,
+                "pre_push_shadowed": status.pre_push_shadowed,
+                "commit_msg_shadowed": status.commit_msg_shadowed,
+                "shadowed": status.is_shadowed()
             },
             "database_ok": db_ok,
             "orphan_tasks": orphan_tasks,
@@ -133,16 +144,21 @@ pub(crate) async fn run_with_status(
             );
         }
 
-        for (name, installed) in [
-            ("pre-commit", status.pre_commit),
-            ("pre-push", status.pre_push),
-            ("commit-msg", status.commit_msg),
+        for (name, installed, shadowed) in [
+            ("pre-commit", status.pre_commit, status.pre_commit_shadowed),
+            ("pre-push", status.pre_push, status.pre_push_shadowed),
+            ("commit-msg", status.commit_msg, status.commit_msg_shadowed),
         ] {
-            println!(
-                "  [{}] {name} hook: {}",
-                if installed { "OK" } else { "WARN" },
-                if installed { "installed" } else { "absent" }
-            );
+            if installed {
+                println!("  [OK] {name} hook: installed");
+            } else if shadowed {
+                let cfg = status.core_hooks_path.as_deref().unwrap_or("configured");
+                println!(
+                    "  [FAIL] {name} hook: installed in .git/hooks but shadowed by core.hooksPath={cfg}"
+                );
+            } else {
+                println!("  [WARN] {name} hook: absent");
+            }
         }
 
         match &db_res {
@@ -273,8 +289,29 @@ mod tests {
             pre_commit: true,
             pre_push: true,
             commit_msg: true,
+            pre_commit_shadowed: false,
+            pre_push_shadowed: false,
+            commit_msg_shadowed: false,
             binary: BinSource::Repo(root.join("target/release/do-harness")),
+            core_hooks_path: None,
+            hooks_dir: root.join(".git/hooks"),
         }
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn fails_when_hooks_are_shadowed() {
+        let (_temp, root) = fake_repo_with_git();
+        stub_binary(&root);
+        let mut status = repo_status(&root);
+        status.pre_commit = false;
+        status.pre_commit_shadowed = true;
+        status.core_hooks_path = Some(".githooks".to_string());
+
+        let result = run_with_status(&root, Format::Text, false, &status).await;
+
+        let message = result.unwrap_err().to_string();
+        assert!(message.contains("doctor check failed"));
+        assert!(message.contains("shadowed by core.hooksPath=.githooks"));
     }
 
     #[tokio::test(flavor = "current_thread")]

@@ -24,8 +24,8 @@ jobs:
       contents: read
       actions: write
     steps:
-      # actions/checkout@v4
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      # actions/checkout@v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           # Full history so the commitlint sensor can inspect recent subjects.
           fetch-depth: 0
@@ -37,7 +37,7 @@ jobs:
           channel="$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)"
           echo "channel=$channel" >> "$GITHUB_OUTPUT"
       # dtolnay/rust-toolchain@master (SHA within master history per action docs)
-      - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772
+      - uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de
         with:
           # The @rev default ignores rust-toolchain.toml; pass the pinned
           # channel so rust-toolchain.toml stays the single source of truth.
@@ -103,6 +103,23 @@ jobs:
           mkdir -p .do-harness
           sha256sum Cargo.lock > .do-harness/Cargo.lock.sha256
           cat .do-harness/Cargo.lock.sha256
+      - name: Record the DORA snapshot
+        # Records the snapshot for this run and asserts the collector's exit
+        # contract. Exit 1 is the metric verdict (a threshold breach), not a
+        # recording failure: the snapshot row is written either way, and `dora`
+        # is report-only by design. Exit 2 (usage/config/discovery) and any
+        # other code still fails the job, so a broken collector cannot hide
+        # here.
+        #
+        # This does NOT accumulate history across runs: `.do-harness/` is
+        # gitignored local state, and CI neither caches nor uploads
+        # `agent_state.db`, so the row lives only for the duration of the job.
+        # Durable history means running `dora --record` on a checkout whose
+        # state database persists.
+        run: |
+          code=0
+          ./target/release/do-harness dora --record --format json || code=$?
+          test "$code" -le 1
       - name: Lint full PR commit range
         # The commitlint sensor only checks COUNT=1 locally; PRs must lint
         # every non-merge commit (fetch-depth: 0 makes both SHAs available).
@@ -132,10 +149,10 @@ jobs:
           test -f .do-harness/evidence.verification.json
           test -n "$(jq -r '.git_sha // empty' .do-harness/evidence.verification.json)"
           test "$(jq -r '.signal_set' .do-harness/evidence.verification.json)" = "verification"
-      # actions/upload-artifact@v4 (v4.6.2)
+      # actions/upload-artifact@v7.0.1
       - name: Upload verify evidence
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: verify-evidence
           path: |
@@ -147,8 +164,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      # actions/checkout@v4
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      # actions/checkout@v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           # No push/fetch credentials persisted: this workflow never pushes.
           persist-credentials: false
@@ -158,7 +175,7 @@ jobs:
           msrv="$(sed -n '/^\[workspace.package\]/,/^\[/ s/^rust-version *= *"\(.*\)"/\1/p' Cargo.toml)"
           echo "msrv=$msrv" >> "$GITHUB_OUTPUT"
       # dtolnay/rust-toolchain@master
-      - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772
+      - uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de
         with:
           # Explicit input overrides any local rust-toolchain.toml pin.
           toolchain: ${{ steps.msrv.outputs.msrv }}
@@ -173,8 +190,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      # actions/checkout@v4
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      # actions/checkout@v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           # No push/fetch credentials persisted: this workflow never pushes.
           persist-credentials: false
@@ -184,7 +201,7 @@ jobs:
           channel="$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)"
           echo "channel=$channel" >> "$GITHUB_OUTPUT"
       # dtolnay/rust-toolchain@master (SHA within master history per action docs)
-      - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772
+      - uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de
         with:
           toolchain: ${{ steps.toolchain.outputs.channel }}
       # Swatinem/rust-cache@v2
@@ -202,8 +219,8 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 30
     steps:
-      # actions/checkout@v4
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      # actions/checkout@v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           # No push/fetch credentials persisted: this workflow never pushes.
           persist-credentials: false
@@ -214,7 +231,7 @@ jobs:
           channel="$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)"
           echo "channel=$channel" >> "$GITHUB_OUTPUT"
       # dtolnay/rust-toolchain@master (SHA within master history per action docs)
-      - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772
+      - uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de
         with:
           toolchain: ${{ steps.toolchain.outputs.channel }}
           components: rustfmt, clippy

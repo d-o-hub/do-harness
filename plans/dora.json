@@ -1,0 +1,14 @@
+{
+  "$comment": "DORA derivation policy. Every key here changes the numbers, so this file is declared as the dora sensor's coverage-inputs and its content is hashed into the evidence policy fingerprint: editing a threshold makes prior dora evidence stale instead of silently incomparable. Bands: max_lead_p90_days is 30 (not 14) because this repo's first release deployed 27.03 days after its first commit; a 14-day bar would breach permanently on first-release history and stop carrying information.",
+  "window_days": 30,
+  "tag_glob": "refs/tags/v*",
+  "merge_strategy": "squash",
+  "percentile_method": "nearest-rank",
+  "revert_pattern": "^revert(\\(|:)",
+  "bot_allowlist": [],
+  "min_deploys": 1,
+  "max_lead_p90_days": 30,
+  "max_change_failure_rate": 0.15,
+  "max_mttr_hours": 24,
+  "max_unrestored": 0
+}

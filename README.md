@@ -178,6 +178,7 @@ export PATH="$HOME/.local/bin:$PATH"
 | `distill --skill NAME --pattern P [--description D] [--from-trace ID] [--to-fixture]` | Distill a resolved trace into a skill (refuses without resolution steps); `--to-fixture` raises the skill's pass-rate bar |
 | `eval [--skill NAME] [--bless] [--agent-cmd CMD]` | Validate skills via skill-creator's quick_validate.py and persist skill_evals; `--bless` re-baselines graders and raises the pass-rate bar after a fully green run; `--agent-cmd` runs an external agent per case for true Skill Lift |
 | `metrics [--format text\|json]` | Report sensor stats, strike counts, and eval pass-rate history |
+| `dora [--days N] [--format text\|json] [--record] [--source git\|gh] [--now UNIX]` | Derive DORA metrics (deployment frequency, lead time, change failure rate, time to restore) from git history plus the pinned `plans/dora.json` policy; every number carries its derivation manifest |
 | `compliance [--format text\|json]` | Print compliance mapping to OWASP Agentic Top 10, NIST AI RMF, and EU AI Act |
 | `init [--language rust\|generic] [--force]` | Scaffold a harness workspace in the current directory |
 | `hook install [--force]` / `hook uninstall` / `hook status` / `hook diff` | Manage git hooks (`.git/hooks/pre-commit`, `commit-msg`, `pre-push`) |
