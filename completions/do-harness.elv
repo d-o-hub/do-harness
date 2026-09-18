@@ -39,6 +39,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand explain 'Explain which sensors the current change selects, without running them'
             cand status 'Report verification evidence freshness without running sensors'
             cand pr 'Deterministic PR analysis (read-only; works in any git repository)'
+            cand skills 'Inspect and select skills by progressive disclosure'
             cand init-db 'Apply pending database migrations'
             cand seed 'Seed invariants from plans/invariants.json'
             cand init 'Scaffold a harness workspace in a target directory'
@@ -266,6 +267,49 @@ set edit:completion:arg-completer[do-harness] = {|@words|
         &'do-harness;pr;help;review'= {
         }
         &'do-harness;pr;help;help'= {
+        }
+        &'do-harness;skills'= {
+            cand --root 'Workspace root override (default: walk up from cwd)'
+            cand --config 'Explicit path to do-harness.toml'
+            cand --color 'Color output (auto, always, never)'
+            cand --output 'Default output file path'
+            cand -v 'Verbosity level (-v, -vv)'
+            cand --verbose 'Verbosity level (-v, -vv)'
+            cand -q 'Suppress non-error messages'
+            cand --quiet 'Suppress non-error messages'
+            cand --dry-run 'Dry run without side effects'
+            cand -h 'Print help'
+            cand --help 'Print help'
+            cand -V 'Print version'
+            cand --version 'Print version'
+            cand suggest 'Rank skills by relevance to a query using metadata only'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'do-harness;skills;suggest'= {
+            cand --query 'Task description to match against skill metadata'
+            cand --limit 'Maximum number of candidates to return'
+            cand --format 'Output format'
+            cand --root 'Workspace root override (default: walk up from cwd)'
+            cand --config 'Explicit path to do-harness.toml'
+            cand --color 'Color output (auto, always, never)'
+            cand --output 'Default output file path'
+            cand -v 'Verbosity level (-v, -vv)'
+            cand --verbose 'Verbosity level (-v, -vv)'
+            cand -q 'Suppress non-error messages'
+            cand --quiet 'Suppress non-error messages'
+            cand --dry-run 'Dry run without side effects'
+            cand -h 'Print help (see more with ''--help'')'
+            cand --help 'Print help (see more with ''--help'')'
+            cand -V 'Print version'
+            cand --version 'Print version'
+        }
+        &'do-harness;skills;help'= {
+            cand suggest 'Rank skills by relevance to a query using metadata only'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'do-harness;skills;help;suggest'= {
+        }
+        &'do-harness;skills;help;help'= {
         }
         &'do-harness;init-db'= {
             cand --root 'Workspace root override (default: walk up from cwd)'
@@ -985,6 +1029,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand explain 'Explain which sensors the current change selects, without running them'
             cand status 'Report verification evidence freshness without running sensors'
             cand pr 'Deterministic PR analysis (read-only; works in any git repository)'
+            cand skills 'Inspect and select skills by progressive disclosure'
             cand init-db 'Apply pending database migrations'
             cand seed 'Seed invariants from plans/invariants.json'
             cand init 'Scaffold a harness workspace in a target directory'
@@ -1022,6 +1067,11 @@ set edit:completion:arg-completer[do-harness] = {|@words|
         &'do-harness;help;pr;no-effect'= {
         }
         &'do-harness;help;pr;review'= {
+        }
+        &'do-harness;help;skills'= {
+            cand suggest 'Rank skills by relevance to a query using metadata only'
+        }
+        &'do-harness;help;skills;suggest'= {
         }
         &'do-harness;help;init-db'= {
         }

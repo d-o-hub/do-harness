@@ -302,6 +302,80 @@ esac
     ;;
 esac
 ;;
+(skills)
+_arguments "${_arguments_options[@]}" : \
+'--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
+'--config=[Explicit path to do-harness.toml]:FILE:_files' \
+'--color=[Color output (auto, always, never)]:WHEN:_default' \
+'--output=[Default output file path]:FILE:_files' \
+'*-v[Verbosity level (-v, -vv)]' \
+'*--verbose[Verbosity level (-v, -vv)]' \
+'-q[Suppress non-error messages]' \
+'--quiet[Suppress non-error messages]' \
+'--dry-run[Dry run without side effects]' \
+'-h[Print help]' \
+'--help[Print help]' \
+'-V[Print version]' \
+'--version[Print version]' \
+":: :_do-harness__subcmd__skills_commands" \
+"*::: :->skills" \
+&& ret=0
+
+    case $state in
+    (skills)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:do-harness-skills-command-$line[1]:"
+        case $line[1] in
+            (suggest)
+_arguments "${_arguments_options[@]}" : \
+'--query=[Task description to match against skill metadata]:TEXT:_default' \
+'--limit=[Maximum number of candidates to return]:N:_default' \
+'--format=[Output format]:FORMAT:((text\:"Human-readable text output"
+json\:"Machine-readable JSON output"))' \
+'--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
+'--config=[Explicit path to do-harness.toml]:FILE:_files' \
+'--color=[Color output (auto, always, never)]:WHEN:_default' \
+'--output=[Default output file path]:FILE:_files' \
+'*-v[Verbosity level (-v, -vv)]' \
+'*--verbose[Verbosity level (-v, -vv)]' \
+'-q[Suppress non-error messages]' \
+'--quiet[Suppress non-error messages]' \
+'--dry-run[Dry run without side effects]' \
+'-h[Print help (see more with '\''--help'\'')]' \
+'--help[Print help (see more with '\''--help'\'')]' \
+'-V[Print version]' \
+'--version[Print version]' \
+&& ret=0
+;;
+(help)
+_arguments "${_arguments_options[@]}" : \
+":: :_do-harness__subcmd__skills__subcmd__help_commands" \
+"*::: :->help" \
+&& ret=0
+
+    case $state in
+    (help)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:do-harness-skills-help-command-$line[1]:"
+        case $line[1] in
+            (suggest)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(help)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+        esac
+    ;;
+esac
+;;
+        esac
+    ;;
+esac
+;;
 (init-db)
 _arguments "${_arguments_options[@]}" : \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
@@ -1273,6 +1347,26 @@ _arguments "${_arguments_options[@]}" : \
     ;;
 esac
 ;;
+(skills)
+_arguments "${_arguments_options[@]}" : \
+":: :_do-harness__subcmd__help__subcmd__skills_commands" \
+"*::: :->skills" \
+&& ret=0
+
+    case $state in
+    (skills)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:do-harness-help-skills-command-$line[1]:"
+        case $line[1] in
+            (suggest)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+        esac
+    ;;
+esac
+;;
 (init-db)
 _arguments "${_arguments_options[@]}" : \
 && ret=0
@@ -1489,6 +1583,7 @@ _do-harness_commands() {
 'explain:Explain which sensors the current change selects, without running them' \
 'status:Report verification evidence freshness without running sensors' \
 'pr:Deterministic PR analysis (read-only; works in any git repository)' \
+'skills:Inspect and select skills by progressive disclosure' \
 'init-db:Apply pending database migrations' \
 'seed:Seed invariants from plans/invariants.json' \
 'init:Scaffold a harness workspace in a target directory' \
@@ -1603,6 +1698,7 @@ _do-harness__subcmd__help_commands() {
 'explain:Explain which sensors the current change selects, without running them' \
 'status:Report verification evidence freshness without running sensors' \
 'pr:Deterministic PR analysis (read-only; works in any git repository)' \
+'skills:Inspect and select skills by progressive disclosure' \
 'init-db:Apply pending database migrations' \
 'seed:Seed invariants from plans/invariants.json' \
 'init:Scaffold a harness workspace in a target directory' \
@@ -1775,6 +1871,18 @@ _do-harness__subcmd__help__subcmd__pr__subcmd__review_commands() {
 _do-harness__subcmd__help__subcmd__seed_commands() {
     local commands; commands=()
     _describe -t commands 'do-harness help seed commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__help__subcmd__skills_commands] )) ||
+_do-harness__subcmd__help__subcmd__skills_commands() {
+    local commands; commands=(
+'suggest:Rank skills by relevance to a query using metadata only' \
+    )
+    _describe -t commands 'do-harness help skills commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__help__subcmd__skills__subcmd__suggest_commands] )) ||
+_do-harness__subcmd__help__subcmd__skills__subcmd__suggest_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness help skills suggest commands' commands "$@"
 }
 (( $+functions[_do-harness__subcmd__help__subcmd__status_commands] )) ||
 _do-harness__subcmd__help__subcmd__status_commands() {
@@ -2024,6 +2132,37 @@ _do-harness__subcmd__pr__subcmd__review_commands() {
 _do-harness__subcmd__seed_commands() {
     local commands; commands=()
     _describe -t commands 'do-harness seed commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__skills_commands] )) ||
+_do-harness__subcmd__skills_commands() {
+    local commands; commands=(
+'suggest:Rank skills by relevance to a query using metadata only' \
+'help:Print this message or the help of the given subcommand(s)' \
+    )
+    _describe -t commands 'do-harness skills commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__skills__subcmd__help_commands] )) ||
+_do-harness__subcmd__skills__subcmd__help_commands() {
+    local commands; commands=(
+'suggest:Rank skills by relevance to a query using metadata only' \
+'help:Print this message or the help of the given subcommand(s)' \
+    )
+    _describe -t commands 'do-harness skills help commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__skills__subcmd__help__subcmd__help_commands] )) ||
+_do-harness__subcmd__skills__subcmd__help__subcmd__help_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness skills help help commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__skills__subcmd__help__subcmd__suggest_commands] )) ||
+_do-harness__subcmd__skills__subcmd__help__subcmd__suggest_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness skills help suggest commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__skills__subcmd__suggest_commands] )) ||
+_do-harness__subcmd__skills__subcmd__suggest_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness skills suggest commands' commands "$@"
 }
 (( $+functions[_do-harness__subcmd__status_commands] )) ||
 _do-harness__subcmd__status_commands() {

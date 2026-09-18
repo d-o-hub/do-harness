@@ -385,6 +385,79 @@ JSON reports also carry `measurement`: `t_raw` (unified-diff bytes), `t_res`
 cancels out; the JSON envelope counts against the residual. Consumers should
 review the residual only on `reduced` and fall back to the raw diff on `no-go`.
 
+### `skills`
+Progressive-disclosure skill selection. `skills suggest` ranks the skills under
+`.agents/skills/*/SKILL.md` against a task description using **frontmatter
+metadata only** — the catalog never reads a skill body, and ranking is offline
+and deterministic.
+
+```bash
+do-harness skills suggest --query "review this pull request" --limit 5
+```
+
+- `--query <TEXT>`: Required task description.
+- `--limit <N>`: Maximum candidates to return (default `5`); `0` is a usage error.
+- `--format <Format>`: `text` (one `<score> <name> — <summary>` line per
+  candidate) or `json`.
+
+JSON output carries metadata only:
+
+```json
+{
+  "schema_version": 1,
+  "query_terms": 8,
+  "catalog_size": 27,
+  "candidates": [
+    {
+      "name": "pr-triage",
+      "description": "Triage GitHub pull requests...",
+      "path": ".agents/skills/pr-triage/SKILL.md",
+      "score": 0.87
+    }
+  ],
+  "warnings": []
+}
+```
+
+Scoring splits the query and the skill's `name` + `metadata.short-description` +
+`description` into lowercased alphanumeric tokens, computes the fraction of
+query tokens present, and adds a full weight when the skill name appears as a
+query token. Ties break on `(name, path)`, so repeated runs over an unchanged
+catalog are byte-identical. Malformed, unreadable, and path-escaping skills
+become `warnings` entries instead of failures, and duplicate names resolve to
+the first path with a warning naming both.
+
+**Optional semantic selector.** Set `DO_HARNESS_SKILL_SELECTOR` to an
+executable and it is invoked with bounded candidate metadata on stdin:
+
+```json
+{"schema_version":1,"query":"…","candidates":[{"name":"…","description":"…","score":0.87}]}
+```
+
+It answers `{"schema_version":1,"selected":["…"],"confidence":0.94}`. A wrong
+`schema_version`, a name outside the candidate set, duplicates, an over-long
+list, a non-finite or out-of-range `confidence`, non-JSON output, a non-zero
+exit, or a timeout (`DO_HARNESS_SKILL_SELECTOR_TIMEOUT`, default `10` seconds)
+all fall back to the deterministic order with a warning. The selector can only
+reorder candidates the deterministic stage already chose: it never sees a skill
+body, cannot introduce a path, and cannot execute a skill or grant a permission.
+
+**Cache.** Frontmatter metadata is cached at
+`.do-harness/cache/skills-v1.json`, keyed by canonical `SKILL.md` path and
+validated against a sha256 of the frontmatter block. A missing, corrupt,
+stale-schema, or stale-scoring cache is a warning and a fresh scan, never an
+error; skill bodies are never cached.
+
+**Loading contract.** `suggest` → inspect candidate metadata → select → read
+only the selected `SKILL.md` and the references it names. Defaults are five
+metadata candidates and one fully loaded skill.
+
+`crates/do-harness/src/skills/tests.rs` covers the algorithm and cache;
+`crates/do-harness/tests/skills_suggest.rs` drives the real binary;
+`scripts/skills-suggest-benchmark.sh` measures top-1/top-3/top-5 accuracy,
+metadata bytes, loaded-context bytes, unnecessary-load rate, and latency across
+the load-all, deterministic-only, and deterministic+selector arms.
+
 ### `completions`
 Generate shell completions for `bash`, `zsh`, `fish`, `powershell`, `elvish`.
 

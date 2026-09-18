@@ -40,7 +40,11 @@ checks failed. `missing` means no current evidence exists yet.
 ## Repository knowledge
 
 - Follow the nearest `AGENTS.md` and the project documentation.
-- Load project-specific skills from `.agents/skills/` only when applicable.
+- Load project-specific skills progressively: run
+  `do-harness skills suggest --query "<task>" --limit 5` to rank skills by
+  frontmatter metadata, inspect the candidate metadata, select the matching
+  skill(s), and only then read the selected `SKILL.md` and its references.
+  Never read every `SKILL.md` to decide which one applies.
 - Sensors and signal sets live in `do-harness.toml`; run
   `do-harness explain --set verification --changed` to see which sensors apply
   to the current change and why.
