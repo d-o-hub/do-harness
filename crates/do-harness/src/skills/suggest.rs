@@ -317,7 +317,10 @@ struct Response {
 /// Every rejection reason is a fallback, never a partial application: an
 /// out-of-set name, a duplicate, an over-long list, or an out-of-range
 /// confidence all mean the deterministic ranking is used unchanged.
-fn validate(stdout: &str, candidates: &[Scored]) -> Result<Vec<String>, String> {
+///
+/// Exposed to the crate so the rejection matrix is testable without spawning a
+/// process: the spawn path is platform-specific, the trust logic is not.
+pub(crate) fn validate(stdout: &str, candidates: &[Scored]) -> Result<Vec<String>, String> {
     let response: Response = serde_json::from_str(stdout)
         .map_err(|err| format!("selector output is not JSON: {err}"))?;
     if response.schema_version != SELECTOR_SCHEMA_VERSION {

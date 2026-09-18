@@ -6,10 +6,13 @@ use super::*;
 use std::path::Path;
 
 /// Writes an executable selector script and points the environment at it.
+///
+/// Unix-only: spawning a `#!` script directly is a POSIX behaviour, so the
+/// spawn-based cases are gated and the trust logic is covered without it.
+#[cfg(unix)]
 fn write_selector(root: &Path, body: &str) -> std::path::PathBuf {
     let path = root.join("selector.sh");
     fs::write(&path, body).unwrap();
-    #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
         fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).unwrap();
@@ -42,6 +45,7 @@ fn missing_selector_keeps_the_deterministic_order() {
     assert!(warnings.is_empty());
 }
 
+#[cfg(unix)]
 #[test]
 fn selector_failures_all_fall_back_to_deterministic() {
     let temp = tempfile::tempdir().unwrap();
@@ -94,6 +98,7 @@ fn selector_failures_all_fall_back_to_deterministic() {
     }
 }
 
+#[cfg(unix)]
 #[test]
 fn selector_sees_only_metadata_and_can_reorder() {
     let temp = tempfile::tempdir().unwrap();
@@ -147,6 +152,69 @@ fn reorder_keeps_unselected_candidates_in_deterministic_order() {
             .collect::<Vec<_>>(),
         vec!["c", "a", "b"]
     );
+}
+
+#[test]
+fn selector_output_validation_rejects_every_untrusted_shape() {
+    let temp = tempfile::tempdir().unwrap();
+    let root = temp.path();
+    let candidates = two_candidates(root);
+
+    // The spawn path is platform-specific, but the trust boundary is not:
+    // every rejection below is a fallback to the deterministic order.
+    let rejections: [(&str, &str); 9] = [
+        ("not json", "not JSON"),
+        (
+            "{\"schema_version\":9,\"selected\":[],\"confidence\":0.9}",
+            "unsupported",
+        ),
+        (
+            "{\"schema_version\":1,\"selected\":[],\"confidence\":1.5}",
+            "outside [0,1]",
+        ),
+        (
+            "{\"schema_version\":1,\"selected\":[],\"confidence\":-0.1}",
+            "outside [0,1]",
+        ),
+        (
+            "{\"schema_version\":1,\"selected\":[\"absent-skill\"],\"confidence\":0.9}",
+            "outside the candidate set",
+        ),
+        (
+            "{\"schema_version\":1,\"selected\":[\"harness\",\"harness\"],\"confidence\":0.9}",
+            "repeated",
+        ),
+        (
+            "{\"schema_version\":1,\"selected\":[\"harness\",\"pr-triage\",\"harness\"],\"confidence\":0.9}",
+            "repeated",
+        ),
+        ("{\"schema_version\":1,\"confidence\":0.9}", "not JSON"),
+        (
+            "{\"schema_version\":1,\"selected\":[\"harness\"],\"confidence\":0.9,\"extra\":1}",
+            "not JSON",
+        ),
+    ];
+    for (stdout, needle) in rejections {
+        let reason = suggest::validate(stdout, &candidates)
+            .expect_err(&format!("{stdout} must be rejected"));
+        assert!(reason.contains(needle), "case {stdout}: {reason}");
+    }
+
+    // An in-set, deduplicated selection is accepted unchanged.
+    let accepted = suggest::validate(
+        "{\"schema_version\":1,\"selected\":[\"harness\"],\"confidence\":0.9}",
+        &candidates,
+    )
+    .unwrap();
+    assert_eq!(accepted, vec!["harness".to_owned()]);
+
+    // A selector may not choose a candidate it was not offered.
+    let over = suggest::validate(
+        "{\"schema_version\":1,\"selected\":[\"harness\",\"pr-triage\"],\"confidence\":0.9}",
+        &candidates[..1],
+    )
+    .expect_err("an unoffered candidate must be rejected");
+    assert!(over.contains("outside the candidate set"), "{over}");
 }
 
 #[test]
