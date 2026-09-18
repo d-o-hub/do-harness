@@ -8,6 +8,12 @@ pre-push = []
 feedback = ["fmt", "check", "clippy"]
 verification = ["fmt", "check", "clippy", "test", "loc", "skills", "deps", "shell", "check-agt", "check-mcp", "check-promotions", "audit", "commitlint"]
 release = ["fmt", "check", "clippy", "test", "loc", "skills", "deps", "shell", "check-agt", "check-mcp", "check-promotions", "audit", "commitlint"]
+# DORA gets its own set so its evidence is addressable (`status --set metrics`)
+# without joining the gating sets. A no-`--set` status check compares against
+# every configured sensor, so a dora-only run's artifact would report
+# `insufficient_coverage` rather than green; scoping the evidence to a set is
+# what makes the freshness comparison meaningful.
+metrics = ["dora"]
 
 [[sensors]]
 name = "fmt"
@@ -77,3 +83,25 @@ when-changed = ["Cargo.toml", "Cargo.lock"]
 [[sensors]]
 name = "commitlint"
 argv = ["bash", "scripts/check-commitlint.sh"]
+
+[[sensors]]
+# DORA deployment health, derived (never judged) from git history. Report-only:
+# severity stays "warn" and the sensor is deliberately absent from every
+# [signal-sets] entry until a blessed findings baseline exists, so a breach is
+# advisory rather than a CI stop. Gating is then mechanical: `verify --record
+# --only dora --bless` pins the current breach count into plans/baselines.json,
+# after which apply_ratchet turns any increase into a hard failure even at warn
+# severity, and a later bless can only lower the ceiling.
+#
+# No `when-changed` key: DORA is a whole-history measurement, not a per-file
+# check, so the sensor must stay always-applicable. Listing source globs here
+# would silently skip the sensor on every unrelated change, which is the
+# failure mode that makes a metric disappear exactly when it should be read.
+#
+# `coverage-inputs` is what pins the policy: plans/dora.json defines every
+# number, so editing a threshold makes prior dora evidence stale instead of
+# silently incomparable.
+name = "dora"
+argv = ["bash", "scripts/check-dora.sh"]
+severity = "warn"
+coverage-inputs = ["plans/dora.json"]
