@@ -259,6 +259,211 @@ checks_fallback_summary=$checks_fallback_summary
 post_merge_event_exit=$post_merge_event_exit
 EOF
 
+# 5e. Semantic router: drive the optional typed router wrapper against a
+# hermetic fake provider. Every scenario writes residue under $root so the
+# policy (fallbacks, schema rejection, uncertainty escalation, head-bound cache,
+# zero-effect bypass, and diff text that must never be executed) is graded.
+unset PR_TRIAGE_ROUTER
+unset PR_TRIAGE_CONFIDENCE_THRESHOLD
+unset PR_TRIAGE_ROUTER_TIMEOUT
+
+cat > "$root/bin/fake-router" <<'ROUTER'
+#!/usr/bin/env bash
+# Deterministic router stub: reads one JSON object on stdin and emits the
+# judgment named by FAKE_ROUTER_MODE. Each invocation appends to
+# FAKE_ROUTER_COUNTER so the walkthrough can observe cache and bypass paths.
+set -euo pipefail
+cat >/dev/null
+if [ -n "${FAKE_ROUTER_COUNTER:-}" ]; then
+  printf 'call\n' >> "$FAKE_ROUTER_COUNTER"
+fi
+case "${FAKE_ROUTER_MODE:?FAKE_ROUTER_MODE required}" in
+  docs-cheap)
+    printf '%s\n' '{"schema_version":1,"change_kind":"docs","behavior_change":{"answer":"no","confidence":0.95},"public_contract_change":{"answer":"no","confidence":0.98},"security_sensitive":{"answer":"no","confidence":0.99},"needs_repository_context":{"answer":"no","confidence":0.90},"confidence":0.95}'
+    ;;
+  api-deep)
+    printf '%s\n' '{"schema_version":1,"change_kind":"public-api","behavior_change":{"answer":"yes","confidence":0.95},"public_contract_change":{"answer":"yes","confidence":0.98},"security_sensitive":{"answer":"no","confidence":0.99},"needs_repository_context":{"answer":"no","confidence":0.90},"confidence":0.95}'
+    ;;
+  security-deep)
+    printf '%s\n' '{"schema_version":1,"change_kind":"security","behavior_change":{"answer":"yes","confidence":0.95},"public_contract_change":{"answer":"no","confidence":0.98},"security_sensitive":{"answer":"yes","confidence":0.99},"needs_repository_context":{"answer":"no","confidence":0.90},"confidence":0.95}'
+    ;;
+  low-confidence)
+    printf '%s\n' '{"schema_version":1,"change_kind":"docs","behavior_change":{"answer":"no","confidence":0.60},"public_contract_change":{"answer":"no","confidence":0.98},"security_sensitive":{"answer":"no","confidence":0.99},"needs_repository_context":{"answer":"no","confidence":0.90},"confidence":0.60}'
+    ;;
+  malformed)
+    printf 'this is not json\n'
+    ;;
+  bad-schema)
+    printf '%s\n' '{"schema_version":1,"change_kind":"prose","behavior_change":{"answer":"no","confidence":0.95},"public_contract_change":{"answer":"no","confidence":0.98},"security_sensitive":{"answer":"no","confidence":0.99},"needs_repository_context":{"answer":"no","confidence":0.90},"confidence":0.95}'
+    ;;
+  out-of-range)
+    printf '%s\n' '{"schema_version":1,"change_kind":"docs","behavior_change":{"answer":"no","confidence":1.5},"public_contract_change":{"answer":"no","confidence":0.98},"security_sensitive":{"answer":"no","confidence":0.99},"needs_repository_context":{"answer":"no","confidence":0.90},"confidence":0.95}'
+    ;;
+  missing-fields)
+    printf '%s\n' '{"schema_version":1,"change_kind":"docs","behavior_change":{"answer":"no","confidence":0.95},"public_contract_change":{"answer":"no","confidence":0.98},"needs_repository_context":{"answer":"no","confidence":0.90},"confidence":0.95}'
+    ;;
+  misleading)
+    printf '%s\n' '{"schema_version":1,"change_kind":"docs","behavior_change":{"answer":"no","confidence":0.95},"public_contract_change":{"answer":"yes","confidence":0.99},"security_sensitive":{"answer":"no","confidence":0.99},"needs_repository_context":{"answer":"no","confidence":0.90},"confidence":0.95}'
+    ;;
+  *)
+    printf 'unknown FAKE_ROUTER_MODE: %s\n' "$FAKE_ROUTER_MODE" >&2
+    exit 1
+    ;;
+esac
+ROUTER
+chmod 0755 "$root/bin/fake-router"
+
+# Router fixture repo. The gate policy proves `src/generated/**` mechanical, so
+# a branch that rewrites the generated file *and* one unproven source line has a
+# residual smaller than its raw diff (`reduced`), while a branch that touches
+# only the unproven line does not (the serialized residual is larger than the
+# diff). Distinct branches give every scenario a distinct head sha, so the
+# head-bound route cache cannot cross-serve one scenario's decision to the next.
+router_repo="$root/router_repo"
+mkdir -p "$router_repo/src/generated"
+cd "$router_repo"
+git init -q -b main
+git config user.email "eval@example.com"
+git config user.name "Eval"
+mkdir -p .github
+printf '[proof]\nmechanical = ["src/generated/**"]\n' > .github/pr-gate.toml
+seq 1 200 | sed 's/^/generated line /' > src/generated/bulk.txt
+printf 'alpha\nbeta\ngamma\n' > src/real.txt
+python3 - <<'PY'
+lines = [f'{{"key_{i}": "va\\"lue \\\\ with \\"quotes\\"", "n": {i}}}' for i in range(60)]
+open('src/config.json', 'w').write('\n'.join(lines) + '\n')
+PY
+git add .
+git commit -q -m base
+
+# Rewrites the proven generated file (dropped from the residual) plus one
+# unproven source line (kept), leaving a residual smaller than the raw diff.
+make_routed_change() {
+  seq 201 400 | sed 's/^/generated line /' > src/generated/bulk.txt
+  printf 'changed\n' >> src/real.txt
+  git add src/generated/bulk.txt src/real.txt
+  git commit -qm routed
+}
+
+# The malicious payload carries text that would create a file or delete the
+# sandbox root if any code path ever interpreted diff content as a command.
+git switch -qc malicious main
+cat > src/payload.txt <<'PAYLOAD'
+$(touch __SANDBOX_ROOT__/pwned)
+; rm -rf __SANDBOX_ROOT__
+PAYLOAD
+sed -i "s|__SANDBOX_ROOT__|$root|g" src/payload.txt
+git add src/payload.txt
+git commit -qm malicious
+
+# No-go branch: escaping-heavy JSON makes the serialized residual larger than
+# the raw diff, so the wrapper must select the raw diff instead.
+git switch -qc no_go main
+python3 - <<'PY'
+lines = [f'{{"key_{i}": "CHANGED \\"value\\" \\\\ more", "n": {i}}}' for i in range(60)]
+open('src/config.json', 'w').write('\n'.join(lines) + '\n')
+PY
+git commit -qam no-go
+
+# Do-nothing branch: an empty commit has no diff at all.
+git switch -qc empty main
+git commit -q --allow-empty -m empty
+
+# Per-judgment branches; each name mirrors the FAKE_ROUTER_MODE it exercises.
+for spec in docs-cheap api-deep security-deep low-confidence malformed bad-schema out-of-range missing-fields misleading; do
+  git switch -qc "case-$spec" main
+  make_routed_change
+done
+
+# Cache branch: a routed change whose content a later empty commit leaves intact.
+git switch -qc cache-case main
+make_routed_change
+
+router_counter="$root/router_calls"
+route() {  # <residue-case> <FAKE_ROUTER_MODE> <head>
+  local case_name="$1" mode="$2" head="$3"
+  FAKE_ROUTER_MODE="$mode" FAKE_ROUTER_COUNTER="$router_counter" \
+    DO_HARNESS_BIN="$DO_HARNESS_BIN" PR_TRIAGE_ROUTER="$root/bin/fake-router" \
+    "$skill/scripts/semantic-route.sh" --base main --head "$head" \
+    > "$root/route_${case_name}.json" 2> "$root/route_${case_name}.err" || true
+}
+
+# Unconfigured and non-executable routers never reach a provider.
+DO_HARNESS_BIN="$DO_HARNESS_BIN" \
+  "$skill/scripts/semantic-route.sh" --base main --head case-docs-cheap \
+  > "$root/route_unset.json" 2> "$root/route_unset.err" || true
+DO_HARNESS_BIN="$DO_HARNESS_BIN" PR_TRIAGE_ROUTER="$root/bin/absent-router" \
+  "$skill/scripts/semantic-route.sh" --base main --head case-docs-cheap \
+  > "$root/route_missing.json" 2> "$root/route_missing.err" || true
+
+# Schema rejections: malformed JSON, unknown enum, out-of-range confidence,
+# below-threshold confidence, and a missing required subfield.
+route malformed malformed case-malformed
+route bad_schema bad-schema case-bad-schema
+route out_of_range out-of-range case-out-of-range
+route low_confidence low-confidence case-low-confidence
+route missing_fields missing-fields case-missing-fields
+
+# Valid judgments. `misleading` claims docs but asserts a public contract
+# change, so the atomic answer wins and the route is deep.
+route docs_cheap docs-cheap case-docs-cheap
+route api_deep api-deep case-api-deep
+route security_deep security-deep case-security-deep
+route misleading misleading case-misleading
+
+# The no-go case reviews the raw diff rather than a residual.
+route no_go docs-cheap no_go
+
+# Cache identity: an unchanged head reuses the decision; advancing the head
+# re-invokes the provider.
+: > "$router_counter"
+route cache_first docs-cheap cache-case
+cache_first_calls=$(wc -l < "$router_counter" | tr -d ' ')
+route cache_second docs-cheap cache-case
+cache_second_calls=$(wc -l < "$router_counter" | tr -d ' ')
+git commit -q --allow-empty -m advance
+route cache_third docs-cheap cache-case
+cache_third_calls=$(wc -l < "$router_counter" | tr -d ' ')
+cache_cached=no
+cache_reinvoked=no
+[ "$cache_second_calls" -eq "$cache_first_calls" ] && cache_cached=yes
+[ "$cache_third_calls" -gt "$cache_second_calls" ] && cache_reinvoked=yes
+printf 'cache_first_calls=%s\ncache_second_calls=%s\ncache_third_calls=%s\ncache_cached=%s\ncache_reinvoked=%s\n' \
+  "$cache_first_calls" "$cache_second_calls" "$cache_third_calls" "$cache_cached" "$cache_reinvoked" \
+  > "$root/route_summary.txt"
+
+# Diff text stays data: routing the malicious payload executes nothing.
+rm -f "$root/pwned"
+route malicious docs-cheap malicious
+if [ -e "$root/pwned" ]; then
+  printf 'executed\n' > "$root/route_malicious.txt"
+else
+  printf 'not-executed\n' > "$root/route_malicious.txt"
+fi
+
+# Timeout: a provider that outlives the bound fails toward depth.
+cat > "$root/bin/fake-router-slow" <<'SLOW'
+#!/usr/bin/env bash
+set -euo pipefail
+cat >/dev/null
+sleep 5
+printf '%s\n' '{"schema_version":1,"change_kind":"docs","behavior_change":{"answer":"no","confidence":0.95},"public_contract_change":{"answer":"no","confidence":0.98},"security_sensitive":{"answer":"no","confidence":0.99},"needs_repository_context":{"answer":"no","confidence":0.90},"confidence":0.95}'
+SLOW
+chmod 0755 "$root/bin/fake-router-slow"
+FAKE_ROUTER_MODE=docs-cheap DO_HARNESS_BIN="$DO_HARNESS_BIN" \
+  PR_TRIAGE_ROUTER="$root/bin/fake-router-slow" PR_TRIAGE_ROUTER_TIMEOUT=1 \
+  "$skill/scripts/semantic-route.sh" --base main --head case-docs-cheap \
+  > "$root/route_timeout.json" 2> "$root/route_timeout.err" || true
+
+# Zero-effect: an empty diff bypasses the provider entirely.
+: > "$router_counter"
+route no_effect docs-cheap empty
+zero_calls=$(wc -l < "$router_counter" | tr -d ' ')
+printf 'provider_calls=%s\n' "$zero_calls" > "$root/route_zero_calls.txt"
+
+git switch -q main
+cd "$root"
+
 # 6. Harness command: a git repo at the sandbox root for `cli:` assertions.
 cd "$root"
 git init -q "$root"

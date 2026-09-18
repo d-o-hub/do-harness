@@ -68,12 +68,17 @@ The semantic provider returns judgments only. Policy derives the route:
 | Process failure / timeout | `deep` |
 | Invalid JSON / schema validation failure | `deep` |
 | `confidence < threshold` (default 0.80) or any subfield confidence < threshold | `deep` |
+| Any atomic answer is `unknown` (uncertainty fails toward depth) | `deep` |
 | `security_sensitive == "yes"` | `deep` |
 | `public_contract_change == "yes"` | `deep` |
 | `needs_repository_context == "yes"` | `deep` |
-| `change_kind` in `("docs", "tests")` and `behavior_change != "yes"` (with no high-risk flags) | `cheap` |
-| `behavior_change == "yes"` | `focused` |
+| `change_kind` in `("docs", "tests")` and `behavior_change == "no"` (with no high-risk flags) | `cheap` |
 | Otherwise | `focused` |
+
+Rules are evaluated in order: confidence floor, then uncertainty, then affirmative risk,
+then the inert-docs/tests `cheap` path, then `focused`. `change_kind == "unknown"` alone is not
+an escalation signal — the four atomic answers carry the risk, and any of them being `unknown`
+already selects `deep`.
 
 There is no semantic skip-review route.
 

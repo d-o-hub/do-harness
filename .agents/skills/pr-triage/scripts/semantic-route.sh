@@ -76,6 +76,13 @@ def validate_confidence(val):
         return False
     return True
 
+ANSWER_FIELDS = [
+    "behavior_change",
+    "public_contract_change",
+    "security_sensitive",
+    "needs_repository_context",
+]
+
 def validate_judgment(judgment):
     if not isinstance(judgment, dict):
         return False
@@ -92,15 +99,9 @@ def validate_judgment(judgment):
     if not validate_confidence(judgment.get("confidence")):
         return False
 
-    answer_fields = [
-        "behavior_change",
-        "public_contract_change",
-        "security_sensitive",
-        "needs_repository_context",
-    ]
     valid_answers = {"yes", "no", "unknown"}
 
-    for field in answer_fields:
+    for field in ANSWER_FIELDS:
         obj = judgment.get(field)
         if not isinstance(obj, dict):
             return False
@@ -112,35 +113,33 @@ def validate_judgment(judgment):
     return True
 
 def derive_route(judgment, threshold):
-    top_conf = judgment["confidence"]
-    if top_conf < threshold:
+    # 1. Any risk signal below the confidence threshold fails toward depth.
+    if judgment["confidence"] < threshold:
         return "deep"
 
-    answer_fields = [
-        "behavior_change",
-        "public_contract_change",
-        "security_sensitive",
-        "needs_repository_context",
-    ]
-    for field in answer_fields:
+    for field in ANSWER_FIELDS:
         if judgment[field]["confidence"] < threshold:
             return "deep"
 
-    sec = judgment["security_sensitive"]["answer"]
-    pub = judgment["public_contract_change"]["answer"]
-    ctx = judgment["needs_repository_context"]["answer"]
-    beh = judgment["behavior_change"]["answer"]
+    # 2. Any uncertain risk signal fails toward depth. `change_kind` alone
+    #    never escalates: the four atomic answers carry the risk.
+    for field in ANSWER_FIELDS:
+        if judgment[field]["answer"] == "unknown":
+            return "deep"
+
+    # 3. An affirmative risk signal fails toward depth.
+    for field in ("security_sensitive", "public_contract_change", "needs_repository_context"):
+        if judgment[field]["answer"] == "yes":
+            return "deep"
+
     kind = judgment["change_kind"]
+    beh = judgment["behavior_change"]["answer"]
 
-    if sec == "yes" or pub == "yes" or ctx == "yes":
-        return "deep"
-
-    if kind in ("docs", "tests") and beh != "yes":
+    # 4. Proven-inert docs/tests-only changes take the cheap path.
+    if kind in ("docs", "tests") and beh == "no":
         return "cheap"
 
-    if beh == "yes":
-        return "focused"
-
+    # 5. Everything else gets focused review.
     return "focused"
 
 def main():
@@ -187,6 +186,20 @@ def main():
     else:
         source = "raw"
         content = get_raw_diff(pr_num, merge_base, head_sha)
+
+    # Zero-LLM path: an empty merge-base..head delta has no effective change,
+    # so the router is never invoked. The deterministic no-effect gate owns
+    # this decision; routing it would spend a model call to decide nothing.
+    if not content:
+        print(json.dumps({
+            "status": "no-effect",
+            "route": "deep",
+            "source": source,
+            "router_confidence": 0.0,
+            "judgment": None,
+            "reason": "no_effective_change",
+        }))
+        return
 
     cache_key = {
         "pr": pr_num if pr_num is not None else " ".join(target_args),
