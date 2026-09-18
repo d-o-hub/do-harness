@@ -243,34 +243,41 @@ pub async fn hook(root: &Path, config_path: Option<&Path>, action: HookAction) -
     match action {
         HookAction::Install { force } => {
             let cfg = config::load(root, config_path).await?;
-            hooks::install(&git_dir, &cfg.hooks.pre_commit, &cfg.hooks.pre_push, force)?;
-            println!("Installed managed git hooks in {}", git_dir.display());
+            let target = hooks::install(
+                &git_dir,
+                root,
+                &cfg.hooks.pre_commit,
+                &cfg.hooks.pre_push,
+                force,
+            )?;
+            println!("Installed managed git hooks in {}", target.display());
         }
         HookAction::Uninstall => {
-            hooks::uninstall(&git_dir)?;
-            println!("Removed managed hooks from {}", git_dir.display());
+            hooks::uninstall(&git_dir, root)?;
+            println!("Removed managed hooks");
         }
         HookAction::Status { format } => {
             let status = hooks::status(&git_dir, root);
             match format {
                 Format::Text => {
+                    let format_hook = |installed: bool, shadowed: bool| -> String {
+                        if installed {
+                            "installed".to_string()
+                        } else if shadowed {
+                            if let Some(ref cfg) = status.core_hooks_path {
+                                format!("installed (shadowed by core.hooksPath={cfg})")
+                            } else {
+                                "installed (shadowed)".to_string()
+                            }
+                        } else {
+                            "absent".to_string()
+                        }
+                    };
                     println!(
                         "pre-commit: {}  pre-push: {}  commit-msg: {}  binary: {} ({})",
-                        if status.pre_commit {
-                            "installed"
-                        } else {
-                            "absent"
-                        },
-                        if status.pre_push {
-                            "installed"
-                        } else {
-                            "absent"
-                        },
-                        if status.commit_msg {
-                            "installed"
-                        } else {
-                            "absent"
-                        },
+                        format_hook(status.pre_commit, status.pre_commit_shadowed),
+                        format_hook(status.pre_push, status.pre_push_shadowed),
+                        format_hook(status.commit_msg, status.commit_msg_shadowed),
                         describe_binary(&status.binary),
                         if status.binary.present() {
                             "present"
@@ -284,6 +291,11 @@ pub async fn hook(root: &Path, config_path: Option<&Path>, action: HookAction) -
                         "pre_commit": status.pre_commit,
                         "pre_push": status.pre_push,
                         "commit_msg": status.commit_msg,
+                        "pre_commit_shadowed": status.pre_commit_shadowed,
+                        "pre_push_shadowed": status.pre_push_shadowed,
+                        "commit_msg_shadowed": status.commit_msg_shadowed,
+                        "core_hooks_path": status.core_hooks_path,
+                        "hooks_dir": status.hooks_dir.display().to_string(),
                         "binary_present": status.binary.present(),
                         "binary_source": describe_binary(&status.binary)
                     });
@@ -296,13 +308,21 @@ pub async fn hook(root: &Path, config_path: Option<&Path>, action: HookAction) -
                     status.binary.path().display()
                 );
             }
-            if !(status.pre_commit && status.pre_push && status.commit_msg) {
-                eprintln!("hint: run `do-harness hook install` to (re)install managed hooks");
+            if !status.is_all_installed() {
+                if status.is_shadowed() {
+                    eprintln!(
+                        "hint: managed hooks are shadowed by core.hooksPath; run `do-harness hook install` to install into the configured directory or unset core.hooksPath"
+                    );
+                } else {
+                    eprintln!("hint: run `do-harness hook install` to (re)install managed hooks");
+                }
             }
         }
         HookAction::Diff => {
             let status = hooks::status(&git_dir, root);
-            if status.pre_commit && status.pre_push && status.commit_msg {
+            if status.is_shadowed() {
+                println!("One or more hooks differ or are missing.");
+            } else if status.is_all_installed() {
                 println!("Hooks match installed templates.");
             } else {
                 println!("One or more hooks differ or are missing.");

@@ -15,9 +15,26 @@ use std::process::Command;
 
 use serde_json::Value;
 
+fn isolated_command(program: &str) -> Command {
+    let mut command = Command::new(program);
+    for key in [
+        "GIT_DIR",
+        "GIT_WORK_TREE",
+        "GIT_INDEX_FILE",
+        "GIT_OBJECT_DIRECTORY",
+        "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+        "GIT_CEILING_DIRECTORIES",
+        "GIT_NAMESPACE",
+        "GIT_PREFIX",
+    ] {
+        command.env_remove(key);
+    }
+    command
+}
+
 /// Builds a `do-harness --root <root>` command using the real binary.
 fn harness(root: &Path) -> Command {
-    let mut cmd = Command::new(env!("CARGO_BIN_EXE_do-harness"));
+    let mut cmd = isolated_command(env!("CARGO_BIN_EXE_do-harness"));
     cmd.arg("--root").arg(root);
     cmd
 }
@@ -41,12 +58,13 @@ fn verify_json(root: &Path) -> Value {
 #[test]
 fn rust_init_on_empty_git_repo_is_green() {
     let dir = tempfile::tempdir().unwrap();
-    let status = Command::new("git")
+    let status = isolated_command("git")
         .args(["init", "-q"])
         .current_dir(dir.path())
         .status()
         .expect("git init");
     assert!(status.success(), "git init failed");
+    assert!(dir.path().join(".git").is_dir());
 
     let (ok, out) = run(harness(dir.path()).arg("init"));
     assert!(
@@ -68,6 +86,62 @@ fn rust_init_on_empty_git_repo_is_green() {
         .expect("commitlint sensor entry");
     assert_eq!(commitlint["ok"], serde_json::json!(true));
     assert_eq!(commitlint["exit_code"], serde_json::json!(0));
+}
+
+#[test]
+fn commitlint_empty_history_validates_arguments_and_messages() {
+    let source = include_str!("../../../scripts/check-commitlint.sh");
+    assert_eq!(
+        source,
+        include_str!("../templates/scripts/check-commitlint.sh")
+    );
+    let dir = tempfile::tempdir().unwrap();
+    assert!(
+        isolated_command("git")
+            .args(["init", "-q"])
+            .current_dir(dir.path())
+            .status()
+            .unwrap()
+            .success()
+    );
+    assert!(dir.path().join(".git").is_dir());
+    let scripts = dir.path().join("scripts");
+    std::fs::create_dir(&scripts).unwrap();
+    let script = scripts.join("check-commitlint.sh");
+    std::fs::write(&script, source).unwrap();
+    std::fs::write(dir.path().join("valid-message"), "fix: initial commit\n").unwrap();
+    std::fs::write(dir.path().join("invalid-message"), "invalid subject\n").unwrap();
+
+    let cases: &[(&[&str], i32)] = &[
+        (&[], 0),
+        (&["--count", "2"], 0),
+        (&["--count", "0"], 2),
+        (&["--unknown"], 2),
+        (&["--range", "missing..HEAD"], 2),
+        (&["--range=missing..HEAD"], 2),
+        (&["--range"], 2),
+        (&["--range", ""], 2),
+        (&["--range="], 2),
+        (&["--range", "missing..HEAD", "--count", "1"], 2),
+        (&["--message", "valid-message"], 0),
+        (&["--message", "invalid-message"], 1),
+    ];
+    for (args, expected) in cases {
+        let output = isolated_command("bash")
+            .arg(&script)
+            .args(*args)
+            .env_remove("DO_HARNESS_COMMITLINT_COUNT")
+            .current_dir(dir.path())
+            .output()
+            .unwrap();
+        assert_eq!(
+            output.status.code(),
+            Some(*expected),
+            "args {args:?}: stdout={} stderr={}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
 }
 
 #[test]
