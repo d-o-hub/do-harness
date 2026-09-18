@@ -11,7 +11,7 @@ use crate::init;
 mod actions;
 
 use crate::report::Format;
-pub use actions::{ErrorsAction, HookAction, PrAction, TaskAction, TraceAction};
+pub use actions::{ErrorsAction, HookAction, PrAction, SkillsAction, TaskAction, TraceAction};
 
 /// Unified entrypoint for harness sensors and database maintenance.
 #[derive(Debug, Parser)]
@@ -142,6 +142,11 @@ pub enum Command {
     Pr {
         #[command(subcommand)]
         action: PrAction,
+    },
+    /// Inspect and select skills by progressive disclosure.
+    Skills {
+        #[command(subcommand)]
+        action: SkillsAction,
     },
     /// Apply pending database migrations.
     InitDb {

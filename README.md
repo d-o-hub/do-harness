@@ -185,6 +185,7 @@ export PATH="$HOME/.local/bin:$PATH"
 | `doctor` | Run diagnostic checks on binary resolution, git hook health, and state-database migration skew (fails when the database outruns the binary) |
 | `pr no-effect <PR\|--base REV --head REV>` | Report whether a PR or revision range introduces any effective change, from the merge-base tree delta (read-only; works in any git repo) |
 | `pr review <PR\|--base REV --head REV> [--recompute]` | Emit the semantic residual evidence could not prove, with skipped units and revocable `false_proven` claims (read-only) |
+| `skills suggest --query TEXT [--limit N] [--format text\|json]` | Rank skills by frontmatter metadata for progressive disclosure (offline; metadata only, never a skill body); `DO_HARNESS_SKILL_SELECTOR` optionally reorders the shortlist |
 
 Global flags: `--root <path>`, `--config <path>`.
 

@@ -1,0 +1,36 @@
+{
+ "tasks": [
+  {
+   "query": "review this pull request and resolve the review comments",
+   "expected_top1": "pr-triage"
+  },
+  {
+   "query": "the clippy sensor failed, run the self-correction protocol",
+   "expected_top1": "harness"
+  },
+  {
+   "query": "cut a tagged release and publish the platform packages",
+   "expected_top1": "release-publisher"
+  },
+  {
+   "query": "write the reference documentation for the new flag",
+   "expected_top1": "docs-writer"
+  },
+  {
+   "query": "add a database schema migration for the new column",
+   "expected_top1": "sql-migration"
+  },
+  {
+   "query": "test the web form in a real browser and take a screenshot",
+   "expected_top1": "browser-automation"
+  },
+  {
+   "query": "generate an illustration for the landing page",
+   "expected_top1": "image-generation"
+  },
+  {
+   "query": "tidy the commit history and squash the branch",
+   "expected_top1": "commit-hygiene"
+  }
+ ]
+}

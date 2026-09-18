@@ -42,6 +42,7 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('explain', 'explain', [CompletionResultType]::ParameterValue, 'Explain which sensors the current change selects, without running them')
             [CompletionResult]::new('status', 'status', [CompletionResultType]::ParameterValue, 'Report verification evidence freshness without running sensors')
             [CompletionResult]::new('pr', 'pr', [CompletionResultType]::ParameterValue, 'Deterministic PR analysis (read-only; works in any git repository)')
+            [CompletionResult]::new('skills', 'skills', [CompletionResultType]::ParameterValue, 'Inspect and select skills by progressive disclosure')
             [CompletionResult]::new('init-db', 'init-db', [CompletionResultType]::ParameterValue, 'Apply pending database migrations')
             [CompletionResult]::new('seed', 'seed', [CompletionResultType]::ParameterValue, 'Seed invariants from plans/invariants.json')
             [CompletionResult]::new('init', 'init', [CompletionResultType]::ParameterValue, 'Scaffold a harness workspace in a target directory')
@@ -283,6 +284,54 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             break
         }
         'do-harness;pr;help;help' {
+            break
+        }
+        'do-harness;skills' {
+            [CompletionResult]::new('--root', '--root', [CompletionResultType]::ParameterName, 'Workspace root override (default: walk up from cwd)')
+            [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Explicit path to do-harness.toml')
+            [CompletionResult]::new('--color', '--color', [CompletionResultType]::ParameterName, 'Color output (auto, always, never)')
+            [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Default output file path')
+            [CompletionResult]::new('-v', '-v', [CompletionResultType]::ParameterName, 'Verbosity level (-v, -vv)')
+            [CompletionResult]::new('--verbose', '--verbose', [CompletionResultType]::ParameterName, 'Verbosity level (-v, -vv)')
+            [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Suppress non-error messages')
+            [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Suppress non-error messages')
+            [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Dry run without side effects')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('-V', '-V ', [CompletionResultType]::ParameterName, 'Print version')
+            [CompletionResult]::new('--version', '--version', [CompletionResultType]::ParameterName, 'Print version')
+            [CompletionResult]::new('suggest', 'suggest', [CompletionResultType]::ParameterValue, 'Rank skills by relevance to a query using metadata only')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'do-harness;skills;suggest' {
+            [CompletionResult]::new('--query', '--query', [CompletionResultType]::ParameterName, 'Task description to match against skill metadata')
+            [CompletionResult]::new('--limit', '--limit', [CompletionResultType]::ParameterName, 'Maximum number of candidates to return')
+            [CompletionResult]::new('--format', '--format', [CompletionResultType]::ParameterName, 'Output format')
+            [CompletionResult]::new('--root', '--root', [CompletionResultType]::ParameterName, 'Workspace root override (default: walk up from cwd)')
+            [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Explicit path to do-harness.toml')
+            [CompletionResult]::new('--color', '--color', [CompletionResultType]::ParameterName, 'Color output (auto, always, never)')
+            [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Default output file path')
+            [CompletionResult]::new('-v', '-v', [CompletionResultType]::ParameterName, 'Verbosity level (-v, -vv)')
+            [CompletionResult]::new('--verbose', '--verbose', [CompletionResultType]::ParameterName, 'Verbosity level (-v, -vv)')
+            [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Suppress non-error messages')
+            [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Suppress non-error messages')
+            [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Dry run without side effects')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            [CompletionResult]::new('-V', '-V ', [CompletionResultType]::ParameterName, 'Print version')
+            [CompletionResult]::new('--version', '--version', [CompletionResultType]::ParameterName, 'Print version')
+            break
+        }
+        'do-harness;skills;help' {
+            [CompletionResult]::new('suggest', 'suggest', [CompletionResultType]::ParameterValue, 'Rank skills by relevance to a query using metadata only')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'do-harness;skills;help;suggest' {
+            break
+        }
+        'do-harness;skills;help;help' {
             break
         }
         'do-harness;init-db' {
@@ -1065,6 +1114,7 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('explain', 'explain', [CompletionResultType]::ParameterValue, 'Explain which sensors the current change selects, without running them')
             [CompletionResult]::new('status', 'status', [CompletionResultType]::ParameterValue, 'Report verification evidence freshness without running sensors')
             [CompletionResult]::new('pr', 'pr', [CompletionResultType]::ParameterValue, 'Deterministic PR analysis (read-only; works in any git repository)')
+            [CompletionResult]::new('skills', 'skills', [CompletionResultType]::ParameterValue, 'Inspect and select skills by progressive disclosure')
             [CompletionResult]::new('init-db', 'init-db', [CompletionResultType]::ParameterValue, 'Apply pending database migrations')
             [CompletionResult]::new('seed', 'seed', [CompletionResultType]::ParameterValue, 'Seed invariants from plans/invariants.json')
             [CompletionResult]::new('init', 'init', [CompletionResultType]::ParameterValue, 'Scaffold a harness workspace in a target directory')
@@ -1110,6 +1160,13 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             break
         }
         'do-harness;help;pr;review' {
+            break
+        }
+        'do-harness;help;skills' {
+            [CompletionResult]::new('suggest', 'suggest', [CompletionResultType]::ParameterValue, 'Rank skills by relevance to a query using metadata only')
+            break
+        }
+        'do-harness;help;skills;suggest' {
             break
         }
         'do-harness;help;init-db' {

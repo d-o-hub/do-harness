@@ -140,3 +140,50 @@ fn pr_review_parses_recompute_and_rejects_mixed_modes() {
         .expect_err("head without base must fail");
     assert!(missing.to_string().contains("--base"));
 }
+
+#[test]
+fn skills_suggest_parses_query_limit_and_rejects_a_missing_query() {
+    let parsed = Cli::try_parse_from([
+        "do-harness",
+        "skills",
+        "suggest",
+        "--query",
+        "review this pull request",
+        "--limit",
+        "3",
+        "--format",
+        "json",
+    ])
+    .expect("skills suggest parses");
+    if let Command::Skills {
+        action:
+            SkillsAction::Suggest {
+                query,
+                limit,
+                format,
+            },
+    } = parsed.command
+    {
+        assert_eq!(query, "review this pull request");
+        assert_eq!(limit, 3);
+        assert_eq!(format, Format::Json);
+    } else {
+        panic!("expected Command::Skills with Suggest");
+    }
+
+    let defaulted = Cli::try_parse_from(["do-harness", "skills", "suggest", "--query", "anything"])
+        .expect("limit and format have defaults");
+    if let Command::Skills {
+        action: SkillsAction::Suggest { limit, format, .. },
+    } = defaulted.command
+    {
+        assert_eq!(limit, 5);
+        assert_eq!(format, Format::Text);
+    } else {
+        panic!("expected Command::Skills with Suggest");
+    }
+
+    let missing =
+        Cli::try_parse_from(["do-harness", "skills", "suggest"]).expect_err("--query is required");
+    assert!(missing.to_string().contains("--query"));
+}

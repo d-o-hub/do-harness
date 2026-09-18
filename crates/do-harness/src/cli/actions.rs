@@ -227,3 +227,20 @@ pub enum HookAction {
     /// Show diff between installed hooks and current templates.
     Diff,
 }
+
+/// Available progressive-disclosure skill actions.
+#[derive(Debug, Subcommand)]
+pub enum SkillsAction {
+    /// Rank skills by relevance to a query using metadata only.
+    Suggest {
+        /// Task description to match against skill metadata.
+        #[arg(long, value_name = "TEXT")]
+        query: String,
+        /// Maximum number of candidates to return.
+        #[arg(long, default_value_t = 5, value_name = "N")]
+        limit: usize,
+        /// Output format.
+        #[arg(long, value_enum, default_value_t = Format::Text)]
+        format: Format,
+    },
+}
