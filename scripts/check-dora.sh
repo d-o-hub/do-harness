@@ -16,9 +16,12 @@
 # pass `--record`). Exit 2 is propagated as a hard failure: a collector that
 # cannot read git history must never read as healthy.
 #
-# Binary resolution order matches hook_script.rs RESOLVE_BIN: an explicit
-# DO_HARNESS_BIN, then PATH, then the repo-local release build (including the
-# .exe suffix so it works under Git Bash on Windows).
+# Binary resolution order matches hook_script.rs RESOLVE_BIN, including its
+# stale-binary guard: an explicit DO_HARNESS_BIN, then PATH, then the repo-local
+# release build (including the .exe suffix so it works under Git Bash on
+# Windows). A PATH-installed or cargo-installed `do-harness` can predate the
+# workspace, so when the repo build is newer it wins — otherwise `verify`
+# dogfoods an old CLI and reports failures the working tree does not have.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -31,9 +34,20 @@ else
     BIN="$ROOT/target/release/do-harness"
     [[ -x "$BIN" ]] || { [[ -x "$BIN.exe" ]] && BIN="$BIN.exe"; }
 fi
+
+REPO_BIN="$ROOT/target/release/do-harness"
+[[ -x "$REPO_BIN" ]] || { [[ -x "$REPO_BIN.exe" ]] && REPO_BIN="$REPO_BIN.exe"; }
+if [[ -z "${DO_HARNESS_BIN:-}" && -x "$REPO_BIN" && "$REPO_BIN" -nt "$BIN" ]]; then
+    BIN="$REPO_BIN"
+fi
+
 if [[ ! -x "$BIN" ]]; then
     echo "FAIL: do-harness binary not found. Set DO_HARNESS_BIN, add do-harness to PATH, or build with: cargo build --release -p do-harness" >&2
     exit 1
+fi
+
+if [[ -n "$(find "$ROOT/crates" -name '*.rs' -newer "$BIN" -print -quit 2>/dev/null)" ]]; then
+    echo "warning: $BIN is older than workspace sources; rebuild with: cargo build --release -p do-harness (or set DO_HARNESS_BIN)" >&2
 fi
 
 # Stream output directly (not through a substitution) so the FINDINGS: and

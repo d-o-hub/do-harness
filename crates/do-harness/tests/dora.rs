@@ -378,6 +378,76 @@ fn reaching_breach_count_never_quarantines_the_sensor() {
     assert_eq!(last["sensors"][0]["findings"], serde_json::json!(2));
 }
 
+/// The shim must prefer the repo build over a stale PATH-installed binary.
+///
+/// `~/.cargo/bin/do-harness` can predate the workspace, and a `PATH` lookup
+/// that wins over the fresh repo build makes `verify` dogfood an old CLI —
+/// observed as `unrecognized subcommand 'dora'` from a pre-dora binary, a
+/// failure the working tree does not have. `hook_script.rs` guards this with
+/// "repo build newer wins"; the shim must too. With no repo build present,
+/// falling back to `PATH` is correct, so the fixture provides one.
+#[test]
+fn a_stale_path_binary_does_not_shadow_the_repo_build() {
+    let (_dir, root) = deployed_fixture();
+    install_dora_sensor(&root);
+
+    // A repo-local release build, newer than the PATH stand-in below.
+    let repo_bin = root.join("target/release");
+    std::fs::create_dir_all(&repo_bin).unwrap();
+    std::fs::copy(
+        env!("CARGO_BIN_EXE_do-harness"),
+        repo_bin.join("do-harness"),
+    )
+    .unwrap();
+
+    // A fake `do-harness` on PATH that cannot run `dora`, standing in for a
+    // cargo-installed binary that predates this workspace.
+    let stale_dir = root.join("stale-bin");
+    std::fs::create_dir_all(&stale_dir).unwrap();
+    let stale = stale_dir.join("do-harness");
+    std::fs::write(
+        &stale,
+        "#!/bin/sh\necho \"unrecognized subcommand\" >&2\nexit 2\n",
+    )
+    .unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt as _;
+        std::fs::set_permissions(&stale, std::fs::Permissions::from_mode(0o755)).unwrap();
+    }
+    // Age the stand-in so the repo build is strictly newer.
+    let old = std::time::SystemTime::now() - std::time::Duration::from_secs(3_600);
+    let handle = std::fs::File::options().write(true).open(&stale).unwrap();
+    handle.set_modified(old).unwrap();
+    drop(handle);
+
+    let path = format!(
+        "{}:{}",
+        stale_dir.display(),
+        std::env::var("PATH").unwrap_or_default()
+    );
+    let (code, stdout, stderr) = run(harness(&root)
+        .args(["verify", "--only", "dora", "--format", "json"])
+        .env("DO_HARNESS_BIN", "")
+        .env("PATH", &path));
+    assert_eq!(
+        code,
+        Some(0),
+        "the shim must not fail on a stale binary:\n{stderr}"
+    );
+    let report: Value = serde_json::from_str(&stdout)
+        .unwrap_or_else(|_| panic!("verify stdout is not JSON:\n{stdout}\n{stderr}"));
+    assert_eq!(
+        report["sensors"][0]["findings"],
+        serde_json::json!(2),
+        "the fresh repo build must be the one executed: {report}"
+    );
+    assert!(
+        !stderr.contains("unrecognized subcommand"),
+        "the stale stand-in must never run:\n{stderr}"
+    );
+}
+
 /// A collector that cannot answer must report failure rather than health.
 ///
 /// The shim propagates the CLI's exit 2, so the sensor is `ok = false` with
