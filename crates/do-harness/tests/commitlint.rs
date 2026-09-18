@@ -10,6 +10,20 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+/// The shipped shell resolver, reused rather than re-derived.
+///
+/// A bare `bash` is wrong on Windows: `PATH` finds the WSL launcher in
+/// `System32`, which exits non-zero with an empty diagnostic when no
+/// distribution is installed, so every fixture would fail without ever running
+/// the script. `src/shell.rs` already resolves Git Bash there; integration
+/// test targets cannot reach it (the package has no library target), so the
+/// module is included by path. Two consequences, both harmless: compiling it
+/// into this target leaves helpers unused here, and the module's own unit
+/// tests run in this binary as well as in the CLI's.
+#[path = "../src/shell.rs"]
+#[allow(dead_code)]
+mod shell;
+
 /// Builds a command with hook-inherited repository environment removed.
 fn isolated_command(program: &str) -> Command {
     let mut command = Command::new(program);
@@ -50,7 +64,7 @@ fn fixture() -> (tempfile::TempDir, PathBuf) {
 
 /// Runs the script in `root`, returning (success, stdout, stderr).
 fn lint(root: &Path, args: &[&str]) -> (bool, String, String) {
-    let output = isolated_command("bash")
+    let output = shell::bash()
         .arg(root.join("scripts/check-commitlint.sh"))
         .args(args)
         .env_remove("DO_HARNESS_COMMITLINT_COUNT")
@@ -119,7 +133,7 @@ fn commitlint_empty_history_validates_arguments_and_messages() {
         (&["--message", "invalid-message"], 1),
     ];
     for (args, expected) in cases {
-        let output = isolated_command("bash")
+        let output = shell::bash()
             .arg(root.join("scripts/check-commitlint.sh"))
             .args(*args)
             .env_remove("DO_HARNESS_COMMITLINT_COUNT")
