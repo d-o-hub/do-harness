@@ -1,0 +1,64 @@
+{
+ "cases": [
+  {
+   "case": "docs-only",
+   "expected_min_route": "cheap",
+   "reason": "documentation edit with no behavior change"
+  },
+  {
+   "case": "tests-only",
+   "expected_min_route": "cheap",
+   "reason": "test-only edit with no production behavior change"
+  },
+  {
+   "case": "lockfile-only",
+   "expected_min_route": "cheap",
+   "reason": "lockfile dependency bump with no source edit"
+  },
+  {
+   "case": "internal-refactor",
+   "expected_min_route": "focused",
+   "reason": "internal rename with no public contract change"
+  },
+  {
+   "case": "behavior-change",
+   "expected_min_route": "focused",
+   "reason": "internal behavior changes without touching the public contract"
+  },
+  {
+   "case": "public-api-break",
+   "expected_min_route": "deep",
+   "reason": "public function signature changes: callers must be updated"
+  },
+  {
+   "case": "security",
+   "expected_min_route": "deep",
+   "reason": "credential handling and command construction are security sensitive"
+  },
+  {
+   "case": "persistence-schema",
+   "expected_min_route": "deep",
+   "reason": "stored schema changes: existing rows must still be readable"
+  },
+  {
+   "case": "concurrency",
+   "expected_min_route": "deep",
+   "reason": "lock ordering and shared state change"
+  },
+  {
+   "case": "error-handling",
+   "expected_min_route": "focused",
+   "reason": "failure path changes: the error branch is reachable differently"
+  },
+  {
+   "case": "mixed-buried",
+   "expected_min_route": "deep",
+   "reason": "one schema-touching unit buried among mechanical edits"
+  },
+  {
+   "case": "router-invalid",
+   "expected_min_route": "deep",
+   "reason": "provider failure must not downgrade a public contract change"
+  }
+ ]
+}

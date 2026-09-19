@@ -1,6 +1,6 @@
 # Epic: pr-triage Agent Skill
 
-> **Status:** phases 1–4 complete (skill + evals; `pr no-effect` + `pr review` with cache; proof skipping + `false_proven`; measurement + benchmark)
+> **Status:** phases 1–5 complete (skill + evals; `pr no-effect` + `pr review` with cache; proof skipping + `false_proven`; measurement + benchmark; semantic routing cost/safety benchmark with a recorded `no-go` verdict)
 > **Related:** Agent Skills open standard, GitHub PR lifecycle, optional `do-harness` token reduction
 > **Created:** 2026-09-11
 
@@ -26,6 +26,7 @@ residual plus evidence; the skill works with `gh` + `git` alone.
 | Phase 2: do-harness commands | `do-harness pr no-effect` and `do-harness pr review` (residual + minimal context + skipped-unit audit) in universal mode (git-fallback root, no `do-harness.toml` required); ATDD coverage | `cargo test`, fixtures |
 | Phase 3: proof skipping | evidence mapping marks mechanical units proven and lists them for audit; behavioral units always residual; `false_proven` oracle | seeded-defect fixtures |
 | Phase 4: measurement | context-inclusive baseline (`T_raw`, `T_res`) recorded per sweep; no-go if residual >= raw on ordinary PRs | benchmark report |
+| Phase 5: semantic routing | optional typed router selects review depth; all error/uncertain states fail toward depth; end-to-end cost + seeded-route oracle over 12 classes; regression gate in `cargo test` | `scripts/pr-routing-benchmark.sh` + `tests/pr_routing.rs`; recorded `no-go` verdict |
 
 ## Phase 1 requirements (roast findings)
 
@@ -131,6 +132,48 @@ residual plus evidence; the skill works with `gh` + `git` alone.
   `gh pr diff` on `no-go`, and records the four measurement fields per sweep.
 - Evidence: `review::tests` pins the reduced/no-go/empty computation;
   `tests/pr_review.rs` asserts measurement fields and the reduced case.
+
+## Phase 5 completion — end-to-end routing cost and safety gate (2026-09-18)
+
+- `scripts/pr-routing-benchmark.sh` measures three arms over a seeded 12-class corpus
+  (`tests/fixtures/pr-routing/`): **A** raw unified diff, **B** the current `pr review`
+  residual policy (the same `measurement.verdict` probe the skill uses, so B is not a
+  strawman), and **C** semantic routing — the router judgment plus the review payload it
+  selects. Deterministic fake provider (`fake-router.sh`), so a run is byte-identical.
+  Byte fields are byte proxies for deterministic CI; they are never tokens.
+- Run: `DO_HARNESS_BIN=target/debug/do-harness bash scripts/pr-routing-benchmark.sh --fixtures tests/fixtures/pr-routing`.
+- Result over the 12 seeded classes:
+
+  | metric | value |
+  |---|---|
+  | total model input (C) | 8484 B |
+  | baseline model input (B) | 3253 B |
+  | mean / median / p95 savings vs B | −1.705 / −1.678 / −1.579 |
+  | reduced vs B / no-go vs B | 91.7% / 8.3% |
+  | router calls per case | 1.00 |
+  | seeded oracle failures / downgrades | 0 / 0 |
+  | timeout-or-invalid fallbacks | 1 |
+
+  `VERDICT no-go: total model input is not lower than Baseline B, or seeded escalations regressed`.
+- **Safety is proven, economy is not.** The route oracle passes on all 12 classes with zero
+  downgrades, including the adversarial `misleading` provider (its judgment looks `cheap` while
+  asserting `public_contract_change: yes`) and the `malformed` provider — the six high-impact
+  classes (`public-api-break`, `security`, `persistence-schema`, `concurrency`, `mixed-buried`,
+  `router-invalid`) all stay `deep`. The routing *decision* is therefore safe to rely on.
+- The economy verdict is negative on this corpus because each fixture diff is only ~150–800 B, so
+  the router envelope (request + judgment, ~330–430 B each) is larger than the diff it is meant to
+  save. Routing only pays when the potential review payload is substantially larger than the
+  judgment envelope; the three largest classes (`mixed-buried`, `security`, `public-api-break`) are
+  the only ones where the ratio improves, and none reach break-even.
+- Regression gate: `crates/do-harness/tests/pr_routing.rs` runs the benchmark inside the existing
+  `test` sensor — exit 0, every seeded class at or above its declared minimum route, `downgrades=0`,
+  `seeded_oracle_failures=0`, and byte-identical output across two runs. No new sensor, no new
+  `verify` cost.
+- **Next action:** a `go` verdict requires the review payload to dominate the router envelope —
+  i.e. a corpus of realistic large diffs (thousands of lines, the case where residual savings are
+  hundreds of KB) rather than minimal fixtures, and ideally a single batched routing call per
+  sweep instead of one per PR. Until then the router stays optional and experimental: no default
+  enables it.
 
 ## Task tracking note
 
