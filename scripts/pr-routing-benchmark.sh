@@ -12,8 +12,17 @@
 #      PR_TRIAGE_ROUTER_TIMEOUT seconds (default: 5).
 #
 # Stdout: one JSON row per case (the machine-readable source of truth).
-# Stderr: aggregates plus the reduced/no-go recommendation, and a
-# `FINDINGS: <n>` marker counting oracle failures.
+# Stderr: aggregates plus two recommendations — the conservative `VERDICT`
+# (review payload, ignoring routing) and the route-aware `ROUTED_VERDICT`
+# (the payload the route actually selects) — and a `FINDINGS: <n>` marker
+# counting oracle failures.
+#
+# Cost models:
+#   conservative  total = router_input + review_input   (routing always adds)
+#   route-aware   total = router_input + routed_review  where the route picks
+#                 the payload: `cheap` reads nothing (0), `focused` reads the
+#                 residual, `deep` reads the full raw diff, and a no-effect
+#                 case spends no model bytes at all.
 #
 # Byte fields are byte proxies for deterministic CI. They are never tokens and
 # must not be presented as exact token counts.
@@ -49,6 +58,10 @@ if [[ ! -x "$BIN" ]]; then
   echo "build with: cargo build -p do-harness (or set DO_HARNESS_BIN)" >&2
   exit 2
 fi
+# The router wrapper runs with the case repository as its cwd, so a relative
+# DO_HARNESS_BIN would stop resolving after the first case and silently
+# degrade every route to the `deep` fallback.
+BIN="$(cd "$(dirname "$BIN")" && pwd)/$(basename "$BIN")"
 if ! command -v jq >/dev/null 2>&1; then
   echo "pr-routing-benchmark: jq is required" >&2
   exit 2
@@ -137,6 +150,7 @@ materialize() {  # <case-dir> <dest>
 
 total_bytes=0
 baseline_total=0
+routed_total_bytes=0
 case_count=0
 oracle_failures=0
 downgrades=0
@@ -146,8 +160,11 @@ zero_model_cases=0
 reduced=0
 no_go=0
 savings_sum=0
+routed_savings_sum=0
 median_list="$work/savings.txt"
 : > "$median_list"
+routed_median_list="$work/routed_savings.txt"
+: > "$routed_median_list"
 
 run_case() {  # <case> <expected_min_route> <repo>
   local case_name="$1" expected="$2" repo="$3"
@@ -214,6 +231,26 @@ run_case() {  # <case> <expected_min_route> <repo>
   # Baseline B: the same probe with no router at all.
   baseline="$review_input_bytes"
 
+  # Route-aware arm: the payload the chosen route actually reads. `cheap`
+  # trusts the classification and skips the diff, `focused` reviews the
+  # residual, `deep` reviews the full raw diff, and a no-effect case reads
+  # nothing. This is the model that can show a routing win, because the
+  # conservative model above charges for review input on every route.
+  local routed_review_input routed_total
+  case "$route" in
+    cheap) routed_review_input=0 ;;
+    focused) routed_review_input="$t_res" ;;
+    deep) routed_review_input="$t_raw" ;;
+    *)
+      echo "pr-routing-benchmark: unknown route name (route=$route)" >&2
+      exit 2
+      ;;
+  esac
+  if [[ "$status" == "no-effect" ]]; then
+    routed_review_input=0
+  fi
+  routed_total=$((router_input_bytes + routed_review_input))
+
   local expected_rank actual_rank oracle_pass
   expected_rank="$(rank "$expected")"
   actual_rank="$(rank "$route")"
@@ -232,6 +269,9 @@ run_case() {  # <case> <expected_min_route> <repo>
   local savings
   savings="$(awk -v t="$total_bytes_case" -v b="$baseline" \
     'BEGIN { if (b == 0) { print "0.000" } else { printf "%.3f", 1 - (t / b) } }')"
+  local routed_savings
+  routed_savings="$(awk -v t="$routed_total" -v b="$baseline" \
+    'BEGIN { if (b == 0) { print "0.000" } else { printf "%.3f", 1 - (t / b) } }')"
 
   jq -n -c \
     --arg case "$case_name" \
@@ -244,6 +284,9 @@ run_case() {  # <case> <expected_min_route> <repo>
     --argjson total "$total_bytes_case" \
     --argjson baseline "$baseline" \
     --argjson savings "$savings" \
+    --argjson routed_review "$routed_review_input" \
+    --argjson routed_total "$routed_total" \
+    --argjson routed_savings "$routed_savings" \
     --arg route "$route" \
     --arg expected "$expected" \
     --argjson oracle_pass "$oracle_pass" \
@@ -251,13 +294,18 @@ run_case() {  # <case> <expected_min_route> <repo>
       review_source:$review_source, router_input_bytes:$router_input_bytes,
       router_output_bytes:$router_output_bytes, review_input_bytes:$review_input_bytes,
       total_model_input_bytes:$total, baseline_model_input_bytes:$baseline,
-      input_savings_ratio:$savings, route:$route, expected_min_route:$expected,
-      oracle_pass:$oracle_pass}'
+      input_savings_ratio:$savings, routed_review_input_bytes:$routed_review,
+      routed_total_model_input_bytes:$routed_total,
+      routed_savings_ratio:$routed_savings, route:$route,
+      expected_min_route:$expected, oracle_pass:$oracle_pass}'
 
   total_bytes=$((total_bytes + total_bytes_case))
   baseline_total=$((baseline_total + baseline))
+  routed_total_bytes=$((routed_total_bytes + routed_total))
   savings_sum="$(awk -v s="$savings_sum" -v v="$savings" 'BEGIN { printf "%.6f", s + v }')"
+  routed_savings_sum="$(awk -v s="$routed_savings_sum" -v v="$routed_savings" 'BEGIN { printf "%.6f", s + v }')"
   printf '%s\n' "$savings" >> "$median_list"
+  printf '%s\n' "$routed_savings" >> "$routed_median_list"
   case_count=$((case_count + 1))
 }
 
@@ -300,6 +348,8 @@ fi
 median="$(sort -n "$median_list" | awk '{ a[NR] = $1 } END { if (NR % 2 == 1) { print a[(NR + 1) / 2] } else { printf "%.3f", (a[NR / 2] + a[NR / 2 + 1]) / 2 } }')"
 p95="$(sort -n "$median_list" | awk '{ a[NR] = $1 } END { idx = int(NR * 0.95); if (idx < 1) { idx = 1 } print a[idx] }')"
 mean_savings="$(awk -v s="$savings_sum" -v n="$case_count" 'BEGIN { printf "%.3f", s / n }')"
+routed_median="$(sort -n "$routed_median_list" | awk '{ a[NR] = $1 } END { if (NR % 2 == 1) { print a[(NR + 1) / 2] } else { printf "%.3f", (a[NR / 2] + a[NR / 2 + 1]) / 2 } }')"
+routed_mean_savings="$(awk -v s="$routed_savings_sum" -v n="$case_count" 'BEGIN { printf "%.3f", s / n }')"
 
 pct() { awk -v n="$1" -v d="$2" 'BEGIN { if (d == 0) { print "0.0" } else { printf "%.1f", (n / d) * 100 } }'; }
 
@@ -307,6 +357,8 @@ pct() { awk -v n="$1" -v d="$2" 'BEGIN { if (d == 0) { print "0.0" } else { prin
   echo "cases=$case_count router=$ROUTER"
   echo "total_model_input_bytes=$total_bytes baseline_model_input_bytes=$baseline_total"
   echo "mean_savings_ratio=$mean_savings median_savings_ratio=$median p95_savings_ratio=$p95"
+  echo "routed_total_model_input_bytes=$routed_total_bytes"
+  echo "routed_mean_savings_ratio=$routed_mean_savings routed_median_savings_ratio=$routed_median"
   echo "reduced_vs_baseline_b=$(pct "$reduced" "$case_count") no_go_vs_baseline_b=$(pct "$no_go" "$case_count")"
   echo "router_calls=$router_calls router_calls_per_case=$(awk -v c="$router_calls" -v n="$case_count" 'BEGIN { printf "%.2f", c / n }')"
   echo "zero_model_cases=$zero_model_cases"
@@ -316,6 +368,15 @@ pct() { awk -v n="$1" -v d="$2" 'BEGIN { if (d == 0) { print "0.0" } else { prin
     echo "VERDICT go: total model input is lower than Baseline B with zero seeded escalation regressions"
   else
     echo "VERDICT no-go: total model input is not lower than Baseline B, or seeded escalations regressed"
+  fi
+  # Route-aware verdict. The conservative VERDICT above stays as the
+  # routing-is-pure-overhead upper bound; this one answers the question the
+  # router is actually for: does reading only what the route selects cost less
+  # than reading the review payload unconditionally?
+  if [[ "$routed_total_bytes" -lt "$baseline_total" && "$oracle_failures" -eq 0 ]]; then
+    echo "ROUTED_VERDICT go: routed total is lower than Baseline B with zero escalation regressions"
+  else
+    echo "ROUTED_VERDICT no-go: routed total is not lower than Baseline B, or seeded escalations regressed"
   fi
   echo "FINDINGS: $oracle_failures"
 } >&2

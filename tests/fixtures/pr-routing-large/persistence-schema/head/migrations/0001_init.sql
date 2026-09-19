@@ -1,0 +1,1 @@
+ALTER TABLE account ADD COLUMN slug TEXT;
