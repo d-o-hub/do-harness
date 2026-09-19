@@ -10,16 +10,26 @@
 //! These fixtures are hermetic — no network, no registry, no clock — so the
 //! verdict logic is pinned rather than observed from a live service that is
 //! expected to change under us.
+//!
+//! Gating: the two source-level checks run everywhere. The cases that execute
+//! the script are `#[cfg(unix)]`, because the watch is a `bash` script that
+//! requires `jq` and reads fixture paths through Git Bash on Windows, where
+//! path translation is not the behaviour under test. The unix CI jobs run all
+//! of them; `scripts/check-shell.sh` lints the script on every platform.
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use std::path::PathBuf;
-use std::process::{Command, Output};
+#[cfg(unix)]
+use std::process::Command;
+#[cfg(unix)]
+use std::process::Output;
 
 fn script() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../scripts/check-agt-ga.sh")
 }
 
+#[cfg(unix)]
 fn fixture(name: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../tests/fixtures/agt-ga")
@@ -27,8 +37,9 @@ fn fixture(name: &str) -> PathBuf {
 }
 
 /// Runs the watch in fixture mode, optionally adding the retired-crate input.
+#[cfg(unix)]
 fn run(crate_json: &str, release_json: &str, legacy: Option<&str>) -> Output {
-    let mut cmd = Command::new("bash");
+    let mut cmd = Command::new("/bin/bash");
     cmd.arg(script())
         .arg("--crate-json")
         .arg(fixture(crate_json))
@@ -40,6 +51,7 @@ fn run(crate_json: &str, release_json: &str, legacy: Option<&str>) -> Output {
     cmd.output().expect("spawn check-agt-ga.sh")
 }
 
+#[cfg(unix)]
 fn verdict(out: &Output) -> String {
     String::from_utf8_lossy(&out.stdout)
         .lines()
@@ -80,6 +92,7 @@ fn watch_source_is_the_live_crate_path() {
 }
 
 /// The watch prints which sources it queried, so blind watching is visible.
+#[cfg(unix)]
 #[test]
 fn watch_reports_its_sources() {
     let out = run(
@@ -96,6 +109,7 @@ fn watch_reports_its_sources() {
 }
 
 /// A preview self-description keeps the gate closed at any version.
+#[cfg(unix)]
 #[test]
 fn preview_description_is_not_ga_even_when_the_release_is_loud() {
     // Release notes that do declare GA must still not promote a preview SDK.
@@ -112,6 +126,7 @@ fn preview_description_is_not_ga_even_when_the_release_is_loud() {
 }
 
 /// GA requires both signals: preview banner dropped and release notes say GA.
+#[cfg(unix)]
 #[test]
 fn ga_requires_both_the_banner_drop_and_the_release_declaration() {
     // Banner dropped but the release says nothing about GA.
@@ -142,6 +157,7 @@ fn ga_requires_both_the_banner_drop_and_the_release_declaration() {
 }
 
 /// A prerelease never promotes, even with a GA-shaped description and body.
+#[cfg(unix)]
 #[test]
 fn prerelease_never_promotes() {
     let temp = tempfile::tempdir().unwrap();
@@ -153,7 +169,7 @@ fn prerelease_never_promotes() {
     )
     .unwrap();
 
-    let out = Command::new("bash")
+    let out = Command::new("/bin/bash")
         .arg(script())
         .arg("--crate-json")
         .arg(fixture("crate-ga.json"))
@@ -165,6 +181,7 @@ fn prerelease_never_promotes() {
 }
 
 /// The retired crate is supplementary: omitting it must not change the verdict.
+#[cfg(unix)]
 #[test]
 fn the_retired_crate_cannot_swing_the_verdict() {
     let with_legacy = run(
@@ -188,9 +205,10 @@ fn the_retired_crate_cannot_swing_the_verdict() {
 /// over time. A hard-coded line range in the predecessor leaked `set -euo
 /// pipefail` into the help output the moment the header got longer; the range
 /// must therefore be derived, not counted.
+#[cfg(unix)]
 #[test]
 fn help_prints_the_header_and_never_code() {
-    let out = Command::new("bash")
+    let out = Command::new("/bin/bash")
         .arg(script())
         .arg("--help")
         .output()
@@ -212,9 +230,10 @@ fn help_prints_the_header_and_never_code() {
 }
 
 /// Fixture mode requires both gating inputs; a partial invocation is a usage error.
+#[cfg(unix)]
 #[test]
 fn fixture_mode_rejects_a_missing_release_input() {
-    let out = Command::new("bash")
+    let out = Command::new("/bin/bash")
         .arg(script())
         .arg("--crate-json")
         .arg(fixture("crate-preview.json"))
