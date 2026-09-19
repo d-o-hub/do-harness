@@ -3,6 +3,7 @@
 > **Assessment date:** 2026-09-11 · **Harness version:** 0.1.0 · **Scope:** dev-loop only
 >
 > Pinned framework editions: **OWASP Top 10 for Agentic Applications (2026, ASI01–ASI10)**;
+> **OWASP Top 10 for LLM Applications (2025, LLM01–LLM10)**;
 > **NIST AI RMF 1.0 (NIST AI 100-1, January 2023)**;
 > **EU AI Act, Regulation (EU) 2024/1689**;
 > **SOC 2 Trust Services Criteria (2017, revised 2022)**.
@@ -24,6 +25,17 @@ dev-loop verification controls**. In particular:
   decomposition orders *engineering work*, not AI-system risk categorization.
 - Every `✅` row below links the file or command that enforces it; rows without
   evidence are marked partial.
+
+**OWASP LLM Top 10 vs Agentic Top 10.** These are two distinct taxonomies and
+only one of them is about this project. The LLM list (LLM01–LLM10) targets
+*LLM applications* — prompt injection, insecure output handling, excessive
+agency, vector/embedding weaknesses, and so on. The Agentic list (ASI01–ASI10)
+targets *agentic systems* that plan and call tools. `do-harness` is neither an
+LLM application nor a production agent runtime: it is the verification layer an
+agent's development loop runs through, so the ASI matrix below is the primary
+mapping and the LLM matrix applies only where untrusted content reaches the
+harness itself. The one such surface is the `pr-triage` skill, which ingests
+attacker-controlled PR text; that is mapped at LLM01 below.
 
 > **Adjacent optional runtime:** `crates/guardian-proxy` is a separate,
 > off-by-default, fail-closed sidecar (governance enforcement is optional via
@@ -58,7 +70,7 @@ dev-loop verification controls**. In particular:
 
 | Risk ID | Risk Title | Coverage | do-harness Control & Evidence |
 |---|---|---|---|
-| **ASI01** | Agent Goal Hijack | ⚠️ Partial (Dev-Loop) | Fixture assertions can encode prompt-injection expectations; runtime prompt interception is out of scope. [`eval_assert.rs`](../crates/do-harness/src/eval_assert.rs) |
+| **ASI01** | Agent Goal Hijack | ⚠️ Partial (Dev-Loop) | Fixture assertions can encode prompt-injection expectations, and the `untrusted-ingest` sensor enforces that `pr-triage`'s ingest scripts hold no dynamic-execution sink (see LLM01); runtime prompt interception is out of scope. [`eval_assert.rs`](../crates/do-harness/src/eval_assert.rs), [`check-untrusted-ingest.sh`](../scripts/check-untrusted-ingest.sh) |
 | **ASI02** | Tool Misuse and Exploitation | ✅ Dev-Loop | Methods validated against the catalog and each subtask gate re-checked in-transaction. [`methods.rs`](../crates/do-harness/src/methods.rs), [`repo_workflow.rs`](../crates/db/src/repo_workflow.rs) |
 | **ASI03** | Identity and Privilege Abuse | ⚠️ Partial (Dev-Loop) | Commit identity rules and machine-readable invariants; runtime identity/credential policy is out of scope. [`check-commitlint.sh`](../scripts/check-commitlint.sh), [`plans/invariants.json`](../plans/invariants.json) |
 | **ASI04** | Agentic Supply Chain Vulnerabilities | ✅ Dev-Loop | `cargo deny` + RustSec sensors and transitive dependency-direction checks. [`check-deps.sh`](../scripts/check-deps.sh), [`check-audit.sh`](../scripts/check-audit.sh), [`deny.toml`](../deny.toml) |
@@ -69,6 +81,29 @@ dev-loop verification controls**. In particular:
 | **ASI09** | Human-Agent Trust Exploitation | ✅ Dev-Loop | Computational sensors override self-assessment; `task done` rejects unverified claims. [`sensors/mod.rs`](../crates/do-harness/src/sensors/mod.rs), [`repo_workflow.rs`](../crates/db/src/repo_workflow.rs) |
 | **ASI10** | Rogue Agents | ✅ Dev-Loop | Terminal transitions require passing gates re-checked inside the command transaction. [`repo_workflow.rs`](../crates/db/src/repo_workflow.rs) |
 | **do-harness Traceability extension** | *Non-standard; not an OWASP ASI category* | ✅ Dev-Loop | Hash-chained workflow events and hash-chained evidence artifacts. [`repo_workflow.rs`](../crates/db/src/repo_workflow.rs), [`evidence/mod.rs`](../crates/do-harness/src/evidence/mod.rs) |
+
+---
+
+## OWASP LLM Top 10 (LLM 2025 taxonomy)
+
+The harness is not an LLM application, so most of this list is out of scope by
+construction (it has no prompts, no vector store, no model endpoint, no chat
+surface). One row applies, because `pr-triage` ingests attacker-controlled text.
+The remaining rows are recorded as out-of-scope rather than silently omitted, so
+the omission is a decision a reader can audit.
+
+| Risk ID | Risk Title | Coverage | do-harness Control & Evidence |
+|---|---|---|---|
+| **LLM01** | Prompt Injection | ✅ Dev-Loop (ingest surface only) | `pr-triage` treats PR titles, bodies, comments, diffs, and webhook payloads as data, never instructions, and its ingest scripts hold no dynamic-execution sink (`eval`, `sh -c`, `child_process.exec`, shell-enabled `spawn`) — enforced by the `untrusted-ingest` sensor, with the prose contract asserted to still exist. Injected text cannot fabricate a passing result either: the completion gate is a sensor exit code and a hash-chained evidence artifact, not model prose. Residual risk (the model's own reasoning about untrusted text) is accepted and recorded in [`plans/invariants.json`](../plans/invariants.json). [`check-untrusted-ingest.sh`](../scripts/check-untrusted-ingest.sh), [`.agents/skills/pr-triage/SKILL.md`](../.agents/skills/pr-triage/SKILL.md) |
+| **LLM02** | Sensitive Information Disclosure | ⬜ Out of scope | The harness has no prompt or model I/O surface; the optional `guardian-proxy` sidecar caps bodies and binds decisions to a hash-chained audit log. |
+| **LLM03** | Supply Chain | ➡️ See ASI04 | Mapped once, under the Agentic taxonomy: `cargo deny` + RustSec + dependency-direction sensors. |
+| **LLM04** | Data and Model Poisoning | ⬜ Out of scope | No training, fine-tuning, or embedding pipeline exists in this repository. |
+| **LLM05** | Improper Output Handling | ⬜ Out of scope | No LLM output is rendered or executed; sensor verdicts are exit codes and typed evidence. |
+| **LLM06** | Excessive Agency | ✅ Dev-Loop | Deliberately no do-harness MCP wrapper and no host-side sensor execution: MCP cannot enforce the completion gate, so agent integration stays skills + JSON contracts. [`plans/invariants.json`](../plans/invariants.json), [`.agents/skills/pr-triage/SKILL.md`](../.agents/skills/pr-triage/SKILL.md) |
+| **LLM07** | System Prompt Leakage | ⬜ Out of scope | Guides are repository content, not a runtime system prompt; there is no secret to leak. |
+| **LLM08** | Vector and Embedding Weaknesses | ⬜ Out of scope | No vector store or retrieval index. |
+| **LLM09** | Misinformation | ✅ Dev-Loop | Computational sensors strictly supersede LLM self-assessment; `task done` rejects unverified claims. [`sensors/mod.rs`](../crates/do-harness/src/sensors/mod.rs), [`repo_workflow.rs`](../crates/db/src/repo_workflow.rs) |
+| **LLM10** | Unbounded Consumption | ⚠️ Partial (Dev-Loop) | Sensor timeouts, bounded parallel jobs, and `maintenance --prune-beats`; unbounded *model* consumption is a runtime concern and is out of scope. [`sensors/exec.rs`](../crates/do-harness/src/sensors/exec.rs), [`sensors/parallel.rs`](../crates/do-harness/src/sensors/parallel.rs) |
 
 ---
 

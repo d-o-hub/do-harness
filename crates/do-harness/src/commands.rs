@@ -52,6 +52,7 @@ const COMPLIANCE_DOC: &str = include_str!("../assets/compliance.md");
 pub fn print_compliance_filtered(framework: Option<&str>, format: Format) {
     let frameworks = vec![
         "OWASP Agentic Top 10",
+        "OWASP LLM Top 10",
         "NIST AI RMF 1.0",
         "EU AI Act",
         "SOC 2",
