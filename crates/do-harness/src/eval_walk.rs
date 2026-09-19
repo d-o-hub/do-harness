@@ -17,18 +17,21 @@ use std::process::{Command, Output};
 const STDERR_TAIL_CHARS: usize = 500;
 
 /// Retries for a transient `ETXTBSY` launch failure (see [`spawn_walkthrough`]).
-const EXEC_BUSY_RETRIES: u32 = 10;
+/// Combined with the backoff this bounds the retry budget at ~200ms, which is
+/// far longer than the race and short enough not to stall a real failure for an
+/// appreciable time.
+const EXEC_BUSY_RETRIES: u32 = 20;
 
 /// Backoff between `ETXTBSY` retries; the race clears in microseconds, so this
 /// only needs to yield the CPU to the writer that holds the script open.
-const EXEC_BUSY_BACKOFF_MILLIS: u64 = 5;
+const EXEC_BUSY_BACKOFF_MILLIS: u64 = 10;
 
 /// How long the regression test holds the script open for writing. It must
-/// outlast the first exec attempt (microseconds, but scheduler-delayed under
-/// load) while staying well inside the retry budget, so the test detects the
-/// race pre-fix and still passes post-fix.
+/// comfortably outlast the first exec attempt (microseconds, but scheduler-
+/// delayed under load) so the pre-fix control detects the race, and stay well
+/// inside the retry budget above so the post-fix run cannot time out.
 #[cfg(all(test, unix))]
-const EXEC_BUSY_HOLD_MILLIS: u64 = 25;
+const EXEC_BUSY_HOLD_MILLIS: u64 = 50;
 
 /// Outcome of running a skill's walkthrough, or of deciding not to.
 #[derive(Debug, Clone)]
