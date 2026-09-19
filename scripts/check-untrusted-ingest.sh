@@ -51,22 +51,29 @@ for script in "${scripts[@]:-}"; do
     [[ -n "$script" ]] || continue
     rel="${script#"$ROOT"/}"
 
-    # Shell dynamic execution. Each pattern is anchored so prose or an
-    # unrelated identifier (`evaluate`, `eval.json`) cannot trip it.
-    if grep -nE '(^|[^[:alnum:]_])eval([[:space:]]|$)' "$script" >/dev/null; then
+    # Strip full-line comments before matching. Documentation that *names* a
+    # sink ("never run eval on a PR body") is the thing that stops the next
+    # person from adding one, so the sensor must not punish writing it down.
+    # Only whole-line comments are dropped: a sink inside an inline comment
+    # still trips, which is the safe direction to be wrong in.
+    code="$(grep -vE '^[[:space:]]*(#|//)' "$script" || true)"
+
+    # Shell dynamic execution. Each pattern is anchored so an unrelated
+    # identifier (`evaluate`, `my_eval`) cannot trip it.
+    if grep -nE '(^|[^[:alnum:]_])eval([[:space:]]|$)' <<<"$code" >/dev/null; then
         fail "$rel uses 'eval'; untrusted PR text must never reach a shell evaluation."
     fi
     if grep -nE '(^|[^[:alnum:]_])(bash|sh|zsh|dash|ksh)[[:space:]]+-c([[:space:]]|$)' \
-        "$script" >/dev/null; then
+        <<<"$code" >/dev/null; then
         fail "$rel passes a command string to a shell; use a fixed argv instead."
     fi
 
     # Node dynamic execution: only meaningful once the module imports it.
-    if grep -nE "from[[:space:]]+['\"]node:child_process['\"]" "$script" >/dev/null; then
-        if grep -nE '(^|[^[:alnum:]_.])exec(Sync)?[[:space:]]*\(' "$script" >/dev/null; then
+    if grep -nE "from[[:space:]]+['\"]node:child_process['\"]" <<<"$code" >/dev/null; then
+        if grep -nE '(^|[^[:alnum:]_.])exec(Sync)?[[:space:]]*\(' <<<"$code" >/dev/null; then
             fail "$rel uses child_process.exec, which interprets its argument as a shell command."
         fi
-        if grep -nE 'shell[[:space:]]*:[[:space:]]*true' "$script" >/dev/null; then
+        if grep -nE 'shell[[:space:]]*:[[:space:]]*true' <<<"$code" >/dev/null; then
             fail "$rel enables shell interpretation in a spawn call."
         fi
     fi
