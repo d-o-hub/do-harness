@@ -1,13 +1,13 @@
-//! Brace-balanced line scanning for `do-harness split`.
+//! Top-level item discovery for `do-harness split`.
 //!
-//! A line-based walk that knows enough Rust lexical structure — string
-//! literals, char literals, lifetimes, raw strings, and both comment forms —
-//! to count braces that actually nest code. Deliberately not an AST: `split`
-//! needs item boundaries and item kinds, which column-0 keywords plus balanced
-//! braces give reliably for the `cargo fmt`-normalized sources this repository
-//! enforces. Anything the walk cannot classify is refused rather than guessed.
+//! Finds item boundaries and item kinds: column-0 keywords give the kind, and
+//! balanced braces (from [`super::lex`]) give the span. Deliberately not an
+//! AST — `cargo fmt`-normalized sources make the walk reliable, and anything it
+//! cannot classify is refused rather than guessed.
 
 use anyhow::{Result, bail};
+
+use super::lex::{line_scan, strip_comment};
 
 /// Visibility and item modifiers stripped before reading an item's keyword.
 const ITEM_MODIFIERS: &[&str] = &[
@@ -195,93 +195,4 @@ pub fn refuse_unsupported(lines: &[&str]) -> Result<()> {
         );
     }
     Ok(())
-}
-
-/// Net brace delta for one line plus whether an opening brace appeared,
-/// ignoring braces inside strings, chars, raw strings, and comments.
-fn line_scan(line: &str, block_depth: &mut usize) -> (i32, bool) {
-    let bytes = line.as_bytes();
-    let mut index = 0;
-    let mut delta = 0i32;
-    let mut saw_open = false;
-    while index < bytes.len() {
-        if *block_depth > 0 {
-            if bytes[index..].starts_with(b"/*") {
-                *block_depth += 1;
-                index += 2;
-            } else if bytes[index..].starts_with(b"*/") {
-                *block_depth -= 1;
-                index += 2;
-            } else {
-                index += 1;
-            }
-            continue;
-        }
-        match bytes[index] {
-            b'/' if bytes[index..].starts_with(b"//") => break,
-            b'/' if bytes[index..].starts_with(b"/*") => {
-                *block_depth += 1;
-                index += 2;
-            }
-            b'{' => {
-                delta += 1;
-                saw_open = true;
-                index += 1;
-            }
-            b'}' => {
-                delta -= 1;
-                index += 1;
-            }
-            b'"' => index = skip_string(bytes, index),
-            b'\'' => index = skip_char(bytes, index),
-            b'r' | b'b' | b'c' => match crate::split::lex::skip_raw_string(bytes, index) {
-                Some(next) => index = next,
-                None => index += 1,
-            },
-            _ => index += 1,
-        }
-    }
-    (delta, saw_open)
-}
-
-/// Strips a trailing line comment; block comments are left to [`line_scan`].
-fn strip_comment(line: &str) -> &str {
-    let bytes = line.as_bytes();
-    let mut index = 0;
-    while index < bytes.len() {
-        match bytes[index] {
-            b'"' => index = skip_string(bytes, index),
-            b'/' if bytes[index..].starts_with(b"//") => return &line[..index],
-            _ => index += 1,
-        }
-    }
-    line
-}
-
-/// Index just past the closing quote of a `"…"` literal opened at `open`.
-fn skip_string(bytes: &[u8], open: usize) -> usize {
-    let mut index = open + 1;
-    while index < bytes.len() {
-        match bytes[index] {
-            b'\\' => index += 2,
-            b'"' => return index + 1,
-            _ => index += 1,
-        }
-    }
-    index
-}
-
-/// Index just past a char literal at `quote`, or past the `'` of a lifetime.
-fn skip_char(bytes: &[u8], quote: usize) -> usize {
-    if bytes.get(quote + 1) == Some(&b'\\') {
-        let mut index = quote + 2;
-        while index < bytes.len() && bytes[index] != b'\'' {
-            index += 1;
-        }
-        return (index + 1).min(bytes.len());
-    }
-    if bytes.get(quote + 2) == Some(&b'\'') {
-        return quote + 3;
-    }
-    quote + 1
 }

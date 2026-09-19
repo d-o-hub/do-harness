@@ -5,6 +5,7 @@
 
 use anyhow::{Result, bail};
 
+use super::lex;
 use super::scan::ItemKind;
 
 /// Visibility and item modifiers stripped before reading an item's name.
@@ -171,17 +172,31 @@ pub fn snake_case(name: &str) -> String {
 }
 
 /// Removes the common leading indentation from `lines`.
+///
+/// Lines that *begin* inside a multi-line token — the interior of a string,
+/// raw string, or block comment — are copied verbatim: their leading whitespace
+/// is literal content, so re-indenting them would silently change the value.
+/// See [`lex::protected_line_starts`].
 #[must_use]
 pub fn dedent(lines: &[&str]) -> Vec<String> {
+    let protected = lex::protected_line_starts(&lines.join("\n"));
     let indent = lines
         .iter()
-        .filter(|line| !line.trim().is_empty())
-        .map(|line| line.len() - line.trim_start().len())
+        .zip(&protected)
+        .filter(|(line, protected)| !**protected && !line.trim().is_empty())
+        .map(|(line, _)| line.len() - line.trim_start().len())
         .min()
         .unwrap_or(0);
     let prefix = " ".repeat(indent);
     lines
         .iter()
-        .map(|line| line.strip_prefix(&prefix).unwrap_or(line).to_owned())
+        .zip(&protected)
+        .map(|(line, protected)| {
+            if *protected {
+                (*line).to_owned()
+            } else {
+                line.strip_prefix(&prefix).unwrap_or(line).to_owned()
+            }
+        })
         .collect()
 }
