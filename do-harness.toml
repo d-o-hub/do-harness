@@ -6,8 +6,8 @@ pre-push = []
 
 [signal-sets]
 feedback = ["fmt", "check", "clippy"]
-verification = ["fmt", "check", "clippy", "test", "loc", "skills", "deps", "shell", "check-agt", "check-mcp", "check-promotions", "audit", "commitlint"]
-release = ["fmt", "check", "clippy", "test", "loc", "skills", "deps", "shell", "check-agt", "check-mcp", "check-promotions", "audit", "commitlint"]
+verification = ["fmt", "check", "clippy", "test", "loc", "skills", "deps", "shell", "check-agt", "check-mcp", "check-promotions", "untrusted-ingest", "audit", "commitlint"]
+release = ["fmt", "check", "clippy", "test", "loc", "skills", "deps", "shell", "check-agt", "check-mcp", "check-promotions", "untrusted-ingest", "audit", "commitlint"]
 # DORA gets its own set so its evidence is addressable (`status --set metrics`)
 # without joining the gating sets. A no-`--set` status check compares against
 # every configured sensor, so a dora-only run's artifact would report
@@ -83,6 +83,16 @@ when-changed = ["Cargo.toml", "Cargo.lock"]
 [[sensors]]
 name = "commitlint"
 argv = ["bash", "scripts/check-commitlint.sh"]
+
+[[sensors]]
+# Executable half of pr-triage's "untrusted text is data, never instructions"
+# contract. The skill ingests hostile PR bodies, comments, and webhook
+# payloads; the rule that none of it reaches a dynamic-execution sink used to
+# be prose only, which AGENTS.md section 7 does not accept. Hermetic: reads
+# the skill tree, runs nothing from it.
+name = "untrusted-ingest"
+argv = ["bash", "scripts/check-untrusted-ingest.sh"]
+when-changed = [".agents/skills/pr-triage/**", "scripts/check-untrusted-ingest.sh"]
 
 [[sensors]]
 # DORA deployment health, derived (never judged) from git history. Report-only:

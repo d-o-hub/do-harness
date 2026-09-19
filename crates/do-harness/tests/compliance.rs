@@ -16,6 +16,11 @@ fn compliance_command_text() {
     assert!(stdout.contains("OWASP Agentic Top 10"));
     assert!(stdout.contains("NIST AI Risk Management Framework"));
     assert!(stdout.contains("EU AI Act"));
+    // The LLM taxonomy is a distinct framework from the Agentic one, and LLM01
+    // is the row that maps the pr-triage ingest control; pin both so dropping
+    // either is a test failure rather than a silently narrower doc.
+    assert!(stdout.contains("OWASP LLM Top 10"));
+    assert!(stdout.contains("LLM01"));
 }
 
 #[test]
