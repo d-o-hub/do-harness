@@ -358,11 +358,27 @@ fn stem_for(path: &Path) -> String {
     }
 }
 
-/// Renders a sibling module: doc header, `super` glob when the body needs one,
-/// then the moved text.
+/// Renders a sibling module: doc header, any leading inner attributes, the
+/// `super` glob when the body needs one, then the moved text.
+///
+/// Inner attributes (`#![…]`) must come first in the file, so a body that
+/// opens with them keeps them at the top and the glob follows. Emitting the
+/// glob first would place an inner attribute after an item, which does not
+/// compile.
 fn render_target(header: &str, body: &[String]) -> String {
+    let attrs = body
+        .iter()
+        .take_while(|line| {
+            let trimmed = line.trim_start();
+            trimmed.is_empty() || trimmed.starts_with("#![")
+        })
+        .count();
     let mut text = String::from(header);
     text.push('\n');
+    for line in &body[..attrs] {
+        text.push_str(line);
+        text.push('\n');
+    }
     if !body
         .iter()
         .any(|line| line.trim_start().starts_with("use super"))
@@ -370,10 +386,10 @@ fn render_target(header: &str, body: &[String]) -> String {
         // The moved text may name items that stayed behind. `#[allow]` keeps a
         // mechanical move from failing the workspace `-D warnings` gate when it
         // happens to reference nothing in the parent.
-        text.push_str("\n#[allow(unused_imports)]\nuse super::*;\n");
+        text.push_str("#[allow(unused_imports)]\nuse super::*;\n");
     }
     text.push('\n');
-    for line in body {
+    for line in &body[attrs..] {
         text.push_str(line);
         text.push('\n');
     }
