@@ -1,6 +1,6 @@
 # Epic: pr-triage Agent Skill
 
-> **Status:** phases 1–5 complete (skill + evals; `pr no-effect` + `pr review` with cache; proof skipping + `false_proven`; measurement + benchmark; semantic routing cost/safety benchmark with a recorded `no-go` verdict)
+> **Status:** phases 1–7 complete (skill + evals; `pr no-effect` + `pr review` with cache; proof skipping + `false_proven`; measurement + benchmark; semantic routing cost/safety benchmark with a recorded `no-go` verdict; realistic large-diff corpus + route-aware cost model; cheap-metadata input investigated and **rejected** as strictly worse than the proof gate)
 > **Related:** Agent Skills open standard, GitHub PR lifecycle, optional `do-harness` token reduction
 > **Created:** 2026-09-11
 
