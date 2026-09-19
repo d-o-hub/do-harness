@@ -119,12 +119,12 @@ across it. Measured on a realistic 12-class corpus with diffs of 2.8–25 KB, th
 Cheaper input views were measured and rejected — the byte saving and the risk
 signal are the same bytes:
 
-| input view | % of baseline | oracle failures |
-|---|---|---|
-| full diff | 100% | 0/12 |
-| numstat + hunk headers with context | 15.9% | 0/12 |
-| numstat + hunk headers stripped | 5.9% | 4/12 |
-| numstat only | 0.7% | 4/12 |
+| input view | bytes | % of baseline | oracle failures |
+|---|---|---|---|
+| full diff | 114 670 | 100% | 0/12 |
+| numstat + hunk headers with context | 18 231 | 15.9% | 0/12 |
+| numstat + hunk headers stripped | 6 785 | 5.9% | **4/12** |
+| numstat only (paths) | 751 | 0.7% | **4/12** |
 
 Stripping hunk context is what buys the bytes *and* what loses the deep classes,
 because git's hunk header is the only cheap view that quotes the containing
@@ -132,13 +132,15 @@ function (a schema change buried among mechanical renames is otherwise invisible
 at every cheaper view — verified: 0 schema tokens visible in numstat or stripped
 hunks, 1 in contextual hunks).
 
-Do not implement metadata input on this policy. The `cheap` set is the same set
-the deterministic proof gate already skips for zero model bytes
-(`[proof] mechanical` globs drive `t_res = 2 B`, `verdict = reduced`), so routing
-loses to the gate it would compete with (measured: routed 123 675 B vs proof gate
-86 938 B, −42.3%), while adding input on every non-inert case. Reopening requires
-a view that is cheaper *and* retains hunk context, or dropping `cheap` (which
-removes the only savings mechanism).
+Do not implement metadata input on this policy. Priced as
+`metadata + envelope + selected payload` against the deterministic proof gate
+(which skips the inert classes for zero model bytes, `t_res = 2 B`,
+`verdict = reduced`), the contextual view costs **46.0% more** with the current
+`cheap` set and **28.8% more** even when `dependency` is also routed `cheap` —
+while adding input on every non-inert case. The full-diff baseline is
+114 670 B, the proof gate 86 938 B, and the routed arms 126 953 B and 112 018 B.
+Reopening requires a view that is cheaper *and* retains hunk context, or dropping
+`cheap` (which removes the only savings mechanism).
 
 ## Trust Boundary & Untrusted Data
 
