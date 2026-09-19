@@ -189,7 +189,10 @@ fn status_reports_installed_hooks() {
 #[test]
 fn status_detects_release_binary() {
     let (temp, git_dir) = fake_git_dir();
-    let bin = temp.path().join("target/release/do-harness");
+    let mut bin = temp.path().join("target/release/do-harness");
+    if cfg!(windows) {
+        bin.set_extension("exe");
+    }
     fs::create_dir_all(bin.parent().unwrap()).unwrap();
     write(&bin, "stub");
 

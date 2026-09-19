@@ -169,24 +169,57 @@ fn resolve_binary_with(
     env_bin: Option<PathBuf>,
     path: Option<OsString>,
 ) -> BinSource {
+    resolve_binary_with_names(repo_root, env_bin, path, binary_names())
+}
+
+/// Resolution core with explicit probe names, so the Windows `.exe` fallback
+/// stays testable on every platform.
+fn resolve_binary_with_names(
+    repo_root: &Path,
+    env_bin: Option<PathBuf>,
+    path: Option<OsString>,
+    names: &[&str],
+) -> BinSource {
     if let Some(bin) = env_bin
         && is_executable_file(&bin)
     {
         return BinSource::Env(bin);
     }
-    if let Some(found) = search_path(path) {
+    if let Some(found) = search_path(path, names) {
         return BinSource::Path(found);
     }
-    BinSource::Repo(repo_root.join("target/release/do-harness"))
+    BinSource::Repo(repo_binary(repo_root, names))
 }
 
-/// Searches `PATH` entries for an executable `do-harness`.
-fn search_path(path: Option<OsString>) -> Option<PathBuf> {
+/// File names the harness binary may carry, most preferred first; the last
+/// entry is Cargo's `target/release` output name (`do-harness.exe` on
+/// Windows, `do-harness` elsewhere). PATH probing mirrors the generated hook
+/// script: the extensionless name wins when both exist.
+#[must_use]
+fn binary_names() -> &'static [&'static str] {
+    if cfg!(windows) {
+        &["do-harness", "do-harness.exe"]
+    } else {
+        &["do-harness"]
+    }
+}
+
+/// Repo-local `target/release` fallback under the platform output name.
+fn repo_binary(repo_root: &Path, names: &[&str]) -> PathBuf {
+    let name = names.last().copied().unwrap_or("do-harness");
+    repo_root.join("target/release").join(name)
+}
+
+/// Searches `PATH` entries for an executable harness binary under one of
+/// `names` (first name wins within a directory).
+fn search_path(path: Option<OsString>, names: &[&str]) -> Option<PathBuf> {
     let path = path?;
     for dir in std::env::split_paths(&path) {
-        let candidate = dir.join("do-harness");
-        if is_executable_file(&candidate) {
-            return Some(candidate);
+        for name in names {
+            let candidate = dir.join(name);
+            if is_executable_file(&candidate) {
+                return Some(candidate);
+            }
         }
     }
     None
@@ -294,11 +327,65 @@ mod tests {
     fn resolve_uses_repo_fallback_when_nowhere() {
         let (_temp, root) = fake_repo();
         let source = resolve_binary_with(&root, None, Some(OsString::from("/nonexistent")));
+        let name = if cfg!(windows) {
+            "do-harness.exe"
+        } else {
+            "do-harness"
+        };
         assert_eq!(
             source,
-            BinSource::Repo(root.join("target/release/do-harness"))
+            BinSource::Repo(root.join("target/release").join(name))
         );
         assert!(!source.present());
+    }
+
+    #[test]
+    fn resolve_finds_exe_fallback_on_path() {
+        let (temp, root) = fake_repo();
+        let bin = temp.path().join("bin").join("do-harness.exe");
+        write_exec(&bin);
+        let path = std::env::join_paths([temp.path().join("bin")]).unwrap();
+        let names = ["do-harness", "do-harness.exe"];
+        let source = resolve_binary_with_names(&root, None, Some(path), &names);
+        assert_eq!(source, BinSource::Path(bin));
+    }
+
+    #[test]
+    fn resolve_prefers_extensionless_over_exe() {
+        let (temp, root) = fake_repo();
+        let bin = temp.path().join("bin").join("do-harness");
+        let exe = temp.path().join("bin").join("do-harness.exe");
+        write_exec(&bin);
+        write_exec(&exe);
+        let path = std::env::join_paths([temp.path().join("bin")]).unwrap();
+        let names = ["do-harness", "do-harness.exe"];
+        let source = resolve_binary_with_names(&root, None, Some(path), &names);
+        assert_eq!(source, BinSource::Path(bin));
+    }
+
+    #[test]
+    fn resolve_repo_fallback_takes_last_probe_name() {
+        let (_temp, root) = fake_repo();
+        let names = ["do-harness", "do-harness.exe"];
+        let source =
+            resolve_binary_with_names(&root, None, Some(OsString::from("/nonexistent")), &names);
+        assert_eq!(
+            source,
+            BinSource::Repo(root.join("target/release").join("do-harness.exe"))
+        );
+        assert!(!source.present());
+    }
+
+    #[test]
+    #[cfg(windows)]
+    fn binary_names_include_cargo_exe_on_windows() {
+        assert_eq!(binary_names(), ["do-harness", "do-harness.exe"]);
+    }
+
+    #[test]
+    #[cfg(not(windows))]
+    fn binary_names_are_extensionless_off_windows() {
+        assert_eq!(binary_names(), ["do-harness"]);
     }
 
     #[test]
