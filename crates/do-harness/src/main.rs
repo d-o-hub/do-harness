@@ -19,6 +19,7 @@ mod approver;
 mod artifacts;
 mod audit;
 mod baselines;
+mod binary;
 mod changes;
 mod cli;
 mod commands;
