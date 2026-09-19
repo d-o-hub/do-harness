@@ -40,7 +40,11 @@ while (( $# )); do
         --release-json)
             RELEASE_JSON="${2:-}"; shift 2 ;;
         --help|-h)
-            sed -n '2,22p' "${BASH_SOURCE[0]}"; exit 0 ;;
+            # Print the header comment block only. A hard-coded line range
+            # silently starts leaking code as soon as the header grows, so stop
+            # at the first non-comment line instead.
+            awk 'NR == 1 { next } /^#/ { print; next } { exit }' "${BASH_SOURCE[0]}"
+            exit 0 ;;
         *)
             echo "check-agt-ga: unknown argument: $1 (see --help)" >&2; exit 2 ;;
     esac

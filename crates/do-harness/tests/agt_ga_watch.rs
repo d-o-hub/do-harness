@@ -182,6 +182,35 @@ fn the_retired_crate_cannot_swing_the_verdict() {
     );
 }
 
+/// `--help` prints the header comment and never a line of code.
+///
+/// The header documents the crate rename and the fixture interface, so it grows
+/// over time. A hard-coded line range in the predecessor leaked `set -euo
+/// pipefail` into the help output the moment the header got longer; the range
+/// must therefore be derived, not counted.
+#[test]
+fn help_prints_the_header_and_never_code() {
+    let out = Command::new("bash")
+        .arg(script())
+        .arg("--help")
+        .output()
+        .expect("spawn check-agt-ga.sh --help");
+
+    assert!(out.status.success());
+    let stdout = String::from_utf8_lossy(&out.stdout);
+
+    // Documents the rename, so an operator learns which crate is watched.
+    assert!(stdout.contains("agentmesh"), "{stdout}");
+    assert!(stdout.contains("--legacy-crate-json"), "{stdout}");
+    // Every printed line is a comment; no code may leak.
+    for line in stdout.lines() {
+        assert!(
+            line.is_empty() || line.starts_with('#'),
+            "help leaked a non-comment line: {line:?}"
+        );
+    }
+}
+
 /// Fixture mode requires both gating inputs; a partial invocation is a usage error.
 #[test]
 fn fixture_mode_rejects_a_missing_release_input() {
