@@ -23,6 +23,13 @@ const EXEC_BUSY_RETRIES: u32 = 10;
 /// only needs to yield the CPU to the writer that holds the script open.
 const EXEC_BUSY_BACKOFF_MILLIS: u64 = 5;
 
+/// How long the regression test holds the script open for writing. It must
+/// outlast the first exec attempt (microseconds, but scheduler-delayed under
+/// load) while staying well inside the retry budget, so the test detects the
+/// race pre-fix and still passes post-fix.
+#[cfg(all(test, unix))]
+const EXEC_BUSY_HOLD_MILLIS: u64 = 25;
+
 /// Outcome of running a skill's walkthrough, or of deciding not to.
 #[derive(Debug, Clone)]
 pub struct WalkRun {
@@ -293,8 +300,11 @@ mod tests {
     /// microseconds and not a property of the script.
     ///
     /// Reproduces the race deterministically by holding a write handle open
-    /// while the launcher execs: on Linux an open write-descriptor on the file
-    /// makes `execve` return `ETXTBSY`.
+    /// across the first exec: on unix an open write-descriptor on the file makes
+    /// `execve` return `ETXTBSY`. The hold is short because detection only needs
+    /// the descriptor open across the *first* attempt (microseconds later),
+    /// while the retry budget below gives the releasing thread a wide margin so
+    /// the test cannot flake under load.
     #[cfg(unix)]
     #[test]
     fn exec_busy_is_retried_instead_of_failing_the_walkthrough() {
@@ -310,12 +320,9 @@ mod tests {
             fs::set_permissions(&script, fs::Permissions::from_mode(0o755)).unwrap();
         }
 
-        // Hold the script open for writing for longer than the retry budget
-        // starts, then release it: the first exec attempts must see ETXTBSY and
-        // a later retry must succeed.
         let mut holder = fs::OpenOptions::new().write(true).open(&script).unwrap();
         let release = std::thread::spawn(move || {
-            std::thread::sleep(std::time::Duration::from_millis(20));
+            std::thread::sleep(std::time::Duration::from_millis(EXEC_BUSY_HOLD_MILLIS));
             let _ = holder.write_all(b"");
             drop(holder);
         });
@@ -331,12 +338,30 @@ mod tests {
         );
     }
 
+    /// `ETXTBSY` is the unix spelling of the race; this is the mapping the
+    /// launcher's predicate relies on, and it is asserted here rather than in
+    /// the portable predicate test because raw error 26 is a *different* code
+    /// on Windows.
+    #[cfg(unix)]
+    #[test]
+    fn unix_text_file_busy_maps_to_executable_file_busy() {
+        /// `ETXTBSY` on Linux/macOS (`asm-generic/errno.h`: ETXTBSY = 26).
+        const UNPG_ETXTBSY: i32 = 26;
+        assert!(is_executable_busy(&std::io::Error::from_raw_os_error(
+            UNPG_ETXTBSY
+        )));
+    }
+
     /// The retry predicate must not swallow unrelated launch errors: only the
-    /// transient busy condition is retried.
+    /// transient busy condition is retried. Built from `ErrorKind` directly so
+    /// the assertion holds on every platform, including Windows where a raw
+    /// error code of 26 means something else entirely.
     #[test]
     fn only_executable_file_busy_is_retried() {
-        let busy = std::io::Error::from_raw_os_error(26);
-        assert!(is_executable_busy(&busy));
+        assert!(is_executable_busy(&std::io::Error::new(
+            std::io::ErrorKind::ExecutableFileBusy,
+            "busy"
+        )));
         assert!(!is_executable_busy(&std::io::Error::new(
             std::io::ErrorKind::NotFound,
             "missing"
@@ -344,6 +369,10 @@ mod tests {
         assert!(!is_executable_busy(&std::io::Error::new(
             std::io::ErrorKind::PermissionDenied,
             "denied"
+        )));
+        assert!(!is_executable_busy(&std::io::Error::new(
+            std::io::ErrorKind::Interrupted,
+            "interrupted"
         )));
     }
 
