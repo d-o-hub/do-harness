@@ -27,6 +27,7 @@ residual plus evidence; the skill works with `gh` + `git` alone.
 | Phase 3: proof skipping | evidence mapping marks mechanical units proven and lists them for audit; behavioral units always residual; `false_proven` oracle | seeded-defect fixtures |
 | Phase 4: measurement | context-inclusive baseline (`T_raw`, `T_res`) recorded per sweep; no-go if residual >= raw on ordinary PRs | benchmark report |
 | Phase 5: semantic routing | optional typed router selects review depth; all error/uncertain states fail toward depth; end-to-end cost + seeded-route oracle over 12 classes; regression gate in `cargo test` | `scripts/pr-routing-benchmark.sh` + `tests/pr_routing.rs`; recorded `no-go` verdict |
+| Phase 6: realistic corpus economy | route-aware cost model in the benchmark + a 12-class large-diff corpus (`tests/fixtures/pr-routing-large/`, 2.8–25 KB per case) generated deterministically; both corpora gated in `cargo test` | `scripts/generate-large-fixtures.sh` + route-aware fields; recorded `ROUTED_VERDICT no-go` with the structural reason |
 
 ## Phase 1 requirements (roast findings)
 
@@ -169,11 +170,66 @@ residual plus evidence; the skill works with `gh` + `git` alone.
   `test` sensor — exit 0, every seeded class at or above its declared minimum route, `downgrades=0`,
   `seeded_oracle_failures=0`, and byte-identical output across two runs. No new sensor, no new
   `verify` cost.
-- **Next action:** a `go` verdict requires the review payload to dominate the router envelope —
-  i.e. a corpus of realistic large diffs (thousands of lines, the case where residual savings are
-  hundreds of KB) rather than minimal fixtures, and ideally a single batched routing call per
-  sweep instead of one per PR. Until then the router stays optional and experimental: no default
-  enables it.
+- **Next action:** the review payload must dominate the router envelope for a `go`; Phase 6
+  (below) tested that hypothesis on a realistic large-diff corpus and refuted it. Until then the
+  router stays optional and experimental: no default enables it.
+
+## Phase 6 completion — realistic corpus economy measurement (2026-09-18)
+
+- New corpus `tests/fixtures/pr-routing-large/` — the same 12 classes, but sized like real PRs
+  (2.8–25 KB unified diff per case, all 12 above 2 KB, 114 670 B total, vs 3 253 B for the minimal
+  corpus). Generated deterministically by `scripts/generate-large-fixtures.sh` (idempotent; two runs
+  are byte-identical, verified with `diff -r`).
+- The benchmark gains a **route-aware** arm alongside the conservative one, because the
+  conservative model (`total = router_input + review_input`) charges review input on *every* route
+  and so can never show a routing win by construction. Route-aware model:
+  `cheap → 0` review bytes, `focused → t_res`, `deep → t_raw`, no-effect → `0`; per-case fields
+  `routed_review_input_bytes` / `routed_total_model_input_bytes` / `routed_savings_ratio` and
+  aggregate `routed_total_model_input_bytes` / `routed_mean_savings_ratio` are additive (schema
+  stays v1), reported as a second `ROUTED_VERDICT` line. The `VERDICT` line, the `FINDINGS:`
+  marker (oracle failures only), and the exit code (`downgrades` only) are unchanged.
+- Run:
+  `DO_HARNESS_BIN=target/debug/do-harness bash scripts/pr-routing-benchmark.sh --fixtures tests/fixtures/pr-routing-large`.
+- Result over the 12 large classes:
+
+  | metric | value |
+  |---|---|
+  | baseline model input (B) | 114 670 B |
+  | conservative total (C) | 235 018 B |
+  | routed total | 226 436 B |
+  | routed mean / median savings vs B | −0.924 / −1.055 |
+  | reduced vs B / no-go vs B | 0.0% / 100.0% |
+  | router calls per case | 1.00 |
+  | seeded oracle failures / downgrades | 0 / 0 |
+  | timeout-or-invalid fallbacks | 1 |
+
+  `VERDICT no-go` and `ROUTED_VERDICT no-go`.
+- Cheap-class `routed_savings_ratio` (the cases where routing skips review bytes entirely):
+  `docs-only` −0.033 (8 178 B baseline → 8 449 B routed, router input 8 449 B, review 0) and
+  `tests-only` −0.087 (3 448 B → 3 748 B, router input 3 748 B). Even at 8 KB of diff the `cheap`
+  route still costs **more** than not routing at all.
+- **Economy is still `no-go`, and enlarging the corpus cannot change it.** The cause is structural,
+  not fixture size: the router's own input *is* the review payload plus an envelope —
+  `router_input = review_payload + envelope` — so
+  `routed_total = baseline + envelope + routed_review ≥ baseline + envelope > baseline`. Measured
+  envelope over baseline is **259–1152 B** on every one of the 12 cases (0 of 12 routed totals beat
+  baseline). Savings therefore approach $0^-$ asymptotically as diffs grow and never become
+  positive; a bigger corpus yields a savings ratio nearer to (but below) zero, not a `go`.
+- What would change the verdict: the router must classify from something **cheaper than the payload
+  it decides about** — a path list / hunk-header / stat summary instead of the full diff — so that
+  `router_input ≪ baseline`. That is the only lever that makes routing additive-negative; a
+  per-sweep batched call amortizes the envelope but still stacks it on top of the review input.
+  Recorded as the surviving hypothesis; no default enables the router.
+- Regression gate extended: `crates/do-harness/tests/pr_routing.rs` now runs **both** corpora inside
+  the existing `test` sensor (`run_benchmark_at` parameterizes the corpus; `run_benchmark` and
+  `run_large_benchmark` are thin wrappers). `large_corpus_never_downgrades` asserts the safety
+  properties plus route-aware column consistency, and `large_corpus_output_is_stable` asserts
+  byte-identical output. No new sensor, no new `verify` cost.
+- Bug found and fixed while baselining: the benchmark's `DO_HARNESS_BIN` was used verbatim, so a
+  *relative* value (as in the documented command line) stopped resolving once the router wrapper
+  `cd`-ed into the case repository — silently degrading every route to the `deep` fallback and
+  passing the oracle for the wrong reason. The benchmark now absolutizes the binary path before
+  use (`.agents/skills/pr-triage/scripts/semantic-route.sh` inherits it via `DO_HARNESS_BIN`).
 
 ## Task tracking note
 

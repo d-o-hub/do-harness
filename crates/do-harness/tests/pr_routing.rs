@@ -1,10 +1,17 @@
 //! Regression gate for the semantic-routing benchmark.
 //!
-//! Runs `scripts/pr-routing-benchmark.sh --fixtures <corpus>` against the
-//! checked-in seeded corpus and asserts the properties #114 makes
+//! Runs `scripts/pr-routing-benchmark.sh --fixtures <corpus>` against both
+//! checked-in seeded corpora and asserts the properties #114 makes
 //! release-blocking: the benchmark completes, no high-impact class is
 //! downgraded, the aggregate downgrade count is zero, and the adversarially
 //! misleading provider still routes a contract change to `deep`.
+//!
+//! Two corpora, one safety contract:
+//!   - `tests/fixtures/pr-routing` — 12 minimal cases, pinning the route
+//!     *decision*.
+//!   - `tests/fixtures/pr-routing-large` — the same 12 classes at realistic
+//!     diff sizes (2.8–25 KB), pinning that the decision holds, and that the
+//!     route-aware cost columns stay internally consistent, as diffs grow.
 //!
 //! The fixture provider is deterministic, so a failure here means the routing
 //! policy changed, not that a model answered differently.
@@ -19,7 +26,7 @@
 #![cfg(unix)]
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
 use serde_json::Value;
@@ -32,25 +39,30 @@ fn repo_root() -> PathBuf {
         .expect("canonical repository root")
 }
 
-/// Runs the benchmark against the seeded corpus.
+/// Runs the benchmark against the minimal seeded corpus.
 ///
 /// The hook-inherited git environment is scrubbed: git exports `GIT_DIR` to
 /// hooks, and an inherited value would make the benchmark's fixture `git init`
 /// target the outer repository.
 fn run_benchmark() -> Output {
+    run_benchmark_at(&repo_root().join("tests/fixtures/pr-routing"))
+}
+
+/// Runs the benchmark against an explicit corpus directory.
+///
+/// The provider is pinned to the corpus's own `fake-router.sh`, because the
+/// benchmark resolves `PR_TRIAGE_ROUTER` relative to `--fixtures`; pinning the
+/// sibling corpus's provider would silently measure the wrong router.
+fn run_benchmark_at(fixtures: &Path) -> Output {
     let root = repo_root();
+    let fixtures = fixtures
+        .canonicalize()
+        .expect("canonical fixture corpus directory");
     let mut cmd = Command::new("/bin/bash");
     cmd.arg(root.join("scripts/pr-routing-benchmark.sh"));
-    cmd.arg("--fixtures")
-        .arg(root.join("tests/fixtures/pr-routing"));
+    cmd.arg("--fixtures").arg(&fixtures);
     cmd.env("DO_HARNESS_BIN", env!("CARGO_BIN_EXE_do-harness"));
-    // The benchmark defaults PR_TRIAGE_ROUTER to the fixture provider; pinning
-    // it here keeps an exported value in the developer's shell from arming a
-    // real provider mid-test.
-    cmd.env(
-        "PR_TRIAGE_ROUTER",
-        root.join("tests/fixtures/pr-routing/fake-router.sh"),
-    );
+    cmd.env("PR_TRIAGE_ROUTER", fixtures.join("fake-router.sh"));
     cmd.env("PR_TRIAGE_ROUTER_TIMEOUT", "5");
     for key in [
         "GIT_DIR",
@@ -65,6 +77,11 @@ fn run_benchmark() -> Output {
         cmd.env_remove(key);
     }
     cmd.output().expect("spawn pr-routing-benchmark.sh")
+}
+
+/// Runs the benchmark against the realistic large-diff corpus.
+fn run_large_benchmark() -> Output {
+    run_benchmark_at(&repo_root().join("tests/fixtures/pr-routing-large"))
 }
 
 /// Parses the per-case JSON rows from benchmark stdout.
@@ -181,6 +198,93 @@ fn benchmark_output_is_stable_across_runs() {
         String::from_utf8_lossy(&first.stdout),
         String::from_utf8_lossy(&second.stdout),
         "the deterministic provider must make the benchmark byte-identical"
+    );
+}
+
+#[test]
+fn large_corpus_never_downgrades() {
+    let output = run_large_benchmark();
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    // Safety, not economy, is what gates here: the large corpus is ~2-25 KB per
+    // case, so it is the realistic-diff arm of the same route oracle.
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "large benchmark must pass:\nstdout:\n{stdout}\nstderr:\n{stderr}"
+    );
+
+    let rows = rows(&stdout);
+    assert_eq!(rows.len(), 12, "every corpus case must be measured");
+
+    let rank = |route: &str| match route {
+        "cheap" => 0,
+        "focused" => 1,
+        "deep" => 2,
+        other => panic!("unknown route {other}"),
+    };
+    for row in &rows {
+        let case = row["case"].as_str().unwrap();
+        let route = row["route"].as_str().unwrap();
+        let expected = row["expected_min_route"].as_str().unwrap();
+        assert!(
+            rank(route) >= rank(expected),
+            "{case}: routed {route} below the required {expected}"
+        );
+        assert_eq!(row["oracle_pass"], Value::Bool(true), "{case}");
+    }
+
+    assert_eq!(summary_value(&stderr, "downgrades").as_deref(), Some("0"));
+    assert_eq!(
+        summary_value(&stderr, "seeded_oracle_failures").as_deref(),
+        Some("0")
+    );
+    assert!(
+        stderr.contains("FINDINGS: 0"),
+        "large corpus must report no findings:\n{stderr}"
+    );
+
+    // The route-aware columns must exist and be internally consistent on every
+    // row, so a corpus run is comparable to the recorded economy verdict.
+    for row in &rows {
+        let case = row["case"].as_str().unwrap();
+        let route = row["route"].as_str().unwrap();
+        let routed_review = row["routed_review_input_bytes"].as_u64().unwrap();
+        let routed_total = row["routed_total_model_input_bytes"].as_u64().unwrap();
+        let router_input = row["router_input_bytes"].as_u64().unwrap();
+        let expected_review = match route {
+            "cheap" => 0,
+            "focused" => row["t_res_bytes"].as_u64().unwrap(),
+            "deep" => row["t_raw_bytes"].as_u64().unwrap(),
+            other => panic!("unknown route {other}"),
+        };
+        // A case with no effective change spends no review bytes on any route,
+        // so only non-empty cases pin the route's payload exactly.
+        if row["t_raw_bytes"].as_u64().unwrap() > 0 {
+            assert_eq!(
+                routed_review, expected_review,
+                "{case}: the {route} route must read exactly {expected_review} review bytes"
+            );
+        }
+        assert_eq!(
+            routed_total,
+            router_input + routed_review,
+            "{case}: routed total must be the router envelope plus the selected payload"
+        );
+    }
+}
+
+#[test]
+fn large_corpus_output_is_stable() {
+    let first = run_large_benchmark();
+    let second = run_large_benchmark();
+    assert_eq!(first.status.code(), Some(0));
+    assert_eq!(second.status.code(), Some(0));
+    assert_eq!(
+        String::from_utf8_lossy(&first.stdout),
+        String::from_utf8_lossy(&second.stdout),
+        "the deterministic provider must make the large benchmark byte-identical"
     );
 }
 
