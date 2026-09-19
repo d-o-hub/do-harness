@@ -28,6 +28,7 @@ residual plus evidence; the skill works with `gh` + `git` alone.
 | Phase 4: measurement | context-inclusive baseline (`T_raw`, `T_res`) recorded per sweep; no-go if residual >= raw on ordinary PRs | benchmark report |
 | Phase 5: semantic routing | optional typed router selects review depth; all error/uncertain states fail toward depth; end-to-end cost + seeded-route oracle over 12 classes; regression gate in `cargo test` | `scripts/pr-routing-benchmark.sh` + `tests/pr_routing.rs`; recorded `no-go` verdict |
 | Phase 6: realistic corpus economy | route-aware cost model in the benchmark + a 12-class large-diff corpus (`tests/fixtures/pr-routing-large/`, 2.8–25 KB per case) generated deterministically; both corpora gated in `cargo test` | `scripts/generate-large-fixtures.sh` + route-aware fields; recorded `ROUTED_VERDICT no-go` with the structural reason |
+| Phase 7: cheap-metadata input | test the last hypothesis for a routing `go`: classify from a path/hunk/stat view so the router reads far less than it decides about | rejected — saving and safety are the same bytes (stripped view: 4/12 oracle failures; contextual view −10.7% vs raw diff); routing costs 46.0% *more* than the deterministic proof gate it competes with |
 
 ## Phase 1 requirements (roast findings)
 
@@ -217,9 +218,8 @@ residual plus evidence; the skill works with `gh` + `git` alone.
   positive; a bigger corpus yields a savings ratio nearer to (but below) zero, not a `go`.
 - What would change the verdict: the router must classify from something **cheaper than the payload
   it decides about** — a path list / hunk-header / stat summary instead of the full diff — so that
-  `router_input ≪ baseline`. That is the only lever that makes routing additive-negative; a
-  per-sweep batched call amortizes the envelope but still stacks it on top of the review input.
-  Recorded as the surviving hypothesis; no default enables the router.
+  `router_input ≪ baseline`. That was the standing hypothesis; **Phase 7 tested it and refuted it**.
+  No default enables the router.
 - Regression gate extended: `crates/do-harness/tests/pr_routing.rs` now runs **both** corpora inside
   the existing `test` sensor (`run_benchmark_at` parameterizes the corpus; `run_benchmark` and
   `run_large_benchmark` are thin wrappers). `large_corpus_never_downgrades` asserts the safety
@@ -230,6 +230,89 @@ residual plus evidence; the skill works with `gh` + `git` alone.
   `cd`-ed into the case repository — silently degrading every route to the `deep` fallback and
   passing the oracle for the wrong reason. The benchmark now absolutizes the binary path before
   use (`.agents/skills/pr-triage/scripts/semantic-route.sh` inherits it via `DO_HARNESS_BIN`).
+
+## Phase 7 — cheap-metadata router input investigated and rejected (2026-09-19)
+
+Phase 6 left one hypothesis: route from something cheaper than the payload
+(a path list / hunk-header / stat view) so `router_input ≪ baseline`. Spiked
+against the large corpus with a **content-sensitive** classifier (the corpus
+`fake-router.sh` ignores its input, so it can prove cost but never decision
+quality). Result: the change is rejected, and the router has no cost win
+available on any safe design.
+
+**Why this needed a decision-sensitive probe.** Every previous measurement used
+a canned-answer provider, which cannot show whether a cheaper input loses
+information. The spike classifies the input it is handed, so a route loss is
+attributable to the view rather than to the stub.
+
+| input view | bytes | % of baseline | oracle failures |
+|---|---|---|---|
+| full diff (today) | 114 670 | 100% | 0/12 |
+| numstat + hunk headers **with** syntactic context | 18 231 | 15.9% | 0/12 |
+| numstat + hunk headers **stripped** | 6 785 | 5.9% | **4/12** |
+| numstat only (paths) | 751 | 0.7% | **4/12** |
+
+The saving and the safety signal are the *same bytes*: stripping hunk context is
+what buys the byte reduction, and it is also what loses `public-api-break`,
+`concurrency`, `mixed-buried`, and `router-invalid` (all route `focused` instead
+of `deep`). This is an information bound, not a classifier weakness — verified
+directly, the buried schema change is invisible at every cheaper view:
+
+| view | bytes | schema tokens visible |
+|---|---|---|
+| numstat | 239 | 0 |
+| numstat + stripped hunks | 955 | 0 |
+| numstat + contextual hunks | 2 253 | 1 |
+
+`mixed-buried` (a `CREATE TABLE` column change buried among 14 mechanical
+renames) is caught *only* because git's hunk header quotes the function
+containing the change. Remove that context and no classifier can recover it, so
+`cheap → focused` for that class is an unavoidable downgrade.
+
+**The decisive measurement — routing versus the gate it competes with.** The
+route policy's only zero-cost route is `cheap`, and that set is exactly what the
+shipped deterministic proof gate (`[proof] mechanical` globs) already skips at
+**zero model bytes**: with `mechanical = ["docs/**","tests/**","**/Cargo.lock","**/*.md","**/migrations/**"]`
+the inert classes serialize to `t_res = 2 B` with `verdict = reduced`.
+
+Routed cost is priced as `metadata_input + router_envelope + selected_payload`,
+where the selected payload is what `pr review` actually sends under the active
+policy (`t_res` when `reduced`, otherwise `t_raw`) and is zero on the `cheap`
+route. Measured:
+
+| arm | total | vs proof gate |
+|---|---|---|
+| proof gate, mechanical globs (deterministic) | 86 938 B | — (zero router bytes) |
+| routed, current `cheap` set (docs/tests) | 126 953 B | **+46.0%** |
+| routed, `cheap` set extended to `dependency` | 112 018 B | **+28.8%** |
+| full-diff baseline (no policy), for reference | 114 670 B | — |
+
+Both routed arms are *worse than routing nothing*: they lose to the gate on cost
+and win nothing it did not already win, because on source changes both
+`focused` and `deep` read the full payload — the router adds input on every
+non-inert case.
+
+**The one `go` is an artifact of a baseline that double-counts.** Against the
+full-diff baseline (not the gate) the extended `cheap` set prices at **+2.3%**
+and the current set at **−10.7%**. The `+2.3%` rests entirely on `lockfile-only`:
+
+```
+routed B vs raw diff:  114 670 → 112 018  (+2.3%, 2 652 B)
+lockfile-only alone:    14 935 →   6 853  (8 082 B saved)
+```
+
+`dependency` is already free — SKILL.md step 6 merges bot dependency-only PRs on
+the machine fast path with zero LLM review — so charging its 14 935 B to the
+baseline while letting routing claim the saving counts the same win twice. The
+honest comparison is against the gate (row 2/3 above), where routing loses.
+
+**Verdict: the router stays off and the metadata-input change is not
+implemented.** It would have added a fail-safe policy with a new downgrade class,
+red cost on every safe case, and a zero-value byte win. The recorded outcome is
+this negative result plus the survey instrumentation in Phase 6; no production
+code changes, so no sensor cost. Reopening this needs a cheaper view that
+*retains* hunk context (which is not cheaper) or dropping the `cheap` route
+(which removes the only savings mechanism).
 
 ## Task tracking note
 
