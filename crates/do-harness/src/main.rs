@@ -42,6 +42,7 @@ mod fs_perm;
 mod hook_script;
 mod hooks;
 mod init;
+mod loc;
 mod methods;
 mod metrics;
 mod overlap;
@@ -52,6 +53,7 @@ mod shell;
 mod signals;
 mod skill_write;
 mod skills;
+mod split;
 mod status;
 mod task;
 mod telemetry;
@@ -240,6 +242,16 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
             evidence,
             format,
         } => status::run(&root, cli.config.as_deref(), set, evidence, format).await,
+        Command::Loc {
+            format,
+            warn,
+            paths,
+        } => loc::run(&root, format, warn, &paths).map_err(CliError::Usage),
+        Command::Split {
+            file,
+            dry_run,
+            target,
+        } => split::run(&root, &file, dry_run, target.as_deref()).map_err(CliError::Usage),
         Command::InitDb {
             check,
             dry_run,

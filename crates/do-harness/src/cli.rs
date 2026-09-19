@@ -237,6 +237,30 @@ pub enum Command {
         #[command(subcommand)]
         action: ErrorsAction,
     },
+    /// Report line-of-code state for the 500-LOC invariant.
+    Loc {
+        /// Output format.
+        #[arg(long, value_enum, default_value_t = Format::Text)]
+        format: Format,
+        /// Show only files at or above the 450-line decomposition threshold.
+        #[arg(long)]
+        warn: bool,
+        /// Files or directories to measure (default: all `.rs` under crates/).
+        #[arg(value_hint = ValueHint::AnyPath, value_name = "PATH")]
+        paths: Vec<PathBuf>,
+    },
+    /// Extract a large top-level item into a sibling module.
+    Split {
+        /// Source file to decompose.
+        #[arg(value_hint = ValueHint::FilePath, value_name = "FILE")]
+        file: PathBuf,
+        /// Print the plan without writing files.
+        #[arg(long)]
+        dry_run: bool,
+        /// Name the sibling module instead of deriving it from the item.
+        #[arg(long, value_name = "NAME")]
+        target: Option<String>,
+    },
     /// Validate skill structure and benchmark skill evals.
     Eval {
         /// Restrict evaluation to this skill directory name.
