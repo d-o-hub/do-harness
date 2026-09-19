@@ -44,5 +44,5 @@ jobs:
             exit 0
           fi
           gh issue create \
-            --title "[agt-ga-watch] agent-governance sdk signals ga — promotion review due" \
+            --title "[agt-ga-watch] agentmesh sdk signals ga — promotion review due" \
             --body "scripts/check-agt-ga.sh reported VERDICT=GA. Review the chore-agt-promotion gate in plans/agt-governance-epic.md: confirm (a) sdk ga and (b) mediation surface, then decide on removing or keeping the agt-governance feature flag per invariants review. This issue was opened by automation; the flag was NOT changed."

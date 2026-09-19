@@ -50,7 +50,9 @@ jobs:
         with:
           tool: cargo-deny,cargo-audit
       # Pin maintenance note: agent-governance is pinned to =3.2.2 in workspace dependencies
-      # until GA. Use `cargo update -p agent-governance --precise <ver>` for updates.
+      # until GA. Upstream renamed this crate to `agentmesh`; the pin stays on the
+      # retired 3.2.x line because the live 4.x line is a breaking API change
+      # (chore-agt-promotion). Use `cargo update -p agent-governance --precise <ver>`.
       - name: Lint shell sensors
         run: shellcheck scripts/*.sh crates/do-harness/templates/scripts/*.sh
       - name: Build harness CLI

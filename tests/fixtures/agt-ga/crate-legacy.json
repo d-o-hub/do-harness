@@ -1,0 +1,8 @@
+{
+ "crate": {
+  "name": "agent-governance",
+  "max_stable_version": "3.2.2",
+  "newest_version": "3.2.2",
+  "description": "Public Preview \u2014 Rust SDK for the Agent Governance Toolkit (policy, trust, audit, identity)"
+ }
+}

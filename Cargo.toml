@@ -31,13 +31,19 @@ reqwest = { version = "0.12", default-features = false, features = ["json", "rus
 tower = { version = "0.5" }
 http-body-util = "0.1"
 # Exact pin (exemption from the caret-range policy in AGENTS.md): the
-# agent-governance toolkit is pre-GA (Public Preview, max_stable 3.2.2), so
-# floating it risks silent API drift. Update with
+# Agent Governance Toolkit Rust SDK is pre-GA (upstream CHANGELOG: "all releases
+# are currently public preview releases"), so floating it risks silent API
+# drift. NOTE: upstream renamed this crate `agent-governance` -> `agentmesh`;
+# the retired name is frozen at 3.2.2 (2026-04-22) and the live crate is
+# `agentmesh` (4.0.0). This pin therefore deliberately still points at the
+# retired 3.2.x line: migrating to `agentmesh` 4.x is a breaking API change
+# (serde_yaml -> agentmesh::policy_data) tracked by the `chore-agt-promotion`
+# gate, not a routine bump. Update with
 # `cargo update -p agent-governance --precise <ver>` and re-run
 # `cargo deny check` + `cargo audit`; see plans/agt-governance-epic.md
 # (chore-agt-promotion gate) before removing the pin.
 agent-governance = "=3.2.2"
-# Exact pin (same policy as agent-governance): rmcp 3.x is the official Rust
+# Exact pin (same policy as the AGT SDK pin): rmcp 3.x is the official Rust
 # MCP SDK and still evolving. Only guardian-proxy's optional `mcp-surface`
 # feature enables it. Update with `cargo update -p rmcp --precise <ver>` and
 # re-run `cargo deny check` + `cargo audit`; see plans/mcp-conformance-epic.md
