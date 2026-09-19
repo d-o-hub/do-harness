@@ -348,12 +348,12 @@ fn unsupported_shapes_are_refused_with_a_reason() {
 }
 
 #[test]
-fn files_outside_crates_and_under_the_ceiling_are_handled() {
+fn files_outside_the_scope_and_under_the_ceiling_are_handled() {
     let (root, _guard) = workspace();
     let outside = root.join("elsewhere.rs");
     std::fs::write(&outside, "fn a() {}\n").unwrap();
     let err = run(&root, &outside, true, None).unwrap_err().to_string();
-    assert!(err.contains("only operates on files under crates"), "{err}");
+    assert!(err.contains("only operates on Rust sources under"), "{err}");
 
     let small = write_source(&root, "small.rs", "fn a() {}\n");
     run(&root, &small, false, None).unwrap();
@@ -362,6 +362,32 @@ fn files_outside_crates_and_under_the_ceiling_are_handled() {
             .unwrap()
             .contains("fn a() {}")
     );
+}
+
+/// The `rust` pack scaffolds a single crate at `src/`, so `split` must accept
+/// those paths and not only this repository's `crates/` layout.
+#[test]
+fn src_layout_is_accepted() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path().to_path_buf();
+    std::fs::create_dir_all(root.join("src")).unwrap();
+    let mut source = String::from("//! main.\n\nfn anchor() {}\n\n#[cfg(test)]\nmod tests {\n");
+    for filler in 0..120 {
+        writeln!(
+            source,
+            "    #[test]\n    fn filler_{filler}() {{\n        assert!(true);\n    }}\n"
+        )
+        .unwrap();
+    }
+    source.push_str("}\n");
+    let path = root.join("src/main.rs");
+    std::fs::write(&path, &source).unwrap();
+
+    let lines: Vec<&str> = source.lines().collect();
+    let plan = build_plan(&root, &path, &lines, None).unwrap();
+    assert_eq!(plan.target_file, "src/main_tests.rs");
+    run(&root, &path, false, None).unwrap();
+    assert!(std::fs::read_to_string(&path).unwrap().lines().count() <= 500);
 }
 
 #[test]

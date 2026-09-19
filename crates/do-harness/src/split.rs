@@ -81,11 +81,14 @@ pub fn run(root: &Path, file: &Path, dry_run: bool, target: Option<&str>) -> Res
     } else {
         root.join(file)
     };
-    let crates = root.join("crates");
-    if !path.starts_with(&crates) {
+    if !loc::in_scope(root, &path) {
         bail!(
-            "split only operates on files under {}: {}",
-            loc::display_path(root, &crates),
+            "split only operates on Rust sources under {}: {}",
+            loc::SCOPE_DIRS
+                .iter()
+                .map(|dir| format!("{dir}/"))
+                .collect::<Vec<_>>()
+                .join(" or "),
             path.display()
         );
     }

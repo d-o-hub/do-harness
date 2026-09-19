@@ -6,10 +6,11 @@
 //! question "is this file about to become a problem, and where do I cut it?"
 //! is answerable without running the sensor or reading the file.
 //!
-//! Scope matches the sensor: every `.rs` file under `<root>/crates`, minus
-//! `target/`. The thresholds are duplicated from the script deliberately —
-//! [`MAX_LINES`] and [`WARN_THRESHOLD`] are the same numbers the shell sensor
-//! uses, and a change to one must be made in both.
+//! Scope matches the sensors: every `.rs` file under `<root>/crates` and
+//! `<root>/src`, minus `target/`, which together cover this workspace and the
+//! single-crate layout `init` scaffolds. The thresholds are duplicated from the
+//! script deliberately — [`MAX_LINES`] and [`WARN_THRESHOLD`] are the same
+//! numbers the shell sensor uses, and a change to one must be made in both.
 
 use std::path::{Path, PathBuf};
 
@@ -154,19 +155,47 @@ pub fn collect_rust_files(dir: &Path, out: &mut Vec<PathBuf>) {
     }
 }
 
-/// Measures every `.rs` file under `<root>/crates`, in path order.
+/// Directories the LOC invariant covers, relative to the workspace root.
+pub const SCOPE_DIRS: [&str; 2] = ["crates", "src"];
+
+/// True when `file` lies inside a directory [`scan`] measures.
+///
+/// Callers that mutate or index Rust sources use this so they accept exactly
+/// the files the sensors can fail on: the workspace layout (`crates/`) and the
+/// single-crate layout `init` scaffolds (`src/`).
+#[must_use]
+pub fn in_scope(root: &Path, file: &Path) -> bool {
+    SCOPE_DIRS
+        .iter()
+        .any(|dir| file.starts_with(root.join(dir)))
+}
+
+/// Measures every `.rs` file under `<root>/crates` and `<root>/src`.
+///
+/// The scope is the union of what the workspace sensor and the scaffolded
+/// sensor cover: this repository keeps all Rust under `crates/`, while the
+/// `rust` pack `init` scaffolds is a single crate rooted at `src/`. Scanning
+/// both keeps `loc` and whichever `check-loc.sh` is installed in agreement, so
+/// `loc` can never report a file safe that the sensor would fail.
 ///
 /// # Errors
 ///
-/// Returns an error when there is no `crates` directory or a file is
-/// unreadable.
+/// Returns an error when neither directory exists, or a file is unreadable.
 pub fn scan(root: &Path) -> Result<Vec<FileLocInfo>> {
-    let base = root.join("crates");
-    if !base.is_dir() {
-        bail!("no crates directory under {}", root.display());
-    }
     let mut files = Vec::new();
-    collect_rust_files(&base, &mut files);
+    for dir in SCOPE_DIRS {
+        let base = root.join(dir);
+        if base.is_dir() {
+            collect_rust_files(&base, &mut files);
+        }
+    }
+    if files.is_empty() {
+        bail!(
+            "no Rust sources under {}/crates or {}/src",
+            root.display(),
+            root.display()
+        );
+    }
     files.sort();
     files.iter().map(|file| measure(root, file)).collect()
 }
@@ -301,8 +330,11 @@ mod tests {
         assert_eq!(LocStatus::of(MAX_LINES + 1), LocStatus::Fail);
     }
 
+    /// `loc` must cover everything either shipped `check-loc.sh` scans, so a
+    /// scaffolded single-crate repo (`src/`) and this workspace (`crates/`) are
+    /// both reported, with `target/` and non-Rust files excluded.
     #[test]
-    fn scan_covers_crates_only_and_skips_target() {
+    fn scan_covers_crates_and_src_but_skips_target() {
         let dir = tempfile::tempdir().unwrap();
         let root = dir.path();
         std::fs::create_dir_all(root.join("crates/app/src")).unwrap();
@@ -315,7 +347,28 @@ mod tests {
 
         let infos = scan(root).unwrap();
         let paths: Vec<&str> = infos.iter().map(|info| info.path.as_str()).collect();
-        assert_eq!(paths, vec!["crates/app/src/lib.rs"]);
+        assert_eq!(paths, vec!["crates/app/src/lib.rs", "src/outside.rs"]);
+    }
+
+    /// A scaffolded single-crate repo has no `crates/` at all: `loc` must still
+    /// measure it rather than failing.
+    #[test]
+    fn scan_works_without_a_crates_directory() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        std::fs::create_dir_all(root.join("src")).unwrap();
+        std::fs::write(root.join("src/main.rs"), "fn main() {}\n").unwrap();
+
+        let infos = scan(root).unwrap();
+        assert_eq!(infos.len(), 1);
+        assert_eq!(infos[0].path, "src/main.rs");
+    }
+
+    #[test]
+    fn scan_fails_when_no_rust_sources_exist() {
+        let dir = tempfile::tempdir().unwrap();
+        let err = scan(dir.path()).unwrap_err().to_string();
+        assert!(err.contains("no Rust sources"), "{err}");
     }
 
     #[test]
