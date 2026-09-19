@@ -289,6 +289,76 @@ fn large_corpus_output_is_stable() {
 }
 
 #[test]
+fn fixture_generator_refuses_destructive_targets() {
+    // The generator `rm -rf`s its target, so a regressed guard would delete
+    // whatever it was pointed at. Run it inside a throwaway fake repository so
+    // the assertion can be made without risking the real checkout: the copied
+    // script derives its root from its own location, so it believes the fake
+    // tree is the repository.
+    let sandbox = tempfile::tempdir().unwrap();
+    let fake_root = sandbox.path().join("repo");
+    std::fs::create_dir_all(fake_root.join("scripts")).unwrap();
+    let source_corpus = fake_root.join("tests/fixtures/pr-routing");
+    std::fs::create_dir_all(&source_corpus).unwrap();
+    std::fs::write(source_corpus.join("manifest.json"), b"{\"cases\":[]}").unwrap();
+    std::fs::write(source_corpus.join("fake-router.sh"), b"#!/bin/sh\n").unwrap();
+    let sentinel = fake_root.join("SENTINEL");
+    std::fs::write(&sentinel, b"must survive").unwrap();
+
+    let generator = fake_root.join("scripts/generate-large-fixtures.sh");
+    std::fs::copy(
+        repo_root().join("scripts/generate-large-fixtures.sh"),
+        &generator,
+    )
+    .unwrap();
+
+    let run = |target: &str| {
+        let output = Command::new("/bin/bash")
+            .arg(&generator)
+            .arg(target)
+            .output()
+            .expect("spawn generator");
+        (
+            output.status.code(),
+            String::from_utf8_lossy(&output.stderr).into_owned(),
+        )
+    };
+
+    // Every spelling that names the repository root, the source corpus, or an
+    // ancestor must be refused. The trailing-slash forms are the ones a shell's
+    // tab completion produces, and are what a purely textual guard misses.
+    let fake = fake_root.to_string_lossy().into_owned();
+    for target in [
+        "/".to_owned(),
+        "///".to_owned(),
+        fake.clone(),
+        format!("{fake}/"),
+        format!("{fake}/scripts/.."),
+        source_corpus.to_string_lossy().into_owned(),
+        format!("{}/", source_corpus.to_string_lossy()),
+    ] {
+        let (code, stderr) = run(&target);
+        assert_eq!(
+            code,
+            Some(2),
+            "target {target} must be refused, not deleted:\n{stderr}"
+        );
+        assert!(
+            stderr.contains("refusing to write to"),
+            "target {target} must be refused by the guard:\n{stderr}"
+        );
+        assert!(sentinel.exists(), "target {target} deleted the repository");
+    }
+
+    // A legitimate target must still work, so the guard is not simply refusing
+    // everything.
+    let good = fake_root.join("tests/fixtures/pr-routing-large");
+    let (code, stderr) = run(&good.to_string_lossy());
+    assert_eq!(code, Some(0), "a legitimate target must succeed:\n{stderr}");
+    assert!(good.join("manifest.json").exists());
+}
+
+#[test]
 fn benchmark_rejects_an_unusable_fixture_directory() {
     let temp = tempfile::tempdir().unwrap();
     let mut cmd = Command::new("/bin/bash");
