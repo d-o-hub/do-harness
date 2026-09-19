@@ -1,0 +1,8 @@
+{
+ "crate": {
+  "name": "agentmesh",
+  "max_stable_version": "9.0.0",
+  "newest_version": "9.0.0",
+  "description": "Rust SDK for the Agent Governance Toolkit (policy, trust, audit, identity)"
+ }
+}

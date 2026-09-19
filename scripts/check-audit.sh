@@ -39,7 +39,10 @@ fi
 # Scope justification: rand 0.8.5 is pulled ONLY by the optional, pre-GA
 # agent-governance dep (verified via Cargo.lock reverse-deps), never by
 # first-party code. Machine-readable decision: plans/invariants.json
-# (supply-chain, seeded to libSQL). Revisit when agent-governance revs past 3.2.2
+# (supply-chain, seeded to libSQL). NOTE: upstream renamed this crate to
+# `agentmesh`; this repo still pins the retired 3.2.x line deliberately (the
+# live 4.x line is a breaking API change, tracked by chore-agt-promotion).
+# Revisit when the SDK moves past 3.2.2
 # (`cargo update -p agent-governance --precise <ver>`) or at GA promotion
 # (plans/agt-governance-epic.md), when the pin — and this ignore — go away.
 # Advisory-DB pin decision: intentionally unpinned. RustSec advisories are the

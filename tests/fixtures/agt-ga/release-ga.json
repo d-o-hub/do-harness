@@ -1,0 +1,6 @@
+{
+ "tag_name": "v9.0.0",
+ "name": "Agent Governance Toolkit v9.0.0",
+ "prerelease": false,
+ "body": "This release declares the Rust SDK generally available."
+}
