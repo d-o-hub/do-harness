@@ -14,17 +14,53 @@
 # Usage: generate-large-fixtures.sh [OUTPUT_DIR]
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 OUTPUT="${1:-$ROOT/tests/fixtures/pr-routing-large}"
 SOURCE_CORPUS="$ROOT/tests/fixtures/pr-routing"
 
+# Resolves a path to an absolute physical path without requiring it to exist
+# yet, and drops any trailing slash. Textual comparison alone is not enough:
+# `tests/fixtures/../fixtures` and a tab-completed `tests/fixtures/` both name
+# the same directory as the plain spelling.
+normalize() {  # <path>
+  local p="$1" tail="" base resolved
+  while [[ ! -e "$p" ]]; do
+    tail="/$(basename "$p")$tail"
+    p="$(dirname "$p")"
+    [[ "$p" == "/" || "$p" == "." ]] && break
+  done
+  base="$(cd "$p" 2>/dev/null && pwd -P)" || base="$p"
+  # Never let the strip turn the filesystem root into an empty string: an empty
+  # OUTPUT would defeat the root guard below.
+  if [[ "$base" == "/" ]]; then
+    resolved="/"
+  else
+    resolved="${base%/}$tail"
+    resolved="${resolved%/}"
+  fi
+  printf '%s' "$resolved"
+}
+
+OUTPUT="$(normalize "$OUTPUT")"
+SOURCE_CORPUS="$(normalize "$SOURCE_CORPUS")"
+
 # The script deletes OUTPUT before regenerating, so a typo must never point it
-# at the working tree or at the corpus it reads.
-case "$OUTPUT" in
-  ""|"/"|"$ROOT"|"$SOURCE_CORPUS")
-    printf 'generate-large-fixtures: refusing to write to %s\n' "$OUTPUT" >&2
-    exit 2
-    ;;
+# at the working tree or at the corpus it reads. An ancestor-or-self of either
+# would take the repository (or the source corpus) down with the target.
+refuse() {  # <reason>
+  printf 'generate-large-fixtures: refusing to write to %s (%s)\n' "$OUTPUT" "$1" >&2
+  exit 2
+}
+
+if [[ -z "$OUTPUT" || "$OUTPUT" == "/" ]]; then
+  refuse "filesystem root"
+fi
+case "$ROOT/" in
+  "$OUTPUT"/*) refuse "it contains the repository root" ;;
+  *) ;;
+esac
+case "$SOURCE_CORPUS/" in
+  "$OUTPUT"/*) refuse "it contains the source corpus" ;;
   *) ;;
 esac
 
