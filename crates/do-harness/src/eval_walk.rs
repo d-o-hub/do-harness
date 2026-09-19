@@ -16,6 +16,23 @@ use std::process::{Command, Output};
 /// Maximum characters of a failed walkthrough's stderr kept as evidence.
 const STDERR_TAIL_CHARS: usize = 500;
 
+/// Retries for a transient `ETXTBSY` launch failure (see [`spawn_walkthrough`]).
+/// Combined with the backoff this bounds the retry budget at ~200ms, which is
+/// far longer than the race and short enough not to stall a real failure for an
+/// appreciable time.
+const EXEC_BUSY_RETRIES: u32 = 20;
+
+/// Backoff between `ETXTBSY` retries; the race clears in microseconds, so this
+/// only needs to yield the CPU to the writer that holds the script open.
+const EXEC_BUSY_BACKOFF_MILLIS: u64 = 10;
+
+/// How long the regression test holds the script open for writing. It must
+/// comfortably outlast the first exec attempt (microseconds, but scheduler-
+/// delayed under load) so the pre-fix control detects the race, and stay well
+/// inside the retry budget above so the post-fix run cannot time out.
+#[cfg(all(test, unix))]
+const EXEC_BUSY_HOLD_MILLIS: u64 = 50;
+
 /// Outcome of running a skill's walkthrough, or of deciding not to.
 #[derive(Debug, Clone)]
 pub struct WalkRun {
@@ -97,12 +114,21 @@ pub fn run_walkthrough(skill_dir: &Path, root: &Path) -> WalkRun {
 /// to an explicit `bash` invocation only when a lost exec bit denies direct
 /// execution.
 fn spawn_walkthrough(script: &Path, root: &Path, bin: &Path) -> std::io::Result<Output> {
-    let attempt = Command::new(script)
-        .current_dir(root)
-        .env("DO_HARNESS_ROOT", root)
-        .env("DO_HARNESS_BIN", bin)
-        .env("PYTHONUNBUFFERED", "1")
-        .output();
+    let mut attempt = run_script(script, root, bin);
+    // `ETXTBSY` ("Text file busy") is a fork/exec race, not a property of the
+    // script: a forked child holds every write-descriptor it inherited until its
+    // own execve completes, and a `posix_spawn` in this process shares that fd
+    // table, so an exec of a just-written script can fail while an unrelated
+    // thread is mid-write or mid-spawn. The window is transient, so retry a few
+    // times before treating it as a real launch failure — a git hook runner
+    // concurrently writing its own script is enough to trigger it.
+    for _ in 0..EXEC_BUSY_RETRIES {
+        if !matches!(&attempt, Err(err) if is_executable_busy(err)) {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(EXEC_BUSY_BACKOFF_MILLIS));
+        attempt = run_script(script, root, bin);
+    }
     match attempt {
         Ok(output) => Ok(output),
         Err(err) if crate::shell::needs_bash_fallback(&err) => crate::shell::bash()
@@ -114,6 +140,24 @@ fn spawn_walkthrough(script: &Path, root: &Path, bin: &Path) -> std::io::Result<
             .output(),
         Err(err) => Err(err),
     }
+}
+
+/// One direct-exec attempt of the walkthrough script.
+fn run_script(script: &Path, root: &Path, bin: &Path) -> std::io::Result<Output> {
+    Command::new(script)
+        .current_dir(root)
+        .env("DO_HARNESS_ROOT", root)
+        .env("DO_HARNESS_BIN", bin)
+        .env("PYTHONUNBUFFERED", "1")
+        .output()
+}
+
+/// Whether the error is the transient `ETXTBSY` fork/exec race.
+///
+/// Linux reports `ETXTBSY` (26) for a script that is momentarily open for
+/// writing elsewhere; Rust surfaces it as [`std::io::ErrorKind::ExecutableFileBusy`].
+fn is_executable_busy(err: &std::io::Error) -> bool {
+    err.kind() == std::io::ErrorKind::ExecutableFileBusy
 }
 
 /// Bounds failed-run stderr to its last [`STDERR_TAIL_CHARS`] characters so
@@ -251,6 +295,88 @@ mod tests {
         // `.output()` the child's stdout/stderr are captured via pipes and
         // dropped, never inherited by (or leaked to) the parent's terminal.
         assert!(run.success);
+    }
+
+    /// A script that is momentarily open for writing elsewhere fails the direct
+    /// exec with `ETXTBSY`; the launcher must retry rather than report a launch
+    /// failure, because the condition is a fork/exec race that clears in
+    /// microseconds and not a property of the script.
+    ///
+    /// Reproduces the race deterministically by holding a write handle open
+    /// across the first exec: on unix an open write-descriptor on the file makes
+    /// `execve` return `ETXTBSY`. The hold is short because detection only needs
+    /// the descriptor open across the *first* attempt (microseconds later),
+    /// while the retry budget below gives the releasing thread a wide margin so
+    /// the test cannot flake under load.
+    #[cfg(unix)]
+    #[test]
+    fn exec_busy_is_retried_instead_of_failing_the_walkthrough() {
+        use std::io::Write;
+
+        let dir = tempfile::tempdir().unwrap();
+        let evals = dir.path().join("evals");
+        fs::create_dir_all(&evals).unwrap();
+        let script = evals.join("walkthrough.sh");
+        fs::write(&script, "#!/bin/sh\necho ok\n").unwrap();
+        {
+            use std::os::unix::fs::PermissionsExt;
+            fs::set_permissions(&script, fs::Permissions::from_mode(0o755)).unwrap();
+        }
+
+        let mut holder = fs::OpenOptions::new().write(true).open(&script).unwrap();
+        let release = std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_millis(EXEC_BUSY_HOLD_MILLIS));
+            let _ = holder.write_all(b"");
+            drop(holder);
+        });
+
+        let run = run_walkthrough(dir.path(), dir.path());
+        release.join().unwrap();
+
+        assert!(run.present);
+        assert!(
+            run.success,
+            "a transient ETXTBSY must be retried, not reported as a launch failure: {:?}",
+            run.detail
+        );
+    }
+
+    /// `ETXTBSY` is the unix spelling of the race; this is the mapping the
+    /// launcher's predicate relies on, and it is asserted here rather than in
+    /// the portable predicate test because raw error 26 is a *different* code
+    /// on Windows.
+    #[cfg(unix)]
+    #[test]
+    fn unix_text_file_busy_maps_to_executable_file_busy() {
+        /// `ETXTBSY` on Linux/macOS (`asm-generic/errno.h`: ETXTBSY = 26).
+        const UNPG_ETXTBSY: i32 = 26;
+        assert!(is_executable_busy(&std::io::Error::from_raw_os_error(
+            UNPG_ETXTBSY
+        )));
+    }
+
+    /// The retry predicate must not swallow unrelated launch errors: only the
+    /// transient busy condition is retried. Built from `ErrorKind` directly so
+    /// the assertion holds on every platform, including Windows where a raw
+    /// error code of 26 means something else entirely.
+    #[test]
+    fn only_executable_file_busy_is_retried() {
+        assert!(is_executable_busy(&std::io::Error::new(
+            std::io::ErrorKind::ExecutableFileBusy,
+            "busy"
+        )));
+        assert!(!is_executable_busy(&std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "missing"
+        )));
+        assert!(!is_executable_busy(&std::io::Error::new(
+            std::io::ErrorKind::PermissionDenied,
+            "denied"
+        )));
+        assert!(!is_executable_busy(&std::io::Error::new(
+            std::io::ErrorKind::Interrupted,
+            "interrupted"
+        )));
     }
 
     #[test]
