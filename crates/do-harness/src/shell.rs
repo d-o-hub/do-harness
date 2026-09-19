@@ -197,11 +197,124 @@ pub fn needs_bash_fallback(err: &std::io::Error) -> bool {
     }
 }
 
+/// Retries for a transient `ETXTBSY` exec failure (see [`retry_executable_busy`]).
+const EXEC_BUSY_RETRIES: u32 = 20;
+
+/// Backoff between `ETXTBSY` retries; the race clears in microseconds, so this
+/// only needs to yield the CPU to the writer holding the script open. The
+/// combined budget is ~200ms, far longer than the race and short enough not to
+/// stall a genuine failure appreciably.
+const EXEC_BUSY_BACKOFF_MILLIS: u64 = 10;
+
+/// Whether the error is the transient `ETXTBSY` fork/exec race.
+///
+/// Executing a script that is momentarily open for writing elsewhere fails with
+/// `ETXTBSY`; Rust surfaces that as [`std::io::ErrorKind::ExecutableFileBusy`].
+/// It is a race, not a property of the target: a forked child holds every
+/// write-descriptor it inherited until its own `execve` completes, so an exec
+/// of a just-written script can fail while an unrelated thread is mid-write or
+/// mid-spawn.
+#[must_use]
+pub fn is_executable_busy(err: &std::io::Error) -> bool {
+    err.kind() == std::io::ErrorKind::ExecutableFileBusy
+}
+
+/// Runs `attempt`, retrying while it fails with the transient busy condition.
+///
+/// Every exec of a script this process just wrote needs this: `fs::write`
+/// followed immediately by an exec races any other thread that forks in
+/// between. Without the retry the failure surfaces as a spurious launch error
+/// (or, worse, as a silent fallback to a degraded code path).
+pub fn retry_executable_busy<T>(
+    mut attempt: impl FnMut() -> std::io::Result<T>,
+) -> std::io::Result<T> {
+    let mut result = attempt();
+    for _ in 0..EXEC_BUSY_RETRIES {
+        if !matches!(&result, Err(err) if is_executable_busy(err)) {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(EXEC_BUSY_BACKOFF_MILLIS));
+        result = attempt();
+    }
+    result
+}
+
 #[cfg(test)]
 mod tests {
     #![allow(clippy::unwrap_used, clippy::expect_used)]
-
     use super::*;
+
+    /// The retry predicate must not swallow unrelated launch errors: only the
+    /// transient busy condition is retried. Built from `ErrorKind` directly so
+    /// the assertion holds on every platform, including Windows where a raw
+    /// error code of 26 means something else entirely.
+    #[test]
+    fn only_executable_file_busy_is_retried() {
+        assert!(is_executable_busy(&std::io::Error::new(
+            std::io::ErrorKind::ExecutableFileBusy,
+            "busy"
+        )));
+        assert!(!is_executable_busy(&std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "missing"
+        )));
+        assert!(!is_executable_busy(&std::io::Error::new(
+            std::io::ErrorKind::PermissionDenied,
+            "denied"
+        )));
+        assert!(!is_executable_busy(&std::io::Error::new(
+            std::io::ErrorKind::Interrupted,
+            "interrupted"
+        )));
+    }
+
+    /// `ETXTBSY` is the unix spelling of the race; this is the mapping the
+    /// predicate relies on, asserted only on unix because raw error 26 is a
+    /// *different* code on Windows.
+    #[cfg(unix)]
+    #[test]
+    fn unix_text_file_busy_maps_to_executable_file_busy() {
+        /// `ETXTBSY` on Linux/macOS (`asm-generic/errno.h`: ETXTBSY = 26).
+        const TXTBSY: i32 = 26;
+        assert!(is_executable_busy(&std::io::Error::from_raw_os_error(
+            TXTBSY
+        )));
+    }
+
+    /// The retry runs the closure again only while it reports the transient
+    /// condition, and returns the first non-busy result unchanged.
+    #[test]
+    fn retry_repeats_only_while_busy_then_succeeds() {
+        let mut calls = 0;
+        let out = retry_executable_busy(|| {
+            calls += 1;
+            if calls < 3 {
+                Err(std::io::Error::new(
+                    std::io::ErrorKind::ExecutableFileBusy,
+                    "busy",
+                ))
+            } else {
+                Ok(calls)
+            }
+        })
+        .unwrap();
+        assert_eq!(out, 3);
+        assert_eq!(calls, 3);
+    }
+
+    /// A non-busy error is returned on the first attempt without retrying, so
+    /// a real failure is never delayed or masked.
+    #[test]
+    fn retry_does_not_repeat_a_permanent_error() {
+        let mut calls = 0;
+        let err = retry_executable_busy::<()>(|| {
+            calls += 1;
+            Err(std::io::Error::new(std::io::ErrorKind::NotFound, "missing"))
+        })
+        .unwrap_err();
+        assert_eq!(err.kind(), std::io::ErrorKind::NotFound);
+        assert_eq!(calls, 1);
+    }
 
     /// Every candidate is a `bash.exe` beneath a `Git` root, and the list is
     /// built from the documented Windows environment roots. The env vars do

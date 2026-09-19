@@ -227,13 +227,14 @@ pub fn select(
     });
     let input = payload.to_string();
 
-    let mut child = match Command::new(&bin)
-        .current_dir(root)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-    {
+    let mut child = match crate::shell::retry_executable_busy(|| {
+        Command::new(&bin)
+            .current_dir(root)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+    }) {
         Ok(child) => child,
         Err(err) => {
             warnings.push(format!("cannot spawn {SELECTOR_ENV}={bin}: {err}"));

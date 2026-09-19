@@ -135,6 +135,50 @@ fn selector_sees_only_metadata_and_can_reorder() {
     assert_eq!(reordered.len(), 2);
 }
 
+/// A selector script that is momentarily busy fails the spawn; the selector
+/// must retry rather than silently degrade to the deterministic fallback,
+/// because `ETXTBSY` is a fork/exec race and not a property of the script.
+///
+/// The sibling `eval_walk` bug had the same root cause: a `fs::write` followed
+/// immediately by an exec races any other thread that forks in between.
+#[cfg(unix)]
+#[test]
+fn selector_retries_a_busy_exec_instead_of_falling_back() {
+    use std::io::Write;
+
+    let temp = tempfile::tempdir().unwrap();
+    let root = temp.path();
+    let candidates = two_candidates(root);
+    let capture = root.join("captured.json");
+    let selector = write_selector(
+        root,
+        &format!(
+            "#!/bin/sh\ncat > {}\nprintf '{{\"schema_version\":1,\"selected\":[\"harness\"],\"confidence\":0.94}}'\n",
+            capture.display()
+        ),
+    );
+
+    // Hold the script open for writing across the spawn: on unix an open
+    // write-descriptor makes `execve` return ETXTBSY.
+    let mut holder = fs::OpenOptions::new().write(true).open(&selector).unwrap();
+    let release = std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(60));
+        let _ = holder.write_all(b"");
+        drop(holder);
+    });
+
+    let (selection, warnings) =
+        suggest::select(root, "sensors", &candidates, &config(Some(&selector), 10.0));
+    release.join().unwrap();
+
+    assert_eq!(
+        selection,
+        suggest::Selection::Selected(vec!["harness".to_owned()]),
+        "a transient busy exec must be retried, not degraded to the fallback: {warnings:?}"
+    );
+    assert!(warnings.is_empty(), "{warnings:?}");
+}
+
 #[test]
 fn reorder_keeps_unselected_candidates_in_deterministic_order() {
     let temp = tempfile::tempdir().unwrap();
