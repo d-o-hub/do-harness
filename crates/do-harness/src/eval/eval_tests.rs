@@ -334,4 +334,114 @@ async fn unknown_skill_filter_errors() {
     );
 }
 
+#[tokio::test(flavor = "current_thread")]
+async fn failing_assertion_detail_is_carried_per_case() {
+    let dir = fixture_root(
+        VALID_SKILL_MD,
+        Some(&single_case_json(&[
+            "exists:.",
+            "contains:.agents/skills/test-skill/SKILL.md|absent-needle",
+        ])),
+    );
+    let skill_dir = dir.path().join(".agents/skills/test-skill");
+    let evals = grading::load_evals(&skill_dir).await.unwrap().unwrap();
+    let walk = crate::eval_walk::WalkRun::absent();
+    let outcome = grading::grade_skill(&evals, dir.path(), &walk)
+        .await
+        .unwrap();
+
+    assert_eq!(outcome.cases.len(), 1);
+    let case = &outcome.cases[0];
+    assert_eq!(case.id, 1);
+    assert_eq!(case.graded, 2);
+    assert_eq!(case.passed, 1);
+    let failed: Vec<_> = case.assertions.iter().filter(|a| !a.passed).collect();
+    assert_eq!(failed.len(), 1);
+    assert!(
+        failed[0].spec.contains("absent-needle"),
+        "{}",
+        failed[0].spec
+    );
+    assert!(
+        failed[0].reason.contains("absent-needle"),
+        "{}",
+        failed[0].reason
+    );
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn json_report_includes_case_and_assertion_detail() {
+    let dir = fixture_root(
+        VALID_SKILL_MD,
+        Some(&single_case_json(&[
+            "exists:.",
+            "contains:.agents/skills/test-skill/SKILL.md|absent-needle",
+        ])),
+    );
+    let skill_dir = dir.path().join(".agents/skills/test-skill");
+    let evals = grading::load_evals(&skill_dir).await.unwrap().unwrap();
+    let walk = crate::eval_walk::WalkRun::absent();
+    let outcome = grading::grade_skill(&evals, dir.path(), &walk)
+        .await
+        .unwrap();
+    let report = grading::report_from_outcome("test-skill", "ok", outcome, 1, Vec::new());
+    let json = orchestrator::report_json(
+        "test-skill",
+        &report,
+        do_harness_types::EvalMode::Deterministic,
+    );
+
+    assert_eq!(json["cases"][0]["id"], 1);
+    assert_eq!(json["cases"][0]["kind"], "explicit");
+    assert_eq!(json["cases"][0]["dim"], "effectiveness");
+    assert_eq!(json["cases"][0]["graded"], 2);
+    assert_eq!(json["cases"][0]["passed"], 1);
+    assert_eq!(json["cases"][0]["assertions"][1]["passed"], false);
+    let reason = json["cases"][0]["assertions"][1]["reason"]
+        .as_str()
+        .unwrap();
+    assert!(reason.contains("absent-needle"), "{reason}");
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn unknown_fixture_field_reports_upgrade_hint() {
+    let json = r#"{
+      "skill_name": "test-skill",
+      "evals": [
+        {
+          "id": 1,
+          "prompt": "prompt one",
+          "expected_output": "out one",
+          "files": [],
+          "assertions": ["exists:."],
+          "future_field": true
+        }
+      ]
+    }"#;
+    let dir = fixture_root(VALID_SKILL_MD, Some(json));
+    let skill_dir = dir.path().join(".agents/skills/test-skill");
+    let gate = dir
+        .path()
+        .join(".agents/skills/skill-creator/scripts/quick_validate.py");
+    match grading::gate_and_parse(&skill_dir, "test-skill", &gate)
+        .await
+        .unwrap()
+    {
+        grading::GateOutcome::InvalidEvals(report) => {
+            assert!(report.line.contains("unknown field"), "{}", report.line);
+            assert!(
+                report.line.contains("upgrade and re-run"),
+                "{}",
+                report.line
+            );
+            assert!(
+                report.line.contains(env!("CARGO_PKG_VERSION")),
+                "{}",
+                report.line
+            );
+        }
+        _ => panic!("expected InvalidEvals for an unknown fixture field"),
+    }
+}
+
 mod lift;

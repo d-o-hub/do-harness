@@ -22,7 +22,7 @@ use super::gate::{GateVerdict, run_structure_gate};
 
 mod grade_outcome;
 
-pub(super) use grade_outcome::{GradeOutcome, grade_skill, single_case};
+pub(super) use grade_outcome::{CaseOutcome, GradeOutcome, grade_skill, single_case};
 
 #[derive(Debug, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -35,7 +35,6 @@ pub(super) struct SkillEvals {
 #[derive(Debug, Clone, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct EvalCase {
-    #[allow(dead_code)]
     pub(super) id: i64,
     pub(super) prompt: String,
     pub(super) expected_output: String,
@@ -74,6 +73,8 @@ pub(super) struct SkillReport {
     pub(super) without_passed: u32,
     /// Per-dimension tallies with without-run passes merged in.
     pub(super) dims: Vec<DimReport>,
+    /// Per-case detail backing the failure lines and the JSON `cases` array.
+    pub(super) cases: Vec<CaseOutcome>,
     /// Words in the installed `SKILL.md` plus `references/`.
     pub(super) skill_words: i64,
     /// Executor wall time in seconds (walkthrough or agent runs).
@@ -151,9 +152,28 @@ pub(super) async fn gate_and_parse(
         Ok(evals) => Ok(GateOutcome::Ready { structure, evals }),
         Err(err) => {
             let mut report = empty_report();
-            report.line = format!("{name}: structure={structure} evals-invalid: {err}");
+            report.line = format!(
+                "{name}: structure={structure} evals-invalid: {}",
+                fixture_parse_error(&err)
+            );
             Ok(GateOutcome::InvalidEvals(report))
         }
+    }
+}
+
+/// Renders a fixture parse error, appending an upgrade hint for unknown
+/// fields: a field this build does not know usually means the fixture targets
+/// a newer release, not that the fixture is malformed.
+fn fixture_parse_error(err: &serde_json::Error) -> String {
+    let message = err.to_string();
+    if message.contains("unknown field") {
+        format!(
+            "{message} hint: this field may require a newer do-harness than this build \
+             ({}); upgrade and re-run",
+            crate::version::version_str()
+        )
+    } else {
+        message
     }
 }
 
@@ -189,6 +209,7 @@ fn empty_report() -> SkillReport {
         without_graded: 0,
         without_passed: 0,
         dims: Vec::new(),
+        cases: Vec::new(),
         skill_words: 0,
         walk_secs: 0.0,
         fixture_warnings: Vec::new(),
@@ -288,6 +309,7 @@ pub(super) fn report_from_outcome(
                 without_passed: None,
             })
             .collect(),
+        cases: outcome.cases,
         skill_words: words,
         walk_secs: outcome.walk_secs,
         fixture_warnings,

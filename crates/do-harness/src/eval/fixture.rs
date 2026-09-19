@@ -17,7 +17,7 @@ use super::grading::SkillEvals;
 /// wrong action. The last one is where unsolved, non-green lessons live: a
 /// gotchas case is provable even though no positive fix ever passed, because
 /// its assertions are negative (`absent:` / `not-contains:`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "lowercase")]
 pub(super) enum EvalKind {
     /// Direct request naming the skill or its task.
@@ -31,6 +31,20 @@ pub(super) enum EvalKind {
     Negative,
     /// Known trap: the run must observably avoid a recorded wrong action.
     Gotchas,
+}
+
+impl EvalKind {
+    /// Lowercase wire name shared by fixtures, reports, and JSON output.
+    #[must_use]
+    pub(super) const fn as_str(self) -> &'static str {
+        match self {
+            Self::Explicit => "explicit",
+            Self::Implicit => "implicit",
+            Self::Contextual => "contextual",
+            Self::Negative => "negative",
+            Self::Gotchas => "gotchas",
+        }
+    }
 }
 
 /// Dataset-quality findings for a parsed fixture.

@@ -232,6 +232,11 @@ Skill structure validation and evaluation benchmark runner.
 - `--dry-run`: Perform dry-run evaluation without updating state.
 - `--format <Format>`: Output format (`text` or `json`).
 
+Failing runs print one `CASE-FAIL:` line per failing assertion in text mode
+(case id, kind, dimension, assertion spec, and the grader reason); `--format
+json` carries the same detail per skill under `cases[].assertions[]`, so a
+sub-1.00 pass rate is diagnosable without re-grading by hand.
+
 **Sandbox boundary:** walkthroughs, agent commands, and graded assertions
 execute in a `tempfile` filesystem sandbox only. There is no seccomp/netns/
 gVisor isolation; children run with the caller's privileges. Treat skill

@@ -237,6 +237,7 @@ pub async fn run_eval(root: &Path, opts: EvalOpts<'_>) -> Result<()> {
             reports_json.push(report_json(&name, &report, mode));
         } else {
             println!("{}", report.line);
+            print_case_failures(&name, &report);
         }
 
         if !report.fixture_warnings.is_empty() {
@@ -338,6 +339,26 @@ pub async fn run_eval(root: &Path, opts: EvalOpts<'_>) -> Result<()> {
     }
 }
 
+/// Prints one line per failing assertion in text mode, so a sub-1.00 skill is
+/// diagnosable without re-grading by hand; `--format json` carries the same
+/// detail under `cases`.
+fn print_case_failures(name: &str, report: &super::grading::SkillReport) {
+    for case in &report.cases {
+        for assertion in &case.assertions {
+            if !assertion.passed {
+                println!(
+                    "{name}: CASE-FAIL: case {} ({}, {}): {} -> {}",
+                    case.id,
+                    case.kind.as_str(),
+                    case.dim.as_str(),
+                    assertion.spec,
+                    assertion.reason
+                );
+            }
+        }
+    }
+}
+
 /// Appends lift, cost proxies, and the eval mode to the human-readable
 /// report line once the baseline has been measured.
 fn finish_line(report: &mut super::grading::SkillReport, mode: EvalMode) {
@@ -365,7 +386,7 @@ fn finish_line(report: &mut super::grading::SkillReport, mode: EvalMode) {
 }
 
 /// Machine-readable eval report including mode, lift, dimensions, and cost.
-fn report_json(
+pub(super) fn report_json(
     name: &str,
     report: &super::grading::SkillReport,
     mode: EvalMode,
@@ -392,6 +413,7 @@ fn report_json(
             "passed": d.passed,
             "without_passed": d.without_passed,
         })).collect::<Vec<_>>(),
+        "cases": &report.cases,
     })
 }
 
