@@ -1,0 +1,59 @@
+{
+  "skill_name": "crates-io-name-check",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Check whether a candidate crate name 'do-harness-newcrate' is available on crates.io using exact curl commands.",
+      "expected_output": "The check uses curl against crates.io API with a custom User-Agent and Accept application/json header, interpreting 404 as available and 200 as taken.",
+      "files": [],
+      "dim": "correctness",
+      "kind": "explicit",
+      "assertions": [
+        "walk:",
+        "contains:.agents/skills/crates-io-name-check/SKILL.md|User-Agent",
+        "contains:.agents/skills/crates-io-name-check/SKILL.md|Accept: application/json",
+        "contains:.agents/skills/crates-io-name-check/SKILL.md|404",
+        "contains:.agents/skills/crates-io-name-check/SKILL.md|200",
+        "exists:name_check_output.txt"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "We are introducing a new publishable workspace crate. Describe the pre-publish name check workflow before tag release.",
+      "expected_output": "Run crates.io availability curl check and cargo search, paste terminal output into pre-publish/PR docs, and confirm 404 before first publish.",
+      "files": [],
+      "dim": "effectiveness",
+      "kind": "contextual",
+      "assertions": [
+        "contains:.agents/skills/crates-io-name-check/SKILL.md|cargo search",
+        "contains:.agents/skills/crates-io-name-check/SKILL.md|Check-then-Record Pre-Publish Workflow",
+        "contains:name_check_output.txt|status="
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "What standard Rust crate naming guidelines should be followed when choosing a new crate name?",
+      "expected_output": "Use kebab-case or snake_case, prefer workspace prefixing, avoid std/rust prefixes, and comply with crates.io squatting policies.",
+      "files": [],
+      "dim": "correctness",
+      "kind": "implicit",
+      "assertions": [
+        "contains:.agents/skills/crates-io-name-check/SKILL.md|kebab-case",
+        "contains:.agents/skills/crates-io-name-check/SKILL.md|workspace crate names",
+        "contains:.agents/skills/crates-io-name-check/SKILL.md|Squatting Policy"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "Summarize today's financial stock market activity. No crate naming or publishing task is involved.",
+      "expected_output": "Do not load the crates-io-name-check workflow for unrelated requests.",
+      "files": [],
+      "dim": "discoverability",
+      "kind": "negative",
+      "assertions": [
+        "contains:crates_io_negative.txt|out-of-scope",
+        "absent:crates_io_check_force.txt"
+      ]
+    }
+  ]
+}

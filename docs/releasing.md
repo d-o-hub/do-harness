@@ -105,6 +105,8 @@ present on crates.io is skipped, so a partially failed run can be re-run
 safely. Publish order is `do-harness-types` → `do-harness-db` → `do-harness`;
 each step retries while the registry index catches up.
 
+Before introducing or publishing a new publishable crate, run the pre-publish name check described in [.agents/skills/crates-io-name-check/SKILL.md](../.agents/skills/crates-io-name-check/SKILL.md). Paste the terminal output (`curl` API status and `cargo search` results) into the release PR or pre-publish record to confirm availability and naming appropriateness before the first publish.
+
 The CLI crate embeds repository files through symlinked assets
 (`crates/do-harness/assets/compliance.md` → `docs/compliance.md`,
 `crates/do-harness/assets/methods.json` → `plans/methods.json`). `cargo
