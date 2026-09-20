@@ -1,5 +1,7 @@
 //! Integration tests for the generic artifact-provenance sensor contract.
 
+#![allow(clippy::unwrap_used, clippy::expect_used)]
+
 use std::fs;
 use std::process::Command;
 use tempfile::tempdir;
@@ -25,15 +27,13 @@ fn test_artifact_provenance_pass() {
     }
 
     let config_path = root.join("do-harness.toml");
-    let config_content = format!(
-        r#"
+    let config_content = r#"
 language = "generic"
 
 [[sensors]]
 name = "artifact-provenance"
 argv = ["bash", "check-provenance.sh", "--artifact", "artifact.bin", "--mode", "digest-only"]
-"#
-    );
+"#;
     fs::write(&config_path, config_content).unwrap();
 
     let bin_path = env!("CARGO_BIN_EXE_do-harness");
@@ -83,15 +83,13 @@ fn test_artifact_provenance_fail_mismatched_digest() {
     }
 
     let config_path = root.join("do-harness.toml");
-    let config_content = format!(
-        r#"
+    let config_content = r#"
 language = "generic"
 
 [[sensors]]
 name = "artifact-provenance"
 argv = ["bash", "check-provenance.sh", "--artifact", "artifact.bin", "--digest", "0000000000000000000000000000000000000000000000000000000000000000"]
-"#
-    );
+"#;
     fs::write(&config_path, config_content).unwrap();
 
     let bin_path = env!("CARGO_BIN_EXE_do-harness");
@@ -116,10 +114,12 @@ argv = ["bash", "check-provenance.sh", "--artifact", "artifact.bin", "--digest",
     let coverage = &doc["coverage"]["artifact-provenance"];
     assert_eq!(coverage["artifact"], "artifact.bin");
     assert_eq!(coverage["status"], "fail");
-    assert!(coverage["reason"]
-        .as_str()
-        .unwrap()
-        .contains("digest mismatch"));
+    assert!(
+        coverage["reason"]
+            .as_str()
+            .unwrap()
+            .contains("digest mismatch")
+    );
 }
 
 #[test]
@@ -140,15 +140,13 @@ fn test_artifact_provenance_missing_artifact() {
     }
 
     let config_path = root.join("do-harness.toml");
-    let config_content = format!(
-        r#"
+    let config_content = r#"
 language = "generic"
 
 [[sensors]]
 name = "artifact-provenance"
 argv = ["bash", "check-provenance.sh", "--artifact", "missing.bin"]
-"#
-    );
+"#;
     fs::write(&config_path, config_content).unwrap();
 
     let bin_path = env!("CARGO_BIN_EXE_do-harness");
@@ -173,10 +171,12 @@ argv = ["bash", "check-provenance.sh", "--artifact", "missing.bin"]
     let coverage = &doc["coverage"]["artifact-provenance"];
     assert_eq!(coverage["artifact"], "missing.bin");
     assert_eq!(coverage["status"], "fail");
-    assert!(coverage["reason"]
-        .as_str()
-        .unwrap()
-        .contains("artifact file not found"));
+    assert!(
+        coverage["reason"]
+            .as_str()
+            .unwrap()
+            .contains("artifact file not found")
+    );
 }
 
 #[test]
@@ -185,15 +185,13 @@ fn test_artifact_provenance_malformed_evidence() {
     let root = dir.path();
 
     let config_path = root.join("do-harness.toml");
-    let config_content = format!(
-        r#"
+    let config_content = r#"
 language = "generic"
 
 [[sensors]]
 name = "artifact-provenance"
-argv = ["sh", "-c", "echo 'COVERAGE: {{not_valid_json}}'; exit 1"]
-"#
-    );
+argv = ["sh", "-c", "echo 'COVERAGE: {not_valid_json}'; exit 1"]
+"#;
     fs::write(&config_path, config_content).unwrap();
 
     let bin_path = env!("CARGO_BIN_EXE_do-harness");
