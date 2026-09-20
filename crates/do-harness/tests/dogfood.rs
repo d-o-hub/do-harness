@@ -110,7 +110,15 @@ fn rust_init_then_full_verify_is_green() {
         !sensors.is_empty(),
         "sensors must actually run; a green report with no sensors is vacuous"
     );
-    for want in ["fmt", "check", "clippy", "test", "loc", "commitlint"] {
+    for want in [
+        "fmt",
+        "check",
+        "clippy",
+        "test",
+        "doctest",
+        "loc",
+        "commitlint",
+    ] {
         assert!(
             sensors.contains(&want),
             "missing sensor {want} in {sensors:?}"
@@ -128,6 +136,72 @@ fn rust_init_then_full_verify_is_green() {
             "sensor {want} exit code"
         );
     }
+}
+
+#[test]
+fn rust_doctest_only_failure_is_caught_by_verification_set() {
+    let dir = tempfile::tempdir().unwrap();
+    let (ok, out) = run(harness(dir.path()).arg("init"));
+    assert!(ok, "init failed:\n{out}");
+
+    // Add a broken doctest in src/lib.rs while regular unit tests pass.
+    let broken_lib = r"
+/// A function with a broken doctest.
+/// ```
+/// assert_eq!(1, 2);
+/// ```
+pub fn broken() {}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn unit_test_passes() {
+        assert_eq!(1 + 1, 2);
+    }
+}
+";
+    std::fs::write(dir.path().join("src/lib.rs"), broken_lib).unwrap();
+
+    let (ok, stdout) = run(harness(dir.path())
+        .arg("verify")
+        .arg("--set")
+        .arg("verification")
+        .arg("--format")
+        .arg("json"));
+    assert!(!ok, "verify --set verification must fail on broken doctest");
+
+    let report: Value = serde_json::from_str(&stdout).expect("valid json report");
+    assert_eq!(report["ok"], serde_json::json!(false));
+
+    let failed = report["failed"].as_array().expect("failed array");
+    assert!(
+        failed.iter().any(|name| name == "doctest"),
+        "doctest sensor must be in failed array: {failed:?}"
+    );
+
+    let nextest_test = report["sensors"]
+        .as_array()
+        .expect("sensors")
+        .iter()
+        .find(|s| s["name"] == "test")
+        .expect("test sensor entry");
+    assert_eq!(
+        nextest_test["ok"],
+        serde_json::json!(true),
+        "nextest 'test' sensor should pass even when doctest fails"
+    );
+
+    let doctest = report["sensors"]
+        .as_array()
+        .expect("sensors")
+        .iter()
+        .find(|s| s["name"] == "doctest")
+        .expect("doctest sensor entry");
+    assert_eq!(
+        doctest["ok"],
+        serde_json::json!(false),
+        "doctest sensor must fail on broken /// example"
+    );
 }
 
 #[test]

@@ -183,6 +183,8 @@ fn rust_candidates() -> Vec<Candidate> {
     let cargo = probe("cargo", &["--version"]);
     let cargo_fmt = probe("cargo", &["fmt", "--version"]);
     let cargo_clippy = probe("cargo", &["clippy", "--version"]);
+    let cargo_nextest = probe("cargo", &["nextest", "--version"]);
+    let cargo_llvm_cov = probe("cargo", &["llvm-cov", "--version"]);
     let bash = probe("bash", &["--version"]);
     let cargo_deny = probe("cargo", &["deny", "--version"]);
     let cargo_audit = probe("cargo", &["audit", "--version"]);
@@ -191,7 +193,9 @@ fn rust_candidates() -> Vec<Candidate> {
         candidate("fmt", cargo_fmt, cargo_fmt, ""),
         candidate("check", cargo, cargo, ""),
         candidate("clippy", cargo_clippy, cargo_clippy, ""),
-        candidate("test", cargo, cargo, ""),
+        candidate("test", cargo_nextest, cargo_nextest, ""),
+        candidate("doctest", cargo, cargo, ""),
+        candidate("coverage", cargo_llvm_cov, cargo_llvm_cov, ""),
         candidate("loc", bash, bash, ""),
         candidate(
             "deps",

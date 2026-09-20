@@ -201,9 +201,9 @@ async fn missing_file_returns_rust_default() {
         vec!["fmt".to_owned(), "loc".to_owned()]
     );
     assert!(cfg.hooks.pre_push.is_empty());
-    assert_eq!(cfg.sensors.len(), 8);
-    assert_eq!(cfg.sensor_names().len(), 8);
-    assert_eq!(cfg.effective_sensors().len(), 8);
+    assert_eq!(cfg.sensors.len(), 10);
+    assert_eq!(cfg.sensor_names().len(), 10);
+    assert_eq!(cfg.effective_sensors().len(), 10);
 }
 
 /// An unknown language pack identifier is rejected at load time.
@@ -236,7 +236,7 @@ async fn rust_language_without_sensors_uses_builtin_pack() {
     let path = dir.path().join("do-harness.toml");
     std::fs::write(&path, "language = \"rust\"\n").expect("write config");
     let cfg = load(dir.path(), Some(&path)).await.expect("load config");
-    assert_eq!(cfg.effective_sensors().len(), 8);
+    assert_eq!(cfg.effective_sensors().len(), 10);
     assert!(cfg.sensor_names().contains(&"clippy".to_owned()));
 }
 
@@ -393,8 +393,8 @@ fn rust_default_ships_signal_sets() {
             "clippy".to_owned()
         ])
     );
-    assert_eq!(cfg.signal_sets.get("verification").unwrap().len(), 8);
-    assert_eq!(cfg.signal_sets.get("release").unwrap().len(), 8);
+    assert_eq!(cfg.signal_sets.get("verification").unwrap().len(), 9);
+    assert_eq!(cfg.signal_sets.get("release").unwrap().len(), 10);
     cfg.validate().expect("built-in default must validate");
 }
 
@@ -417,7 +417,7 @@ fn rust_pack_pins_all_targets_and_when_changed() {
             .any(|arg| arg == "--all-targets"),
         "clippy must analyze all targets"
     );
-    for name in ["fmt", "check", "clippy", "test"] {
+    for name in ["fmt", "check", "clippy", "test", "doctest", "coverage"] {
         assert!(
             !sensor(name).when_changed.is_empty(),
             "{name} must declare when-changed globs"
