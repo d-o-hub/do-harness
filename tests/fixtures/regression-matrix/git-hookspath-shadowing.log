@@ -1,0 +1,3 @@
+do-harness doctor checking repository configuration...
+warning: core.hooksPath is set to /dev/null
+Local git hooks in .git/hooks will not run!

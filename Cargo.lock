@@ -543,6 +543,7 @@ dependencies = [
  "do-harness-types",
  "globset",
  "hex",
+ "regex",
  "serde",
  "serde_json",
  "serde_yaml",

@@ -36,6 +36,7 @@ Two modes:
 | Event modeling | `.agents/skills/event-modeler` | Event-slice schemas |
 | Spike running | `.agents/skills/spike-runner` | De-risking spikes |
 | Distillation | `.agents/skills/skill-distiller` | Distillation loop |
+| Regression matrix | `plans/regression-matrix.json` | Known failure signatures & fix hints |
 
 ## Feedback Sensors
 
@@ -56,10 +57,11 @@ Two modes:
 When a computational sensor fires:
 1. Read the full error message — it includes a fix hint.
 2. Classify the error: fmt / check / lint / test / schema.
-3. Apply the minimal fix — do not refactor unrelated code.
-4. Re-run the specific sensor.
-5. Only proceed when the sensor is green.
-6. Write a metrics event to `.agents/events/YYYY/MM/DD/` if the fix was non-trivial.
+3. Check historical signatures: compare failure output against `plans/regression-matrix.json` to find known issue signatures and fix hints before attempting a broader fix. Sensor output suggests matching matrix entry IDs when known signatures fire.
+4. Apply the minimal fix — do not refactor unrelated code.
+5. Re-run the specific sensor.
+6. Only proceed when the sensor is green.
+7. Write a metrics event to `.agents/events/YYYY/MM/DD/` if the fix was non-trivial.
 
 ## Fail-Fast Policy
 
