@@ -142,7 +142,8 @@ do-harness verify
 ```
 
 See [docs/adoption.md](docs/adoption.md) for per-ecosystem quickstarts,
-air-gapped mirrors, and the agent evidence loop.
+air-gapped mirrors, and the agent evidence loop. See [docs/fast-builds.md](docs/fast-builds.md)
+for opt-in `sccache` + `mold` build performance notes and measurements.
 
 The green path is dogfooded, not assumed: `crates/do-harness/tests/dogfood.rs`
 runs the real binary on fresh temp workspaces and asserts the rust pack goes
