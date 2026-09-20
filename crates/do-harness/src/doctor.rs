@@ -276,8 +276,18 @@ mod tests {
         (temp, root)
     }
 
+    /// The repo-local release path the resolver expects on this platform
+    /// (Cargo appends `.exe` on Windows).
+    fn release_binary(root: &Path) -> PathBuf {
+        let mut bin_path = root.join("target/release/do-harness");
+        if cfg!(windows) {
+            bin_path.set_extension("exe");
+        }
+        bin_path
+    }
+
     fn stub_binary(root: &Path) {
-        let bin_path = root.join("target/release/do-harness");
+        let bin_path = release_binary(root);
         fs::create_dir_all(bin_path.parent().unwrap()).unwrap();
         fs::write(&bin_path, "stub").unwrap();
     }
@@ -292,7 +302,7 @@ mod tests {
             pre_commit_shadowed: false,
             pre_push_shadowed: false,
             commit_msg_shadowed: false,
-            binary: BinSource::Repo(root.join("target/release/do-harness")),
+            binary: BinSource::Repo(release_binary(root)),
             core_hooks_path: None,
             hooks_dir: root.join(".git/hooks"),
         }
