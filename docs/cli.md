@@ -118,6 +118,25 @@ overwrites them, but `status` treats them as legacy (missing), never as
 current evidence. Schema v3 artifacts parse into v4 with empty
 `artifacts`/`coverage` and stay current.
 
+#### Generic Artifact Provenance Sensor Contract (`artifact-provenance`)
+A generic, stack-neutral contract for verifying release-artifact provenance without hard-coding language toolchains into the harness.
+- **Sensor Name**: `artifact-provenance` (or any custom sensor name adhering to the contract).
+- **Required Inputs**:
+  - `ARTIFACT_PATHS`: Space- or comma-separated list/globs of target artifact file paths.
+  - `EXPECTED_DIGEST`: Optional expected hex SHA-256 digest of the artifact.
+  - `VERIFY_MODE`: Verification mode (e.g. `slsa`, `github-attestation`, `sbom`, `strict`, or `digest-only`).
+- **Required Evidence Output**:
+  Sensors implementing this contract output a `COVERAGE: <json>` line carrying structured JSON:
+  ```json
+  {
+    "artifact": "path/to/artifact",
+    "digest": "sha256_hex_digest",
+    "status": "pass",
+    "reason": null
+  }
+  ```
+  On verification failure, `status` is set to `"fail"` and `reason` details the cause (e.g. `"digest mismatch"`, `"missing artifact"`, or `"attestation invalid"`).
+
 ### `status`
 Reports verification evidence freshness for a signal set without executing
 any sensor: `green` (current passing evidence covers the set), `red`
