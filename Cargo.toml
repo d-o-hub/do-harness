@@ -72,6 +72,8 @@ unsafe_code = "forbid"
 missing_docs = "warn"
 
 [workspace.lints.clippy]
+# Note for contributors: when touching async code, follow workload-aware Tokio
+# performance guidance (template #336, .agents/skills/tokio-performance/SKILL.md).
 # Groups run at lower priority so the deny-level panicking lints below win.
 all = { level = "warn", priority = -1 }
 pedantic = { level = "warn", priority = -1 }
