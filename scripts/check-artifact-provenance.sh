@@ -119,7 +119,7 @@ done
 
 if [[ $FAILURES -gt 0 ]]; then
     # Sanitize JSON string quotes in FIRST_REASON
-    SAFE_REASON=$(echo "$FIRST_REASON" | sed 's/"/\\"/g')
+    SAFE_REASON="${FIRST_REASON//\"/\\\"}"
     echo "COVERAGE: {\"artifact\": \"$LAST_ART\", \"digest\": $LAST_DIGEST, \"status\": \"fail\", \"reason\": \"$SAFE_REASON\"}"
     echo "FINDINGS: $FAILURES"
     exit 1
