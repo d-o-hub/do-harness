@@ -42,8 +42,7 @@ fn test_regression_matrix_entries_and_fixtures() {
     let clean_path = fixtures_dir.join("clean.log");
     assert!(
         clean_path.exists(),
-        "clean.log fixture should exist at {:?}",
-        clean_path
+        "clean.log fixture should exist at {clean_path:?}"
     );
     let clean_text = fs::read_to_string(&clean_path).expect("failed to read clean.log");
 
@@ -54,26 +53,28 @@ fn test_regression_matrix_entries_and_fixtures() {
         assert!(!entry.fix_hint.is_empty(), "fix_hint should not be empty");
         assert!(!entry.sensor.is_empty(), "sensor should not be empty");
 
-        let re = Regex::new(&entry.signature)
-            .unwrap_or_else(|e| panic!("invalid regex signature '{}' for entry '{}': {}", entry.signature, entry.id, e));
+        let re = Regex::new(&entry.signature).unwrap_or_else(|e| {
+            panic!(
+                "invalid regex signature '{}' for entry '{}': {e}",
+                entry.signature, entry.id
+            )
+        });
 
         // Positive test: must match fixture
         let fixture_path = fixtures_dir.join(format!("{}.log", entry.id));
         assert!(
             fixture_path.exists(),
-            "positive fixture log {:?} should exist for entry '{}'",
-            fixture_path,
+            "positive fixture log {fixture_path:?} should exist for entry '{}'",
             entry.id
         );
         let fixture_text = fs::read_to_string(&fixture_path)
-            .unwrap_or_else(|e| panic!("failed to read fixture {:?}: {}", fixture_path, e));
+            .unwrap_or_else(|e| panic!("failed to read fixture {fixture_path:?}: {e}"));
 
         assert!(
             re.is_match(&fixture_text),
-            "entry '{}' signature '{}' should match its positive fixture {:?}",
+            "entry '{}' signature '{}' should match its positive fixture {fixture_path:?}",
             entry.id,
-            entry.signature,
-            fixture_path
+            entry.signature
         );
 
         // Negative test: must NOT match clean log
