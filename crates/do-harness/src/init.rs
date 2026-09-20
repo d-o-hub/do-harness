@@ -91,6 +91,8 @@ const CHECK_LOC: &str = include_str!("../templates/scripts/check-loc.sh");
 const CHECK_COMMITLINT: &str = include_str!("../templates/scripts/check-commitlint.sh");
 const CHECK_DEPS: &str = include_str!("../templates/scripts/check-deps.sh");
 const CHECK_AUDIT: &str = include_str!("../templates/scripts/check-audit.sh");
+const CHECK_COVERAGE: &str = include_str!("../templates/scripts/check-coverage.sh");
+const NEXTEST_CONFIG: &str = include_str!("../../../.config/nextest.toml");
 const CRATE_MANIFEST: &str = include_str!("../templates/crate/Cargo.toml.template");
 const CRATE_LIB: &str = include_str!("../templates/crate/src/lib.rs");
 
@@ -200,9 +202,14 @@ fn generate_rust_config(sensors: &[crate::config::SensorSpec]) -> Result<String>
         .filter(|name| names.contains(name))
         .map(ToString::to_string)
         .collect();
+    let verification = names
+        .iter()
+        .filter(|name| **name != "coverage")
+        .map(ToString::to_string)
+        .collect();
     let full = names.iter().map(ToString::to_string).collect::<Vec<_>>();
     signal_sets.insert("feedback".to_owned(), feedback);
-    signal_sets.insert("verification".to_owned(), full.clone());
+    signal_sets.insert("verification".to_owned(), verification);
     signal_sets.insert("release".to_owned(), full);
     let pre_commit = ["fmt", "loc"]
         .iter()
@@ -265,6 +272,7 @@ fn scaffold_scripts(root: &Path, opts: &InitOpts, report: &mut InitReport) -> Re
         ("scripts/check-commitlint.sh", CHECK_COMMITLINT),
         ("scripts/check-deps.sh", CHECK_DEPS),
         ("scripts/check-audit.sh", CHECK_AUDIT),
+        ("scripts/check-coverage.sh", CHECK_COVERAGE),
     ] {
         write_if_absent(root, relative, body, opts.force, report)?;
         crate::fs_perm::set_owner_exec(&root.join(relative))?;
@@ -415,6 +423,7 @@ fn scaffold_crate(root: &Path, report: &mut InitReport) -> Result<()> {
     }
     write_if_absent(root, "Cargo.toml", CRATE_MANIFEST, false, report)?;
     write_if_absent(root, "src/lib.rs", CRATE_LIB, false, report)?;
+    write_if_absent(root, ".config/nextest.toml", NEXTEST_CONFIG, false, report)?;
     Ok(())
 }
 
