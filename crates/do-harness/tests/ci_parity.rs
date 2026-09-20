@@ -76,3 +76,41 @@ fn deps_sensor_fails_closed_only_when_required() {
         "CI run must fail closed without cargo-deny/cargo tree"
     );
 }
+
+#[test]
+fn markdownlint_sensor_fails_closed_only_when_required() {
+    if !tool_hidden("markdownlint-cli2") || !tool_hidden("markdownlint") {
+        eprintln!("markdownlint tool visible under /usr/bin:/bin; skipping parity check");
+        return;
+    }
+    let local = run("check-markdownlint.sh", false);
+    assert!(
+        local.status.success(),
+        "local run must WARN-skip: {}",
+        String::from_utf8_lossy(&local.stderr)
+    );
+    let ci = run("check-markdownlint.sh", true);
+    assert!(
+        !ci.status.success(),
+        "CI run must fail closed without markdownlint"
+    );
+}
+
+#[test]
+fn yamllint_sensor_fails_closed_only_when_required() {
+    if !tool_hidden("yamllint") {
+        eprintln!("yamllint visible under /usr/bin:/bin; skipping parity check");
+        return;
+    }
+    let local = run("check-yamllint.sh", false);
+    assert!(
+        local.status.success(),
+        "local run must WARN-skip: {}",
+        String::from_utf8_lossy(&local.stderr)
+    );
+    let ci = run("check-yamllint.sh", true);
+    assert!(
+        !ci.status.success(),
+        "CI run must fail closed without yamllint"
+    );
+}
