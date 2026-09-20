@@ -1,0 +1,57 @@
+{
+  "skill_name": "tokio-performance",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "We have a small in-memory JSON parsing function (<20us) and a disk append function. Should we wrap both in spawn_blocking?",
+      "expected_output": "Workload-aware rule: keep short bounded CPU (<10-100us) on Tokio worker threads; reserve spawn_blocking for genuinely blocking disk/FFI or sustained heavy CPU (>1ms). Wrapping short JSON parsing in spawn_blocking is cargo-cult overhead.",
+      "files": [],
+      "dim": "efficiency",
+      "kind": "explicit",
+      "assertions": [
+        "walk:",
+        "exists:tokio_perf_proof.txt",
+        "contains:tokio_perf_proof.txt|short bounded CPU on worker",
+        "contains:tokio_perf_proof.txt|spawn_blocking for genuinely blocking",
+        "contains:.agents/skills/tokio-performance/SKILL.md|Short Bounded CPU"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "What review flags should I check when reviewing async Rust code?",
+      "expected_output": "Check for cargo-cult spawn_blocking on short CPU, unbounded spawn fan-out without backpressure, lock-across-.await, and repeatedly-ready spin loops.",
+      "files": [],
+      "dim": "effectiveness",
+      "kind": "implicit",
+      "assertions": [
+        "contains:tokio_perf_proof.txt|review flags: lock-across-.await, unbounded fanout",
+        "contains:.agents/skills/tokio-performance/SKILL.md|Unbounded Spawn Fan-out",
+        "contains:.agents/skills/tokio-performance/SKILL.md|Lock-Across-`.await`"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Review existing async sites in guardian-proxy server.rs (record_audit). Does it violate the workload rule?",
+      "expected_output": "record_audit performs synchronous std::fs disk I/O with mutex locking, which is genuinely blocking. Offloading to spawn_blocking is legitimate and already fine.",
+      "files": [],
+      "dim": "correctness",
+      "kind": "contextual",
+      "assertions": [
+        "contains:tokio_perf_proof.txt|record_audit is already fine",
+        "contains:.agents/skills/tokio-performance/SKILL.md|crates/guardian-proxy/src/server.rs"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "Parse synchronous CLI arguments with clap.",
+      "expected_output": "Synchronous CLI parsing uses no Tokio offload or async tasks.",
+      "files": [],
+      "dim": "discoverability",
+      "kind": "negative",
+      "assertions": [
+        "absent:tokio_offload_leak",
+        "contains:tokio_perf_proof.txt|sync CLI needs no tokio offload"
+      ]
+    }
+  ]
+}
