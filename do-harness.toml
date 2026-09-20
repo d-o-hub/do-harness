@@ -6,8 +6,8 @@ pre-push = []
 
 [signal-sets]
 feedback = ["fmt", "check", "clippy"]
-verification = ["fmt", "check", "clippy", "test", "loc", "skills", "deps", "shell", "check-agt", "check-mcp", "check-promotions", "untrusted-ingest", "audit", "commitlint"]
-release = ["fmt", "check", "clippy", "test", "loc", "skills", "deps", "shell", "check-agt", "check-mcp", "check-promotions", "untrusted-ingest", "audit", "commitlint"]
+verification = ["fmt", "check", "clippy", "test", "loc", "skills", "deps", "shell", "markdownlint", "yamllint", "check-agt", "check-mcp", "check-promotions", "untrusted-ingest", "audit", "commitlint"]
+release = ["fmt", "check", "clippy", "test", "loc", "skills", "deps", "shell", "markdownlint", "yamllint", "check-agt", "check-mcp", "check-promotions", "untrusted-ingest", "audit", "commitlint"]
 # DORA gets its own set so its evidence is addressable (`status --set metrics`)
 # without joining the gating sets. A no-`--set` status check compares against
 # every configured sensor, so a dora-only run's artifact would report
@@ -54,6 +54,16 @@ when-changed = ["Cargo.toml", "Cargo.lock", "crates/**/Cargo.toml", "deny.toml",
 name = "shell"
 argv = ["bash", "scripts/check-shell.sh"]
 when-changed = ["scripts/**", "crates/do-harness/templates/scripts/**", ".agents/skills/**", "crates/do-harness/templates/skills/**", "tests/fixtures/**"]
+
+[[sensors]]
+name = "markdownlint"
+argv = ["bash", "scripts/check-markdownlint.sh"]
+when-changed = ["**/*.md", ".markdownlint-cli2.jsonc", "scripts/check-markdownlint.sh"]
+
+[[sensors]]
+name = "yamllint"
+argv = ["bash", "scripts/check-yamllint.sh"]
+when-changed = ["**/*.yml", "**/*.yaml", ".yamllint.yml", "do-harness.toml", "plans/*.json", "scripts/check-yamllint.sh"]
 
 [[sensors]]
 name = "check-agt"
