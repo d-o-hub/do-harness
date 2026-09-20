@@ -179,7 +179,11 @@ pub fn rust_pack() -> Vec<SensorSpec> {
             &["cargo", "nextest", "run", "--workspace", "--no-tests=pass"],
             RUST_INPUTS,
         ),
-        spec("doctest", &["cargo", "test", "--doc", "--workspace"], RUST_INPUTS),
+        spec(
+            "doctest",
+            &["cargo", "test", "--doc", "--workspace"],
+            RUST_INPUTS,
+        ),
         SensorSpec {
             name: "coverage".to_owned(),
             argv: vec!["bash".to_owned(), "scripts/check-coverage.sh".to_owned()],
