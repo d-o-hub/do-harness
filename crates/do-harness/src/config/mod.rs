@@ -174,7 +174,28 @@ pub fn rust_pack() -> Vec<SensorSpec> {
             ],
             RUST_INPUTS,
         ),
-        spec("test", &["cargo", "test", "--workspace"], RUST_INPUTS),
+        spec(
+            "test",
+            &["cargo", "nextest", "run", "--workspace", "--no-tests=pass"],
+            RUST_INPUTS,
+        ),
+        spec(
+            "doctest",
+            &["cargo", "test", "--doc", "--workspace"],
+            RUST_INPUTS,
+        ),
+        SensorSpec {
+            name: "coverage".to_owned(),
+            argv: vec!["bash".to_owned(), "scripts/check-coverage.sh".to_owned()],
+            retry: None,
+            timeout: None,
+            severity: Some(SensorSeverity::Warn),
+            allow_failure: false,
+            transient_exit_codes: Vec::new(),
+            when_changed: RUST_INPUTS.iter().map(|glob| (*glob).to_owned()).collect(),
+            artifacts: Vec::new(),
+            coverage_inputs: Vec::new(),
+        },
         spec("loc", &["bash", "scripts/check-loc.sh"], &["**/*.rs"]),
         spec("deps", &["bash", "scripts/check-deps.sh"], &[]),
         spec("audit", &["bash", "scripts/check-audit.sh"], &[]),
@@ -320,7 +341,9 @@ pub fn rust_default() -> Config {
         "feedback".to_owned(),
         vec!["fmt".to_owned(), "check".to_owned(), "clippy".to_owned()],
     );
-    signal_sets.insert("verification".to_owned(), names.clone());
+    let verification_names: Vec<String> =
+        names.iter().filter(|n| *n != "coverage").cloned().collect();
+    signal_sets.insert("verification".to_owned(), verification_names);
     signal_sets.insert("release".to_owned(), names);
     Config {
         language: None,

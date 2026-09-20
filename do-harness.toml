@@ -6,8 +6,8 @@ pre-push = []
 
 [signal-sets]
 feedback = ["fmt", "check", "clippy"]
-verification = ["fmt", "check", "clippy", "test", "loc", "skills", "deps", "shell", "markdownlint", "yamllint", "check-agt", "check-mcp", "check-promotions", "untrusted-ingest", "audit", "commitlint"]
-release = ["fmt", "check", "clippy", "test", "loc", "skills", "deps", "shell", "markdownlint", "yamllint", "check-agt", "check-mcp", "check-promotions", "untrusted-ingest", "audit", "commitlint"]
+verification = ["fmt", "check", "clippy", "deps", "audit", "test", "doctest", "loc", "skills", "shell", "markdownlint", "yamllint", "check-agt", "check-mcp", "check-promotions", "untrusted-ingest", "commitlint"]
+release = ["fmt", "check", "clippy", "deps", "audit", "test", "doctest", "coverage", "loc", "skills", "shell", "markdownlint", "yamllint", "check-agt", "check-mcp", "check-promotions", "untrusted-ingest", "commitlint"]
 # DORA gets its own set so its evidence is addressable (`status --set metrics`)
 # without joining the gating sets. A no-`--set` status check compares against
 # every configured sensor, so a dora-only run's artifact would report
@@ -32,7 +32,18 @@ when-changed = ["**/*.rs", "Cargo.toml", "Cargo.lock"]
 
 [[sensors]]
 name = "test"
-argv = ["cargo", "test", "--workspace"]
+argv = ["cargo", "nextest", "run", "--workspace", "--no-tests=pass"]
+when-changed = ["**/*.rs", "Cargo.toml", "Cargo.lock"]
+
+[[sensors]]
+name = "doctest"
+argv = ["cargo", "test", "--doc", "--workspace"]
+when-changed = ["**/*.rs", "Cargo.toml", "Cargo.lock"]
+
+[[sensors]]
+name = "coverage"
+argv = ["bash", "scripts/check-coverage.sh"]
+severity = "warn"
 when-changed = ["**/*.rs", "Cargo.toml", "Cargo.lock"]
 
 [[sensors]]

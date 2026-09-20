@@ -1,3 +1,0 @@
-npm ERR! code E403
-npm ERR! 403 Forbidden - PUT https://registry.npmjs.org/do-harness-win32-x64 - Package name trigger security screening
-npm ERR! 403 In most cases, you or one of your dependencies are requesting

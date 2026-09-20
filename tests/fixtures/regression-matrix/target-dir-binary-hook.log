@@ -1,3 +1,0 @@
-[pre-commit] running hook script...
-.git/hooks/pre-commit: line 4: ./target/release/do-harness: No such file or directory
-Hook failed with status 127

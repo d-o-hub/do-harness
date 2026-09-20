@@ -26,7 +26,6 @@ Thumbs.db
 
 # Logs
 *.log
-!tests/fixtures/**/*.log
 
 # Local guardian-proxy runtime state (never commit live configs or audit logs)
 guardian-proxy.toml
