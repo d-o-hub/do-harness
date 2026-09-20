@@ -101,7 +101,7 @@
 - **Safety**: `#![forbid(unsafe_code)]` at workspace and crate roots.
 - **Config & Events**: `#[serde(deny_unknown_fields)]` on config and event structs.
 - **Constants**: Named constants over magic numbers.
-- **Async**: `#[tokio::main(flavor = "current_thread")]` for CLI binaries; sync `main` when no async is required.
+- **Async**: `#[tokio::main(flavor = "current_thread")]` for CLI binaries; sync `main` when no async is required. Follow workload-aware Tokio guidance (template #336, `.agents/skills/tokio-performance/SKILL.md`): short bounded CPU (<10–100µs) stays on worker threads; reserve `spawn_blocking`/pools for genuinely blocking disk/FFI or sustained heavy CPU (>1ms). Review flags: unbounded spawn fan-out, lock-across-`.await`, and repeatedly-ready loops.
 - **Commits**: Conventional commits with lowercase subject lines.
 - **Dependencies**: Declare versions in `[workspace.dependencies]` with caret ranges; commit `Cargo.lock` for binary applications.
 
