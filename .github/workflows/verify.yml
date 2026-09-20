@@ -48,7 +48,11 @@ jobs:
       # taiki-e/install-action@v2
       - uses: taiki-e/install-action@ba47c86ac325773530516bb756137ac718732518
         with:
-          tool: cargo-deny,cargo-audit,shellcheck,yamllint,markdownlint-cli2
+          tool: cargo-deny,cargo-audit,shellcheck
+      - name: Install markdownlint and yamllint
+        run: |
+          python3 -m pip install --disable-pip-version-check yamllint
+          npm install -g markdownlint-cli2
       # Pin maintenance note: agent-governance is pinned to =3.2.2 in workspace dependencies
       # until GA. Upstream renamed this crate to `agentmesh`; the pin stays on the
       # retired 3.2.x line because the live 4.x line is a breaking API change

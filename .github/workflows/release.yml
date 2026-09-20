@@ -67,7 +67,11 @@ jobs:
       # taiki-e/install-action@v2
       - uses: taiki-e/install-action@ba47c86ac325773530516bb756137ac718732518
         with:
-          tool: cargo-deny,cargo-audit,shellcheck,yamllint,markdownlint-cli2
+          tool: cargo-deny,cargo-audit,shellcheck
+      - name: Install markdownlint and yamllint
+        run: |
+          python3 -m pip install --disable-pip-version-check yamllint
+          npm install -g markdownlint-cli2
       - name: Build harness CLI
         run: cargo build --release -p do-harness
       - name: Verify the tagged commit
