@@ -23,7 +23,7 @@ Standard review depth (current default):
 Full reasoning review for high-risk changes (public API, security, state machines, cross-file invariants):
 - Public API compatibility and breaking contract changes
 - Cross-file invariants and state machine transitions
-- Concurrency, races, and resource lifecycle
+- Concurrency, races, and resource lifecycle (for async code, flag: cargo-cult `spawn_blocking` on short bounded CPU, unbounded spawn fan-out without backpressure, holding locks across `.await`, or repeatedly-ready spin loops — see `.agents/skills/tokio-performance/SKILL.md`)
 - Persistence, data integrity, and database schema consequences
 - Security and failure-path analysis
 
@@ -34,7 +34,7 @@ Report only defects in these categories:
 - Correctness and edge cases
 - Security and authorization
 - Data integrity and transaction semantics
-- Concurrency, races, and resource lifecycle
+- Concurrency, races, and resource lifecycle (e.g. Tokio workload-aware offloading, lock-across-.await; see .agents/skills/tokio-performance/SKILL.md)
 - Compatibility: API breaks, migrations, versioning
 - Error handling and failure propagation
 
