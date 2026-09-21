@@ -111,7 +111,7 @@ Use this decision path:
 1. Stop the ordered release. Record the exact package, version, npm account,
    registry URL, complete error text, and the already-published siblings.
 2. Contact npm Support at <https://www.npmjs.com/support> or
-   `support@npmjs.com`. Ask for a review/clearance of the exact name; include
+   `support@example.com`. Ask for a review/clearance of the exact name; include
    the package's purpose, repository URL, and why it is not a typosquat.
 3. Leave the blocked platform package unpublished. The meta package still
    publishes: its pin on the blocked name is inert where another platform

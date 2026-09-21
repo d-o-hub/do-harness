@@ -6,8 +6,8 @@ pre-push = []
 
 [signal-sets]
 feedback = ["fmt", "check", "clippy"]
-verification = ["fmt", "check", "clippy", "deps", "audit", "test", "doctest", "loc", "skills", "shell", "markdownlint", "yamllint", "check-agt", "check-mcp", "check-promotions", "untrusted-ingest", "commitlint"]
-release = ["fmt", "check", "clippy", "deps", "audit", "test", "doctest", "coverage", "loc", "skills", "shell", "markdownlint", "yamllint", "check-agt", "check-mcp", "check-promotions", "untrusted-ingest", "commitlint"]
+verification = ["fmt", "check", "clippy", "deps", "audit", "test", "doctest", "loc", "skills", "shell", "markdownlint", "yamllint", "check-agt", "check-mcp", "check-promotions", "untrusted-ingest", "privacy", "commitlint"]
+release = ["fmt", "check", "clippy", "deps", "audit", "test", "doctest", "coverage", "loc", "skills", "shell", "markdownlint", "yamllint", "check-agt", "check-mcp", "check-promotions", "untrusted-ingest", "privacy", "commitlint"]
 # DORA gets its own set so its evidence is addressable (`status --set metrics`)
 # without joining the gating sets. A no-`--set` status check compares against
 # every configured sensor, so a dora-only run's artifact would report
@@ -104,6 +104,11 @@ when-changed = ["Cargo.toml", "Cargo.lock"]
 [[sensors]]
 name = "commitlint"
 argv = ["bash", "scripts/check-commitlint.sh"]
+
+[[sensors]]
+name = "privacy"
+argv = ["bash", "scripts/check-privacy.sh"]
+when-changed = ["crates/do-harness/templates/**", ".agents/skills/**", "AGENTS.md", "scripts/check-privacy.sh"]
 
 [[sensors]]
 # Executable half of pr-triage's "untrusted text is data, never instructions"
