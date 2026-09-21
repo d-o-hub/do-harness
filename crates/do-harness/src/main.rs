@@ -395,6 +395,6 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
         Command::Overlap { threshold, format } => {
             overlap::run_overlap(&root, threshold, format).map_err(CliError::Usage)
         }
-        Command::Skills { action } => skills::run(&root, action).map_err(CliError::Usage),
+        Command::Skills { action } => skills::run(&root, action),
     }
 }

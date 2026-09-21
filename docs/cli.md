@@ -439,7 +439,8 @@ cancels out; the JSON envelope counts against the residual. Consumers should
 review the residual only on `reduced` and fall back to the raw diff on `no-go`.
 
 ### `skills`
-Progressive-disclosure skill selection. `skills suggest` ranks the skills under
+Progressive-disclosure skill selection and opt-in drift checks for shared
+skills. `skills suggest` ranks the skills under
 `.agents/skills/*/SKILL.md` against a task description using **frontmatter
 metadata only** — the catalog never reads a skill body, and ranking is offline
 and deterministic.
@@ -505,11 +506,54 @@ error; skill bodies are never cached.
 only the selected `SKILL.md` and the references it names. Defaults are five
 metadata candidates and one fully loaded skill.
 
-`crates/do-harness/src/skills/tests.rs` covers the algorithm and cache;
+`crates/do-harness/src/skills/tests/` covers the algorithm and cache;
 `crates/do-harness/tests/skills_suggest.rs` drives the real binary;
 `scripts/skills-suggest-benchmark.sh` measures top-1/top-3/top-5 accuracy,
 metadata bytes, loaded-context bytes, unnecessary-load rate, and latency across
 the load-all, deterministic-only, and deterministic+selector arms.
+
+**Drift checks (`skills drift`).** Shared skills are copied between repositories
+on purpose, so their drift cannot be detected by comparing a repository against
+itself. An opt-in manifest at `.agents/skills-manifest.toml` (override with
+`--manifest <FILE>`) names the skills a repository manages from an upstream and
+pins each one:
+
+```toml
+[[skills]]
+name = "skill-creator"
+path = ".agents/skills/skill-creator"
+upstream = "owner/repo"
+upstream_path = ".agents/skills/skill-creator"
+version = "1.2.0"            # informational; never compared
+commit = "<40-hex>"          # provenance anchor
+content_sha256 = "<64-hex>"  # content anchor: digest of the managed tree
+```
+
+The digest is `sha256` over one record per file — the repository-relative path,
+a NUL byte, the file's sha256 hex, and a newline — ordered by byte-wise path.
+Empty directories do not appear, file symlinks are followed, and a symlinked
+directory is an error because a pinned digest cannot describe it. Obtain a pin
+by running the check once — the report carries the `actual` digest for every
+managed tree.
+
+```bash
+do-harness skills drift                  # text: one line per managed skill
+do-harness skills drift --format json    # schema_version 1 report
+```
+
+Exit codes are the verdict: `0` every managed skill matches its pin, `1` at
+least one drifted or is missing (the report names the skill and its path), `2`
+the manifest is absent, unreadable, or invalid (including one that lists no
+skills). A missing manifest is deliberately an error rather than a vacuous
+pass, and the check stays offline and check-only: it never fetches, never
+writes, and never inspects a skill the manifest does not name. Adopters who
+wire it in as a sensor should declare the manifest under `coverage-inputs`, so
+a changed pin invalidates stale evidence instead of hiding behind it.
+
+`crates/do-harness/src/skills/tests/drift_cases.rs` covers the digest,
+validation, and status rules; `crates/do-harness/tests/skills_drift.rs` drives
+the real binary's exit codes, output determinism, and unmanaged-skill
+isolation.
 
 ### `completions`
 Generate shell completions for `bash`, `zsh`, `fish`, `powershell`, `elvish`.

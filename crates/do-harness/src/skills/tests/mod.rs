@@ -10,9 +10,11 @@ use std::path::Path;
 
 use super::cache;
 use super::catalog::{self, SKILL_ROOT};
+use super::drift;
 use super::suggest;
 
 mod catalog_cases;
+mod drift_cases;
 mod selector_cases;
 
 /// Writes a skill directory with the given frontmatter body.
