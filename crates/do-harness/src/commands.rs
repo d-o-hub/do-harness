@@ -238,11 +238,23 @@ pub async fn errors_cmd(root: &Path, action: ErrorsAction) -> Result<()> {
 }
 
 /// Dispatches hook management using the configured sensor split.
-pub async fn hook(root: &Path, config_path: Option<&Path>, action: HookAction) -> Result<()> {
-    let cwd = std::env::current_dir().context("failed to read current directory")?;
-    let git_dir = hooks::find_git_dir(&cwd)?;
+pub async fn hook(
+    root: &Path,
+    config_path: Option<&Path>,
+    action: HookAction,
+    dry_run: bool,
+) -> Result<()> {
+    let git_dir = hooks::find_git_dir(root)?;
     match action {
         HookAction::Install { force } => {
+            let (target, _) = hooks::get_effective_hooks_dir(&git_dir, root);
+            if dry_run {
+                println!(
+                    "Dry run: would install managed git hooks in {}",
+                    target.display()
+                );
+                return Ok(());
+            }
             let cfg = config::load(root, config_path).await?;
             let target = hooks::install(
                 &git_dir,
@@ -254,6 +266,10 @@ pub async fn hook(root: &Path, config_path: Option<&Path>, action: HookAction) -
             println!("Installed managed git hooks in {}", target.display());
         }
         HookAction::Uninstall => {
+            if dry_run {
+                println!("Dry run: would remove managed hooks");
+                return Ok(());
+            }
             hooks::uninstall(&git_dir, root)?;
             println!("Removed managed hooks");
         }

@@ -360,3 +360,33 @@ fn uninstall_cleans_both_custom_and_default_hooks() {
     assert!(!default_hooks.join("pre-commit").exists());
     assert!(!custom_hooks.join("pre-commit").exists());
 }
+
+#[tokio::test(flavor = "current_thread")]
+async fn dry_run_install_and_uninstall_do_not_modify_hooks() {
+    let (temp, git_dir) = fake_git_dir();
+    let root = temp.path();
+
+    crate::commands::hook(
+        root,
+        None,
+        crate::cli::HookAction::Install { force: false },
+        true,
+    )
+    .await
+    .unwrap();
+
+    assert!(!hook_path(&git_dir, "pre-commit").exists());
+    assert!(!hook_path(&git_dir, "pre-push").exists());
+    assert!(!hook_path(&git_dir, "commit-msg").exists());
+
+    install(&git_dir, root, &[], &[], false).unwrap();
+    assert!(hook_path(&git_dir, "pre-commit").exists());
+
+    crate::commands::hook(root, None, crate::cli::HookAction::Uninstall, true)
+        .await
+        .unwrap();
+
+    assert!(hook_path(&git_dir, "pre-commit").exists());
+    assert!(hook_path(&git_dir, "pre-push").exists());
+    assert!(hook_path(&git_dir, "commit-msg").exists());
+}

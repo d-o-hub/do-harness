@@ -360,9 +360,11 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
         )
         .await
         .map_err(CliError::Verify),
-        Command::Hook { action } => commands::hook(&root, cli.config.as_deref(), action)
-            .await
-            .map_err(CliError::Usage),
+        Command::Hook { action } => {
+            commands::hook(&root, cli.config.as_deref(), action, cli.dry_run)
+                .await
+                .map_err(CliError::Usage)
+        }
         Command::Doctor { format, strict } => doctor::run(&root, format, strict)
             .await
             .map_err(CliError::Verify),
