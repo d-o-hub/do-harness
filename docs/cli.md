@@ -227,8 +227,8 @@ development-methodology skills used to build do-harness itself (HTN planning,
 spikes, event modeling, skill distillation) are not scaffolded into adopting
 projects.
 
-- `--language <LANG>`: Force a pack (`rust`, `generic`); default detects from
-  the repository (empty/hidden-only directories bootstrap Rust).
+- `--language <LANG>`: Force a pack (`rust`, `generic`, `web`, `node`); default
+  detects from the repository (empty/hidden-only directories bootstrap Rust).
 - `--force`: Overwrite existing files.
 - `--format <Format>`: Output format (`text` or `json`); JSON carries
   `detected`, `candidates`, `written`, `skipped`, and `baseline`.

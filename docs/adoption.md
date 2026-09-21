@@ -91,6 +91,8 @@ cargo binstall do-harness          # prebuilt, no compile
 cd /path/to/repository
 do-harness init                    # detects the stack; rust pack by default
 do-harness init --language generic # no built-in sensors (vacuous pass)
+do-harness init --language web     # web UI audit pack (viewport, a11y, console, perf, visual, i18n)
+do-harness init --language node    # Node/JS/TS pack (typecheck, lint, test, build)
 do-harness hook install            # pre-commit, commit-msg, pre-push
 do-harness doctor                  # binary resolution, hooks, db skew
 ```
@@ -107,8 +109,11 @@ application source is never touched. The run ends with
 a top-level `invariants` array (extra keys such as `$comment` are ignored).
 Each header stays strict: unknown fields inside a header are rejected.
 
-The generic pack ships **zero sensors**: its pass is vacuous, not evidence.
-Add real checks before trusting `verify`.
+The harness supports four language packs: `rust` (Rust sensor pack),
+`generic` (no built-in sensors), `web` (web UI audit pack), and `node`
+(Node/JS/TS pack probing package scripts and toolchains). The generic pack
+ships **zero sensors**: its pass is vacuous, not evidence. Add real checks
+before trusting `verify`.
 
 ## Configure sensors for your stack
 
