@@ -197,7 +197,8 @@ pub enum Command {
         #[command(subcommand)]
         action: TraceAction,
     },
-    /// Extract a heuristic from a resolved trace.
+    /// Extract a heuristic from a resolved trace into a skill.
+    /// Review output against the anti-AI-slop checklist (.agents/skills/skill-creator/references/anti_ai_slop.md).
     Distill {
         /// Skill the heuristic belongs to.
         #[arg(long, value_name = "SKILL")]
@@ -222,7 +223,7 @@ pub enum Command {
         /// Scope strike lookup to this task id.
         #[arg(long, value_name = "ID", requires = "from_strikes")]
         task: Option<i64>,
-        /// Raise the skill's pass-rate bar after this recovery.
+        /// Raise the skill's pass-rate bar after this recovery (review ticks anti-AI-slop checklist first).
         #[arg(long = "to-fixture")]
         to_fixture: bool,
         /// Perform dry run without modifying skill files.

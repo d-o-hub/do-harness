@@ -435,4 +435,49 @@ mod tests {
             )
         );
     }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn distill_accepts_resolution_steps_with_anti_ai_slop_checklist() {
+        let dir = tempfile::tempdir().unwrap();
+        write_skill_md(dir.path(), "harness");
+        seed_ok_beat(dir.path()).await;
+        let trace_id = seed_trace(
+            dir.path(),
+            "s1",
+            Some("anti-ai-slop: pass (no speculative structs, real error handling)"),
+        )
+        .await;
+
+        distill(
+            dir.path(),
+            "harness",
+            "idiomatic error context wrapping",
+            Some("applies when adding context to I/O failures"),
+            Some(trace_id),
+            false,
+            false,
+            Format::Text,
+        )
+        .await
+        .unwrap();
+
+        let conn = do_harness_db::connect_and_migrate(dir.path())
+            .await
+            .unwrap();
+        let trace = do_harness_db::get_trace(&conn, trace_id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(trace
+            .resolution_steps
+            .as_deref()
+            .unwrap()
+            .contains("anti-ai-slop: pass"));
+
+        let heuristics = do_harness_db::list_heuristics(&conn, "harness")
+            .await
+            .unwrap();
+        assert_eq!(heuristics.len(), 1);
+        assert_eq!(heuristics[0].pattern, "idiomatic error context wrapping");
+    }
 }

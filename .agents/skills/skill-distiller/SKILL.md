@@ -44,7 +44,11 @@ Execute when:
   - `evals/evals.json`: At least 2-3 verification cases with `id`, `prompt`, `expected_output`, and checkable `assertions`.
 - Run `do-harness overlap` after any corpus change: new or moved guidance must not push a pair past the accepted baselines in `plans/invariants.json`.
 
-### 4. Benchmark & Evaluate
+### 4. Anti-AI-Slop Review Pass & Trace Recording
+- Review the generalized heuristic and any code snippets against the Anti-AI-Slop checklist in [references/anti_ai_slop.md](references/anti_ai_slop.md) (purpose-per-struct, real error handling, meaningful domain names, no speculative abstractions, why-focused docs).
+- Record the checklist outcome in the trace's `resolution_steps` (e.g., `anti-ai-slop: pass (no speculative structs, real error handling)`) prior to distillation review and raising the pass-rate floor (`distill --to-fixture`).
+
+### 5. Benchmark & Evaluate
 Run the skill-evaluator loop:
 1. **Structure check** — `SKILL.md` present, frontmatter valid, `evals/evals.json` exists and parses.
 2. **Eval review** — each case has a real prompt, a concrete expected outcome, and checkable assertions.
@@ -52,11 +56,16 @@ Run the skill-evaluator loop:
 4. **Baseline comparison** — when measuring improvement, rerun the same prompt without the skill or against the previous version.
 5. **Verdict** — `PASS`, `NEEDS_WORK`, or `FAIL` with evidence; iterate until `PASS`.
 
-### 5. Steering Loop
+### 6. Steering Loop
 - Canonical rule lives in `.agents/skills/harness` (Steering Loop): a sensor
   firing >2 times in one sprint is a feedforward-guide defect, not a symptom
   to patch. Follow it; do not restate it here.
-- If no guide exists, create one in `.agents/skills/` via steps 1-4.
+- If no guide exists, create one in `.agents/skills/` via steps 1-5.
+
+## References
+
+- Anti-AI-slop audit checklist: see
+  [references/anti_ai_slop.md](references/anti_ai_slop.md).
 
 ## Gotchas
 - Never distill a fix that did not pass computational sensors — hallucinations propagate.
