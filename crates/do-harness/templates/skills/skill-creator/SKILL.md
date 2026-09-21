@@ -68,11 +68,16 @@ flow, walkthrough env contract) get exact scripts; judgment calls
    `do-harness eval --bless --skill <name>`. Fixtures are
    executor-agnostic: `eval --agent-cmd <command>` runs an agent per case
    and grades the same assertions, which measures true Skill Lift.
-6. Iterate from eval evidence. New reusable patterns go through
+6. Anti-AI-slop audit: review written code and guidance against the checklist in
+   `references/anti_ai_slop.md` (purpose-per-struct, real error handling,
+   meaningful names, no speculative abstraction, why-focused docs).
+7. Iterate from eval evidence. New reusable patterns go through
    `.agents/skills/skill-distiller`, never straight into prose.
 
 ## References
 
+- Anti-AI-slop audit checklist: see
+  [references/anti_ai_slop.md](references/anti_ai_slop.md).
 - UI metadata (`agents/openai.yaml`): see
   [references/openai_yaml.md](references/openai_yaml.md).
 - Operating invariants and workflow: `AGENTS.md`.

@@ -265,11 +265,13 @@ command in an outer sandbox if needed.
 ### `distill`
 Extracts a heuristic from a resolved trace into a skill.
 
+Review distilled heuristics and code snippets against the advisory Anti-AI-Slop checklist (`.agents/skills/skill-creator/references/anti_ai_slop.md`): purpose-per-struct, real error handling, meaningful domain names, no speculative abstractions, and why-focused docs.
+
 - `--skill <SKILL>`: Target skill directory name.
 - `--pattern <PATTERN>`: Generalized heuristic pattern.
 - `--description <DESC>`: When the pattern applies.
 - `--from-trace <ID>`: Required source trace ID as evidence.
-- `--to-fixture`: Raise skill pass-rate floor after recovery.
+- `--to-fixture`: Raise skill pass-rate floor after recovery (review ticks the anti-AI-slop checklist before raising the bar).
 - `--dry-run`: Perform dry run without modifying files.
 - `--format <Format>`: Output format (`text` or `json`).
 
