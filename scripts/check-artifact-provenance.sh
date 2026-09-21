@@ -4,7 +4,9 @@
 # Inputs via environment or command-line arguments:
 #   ARTIFACT_PATHS: File path(s) to verify (space or comma separated).
 #   EXPECTED_DIGEST: Optional expected hex SHA-256 digest.
-#   VERIFY_MODE: Verification mode (e.g. digest-only, slsa, github-attestation, sbom, strict). Default: digest-only.
+#   VERIFY_MODE: Verification mode. digest-only (default) is implemented;
+#                slsa, github-attestation, sbom and strict are reserved and
+#                fail closed until they verify something.
 
 set -euo pipefail
 
@@ -103,7 +105,14 @@ for path in "${PATHS[@]}"; do
         digest-only)
             ;;
         slsa|github-attestation|sbom|strict)
-            # Generic mode check placeholder - mode supported
+            # Reserved modes are part of the contract but carry no verification
+            # yet. Reporting PASS on a digest check the mode never performed
+            # would be a vacuous pass, so fail closed until the mode is real.
+            FAILURES=$((FAILURES + 1))
+            REASON="verification mode '$VERIFY_MODE' is reserved and not implemented; implemented modes: digest-only"
+            [[ -z "$FIRST_REASON" ]] && FIRST_REASON="$REASON"
+            echo "FAIL: $REASON"
+            continue
             ;;
         *)
             FAILURES=$((FAILURES + 1))
