@@ -210,12 +210,12 @@ TOTAL                              50                10    80.00%          15   
 
     create_fake_tool(&bin_dir, "llvm-cov", cov_output_with_branch);
 
+    let path_env = std::env::join_paths(std::iter::once(bin_dir.clone()).chain(
+        std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default()),
+    ))
+    .unwrap();
+
     let mut cmd = shell::bash();
-    let path_env = format!(
-        "{}:{}",
-        bin_dir.display(),
-        std::env::var("PATH").unwrap_or_default()
-    );
     cmd.env("PATH", &path_env);
 
     let output = cmd
