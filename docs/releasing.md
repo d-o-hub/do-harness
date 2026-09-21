@@ -53,6 +53,8 @@ verification set and every build target dogfoods green.
   automatically for these public GitHub Actions publishes. After a successful
   migration, revoke unused publish tokens and enable npm's **require
   two-factor authentication and disallow tokens** setting.
+  See [`docs/provenance-trust-model.md`](provenance-trust-model.md) for the exact
+  trust boundaries and claims proven by provenance artifacts.
 - **`actions/setup-node` exports a fake credential, and it silently defeats
   OIDC.** With `registry-url` set, the action always runs
   `core.exportVariable('NODE_AUTH_TOKEN', process.env.NODE_AUTH_TOKEN || 'XXXXX-XXXXX-XXXXX-XXXXX')`
