@@ -137,6 +137,20 @@ printf 'flaky_exit=%s\nflaky_out=%s\nflaky_runs=%s\ndet_exit=%s\ndet_runs=%s\n' 
   "$flaky_exit" "$(cat "$root/retry_flaky.out")" "$flaky_runs" "$det_exit" "$det_runs" \
   > "$root/retry_summary.txt"
 
+# 5e. Auto-merge guard: a pre-armed request is detected (exit 1 proves the
+# caller must act), disarmed through --disable-auto, and then reads clean.
+export FAKE_GH_AUTO_MERGE=armed
+export FAKE_GH_AUTO_MERGE_LOG="$root/auto_merge_disable.log"
+rm -f "$FAKE_GH_AUTO_MERGE_LOG"
+set +e
+"$skill/scripts/auto-merge.sh" 9 > "$root/auto_merge_armed.out"
+auto_merge_armed_exit=$?
+set -e
+"$skill/scripts/auto-merge.sh" 9 --disable > "$root/auto_merge_disabled.out"
+"$skill/scripts/auto-merge.sh" 9 > "$root/auto_merge_after.out"
+printf 'armed_exit=%s\n' "$auto_merge_armed_exit" > "$root/auto_merge_summary.txt"
+unset FAKE_GH_AUTO_MERGE FAKE_GH_AUTO_MERGE_LOG
+
 # 5d. Webhook fast path: a real receiver answers /health, persists signed
 # deliveries (rejecting unsigned ones), wakes long-polls, and drives the wait
 # scripts with events instead of sleeps; an unreachable receiver falls back to

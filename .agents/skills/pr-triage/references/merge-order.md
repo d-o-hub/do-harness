@@ -56,6 +56,10 @@ Requirements before running it:
 - Every check passes or is an allowed skip (see `check-policy.md`).
 - No unresolved review threads.
 - No blocking review findings.
+- No auto-merge request is armed: it merges whatever head exists when GitHub
+  next computes mergeability, defeating the pin. The sweep disarms any
+  pre-existing request (`scripts/auto-merge.sh PR --disable`) before validating
+  and halts if the disarm fails.
 - The head SHA equals the one validated, and the merge command pins it.
 
 Never pass `--auto`.
