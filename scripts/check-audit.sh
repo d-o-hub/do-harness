@@ -52,14 +52,14 @@ run_audit() {
     cargo audit --deny warnings --ignore RUSTSEC-2026-0097 "$@"
 }
 
-if ! run_audit; then
+if ! run_audit "$@"; then
     # If cargo audit fails (e.g. due to a corrupted/truncated advisory-db file
     # on runner hosts), clear the local advisory-db cache and retry once.
     CARGO_HOME_DIR="${CARGO_HOME:-${HOME:-/tmp}/.cargo}"
     if [ -d "$CARGO_HOME_DIR/advisory-db" ]; then
         echo "WARN: cargo audit failed; clearing advisory-db and retrying..."
         rm -rf "$CARGO_HOME_DIR/advisory-db"
-        run_audit
+        run_audit "$@"
     else
         exit 1
     fi
