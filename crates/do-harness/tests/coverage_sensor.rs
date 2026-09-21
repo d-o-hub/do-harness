@@ -37,6 +37,23 @@ fn harness(root: &Path) -> Command {
     cmd
 }
 
+fn create_fake_tool(bin_dir: &Path, name: &str, output_str: &str) {
+    let exe_name = format!("cargo-{name}{}", std::env::consts::EXE_SUFFIX);
+    let target_path = bin_dir.join(exe_name);
+
+    let src = format!(r"fn main() {{ print!({output_str:?}); }}");
+    let src_path = bin_dir.join(format!("{name}.rs"));
+    std::fs::write(&src_path, src).unwrap();
+
+    let status = Command::new("rustc")
+        .arg(&src_path)
+        .arg("-o")
+        .arg(&target_path)
+        .status()
+        .expect("compile fake tool");
+    assert!(status.success(), "rustc compilation of fake {name} failed");
+}
+
 #[test]
 fn fresh_init_inventory_exits_zero_with_stable_table() {
     let repo_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
@@ -183,40 +200,15 @@ fn llvm_cov_parsing_with_and_without_branch_column() {
     let bin_dir = temp_dir.path().join("bin");
     std::fs::create_dir_all(&bin_dir).unwrap();
 
-    let fake_cargo_llvm_cov = bin_dir.join("cargo-llvm-cov");
-    let fake_cargo_nextest = bin_dir.join("cargo-nextest");
+    create_fake_tool(&bin_dir, "nextest", "");
 
-    std::fs::write(&fake_cargo_nextest, "#!/bin/sh\nexit 0\n").unwrap();
-    std::fs::write(bin_dir.join("cargo-nextest.cmd"), "@echo off\nexit /b 0\n").unwrap();
-
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(&fake_cargo_nextest, std::fs::Permissions::from_mode(0o755))
-            .unwrap();
-    }
-
-    let cov_script_with_branch = r"#!/bin/sh
-cat << 'EOF'
-Filename                      Regions    Missed Regions     Cover   Functions  Missed Functions  Executed       Lines      Missed Lines     Cover    Branches   Missed Branches     Cover
+    let cov_output_with_branch = r"Filename                      Regions    Missed Regions     Cover   Functions  Missed Functions  Executed       Lines      Missed Lines     Cover    Branches   Missed Branches     Cover
 -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 src/lib.rs                         10                 2    80.00%           3                 0   100.00%          25                 5    80.00%           4                 1    75.00%
 TOTAL                              50                10    80.00%          15                 0   100.00%         100                26    74.00%          20                 7    65.00%
-EOF
 ";
-    std::fs::write(&fake_cargo_llvm_cov, cov_script_with_branch).unwrap();
-    std::fs::write(
-        bin_dir.join("cargo-llvm-cov.cmd"),
-        "@echo off\nsh \"%~dp0cargo-llvm-cov\" %*\n",
-    )
-    .unwrap();
 
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(&fake_cargo_llvm_cov, std::fs::Permissions::from_mode(0o755))
-            .unwrap();
-    }
+    create_fake_tool(&bin_dir, "llvm-cov", cov_output_with_branch);
 
     let mut cmd = shell::bash();
     let path_env = format!(
@@ -245,15 +237,13 @@ EOF
         "expected FINDINGS: 0, got:\n{stdout}"
     );
 
-    let cov_script_no_branch = r"#!/bin/sh
-cat << 'EOF'
-Filename                      Regions    Missed Regions     Cover   Functions  Missed Functions  Executed       Lines      Missed Lines     Cover
+    let cov_output_no_branch = r"Filename                      Regions    Missed Regions     Cover   Functions  Missed Functions  Executed       Lines      Missed Lines     Cover
 -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 src/lib.rs                         10                 2    80.00%           3                 0   100.00%          25                 5    80.00%
 TOTAL                              50                10    80.00%          15                 0   100.00%         100                35    65.00%
-EOF
 ";
-    std::fs::write(&fake_cargo_llvm_cov, cov_script_no_branch).unwrap();
+
+    create_fake_tool(&bin_dir, "llvm-cov", cov_output_no_branch);
 
     let mut cmd2 = shell::bash();
     cmd2.env("PATH", &path_env);
