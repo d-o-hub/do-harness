@@ -124,7 +124,7 @@ A generic, stack-neutral contract for verifying release-artifact provenance with
 - **Required Inputs**:
   - `ARTIFACT_PATHS`: Space- or comma-separated list/globs of target artifact file paths.
   - `EXPECTED_DIGEST`: Optional expected hex SHA-256 digest of the artifact.
-  - `VERIFY_MODE`: Verification mode (e.g. `slsa`, `github-attestation`, `sbom`, `strict`, or `digest-only`).
+  - `VERIFY_MODE`: Verification mode. `digest-only` (default) is implemented; `slsa`, `github-attestation`, `sbom`, and `strict` are reserved and fail closed until implemented, so a configured mode never reports a pass it did not verify.
 - **Required Evidence Output**:
   Sensors implementing this contract output a `COVERAGE: <json>` line carrying structured JSON:
   ```json
@@ -135,7 +135,7 @@ A generic, stack-neutral contract for verifying release-artifact provenance with
     "reason": null
   }
   ```
-  On verification failure, `status` is set to `"fail"` and `reason` details the cause (e.g. `"digest mismatch"`, `"missing artifact"`, or `"attestation invalid"`).
+  On verification failure, `status` is set to `"fail"` and `reason` details the cause (e.g. `"digest mismatch"`, `"missing artifact"`, or `"verification mode 'sbom' is reserved and not implemented"`).
 
 ### `status`
 Reports verification evidence freshness for a signal set without executing

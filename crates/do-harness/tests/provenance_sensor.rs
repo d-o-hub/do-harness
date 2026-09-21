@@ -180,6 +180,69 @@ argv = ["bash", "check-provenance.sh", "--artifact", "missing.bin"]
 }
 
 #[test]
+fn test_artifact_provenance_reserved_mode_fails_closed() {
+    let dir = tempdir().unwrap();
+    let root = dir.path();
+
+    let artifact_path = root.join("artifact.bin");
+    fs::write(&artifact_path, b"sample binary artifact content").unwrap();
+
+    let script_path = root.join("check-provenance.sh");
+    let script_content = include_str!("../../../scripts/check-artifact-provenance.sh");
+    fs::write(&script_path, script_content).unwrap();
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = fs::metadata(&script_path).unwrap().permissions();
+        perms.set_mode(0o755);
+        fs::set_permissions(&script_path, perms).unwrap();
+    }
+
+    let config_path = root.join("do-harness.toml");
+    let config_content = r#"
+language = "generic"
+
+[[sensors]]
+name = "artifact-provenance"
+argv = ["bash", "check-provenance.sh", "--artifact", "artifact.bin", "--mode", "sbom"]
+"#;
+    fs::write(&config_path, config_content).unwrap();
+
+    let bin_path = env!("CARGO_BIN_EXE_do-harness");
+    let output = Command::new(bin_path)
+        .arg("--root")
+        .arg(root)
+        .arg("verify")
+        .arg("--strict")
+        .output()
+        .unwrap();
+
+    assert!(
+        !output.status.success(),
+        "a reserved mode must not pass on a digest check it never performed; stdout: {}",
+        String::from_utf8_lossy(&output.stdout)
+    );
+
+    let evidence_path = root.join(".do-harness/evidence.json");
+    assert!(evidence_path.exists());
+    let evidence_text = fs::read_to_string(&evidence_path).unwrap();
+    let doc: serde_json::Value = serde_json::from_str(&evidence_text).unwrap();
+
+    let coverage = &doc["coverage"]["artifact-provenance"];
+    assert_eq!(coverage["artifact"], "artifact.bin");
+    assert_eq!(coverage["status"], "fail");
+    assert!(
+        coverage["reason"]
+            .as_str()
+            .unwrap()
+            .contains("reserved and not implemented"),
+        "reason should name the reserved mode, got: {}",
+        coverage["reason"]
+    );
+}
+
+#[test]
 fn test_artifact_provenance_malformed_evidence() {
     let dir = tempdir().unwrap();
     let root = dir.path();
