@@ -6,16 +6,18 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use super::cache;
 use super::catalog::{self, SKILL_ROOT};
 use super::drift;
 use super::suggest;
+use super::tree;
 
 mod catalog_cases;
 mod drift_cases;
 mod selector_cases;
+mod tree_cases;
 
 /// Writes a skill directory with the given frontmatter body.
 pub(super) fn write_skill(root: &Path, dir: &str, frontmatter: &str) {
@@ -43,4 +45,17 @@ pub(super) fn write_named(root: &Path, dir: &str, name: &str, description: &str)
 pub(super) fn rank(root: &Path, query: &str, limit: usize) -> Vec<suggest::Scored> {
     let catalog = catalog::scan(root).unwrap();
     suggest::rank(&catalog.skills, query, limit)
+}
+
+/// Creates a directory `relative` under `root` with `files`, returning its path.
+pub(super) fn write_tree(root: &Path, relative: &str, files: &[(&str, &str)]) -> PathBuf {
+    let dir = root.join(relative);
+    for (name, body) in files {
+        let path = dir.join(name);
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).unwrap();
+        }
+        fs::write(path, body).unwrap();
+    }
+    dir
 }

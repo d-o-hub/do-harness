@@ -17,6 +17,7 @@ mod cache;
 pub mod catalog;
 pub mod drift;
 pub mod suggest;
+mod tree;
 
 #[cfg(test)]
 mod tests;

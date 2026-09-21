@@ -535,13 +535,15 @@ because a short prefix is ambiguous across repositories and over time.
 The digest is `sha256` over one record per file — the path relative to the
 managed skill directory (never the repository), a NUL byte, the file's sha256
 hex, and a newline — ordered by byte-wise path, so a copy hashes alike wherever
-it is checked out. Empty directories do not appear, file symlinks are followed,
-and a symlinked directory is an error because a pinned digest cannot describe
-it. File names must be UTF-8, and a managed directory that resolves outside the
-repository root is an error as well: the manifest path check is lexical, so the
-resolved directory is required to stay under the canonical root. Obtain a pin by
-running the check once — the report carries the `actual` digest for every
-managed tree.
+it is checked out. Empty directories do not appear and file symlinks are
+followed (the target's content is hashed). A directory symlink *inside* the
+managed tree is an error because a pinned digest cannot describe it, while the
+managed directory itself may be a symlink as long as its resolved target stays
+under the repository root: the manifest path check is lexical, so the resolved
+directory is what the check trusts. File names must be UTF-8, and a managed
+directory that resolves outside the repository root is an error as well. Obtain
+a pin by running the check once — the report carries the `actual` digest for
+every managed tree.
 
 ```bash
 do-harness skills drift                  # text: one line per managed skill
