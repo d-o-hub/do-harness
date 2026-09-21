@@ -137,6 +137,33 @@ A generic, stack-neutral contract for verifying release-artifact provenance with
   ```
   On verification failure, `status` is set to `"fail"` and `reason` details the cause (e.g. `"digest mismatch"`, `"missing artifact"`, or `"verification mode 'sbom' is reserved and not implemented"`).
 
+#### Rust Binary Provenance Sensor Contract (`rust-binary-provenance`)
+The Rust-specific implementation of the generic artifact-provenance contract: it verifies already-built binaries with `cargo audit bin`, which reads the dependency metadata `cargo auditable` embeds at build time. Configure it in the repository that publishes auditable binaries; the harness builds nothing itself.
+- **Sensor Name**: `rust-binary-provenance` (script: `scripts/check-rust-binary-provenance.sh`).
+- **Required Inputs**:
+  - `--artifact <PATH(S)>` or `ARTIFACT_PATHS`: Target binary path(s), space- or comma-separated.
+  - `--digest <HEX_SHA256>` or `EXPECTED_DIGEST`: Optional expected hex SHA-256 digest, applied to each artifact.
+  - `--strict`: Treat an unavailable `cargo-audit` as a failure instead of a skip.
+  - `CARGO_AUDIT_BIN`: Optional cargo-audit binary override, invoked the way cargo invokes a subcommand (`<bin> audit bin <paths…>`).
+- **Fail-closed behavior**: a missing artifact, an unavailable sha256 tool, a digest mismatch, absent auditable metadata (no `.dep-v0`/`__dep` section), an unavailable `cargo-audit` under `--strict`, and a tool failure all set `status` to `"fail"`. Metadata presence is probed from the binary itself: `cargo-audit` 0.22 exits 0 on a binary without auditable metadata after recovering a partial dependency list from panic messages, so its exit code cannot stand in for the check.
+- **Required Evidence Output**:
+  Outputs a `COVERAGE: <json>` line carrying structured JSON, with one entry per artifact:
+  ```json
+  {
+    "artifact": "path/to/binary",
+    "digest": "sha256_hex_digest",
+    "status": "pass",
+    "reason": null,
+    "tool": "cargo-audit 0.22.2",
+    "auditable_metadata": true,
+    "findings": 0,
+    "artifacts": [
+      { "path": "path/to/binary", "digest": "sha256_hex_digest", "auditable_metadata": true }
+    ]
+  }
+  ```
+  `findings` counts advisory ids (`RUSTSEC-YYYY-NNNN`) so a tool or setup failure stays distinguishable from a vulnerability finding, and the `FINDINGS: <n>` marker carries the same count.
+
 ### `status`
 Reports verification evidence freshness for a signal set without executing
 any sensor: `green` (current passing evidence covers the set), `red`
