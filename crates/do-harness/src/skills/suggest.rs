@@ -251,9 +251,20 @@ pub fn select(
                 .context("cannot write selector input")
         });
     if let Err(err) = write_result {
-        let _ = child.kill();
+        // A selector that exits before reading its input breaks the pipe: the
+        // write error is the symptom, the child's own status is the diagnosis a
+        // caller can act on, so give it a moment to be reaped first.
+        let status = wait_briefly(&mut child, Duration::from_millis(250));
+        if status.is_none() {
+            let _ = child.kill();
+        }
         let _ = child.wait();
-        warnings.push(format!("selector input failed: {err}"));
+        match status {
+            Some(status) if !status.success() => {
+                warnings.push(format!("selector exited with {status}"));
+            }
+            _ => warnings.push(format!("selector input failed: {err}")),
+        }
         return (Selection::Deterministic, warnings);
     }
 
@@ -270,6 +281,26 @@ pub fn select(
                 (Selection::Deterministic, warnings)
             }
         },
+    }
+}
+
+/// Waits up to `budget` for a child that is already exiting.
+///
+/// Used when writing the selector's input fails: an exit closed the pipe, so
+/// the reaped status says *why* the selector stopped while the write error only
+/// says the pipe broke.
+fn wait_briefly(
+    child: &mut std::process::Child,
+    budget: Duration,
+) -> Option<std::process::ExitStatus> {
+    let deadline = std::time::Instant::now() + budget;
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) => return Some(status),
+            Ok(None) if std::time::Instant::now() >= deadline => return None,
+            Ok(None) => std::thread::sleep(Duration::from_millis(5)),
+            Err(_) => return None,
+        }
     }
 }
 
