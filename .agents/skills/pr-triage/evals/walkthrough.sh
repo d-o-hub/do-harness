@@ -137,7 +137,7 @@ printf 'flaky_exit=%s\nflaky_out=%s\nflaky_runs=%s\ndet_exit=%s\ndet_runs=%s\n' 
   "$flaky_exit" "$(cat "$root/retry_flaky.out")" "$flaky_runs" "$det_exit" "$det_runs" \
   > "$root/retry_summary.txt"
 
-# 5e. Auto-merge guard: a pre-armed request is detected (exit 1 proves the
+# 5d. Auto-merge guard: a pre-armed request is detected (exit 1 proves the
 # caller must act), disarmed through --disable-auto, and then reads clean.
 export FAKE_GH_AUTO_MERGE=armed
 export FAKE_GH_AUTO_MERGE_LOG="$root/auto_merge_disable.log"
@@ -151,7 +151,7 @@ set -e
 printf 'armed_exit=%s\n' "$auto_merge_armed_exit" > "$root/auto_merge_summary.txt"
 unset FAKE_GH_AUTO_MERGE FAKE_GH_AUTO_MERGE_LOG
 
-# 5d. Webhook fast path: a real receiver answers /health, persists signed
+# 5e. Webhook fast path: a real receiver answers /health, persists signed
 # deliveries (rejecting unsigned ones), wakes long-polls, and drives the wait
 # scripts with events instead of sleeps; an unreachable receiver falls back to
 # polling. Node and curl are required for this section (present in CI).
@@ -273,7 +273,7 @@ checks_fallback_summary=$checks_fallback_summary
 post_merge_event_exit=$post_merge_event_exit
 EOF
 
-# 5e. Semantic router: drive the optional typed router wrapper against a
+# 5f. Semantic router: drive the optional typed router wrapper against a
 # hermetic fake provider. Every scenario writes residue under $root so the
 # policy (fallbacks, schema rejection, uncertainty escalation, head-bound cache,
 # zero-effect bypass, and diff text that must never be executed) is graded.
