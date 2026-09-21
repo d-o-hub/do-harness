@@ -238,6 +238,7 @@ pub async fn errors_cmd(root: &Path, action: ErrorsAction) -> Result<()> {
 }
 
 /// Dispatches hook management using the configured sensor split.
+#[allow(clippy::too_many_lines)]
 pub async fn hook(
     root: &Path,
     config_path: Option<&Path>,
