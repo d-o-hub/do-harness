@@ -2,8 +2,11 @@
 # Deterministic `gh` stub for the pr-triage walkthrough.
 #
 # Covers only the commands the skill scripts issue:
-#   pr list / pr view, repo view, api check-runs / status / graphql / compare.
-# Fixtures come from FAKE_GH_FIXTURES; check-run mode from FAKE_GH_CHECKS.
+#   pr list / pr view / pr merge --disable-auto, repo view, api check-runs /
+#   status / graphql / compare.
+# Fixtures come from FAKE_GH_FIXTURES; check-run mode from FAKE_GH_CHECKS, and
+# the auto-merge request from FAKE_GH_AUTO_MERGE (armed|none) with disarms
+# recorded in FAKE_GH_AUTO_MERGE_LOG.
 # FAKE_GH_CHECKS_SEQUENCE (comma list, e.g. "pending,pass") advances one mode
 # per check-runs call and clamps at the last entry; its cursor lives in
 # FAKE_GH_SEQ_FILE (default: a file under ${TMPDIR:-/tmp}).
@@ -75,11 +78,35 @@ case "$cmd" in
         fields=$(opt_value --json "$@") || fields=""
         sha=$(git rev-parse "refs/pull/$pr/head")
         case "$fields" in
+          *autoMergeRequest*)
+            mode="${FAKE_GH_AUTO_MERGE:-none}"
+            log="${FAKE_GH_AUTO_MERGE_LOG:-}"
+            if [ "$mode" = "armed" ] && [ -n "$log" ] && grep -qs "^disable-auto $pr$" "$log"; then
+              mode=none
+            fi
+            if [ "$mode" = "armed" ]; then
+              printf '{"autoMergeRequest":{"enabledAt":"2026-01-01T00:00:00Z","enabledBy":{"login":"owner"},"mergeMethod":"SQUASH","authorEmail":"owner@example.com","commitBody":"body","commitHeadline":"headline"}}\n'
+            else
+              printf '{"autoMergeRequest":null}\n'
+            fi
+            ;;
           *mergeCommit*) printf '%s\n' "$sha" ;;
           *baseRefName*) printf 'main\t%s\n' "$sha" ;;
           *headRefOid*) printf '%s\n' "$sha" ;;
           *) printf '{"number":%s,"baseRefName":"main","headRefOid":"%s"}\n' "$pr" "$sha" ;;
         esac
+        ;;
+      merge)
+        pr="${1:-}"
+        shift || true
+        if [ "${1:-}" != "--disable-auto" ]; then
+          echo "fake gh: only 'pr merge <n> --disable-auto' is supported" >&2
+          exit 1
+        fi
+        if [ -n "${FAKE_GH_AUTO_MERGE_LOG:-}" ]; then
+          printf 'disable-auto %s\n' "$pr" >> "$FAKE_GH_AUTO_MERGE_LOG"
+        fi
+        printf 'Disabled auto-merge for pull request #%s\n' "$pr"
         ;;
       *)
         echo "fake gh: unsupported pr subcommand '$sub'" >&2

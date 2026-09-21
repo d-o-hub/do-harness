@@ -21,7 +21,14 @@
     "contains:.agents/skills/pr-triage/SKILL.md|post-merge.sh",
     "exists:.agents/skills/pr-triage/scripts/retry.sh",
     "contains:.agents/skills/pr-triage/SKILL.md|retry.sh",
-    "exists:.agents/skills/pr-triage/references/gh-resilience.md"
+    "exists:.agents/skills/pr-triage/references/gh-resilience.md",
+    "exists:.agents/skills/pr-triage/scripts/auto-merge.sh",
+    "contains:.agents/skills/pr-triage/SKILL.md|auto-merge.sh PR --disable",
+    "contains:.agents/skills/pr-triage/references/merge-order.md|disarm",
+    "contains:auto_merge_summary.txt|armed_exit=1",
+    "contains:auto_merge_armed.out|ARMED",
+    "contains:auto_merge_disable.log|disable-auto 9",
+    "contains:auto_merge_after.out|NONE"
    ]
   },
   {
