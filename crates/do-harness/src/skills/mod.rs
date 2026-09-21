@@ -9,11 +9,13 @@ use std::path::Path;
 
 use anyhow::{Result, bail};
 
+use crate::CliError;
 use crate::cli::SkillsAction;
 use crate::report::Format;
 
 mod cache;
 pub mod catalog;
+pub mod drift;
 pub mod suggest;
 
 #[cfg(test)]
@@ -23,15 +25,18 @@ mod tests;
 ///
 /// # Errors
 ///
-/// Returns an error when the skill root cannot be listed, or the request is a
-/// usage error (`--limit 0`).
-pub fn run(root: &Path, action: SkillsAction) -> Result<()> {
+/// Returns [`CliError::Usage`] when the skill root cannot be listed or the
+/// request is a usage error (`--limit 0`, an unreadable manifest), and
+/// [`CliError::Verify`] when `skills drift` finds a managed skill that no longer
+/// matches its pinned digest.
+pub fn run(root: &Path, action: SkillsAction) -> Result<(), CliError> {
     match action {
         SkillsAction::Suggest {
             query,
             limit,
             format,
-        } => suggest_command(root, &query, limit, format),
+        } => suggest_command(root, &query, limit, format).map_err(CliError::Usage),
+        SkillsAction::Drift { manifest, format } => drift::run(root, manifest.as_deref(), format),
     }
 }
 

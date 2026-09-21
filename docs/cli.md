@@ -124,7 +124,7 @@ A generic, stack-neutral contract for verifying release-artifact provenance with
 - **Required Inputs**:
   - `ARTIFACT_PATHS`: Space- or comma-separated list/globs of target artifact file paths.
   - `EXPECTED_DIGEST`: Optional expected hex SHA-256 digest of the artifact.
-  - `VERIFY_MODE`: Verification mode (e.g. `slsa`, `github-attestation`, `sbom`, `strict`, or `digest-only`).
+  - `VERIFY_MODE`: Verification mode. `digest-only` (default) is implemented; `slsa`, `github-attestation`, `sbom`, and `strict` are reserved and fail closed until implemented, so a configured mode never reports a pass it did not verify.
 - **Required Evidence Output**:
   Sensors implementing this contract output a `COVERAGE: <json>` line carrying structured JSON:
   ```json
@@ -135,7 +135,34 @@ A generic, stack-neutral contract for verifying release-artifact provenance with
     "reason": null
   }
   ```
-  On verification failure, `status` is set to `"fail"` and `reason` details the cause (e.g. `"digest mismatch"`, `"missing artifact"`, or `"attestation invalid"`).
+  On verification failure, `status` is set to `"fail"` and `reason` details the cause (e.g. `"digest mismatch"`, `"missing artifact"`, or `"verification mode 'sbom' is reserved and not implemented"`).
+
+#### Rust Binary Provenance Sensor Contract (`rust-binary-provenance`)
+The Rust-specific implementation of the generic artifact-provenance contract: it verifies already-built binaries with `cargo audit bin`, which reads the dependency metadata `cargo auditable` embeds at build time. Configure it in the repository that publishes auditable binaries; the harness builds nothing itself.
+- **Sensor Name**: `rust-binary-provenance` (script: `scripts/check-rust-binary-provenance.sh`).
+- **Required Inputs**:
+  - `--artifact <PATH(S)>` or `ARTIFACT_PATHS`: Target binary path(s), space- or comma-separated.
+  - `--digest <HEX_SHA256>` or `EXPECTED_DIGEST`: Optional expected hex SHA-256 digest, applied to each artifact.
+  - `--strict`: Treat an unavailable `cargo-audit` as a failure instead of a skip.
+  - `CARGO_AUDIT_BIN`: Optional cargo-audit binary override, invoked the way cargo invokes a subcommand (`<bin> audit bin <paths…>`).
+- **Fail-closed behavior**: a missing artifact, an unavailable sha256 tool, a digest mismatch, absent auditable metadata (no `.dep-v0`/`__dep` section), an unavailable `cargo-audit` under `--strict`, and a tool failure all set `status` to `"fail"`. Metadata presence is probed from the binary itself: `cargo-audit` 0.22 exits 0 on a binary without auditable metadata after recovering a partial dependency list from panic messages, so its exit code cannot stand in for the check.
+- **Required Evidence Output**:
+  Outputs a `COVERAGE: <json>` line carrying structured JSON, with one entry per artifact:
+  ```json
+  {
+    "artifact": "path/to/binary",
+    "digest": "sha256_hex_digest",
+    "status": "pass",
+    "reason": null,
+    "tool": "cargo-audit 0.22.2",
+    "auditable_metadata": true,
+    "findings": 0,
+    "artifacts": [
+      { "path": "path/to/binary", "digest": "sha256_hex_digest", "auditable_metadata": true }
+    ]
+  }
+  ```
+  `findings` counts advisory ids (`RUSTSEC-YYYY-NNNN`) so a tool or setup failure stays distinguishable from a vulnerability finding, and the `FINDINGS: <n>` marker carries the same count.
 
 ### `status`
 Reports verification evidence freshness for a signal set without executing
@@ -412,7 +439,8 @@ cancels out; the JSON envelope counts against the residual. Consumers should
 review the residual only on `reduced` and fall back to the raw diff on `no-go`.
 
 ### `skills`
-Progressive-disclosure skill selection. `skills suggest` ranks the skills under
+Progressive-disclosure skill selection and opt-in drift checks for shared
+skills. `skills suggest` ranks the skills under
 `.agents/skills/*/SKILL.md` against a task description using **frontmatter
 metadata only** — the catalog never reads a skill body, and ranking is offline
 and deterministic.
@@ -478,11 +506,54 @@ error; skill bodies are never cached.
 only the selected `SKILL.md` and the references it names. Defaults are five
 metadata candidates and one fully loaded skill.
 
-`crates/do-harness/src/skills/tests.rs` covers the algorithm and cache;
+`crates/do-harness/src/skills/tests/` covers the algorithm and cache;
 `crates/do-harness/tests/skills_suggest.rs` drives the real binary;
 `scripts/skills-suggest-benchmark.sh` measures top-1/top-3/top-5 accuracy,
 metadata bytes, loaded-context bytes, unnecessary-load rate, and latency across
 the load-all, deterministic-only, and deterministic+selector arms.
+
+**Drift checks (`skills drift`).** Shared skills are copied between repositories
+on purpose, so their drift cannot be detected by comparing a repository against
+itself. An opt-in manifest at `.agents/skills-manifest.toml` (override with
+`--manifest <FILE>`) names the skills a repository manages from an upstream and
+pins each one:
+
+```toml
+[[skills]]
+name = "skill-creator"
+path = ".agents/skills/skill-creator"
+upstream = "owner/repo"
+upstream_path = ".agents/skills/skill-creator"
+version = "1.2.0"            # informational; never compared
+commit = "<40-hex>"          # provenance anchor
+content_sha256 = "<64-hex>"  # content anchor: digest of the managed tree
+```
+
+The digest is `sha256` over one record per file — the repository-relative path,
+a NUL byte, the file's sha256 hex, and a newline — ordered by byte-wise path.
+Empty directories do not appear, file symlinks are followed, and a symlinked
+directory is an error because a pinned digest cannot describe it. Obtain a pin
+by running the check once — the report carries the `actual` digest for every
+managed tree.
+
+```bash
+do-harness skills drift                  # text: one line per managed skill
+do-harness skills drift --format json    # schema_version 1 report
+```
+
+Exit codes are the verdict: `0` every managed skill matches its pin, `1` at
+least one drifted or is missing (the report names the skill and its path), `2`
+the manifest is absent, unreadable, or invalid (including one that lists no
+skills). A missing manifest is deliberately an error rather than a vacuous
+pass, and the check stays offline and check-only: it never fetches, never
+writes, and never inspects a skill the manifest does not name. Adopters who
+wire it in as a sensor should declare the manifest under `coverage-inputs`, so
+a changed pin invalidates stale evidence instead of hiding behind it.
+
+`crates/do-harness/src/skills/tests/drift_cases.rs` covers the digest,
+validation, and status rules; `crates/do-harness/tests/skills_drift.rs` drives
+the real binary's exit codes, output determinism, and unmanaged-skill
+isolation.
 
 ### `completions`
 Generate shell completions for `bash`, `zsh`, `fish`, `powershell`, `elvish`.

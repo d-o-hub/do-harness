@@ -243,4 +243,13 @@ pub enum SkillsAction {
         #[arg(long, value_enum, default_value_t = Format::Text)]
         format: Format,
     },
+    /// Check manifest-managed shared skills against their pinned digests.
+    Drift {
+        /// Manifest to read; defaults to `.agents/skills-manifest.toml`.
+        #[arg(long, value_hint = ValueHint::FilePath, value_name = "FILE")]
+        manifest: Option<PathBuf>,
+        /// Output format.
+        #[arg(long, value_enum, default_value_t = Format::Text)]
+        format: Format,
+    },
 }

@@ -348,6 +348,26 @@ json\:"Machine-readable JSON output"))' \
 '--version[Print version]' \
 && ret=0
 ;;
+(drift)
+_arguments "${_arguments_options[@]}" : \
+'--manifest=[Manifest to read; defaults to \`.agents/skills-manifest.toml\`]:FILE:_files' \
+'--format=[Output format]:FORMAT:((text\:"Human-readable text output"
+json\:"Machine-readable JSON output"))' \
+'--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
+'--config=[Explicit path to do-harness.toml]:FILE:_files' \
+'--color=[Color output (auto, always, never)]:WHEN:_default' \
+'--output=[Default output file path]:FILE:_files' \
+'*-v[Verbosity level (-v, -vv)]' \
+'*--verbose[Verbosity level (-v, -vv)]' \
+'-q[Suppress non-error messages]' \
+'--quiet[Suppress non-error messages]' \
+'--dry-run[Dry run without side effects]' \
+'-h[Print help (see more with '\''--help'\'')]' \
+'--help[Print help (see more with '\''--help'\'')]' \
+'-V[Print version]' \
+'--version[Print version]' \
+&& ret=0
+;;
 (help)
 _arguments "${_arguments_options[@]}" : \
 ":: :_do-harness__subcmd__skills__subcmd__help_commands" \
@@ -361,6 +381,10 @@ _arguments "${_arguments_options[@]}" : \
         curcontext="${curcontext%:*:*}:do-harness-skills-help-command-$line[1]:"
         case $line[1] in
             (suggest)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(drift)
 _arguments "${_arguments_options[@]}" : \
 && ret=0
 ;;
@@ -838,7 +862,7 @@ json\:"Machine-readable JSON output"))' \
 '--color=[Color output (auto, always, never)]:WHEN:_default' \
 '--output=[Default output file path]:FILE:_files' \
 '--from-strikes[Generate a starter skill scaffold from recorded sensor strikes (AGENTS.md §6 steering loop) instead of distilling from a trace]' \
-'--to-fixture[Raise the skill'\''s pass-rate bar after this recovery]' \
+'--to-fixture[Raise the skill'\''s pass-rate bar after this recovery (review ticks anti-AI-slop checklist first)]' \
 '--dry-run[Perform dry run without modifying skill files]' \
 '*-v[Verbosity level (-v, -vv)]' \
 '*--verbose[Verbosity level (-v, -vv)]' \
@@ -946,6 +970,46 @@ esac
         esac
     ;;
 esac
+;;
+(loc)
+_arguments "${_arguments_options[@]}" : \
+'--format=[Output format]:FORMAT:((text\:"Human-readable text output"
+json\:"Machine-readable JSON output"))' \
+'--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
+'--config=[Explicit path to do-harness.toml]:FILE:_files' \
+'--color=[Color output (auto, always, never)]:WHEN:_default' \
+'--output=[Default output file path]:FILE:_files' \
+'--warn[Show only files at or above the 450-line decomposition threshold]' \
+'*-v[Verbosity level (-v, -vv)]' \
+'*--verbose[Verbosity level (-v, -vv)]' \
+'-q[Suppress non-error messages]' \
+'--quiet[Suppress non-error messages]' \
+'--dry-run[Dry run without side effects]' \
+'-h[Print help (see more with '\''--help'\'')]' \
+'--help[Print help (see more with '\''--help'\'')]' \
+'-V[Print version]' \
+'--version[Print version]' \
+'*::paths -- Files or directories to measure (default\: all `.rs` under crates/):_files' \
+&& ret=0
+;;
+(split)
+_arguments "${_arguments_options[@]}" : \
+'--target=[Name the sibling module instead of deriving it from the item]:NAME:_default' \
+'--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
+'--config=[Explicit path to do-harness.toml]:FILE:_files' \
+'--color=[Color output (auto, always, never)]:WHEN:_default' \
+'--output=[Default output file path]:FILE:_files' \
+'--dry-run[Print the plan without writing files]' \
+'*-v[Verbosity level (-v, -vv)]' \
+'*--verbose[Verbosity level (-v, -vv)]' \
+'-q[Suppress non-error messages]' \
+'--quiet[Suppress non-error messages]' \
+'-h[Print help]' \
+'--help[Print help]' \
+'-V[Print version]' \
+'--version[Print version]' \
+':file -- Source file to decompose:_files' \
+&& ret=0
 ;;
 (eval)
 _arguments "${_arguments_options[@]}" : \
@@ -1363,6 +1427,10 @@ _arguments "${_arguments_options[@]}" : \
 _arguments "${_arguments_options[@]}" : \
 && ret=0
 ;;
+(drift)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
         esac
     ;;
 esac
@@ -1487,6 +1555,14 @@ _arguments "${_arguments_options[@]}" : \
     ;;
 esac
 ;;
+(loc)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(split)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
 (eval)
 _arguments "${_arguments_options[@]}" : \
 && ret=0
@@ -1589,8 +1665,10 @@ _do-harness_commands() {
 'init:Scaffold a harness workspace in a target directory' \
 'task:Inspect and export task state' \
 'trace:Record and list interaction traces' \
-'distill:Extract a heuristic from a resolved trace' \
+'distill:Extract a heuristic from a resolved trace into a skill. Review output against the anti-AI-slop checklist (.agents/skills/skill-creator/references/anti_ai_slop.md)' \
 'errors:Inspect and clear fail-fast error signatures' \
+'loc:Report line-of-code state for the 500-LOC invariant' \
+'split:Extract a large top-level item into a sibling module' \
 'eval:Validate skill structure and benchmark skill evals' \
 'hook:Manage git hooks that run \`do-harness verify\`' \
 'doctor:Run diagnostic checks on binary resolution and git hook health' \
@@ -1704,8 +1782,10 @@ _do-harness__subcmd__help_commands() {
 'init:Scaffold a harness workspace in a target directory' \
 'task:Inspect and export task state' \
 'trace:Record and list interaction traces' \
-'distill:Extract a heuristic from a resolved trace' \
+'distill:Extract a heuristic from a resolved trace into a skill. Review output against the anti-AI-slop checklist (.agents/skills/skill-creator/references/anti_ai_slop.md)' \
 'errors:Inspect and clear fail-fast error signatures' \
+'loc:Report line-of-code state for the 500-LOC invariant' \
+'split:Extract a large top-level item into a sibling module' \
 'eval:Validate skill structure and benchmark skill evals' \
 'hook:Manage git hooks that run \`do-harness verify\`' \
 'doctor:Run diagnostic checks on binary resolution and git hook health' \
@@ -1829,6 +1909,11 @@ _do-harness__subcmd__help__subcmd__list_commands() {
     local commands; commands=()
     _describe -t commands 'do-harness help list commands' commands "$@"
 }
+(( $+functions[_do-harness__subcmd__help__subcmd__loc_commands] )) ||
+_do-harness__subcmd__help__subcmd__loc_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness help loc commands' commands "$@"
+}
 (( $+functions[_do-harness__subcmd__help__subcmd__maintenance_commands] )) ||
 _do-harness__subcmd__help__subcmd__maintenance_commands() {
     local commands; commands=()
@@ -1876,13 +1961,24 @@ _do-harness__subcmd__help__subcmd__seed_commands() {
 _do-harness__subcmd__help__subcmd__skills_commands() {
     local commands; commands=(
 'suggest:Rank skills by relevance to a query using metadata only' \
+'drift:Check manifest-managed shared skills against their pinned digests' \
     )
     _describe -t commands 'do-harness help skills commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__help__subcmd__skills__subcmd__drift_commands] )) ||
+_do-harness__subcmd__help__subcmd__skills__subcmd__drift_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness help skills drift commands' commands "$@"
 }
 (( $+functions[_do-harness__subcmd__help__subcmd__skills__subcmd__suggest_commands] )) ||
 _do-harness__subcmd__help__subcmd__skills__subcmd__suggest_commands() {
     local commands; commands=()
     _describe -t commands 'do-harness help skills suggest commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__help__subcmd__split_commands] )) ||
+_do-harness__subcmd__help__subcmd__split_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness help split commands' commands "$@"
 }
 (( $+functions[_do-harness__subcmd__help__subcmd__status_commands] )) ||
 _do-harness__subcmd__help__subcmd__status_commands() {
@@ -2065,6 +2161,11 @@ _do-harness__subcmd__list_commands() {
     local commands; commands=()
     _describe -t commands 'do-harness list commands' commands "$@"
 }
+(( $+functions[_do-harness__subcmd__loc_commands] )) ||
+_do-harness__subcmd__loc_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness loc commands' commands "$@"
+}
 (( $+functions[_do-harness__subcmd__maintenance_commands] )) ||
 _do-harness__subcmd__maintenance_commands() {
     local commands; commands=()
@@ -2137,17 +2238,29 @@ _do-harness__subcmd__seed_commands() {
 _do-harness__subcmd__skills_commands() {
     local commands; commands=(
 'suggest:Rank skills by relevance to a query using metadata only' \
+'drift:Check manifest-managed shared skills against their pinned digests' \
 'help:Print this message or the help of the given subcommand(s)' \
     )
     _describe -t commands 'do-harness skills commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__skills__subcmd__drift_commands] )) ||
+_do-harness__subcmd__skills__subcmd__drift_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness skills drift commands' commands "$@"
 }
 (( $+functions[_do-harness__subcmd__skills__subcmd__help_commands] )) ||
 _do-harness__subcmd__skills__subcmd__help_commands() {
     local commands; commands=(
 'suggest:Rank skills by relevance to a query using metadata only' \
+'drift:Check manifest-managed shared skills against their pinned digests' \
 'help:Print this message or the help of the given subcommand(s)' \
     )
     _describe -t commands 'do-harness skills help commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__skills__subcmd__help__subcmd__drift_commands] )) ||
+_do-harness__subcmd__skills__subcmd__help__subcmd__drift_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness skills help drift commands' commands "$@"
 }
 (( $+functions[_do-harness__subcmd__skills__subcmd__help__subcmd__help_commands] )) ||
 _do-harness__subcmd__skills__subcmd__help__subcmd__help_commands() {
@@ -2163,6 +2276,11 @@ _do-harness__subcmd__skills__subcmd__help__subcmd__suggest_commands() {
 _do-harness__subcmd__skills__subcmd__suggest_commands() {
     local commands; commands=()
     _describe -t commands 'do-harness skills suggest commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__split_commands] )) ||
+_do-harness__subcmd__split_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness split commands' commands "$@"
 }
 (( $+functions[_do-harness__subcmd__status_commands] )) ||
 _do-harness__subcmd__status_commands() {
