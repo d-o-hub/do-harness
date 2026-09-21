@@ -82,6 +82,8 @@ The harness is designed to be adopted by any codebase, Rust or not:
    ```bash
    do-harness init                 # Rust sensor pack
    do-harness init --language generic   # no built-in sensors
+   do-harness init --language web       # web UI audit pack (viewport, a11y, console, perf, visual, i18n)
+   do-harness init --language node      # Node/JS/TS pack (typecheck, lint, test, build)
    ```
 
    This writes `do-harness.toml`, `AGENTS.md`, `plans/invariants.json`,
@@ -102,10 +104,12 @@ The harness is designed to be adopted by any codebase, Rust or not:
    scaffolded into adopting projects.
 
 2. Configure sensors for your stack in `do-harness.toml`. Language packs:
-   `rust` (fmt/check/clippy/test/loc/deps/audit/commitlint) and `generic`
-   (ships no sensors — add your own `[[sensors]]` entries). With zero sensors
-   `verify` exits 0 without running any command: a vacuous pass, not
-   evidence. Define real sensors before treating verify output as proof.
+   `rust` (fmt/check/clippy/test/loc/deps/audit/commitlint), `generic`
+   (ships no sensors — add your own `[[sensors]]` entries), `web` (web UI
+   audit pack: viewport text, axe accessibility, console noise, performance, visual
+   diffs, i18n), and `node` (Node/JS/TS pack: typecheck, lint, test, build).
+   With zero sensors `verify` exits 0 without running any command: a vacuous
+   pass, not evidence. Define real sensors before treating verify output as proof.
 
 3. Wire the git hooks:
 
@@ -183,7 +187,7 @@ export PATH="$HOME/.local/bin:$PATH"
 | `metrics [--format text\|json]` | Report sensor stats, strike counts, and eval pass-rate history |
 | `dora [--days N] [--format text\|json] [--record] [--source git\|gh] [--now UNIX]` | Derive DORA metrics (deployment frequency, lead time, change failure rate, time to restore) from git history plus the pinned `plans/dora.json` policy; every number carries its derivation manifest |
 | `compliance [--format text\|json]` | Print compliance mapping to OWASP Agentic Top 10, NIST AI RMF, and EU AI Act |
-| `init [--language rust\|generic] [--force]` | Scaffold a harness workspace in the current directory |
+| `init [--language rust\|generic\|web\|node] [--force]` | Scaffold a harness workspace in the current directory |
 | `hook install [--force]` / `hook uninstall` / `hook status` / `hook diff` | Manage git hooks (`.git/hooks/pre-commit`, `commit-msg`, `pre-push`) |
 | `doctor` | Run diagnostic checks on binary resolution, git hook health, and state-database migration skew (fails when the database outruns the binary) |
 | `pr no-effect <PR\|--base REV --head REV>` | Report whether a PR or revision range introduces any effective change, from the merge-base tree delta (read-only; works in any git repo) |
@@ -284,8 +288,8 @@ See [docs/compliance.md](docs/compliance.md) for full mappings against the **OWA
 
 `do-harness.toml` at the workspace root configures the harness:
 
-- `language` — the language pack (`"rust"` or `"generic"`; the generic pack
-  ships no sensors).
+- `language` — the language pack (`"rust"`, `"generic"`, `"web"`, or `"node"`;
+  the generic pack ships no sensors).
 - `[hooks]` — `pre-commit` / `pre-push` lists naming the sensors each hook runs; an empty `pre-push` list means the full suite.
 - `[[sensors]]` — each sensor has a `name` and an `argv` (the command to execute).
   Optional `when-changed` globs declare when the sensor applies to the current
