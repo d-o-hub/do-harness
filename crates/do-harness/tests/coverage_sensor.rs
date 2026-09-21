@@ -3,9 +3,9 @@
 //! Verifies acceptance criteria:
 //! - `inventory` on a fresh init rust workspace exits 0 with a stable layer table and no test execution.
 //! - `llvm-cov` path emits `FINDINGS: <n>` (deficit) and `FINDINGS: 0` on green; branch % printed when parseable, never breaks ratchet when unparseable.
-//! - Missing cargo-llvm-cov/cargo-nextest keeps current SKIP/FAIL contract (CI=true / DO_HARNESS_REQUIRE_TOOLS=1).
+//! - Missing cargo-llvm-cov/cargo-nextest keeps current SKIP/FAIL contract (`CI=true` / `DO_HARNESS_REQUIRE_TOOLS=1`).
 
-#![allow(clippy::unwrap_used, clippy::expect_used)]
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::doc_markdown)]
 
 use std::path::Path;
 use std::process::Command;
@@ -177,6 +177,9 @@ fn llvm_cov_parsing_with_and_without_branch_column() {
     let temp_dir = tempfile::tempdir().unwrap();
     let root = temp_dir.path();
 
+    let init_status = harness(root).arg("init").status().expect("run init");
+    assert!(init_status.success(), "do-harness init failed");
+
     let bin_dir = temp_dir.path().join("bin");
     std::fs::create_dir_all(&bin_dir).unwrap();
 
@@ -184,31 +187,43 @@ fn llvm_cov_parsing_with_and_without_branch_column() {
     let fake_cargo_nextest = bin_dir.join("cargo-nextest");
 
     std::fs::write(&fake_cargo_nextest, "#!/bin/sh\nexit 0\n").unwrap();
+    std::fs::write(bin_dir.join("cargo-nextest.cmd"), "@echo off\nexit /b 0\n").unwrap();
+
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(&fake_cargo_nextest, std::fs::Permissions::from_mode(0o755)).unwrap();
+        std::fs::set_permissions(&fake_cargo_nextest, std::fs::Permissions::from_mode(0o755))
+            .unwrap();
     }
 
-    let cov_script_with_branch = format!(
-        r#"#!/bin/sh
+    let cov_script_with_branch = r"#!/bin/sh
 cat << 'EOF'
 Filename                      Regions    Missed Regions     Cover   Functions  Missed Functions  Executed       Lines      Missed Lines     Cover    Branches   Missed Branches     Cover
 -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 src/lib.rs                         10                 2    80.00%           3                 0   100.00%          25                 5    80.00%           4                 1    75.00%
 TOTAL                              50                10    80.00%          15                 0   100.00%         100                26    74.00%          20                 7    65.00%
 EOF
-"#
-    );
+";
     std::fs::write(&fake_cargo_llvm_cov, cov_script_with_branch).unwrap();
+    std::fs::write(
+        bin_dir.join("cargo-llvm-cov.cmd"),
+        "@echo off\nsh \"%~dp0cargo-llvm-cov\" %*\n",
+    )
+    .unwrap();
+
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(&fake_cargo_llvm_cov, std::fs::Permissions::from_mode(0o755)).unwrap();
+        std::fs::set_permissions(&fake_cargo_llvm_cov, std::fs::Permissions::from_mode(0o755))
+            .unwrap();
     }
 
     let mut cmd = shell::bash();
-    let path_env = format!("{}:{}", bin_dir.display(), std::env::var("PATH").unwrap_or_default());
+    let path_env = format!(
+        "{}:{}",
+        bin_dir.display(),
+        std::env::var("PATH").unwrap_or_default()
+    );
     cmd.env("PATH", &path_env);
 
     let output = cmd
@@ -220,7 +235,9 @@ EOF
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(
-        stdout.contains("check-coverage OK: Line coverage is 74.00% (>= 70%), Branch coverage is 65.00%."),
+        stdout.contains(
+            "check-coverage OK: Line coverage is 74.00% (>= 70%), Branch coverage is 65.00%."
+        ),
         "expected line and branch coverage in stdout, got:\n{stdout}"
     );
     assert!(
@@ -228,16 +245,14 @@ EOF
         "expected FINDINGS: 0, got:\n{stdout}"
     );
 
-    let cov_script_no_branch = format!(
-        r#"#!/bin/sh
+    let cov_script_no_branch = r"#!/bin/sh
 cat << 'EOF'
 Filename                      Regions    Missed Regions     Cover   Functions  Missed Functions  Executed       Lines      Missed Lines     Cover
 -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 src/lib.rs                         10                 2    80.00%           3                 0   100.00%          25                 5    80.00%
 TOTAL                              50                10    80.00%          15                 0   100.00%         100                35    65.00%
 EOF
-"#
-    );
+";
     std::fs::write(&fake_cargo_llvm_cov, cov_script_no_branch).unwrap();
 
     let mut cmd2 = shell::bash();
