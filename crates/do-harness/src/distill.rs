@@ -468,11 +468,13 @@ mod tests {
             .await
             .unwrap()
             .unwrap();
-        assert!(trace
-            .resolution_steps
-            .as_deref()
-            .unwrap()
-            .contains("anti-ai-slop: pass"));
+        assert!(
+            trace
+                .resolution_steps
+                .as_deref()
+                .unwrap()
+                .contains("anti-ai-slop: pass")
+        );
 
         let heuristics = do_harness_db::list_heuristics(&conn, "harness")
             .await
