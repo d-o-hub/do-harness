@@ -164,6 +164,23 @@ The Rust-specific implementation of the generic artifact-provenance contract: it
   ```
   `findings` counts advisory ids (`RUSTSEC-YYYY-NNNN`) so a tool or setup failure stays distinguishable from a vulnerability finding, and the `FINDINGS: <n>` marker carries the same count.
 
+#### Coverage Sensor (`check-coverage.sh`)
+The coverage sensor provides behavior-based coverage inventory alongside line and branch coverage threshold verification.
+- **Sensor Name**: `coverage` (script: `scripts/check-coverage.sh`).
+- **Invocation Modes**:
+  - `check-coverage.sh inventory`: Fast path (no test execution, python3/grep only). Generates a behavior map table of unique compiled behavior per layer.
+  - `check-coverage.sh` / `check-coverage.sh llvm-cov`: Full verification path. Prints the behavior inventory table, then executes `cargo-llvm-cov nextest` to verify line and branch coverage.
+- **Methodology**:
+  - **Inventory**: Behavior map measuring unique test function declarations `unique(file, fn)` per layer.
+  - **llvm-cov**: Proof measuring workspace line % and branch % coverage.
+  - Test-LOC counts do not replace inventory or `llvm-cov` metrics.
+- **Layer Attribution**: Path-based attribution across four canonical layers:
+  - `crates/*/src`: Component/crate owner source.
+  - `crates/*/tests`: Crate-level integration tests.
+  - `src/`: Root facade source.
+  - `tests/`: Root-level integration tests.
+- **Ratchet Contract**: Emits `FINDINGS: <deficit>` (or `FINDINGS: 0` on pass) representing the line coverage percentage deficit against `TARGET_PCT=70` for baseline ratcheting. Branch coverage % is reported alongside line coverage % when parseable and does not break baseline ratcheting when unparseable.
+
 ### `status`
 Reports verification evidence freshness for a signal set without executing
 any sensor: `green` (current passing evidence covers the set), `red`
