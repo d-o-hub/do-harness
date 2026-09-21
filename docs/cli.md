@@ -529,11 +529,18 @@ commit = "<40-hex>"          # provenance anchor
 content_sha256 = "<64-hex>"  # content anchor: digest of the managed tree
 ```
 
-The digest is `sha256` over one record per file — the repository-relative path,
-a NUL byte, the file's sha256 hex, and a newline — ordered by byte-wise path.
-Empty directories do not appear, file symlinks are followed, and a symlinked
-directory is an error because a pinned digest cannot describe it. Obtain a pin
-by running the check once — the report carries the `actual` digest for every
+The commit pin is the full 40-hex object ID: abbreviated SHAs are rejected,
+because a short prefix is ambiguous across repositories and over time.
+
+The digest is `sha256` over one record per file — the path relative to the
+managed skill directory (never the repository), a NUL byte, the file's sha256
+hex, and a newline — ordered by byte-wise path, so a copy hashes alike wherever
+it is checked out. Empty directories do not appear, file symlinks are followed,
+and a symlinked directory is an error because a pinned digest cannot describe
+it. File names must be UTF-8, and a managed directory that resolves outside the
+repository root is an error as well: the manifest path check is lexical, so the
+resolved directory is required to stay under the canonical root. Obtain a pin by
+running the check once — the report carries the `actual` digest for every
 managed tree.
 
 ```bash
@@ -544,9 +551,11 @@ do-harness skills drift --format json    # schema_version 1 report
 Exit codes are the verdict: `0` every managed skill matches its pin, `1` at
 least one drifted or is missing (the report names the skill and its path), `2`
 the manifest is absent, unreadable, or invalid (including one that lists no
-skills). A missing manifest is deliberately an error rather than a vacuous
-pass, and the check stays offline and check-only: it never fetches, never
-writes, and never inspects a skill the manifest does not name. Adopters who
+skills), or a managed tree cannot be described — unreadable, containing a
+non-UTF-8 file name, or resolving outside the repository root. A missing
+manifest is deliberately an error rather than a vacuous pass, and the check
+stays offline and check-only: it never fetches, never writes, and never
+inspects a skill the manifest does not name. Adopters who
 wire it in as a sensor should declare the manifest under `coverage-inputs`, so
 a changed pin invalidates stale evidence instead of hiding behind it.
 
