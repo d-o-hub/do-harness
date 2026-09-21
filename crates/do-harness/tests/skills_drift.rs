@@ -281,3 +281,33 @@ fn unmanaged_skills_are_never_checked() {
     let absent = sandbox.drift();
     assert_eq!(absent.status.code(), Some(0));
 }
+
+#[cfg(unix)]
+#[test]
+fn managed_path_resolving_outside_the_root_is_a_usage_error() {
+    let sandbox = Sandbox::new(Some(&manifest_text(
+        ".agents/skills/managed",
+        &"0".repeat(64),
+    )));
+    let elsewhere = tempdir().unwrap();
+    fs::write(elsewhere.path().join(UNMANAGED), "external body\n").unwrap();
+    fs::remove_dir_all(sandbox.root.join(".agents/skills/managed")).unwrap();
+    std::os::unix::fs::symlink(
+        elsewhere.path(),
+        sandbox.root.join(".agents/skills/managed"),
+    )
+    .unwrap();
+
+    let output = sandbox.drift();
+    assert_eq!(
+        output.status.code(),
+        Some(2),
+        "a managed path that resolves outside the root is a configuration error, not a verdict"
+    );
+    assert!(
+        String::from_utf8_lossy(&output.stderr).contains("resolves outside the repository root"),
+        "the error names the escape: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(output.stdout.is_empty(), "a usage error prints no report");
+}

@@ -28,10 +28,8 @@ pub const MANIFEST_PATH: &str = ".agents/skills-manifest.toml";
 
 /// Length of a SHA-256 digest in hexadecimal characters.
 const SHA256_HEX_LEN: usize = 64;
-/// Shortest accepted commit pin (a full SHA-1 is 40 characters).
-const COMMIT_MIN_LEN: usize = 7;
-/// Longest accepted commit pin.
-const COMMIT_MAX_LEN: usize = 40;
+/// Length of a commit pin in hexadecimal characters (a full SHA-1 object ID).
+const COMMIT_HEX_LEN: usize = 40;
 /// Status column width in the text report.
 const STATUS_WIDTH: usize = 7;
 
@@ -51,7 +49,7 @@ pub struct ManagedSkill {
     /// Informational human version; never compared.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub version: Option<String>,
-    /// Pinned upstream commit (hex); the provenance anchor.
+    /// Pinned upstream commit (a full 40-hex object ID); the provenance anchor.
     pub commit: String,
     /// Pinned digest of the managed skill tree; the content anchor.
     pub content_sha256: String,
@@ -134,8 +132,9 @@ pub fn manifest_path(root: &Path, override_path: Option<&Path>) -> PathBuf {
 ///
 /// Returns an error naming the offending entry when the TOML is malformed or an
 /// entry carries an unknown key, an empty name or upstream, a path that is
-/// absolute or escapes the repository, a duplicate name or path, or a pin that
-/// is not hexadecimal.
+/// absolute or escapes the repository, a duplicate name or path, a commit pin
+/// that is not a full 40-hex object ID, or a digest that is not 64 hexadecimal
+/// characters.
 pub fn parse(text: &str) -> Result<Manifest> {
     let manifest: Manifest = toml::from_str(text).context("invalid skills manifest")?;
     validate(&manifest)?;
@@ -168,14 +167,14 @@ fn validate(manifest: &Manifest) -> Result<()> {
         if skill.upstream.trim().is_empty() {
             bail!("managed skill '{}' has an empty upstream", skill.name);
         }
-        if !is_hex(&skill.commit, COMMIT_MIN_LEN, COMMIT_MAX_LEN) {
+        if !is_hex(&skill.commit, COMMIT_HEX_LEN) {
             bail!(
-                "managed skill '{}' has an invalid commit pin '{}': expected {COMMIT_MIN_LEN}-{COMMIT_MAX_LEN} hexadecimal characters",
+                "managed skill '{}' has an invalid commit pin '{}': expected a full {COMMIT_HEX_LEN}-character hexadecimal commit ID",
                 skill.name,
                 skill.commit
             );
         }
-        if !is_hex(&skill.content_sha256, SHA256_HEX_LEN, SHA256_HEX_LEN) {
+        if !is_hex(&skill.content_sha256, SHA256_HEX_LEN) {
             bail!(
                 "managed skill '{}' has an invalid content_sha256 '{}': expected {SHA256_HEX_LEN} hexadecimal characters",
                 skill.name,
@@ -202,23 +201,26 @@ fn check_relative_path(name: &str, field: &str, value: &str) -> Result<()> {
     )
 }
 
-/// Whether `value` is hexadecimal within the inclusive length bounds.
-fn is_hex(value: &str, min: usize, max: usize) -> bool {
-    (min..=max).contains(&value.len()) && value.bytes().all(|byte| byte.is_ascii_hexdigit())
+/// Whether `value` is exactly `len` hexadecimal characters.
+fn is_hex(value: &str, len: usize) -> bool {
+    value.len() == len && value.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
 
 /// Digest of a directory tree: `sha256` over `<path>\0<file-sha256>\n` lines.
 ///
-/// Paths are forward-slashed, sorted by byte order, and framed so no
-/// concatenation is ambiguous; empty directories do not appear. File symlinks
-/// are followed (the target's content is hashed), a symlinked directory is an
-/// error because its contents are not well-defined for a pinned tree, and other
-/// file types are rejected rather than silently skipped.
+/// Paths are relative to `dir` — never to the checkout that holds the copy — so
+/// the same tree hashes alike in every repository. They are forward-slashed,
+/// sorted by byte order, and framed so no concatenation is ambiguous; empty
+/// directories do not appear. File symlinks are followed (the target's content
+/// is hashed), a symlinked directory is an error because its contents are not
+/// well-defined for a pinned tree, and other file types are rejected rather
+/// than silently skipped.
 ///
 /// # Errors
 ///
 /// Returns an error when the tree cannot be read or contains an entry the digest
-/// cannot describe (a symlinked directory, a socket, or a fifo).
+/// cannot describe (a non-UTF-8 file name, a symlinked directory, a socket, or a
+/// fifo).
 pub fn tree_digest(dir: &Path) -> Result<String> {
     let mut files = Vec::new();
     collect_files(dir, "", &mut files)?;
@@ -240,7 +242,14 @@ fn collect_files(dir: &Path, prefix: &str, out: &mut Vec<(String, PathBuf)>) -> 
     let entries = fs::read_dir(dir).with_context(|| format!("reading {}", dir.display()))?;
     for entry in entries {
         let entry = entry?;
-        let name = entry.file_name().to_string_lossy().into_owned();
+        let name = match entry.file_name().into_string() {
+            Ok(name) => name,
+            Err(name) => bail!(
+                "managed skill tree has a non-UTF-8 file name in {}: {}; pin UTF-8 names so the digest stays unambiguous",
+                dir.display(),
+                name.to_string_lossy()
+            ),
+        };
         let relative = if prefix.is_empty() {
             name
         } else {
@@ -267,14 +276,27 @@ fn collect_files(dir: &Path, prefix: &str, out: &mut Vec<(String, PathBuf)>) -> 
 
 /// Checks every managed skill against its pin.
 ///
+/// The manifest path check is lexical, so every managed directory is resolved
+/// and required to stay under the canonical repository root: a symlinked
+/// top-level path must not make the digest describe content outside the
+/// repository.
+///
 /// # Errors
 ///
-/// Returns an error when a managed tree cannot be hashed.
+/// Returns an error when the root or a managed tree cannot be resolved or
+/// hashed, and when a managed path resolves outside the repository root.
 pub fn evaluate(root: &Path, manifest: &Manifest) -> Result<Report> {
+    let root = root
+        .canonicalize()
+        .with_context(|| format!("resolving repository root {}", root.display()))?;
     let mut skills = Vec::with_capacity(manifest.skills.len());
     for skill in &manifest.skills {
         let directory = root.join(&skill.path);
         let (status, actual) = if directory.is_dir() {
+            let directory = directory
+                .canonicalize()
+                .with_context(|| format!("resolving managed skill '{}'", skill.name))?;
+            ensure_within_root(&root, &directory, skill)?;
             let digest = tree_digest(&directory)
                 .with_context(|| format!("hashing managed skill '{}'", skill.name))?;
             let status = if digest.eq_ignore_ascii_case(&skill.content_sha256) {
@@ -303,6 +325,22 @@ pub fn evaluate(root: &Path, manifest: &Manifest) -> Result<Report> {
     })
 }
 
+/// Rejects a resolved managed directory that sits outside the repository root.
+///
+/// The manifest's path check is lexical, so `is_dir()` would happily follow a
+/// symlinked top-level path and hash content the repository does not own.
+fn ensure_within_root(root: &Path, directory: &Path, skill: &ManagedSkill) -> Result<()> {
+    if directory.starts_with(root) {
+        return Ok(());
+    }
+    bail!(
+        "managed skill '{}' resolves outside the repository root: '{}' -> {}; pin a real directory inside the root",
+        skill.name,
+        skill.path,
+        directory.display()
+    )
+}
+
 /// Runs `do-harness skills drift`.
 ///
 /// Exit codes are the verdict: `0` when every managed skill matches its pin,
@@ -314,9 +352,10 @@ pub fn evaluate(root: &Path, manifest: &Manifest) -> Result<Report> {
 /// # Errors
 ///
 /// Returns [`CliError::Usage`] when the manifest is absent, unreadable, or
-/// invalid (including one that lists no skills), and when a managed tree cannot
-/// be hashed; returns [`CliError::Verify`] when a managed skill no longer
-/// matches its pinned digest.
+/// invalid (including one that lists no skills), when a managed tree cannot be
+/// hashed, and when a managed path resolves outside the repository root;
+/// returns [`CliError::Verify`] when a managed skill no longer matches its
+/// pinned digest.
 pub fn run(root: &Path, override_path: Option<&Path>, format: Format) -> Result<(), CliError> {
     let path = manifest_path(root, override_path);
     let display = display_path(root, &path);

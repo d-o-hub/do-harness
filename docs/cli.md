@@ -529,11 +529,18 @@ commit = "<40-hex>"          # provenance anchor
 content_sha256 = "<64-hex>"  # content anchor: digest of the managed tree
 ```
 
-The digest is `sha256` over one record per file — the repository-relative path,
-a NUL byte, the file's sha256 hex, and a newline — ordered by byte-wise path.
-Empty directories do not appear, file symlinks are followed, and a symlinked
-directory is an error because a pinned digest cannot describe it. Obtain a pin
-by running the check once — the report carries the `actual` digest for every
+The commit pin is the full 40-hex object ID: abbreviated SHAs are rejected,
+because a short prefix is ambiguous across repositories and over time.
+
+The digest is `sha256` over one record per file — the path relative to the
+managed skill directory (never the repository), a NUL byte, the file's sha256
+hex, and a newline — ordered by byte-wise path, so a copy hashes alike wherever
+it is checked out. Empty directories do not appear, file symlinks are followed,
+and a symlinked directory is an error because a pinned digest cannot describe
+it. File names must be UTF-8, and a managed directory that resolves outside the
+repository root is an error as well: the manifest path check is lexical, so the
+resolved directory is required to stay under the canonical root. Obtain a pin by
+running the check once — the report carries the `actual` digest for every
 managed tree.
 
 ```bash
