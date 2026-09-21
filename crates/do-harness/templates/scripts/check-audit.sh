@@ -22,4 +22,19 @@ if ! cargo audit --version >/dev/null 2>&1; then
     exit 0
 fi
 
-cargo audit --deny warnings
+run_audit() {
+    cargo audit --deny warnings "$@"
+}
+
+if ! run_audit; then
+    # If cargo audit fails (e.g. due to a corrupted/truncated advisory-db file
+    # on runner hosts), clear the local advisory-db cache and retry once.
+    CARGO_HOME_DIR="${CARGO_HOME:-${HOME:-/tmp}/.cargo}"
+    if [ -d "$CARGO_HOME_DIR/advisory-db" ]; then
+        echo "WARN: cargo audit failed; clearing advisory-db and retrying..."
+        rm -rf "$CARGO_HOME_DIR/advisory-db"
+        run_audit
+    else
+        exit 1
+    fi
+fi
