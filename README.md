@@ -33,7 +33,9 @@ curl -fsSL https://raw.githubusercontent.com/d-o-hub/do-harness/main/scripts/ins
 The installer verifies the artifact against the release `checksums.txt` before
 installing to `$HOME/.local/bin` (override with `--bin-dir` /
 `DO_HARNESS_INSTALL_DIR`). Checksums share the release origin, so they detect
-corruption and truncated downloads, not a compromised origin.
+corruption and truncated downloads, not a compromised origin. See
+[docs/provenance-trust-model.md](docs/provenance-trust-model.md) for the complete
+provenance trust boundary and verification model.
 
 Rust users can also install from crates.io (source build) or fetch the
 prebuilt release through `cargo-binstall`:
