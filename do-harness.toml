@@ -14,6 +14,7 @@ release = ["fmt", "check", "clippy", "deps", "audit", "test", "doctest", "covera
 # `insufficient_coverage` rather than green; scoping the evidence to a set is
 # what makes the freshness comparison meaningful.
 metrics = ["dora"]
+scheduled = ["powerset", "machete"]
 
 [[sensors]]
 name = "fmt"
@@ -141,3 +142,19 @@ name = "dora"
 argv = ["bash", "scripts/check-dora.sh"]
 severity = "warn"
 coverage-inputs = ["plans/dora.json"]
+
+[[sensors]]
+# Feature-powerset sensor for guardian-proxy feature combinations (--features
+# agt-governance / mcp-surface on/off). Exact-pin policy: dependency pins
+# (agent-governance = "=3.2.2", rmcp = "=3.3.0") remain exact per policy;
+# this sensor verifies all feature combinations build. Kept out of fast-loop hooks.
+name = "powerset"
+argv = ["bash", "scripts/check-powerset.sh"]
+when-changed = ["crates/guardian-proxy/**", "Cargo.toml", "Cargo.lock", "scripts/check-powerset.sh"]
+
+[[sensors]]
+# Unused-dependency pruning sensor using cargo-machete. Exact-pin policy: pins stay exact;
+# this sensor verifies no unused dependencies exist across workspace manifests. Kept out of fast-loop hooks.
+name = "machete"
+argv = ["bash", "scripts/check-machete.sh"]
+when-changed = ["**/Cargo.toml", "Cargo.lock", "scripts/check-machete.sh"]

@@ -15,7 +15,6 @@ axum.workspace = true
 clap = { workspace = true, features = ["derive"] }
 do-harness-types = { path = "../types", version = "0.1.0" }
 fs2.workspace = true
-http-body-util.workspace = true
 reqwest.workspace = true
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true

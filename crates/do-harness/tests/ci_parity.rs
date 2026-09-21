@@ -114,3 +114,51 @@ fn yamllint_sensor_fails_closed_only_when_required() {
         "CI run must fail closed without yamllint"
     );
 }
+
+#[test]
+fn powerset_sensor_fails_closed_only_when_required() {
+    if !tool_hidden("cargo-hack") {
+        eprintln!("cargo-hack visible under /usr/bin:/bin; skipping parity check");
+        return;
+    }
+    let local = run("check-powerset.sh", false);
+    assert!(
+        local.status.success(),
+        "local run must WARN-skip: {}",
+        String::from_utf8_lossy(&local.stderr)
+    );
+    let output = String::from_utf8_lossy(&local.stdout);
+    assert!(
+        output.contains("SKIP:"),
+        "local run without cargo-hack must output SKIP: marker: {output}"
+    );
+    let ci = run("check-powerset.sh", true);
+    assert!(
+        !ci.status.success(),
+        "CI run must fail closed without cargo-hack"
+    );
+}
+
+#[test]
+fn machete_sensor_fails_closed_only_when_required() {
+    if !tool_hidden("cargo-machete") {
+        eprintln!("cargo-machete visible under /usr/bin:/bin; skipping parity check");
+        return;
+    }
+    let local = run("check-machete.sh", false);
+    assert!(
+        local.status.success(),
+        "local run must WARN-skip: {}",
+        String::from_utf8_lossy(&local.stderr)
+    );
+    let output = String::from_utf8_lossy(&local.stdout);
+    assert!(
+        output.contains("SKIP:"),
+        "local run without cargo-machete must output SKIP: marker: {output}"
+    );
+    let ci = run("check-machete.sh", true);
+    assert!(
+        !ci.status.success(),
+        "CI run must fail closed without cargo-machete"
+    );
+}
