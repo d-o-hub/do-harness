@@ -48,7 +48,7 @@ jobs:
       # taiki-e/install-action@v2
       - uses: taiki-e/install-action@ba47c86ac325773530516bb756137ac718732518
         with:
-          tool: cargo-deny,cargo-audit,cargo-nextest,cargo-llvm-cov,shellcheck
+          tool: cargo-deny,cargo-audit,cargo-nextest,cargo-llvm-cov,shellcheck,cargo-hack,cargo-machete
       - name: Install markdownlint and yamllint
         run: |
           python3 -m pip install --disable-pip-version-check yamllint
@@ -105,6 +105,11 @@ jobs:
         run: ./target/release/do-harness verify --set verification --format json --strict
       - name: Assert verification evidence is green
         run: ./target/release/do-harness status --set verification --format json
+      - name: Run scheduled sensors
+        env:
+          CI: "true"
+          DO_HARNESS_REQUIRE_TOOLS: "1"
+        run: ./target/release/do-harness verify --set scheduled --format json --strict
       - name: Record Cargo.lock hash
         run: |
           mkdir -p .do-harness

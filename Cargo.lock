@@ -821,7 +821,6 @@ dependencies = [
  "clap",
  "do-harness-types",
  "fs2",
- "http-body-util",
  "reqwest",
  "rmcp",
  "serde",
