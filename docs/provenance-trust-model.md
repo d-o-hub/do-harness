@@ -147,6 +147,7 @@ Consumers and automated deployment harnesses verifying `do-harness` release arti
      cargo audit bin path/to/do-harness
      ```
    * *Outcome:* Confirms no embedded dependencies contain newly published high-severity advisories.
+   * The `rust-binary-provenance` sensor automates this step and fails closed when the binary carries no auditable metadata (no `.dep-v0`/`__dep` section) or `cargo-audit` itself is unavailable under strict verification; its evidence records the artifact digest, the tool version, and one entry per artifact.
 
 ### 4.2 Failure Mode Decision Matrix
 
