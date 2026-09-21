@@ -48,8 +48,10 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('init', 'init', [CompletionResultType]::ParameterValue, 'Scaffold a harness workspace in a target directory')
             [CompletionResult]::new('task', 'task', [CompletionResultType]::ParameterValue, 'Inspect and export task state')
             [CompletionResult]::new('trace', 'trace', [CompletionResultType]::ParameterValue, 'Record and list interaction traces')
-            [CompletionResult]::new('distill', 'distill', [CompletionResultType]::ParameterValue, 'Extract a heuristic from a resolved trace')
+            [CompletionResult]::new('distill', 'distill', [CompletionResultType]::ParameterValue, 'Extract a heuristic from a resolved trace into a skill. Review output against the anti-AI-slop checklist (.agents/skills/skill-creator/references/anti_ai_slop.md)')
             [CompletionResult]::new('errors', 'errors', [CompletionResultType]::ParameterValue, 'Inspect and clear fail-fast error signatures')
+            [CompletionResult]::new('loc', 'loc', [CompletionResultType]::ParameterValue, 'Report line-of-code state for the 500-LOC invariant')
+            [CompletionResult]::new('split', 'split', [CompletionResultType]::ParameterValue, 'Extract a large top-level item into a sibling module')
             [CompletionResult]::new('eval', 'eval', [CompletionResultType]::ParameterValue, 'Validate skill structure and benchmark skill evals')
             [CompletionResult]::new('hook', 'hook', [CompletionResultType]::ParameterValue, 'Manage git hooks that run `do-harness verify`')
             [CompletionResult]::new('doctor', 'doctor', [CompletionResultType]::ParameterValue, 'Run diagnostic checks on binary resolution and git hook health')
@@ -301,6 +303,7 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('-V', '-V ', [CompletionResultType]::ParameterName, 'Print version')
             [CompletionResult]::new('--version', '--version', [CompletionResultType]::ParameterName, 'Print version')
             [CompletionResult]::new('suggest', 'suggest', [CompletionResultType]::ParameterValue, 'Rank skills by relevance to a query using metadata only')
+            [CompletionResult]::new('drift', 'drift', [CompletionResultType]::ParameterValue, 'Check manifest-managed shared skills against their pinned digests')
             [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
             break
         }
@@ -323,12 +326,34 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('--version', '--version', [CompletionResultType]::ParameterName, 'Print version')
             break
         }
+        'do-harness;skills;drift' {
+            [CompletionResult]::new('--manifest', '--manifest', [CompletionResultType]::ParameterName, 'Manifest to read; defaults to `.agents/skills-manifest.toml`')
+            [CompletionResult]::new('--format', '--format', [CompletionResultType]::ParameterName, 'Output format')
+            [CompletionResult]::new('--root', '--root', [CompletionResultType]::ParameterName, 'Workspace root override (default: walk up from cwd)')
+            [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Explicit path to do-harness.toml')
+            [CompletionResult]::new('--color', '--color', [CompletionResultType]::ParameterName, 'Color output (auto, always, never)')
+            [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Default output file path')
+            [CompletionResult]::new('-v', '-v', [CompletionResultType]::ParameterName, 'Verbosity level (-v, -vv)')
+            [CompletionResult]::new('--verbose', '--verbose', [CompletionResultType]::ParameterName, 'Verbosity level (-v, -vv)')
+            [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Suppress non-error messages')
+            [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Suppress non-error messages')
+            [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Dry run without side effects')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            [CompletionResult]::new('-V', '-V ', [CompletionResultType]::ParameterName, 'Print version')
+            [CompletionResult]::new('--version', '--version', [CompletionResultType]::ParameterName, 'Print version')
+            break
+        }
         'do-harness;skills;help' {
             [CompletionResult]::new('suggest', 'suggest', [CompletionResultType]::ParameterValue, 'Rank skills by relevance to a query using metadata only')
+            [CompletionResult]::new('drift', 'drift', [CompletionResultType]::ParameterValue, 'Check manifest-managed shared skills against their pinned digests')
             [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
             break
         }
         'do-harness;skills;help;suggest' {
+            break
+        }
+        'do-harness;skills;help;drift' {
             break
         }
         'do-harness;skills;help;help' {
@@ -726,7 +751,7 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('--color', '--color', [CompletionResultType]::ParameterName, 'Color output (auto, always, never)')
             [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Default output file path')
             [CompletionResult]::new('--from-strikes', '--from-strikes', [CompletionResultType]::ParameterName, 'Generate a starter skill scaffold from recorded sensor strikes (AGENTS.md §6 steering loop) instead of distilling from a trace')
-            [CompletionResult]::new('--to-fixture', '--to-fixture', [CompletionResultType]::ParameterName, 'Raise the skill''s pass-rate bar after this recovery')
+            [CompletionResult]::new('--to-fixture', '--to-fixture', [CompletionResultType]::ParameterName, 'Raise the skill''s pass-rate bar after this recovery (review ticks anti-AI-slop checklist first)')
             [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Perform dry run without modifying skill files')
             [CompletionResult]::new('-v', '-v', [CompletionResultType]::ParameterName, 'Verbosity level (-v, -vv)')
             [CompletionResult]::new('--verbose', '--verbose', [CompletionResultType]::ParameterName, 'Verbosity level (-v, -vv)')
@@ -807,6 +832,41 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             break
         }
         'do-harness;errors;help;help' {
+            break
+        }
+        'do-harness;loc' {
+            [CompletionResult]::new('--format', '--format', [CompletionResultType]::ParameterName, 'Output format')
+            [CompletionResult]::new('--root', '--root', [CompletionResultType]::ParameterName, 'Workspace root override (default: walk up from cwd)')
+            [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Explicit path to do-harness.toml')
+            [CompletionResult]::new('--color', '--color', [CompletionResultType]::ParameterName, 'Color output (auto, always, never)')
+            [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Default output file path')
+            [CompletionResult]::new('--warn', '--warn', [CompletionResultType]::ParameterName, 'Show only files at or above the 450-line decomposition threshold')
+            [CompletionResult]::new('-v', '-v', [CompletionResultType]::ParameterName, 'Verbosity level (-v, -vv)')
+            [CompletionResult]::new('--verbose', '--verbose', [CompletionResultType]::ParameterName, 'Verbosity level (-v, -vv)')
+            [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Suppress non-error messages')
+            [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Suppress non-error messages')
+            [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Dry run without side effects')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            [CompletionResult]::new('-V', '-V ', [CompletionResultType]::ParameterName, 'Print version')
+            [CompletionResult]::new('--version', '--version', [CompletionResultType]::ParameterName, 'Print version')
+            break
+        }
+        'do-harness;split' {
+            [CompletionResult]::new('--target', '--target', [CompletionResultType]::ParameterName, 'Name the sibling module instead of deriving it from the item')
+            [CompletionResult]::new('--root', '--root', [CompletionResultType]::ParameterName, 'Workspace root override (default: walk up from cwd)')
+            [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Explicit path to do-harness.toml')
+            [CompletionResult]::new('--color', '--color', [CompletionResultType]::ParameterName, 'Color output (auto, always, never)')
+            [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Default output file path')
+            [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Print the plan without writing files')
+            [CompletionResult]::new('-v', '-v', [CompletionResultType]::ParameterName, 'Verbosity level (-v, -vv)')
+            [CompletionResult]::new('--verbose', '--verbose', [CompletionResultType]::ParameterName, 'Verbosity level (-v, -vv)')
+            [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Suppress non-error messages')
+            [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Suppress non-error messages')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('-V', '-V ', [CompletionResultType]::ParameterName, 'Print version')
+            [CompletionResult]::new('--version', '--version', [CompletionResultType]::ParameterName, 'Print version')
             break
         }
         'do-harness;eval' {
@@ -1120,8 +1180,10 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('init', 'init', [CompletionResultType]::ParameterValue, 'Scaffold a harness workspace in a target directory')
             [CompletionResult]::new('task', 'task', [CompletionResultType]::ParameterValue, 'Inspect and export task state')
             [CompletionResult]::new('trace', 'trace', [CompletionResultType]::ParameterValue, 'Record and list interaction traces')
-            [CompletionResult]::new('distill', 'distill', [CompletionResultType]::ParameterValue, 'Extract a heuristic from a resolved trace')
+            [CompletionResult]::new('distill', 'distill', [CompletionResultType]::ParameterValue, 'Extract a heuristic from a resolved trace into a skill. Review output against the anti-AI-slop checklist (.agents/skills/skill-creator/references/anti_ai_slop.md)')
             [CompletionResult]::new('errors', 'errors', [CompletionResultType]::ParameterValue, 'Inspect and clear fail-fast error signatures')
+            [CompletionResult]::new('loc', 'loc', [CompletionResultType]::ParameterValue, 'Report line-of-code state for the 500-LOC invariant')
+            [CompletionResult]::new('split', 'split', [CompletionResultType]::ParameterValue, 'Extract a large top-level item into a sibling module')
             [CompletionResult]::new('eval', 'eval', [CompletionResultType]::ParameterValue, 'Validate skill structure and benchmark skill evals')
             [CompletionResult]::new('hook', 'hook', [CompletionResultType]::ParameterValue, 'Manage git hooks that run `do-harness verify`')
             [CompletionResult]::new('doctor', 'doctor', [CompletionResultType]::ParameterValue, 'Run diagnostic checks on binary resolution and git hook health')
@@ -1164,9 +1226,13 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
         }
         'do-harness;help;skills' {
             [CompletionResult]::new('suggest', 'suggest', [CompletionResultType]::ParameterValue, 'Rank skills by relevance to a query using metadata only')
+            [CompletionResult]::new('drift', 'drift', [CompletionResultType]::ParameterValue, 'Check manifest-managed shared skills against their pinned digests')
             break
         }
         'do-harness;help;skills;suggest' {
+            break
+        }
+        'do-harness;help;skills;drift' {
             break
         }
         'do-harness;help;init-db' {
@@ -1244,6 +1310,12 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             break
         }
         'do-harness;help;errors;clear' {
+            break
+        }
+        'do-harness;help;loc' {
+            break
+        }
+        'do-harness;help;split' {
             break
         }
         'do-harness;help;eval' {

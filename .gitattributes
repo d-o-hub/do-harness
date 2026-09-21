@@ -1,0 +1,8 @@
+# Line-ending policy for generated artifacts.
+#
+# `crates/do-harness/tests/completions_sync.rs` byte-compares the committed
+# completions against what the CLI generates, and the generator always emits LF.
+# Without this rule a Windows checkout (core.autocrlf=true) rewrites them to
+# CRLF, so the guard would fail for a reason that has nothing to do with the
+# artifact's content.
+completions/* text eol=lf

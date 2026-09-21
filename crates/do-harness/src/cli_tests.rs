@@ -187,3 +187,41 @@ fn skills_suggest_parses_query_limit_and_rejects_a_missing_query() {
         Cli::try_parse_from(["do-harness", "skills", "suggest"]).expect_err("--query is required");
     assert!(missing.to_string().contains("--query"));
 }
+
+#[test]
+fn skills_drift_parses_manifest_and_format() {
+    let parsed = Cli::try_parse_from([
+        "do-harness",
+        "skills",
+        "drift",
+        "--manifest",
+        "custom.toml",
+        "--format",
+        "json",
+    ])
+    .expect("skills drift parses");
+    if let Command::Skills {
+        action: SkillsAction::Drift { manifest, format },
+    } = parsed.command
+    {
+        assert_eq!(manifest, Some(PathBuf::from("custom.toml")));
+        assert_eq!(format, Format::Json);
+    } else {
+        panic!("expected Command::Skills with Drift");
+    }
+
+    let defaulted =
+        Cli::try_parse_from(["do-harness", "skills", "drift"]).expect("flags have defaults");
+    if let Command::Skills {
+        action: SkillsAction::Drift { manifest, format },
+    } = defaulted.command
+    {
+        assert_eq!(
+            manifest, None,
+            "the default manifest is resolved at run time"
+        );
+        assert_eq!(format, Format::Text);
+    } else {
+        panic!("expected Command::Skills with Drift");
+    }
+}

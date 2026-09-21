@@ -45,8 +45,10 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand init 'Scaffold a harness workspace in a target directory'
             cand task 'Inspect and export task state'
             cand trace 'Record and list interaction traces'
-            cand distill 'Extract a heuristic from a resolved trace'
+            cand distill 'Extract a heuristic from a resolved trace into a skill. Review output against the anti-AI-slop checklist (.agents/skills/skill-creator/references/anti_ai_slop.md)'
             cand errors 'Inspect and clear fail-fast error signatures'
+            cand loc 'Report line-of-code state for the 500-LOC invariant'
+            cand split 'Extract a large top-level item into a sibling module'
             cand eval 'Validate skill structure and benchmark skill evals'
             cand hook 'Manage git hooks that run `do-harness verify`'
             cand doctor 'Run diagnostic checks on binary resolution and git hook health'
@@ -283,6 +285,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand -V 'Print version'
             cand --version 'Print version'
             cand suggest 'Rank skills by relevance to a query using metadata only'
+            cand drift 'Check manifest-managed shared skills against their pinned digests'
             cand help 'Print this message or the help of the given subcommand(s)'
         }
         &'do-harness;skills;suggest'= {
@@ -303,11 +306,31 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand -V 'Print version'
             cand --version 'Print version'
         }
+        &'do-harness;skills;drift'= {
+            cand --manifest 'Manifest to read; defaults to `.agents/skills-manifest.toml`'
+            cand --format 'Output format'
+            cand --root 'Workspace root override (default: walk up from cwd)'
+            cand --config 'Explicit path to do-harness.toml'
+            cand --color 'Color output (auto, always, never)'
+            cand --output 'Default output file path'
+            cand -v 'Verbosity level (-v, -vv)'
+            cand --verbose 'Verbosity level (-v, -vv)'
+            cand -q 'Suppress non-error messages'
+            cand --quiet 'Suppress non-error messages'
+            cand --dry-run 'Dry run without side effects'
+            cand -h 'Print help (see more with ''--help'')'
+            cand --help 'Print help (see more with ''--help'')'
+            cand -V 'Print version'
+            cand --version 'Print version'
+        }
         &'do-harness;skills;help'= {
             cand suggest 'Rank skills by relevance to a query using metadata only'
+            cand drift 'Check manifest-managed shared skills against their pinned digests'
             cand help 'Print this message or the help of the given subcommand(s)'
         }
         &'do-harness;skills;help;suggest'= {
+        }
+        &'do-harness;skills;help;drift'= {
         }
         &'do-harness;skills;help;help'= {
         }
@@ -670,7 +693,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand --color 'Color output (auto, always, never)'
             cand --output 'Default output file path'
             cand --from-strikes 'Generate a starter skill scaffold from recorded sensor strikes (AGENTS.md §6 steering loop) instead of distilling from a trace'
-            cand --to-fixture 'Raise the skill''s pass-rate bar after this recovery'
+            cand --to-fixture 'Raise the skill''s pass-rate bar after this recovery (review ticks anti-AI-slop checklist first)'
             cand --dry-run 'Perform dry run without modifying skill files'
             cand -v 'Verbosity level (-v, -vv)'
             cand --verbose 'Verbosity level (-v, -vv)'
@@ -744,6 +767,39 @@ set edit:completion:arg-completer[do-harness] = {|@words|
         &'do-harness;errors;help;clear'= {
         }
         &'do-harness;errors;help;help'= {
+        }
+        &'do-harness;loc'= {
+            cand --format 'Output format'
+            cand --root 'Workspace root override (default: walk up from cwd)'
+            cand --config 'Explicit path to do-harness.toml'
+            cand --color 'Color output (auto, always, never)'
+            cand --output 'Default output file path'
+            cand --warn 'Show only files at or above the 450-line decomposition threshold'
+            cand -v 'Verbosity level (-v, -vv)'
+            cand --verbose 'Verbosity level (-v, -vv)'
+            cand -q 'Suppress non-error messages'
+            cand --quiet 'Suppress non-error messages'
+            cand --dry-run 'Dry run without side effects'
+            cand -h 'Print help (see more with ''--help'')'
+            cand --help 'Print help (see more with ''--help'')'
+            cand -V 'Print version'
+            cand --version 'Print version'
+        }
+        &'do-harness;split'= {
+            cand --target 'Name the sibling module instead of deriving it from the item'
+            cand --root 'Workspace root override (default: walk up from cwd)'
+            cand --config 'Explicit path to do-harness.toml'
+            cand --color 'Color output (auto, always, never)'
+            cand --output 'Default output file path'
+            cand --dry-run 'Print the plan without writing files'
+            cand -v 'Verbosity level (-v, -vv)'
+            cand --verbose 'Verbosity level (-v, -vv)'
+            cand -q 'Suppress non-error messages'
+            cand --quiet 'Suppress non-error messages'
+            cand -h 'Print help'
+            cand --help 'Print help'
+            cand -V 'Print version'
+            cand --version 'Print version'
         }
         &'do-harness;eval'= {
             cand --skill 'Restrict evaluation to this skill directory name'
@@ -1035,8 +1091,10 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand init 'Scaffold a harness workspace in a target directory'
             cand task 'Inspect and export task state'
             cand trace 'Record and list interaction traces'
-            cand distill 'Extract a heuristic from a resolved trace'
+            cand distill 'Extract a heuristic from a resolved trace into a skill. Review output against the anti-AI-slop checklist (.agents/skills/skill-creator/references/anti_ai_slop.md)'
             cand errors 'Inspect and clear fail-fast error signatures'
+            cand loc 'Report line-of-code state for the 500-LOC invariant'
+            cand split 'Extract a large top-level item into a sibling module'
             cand eval 'Validate skill structure and benchmark skill evals'
             cand hook 'Manage git hooks that run `do-harness verify`'
             cand doctor 'Run diagnostic checks on binary resolution and git hook health'
@@ -1070,8 +1128,11 @@ set edit:completion:arg-completer[do-harness] = {|@words|
         }
         &'do-harness;help;skills'= {
             cand suggest 'Rank skills by relevance to a query using metadata only'
+            cand drift 'Check manifest-managed shared skills against their pinned digests'
         }
         &'do-harness;help;skills;suggest'= {
+        }
+        &'do-harness;help;skills;drift'= {
         }
         &'do-harness;help;init-db'= {
         }
@@ -1128,6 +1189,10 @@ set edit:completion:arg-completer[do-harness] = {|@words|
         &'do-harness;help;errors;list'= {
         }
         &'do-harness;help;errors;clear'= {
+        }
+        &'do-harness;help;loc'= {
+        }
+        &'do-harness;help;split'= {
         }
         &'do-harness;help;eval'= {
         }
