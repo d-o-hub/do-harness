@@ -551,9 +551,11 @@ do-harness skills drift --format json    # schema_version 1 report
 Exit codes are the verdict: `0` every managed skill matches its pin, `1` at
 least one drifted or is missing (the report names the skill and its path), `2`
 the manifest is absent, unreadable, or invalid (including one that lists no
-skills). A missing manifest is deliberately an error rather than a vacuous
-pass, and the check stays offline and check-only: it never fetches, never
-writes, and never inspects a skill the manifest does not name. Adopters who
+skills), or a managed tree cannot be described — unreadable, containing a
+non-UTF-8 file name, or resolving outside the repository root. A missing
+manifest is deliberately an error rather than a vacuous pass, and the check
+stays offline and check-only: it never fetches, never writes, and never
+inspects a skill the manifest does not name. Adopters who
 wire it in as a sensor should declare the manifest under `coverage-inputs`, so
 a changed pin invalidates stale evidence instead of hiding behind it.
 
