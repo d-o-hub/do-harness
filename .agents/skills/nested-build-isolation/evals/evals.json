@@ -1,0 +1,66 @@
+{
+ "skill_name": "nested-build-isolation",
+ "evals": [
+  {
+   "id": 1,
+   "prompt": "A test spawns cargo inside a temporary sandbox. Which environment does it have to strip, and what does the nested coverage run do if it does not?",
+   "expected_output": "The spawn helper goes through one isolated_command that removes the launcher's toolchain state (RUSTC_WRAPPER, CARGO_TARGET_DIR, RUSTFLAGS/RUSTDOCFLAGS, the CARGO_LLVM_COV pair, CARGO_ENCODED_RUSTFLAGS, RUSTC/RUSTDOC) and points LLVM_PROFILE_FILE at /dev/null; without it the nested coverage run re-enters the session and dies with os error 11, flipping assertions only under instrumentation.",
+   "files": [],
+   "dim": "correctness",
+   "kind": "explicit",
+   "assertions": [
+    "walk:",
+    "contains:.agents/skills/nested-build-isolation/SKILL.md|RUSTC_WRAPPER",
+    "contains:.agents/skills/nested-build-isolation/SKILL.md|CARGO_TARGET_DIR",
+    "contains:.agents/skills/nested-build-isolation/SKILL.md|os error 11",
+    "contains:.agents/skills/nested-build-isolation/SKILL.md|isolated_command",
+    "contains:isolation-keys.txt|RUSTC_WRAPPER raw=present sanitized=absent",
+    "contains:isolation-sanitized.env|LLVM_PROFILE_FILE=/dev/null",
+    "not-contains:isolation-sanitized.env|RUSTC_WRAPPER="
+   ]
+  },
+  {
+   "id": 2,
+   "prompt": "A coverage sensor prints the same warning and finding on every run even though coverage is healthy. What is wrong and what is the fix?",
+   "expected_output": "The verdict was parsed from the wrapper's stdout: cargo llvm-cov nextest --lcov prints no summary table, so the parser matched nothing; derive the line percentage from LH/LF and the branch percentage from BRH/BRF in the report instead, and keep the WARN plus FINDINGS contract when a report carries no counts.",
+   "files": [],
+   "dim": "correctness",
+   "kind": "contextual",
+   "assertions": [
+    "contains:.agents/skills/nested-build-isolation/SKILL.md|--lcov",
+    "contains:.agents/skills/nested-build-isolation/SKILL.md|BRH",
+    "contains:.agents/skills/nested-build-isolation/SKILL.md|phantom finding",
+    "contains:isolation-raw.env|RUSTC_WRAPPER=cargo-llvm-cov",
+    "not-contains:isolation-raw.env|LLVM_PROFILE_FILE=/dev/null"
+   ]
+  },
+  {
+   "id": 3,
+   "prompt": "The instrumented run fails a sandbox test that passes under cargo test. How must it not be made green, and what stays unmeasured?",
+   "expected_output": "Not by ignoring or deleting the test, not by removing LLVM_PROFILE_FILE without redirecting it, and not by adding --branch on a stable toolchain; the guide fixes the spawn helper, keeps the litter check empty, and treats SKIP or a quarantine as not measured rather than green.",
+   "files": [],
+   "dim": "security",
+   "kind": "gotchas",
+   "assertions": [
+    "contains:.agents/skills/nested-build-isolation/SKILL.md|Anti-patterns",
+    "contains:.agents/skills/nested-build-isolation/SKILL.md|nightly compiler",
+    "contains:isolation-litter.txt|profraw files under the sandbox: 0",
+    "not-contains:.agents/skills/nested-build-isolation/SKILL.md|#[ignore]",
+    "not-contains:isolation-litter.txt|profraw files under the sandbox: [1-9]"
+   ]
+  },
+  {
+   "id": 4,
+   "prompt": "Summarize tomorrow's weather forecast. No nested build, coverage session, or instrumented run is involved.",
+   "expected_output": "The skill stays unloaded: nothing here runs a nested build, so no spawn helper is written, no profile path is redirected, and no sensor is disabled or silenced.",
+   "files": [],
+   "dim": "correctness",
+   "kind": "negative",
+   "assertions": [
+    "contains:.agents/skills/nested-build-isolation/SKILL.md|environment-dependent by construction",
+    "contains:isolation_negative.txt|out-of-scope",
+    "absent:isolation-disabled-sensor.marker"
+   ]
+  }
+ ]
+}
