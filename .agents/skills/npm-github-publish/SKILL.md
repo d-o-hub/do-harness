@@ -218,6 +218,17 @@ These are recorded failures, not passing fixes. They are graded by negative
 assertions (`absent:` / `not-contains:`), so they are provable even though no
 positive fix ever passed:
 
+- **A trusted publisher does not imply permission to publish directly.** npm's
+  docs: configurations created after **2026-09-03** allow `npm stage publish` and
+  require "Allowed actions" to also permit `npm publish`; earlier ones keep their
+  old behaviour. A CI `npm publish` then fails
+  `403 Forbidden - PUT https://registry.npmjs.org/<pkg> - OIDC permission denied
+  for this action` — the wording points at credentials, the cause is the action
+  not being granted. Observed on the v0.1.2 tag for five packages that had been
+  bootstrapped and trusted eleven days earlier; the fix is
+  `npm trust github <pkg> --file <wf.yml> --repo <owner/repo> --allow-publish`
+  (or the package's Trusted publishing → Allowed actions), one interactive 2FA
+  challenge per package name.
 - **Interactive 2FA approval is per-package and non-reusable.** Every
   bootstrap `npm publish` can emit its own browser approval URL; one approval
   does not authorize the next package. Never assume a prior approval covers the
