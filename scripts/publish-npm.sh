@@ -181,13 +181,28 @@ publish_dir() {
         echo "$pkg@$VERSION is already on npm; skipping"
         return 0
     fi
-    if (( DRY_RUN )); then
-        (cd "$dir" && npm publish --dry-run --tag "$TAG")
-    elif [[ -n "$OTP" ]]; then
-        (cd "$dir" && npm publish --tag "$TAG" --otp "$OTP")
-    else
-        (cd "$dir" && npm publish --tag "$TAG")
+    local log="$TMP/publish-$pkg.log"
+    local -a cmd=(npm publish --tag "$TAG")
+    (( DRY_RUN )) && cmd=(npm publish --dry-run --tag "$TAG")
+    [[ -n "$OTP" ]] && cmd=(npm publish --tag "$TAG" --otp "$OTP")
+    # `if !` keeps errexit out of the way, and the log replays npm's output
+    # unchanged on both paths.
+    if ! (cd "$dir" && "${cmd[@]}") >"$log" 2>&1; then
+        cat "$log"
+        # npm's answer when the trusted publisher is configured for staged
+        # publishing only (the default for connections created after
+        # 2026-09-03) reads like a credential problem but is a missing
+        # permission on the action. Name the remedy here: the failure surfaces
+        # in a tag run, where the operator has the least context.
+        if grep -q "OIDC permission denied" "$log"; then
+            die "npm denied the OIDC publish of $pkg@$VERSION: its trusted publisher is not granted direct publishing.
+Grant it per package (interactive 2FA), then re-run this job; publishing is idempotent:
+  npm trust github $pkg --file release.yml --repo ${GITHUB_REPOSITORY:-d-o-hub/do-harness} --allow-publish
+See docs/releasing.md (npm publishing)."
+        fi
+        die "npm publish failed for $pkg@$VERSION (see the output above)"
     fi
+    cat "$log"
 }
 
 for entry in "${TARGETS[@]}"; do
