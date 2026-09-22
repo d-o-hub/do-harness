@@ -12,6 +12,39 @@
 - `scripts/checks.sh` performs both calls and reports `PASS`, `FAIL`,
   `PENDING`, or `SKIP` per check, plus a summary verdict.
 
+## CI truth: annotations, not badges
+
+A red badge is a signal, not a verdict. Before calling a failing check a code
+failure, read what the run actually says:
+
+```bash
+gh pr checks PR --json name,state,link   # which check failed, and its job link
+gh api repos/{owner}/{repo}/check-runs/<check_run_id>/annotations \
+  --jq '.[] | {path, start_line, annotation_level, message}'
+```
+
+`<check_run_id>` is the trailing segment of the failing check's job link
+(`.../job/106683915433`). A workflow-run failure that carries no annotations
+puts its evidence in the job log:
+`gh run view --job <job_id> --log-failed | tail -40`.
+
+Then classify:
+
+- **Real failure.** An annotation points at a file the PR changed, or the failing
+  step reproduces locally. Fix it; do not re-run it.
+- **Infrastructure flake.** Re-run once with `gh run rerun <run_id> --failed`,
+  never "fix" it:
+  - third-party action authentication breakage (FlakeHub and similar);
+  - a hosted runner lost or terminated — `The runner has received a shutdown
+    signal`, or a step with empty logs that normally prints output;
+  - an external-only red (Codacy, Sonar, another app) while every GitHub check is
+    green, with the app's status page as evidence.
+
+If the re-run fails the same way, treat it as real and escalate: a third re-run
+buys nothing. A `rerun forbidden` (HTTP 403) response is plumbing — follow
+[gh-resilience.md](gh-resilience.md) (one empty retrigger commit, one cycle, then
+escalate), never a merge around the check.
+
 ## Verdicts
 
 | Verdict | Meaning | Action |

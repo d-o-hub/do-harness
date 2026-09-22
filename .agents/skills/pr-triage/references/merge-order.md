@@ -11,6 +11,20 @@
 
 `scripts/list-prs.sh` implements this ordering.
 
+## Priority within a sweep
+
+Stacks-first and oldest-first decide *when* a PR is eligible; this decides which
+eligible PR to take next when several are ready:
+
+1. trivial green (docs, chores, dependency bumps whose checks pass);
+2. security and clamp fixes — anything that reduces exposure while it waits;
+3. foundation before dependents (a library change before the PR consuming it);
+4. one keeper per cluster
+   ([duplicate-clusters.md](duplicate-clusters.md)); close the losers before
+   reviewing the keeper;
+5. mega-PRs, `unsafe`, and SIMD last: they need the most review budget and
+   rebase the worst.
+
 ## Updating a branch
 
 - Independent PR behind base: `gh pr update-branch PR` (creates a merge commit;
@@ -62,7 +76,25 @@ Requirements before running it:
   and halts if the disarm fails.
 - The head SHA equals the one validated, and the merge command pins it.
 
-Never pass `--auto`.
+Never pass `--auto`, and never leave an auto-merge request armed while the sweep
+holds more than one PR: the request fires on whatever head exists when GitHub
+computes mergeability, so it races the per-PR loop below and can land a tree
+nobody validated. `scripts/auto-merge.sh PR --disable` disarms one that is
+already armed; halt the sweep if it cannot be disarmed.
+
+## Per-PR loop
+
+Every merge invalidates the next PR's validation, so after `gh pr merge`:
+
+1. rebase or update the next PR against the new base
+   (`gh pr update-branch PR`, or the stacked rebase above);
+2. re-run `scripts/checks.sh PR --wait 1200` — a green from before the rebase is
+   evidence about a different tree;
+3. re-read `gh pr view PR --json mergeStateStatus,mergeable` and confirm the head
+   SHA you are about to pin;
+4. merge with `--match-head-commit`, then repeat from step 1 for the next PR.
+
+A sweep of one PR still follows the loop; it simply has no successor to rebase.
 
 ## Post-merge verification
 
