@@ -199,13 +199,14 @@ jobs:
           key: msrv
       - name: Check workspace on MSRV
         # rust-toolchain.toml pins the dev channel and wins over an installed
-        # toolchain, so this step must select the MSRV explicitly: without
-        # RUSTUP_TOOLCHAIN it compiled with the pinned channel, which cannot
-        # detect incompatibility with the declared minimum — ordinary compile
-        # errors still fail the step, MSRV-only regressions do not (five
-        # let-chains reached main that way). Cargo consults `rust-version` for
-        # dependency resolution, but only the MSRV compiler can prove the code
-        # builds on it.
+        # toolchain, so this step must select the MSRV explicitly: the manifest
+        # bound is enforced only against the *selected* toolchain (Cargo errors
+        # when it is older than `rust-version`, and `--ignore-rust-version`
+        # bypasses that), so compiling with the pinned channel cannot verify the
+        # declared minimum — the Cargo Book's "Verified" support expectation,
+        # which only a build on the MSRV can establish. Without
+        # RUSTUP_TOOLCHAIN this step compiled with the pinned channel and five
+        # let-chains reached main that way.
         env:
           RUSTUP_TOOLCHAIN: ${{ steps.msrv.outputs.msrv }}
         run: cargo check --workspace --all-targets --locked
