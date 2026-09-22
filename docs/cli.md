@@ -20,6 +20,16 @@ do-harness [GLOBAL OPTIONS] <SUBCOMMAND>
 
 ## Subcommands
 
+### `version`
+Print the binary's identity: name, version, commit, commit date, and whether the
+working tree was dirty when it was built.
+
+- `--format <Format>`: Output format (`text` or `json`); the JSON shape is
+  `{ name, version, commit, commit_date, dirty }`.
+
+`doctor` compares the same information against the state database to flag a
+binary that predates the schema.
+
 ### `verify` (alias: `check`)
 Runs computational sensors defined in `do-harness.toml`.
 
@@ -228,6 +238,28 @@ matching pattern or constraint reason) and every skipped sensor.
 - `--changed`: Select by working-tree change instead of listing everything.
 - `--format <Format>`: Output format (`text` or `json`).
 
+### `init-db`
+Apply pending migrations to `.do-harness/agent_state.db`, the local state store
+(beats, traces, heuristics, evaluations).
+
+- `--check`: Report pending migrations and exit non-zero when any are pending.
+- `--dry-run`: Report pending migrations without applying them (exit 0).
+- `-y`, `--yes`: Skip the interactive confirmation prompt.
+
+`doctor` fails when the database outruns the binary; `init-db --check` is the
+machine-readable half of that check.
+
+### `seed`
+Upsert `plans/invariants.json` into the `invariants` table — the machine-readable
+half of the architecture-decision contract (invariant, rationale, sensor).
+
+- `--prune`: Delete rows whose invariant no longer appears in
+  `plans/invariants.json`.
+- `--dry-run`: Report what would be written without writing.
+
+Run `seed --prune` after editing `plans/invariants.json` so the table cannot
+drift from the file.
+
 ### `init`
 Scaffolds a harness workspace in the target directory and proves the
 generated contract before presenting the repository as ready.
@@ -321,6 +353,19 @@ gVisor isolation; children run with the caller's privileges. Treat skill
 walkthroughs and `--agent-cmd` commands as untrusted code and wrap the whole
 command in an outer sandbox if needed.
 
+### `overlap`
+Rank skill pairs by guidance overlap and warn at or above the cosine threshold —
+a Tier-2 distinctiveness advisory: accepted overlaps are recorded in
+`plans/invariants.json`, and a new pair crossing the threshold signals two guides
+drifting together.
+
+- `--threshold <THRESHOLD>`: Cosine similarity at or above which a pair prints
+  as `WARN` (default `0.45`).
+- `--format <Format>`: Output format (`text` or `json`).
+
+Text output is one line per pair (`skill-creator <-> skill-distiller sim=0.765
+shared=[…]`), sorted by similarity; the command is advisory and exits 0.
+
 ### `distill`
 Extracts a heuristic from a resolved trace into a skill.
 
@@ -362,6 +407,27 @@ Longitudinal trends: sensor stats, strikes, and skill pass rates.
 - `--sensor <SENSOR>`: Filter by sensor name.
 - `--skill <SKILL>`: Filter by skill name.
 - `--since <UNIX_SECONDS>`: Filter metrics since a Unix timestamp in seconds.
+
+### `loc`
+Report line-of-code state against the 500-line invariant: one line per file with
+`lines/500`, the band (`OK`, `WARN` at or above the 450-line decomposition
+threshold, `FAIL` above the ceiling), and the code/test split when an inline
+`#[cfg(test)]` module is present.
+
+- `[PATH]...`: Files or directories to measure (default: every `.rs` under
+  `crates/`).
+- `--warn`: Show only files at or above the decomposition threshold.
+- `--format <Format>`: Output format (`text` or `json`).
+
+### `split`
+Extract one large top-level item — or an inline `#[cfg(test)]` module — into a
+sibling module, emitting the declaration and re-exports so the tree still
+compiles. A file already under the ceiling is reported, not modified, and shapes
+the tool cannot make compile are refused with a reason.
+
+- `--target <NAME>`: Name the sibling module instead of deriving it from the
+  item.
+- `--dry-run`: Print the plan without writing files.
 
 ### `maintenance`
 Prune unbounded history and compact the local state database.

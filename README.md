@@ -194,6 +194,14 @@ export PATH="$HOME/.local/bin:$PATH"
 | `pr review <PR\|--base REV --head REV> [--recompute]` | Emit the semantic residual evidence could not prove, with skipped units and revocable `false_proven` claims (read-only) |
 | `skills suggest --query TEXT [--limit N] [--format text\|json]` | Rank skills by frontmatter metadata for progressive disclosure (offline; metadata only, never a skill body); `DO_HARNESS_SKILL_SELECTOR` optionally reorders the shortlist |
 | `skills drift [--manifest FILE] [--format text\|json]` | Check manifest-managed shared skills against their pinned commit and tree digest (offline, check-only; `2` when the manifest is absent or invalid, or a managed tree cannot be described) |
+| `version [--format text\|json]` | Print the running binary's name, version, commit, commit date, and dirty flag |
+| `loc [PATH]... [--warn] [--format text\|json]` | Report each file's line count against the 500-line ceiling with its code/test split (`--warn` shows only files at or above the 450-line threshold) |
+| `split <FILE> [--target NAME] [--dry-run]` | Extract a large top-level item or inline test module into a sibling module, refusing shapes it cannot make compile |
+| `overlap [--threshold N] [--format text\|json]` | Rank skill pairs by guidance overlap; a pair at or above the threshold (default 0.45) prints as WARN (Tier-2 distinctiveness advisory) |
+| `maintenance [--prune-beats DAYS] [--keep-per-task N]` | Prune old beats and compact the local state database |
+| `audit-chain [--format text\|json]` | Recompute the workflow event hash chain and report the first divergence |
+| `completions <bash\|zsh\|fish\|powershell\|elvish>` | Generate shell completions |
+| `man <DIR>` | Generate man pages into a directory |
 
 Global flags: `--root <path>`, `--config <path>`.
 
