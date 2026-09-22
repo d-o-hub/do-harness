@@ -98,3 +98,39 @@ fn embedded_files_stay_inside_the_crate() {
         "embedded paths must stay inside the crate (symlink external files into assets/): {escaping:?}"
     );
 }
+
+/// A symlinked asset must arrive as its content, never as its own link target.
+///
+/// A checkout with `core.symlinks=false` (Windows without developer mode)
+/// materializes a symlink as a small text file holding the target path, which
+/// `include_str!` would then embed verbatim — the crate would still compile and
+/// every path assertion above would still pass.
+#[test]
+fn embedded_assets_carry_content_not_symlink_targets() {
+    let assets = Path::new(env!("CARGO_MANIFEST_DIR")).join("assets");
+    let mut checked = 0usize;
+    for entry in std::fs::read_dir(&assets).unwrap() {
+        let path = entry.unwrap().path();
+        let content = std::fs::read_to_string(&path).unwrap();
+        checked += 1;
+        assert!(
+            !content.trim_start().starts_with(".."),
+            "{} holds a materialized symlink target instead of its content",
+            path.display()
+        );
+        assert!(
+            content.lines().count() > 1,
+            "{} is too small to be the file it stands in for",
+            path.display()
+        );
+    }
+    assert!(
+        checked >= 3,
+        "expected the three symlinked assets to be present, found {checked}"
+    );
+    let nextest = std::fs::read_to_string(assets.join("nextest.toml")).unwrap();
+    assert!(
+        nextest.contains("[profile.default]"),
+        "the embedded nextest config must carry its TOML content"
+    );
+}

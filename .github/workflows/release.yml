@@ -214,6 +214,15 @@ jobs:
       # Least privilege: read source, write the release and its assets.
       contents: write
     steps:
+      # actions/checkout@v7.0.1
+      #
+      # `fetch-depth: 0` so `git describe` can name the previous tag, which scopes
+      # the generated changelog to this release instead of the whole history.
+      # Credentials are not persisted: the job publishes through GH_TOKEN.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
       # actions/download-artifact@v8.0.1
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
@@ -224,6 +233,30 @@ jobs:
           cd dist
           sha256sum do-harness-* > checksums.txt
           cat checksums.txt
+      - name: Compose release notes
+        # GitHub's generated changelog (categorized by .github/release.yml) is
+        # appended to the curated header in .github/release-notes-template.md:
+        # highlights, install commands, and how to verify the download are what
+        # users need, and no generator can write them. See docs/releasing.md.
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          previous="$(git describe --tags --abbrev=0 "${GITHUB_REF_NAME}^" 2>/dev/null || true)"
+          api=(--method POST "repos/${GITHUB_REPOSITORY}/releases/generate-notes"
+            -f "tag_name=${GITHUB_REF_NAME}"
+            -f "configuration_file_path=.github/release.yml")
+          if [ -n "$previous" ]; then
+            api+=(-f "previous_tag_name=$previous")
+          fi
+          gh api "${api[@]}" --jq .body > generated-notes.md
+          sed -e "s/{{TAG}}/${GITHUB_REF_NAME}/g" -e "s/{{VERSION}}/${version}/g" \
+            .github/release-notes-template.md > release-notes.md
+          printf '\n---\n\n# Changes\n\n' >> release-notes.md
+          cat generated-notes.md >> release-notes.md
+          echo "composed release notes ($(wc -l < release-notes.md) lines)"
       - name: Publish the GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -231,8 +264,8 @@ jobs:
         run: |
           gh release create "${GITHUB_REF_NAME}" \
             --verify-tag \
-            --generate-notes \
             --title "do-harness ${GITHUB_REF_NAME}" \
+            --notes-file release-notes.md \
             dist/do-harness-* dist/checksums.txt
 
   publish:
