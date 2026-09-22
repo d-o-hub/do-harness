@@ -201,8 +201,11 @@ jobs:
         # rust-toolchain.toml pins the dev channel and wins over an installed
         # toolchain, so this step must select the MSRV explicitly: without
         # RUSTUP_TOOLCHAIN it compiled with the pinned channel, which cannot
-        # enforce `rust-version` — ordinary compile errors still fail the step,
-        # MSRV-only regressions do not (five let-chains reached main that way).
+        # detect incompatibility with the declared minimum — ordinary compile
+        # errors still fail the step, MSRV-only regressions do not (five
+        # let-chains reached main that way). Cargo consults `rust-version` for
+        # dependency resolution, but only the MSRV compiler can prove the code
+        # builds on it.
         env:
           RUSTUP_TOOLCHAIN: ${{ steps.msrv.outputs.msrv }}
         run: cargo check --workspace --all-targets --locked
