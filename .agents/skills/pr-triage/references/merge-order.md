@@ -25,6 +25,26 @@ eligible PR to take next when several are ready:
 5. mega-PRs, `unsafe`, and SIMD last: they need the most review budget and
    rebase the worst.
 
+## Platform queues and stacks
+
+Prefer the platform's own machinery when the repository has it; the manual loop
+below is the fallback for repositories without it (this one included):
+
+- **Merge queue.** The queue keeps the base green without authors updating their
+  branches: it groups each pull request with the latest base and the entries
+  ahead of it, then lands the group once the required checks pass on that
+  combination. It needs the `merge_group` event in every workflow whose check is
+  required, and it is configured on the base branch's ruleset or protection rule
+  (merge method, build concurrency, merge limits). With a queue configured,
+  adding the pull request to the queue replaces the per-PR step 1–2 loop; do not
+  also rebase and re-run checks by hand.
+- **Stacked pull requests** (public preview). GitHub manages the chain: every
+  member is evaluated against the stack base, everything below a member must
+  also satisfy those protections, the history between branches must stay linear,
+  and the stack lands atomically. Restore linearity with `gh stack rebase` on the
+  CLI or **Rebase stack** in the merge box instead of the manual
+  `git rebase --onto` above; a stack can also pass through a merge queue.
+
 ## Updating a branch
 
 - Independent PR behind base: `gh pr update-branch PR` (creates a merge commit;
@@ -77,10 +97,12 @@ Requirements before running it:
 - The head SHA equals the one validated, and the merge command pins it.
 
 Never pass `--auto`, and never leave an auto-merge request armed while the sweep
-holds more than one PR: the request fires on whatever head exists when GitHub
-computes mergeability, so it races the per-PR loop below and can land a tree
-nobody validated. `scripts/auto-merge.sh PR --disable` disarms one that is
-already armed; halt the sweep if it cannot be disarmed.
+holds more than one PR. Auto-merge is documented as merging "after all required
+reviews and status checks pass" and is only disabled when someone without write
+access pushes to the head branch — it is not pinned to the head you validated, so
+it races the per-PR loop below and can land a tree nobody reviewed.
+`scripts/auto-merge.sh PR --disable` disarms one that is already armed; halt the
+sweep if it cannot be disarmed.
 
 ## Per-PR loop
 
@@ -110,3 +132,13 @@ A sweep of one PR still follows the loop; it simply has no successor to rebase.
 Do not delete PR branches during triage. Deleting a parent branch retargets its
 stacked child and changes the child's diff; leave deletion to the repository's
 own automation or the user.
+
+## Sources
+
+- Managing a merge queue
+  (`docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/configuring-pull-request-merges/managing-a-merge-queue`).
+- Stacked pull requests reference
+  (`docs.github.com/en/pull-requests/reference/stacked-pull-requests`; public
+  preview as of 2026-07-30).
+- Automatically merging a pull request
+  (`docs.github.com/en/pull-requests/how-tos/merge-and-close-pull-requests/automatically-merging-a-pull-request`).

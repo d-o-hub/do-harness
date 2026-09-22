@@ -18,15 +18,23 @@ A red badge is a signal, not a verdict. Before calling a failing check a code
 failure, read what the run actually says:
 
 ```bash
-gh pr checks PR --json name,state,link   # which check failed, and its job link
+gh api repos/{owner}/{repo}/commits/HEAD_SHA/check-runs \
+  --jq '.check_runs[] | {id, name, conclusion, annotations_url: .output.annotations_url}'
 gh api repos/{owner}/{repo}/check-runs/<check_run_id>/annotations \
   --jq '.[] | {path, start_line, annotation_level, message}'
 ```
 
-`<check_run_id>` is the trailing segment of the failing check's job link
-(`.../job/106683915433`). A workflow-run failure that carries no annotations
-puts its evidence in the job log:
-`gh run view --job <job_id> --log-failed | tail -40`.
+Read `annotations_url` from the failing check run rather than splitting the job
+link: the browser link's trailing number is a job number, not the check-run id
+(the same trap `gh run rerun --job` documents). A workflow-run failure that
+carries no annotations keeps its evidence in the job log:
+
+```bash
+gh run view <run_id> --json jobs --jq '.jobs[] | {name, databaseId}'
+gh run view --job <databaseId> --log-failed | tail -40
+```
+
+The URL's job number does not work with `--job` either; only `databaseId` does.
 
 Then classify:
 
@@ -40,8 +48,16 @@ Then classify:
   - an external-only red (Codacy, Sonar, another app) while every GitHub check is
     green, with the app's status page as evidence.
 
-If the re-run fails the same way, treat it as real and escalate: a third re-run
-buys nothing. A `rerun forbidden` (HTTP 403) response is plumbing — follow
+If the re-run fails the same way, distinguish before escalating. Observed on
+this repository: a degraded Windows image failed the same install-action step
+identically on `gh run rerun --failed`, while one empty retrigger commit landed a
+fresh runner where every check passed (main's equivalent jobs were green minutes
+before and after). So when the failure names a runner-image problem — for
+example the install-action `bash startup failure`,
+actions/partner-runner-images#169 — push one empty retrigger commit and
+re-classify. If the check then fails on the new runner, treat it as real and
+escalate: a third attempt buys nothing. A `rerun forbidden` (HTTP 403) response
+is plumbing — follow
 [gh-resilience.md](gh-resilience.md) (one empty retrigger commit, one cycle, then
 escalate), never a merge around the check.
 
@@ -82,3 +98,11 @@ Poll `scripts/checks.sh` while the verdict is `PENDING`. Use a bounded wait
 (default 300 seconds, `PR_TRIAGE_EVENT_CHUNK`) re-classifies even without
 events. Missing deliveries must degrade to polling, never to done. A check
 that never reports is `UNKNOWN`; do not merge around it.
+
+## Sources
+
+- REST: check runs and check-run annotations
+  (`docs.github.com/en/rest/checks/runs`; requests carry the documented
+  `X-GitHub-Api-Version` header, which `gh api` sets).
+- `gh run rerun` manual (`cli.github.com/manual/gh_run_rerun`) for the
+  `--failed` semantics and the job-number trap.
