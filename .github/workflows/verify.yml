@@ -204,7 +204,8 @@ jobs:
         # is older than the declared minimum (`--ignore-rust-version` bypasses
         # it), so compiling with the pinned channel proves nothing about
         # compatibility with 1.85 — five let-chains reached main that way. This
-        # step is source compatibility for every target, including test code.
+        # step is source compatibility for every target (default features),
+        # including test code.
         env:
           RUSTUP_TOOLCHAIN: ${{ steps.msrv.outputs.msrv }}
         run: cargo check --workspace --all-targets --locked
@@ -225,6 +226,21 @@ jobs:
           RUSTUP_TOOLCHAIN: ${{ steps.msrv.outputs.msrv }}
           CI: ""
         run: cargo test --workspace --locked
+      - name: Test guardian-proxy with its MSRV-clean feature on MSRV
+        # Scope: `cargo test --workspace` builds each package with its default
+        # features, and `guardian-proxy` ships `default = []`. `agt-governance`
+        # is MSRV-clean (measured on 1.85), so it is verified here too.
+        #
+        # `mcp-surface` is deliberately absent: it pulls rmcp, whose every 3.x
+        # release requires Rust 1.88, so the workspace declares 1.85 only while
+        # that feature is off (crates/guardian-proxy/Cargo.toml, and
+        # plans/mcp-conformance-epic.md). The verify job exercises that feature
+        # on the stable toolchain; this job cannot, and the exclusion is a
+        # recorded decision rather than an oversight.
+        env:
+          RUSTUP_TOOLCHAIN: ${{ steps.msrv.outputs.msrv }}
+          CI: ""
+        run: cargo test -p guardian-proxy --features agt-governance --locked
 
   dsh-bundle:
     runs-on: ubuntu-latest
