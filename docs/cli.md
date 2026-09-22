@@ -164,6 +164,35 @@ The Rust-specific implementation of the generic artifact-provenance contract: it
   ```
   `findings` counts advisory ids (`RUSTSEC-YYYY-NNNN`) so a tool or setup failure stays distinguishable from a vulnerability finding, and the `FINDINGS: <n>` marker carries the same count.
 
+#### Coverage Sensor (`check-coverage.sh`)
+
+`scripts/check-coverage.sh` reports two layers: a behavior inventory and the
+line/branch proof from `cargo-llvm-cov nextest`.
+
+- **Inventory (fast path).** `check-coverage.sh inventory` prints a deterministic
+  table of unique compiled behavior as `unique(file, fn)` per path-based layer —
+  `crates/*/src` (crate owners), `crates/*/tests` (crate integration), `src/`
+  (root facade), and `tests/` (root integration). It executes no tests and needs
+  only `python3`; `target/`, `.git/`, `.do-harness/`, `.agents/`, and
+  `node_modules/` are skipped, and `tests/fixtures/` never counts as behavior.
+- **Proof path.** `check-coverage.sh` (or `llvm-cov`) prints the same inventory,
+  then runs `cargo llvm-cov nextest --lcov --output-path lcov.info` and derives
+  both percentages from the report itself — `LH`/`LF` for lines, `BRH`/`BRF` for
+  branches — because `--lcov` prints no summary table. The branch percentage is
+  printed only when the report carries branch records.
+- **Ratchet contract.** The verdict stays numeric for `verify --record --bless`:
+  `FINDINGS: <deficit>` is the line-percentage deficit against `TARGET_PCT=70`,
+  and `FINDINGS: 0` above target. A branch percentage never changes that number,
+  and a report with no line counts keeps the `WARN … FINDINGS: 1` contract
+  instead of passing silently.
+- **Tool contract.** A missing `cargo-llvm-cov`/`cargo-nextest` exits 0 with a
+  `SKIP:` line locally and fails closed when `CI=true` or
+  `DO_HARNESS_REQUIRE_TOOLS=1`.
+- The script measures the workspace that contains it; pass `inventory <dir>` or
+  `llvm-cov <dir>` to point it at another workspace.
+- Test-LOC counts replace neither layer: the inventory answers *what behavior,
+  where*, and the llvm-cov run is the coverage proof.
+
 ### `status`
 Reports verification evidence freshness for a signal set without executing
 any sensor: `green` (current passing evidence covers the set), `red`
