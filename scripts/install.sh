@@ -32,7 +32,7 @@ Install a prebuilt do-harness release binary.
 Usage: install.sh [OPTIONS]
 
 Options:
-  --version <TAG>    Release tag to install (e.g. v0.1.1). Default: latest.
+  --version <TAG>    Release tag to install (e.g. v0.1.2). Default: latest.
   --bin-dir <DIR>    Install directory. Default: $HOME/.local/bin.
   --base-url <URL>   Release download base URL (mirrors, tests).
   -h, --help         Show this help.
