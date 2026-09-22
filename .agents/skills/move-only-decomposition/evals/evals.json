@@ -1,0 +1,62 @@
+{
+ "skill_name": "move-only-decomposition",
+ "evals": [
+  {
+   "id": 1,
+   "prompt": "The loc sensor warns on a 460-line file and do-harness split refuses to touch it. What is the procedure?",
+   "expected_output": "Find the band with do-harness loc --warn, accept that split only acts above the hard ceiling, and choose a cohesive seam yourself — the inline cfg(test) module first, via a path-attributed sibling that keeps the module name — then fix relative paths and re-check the band.",
+   "files": [],
+   "dim": "correctness",
+   "kind": "explicit",
+   "assertions": [
+    "walk:",
+    "contains:.agents/skills/move-only-decomposition/SKILL.md|do-harness loc --warn",
+    "contains:.agents/skills/move-only-decomposition/SKILL.md|do-harness split",
+    "contains:.agents/skills/move-only-decomposition/SKILL.md|#[path",
+    "contains:move-declaration.txt|#[path = \"sample_tests.rs\"]",
+    "exists:sample_tests.rs"
+   ]
+  },
+  {
+   "id": 2,
+   "prompt": "How do you prove a refactor that moved 300 lines between files did not change behaviour?",
+   "expected_output": "Compare token streams with all whitespace collapsed — cargo fmt re-wraps, so line-by-line comparison lies — then rely on rustfmt, the affected test target, clippy with -D warnings, and a fresh loc --warn as the behavioural backstop.",
+   "files": [],
+   "dim": "correctness",
+   "kind": "contextual",
+   "assertions": [
+    "contains:.agents/skills/move-only-decomposition/SKILL.md|whitespace collapsed",
+    "contains:.agents/skills/move-only-decomposition/SKILL.md|cargo fmt",
+    "contains:move-fidelity.txt|tokens preserved=true",
+    "not-contains:move-fidelity.txt|preserved=false"
+   ]
+  },
+  {
+   "id": 3,
+   "prompt": "A reviewer objects that a decomposition diff is textual rather than behaviour-preserving. Which shortcuts must the change not have taken?",
+   "expected_output": "Not a line-count-driven split, not a raw line-by-line comparison as proof, not a rename or fix folded into the move, and no leftover inline copy of the moved module.",
+   "files": [],
+   "dim": "security",
+   "kind": "gotchas",
+   "assertions": [
+    "contains:.agents/skills/move-only-decomposition/SKILL.md|Anti-patterns",
+    "not-contains:move-declaration.txt|mod tests {",
+    "not-contains:move-fidelity.txt|preserved=false",
+    "not-contains:.agents/skills/move-only-decomposition/SKILL.md|ignore the warning and move on"
+   ]
+  },
+  {
+   "id": 4,
+   "prompt": "Explain what a compiler warning is. No file is near a line threshold.",
+   "expected_output": "The skill stays unloaded: there is no threshold warning to clear, so no module is extracted, no re-export is added, and nothing is skipped to silence a sensor.",
+   "files": [],
+   "dim": "correctness",
+   "kind": "negative",
+   "assertions": [
+    "contains:.agents/skills/move-only-decomposition/SKILL.md|feedforward",
+    "contains:decomposition_negative.txt|out-of-scope",
+    "absent:decomposition-skipped.marker"
+   ]
+  }
+ ]
+}
