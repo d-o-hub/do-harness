@@ -16,6 +16,9 @@
 # - llvm-cov (proof path): workspace line and branch percentages over the targets
 #   that actually run. Both come from the lcov report itself (LH/LF for lines,
 #   BRH/BRF for branches), never from a stdout summary: `--lcov` prints none.
+#   Branch records need a nightly toolchain (`cargo +nightly llvm-cov nextest
+#   --branch`): the flag is unstable, so the pinned stable channel reports lines
+#   only and the branch percentage stays absent.
 # - Test-LOC counts replace neither layer.
 #
 # Usage: check-coverage.sh [inventory|llvm-cov] [dir]
