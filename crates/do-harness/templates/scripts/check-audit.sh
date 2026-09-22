@@ -27,14 +27,28 @@ run_audit() {
 }
 
 if ! run_audit "$@"; then
-    # If cargo audit fails (e.g. due to a corrupted/truncated advisory-db file
-    # on runner hosts), clear the local advisory-db cache and retry once.
-    CARGO_HOME_DIR="${CARGO_HOME:-${HOME:-/tmp}/.cargo}"
-    if [ -d "$CARGO_HOME_DIR/advisory-db" ]; then
-        echo "WARN: cargo audit failed; clearing advisory-db and retrying..."
-        rm -rf "$CARGO_HOME_DIR/advisory-db"
-        run_audit "$@"
-    else
-        exit 1
+    # Retry once before clearing anything: the advisory-db under CARGO_HOME is
+    # shared with any other sandbox verify running at the same time (parallel
+    # dogfood runs update the same database), so a lock or contention failure
+    # need not mean the cache is unusable, and clearing it would sabotage a
+    # sibling process.
+    sleep "${AUDIT_RETRY_DELAY_SECONDS:-2}"
+    if ! run_audit "$@"; then
+        # Fall back to the original recovery for a corrupted or truncated
+        # advisory-db: clear the cache and retry once more.
+        CARGO_HOME_DIR="${CARGO_HOME:-${HOME:-/tmp}/.cargo}"
+        if [ -d "$CARGO_HOME_DIR/advisory-db" ]; then
+            echo "WARN: cargo audit failed twice; clearing advisory-db and retrying..."
+            # Best effort by design: files can be locked or read-only while
+            # another sandbox verify uses the database, and under
+            # `set -euo pipefail` a failing `rm -rf` would abort the retry this
+            # branch exists to run (measured twice on the Windows runner, where
+            # this copy killed the sensor before the retry).
+            chmod -R u+w "$CARGO_HOME_DIR/advisory-db" 2>/dev/null || true
+            rm -rf "$CARGO_HOME_DIR/advisory-db" || true
+            run_audit "$@"
+        else
+            exit 1
+        fi
     fi
 fi
