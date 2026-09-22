@@ -177,12 +177,12 @@ line/branch proof from `cargo-llvm-cov nextest`.
   `node_modules/` are skipped, and `tests/fixtures/` never counts as behavior.
 - **Proof path.** `check-coverage.sh` (or `llvm-cov`) prints the same inventory,
   then runs `cargo llvm-cov nextest --lcov --output-path lcov.info` and derives
-  both percentages from the report itself — `LH`/`LF` for lines, `BRH`/`BRF` for
-  branches — because `--lcov` prints no summary table. The branch percentage is
-  printed only when the report carries branch records, and collecting them needs
-  a nightly toolchain (`cargo +nightly llvm-cov nextest --branch …`; the flag is
-  unstable, and on the pinned stable channel the report carries none), so on
-  stable the sensor reports lines only.
+  the line percentage from the report's `LH`/`LF` totals — never from a stdout
+  summary, because `--lcov` prints none. Branch records (`BRH`/`BRF`) are
+  opportunistic input: the sensor passes no `--branch` (the flag is unstable and
+  needs a nightly toolchain), so on the pinned stable channel the report carries
+  none and the line-only verdict is the expected output; a report that does carry
+  them gets the branch percentage printed beside the line one.
 - **Ratchet contract.** The verdict stays numeric for `verify --record --bless`:
   `FINDINGS: <deficit>` is the line-percentage deficit against `TARGET_PCT=70`,
   and `FINDINGS: 0` above target. A branch percentage never changes that number,

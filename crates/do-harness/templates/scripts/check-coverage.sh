@@ -13,12 +13,14 @@
 # - inventory (fast path): unique compiled behavior as unique(file, fn) per layer —
 #   crates/*/src (owners), crates/*/tests (crate integration), src/ (root facade),
 #   tests/ (root integration). No test execution, python3 only.
-# - llvm-cov (proof path): workspace line and branch percentages over the targets
-#   that actually run. Both come from the lcov report itself (LH/LF for lines,
-#   BRH/BRF for branches), never from a stdout summary: `--lcov` prints none.
-#   Branch records need a nightly toolchain (`cargo +nightly llvm-cov nextest
-#   --branch`): the flag is unstable, so the pinned stable channel reports lines
-#   only and the branch percentage stays absent.
+# - llvm-cov (proof path): workspace line percentage over the targets that
+#   actually run, derived from the lcov report's LH/LF totals — never from a
+#   stdout summary (`--lcov` prints none). Branch records (BRH/BRF) are treated
+#   as opportunistic input: the sensor passes no `--branch` (the flag is
+#   unstable and nightly-only), so on the pinned stable channel the report
+#   carries none and the line-only verdict is the expected output; when a report
+#   does carry them, the branch percentage is printed beside the line one and
+#   never changes the ratchet number.
 # - Test-LOC counts replace neither layer.
 #
 # Usage: check-coverage.sh [inventory|llvm-cov] [dir]
