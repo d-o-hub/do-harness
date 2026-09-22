@@ -193,10 +193,21 @@ jobs:
           # run inside the checkout still resolve through rust-toolchain.toml
           # unless the step sets RUSTUP_TOOLCHAIN (see the check step below).
           toolchain: ${{ steps.msrv.outputs.msrv }}
+          # `init` emits its `fmt` and `clippy` sensors only when the components
+          # probe OK, and the dogfood tests assert those sensors are present:
+          # a minimal-profile toolchain makes the suite fail for reasons that
+          # have nothing to do with the MSRV.
+          components: rustfmt, clippy
       # Swatinem/rust-cache@v2
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
         with:
           key: msrv
+      # taiki-e/install-action@v2
+      - uses: taiki-e/install-action@ba47c86ac325773530516bb756137ac718732518
+        with:
+          # Same reason: `init` emits its `test` sensor only when
+          # `cargo nextest --version` probes OK (src/init/detect.rs).
+          tool: cargo-nextest
       - name: Check workspace on MSRV
         # rust-toolchain.toml pins the dev channel and wins over an installed
         # toolchain, so every step that must use the MSRV selects it explicitly.
