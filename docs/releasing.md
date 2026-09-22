@@ -135,13 +135,23 @@ The `release` job composes the published notes from two sources:
 
 The job calls `gh api …/releases/generate-notes` with `previous_tag_name` (from
 `git describe` on the tag's parent) and `configuration_file_path`, then publishes
-with `gh release create --notes-file`. Two consequences worth knowing:
-`--generate-notes` is no longer used, so `.github/release.yml` must exist **on
-the default branch** for the API to accept it (a missing file answers
-`Could not find a configuration file`); and the curated header is generic prose —
-anything release-specific (highlights, a known blocker, a migration step) belongs
-there or goes in afterwards with
-`gh release edit <tag> --notes-file <file>`.
+with `gh release create --notes-file`. Three things the experiments pin down:
+
+- **The configuration resolves from the tagged commit, not the default branch**,
+  for a tag that already exists: generating notes for `v0.1.2` (tagged before the
+  config landed) ignored the file, and passing `configuration_file_path`
+  explicitly failed with `Could not find a configuration file at
+  .github/release.yml`. For a tag that does not exist yet the same call resolves
+  it — generating for a hypothetical `v0.1.3` returned the categories. A release
+  tagged after this config therefore gets categorized notes; a release that
+  predates it cannot be retrofitted with `gh release edit`.
+- **Categories group labelled pull requests only.** A pull request with none of
+  the category labels falls into the `*` catch-all ("Other changes"); with every
+  PR unlabelled the notes are simply one long catch-all section.
+- `--generate-notes` is no longer used, so the notes are composed here; anything
+  release-specific (highlights, a known blocker, a migration step) belongs in the
+  template or goes in afterwards with
+  `gh release edit <tag> --notes-file <file>`.
 
 ## crates.io publishing
 
