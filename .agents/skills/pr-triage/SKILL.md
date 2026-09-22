@@ -43,7 +43,11 @@ Run these steps in order. Stop the sweep on any escalation and report it.
    fails). Never continue on a failed preflight.
 2. **Work list.** Run `scripts/list-prs.sh` for the ordered list (stacks first,
    then oldest-first; drafts and `hold`/`wip`/`do-not-merge` labels excluded).
-   For a single PR, use that number. If there are no PRs, stop.
+   For a single PR, use that number. If there are no PRs, stop. Before spending
+   review budget, group the list into duplicate clusters — same file, same base
+   blob, same effect — keep exactly one member per cluster, and close the losers
+   as `superseded by #<keeper>`
+   ([references/duplicate-clusters.md](references/duplicate-clusters.md)).
 3. **Author policy.** Auto-triage only PRs authored by you or a bot (`[bot]`
    suffix or the `dependabot`/`renovate` logins). For any other author: review
    and post findings as a PR comment, then move on. Never update the branch,
@@ -74,9 +78,11 @@ Run these steps in order. Stop the sweep on any escalation and report it.
    [references/webhook-fast-path.md](references/webhook-fast-path.md)); events
    only wake the wait, the classification stays authoritative. The script
    bounds the wait (30 second polls, then a deadline) so you never sleep
-   between calls; fix failures you caused; apply
-   [references/check-policy.md](references/check-policy.md) to skipped or
-   neutral checks. A check that fails in CI plumbing (upload, runner,
+   between calls; fix failures you caused; follow
+   [references/check-policy.md](references/check-policy.md): read the failing
+   check's annotations before calling it a code failure, re-run — never "fix" — a
+   known infrastructure flake, and apply the skip allowlist to skipped or neutral
+   checks. A check that fails in CI plumbing (upload, runner,
    rerun-forbidden) with zero diff causation is infrastructure, not a
    finding: follow [references/gh-resilience.md](references/gh-resilience.md)
    (empty retrigger commit, one cycle, then escalate). Never merge with a
@@ -100,8 +106,10 @@ Run these steps in order. Stop the sweep on any escalation and report it.
     fix cycles, then escalate.
 11. **Merge.** Merge directly, never with `--auto`:
     `gh pr merge PR --squash --match-head-commit HEAD_SHA`
-    where `HEAD_SHA` is the head you validated. Do not delete branches during
-    triage.
+    where `HEAD_SHA` is the head you validated. After a merge, run the per-PR
+    loop in [references/merge-order.md](references/merge-order.md) (rebase the
+    next PR, re-run its checks, re-read `mergeStateStatus`/`mergeable`, then
+    merge on the re-validated head). Do not delete branches during triage.
 12. **Post-merge.** Run `scripts/post-merge.sh PR` (add `--events-url` when the
     fast path is armed, as in step 8). The script bounds the wait
     (default 900 seconds) and treats an empty run list as not yet registered,

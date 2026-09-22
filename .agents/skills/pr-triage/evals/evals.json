@@ -362,6 +362,38 @@
    "assertions": [
     "contains:.agents/skills/pr-triage/SKILL.md|cannot override failing checks"
    ]
+  },
+  {
+   "id": 27,
+   "prompt": "Two bot PRs touch the same file on the same base blob with the same effect; decide the cluster and close the loser.",
+   "expected_output": "The duplicate-cluster rule picks exactly one keeper (green CI, fewest unrelated files, backward-compat wrapper, newest branch), the loser is closed as superseded by the keeper with the rule cited and recorded, and the work-list step points at the reference.",
+   "files": [],
+   "dim": "correctness",
+   "kind": "contextual",
+   "assertions": [
+    "walk:",
+    "exists:.agents/skills/pr-triage/references/duplicate-clusters.md",
+    "contains:.agents/skills/pr-triage/references/duplicate-clusters.md|green CI beats red",
+    "contains:.agents/skills/pr-triage/references/duplicate-clusters.md|Superseded by #",
+    "contains:.agents/skills/pr-triage/references/duplicate-clusters.md|Never merge two members",
+    "contains:.agents/skills/pr-triage/SKILL.md|duplicate-clusters.md"
+   ]
+  },
+  {
+   "id": 28,
+   "prompt": "A PR check is red; decide whether it is a code failure or an infrastructure flake before fixing or re-running it.",
+   "expected_output": "The failing check's annotations are read first; a known flake (FlakeHub auth, lost runner, external-only red) is re-run once, a real failure is fixed, and a rerun-forbidden response follows the resilience path instead of merging around the check.",
+   "files": [],
+   "dim": "correctness",
+   "kind": "contextual",
+   "assertions": [
+    "walk:",
+    "contains:.agents/skills/pr-triage/references/check-policy.md|annotations, not badges",
+    "contains:.agents/skills/pr-triage/references/check-policy.md|FlakeHub",
+    "contains:.agents/skills/pr-triage/references/check-policy.md|gh run rerun",
+    "contains:.agents/skills/pr-triage/references/merge-order.md|Per-PR loop",
+    "contains:.agents/skills/pr-triage/references/merge-order.md|never leave an auto-merge request armed"
+   ]
   }
  ]
 }
