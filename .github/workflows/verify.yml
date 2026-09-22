@@ -193,23 +193,65 @@ jobs:
           # run inside the checkout still resolve through rust-toolchain.toml
           # unless the step sets RUSTUP_TOOLCHAIN (see the check step below).
           toolchain: ${{ steps.msrv.outputs.msrv }}
+          # `init` emits its `fmt` and `clippy` sensors only when the components
+          # probe OK, and the dogfood tests assert those sensors are present:
+          # a minimal-profile toolchain makes the suite fail for reasons that
+          # have nothing to do with the MSRV.
+          components: rustfmt, clippy
       # Swatinem/rust-cache@v2
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
         with:
           key: msrv
+      # taiki-e/install-action@v2
+      - uses: taiki-e/install-action@ba47c86ac325773530516bb756137ac718732518
+        with:
+          # Same reason: `init` emits its `test` sensor only when
+          # `cargo nextest --version` probes OK (src/init/detect.rs).
+          tool: cargo-nextest
       - name: Check workspace on MSRV
         # rust-toolchain.toml pins the dev channel and wins over an installed
-        # toolchain, so this step must select the MSRV explicitly: the manifest
-        # bound is enforced only against the *selected* toolchain (Cargo errors
-        # when it is older than `rust-version`, and `--ignore-rust-version`
-        # bypasses that), so compiling with the pinned channel cannot verify the
-        # declared minimum — the Cargo Book's "Verified" support expectation,
-        # which only a build on the MSRV can establish. Without
-        # RUSTUP_TOOLCHAIN this step compiled with the pinned channel and five
-        # let-chains reached main that way.
+        # toolchain, so every step that must use the MSRV selects it explicitly.
+        # Cargo's `rust-version` check only errors when the *selected* toolchain
+        # is older than the declared minimum (`--ignore-rust-version` bypasses
+        # it), so compiling with the pinned channel proves nothing about
+        # compatibility with 1.85 — five let-chains reached main that way. This
+        # step is source compatibility for every target (default features),
+        # including test code.
         env:
           RUSTUP_TOOLCHAIN: ${{ steps.msrv.outputs.msrv }}
         run: cargo check --workspace --all-targets --locked
+      - name: Test workspace on MSRV
+        # The Cargo Book's "Verified" support expectation is "a package's
+        # functionality is verified on its supported Rust versions, including
+        # automated testing" (cargo/reference/rust-version.html): a type check
+        # is not that, so the suite runs here on the declared minimum.
+        #
+        # `CI` is cleared for this step on purpose. GitHub sets CI=true for every
+        # job, and the scaffolded packs' deps/audit sensors fail closed when
+        # CI=true without cargo-deny/cargo-audit — tools this job does not
+        # install, so `init`'s baseline proof would fail on 1.85 for reasons that
+        # have nothing to do with the MSRV. CI-mode expectations are covered by
+        # the verify job (tools installed, CI=true) and the windows job; this
+        # step runs exactly what a maintainer runs locally.
+        env:
+          RUSTUP_TOOLCHAIN: ${{ steps.msrv.outputs.msrv }}
+          CI: ""
+        run: cargo test --workspace --locked
+      - name: Test guardian-proxy with its MSRV-clean feature on MSRV
+        # Scope: `cargo test --workspace` builds each package with its default
+        # features, and `guardian-proxy` ships `default = []`. `agt-governance`
+        # is MSRV-clean (measured on 1.85), so it is verified here too.
+        #
+        # `mcp-surface` is deliberately absent: it pulls rmcp, whose every 3.x
+        # release requires Rust 1.88, so the workspace declares 1.85 only while
+        # that feature is off (crates/guardian-proxy/Cargo.toml, and
+        # plans/mcp-conformance-epic.md). The verify job exercises that feature
+        # on the stable toolchain; this job cannot, and the exclusion is a
+        # recorded decision rather than an oversight.
+        env:
+          RUSTUP_TOOLCHAIN: ${{ steps.msrv.outputs.msrv }}
+          CI: ""
+        run: cargo test -p guardian-proxy --features agt-governance --locked
 
   dsh-bundle:
     runs-on: ubuntu-latest
