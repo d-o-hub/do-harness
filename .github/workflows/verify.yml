@@ -199,17 +199,23 @@ jobs:
           key: msrv
       - name: Check workspace on MSRV
         # rust-toolchain.toml pins the dev channel and wins over an installed
-        # toolchain, so this step must select the MSRV explicitly: the manifest
-        # bound is enforced only against the *selected* toolchain (Cargo errors
-        # when it is older than `rust-version`, and `--ignore-rust-version`
-        # bypasses that), so compiling with the pinned channel cannot verify the
-        # declared minimum — the Cargo Book's "Verified" support expectation,
-        # which only a build on the MSRV can establish. Without
-        # RUSTUP_TOOLCHAIN this step compiled with the pinned channel and five
-        # let-chains reached main that way.
+        # toolchain, so every step that must use the MSRV selects it explicitly.
+        # Cargo's `rust-version` check only errors when the *selected* toolchain
+        # is older than the declared minimum (`--ignore-rust-version` bypasses
+        # it), so compiling with the pinned channel proves nothing about 1.85 —
+        # five let-chains reached main that way. This step is source
+        # compatibility for every target, including test code.
         env:
           RUSTUP_TOOLCHAIN: ${{ steps.msrv.outputs.msrv }}
         run: cargo check --workspace --all-targets --locked
+      - name: Test workspace on MSRV
+        # The Cargo Book's "Verified" support expectation is "a package's
+        # functionality is verified on its supported Rust versions, including
+        # automated testing" (cargo/reference/rust-version.html): a type check
+        # is not that, so the suite runs here on the declared minimum.
+        env:
+          RUSTUP_TOOLCHAIN: ${{ steps.msrv.outputs.msrv }}
+        run: cargo test --workspace --locked
 
   dsh-bundle:
     runs-on: ubuntu-latest
