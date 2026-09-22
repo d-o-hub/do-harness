@@ -189,7 +189,9 @@ jobs:
       # dtolnay/rust-toolchain@master
       - uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de
         with:
-          # Explicit input overrides any local rust-toolchain.toml pin.
+          # Installs this toolchain and makes it the rustup default. Commands
+          # run inside the checkout still resolve through rust-toolchain.toml
+          # unless the step sets RUSTUP_TOOLCHAIN (see the check step below).
           toolchain: ${{ steps.msrv.outputs.msrv }}
       # Swatinem/rust-cache@v2
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
@@ -197,10 +199,13 @@ jobs:
           key: msrv
       - name: Check workspace on MSRV
         # rust-toolchain.toml pins the dev channel and wins over an installed
-        # toolchain, so the job has to select the MSRV explicitly: without
-        # RUSTUP_TOOLCHAIN this step silently checked the pinned channel and
-        # could never fail, while `cargo +1.85 check --workspace --locked`
-        # failed on five let-chains.
+        # toolchain, so this step must select the MSRV explicitly: without
+        # RUSTUP_TOOLCHAIN it compiled with the pinned channel, which cannot
+        # detect incompatibility with the declared minimum — ordinary compile
+        # errors still fail the step, MSRV-only regressions do not (five
+        # let-chains reached main that way). Cargo consults `rust-version` for
+        # dependency resolution, but only the MSRV compiler can prove the code
+        # builds on it.
         env:
           RUSTUP_TOOLCHAIN: ${{ steps.msrv.outputs.msrv }}
         run: cargo check --workspace --all-targets --locked
