@@ -158,7 +158,11 @@ package_version_exists() {
     local pkg="$1" version="$2"
     local registry="${NPM_CONFIG_REGISTRY:-https://registry.npmjs.org}"
     local status
-    status="$(curl -sS --retry 2 --retry-delay 1 -L \
+    # `--retry` alone does not retry a connection reset ("Recv failure:
+    # Connection reset by peer"), which reddened the verify job on main once;
+    # `--retry-all-errors` covers it, while an HTTP 404 stays a definitive
+    # answer because it is a status, not an error (no `-f`).
+    status="$(curl -sS --retry 3 --retry-delay 2 --retry-all-errors -L \
         -o /dev/null -w '%{http_code}' "${registry%/}/$pkg/$version")" || {
         die "could not query npm registry for $pkg@$version"
     }
