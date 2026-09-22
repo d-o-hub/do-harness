@@ -92,10 +92,10 @@ pub(super) fn find_covering_evidence(
         let Ok(bytes) = std::fs::read(&path) else {
             continue;
         };
-        if let Ok(document) = serde_json::from_slice::<EvidenceDocument>(&bytes)
-            && qualifies(&document, set, required)
-        {
-            return (Some(document), Coverage::Found);
+        if let Ok(document) = serde_json::from_slice::<EvidenceDocument>(&bytes) {
+            if qualifies(&document, set, required) {
+                return (Some(document), Coverage::Found);
+            }
         }
     }
     (None, coverage)
