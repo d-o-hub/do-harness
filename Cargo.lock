@@ -533,7 +533,7 @@ dependencies = [
 
 [[package]]
 name = "do-harness"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "anyhow",
  "clap",
@@ -554,7 +554,7 @@ dependencies = [
 
 [[package]]
 name = "do-harness-db"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "anyhow",
  "do-harness-types",
@@ -568,7 +568,7 @@ dependencies = [
 
 [[package]]
 name = "do-harness-types"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "hex",
  "serde",
@@ -813,7 +813,7 @@ dependencies = [
 
 [[package]]
 name = "guardian-proxy"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "agent-governance",
  "anyhow",
