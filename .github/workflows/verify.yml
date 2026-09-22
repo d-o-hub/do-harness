@@ -202,9 +202,9 @@ jobs:
         # toolchain, so every step that must use the MSRV selects it explicitly.
         # Cargo's `rust-version` check only errors when the *selected* toolchain
         # is older than the declared minimum (`--ignore-rust-version` bypasses
-        # it), so compiling with the pinned channel proves nothing about 1.85 —
-        # five let-chains reached main that way. This step is source
-        # compatibility for every target, including test code.
+        # it), so compiling with the pinned channel proves nothing about
+        # compatibility with 1.85 — five let-chains reached main that way. This
+        # step is source compatibility for every target, including test code.
         env:
           RUSTUP_TOOLCHAIN: ${{ steps.msrv.outputs.msrv }}
         run: cargo check --workspace --all-targets --locked
