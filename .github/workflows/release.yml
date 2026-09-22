@@ -67,7 +67,14 @@ jobs:
       # taiki-e/install-action@v2
       - uses: taiki-e/install-action@ba47c86ac325773530516bb756137ac718732518
         with:
-          tool: cargo-deny,cargo-audit,shellcheck
+          # Every tool the `verification` set's sensors invoke: cargo-deny
+          # (deps), cargo-audit (audit), cargo-nextest (test). rustfmt and
+          # clippy come from the toolchain components above, shellcheck from
+          # the runner image, markdownlint/yamllint from the step below.
+          # Adding a sensor that needs a new tool means adding it here too:
+          # the absence of cargo-nextest failed the v0.1.2 tag preflight with
+          # "error: no such command: `nextest`" -> weak evidence.
+          tool: cargo-deny,cargo-audit,cargo-nextest,shellcheck
       - name: Install markdownlint and yamllint
         run: |
           python3 -m pip install --disable-pip-version-check yamllint
