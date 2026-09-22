@@ -93,7 +93,7 @@ const CHECK_COMMITLINT: &str = include_str!("../templates/scripts/check-commitli
 const CHECK_DEPS: &str = include_str!("../templates/scripts/check-deps.sh");
 const CHECK_AUDIT: &str = include_str!("../templates/scripts/check-audit.sh");
 const CHECK_COVERAGE: &str = include_str!("../templates/scripts/check-coverage.sh");
-const NEXTEST_CONFIG: &str = include_str!("../../../.config/nextest.toml");
+const NEXTEST_CONFIG: &str = include_str!("../assets/nextest.toml");
 const CRATE_MANIFEST: &str = include_str!("../templates/crate/Cargo.toml.template");
 const CRATE_LIB: &str = include_str!("../templates/crate/src/lib.rs");
 
