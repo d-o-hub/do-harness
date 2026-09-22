@@ -1,6 +1,7 @@
 [profile.default]
 retries = 0
-no-tests = "pass"
+# No `no-tests` key here: nextest reports it as an unknown configuration key, and
+# every `nextest run` in the harness and the scaffold passes --no-tests=pass.
 
 [profile.ci]
 retries = 1
