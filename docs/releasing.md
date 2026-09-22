@@ -48,6 +48,27 @@ verification set and every build target dogfoods green.
   --allow-publish`. `npm trust` requires an interactive 2FA challenge and
   writes `createPackage` + `createStagedPackage`; `npm trust list <pkg>`
   verifies what the registry holds.
+- **A trusted publisher created after 2026-09-03 allows `npm stage publish`
+  only unless direct publishing was granted.** npm's docs: configurations from
+  before that date keep their old behaviour, configurations after it default to
+  staged publishing, and "Allowed actions" must additionally permit
+  `npm publish`. A release therefore fails with
+  `403 Forbidden - PUT https://registry.npmjs.org/<pkg> - OIDC permission
+  denied for this action` — which reads like a credential problem but is a
+  missing permission on the action — until each package's connection is granted
+  direct publishing (`npm trust github <pkg> --file release.yml --repo
+  d-o-hub/do-harness --allow-publish`, or the package's **Trusted publishing →
+  Allowed actions** setting). The grant is per package name and takes an
+  interactive 2FA challenge. Measured on the v0.1.2 tag for all five published
+  packages.
+- **A tag run executes the workflow file from the tagged commit.** A `release.yml`
+  fix therefore cannot be validated by re-running or re-pushing the existing tag
+  — `gh run rerun` replays the old file identically. After a fix lands on `main`:
+  delete any release created from the tag (`gh release delete <tag>`), delete and
+  re-create the tag on the fixed commit, and push it. crates.io and npm are
+  immutable-but-idempotent per version, so a re-cut skips whatever the failed run
+  already published; a crate that has already shipped at that version cannot be
+  replaced, only followed by a new version.
 - Trusted publishing requires Node >= 22.14.0 and npm >= 11.5.1; the release
   job pins Node 24 and checks both versions. npm generates provenance
   automatically for these public GitHub Actions publishes. After a successful
@@ -124,6 +145,24 @@ cargo publish --dry-run -p do-harness-types
 # db and do-harness depend on the crates above being on crates.io; once
 # published, their dry runs work too.
 ```
+
+**Every embedded file must live inside the crate.** `cargo package` refuses
+paths outside the package root, so `include_str!("../../../.config/nextest.toml")`
+compiles and passes tests locally while the published tarball cannot build:
+`cargo publish` fails with `error: couldn't read …: No such file or directory`
+during tarball verification. Measured on the v0.1.2 tag, where the CLI crate
+failed eight attempts after two others had published. External files are
+symlinked into `crates/do-harness/assets/` (`compliance.md`, `methods.json`,
+`nextest.toml`), which `cargo package` dereferences;
+`crates/do-harness/tests/embedded_assets.rs` fails when any include path
+resolves outside the crate.
+
+**The tag preflight installs every tool its sensor set runs.** The `verification`
+set's sensors need `cargo-deny` (deps), `cargo-audit` (audit), `cargo-nextest`
+(test), and `shellcheck`, and the preflight lists them explicitly; adding a
+sensor that needs a new tool means adding it there too. Measured on the v0.1.2
+tag: a preflight without `cargo-nextest` failed `verify --strict` with
+`error: no such command: nextest` and skipped the whole release.
 
 ## npm publishing
 
