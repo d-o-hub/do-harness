@@ -1,57 +1,81 @@
 #!/usr/bin/env bash
-# check-coverage.sh — behavior-based coverage inventory alongside line/branch threshold.
+# check-coverage.sh — behavior inventory plus line/branch coverage thresholds.
 #
 # Sensor: scripts/check-coverage.sh
 # Severity: warn
 # Target threshold: 70% line coverage (codecov-style project target).
-# Output: generates lcov.info and reports `FINDINGS: <deficit>` for the blessed ratchet.
+# Output: prints the behavior inventory, generates lcov.info, and reports
+# `FINDINGS: <deficit>` — the line-percentage deficit against TARGET_PCT — for
+# the blessed ratchet. The branch percentage is printed when the report carries
+# one and never affects the ratchet number.
 #
 # Methodology:
-# - inventory (fast path): unique compiled behavior map as unique(file, fn) per layer:
-#   crates/*/src (owners), crates/*/tests (crate integration), src/ (root facade), tests/ (root integration).
-# - llvm-cov (proof path): workspace line + branch percentages over targets.
-# - test-LOC counts do not replace inventory or llvm-cov metrics.
+# - inventory (fast path): unique compiled behavior as unique(file, fn) per layer —
+#   crates/*/src (owners), crates/*/tests (crate integration), src/ (root facade),
+#   tests/ (root integration). No test execution, python3 only.
+# - llvm-cov (proof path): workspace line and branch percentages over the targets
+#   that actually run. Both come from the lcov report itself (LH/LF for lines,
+#   BRH/BRF for branches), never from a stdout summary: `--lcov` prints none.
+# - Test-LOC counts replace neither layer.
+#
+# Usage: check-coverage.sh [inventory|llvm-cov] [dir]
+# The script measures the workspace that contains it unless `dir` is given.
 
 set -euo pipefail
 
 require_tools() { [[ "${CI:-}" == "true" || "${DO_HARNESS_REQUIRE_TOOLS:-}" == "1" ]]; }
 
-MODE="all"
-TARGET_DIR="."
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-if [[ "${1:-}" == "inventory" ]]; then
-    MODE="inventory"
-    TARGET_DIR="${2:-.}"
-elif [[ "${1:-}" == "llvm-cov" ]]; then
-    MODE="llvm-cov"
-    TARGET_DIR="${2:-.}"
-elif [[ -n "${1:-}" ]]; then
-    TARGET_DIR="$1"
-fi
+MODE="all"
+TARGET_DIR="$REPO_DIR"
+case "${1:-}" in
+    inventory)
+        MODE="inventory"
+        TARGET_DIR="${2:-$REPO_DIR}"
+        ;;
+    llvm-cov)
+        MODE="llvm-cov"
+        TARGET_DIR="${2:-$REPO_DIR}"
+        ;;
+    '') ;;
+    *)
+        printf 'check-coverage.sh: unknown argument: %s (see header)\n' "$1" >&2
+        exit 2
+        ;;
+esac
 
 cd "$TARGET_DIR"
 
+# Behavior map: unique test function declarations per canonical layer, sorted
+# deterministically. No test execution and no toolchain beyond python3.
 print_inventory() {
-    if command -v python3 >/dev/null 2>&1; then
-        python3 -c '
-import os, re
+    if ! command -v python3 >/dev/null 2>&1; then
+        echo "SKIP: python3 not installed; behavior inventory unavailable."
+        return 0
+    fi
+    python3 - <<'PY'
+import os
+import re
 
-layers = {
-    "crates/*/src": {"files": 0, "tests": 0, "unique": set()},
-    "crates/*/tests": {"files": 0, "tests": 0, "unique": set()},
-    "src/": {"files": 0, "tests": 0, "unique": set()},
-    "tests/": {"files": 0, "tests": 0, "unique": set()},
+LAYER_LABEL = {
+    "crates/*/src": "crates/*/src",
+    "crates/*/tests": "crates/*/tests",
+    "src/": "src/",
+    "tests/": "tests/",
 }
+SKIP_DIRS = {"target", ".git", ".do-harness", ".agents", "node_modules"}
+ATTR_RE = re.compile(r"#\s*\[\s*(?:[\w:]+::)?\w*test\b")
+FN_RE = re.compile(r"\bfn\s+([a-zA-Z0-9_]+)")
 
-def classify_layer(path):
-    p = path.replace("\\", "/")
-    if p.startswith("./"):
-        p = p[2:]
-    parts = p.split("/")
+
+def classify(relative):
+    parts = relative.split("/")
     if len(parts) >= 3 and parts[0] == "crates":
         if parts[2] == "src":
             return "crates/*/src"
-        elif parts[2] == "tests" and "fixtures" not in parts:
+        if parts[2] == "tests" and "fixtures" not in parts:
             return "crates/*/tests"
     elif len(parts) >= 2 and parts[0] == "src":
         return "src/"
@@ -59,60 +83,50 @@ def classify_layer(path):
         return "tests/"
     return None
 
-attr_re = re.compile(r"#\s*\[\s*(?:[\w:]+::)?\w*test\b")
-fn_re = re.compile(r"\bfn\s+([a-zA-Z0-9_]+)")
+
+def test_function(lines, index):
+    """First `fn` name at most 15 lines below a test attribute, or None."""
+    for following in lines[index + 1 : index + 15]:
+        match = FN_RE.search(following)
+        if match:
+            return match.group(1)
+        stripped = following.strip()
+        if stripped and not stripped.startswith(("#[", "//", "/*", "*")):
+            return None
+    return None
+
+
+counts = {layer: {"files": 0, "tests": 0, "unique": set()} for layer in LAYER_LABEL}
 
 for root, dirs, files in os.walk("."):
-    r_norm = root.replace("\\", "/")
-    if "/target" in r_norm or "/.git" in r_norm or "/.do-harness" in r_norm:
-        continue
-    for f in sorted(files):
-        if f.endswith(".rs"):
-            rel = os.path.normpath(os.path.join(root, f)).replace("\\", "/")
-            if rel.startswith("./"):
-                rel = rel[2:]
-            layer = classify_layer(rel)
-            if not layer:
+    dirs[:] = sorted(d for d in dirs if d not in SKIP_DIRS)
+    for name in sorted(files):
+        if not name.endswith(".rs"):
+            continue
+        relative = os.path.relpath(os.path.join(root, name)).replace("\\", "/")
+        layer = classify(relative)
+        if layer is None:
+            continue
+        counts[layer]["files"] += 1
+        try:
+            with open(relative, encoding="utf-8", errors="ignore") as source:
+                lines = source.readlines()
+        except OSError:
+            continue
+        for index, line in enumerate(lines):
+            if not ATTR_RE.search(line):
                 continue
-            layers[layer]["files"] += 1
-
-            try:
-                with open(rel, "r", encoding="utf-8", errors="ignore") as fobj:
-                    lines = fobj.readlines()
-            except Exception:
-                continue
-
-            for i, line in enumerate(lines):
-                if attr_re.search(line):
-                    layers[layer]["tests"] += 1
-                    fn_name = None
-                    for j in range(i + 1, min(i + 15, len(lines))):
-                        m = fn_re.search(lines[j])
-                        if m:
-                            fn_name = m.group(1)
-                            break
-                        stripped = lines[j].strip()
-                        if stripped and not stripped.startswith("#[") and not stripped.startswith("//") and not stripped.startswith("///") and not stripped.startswith("/*") and not stripped.startswith("*"):
-                            break
-                    if fn_name:
-                        layers[layer]["unique"].add((rel, fn_name))
+            counts[layer]["tests"] += 1
+            name = test_function(lines, index)
+            if name:
+                counts[layer]["unique"].add((relative, name))
 
 print("layer          | files | tests | unique(file, fn)")
 print("---------------+-------+-------+------------------")
-for l in sorted(layers.keys()):
-    f_cnt = layers[l]["files"]
-    t_cnt = layers[l]["tests"]
-    u_cnt = len(layers[l]["unique"])
-    print(f"{l:<14} | {f_cnt:>5} | {t_cnt:>5} | {u_cnt:>16}")
-'
-    else
-        echo "layer          | files | tests | unique(file, fn)"
-        echo "---------------+-------+-------+------------------"
-        echo "crates/*/src   |     0 |     0 |                0"
-        echo "crates/*/tests |     0 |     0 |                0"
-        echo "src/           |     0 |     0 |                0"
-        echo "tests/         |     0 |     0 |                0"
-    fi
+for layer in sorted(counts):
+    entry = counts[layer]
+    print(f"{layer:<14} | {entry['files']:>5} | {entry['tests']:>5} | {len(entry['unique']):>16}")
+PY
 }
 
 print_inventory
@@ -140,40 +154,31 @@ fi
 
 echo "$cov_output"
 
-parsed_percentages="$(echo "$cov_output" | python3 -c '
-import sys, re
-
-cov_text = sys.stdin.read()
-total_line = ""
-for line in cov_text.splitlines():
-    if line.startswith("TOTAL "):
-        total_line = line
-        break
-
-pcts = re.findall(r"(\d+\.\d+)%", total_line)
-line_pct = ""
-branch_pct = ""
-
-if len(pcts) >= 4:
-    line_pct = pcts[2]
-    branch_pct = pcts[3]
-elif len(pcts) == 3:
-    line_pct = pcts[2]
-elif len(pcts) >= 1:
-    line_pct = pcts[-1]
-
-print(f"{line_pct},{branch_pct}")
-' 2>/dev/null || echo ",")"
-
-LINE_PCT="$(echo "$parsed_percentages" | cut -d',' -f1)"
-BRANCH_PCT="$(echo "$parsed_percentages" | cut -d',' -f2)"
-
-if [[ -z "$LINE_PCT" ]]; then
-    LINE_PCT="$(echo "$cov_output" | awk '/^TOTAL[[:space:]]/ {for(i=1;i<=NF;i++) if ($i ~ /^[0-9]+\.[0-9]+%$/) p=$i} END {print p}' | tr -d '%')"
+if [[ ! -f lcov.info ]]; then
+    echo "FAIL: cargo llvm-cov reported success but produced no lcov.info."
+    exit 1
 fi
 
+# `--lcov` prints no TOTAL summary table, so both percentages are derived from
+# the report: LH (lines hit) over LF (lines found), BRH over BRF for branches.
+percentages="$(
+    awk -F: '
+        /^LF:/ { lines_found += $2 }
+        /^LH:/ { lines_hit += $2 }
+        /^BRF:/ { branches_found += $2 }
+        /^BRH:/ { branches_hit += $2 }
+        END {
+            if (lines_found > 0) printf "%.2f ", 100 * lines_hit / lines_found
+            else printf " "
+            if (branches_found > 0) printf "%.2f", 100 * branches_hit / branches_found
+        }
+    ' lcov.info
+)"
+LINE_PCT="${percentages%% *}"
+BRANCH_PCT="${percentages#* }"
+
 if [[ -z "$LINE_PCT" ]]; then
-    echo "WARN: Could not parse coverage percentage from cargo-llvm-cov output."
+    echo "WARN: Could not derive line coverage from lcov.info."
     echo "FINDINGS: 1"
     exit 0
 fi

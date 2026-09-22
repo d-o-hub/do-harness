@@ -1,9 +1,15 @@
-//! Integration test suite for `scripts/check-coverage.sh` (coverage sensor).
+//! Integration tests for `scripts/check-coverage.sh`.
 //!
-//! Verifies acceptance criteria:
-//! - `inventory` on a fresh init rust workspace exits 0 with a stable layer table and no test execution.
-//! - `llvm-cov` path emits `FINDINGS: <n>` (deficit) and `FINDINGS: 0` on green; branch % printed when parseable, never breaks ratchet when unparseable.
-//! - Missing cargo-llvm-cov/cargo-nextest keeps current SKIP/FAIL contract (`CI=true` / `DO_HARNESS_REQUIRE_TOOLS=1`).
+//! Covers the sensor contract:
+//! - `inventory` prints the deterministic layer table on a fresh `init`
+//!   workspace without running tests, and exits 0.
+//! - the llvm-cov path derives the line and branch percentages from the lcov
+//!   report, prints the branch percentage when the report carries one, and
+//!   always reports `FINDINGS: <line deficit>` (0 above target) for the blessed
+//!   ratchet.
+//! - a missing toolchain keeps the SKIP/FAIL contract (`CI=true` /
+//!   `DO_HARNESS_REQUIRE_TOOLS=1`).
+//! - the sensor measures the workspace that contains it, independent of cwd.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::doc_markdown)]
 
@@ -14,6 +20,17 @@ use std::process::Command;
 #[allow(dead_code)]
 mod shell;
 
+/// Fake `cargo-llvm-cov` whose lcov report yields 74.00% lines and 65.00%
+/// branches, with nothing on stdout: only a report-derived parser can pass.
+const LCOV_WITH_BRANCHES: &str = r#"std::fs::write("lcov.info", "SF:src/lib.rs\nLF:100\nLH:74\nBRF:20\nBRH:13\nend_of_record\n").unwrap();"#;
+
+/// Fake `cargo-llvm-cov` whose report has lines only (65.00%), so the sensor
+/// must report the deficit without inventing a branch number.
+const LCOV_WITHOUT_BRANCHES: &str =
+    r#"std::fs::write("lcov.info", "SF:src/lib.rs\nLF:100\nLH:65\nend_of_record\n").unwrap();"#;
+
+/// Removes ambient git state so a spawned command cannot inherit this test
+/// run's repository.
 fn isolated_command(program: &str) -> Command {
     let mut command = Command::new(program);
     for key in [
@@ -37,13 +54,13 @@ fn harness(root: &Path) -> Command {
     cmd
 }
 
-fn create_fake_tool(bin_dir: &Path, name: &str, output_str: &str) {
+/// Compiles a fake `cargo-<name>` whose `main` executes `main_body`.
+fn create_fake_tool(bin_dir: &Path, name: &str, main_body: &str) {
     let exe_name = format!("cargo-{name}{}", std::env::consts::EXE_SUFFIX);
     let target_path = bin_dir.join(exe_name);
 
-    let src = format!(r"fn main() {{ print!({output_str:?}); }}");
     let src_path = bin_dir.join(format!("{name}.rs"));
-    std::fs::write(&src_path, src).unwrap();
+    std::fs::write(&src_path, format!("fn main() {{ {main_body} }}\n")).unwrap();
 
     let status = Command::new("rustc")
         .arg(&src_path)
@@ -54,35 +71,48 @@ fn create_fake_tool(bin_dir: &Path, name: &str, output_str: &str) {
     assert!(status.success(), "rustc compilation of fake {name} failed");
 }
 
+/// Prepends `bin_dir` to the inherited PATH.
+fn path_with(bin_dir: &Path) -> std::ffi::OsString {
+    std::env::join_paths(
+        std::iter::once(bin_dir.to_path_buf()).chain(std::env::split_paths(
+            &std::env::var_os("PATH").unwrap_or_default(),
+        )),
+    )
+    .unwrap()
+}
+
+/// Script path of the repository this test belongs to.
+fn script_path() -> std::path::PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../scripts/check-coverage.sh")
+}
+
+/// Inits a rust workspace at `root` and returns a fake-tool bin directory.
+fn scaffold(root: &Path, main_body: &str) -> std::path::PathBuf {
+    let init_status = harness(root).arg("init").status().expect("run init");
+    assert!(init_status.success(), "do-harness init failed");
+
+    let bin_dir = root.join("fake-bin");
+    std::fs::create_dir_all(&bin_dir).unwrap();
+    create_fake_tool(&bin_dir, "nextest", "");
+    create_fake_tool(&bin_dir, "llvm-cov", main_body);
+    bin_dir
+}
+
 #[test]
 fn fresh_init_inventory_exits_zero_with_stable_table() {
-    let repo_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let script_path = repo_root.join("scripts/check-coverage.sh");
-
     let temp_dir = tempfile::tempdir().unwrap();
     let root = temp_dir.path();
-
+    // The inventory fast path needs no toolchain; the fakes are irrelevant here.
     let init_status = harness(root).arg("init").status().expect("run init");
     assert!(init_status.success(), "do-harness init failed");
 
     let mut cmd = shell::bash();
-    for key in [
-        "GIT_DIR",
-        "GIT_WORK_TREE",
-        "GIT_INDEX_FILE",
-        "GIT_OBJECT_DIRECTORY",
-        "GIT_ALTERNATE_OBJECT_DIRECTORIES",
-        "GIT_CEILING_DIRECTORIES",
-        "GIT_NAMESPACE",
-        "GIT_PREFIX",
-        "CI",
-        "DO_HARNESS_REQUIRE_TOOLS",
-    ] {
+    for key in ["CI", "DO_HARNESS_REQUIRE_TOOLS"] {
         cmd.env_remove(key);
     }
 
     let output = cmd
-        .arg(&script_path)
+        .arg(script_path())
         .arg("inventory")
         .arg(root)
         .output()
@@ -95,7 +125,6 @@ fn fresh_init_inventory_exits_zero_with_stable_table() {
         output.status.success(),
         "inventory on fresh init workspace should exit 0. Output:\nSTDOUT:\n{stdout}\nSTDERR:\n{stderr}"
     );
-
     assert!(
         stdout.contains("layer          | files | tests | unique(file, fn)"),
         "table header missing, got stdout:\n{stdout}"
@@ -111,74 +140,105 @@ fn fresh_init_inventory_exits_zero_with_stable_table() {
 }
 
 #[test]
-fn missing_tools_skips_locally_and_fails_in_ci() {
-    let repo_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let script_path = repo_root.join("scripts/check-coverage.sh");
-
+fn llvm_cov_path_prints_branch_percentage_from_the_report() {
     let temp_dir = tempfile::tempdir().unwrap();
     let root = temp_dir.path();
+    let bin_dir = scaffold(root, LCOV_WITH_BRANCHES);
 
-    let mut cmd_skip = shell::bash();
-    for key in [
-        "GIT_DIR",
-        "GIT_WORK_TREE",
-        "GIT_INDEX_FILE",
-        "GIT_OBJECT_DIRECTORY",
-        "GIT_ALTERNATE_OBJECT_DIRECTORIES",
-        "GIT_CEILING_DIRECTORIES",
-        "GIT_NAMESPACE",
-        "GIT_PREFIX",
-        "CI",
-        "DO_HARNESS_REQUIRE_TOOLS",
-    ] {
-        cmd_skip.env_remove(key);
-    }
-    cmd_skip.env("PATH", "/usr/bin:/bin");
-
-    let output_skip = cmd_skip
-        .arg(&script_path)
+    let output = shell::bash()
+        .arg(script_path())
         .arg("llvm-cov")
         .arg(root)
+        .env("PATH", path_with(&bin_dir))
+        .output()
+        .expect("run check-coverage.sh llvm-cov");
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(output.status.success(), "sensor failed:\n{stdout}");
+    assert!(
+        stdout.contains(
+            "check-coverage OK: Line coverage is 74.00% (>= 70%), Branch coverage is 65.00%."
+        ),
+        "expected line and branch coverage from the report, got:\n{stdout}"
+    );
+    assert!(
+        stdout.contains("FINDINGS: 0"),
+        "expected FINDINGS: 0, got:\n{stdout}"
+    );
+}
+
+#[test]
+fn llvm_cov_path_reports_the_deficit_without_branch_data() {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let root = temp_dir.path();
+    let bin_dir = scaffold(root, LCOV_WITHOUT_BRANCHES);
+
+    let output = shell::bash()
+        .arg(script_path())
+        .arg("llvm-cov")
+        .arg(root)
+        .env("PATH", path_with(&bin_dir))
+        .output()
+        .expect("run check-coverage.sh llvm-cov");
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(output.status.success(), "sensor failed:\n{stdout}");
+    assert!(
+        stdout.contains("WARN: Line coverage is 65.00% (target 70%, deficit 5%)."),
+        "expected line deficit without branch data, got:\n{stdout}"
+    );
+    assert!(
+        stdout.contains("FINDINGS: 5"),
+        "expected FINDINGS: 5 (the ratchet number stays the line deficit), got:\n{stdout}"
+    );
+    assert!(
+        !stdout.contains("Branch coverage"),
+        "a report without branch records must not print a branch percentage:\n{stdout}"
+    );
+}
+
+#[test]
+fn missing_tools_skips_locally_and_fails_in_ci() {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let root = temp_dir.path();
+    let init_status = harness(root).arg("init").status().expect("run init");
+    assert!(init_status.success(), "do-harness init failed");
+
+    let mut cmd_skip = shell::bash();
+    for key in ["CI", "DO_HARNESS_REQUIRE_TOOLS"] {
+        cmd_skip.env_remove(key);
+    }
+    let output_skip = cmd_skip
+        .arg(script_path())
+        .arg("llvm-cov")
+        .arg(root)
+        .env("PATH", "/usr/bin:/bin")
         .output()
         .expect("run check-coverage.sh llvm-cov");
 
     let stdout_skip = String::from_utf8_lossy(&output_skip.stdout);
     assert!(
         output_skip.status.success(),
-        "should skip and exit 0 when tools missing locally"
+        "should skip and exit 0 when tools are missing locally:\n{stdout_skip}"
     );
     assert!(
         stdout_skip.contains("SKIP: cargo-llvm-cov or cargo-nextest not installed"),
         "expected SKIP message, got:\n{stdout_skip}"
     );
 
-    let mut cmd_fail = shell::bash();
-    for key in [
-        "GIT_DIR",
-        "GIT_WORK_TREE",
-        "GIT_INDEX_FILE",
-        "GIT_OBJECT_DIRECTORY",
-        "GIT_ALTERNATE_OBJECT_DIRECTORIES",
-        "GIT_CEILING_DIRECTORIES",
-        "GIT_NAMESPACE",
-        "GIT_PREFIX",
-    ] {
-        cmd_fail.env_remove(key);
-    }
-    cmd_fail.env("PATH", "/usr/bin:/bin");
-    cmd_fail.env("CI", "true");
-
-    let output_fail = cmd_fail
-        .arg(&script_path)
+    let output_fail = shell::bash()
+        .arg(script_path())
         .arg("llvm-cov")
         .arg(root)
+        .env("PATH", "/usr/bin:/bin")
+        .env("CI", "true")
         .output()
         .expect("run check-coverage.sh llvm-cov");
 
     let stdout_fail = String::from_utf8_lossy(&output_fail.stdout);
     assert!(
         !output_fail.status.success(),
-        "should fail and exit non-zero when tools missing and CI=true"
+        "should fail and exit non-zero when tools are missing and CI=true:\n{stdout_fail}"
     );
     assert!(
         stdout_fail.contains("FAIL: cargo-llvm-cov and cargo-nextest are required"),
@@ -187,81 +247,33 @@ fn missing_tools_skips_locally_and_fails_in_ci() {
 }
 
 #[test]
-fn llvm_cov_parsing_with_and_without_branch_column() {
-    let repo_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let script_path = repo_root.join("scripts/check-coverage.sh");
-
+fn the_sensor_measures_the_workspace_that_contains_it() {
     let temp_dir = tempfile::tempdir().unwrap();
-    let root = temp_dir.path();
+    let workspace = temp_dir.path().join("workspace");
+    std::fs::create_dir_all(&workspace).unwrap();
+    let bin_dir = scaffold(&workspace, LCOV_WITH_BRANCHES);
 
-    let init_status = harness(root).arg("init").status().expect("run init");
-    assert!(init_status.success(), "do-harness init failed");
+    // Run the scaffolded copy from an unrelated cwd, with no target argument:
+    // the sensor must measure the workspace that owns the script.
+    let elsewhere = temp_dir.path().join("elsewhere");
+    std::fs::create_dir_all(&elsewhere).unwrap();
 
-    let bin_dir = temp_dir.path().join("bin");
-    std::fs::create_dir_all(&bin_dir).unwrap();
-
-    create_fake_tool(&bin_dir, "nextest", "");
-
-    let cov_output_with_branch = r"Filename                      Regions    Missed Regions     Cover   Functions  Missed Functions  Executed       Lines      Missed Lines     Cover    Branches   Missed Branches     Cover
------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-src/lib.rs                         10                 2    80.00%           3                 0   100.00%          25                 5    80.00%           4                 1    75.00%
-TOTAL                              50                10    80.00%          15                 0   100.00%         100                26    74.00%          20                 7    65.00%
-";
-
-    create_fake_tool(&bin_dir, "llvm-cov", cov_output_with_branch);
-
-    let path_env = std::env::join_paths(std::iter::once(bin_dir.clone()).chain(
-        std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default()),
-    ))
-    .unwrap();
-
-    let mut cmd = shell::bash();
-    cmd.env("PATH", &path_env);
-
-    let output = cmd
-        .arg(&script_path)
+    let output = shell::bash()
+        .arg(workspace.join("scripts/check-coverage.sh"))
         .arg("llvm-cov")
-        .arg(root)
+        .current_dir(&elsewhere)
+        .env("PATH", path_with(&bin_dir))
         .output()
-        .expect("run check-coverage.sh with branch output");
+        .expect("run the scaffolded check-coverage.sh");
 
     let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(output.status.success(), "sensor failed:\n{stdout}");
     assert!(
-        stdout.contains(
-            "check-coverage OK: Line coverage is 74.00% (>= 70%), Branch coverage is 65.00%."
-        ),
-        "expected line and branch coverage in stdout, got:\n{stdout}"
+        workspace.join("lcov.info").is_file(),
+        "the report must land in the workspace that owns the script:\n{stdout}"
     );
     assert!(
-        stdout.contains("FINDINGS: 0"),
-        "expected FINDINGS: 0, got:\n{stdout}"
-    );
-
-    let cov_output_no_branch = r"Filename                      Regions    Missed Regions     Cover   Functions  Missed Functions  Executed       Lines      Missed Lines     Cover
------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-src/lib.rs                         10                 2    80.00%           3                 0   100.00%          25                 5    80.00%
-TOTAL                              50                10    80.00%          15                 0   100.00%         100                35    65.00%
-";
-
-    create_fake_tool(&bin_dir, "llvm-cov", cov_output_no_branch);
-
-    let mut cmd2 = shell::bash();
-    cmd2.env("PATH", &path_env);
-
-    let output2 = cmd2
-        .arg(&script_path)
-        .arg("llvm-cov")
-        .arg(root)
-        .output()
-        .expect("run check-coverage.sh without branch output");
-
-    let stdout2 = String::from_utf8_lossy(&output2.stdout);
-    assert!(
-        stdout2.contains("WARN: Line coverage is 65.00% (target 70%, deficit 5%)."),
-        "expected line coverage warn without branch info, got:\n{stdout2}"
-    );
-    assert!(
-        stdout2.contains("FINDINGS: 5"),
-        "expected FINDINGS: 5 (deficit), got:\n{stdout2}"
+        !elsewhere.join("lcov.info").exists(),
+        "the sensor must not measure the caller's working directory"
     );
 }

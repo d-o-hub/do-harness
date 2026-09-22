@@ -49,9 +49,14 @@ Run these steps in order. Stop the sweep on any escalation and report it.
    and post findings as a PR comment, then move on. Never update the branch,
    resolve threads, push fixes, or merge a PR you do not own.
 4. **State check.** Read `gh pr view PR --json headRefOid,baseRefName`. Run
-   `scripts/state.sh get PR`; if a record exists for the same head and base,
-   and `scripts/checks.sh` reports pass and `scripts/threads.sh list` has no
-   unresolved threads, skip to the next PR.
+   `scripts/auto-merge.sh PR`: an armed auto-merge request merges whatever head
+   exists when GitHub next computes mergeability, which defeats the
+   `--match-head-commit` pin, so disarm it with
+   `scripts/auto-merge.sh PR --disable` before validating this head, and halt
+   the sweep if it cannot be disarmed. Run `scripts/state.sh get PR`; if a
+   record exists for the same head and base, and `scripts/checks.sh` reports
+   pass and `scripts/threads.sh list` has no unresolved threads, skip to the
+   next PR.
 5. **No impact.** Run `scripts/no-effect.sh PR`. On `no-effect`, re-read the head
    SHA and confirm it is unchanged, then close:
    `gh pr close PR --comment "Closed automatically: no effective change remains."`
@@ -113,9 +118,13 @@ Run these steps in order. Stop the sweep on any escalation and report it.
 ## Guardrails
 
 - No auto-merge; `--match-head-commit` always; re-read the head SHA immediately
-  before any merge or close.
+  before any merge or close. A pre-armed request is disarmed
+  (`scripts/auto-merge.sh PR --disable`) before the head is validated: an armed
+  request fires on whatever head exists when mergeability is computed, so it
+  lands a commit the sweep never validated.
 - Route mutating `gh` calls (`pr create`, `pr edit`, `pr close`,
-  `update-branch`) through `scripts/retry.sh`; set PR bodies via the REST
+  `update-branch`, the auto-merge disarm) through `scripts/retry.sh`; set PR
+  bodies via the REST
   API and read PRs/issues with explicit `--json` fields (see
   [references/gh-resilience.md](references/gh-resilience.md)). Never retry a
   deterministic API failure.
