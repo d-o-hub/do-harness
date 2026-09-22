@@ -4,7 +4,8 @@
 # Sensor: scripts/check-coverage.sh
 # Severity: warn
 # Target threshold: 70% line coverage (codecov-style project target).
-# Output: generates lcov.info and reports `FINDINGS: <deficit>` for the blessed ratchet.
+# Output: generates lcov.info, derives the line percentage from its LH/LF
+# totals, and reports `FINDINGS: <deficit>` for the blessed ratchet.
 
 set -euo pipefail
 
@@ -32,10 +33,23 @@ fi
 
 echo "$cov_output"
 
-LINE_PCT="$(echo "$cov_output" | awk '/^TOTAL[[:space:]]/ {for(i=1;i<=NF;i++) if ($i ~ /^[0-9]+\.[0-9]+%$/) p=$i} END {print p}' | tr -d '%')"
+if [[ ! -f lcov.info ]]; then
+    echo "FAIL: cargo llvm-cov reported success but produced no lcov.info."
+    exit 1
+fi
+
+# `--lcov` prints no TOTAL summary table, so the percentage is derived from the
+# report itself: LH (lines hit) over LF (lines found).
+LINE_PCT="$(
+    awk -F: '
+        /^LF:/ { found += $2 }
+        /^LH:/ { hit += $2 }
+        END { if (found > 0) printf "%.2f", 100 * hit / found }
+    ' lcov.info
+)"
 
 if [[ -z "$LINE_PCT" ]]; then
-    echo "WARN: Could not parse coverage percentage from cargo-llvm-cov output."
+    echo "WARN: Could not derive line coverage from lcov.info."
     echo "FINDINGS: 1"
     exit 0
 fi

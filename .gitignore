@@ -27,6 +27,10 @@ Thumbs.db
 # Logs
 *.log
 
+# Coverage artifact written by scripts/check-coverage.sh (local measurement)
+/lcov.info
+*.profraw
+
 # Local guardian-proxy runtime state (never commit live configs or audit logs)
 guardian-proxy.toml
 guardian-audit.jsonl
