@@ -1,0 +1,30 @@
+# Release-note categories for GitHub's generated changelog.
+#
+# The release job composes these generated notes under the curated header in
+# .github/release-notes-template.md; see docs/releasing.md ("Release notes").
+# Labels are the repository's own (no invented ones): a category that matches no
+# label shows nothing, which is why "Other changes" is the catch-all.
+changelog:
+  exclude:
+    labels:
+      - duplicate
+      - invalid
+      - question
+      - wontfix
+  categories:
+    - title: Security
+      labels:
+        - security
+    - title: Fixes
+      labels:
+        - bug
+        - accessibility
+    - title: Features
+      labels:
+        - enhancement
+    - title: Documentation
+      labels:
+        - documentation
+    - title: Other changes
+      labels:
+        - "*"

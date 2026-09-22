@@ -121,6 +121,28 @@ verification set and every build target dogfoods green.
       reports the documented decision and stays green instead of aborting on a
       registry 403. See "Windows has no npm channel" above.
 
+### Release notes
+
+The `release` job composes the published notes from two sources:
+
+1. `.github/release-notes-template.md` — the curated header: install commands
+   with the tag substituted, how to verify `checksums.txt`, and the known
+   limitations a generator cannot know.
+2. GitHub's generated changelog — the merged pull requests since the previous
+   tag, categorized by `.github/release.yml` from this repository's own labels
+   (`changelog.categories`, `*` as the catch-all; see
+   [automatically generated release notes](https://docs.github.com/en/repositories/releasing-projects-on-github/automatically-generated-release-notes)).
+
+The job calls `gh api …/releases/generate-notes` with `previous_tag_name` (from
+`git describe` on the tag's parent) and `configuration_file_path`, then publishes
+with `gh release create --notes-file`. Two consequences worth knowing:
+`--generate-notes` is no longer used, so `.github/release.yml` must exist **on
+the default branch** for the API to accept it (a missing file answers
+`Could not find a configuration file`); and the curated header is generic prose —
+anything release-specific (highlights, a known blocker, a migration step) belongs
+there or goes in afterwards with
+`gh release edit <tag> --notes-file <file>`.
+
 ## crates.io publishing
 
 The publish job runs only on tag pushes and is idempotent: a version already

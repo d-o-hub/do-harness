@@ -1,6 +1,6 @@
 # Epic: Distribution and External Adoption
 
-> **Status:** released as `v0.1.0` (2026-09-13); `v0.1.1` (2026-09-15) ships the first Windows zip (crates.io published all three crates at `0.1.1`; npm publishes four Linux/macOS platform packages plus the `do-harness` meta package, all at `0.1.1` — Windows is GitHub-release-only because npm rejects the `do-harness-win32-x64` name). The meta bootstrap and its Trusted Publisher landed 2026-09-17, so CI publishes through OIDC and `npx do-harness` resolves; see the two defect records below)
+> **Status:** released as `v0.1.0` (2026-09-13); `v0.1.1` (2026-09-15) ships the first Windows zip (crates.io published all three crates at `0.1.1`; npm publishes four Linux/macOS platform packages plus the `do-harness` meta package, all at `0.1.1` — Windows is GitHub-release-only because npm rejects the `do-harness-win32-x64` name). `v0.1.2` (2026-09-22) publishes all three crates and the GitHub release with composed release notes; its npm channel is pending a per-package trusted-publisher grant (npm's post-2026-09-03 staged-publishing default). The meta bootstrap and its Trusted Publisher landed 2026-09-17, so CI publishes through OIDC and `npx do-harness` resolves; see the two defect records below)
 > **Related:** prebuilt releases, `scripts/install.sh`, pinned agent
 > instructions, release evidence
 > **Created:** 2026-09-13
@@ -124,6 +124,61 @@ npm bootstrap publication used the authenticated `d-o-hub` account:
 `do-harness-win32-x64@0.1.1` with HTTP 403 (`Package name triggered spam
 detection`), so the meta package was not published because its pinned Windows
 optional dependency is unavailable.
+
+### Published — v0.1.2 (2026-09-22)
+
+`v0.1.2` (tag on `8f91225`, release run
+[35765951765](https://github.com/d-o-hub/do-harness/actions/runs/35765951765))
+publishes the four Linux/macOS tarballs, `do-harness-v0.1.2-x86_64-pc-windows-msvc.zip`,
+and `checksums.txt`. Verification: `gh release download v0.1.2` then
+`sha256sum -c checksums.txt` → all five artifacts `OK` against the published
+digests.
+
+crates.io publication is **complete for `v0.1.2`**: `do-harness-types`,
+`do-harness-db`, and `do-harness` each answer `200` for `0.1.2` (registry API,
+2026-09-22). The first tag run published only the first two — the CLI crate
+failed eight `cargo publish` attempts with
+`couldn't read src/../../../.config/nextest.toml` (see the packaging record
+below), and the fixed re-run skipped the published pair idempotently.
+
+npm publication is **not** complete: `npm-publish` fails with
+`403 … OIDC permission denied for this action` on `do-harness-linux-x64`. The
+cause is npm's trusted-publisher default for connections created after
+2026-09-03 (staged publishing is automatic, direct publishing must be granted),
+not a code or credential defect — `docs/releasing.md` and the
+`npm-github-publish` skill now record it. Fixing it is an interactive 2FA grant
+per package; `gh run rerun 35765951765 --failed` publishes the four platform
+packages and the meta package afterwards. Until then `npx do-harness` and
+`cargo install` remain the documented install paths, and the npm channel is the
+only incomplete one.
+
+#### Tag movement and replaced assets
+
+The tag was re-cut three times, each after a fix landed on `main`: `fef7eab`
+(preflight lacked `cargo-nextest`), then the packaging fix, then `8f91225`
+(`include_str!` escaping the crate root). Because a tag run executes the workflow
+file from the tagged commit, the failed run could not be re-run into a fix. The
+GitHub release created from the first tag was deleted before the final push, so
+`v0.1.2`'s assets and `checksums.txt` were **replaced** and now attest `8f91225`;
+anyone who recorded the first artifacts' digests must re-verify. The route was a
+tag move rather than the `workflow_dispatch --publish` escape hatch because the
+audit-recovery fix changes the template script shipped inside the binary, so the
+artifacts had to be rebuilt from the fixed tree, not merely re-uploaded.
+
+#### Defects this release found (all fixed on `main`)
+
+| symptom in the tag runs | cause | fix |
+| --- | --- | --- |
+| preflight `FAIL test — no such command: nextest`, every publish job skipped | the preflight installed `cargo-deny,cargo-audit,shellcheck` while the `test` sensor runs `cargo nextest` | #212 installs `cargo-nextest` and names which sensor needs which tool |
+| `publish` failed after publishing two crates | `crates/do-harness/src/init.rs` embedded a repo-root file with `include_str!("../../../.config/nextest.toml")`; `cargo package` refuses paths outside the package root, so the tarball could not build | #213 symlinks the config into `assets/` and adds `tests/embedded_assets.rs`, which fails when an include escapes the crate |
+| `windows` job red twice on different dogfood tests (`failed: audit`) | the audit sensor's recovery branch ran `rm -rf` on the shared `CARGO_HOME/advisory-db` under `set -e`; a collision with a parallel sandbox aborted the retry it existed to perform | #214 retries before touching shared state, makes the cleanup best effort, and pins the contract with a `PATH`-faked `cargo` fixture |
+
+Release notes were upgraded in the same pass: `.github/release.yml` categorizes
+the generated changelog by the repository's own labels, and
+`.github/release-notes-template.md` prepends install, verification, and
+limitation sections; `release.yml` composes the two before `gh release create
+--notes-file`. `docs/releasing.md` documents the mechanism and the
+default-branch requirement of the configuration file.
 
 ### Decision — Windows ships as a GitHub release, not npm
 
