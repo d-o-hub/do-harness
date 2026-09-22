@@ -78,10 +78,10 @@ fn resolve_binary_with_names(
     path: Option<OsString>,
     names: &[&str],
 ) -> BinSource {
-    if let Some(bin) = env_bin
-        && is_executable_file(&bin)
-    {
-        return BinSource::Env(bin);
+    if let Some(bin) = env_bin {
+        if is_executable_file(&bin) {
+            return BinSource::Env(bin);
+        }
     }
     if let Some(found) = search_path(path, names) {
         return BinSource::Path(found);

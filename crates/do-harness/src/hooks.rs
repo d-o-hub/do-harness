@@ -156,14 +156,15 @@ pub fn install(
     if let (Ok(active), Ok(default)) = (
         fs::canonicalize(&hooks_dir),
         fs::canonicalize(&default_hooks_dir),
-    ) && active != default
-    {
-        for name in ["pre-commit", "pre-push", "commit-msg"] {
-            let path = default_hooks_dir.join(name);
-            if let Ok(content) = fs::read_to_string(&path)
-                && content.contains(MARKER)
-            {
-                let _ = fs::remove_file(&path);
+    ) {
+        if active != default {
+            for name in ["pre-commit", "pre-push", "commit-msg"] {
+                let path = default_hooks_dir.join(name);
+                if let Ok(content) = fs::read_to_string(&path) {
+                    if content.contains(MARKER) {
+                        let _ = fs::remove_file(&path);
+                    }
+                }
             }
         }
     }
@@ -195,11 +196,11 @@ pub fn uninstall(git_dir: &Path, repo_root: &Path) -> Result<()> {
         }
         for name in ["pre-commit", "pre-push", "commit-msg"] {
             let path = dir.join(name);
-            if let Ok(content) = fs::read_to_string(&path)
-                && content.contains(MARKER)
-            {
-                fs::remove_file(&path)
-                    .with_context(|| format!("failed to remove {}", path.display()))?;
+            if let Ok(content) = fs::read_to_string(&path) {
+                if content.contains(MARKER) {
+                    fs::remove_file(&path)
+                        .with_context(|| format!("failed to remove {}", path.display()))?;
+                }
             }
         }
     }

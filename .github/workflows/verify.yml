@@ -196,7 +196,14 @@ jobs:
         with:
           key: msrv
       - name: Check workspace on MSRV
-        run: cargo check --workspace --locked
+        # rust-toolchain.toml pins the dev channel and wins over an installed
+        # toolchain, so the job has to select the MSRV explicitly: without
+        # RUSTUP_TOOLCHAIN this step silently checked the pinned channel and
+        # could never fail, while `cargo +1.85 check --workspace --locked`
+        # failed on five let-chains.
+        env:
+          RUSTUP_TOOLCHAIN: ${{ steps.msrv.outputs.msrv }}
+        run: cargo check --workspace --all-targets --locked
 
   dsh-bundle:
     runs-on: ubuntu-latest
