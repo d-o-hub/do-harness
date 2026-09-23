@@ -250,5 +250,11 @@
     "rationale": "A stored publish token is a standing credential that is not bound to the repository, workflow, or ref: it survives contributor turnover, leaks through any job that can read secrets, and needs a separate manual revocation step. Trusted Publishing binds the credential to d-o-hub/do-harness plus release.yml and issues one that expires with the run. The npm side already publishes this way (v0.1.2's job minted an OIDC token and signed a provenance statement); the crates.io side replaced the CARGO_REGISTRY_TOKEN secret that published 0.1.0 through 0.1.2.",
     "sensor": ".github/workflows/release.yml publish job (id-token: write + rust-lang/crates-io-auth-action; no CARGO_REGISTRY_TOKEN secret)",
     "category": "supply-chain"
+  },
+  {
+    "invariant": "A published GitHub Release body carries the reviewed sections — breaking changes, install, download verification, and changes — because scripts/release-notes.sh composes it and checks it before gh release create runs",
+    "rationale": "The body is the only release artifact a reader sees before installing, and it used to be whatever the generator emitted: v0.1.1 shipped a bare commit dump with no install command, no checksum guidance, and no statement about breaking changes. Composition and validation live in one script so the format has a single source and an executable check; the change list is grouped by the conventional-commit type in each pull-request title rather than by label, because no pull request in this repository carries a label and the label categories in .github/release.yml were dead configuration.",
+    "sensor": "bash scripts/release-notes.sh --self-test",
+    "category": "distribution"
   }
 ]

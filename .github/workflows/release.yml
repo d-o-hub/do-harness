@@ -238,16 +238,18 @@ jobs:
           sha256sum do-harness-* > checksums.txt
           cat checksums.txt
       - name: Compose release notes
-        # GitHub's generated changelog (categorized by .github/release.yml) is
-        # appended to the curated header in .github/release-notes-template.md:
-        # highlights, install commands, and how to verify the download are what
-        # users need, and no generator can write them. See docs/releasing.md.
+        # GitHub's generated changelog (the merged pull requests since the
+        # previous tag) is regrouped by conventional-commit type and appended to
+        # a curated header: `docs/releases/<tag>.md` when that file exists at the
+        # tagged commit, otherwise `.github/release-notes-template.md`. Both live
+        # in the repository, so the shipped body is reviewable before the tag.
+        # `check` refuses a body that is missing a section, so a release cannot
+        # ship a bare commit dump. See docs/releasing.md ("Release notes").
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
-          version="${GITHUB_REF_NAME#v}"
           previous="$(git describe --tags --abbrev=0 "${GITHUB_REF_NAME}^" 2>/dev/null || true)"
           api=(--method POST "repos/${GITHUB_REPOSITORY}/releases/generate-notes"
             -f "tag_name=${GITHUB_REF_NAME}"
@@ -256,10 +258,8 @@ jobs:
             api+=(-f "previous_tag_name=$previous")
           fi
           gh api "${api[@]}" --jq .body > generated-notes.md
-          sed -e "s/{{TAG}}/${GITHUB_REF_NAME}/g" -e "s/{{VERSION}}/${version}/g" \
-            .github/release-notes-template.md > release-notes.md
-          printf '\n---\n\n# Changes\n\n' >> release-notes.md
-          cat generated-notes.md >> release-notes.md
+          bash scripts/release-notes.sh compose "${GITHUB_REF_NAME}" generated-notes.md release-notes.md
+          bash scripts/release-notes.sh check "${GITHUB_REF_NAME}" release-notes.md
           echo "composed release notes ($(wc -l < release-notes.md) lines)"
       - name: Publish the GitHub Release
         env:

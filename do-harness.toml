@@ -6,8 +6,8 @@ pre-push = []
 
 [signal-sets]
 feedback = ["fmt", "check", "clippy"]
-verification = ["fmt", "check", "clippy", "deps", "audit", "test", "doctest", "loc", "skills", "shell", "markdownlint", "yamllint", "check-agt", "check-mcp", "check-promotions", "untrusted-ingest", "privacy", "commitlint"]
-release = ["fmt", "check", "clippy", "deps", "audit", "test", "doctest", "coverage", "loc", "skills", "shell", "markdownlint", "yamllint", "check-agt", "check-mcp", "check-promotions", "untrusted-ingest", "privacy", "commitlint"]
+verification = ["fmt", "check", "clippy", "deps", "audit", "test", "doctest", "loc", "skills", "shell", "markdownlint", "yamllint", "check-agt", "check-mcp", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "commitlint"]
+release = ["fmt", "check", "clippy", "deps", "audit", "test", "doctest", "coverage", "loc", "skills", "shell", "markdownlint", "yamllint", "check-agt", "check-mcp", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "commitlint"]
 # DORA gets its own set so its evidence is addressable (`status --set metrics`)
 # without joining the gating sets. A no-`--set` status check compares against
 # every configured sensor, so a dora-only run's artifact would report
@@ -120,6 +120,16 @@ when-changed = ["crates/do-harness/templates/**", ".agents/skills/**", "AGENTS.m
 name = "untrusted-ingest"
 argv = ["bash", "scripts/check-untrusted-ingest.sh"]
 when-changed = [".agents/skills/pr-triage/**", "scripts/check-untrusted-ingest.sh"]
+
+[[sensors]]
+# Executable half of the release-note contract: a published body carries the
+# sections a reader needs. The release job runs `release-notes.sh compose` and
+# `check` against the real body; this entry runs the hermetic controls, which
+# prove the check can still fail (a bare generated dump, a surviving
+# placeholder, an emptied section, a lost pull request).
+name = "release-notes"
+argv = ["bash", "scripts/release-notes.sh", "--self-test"]
+when-changed = [".github/release-notes-template.md", ".github/release.yml", ".github/workflows/release.yml", "docs/releases/**", "scripts/release-notes.sh"]
 
 [[sensors]]
 # DORA deployment health, derived (never judged) from git history. Report-only:
