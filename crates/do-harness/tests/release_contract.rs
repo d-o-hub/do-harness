@@ -29,8 +29,14 @@ fn run_cmd(cmd: &mut Command) -> (Option<i32>, String, String) {
 /// Creates a minimal workspace root with git repo, do-harness.toml, dummy Rust source, and plans/dora.json.
 fn setup_workspace(dir: &Path) {
     let _ = Command::new("git").args(["init"]).current_dir(dir).output();
-    let _ = Command::new("git").args(["config", "user.name", "Test"]).current_dir(dir).output();
-    let _ = Command::new("git").args(["config", "user.email", "test@example.com"]).current_dir(dir).output();
+    let _ = Command::new("git")
+        .args(["config", "user.name", "Test"])
+        .current_dir(dir)
+        .output();
+    let _ = Command::new("git")
+        .args(["config", "user.email", "test@example.com"])
+        .current_dir(dir)
+        .output();
 
     fs::create_dir_all(dir.join("src")).expect("src dir");
     fs::write(dir.join("src/lib.rs"), "// dummy\n").expect("write src/lib.rs");
@@ -67,8 +73,14 @@ argv = ["true"]
     )
     .expect("write do-harness.toml in temp workspace");
 
-    let _ = Command::new("git").args(["add", "."]).current_dir(dir).output();
-    let _ = Command::new("git").args(["commit", "-m", "feat: initial commit"]).current_dir(dir).output();
+    let _ = Command::new("git")
+        .args(["add", "."])
+        .current_dir(dir)
+        .output();
+    let _ = Command::new("git")
+        .args(["commit", "-m", "feat: initial commit"])
+        .current_dir(dir)
+        .output();
 }
 
 /// Verifies that every command in `cli-required.json` exists and supports required flags/options.
@@ -126,8 +138,7 @@ fn test_exit_code_classification() {
     setup_workspace(tmp.path());
 
     // Exit code 0: Success
-    let (code_0, stdout_0, stderr_0) =
-        run_cmd(harness_bin().args(["version", "--format", "json"]));
+    let (code_0, stdout_0, stderr_0) = run_cmd(harness_bin().args(["version", "--format", "json"]));
     assert_eq!(
         code_0,
         Some(0),
@@ -152,8 +163,7 @@ fn test_exit_code_classification() {
     );
 
     // Exit code 2: Usage error (e.g. invalid flag)
-    let (code_2, stdout_2, stderr_2) =
-        run_cmd(harness_bin().args(["--invalid-flag-nonexistent"]));
+    let (code_2, stdout_2, stderr_2) = run_cmd(harness_bin().args(["--invalid-flag-nonexistent"]));
     assert_eq!(
         code_2,
         Some(2),
@@ -161,12 +171,12 @@ fn test_exit_code_classification() {
     );
 
     // Exit code 2: Config error (e.g. nonexistent config file)
-    let (code_2_cfg, stdout_2_cfg, stderr_2_cfg) = run_cmd(
-        harness_bin()
-            .arg("--root")
-            .arg(tmp.path())
-            .args(["verify", "--config", "nonexistent-file.toml"]),
-    );
+    let (code_2_cfg, stdout_2_cfg, stderr_2_cfg) =
+        run_cmd(harness_bin().arg("--root").arg(tmp.path()).args([
+            "verify",
+            "--config",
+            "nonexistent-file.toml",
+        ]));
     assert_eq!(
         code_2_cfg,
         Some(2),
@@ -191,44 +201,34 @@ fn test_single_json_value_stdout() {
     ];
 
     for cmd_args in json_commands {
-        let (code, stdout, stderr) = run_cmd(
-            harness_bin()
-                .arg("--root")
-                .arg(tmp.path())
-                .args(*cmd_args),
-        );
+        let (code, stdout, stderr) =
+            run_cmd(harness_bin().arg("--root").arg(tmp.path()).args(*cmd_args));
         assert!(
             code == Some(0) || code == Some(1),
-            "Command {:?} exited with code {:?}\nstderr:\n{stderr}",
-            cmd_args,
-            code
+            "Command {cmd_args:?} exited with code {code:?}\nstderr:\n{stderr}"
         );
 
         let trimmed = stdout.trim();
         assert!(
             !trimmed.is_empty(),
-            "Command {:?} JSON mode emitted empty stdout",
-            cmd_args
+            "Command {cmd_args:?} JSON mode emitted empty stdout"
         );
 
         let mut stream = serde_json::Deserializer::from_str(trimmed).into_iter::<Value>();
         let first = stream.next();
         assert!(
             first.is_some() && first.as_ref().unwrap().is_ok(),
-            "Command {:?} stdout is not a valid JSON value: {}",
-            cmd_args,
-            trimmed
+            "Command {cmd_args:?} stdout is not a valid JSON value: {trimmed}"
         );
         assert!(
             stream.next().is_none(),
-            "Command {:?} stdout emitted multiple JSON values on stdout",
-            cmd_args
+            "Command {cmd_args:?} stdout emitted multiple JSON values on stdout"
         );
     }
 }
 
 /// Verifies that committed evidence v3 and v4 fixtures deserialize successfully,
-/// and evidence below MIN_CURRENT_SCHEMA_VERSION is rejected as legacy/stale.
+/// and evidence below `MIN_CURRENT_SCHEMA_VERSION` is rejected as legacy/stale.
 #[test]
 fn test_evidence_v3_and_v4_compatibility() {
     let tmp = tempfile::tempdir().unwrap();
@@ -240,42 +240,32 @@ fn test_evidence_v3_and_v4_compatibility() {
     assert!(v3_fixture.exists(), "evidence-v3.json fixture must exist");
     assert!(v4_fixture.exists(), "evidence-v4.json fixture must exist");
 
-    let (code_v3, stdout_v3, stderr_v3) = run_cmd(
-        harness_bin()
-            .arg("--root")
-            .arg(tmp.path())
-            .args([
-                "status",
-                "--evidence",
-                v3_fixture.to_str().unwrap(),
-                "--format",
-                "json",
-            ]),
-    );
+    let (code_v3, stdout_v3, stderr_v3) =
+        run_cmd(harness_bin().arg("--root").arg(tmp.path()).args([
+            "status",
+            "--evidence",
+            v3_fixture.to_str().unwrap(),
+            "--format",
+            "json",
+        ]));
     assert!(
         code_v3 == Some(0) || code_v3 == Some(1),
-        "v3 evidence read status code: {:?}\nstderr: {stderr_v3}",
-        code_v3
+        "v3 evidence read status code: {code_v3:?}\nstderr: {stderr_v3}"
     );
     let val_v3: Value = serde_json::from_str(&stdout_v3).expect("status json for v3 evidence");
     assert_ne!(val_v3["state"], serde_json::json!("missing"));
 
-    let (code_v4, stdout_v4, stderr_v4) = run_cmd(
-        harness_bin()
-            .arg("--root")
-            .arg(tmp.path())
-            .args([
-                "status",
-                "--evidence",
-                v4_fixture.to_str().unwrap(),
-                "--format",
-                "json",
-            ]),
-    );
+    let (code_v4, stdout_v4, stderr_v4) =
+        run_cmd(harness_bin().arg("--root").arg(tmp.path()).args([
+            "status",
+            "--evidence",
+            v4_fixture.to_str().unwrap(),
+            "--format",
+            "json",
+        ]));
     assert!(
         code_v4 == Some(0) || code_v4 == Some(1),
-        "v4 evidence read status code: {:?}\nstderr: {stderr_v4}",
-        code_v4
+        "v4 evidence read status code: {code_v4:?}\nstderr: {stderr_v4}"
     );
     let val_v4: Value = serde_json::from_str(&stdout_v4).expect("status json for v4 evidence");
     assert_ne!(val_v4["state"], serde_json::json!("missing"));
@@ -296,18 +286,14 @@ fn test_evidence_v3_and_v4_compatibility() {
     )
     .unwrap();
 
-    let (_code_v2, stdout_v2, _stderr_v2) = run_cmd(
-        harness_bin()
-            .arg("--root")
-            .arg(tmp.path())
-            .args([
-                "status",
-                "--evidence",
-                v2_file.to_str().unwrap(),
-                "--format",
-                "json",
-            ]),
-    );
+    let (_code_v2, stdout_v2, _stderr_v2) =
+        run_cmd(harness_bin().arg("--root").arg(tmp.path()).args([
+            "status",
+            "--evidence",
+            v2_file.to_str().unwrap(),
+            "--format",
+            "json",
+        ]));
     let val_v2: Value = serde_json::from_str(&stdout_v2).expect("status json for v2 evidence");
     assert!(
         val_v2["state"] == serde_json::json!("stale")
@@ -329,36 +315,28 @@ fn test_config_fixtures_and_fail_closed() {
     assert!(min_cfg.exists(), "config-v0.1-minimal.toml must exist");
     assert!(full_cfg.exists(), "config-v0.1-full.toml must exist");
 
-    let (code_min, stdout_min, stderr_min) = run_cmd(
-        harness_bin()
-            .arg("--root")
-            .arg(tmp.path())
-            .args([
-                "list",
-                "--config",
-                min_cfg.to_str().unwrap(),
-                "--format",
-                "json",
-            ]),
-    );
+    let (code_min, stdout_min, stderr_min) =
+        run_cmd(harness_bin().arg("--root").arg(tmp.path()).args([
+            "list",
+            "--config",
+            min_cfg.to_str().unwrap(),
+            "--format",
+            "json",
+        ]));
     assert_eq!(
         code_min,
         Some(0),
         "Minimal config failed:\nstdout: {stdout_min}\nstderr: {stderr_min}"
     );
 
-    let (code_full, stdout_full, stderr_full) = run_cmd(
-        harness_bin()
-            .arg("--root")
-            .arg(tmp.path())
-            .args([
-                "list",
-                "--config",
-                full_cfg.to_str().unwrap(),
-                "--format",
-                "json",
-            ]),
-    );
+    let (code_full, stdout_full, stderr_full) =
+        run_cmd(harness_bin().arg("--root").arg(tmp.path()).args([
+            "list",
+            "--config",
+            full_cfg.to_str().unwrap(),
+            "--format",
+            "json",
+        ]));
     assert_eq!(
         code_full,
         Some(0),
@@ -375,18 +353,14 @@ unrecognized_field_abc = "invalid_value"
     )
     .unwrap();
 
-    let (code_bad, stdout_bad, stderr_bad) = run_cmd(
-        harness_bin()
-            .arg("--root")
-            .arg(tmp.path())
-            .args([
-                "list",
-                "--config",
-                unknown_cfg.to_str().unwrap(),
-                "--format",
-                "json",
-            ]),
-    );
+    let (code_bad, stdout_bad, stderr_bad) =
+        run_cmd(harness_bin().arg("--root").arg(tmp.path()).args([
+            "list",
+            "--config",
+            unknown_cfg.to_str().unwrap(),
+            "--format",
+            "json",
+        ]));
     assert_eq!(
         code_bad,
         Some(2),

@@ -7,15 +7,6 @@ verification set and every build target dogfoods green.
 
 ## One-time setup
 
-- **Enable release immutability** (repository **Settings → General → Releases →
-  *Enable release immutability***). It is a repository toggle with no REST field,
-  so it cannot be set from CI, and it applies to **future** releases only —
-  `v0.1.2` and earlier stay mutable. With it on, publishing locks the release
-  assets and the associated tag, and GitHub mints a **release attestation**
-  (`gh release verify <tag>`, see "Verifying a download"). The workflow needs no
-  change: `gh release create` with assets already creates a draft, uploads every
-  asset, and only then publishes, which is the sequence the immutability guidance
-  asks for.
 - **crates.io publishes through Trusted Publishing (OIDC); there is no publish
   secret.** For each published crate — `do-harness-types`, `do-harness-db`,
   `do-harness` — open <https://crates.io> → the crate → **Settings → Trusted
@@ -146,36 +137,24 @@ verification set and every build target dogfoods green.
 
 ### Verifying a download
 
-Three checks, each answering a different question:
+Two independent properties, and a user can check both:
 
 ```bash
 gh release download v0.1.3 --repo d-o-hub/do-harness
-sha256sum -c checksums.txt                       # is the download intact?
-gh release verify v0.1.3 --repo d-o-hub/do-harness
-gh release verify-asset v0.1.3 \
-  do-harness-v0.1.3-x86_64-unknown-linux-musl.tar.gz --repo d-o-hub/do-harness
+sha256sum -c checksums.txt                       # integrity
 gh attestation verify do-harness-v0.1.3-x86_64-unknown-linux-musl.tar.gz \
-  --repo d-o-hub/do-harness                      # who built it, from which commit?
+  --repo d-o-hub/do-harness                      # origin
 ```
 
 `checksums.txt` is generated in the `release` job from the artifacts it just
 downloaded, so it travels from the same origin as the files it protects: it
-detects a corrupt or truncated download, not a substituted asset.
-
-`gh release verify` checks the **release attestation** that GitHub mints when an
-immutable release is published — it binds the tag, its commit, and the release
-assets — and `gh release verify-asset` checks one local file against it. Both exit
-1 for a release published before immutability was enabled (`v0.1.2` answers `no
-attestations for tag v0.1.2`), so a passing run also proves the release is
-immutable rather than merely present.
-
-`gh attestation verify` checks the **build attestation** created by
-`actions/attest-build-provenance` inside the matrix job that built the archive:
-signed through Sigstore with a token minted for that job, stored against the
-artifact's digest, and verified against this repository's `release.yml`, its ref,
-and its commit. The registry channels carry their own evidence (npm attestations,
-crates.io Trusted Publishing); `docs/provenance-trust-model.md` states what each
-one proves and what it does not.
+detects a corrupt or truncated download, not a substituted asset. The attestation
+is created by `actions/attest-build-provenance` inside the matrix job that built
+the archive — signed through Sigstore with a token minted for that job, stored
+against the artifact's digest, and checked by `gh attestation verify` against this
+repository's `release.yml`, its ref, and its commit. The registry channels carry
+their own evidence (npm attestations, crates.io Trusted Publishing);
+`docs/provenance-trust-model.md` states what each one proves and what it does not.
 
 ### Release notes
 
@@ -429,27 +408,8 @@ binary) or install the CLI onto `PATH` with the shell installer.
 
 ## Rollback
 
-Two different situations, and only the first is a rewrite:
-
-**Before the release is published.** No immutable release exists yet, so the tag
-can still be deleted or re-pointed and the tagged run can simply be re-run. This
-is the path `v0.1.2` took: its tag was pushed three times while the build matrix
-was fixed. (Adding a `v*` tag ruleset that blocks tag updates would break exactly
-this recovery, which is why the immutability setting is preferred over one.)
-
-**After the release is published.** With immutable releases enabled, the assets
-and the tag are locked: an asset cannot be added, replaced, or deleted, the tag
-cannot move, and the tag name cannot be reused — even if the release is deleted
-first. The title, the notes, and the pre-release/latest flags stay editable, so
-`gh release edit <tag> --notes-file <file>` remains a valid fix for a body that
-turned out wrong. Everything else is superseded, never rewritten:
-
-| channel | recovery for a bad published version |
-|---|---|
-| GitHub Release | fix the notes; anything else waits for a new patch release |
-| crates.io | `cargo yank --version <v>` (reversible by `--undo`) and publish a patch |
-| npm | within 72h `npm unpublish do-harness@<v>`; afterwards `npm deprecate do-harness@<v> "superseded by <new>"`, then publish a patch |
-
-Each recovery ends with a new version, so the fix follows "Cutting a release"
-from step 1. A yanked or deprecated version stays installable for anyone who
-already pinned it, which is why the superseding release is the real fix.
+GitHub release assets can be deleted and the tag re-pointed if a build fails
+before publication. crates.io versions are immutable: a bad version must be
+yanked (`cargo yank --version <v>`) and superseded by a new patch release.
+npm versions can be unpublished within 72 hours of publish, or deprecated
+(`npm deprecate do-harness@<v> "reason"`) and superseded.
