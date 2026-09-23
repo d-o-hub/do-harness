@@ -35,19 +35,23 @@ Windows. Unzip it, run the installer under Git Bash, or use `cargo install`.
 
 ```bash
 gh release download {{TAG}} --repo d-o-hub/do-harness
-sha256sum -c checksums.txt
+sha256sum -c checksums.txt                              # is the download intact?
 
-# provenance: every asset carries an attestation signed by this repository's
-# release workflow, bound to the commit that built it
-gh attestation verify <the-asset-you-downloaded> --repo d-o-hub/do-harness
+gh release verify {{TAG}} --repo d-o-hub/do-harness     # is the release immutable?
+gh release verify-asset {{TAG}} <asset> --repo d-o-hub/do-harness
+gh attestation verify <asset> --repo d-o-hub/do-harness # who built it, from which commit?
 ```
 
 `checksums.txt` covers every asset in this release and detects a corrupt or
 truncated download — but it travels from the same origin as the artifact, so it
-proves integrity, not origin. Each channel publishes its own provenance evidence:
+proves integrity, not origin. `checksums.txt` and these attestations answer
+different questions:
 
-- **GitHub assets** — `gh attestation verify` checks the Sigstore-signed build
-  attestation against the workflow, ref, and commit that produced the file.
+- **GitHub releases** — `gh release verify` checks the attestation GitHub mints
+  for an immutable release (tag, commit, and assets), so it also proves the
+  release cannot have changed since publication; `gh release verify-asset` checks
+  one local file against it, and `gh attestation verify` checks the build
+  provenance of the file itself — the workflow, ref, and commit that produced it.
 - **npm** — the meta package and every platform package are published from this
   repository's `release.yml` workflow with a provenance attestation;
   `npm audit signatures` reports it for an installed tree.

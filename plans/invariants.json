@@ -262,5 +262,11 @@
     "rationale": "checksums.txt is produced after the artifacts are regrouped and is published from the same origin as the files it protects, so it proves integrity and never origin: a substituted asset would arrive with matching digests. The attestation is minted in the job that produced the archive and is bound to this repository's release.yml, its ref, and its commit, which is the property the install documentation used to describe as needing an out-of-band check. The registry channels carry their own evidence for their own artifacts (npm provenance attestations, crates.io Trusted Publishing).",
     "sensor": ".github/workflows/release.yml build job (attestations: write + id-token: write + actions/attest-build-provenance pinned to v4.2.2)",
     "category": "supply-chain"
+  },
+  {
+    "invariant": "A published GitHub Release is immutable and verifiable: its assets and associated tag are locked at publication, and the release attestation is checked with gh release verify before a download is trusted",
+    "rationale": "Immutable releases have been generally available since 2025-10 and are the control that blocks post-publication tampering with a release's assets and its tag; enabling them also mints a release attestation, which is why gh release verify and gh release verify-asset are the user-facing check (both exit 1 for a release that has none, so a pass also proves immutability). The pre-publication recovery the runbook relies on still works — a tag can be deleted or re-pointed while no release exists — and no workflow change is needed because gh release create already creates a draft, attaches every asset, and only then publishes. A v* tag ruleset was deliberately not added: immutability covers post-publication tag tampering, while a ruleset that blocks tag updates would forbid the recovery v0.1.2 used (three pushes on one tag). The setting itself is a repository toggle with no REST field, so the executable half is the verification command.",
+    "sensor": "gh release verify <tag> (docs/releasing.md, 'Verifying a download')",
+    "category": "supply-chain"
   }
 ]
