@@ -7,6 +7,10 @@ rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 readme = "README.md"
+# The published surface is a binary, so the crate's documentation is the CLI
+# reference rather than a rendered library API: `docs.rs` cannot build a crate
+# with no library target, and `src/lib.rs` exists only to give it a landing page.
+documentation = "https://github.com/d-o-hub/do-harness/blob/main/docs/cli.md"
 keywords = ["agents", "harness", "verification", "sensors", "ci"]
 categories = [
     "command-line-utilities",
