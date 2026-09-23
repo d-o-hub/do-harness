@@ -256,5 +256,11 @@
     "rationale": "The body is the only release artifact a reader sees before installing, and it used to be whatever the generator emitted: v0.1.1 shipped a bare commit dump with no install command, no checksum guidance, and no statement about breaking changes. Composition and validation live in one script so the format has a single source and an executable check; the change list is grouped by the conventional-commit type in each pull-request title rather than by label, because no pull request in this repository carries a label and the label categories in .github/release.yml were dead configuration.",
     "sensor": "bash scripts/release-notes.sh --self-test",
     "category": "distribution"
+  },
+  {
+    "invariant": "Every release artifact carries a Sigstore-signed build-provenance attestation created inside the matrix job that built it (actions/attest-build-provenance, attestations: write + id-token: write)",
+    "rationale": "checksums.txt is produced after the artifacts are regrouped and is published from the same origin as the files it protects, so it proves integrity and never origin: a substituted asset would arrive with matching digests. The attestation is minted in the job that produced the archive and is bound to this repository's release.yml, its ref, and its commit, which is the property the install documentation used to describe as needing an out-of-band check. The registry channels carry their own evidence for their own artifacts (npm provenance attestations, crates.io Trusted Publishing).",
+    "sensor": ".github/workflows/release.yml build job (attestations: write + id-token: write + actions/attest-build-provenance pinned to v4.2.2)",
+    "category": "supply-chain"
   }
 ]

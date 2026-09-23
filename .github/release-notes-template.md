@@ -36,19 +36,23 @@ Windows. Unzip it, run the installer under Git Bash, or use `cargo install`.
 ```bash
 gh release download {{TAG}} --repo d-o-hub/do-harness
 sha256sum -c checksums.txt
+
+# provenance: every asset carries an attestation signed by this repository's
+# release workflow, bound to the commit that built it
+gh attestation verify <the-asset-you-downloaded> --repo d-o-hub/do-harness
 ```
 
-`checksums.txt` covers every asset in this release. Provenance is a separate
-property from those digests, and each channel publishes its own evidence:
+`checksums.txt` covers every asset in this release and detects a corrupt or
+truncated download — but it travels from the same origin as the artifact, so it
+proves integrity, not origin. Each channel publishes its own provenance evidence:
 
+- **GitHub assets** — `gh attestation verify` checks the Sigstore-signed build
+  attestation against the workflow, ref, and commit that produced the file.
 - **npm** — the meta package and every platform package are published from this
   repository's `release.yml` workflow with a provenance attestation;
   `npm audit signatures` reports it for an installed tree.
 - **crates.io** — published from the same workflow through the registry's Trusted
   Publishing (OIDC), so the release path holds no long-lived publish token.
-- **GitHub assets** — the digests above detect a corrupt or truncated download.
-  Verifying the origin is out of band, and stronger than a digest served from the
-  same place as the artifact.
 
 ## Requirements
 
