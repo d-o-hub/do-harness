@@ -130,6 +130,13 @@ jobs:
             archive: zip
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
+    permissions:
+      contents: read
+      # Provenance is signed through Sigstore: a token is minted here and the
+      # resulting attestation is stored against the artifact's digest, so no
+      # long-lived signing key exists.
+      id-token: write
+      attestations: write
     steps:
       # actions/checkout@v7.0.1
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -196,6 +203,16 @@ jobs:
           fi
           rm -rf "dist/$name"
           ls -l dist
+      # actions/attest-build-provenance@v4.2.2
+      - name: Attest the artifact's build provenance
+        # Signed inside the job that produced the archive, so the attestation
+        # names the workflow, ref, and commit that actually built it rather than
+        # a later reaggregation step. `checksums.txt` protects integrity; this
+        # protects origin. Verify with `gh attestation verify <file> --repo …`
+        # (docs/releasing.md, "Verifying a download").
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8
+        with:
+          subject-path: dist/*
       # actions/upload-artifact@v7.0.1
       - name: Upload the release artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
