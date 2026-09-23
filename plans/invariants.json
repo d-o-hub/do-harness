@@ -244,5 +244,11 @@
     "rationale": "Secret scanner binaries stay a documented wontfix, whereas contributor PII and personal contact addresses in templates and skills are guarded by a dedicated privacy sensor requiring placeholder tokens",
     "sensor": "bash scripts/check-privacy.sh",
     "category": "privacy"
+  },
+  {
+    "invariant": "Release publication authenticates from GitHub's OIDC identity — crates.io via rust-lang/crates-io-auth-action, npm via npm Trusted Publishing — so no long-lived registry write token is stored in repository secrets",
+    "rationale": "A stored publish token is a standing credential that is not bound to the repository, workflow, or ref: it survives contributor turnover, leaks through any job that can read secrets, and needs a separate manual revocation step. Trusted Publishing binds the credential to d-o-hub/do-harness plus release.yml and issues one that expires with the run. The npm side already publishes this way (v0.1.2's job minted an OIDC token and signed a provenance statement); the crates.io side replaced the CARGO_REGISTRY_TOKEN secret that published 0.1.0 through 0.1.2.",
+    "sensor": ".github/workflows/release.yml publish job (id-token: write + rust-lang/crates-io-auth-action; no CARGO_REGISTRY_TOKEN secret)",
+    "category": "supply-chain"
   }
 ]
