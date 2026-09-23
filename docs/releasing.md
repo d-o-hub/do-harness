@@ -116,8 +116,8 @@ verification set and every build target dogfoods green.
    - `preflight` — asserts tag == version and runs
      `verify --set verification --format json --strict` on the tagged commit.
    - `build` — Linux static-musl (x86_64/aarch64) and macOS (x86_64/arm64)
-     tarballs plus a Windows x86_64 zip, each dogfooded with
-     `init && verify`.
+     tarballs plus a Windows x86_64 zip, each dogfooded with `init && verify`
+     and each attested for build provenance in the job that produced it.
     - `publish` — publishes the three crates to crates.io in dependency order,
       authenticating with a short-lived token exchanged from its OIDC identity.
     - `npm-publish` — publishes the available platform packages, then the
@@ -135,6 +135,27 @@ verification set and every build target dogfoods green.
       unpublished registry version; if either publication fails, the tag exists
       with no Release and the recovery is to re-run the tag-push workflow (a
       `workflow_dispatch` skips `release`).
+
+### Verifying a download
+
+Two independent properties, and a user can check both:
+
+```bash
+gh release download v0.1.3 --repo d-o-hub/do-harness
+sha256sum -c checksums.txt                       # integrity
+gh attestation verify do-harness-v0.1.3-x86_64-unknown-linux-musl.tar.gz \
+  --repo d-o-hub/do-harness                      # origin
+```
+
+`checksums.txt` is generated in the `release` job from the artifacts it just
+downloaded, so it travels from the same origin as the files it protects: it
+detects a corrupt or truncated download, not a substituted asset. The attestation
+is created by `actions/attest-build-provenance` inside the matrix job that built
+the archive — signed through Sigstore with a token minted for that job, stored
+against the artifact's digest, and checked by `gh attestation verify` against this
+repository's `release.yml`, its ref, and its commit. The registry channels carry
+their own evidence (npm attestations, crates.io Trusted Publishing);
+`docs/provenance-trust-model.md` states what each one proves and what it does not.
 
 ### Release notes
 
@@ -196,13 +217,23 @@ and hermetic, so they run in CI as the `release-notes` sensor.
 
 The job calls `gh api …/releases/generate-notes` with `previous_tag_name` (from
 `git describe` on the tag's parent) and `configuration_file_path`, then publishes
-with `gh release create --notes-file`. Two consequences worth knowing:
-`--generate-notes` is no longer used, so `.github/release.yml` must exist **on
-the default branch** for the API to accept it (a missing file answers
-`Could not find a configuration file`); and the curated header is generic prose —
-anything release-specific (highlights, a known blocker, a migration step) belongs
-there or goes in afterwards with
-`gh release edit <tag> --notes-file <file>`.
+with `gh release create --notes-file`. Two behaviours are measured, not assumed:
+
+- **For a tag that already exists, the configuration resolves from the tagged
+  commit.** Generating notes for `v0.1.2` (tagged before `.github/release.yml`
+  landed) ignored the file, and passing `configuration_file_path` explicitly
+  answered `Could not find a configuration file at .github/release.yml`; the same
+  call for a tag that does not exist yet resolves it from the default branch. The
+  config therefore has to be on the commit you tag, and a release that predates
+  it cannot be retrofitted — `gh release edit` takes literal notes, not generated
+  ones.
+- `exclude` still filters by label, which is the one input this repository does
+  not maintain on pull requests; the published grouping comes from commit
+  subjects instead (above), so nothing depends on it.
+
+Anything release-specific (a highlight, a known blocker, a migration step)
+belongs in the curated header — `docs/releases/<tag>.md` for one release — or
+goes in afterwards with `gh release edit <tag> --notes-file <file>`.
 
 ## crates.io publishing
 
