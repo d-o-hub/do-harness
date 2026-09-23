@@ -38,6 +38,10 @@ test("binaryName appends .exe only on Windows", () => {
   assert.equal(platform.binaryName("darwin"), "do-harness");
 });
 
+test("UNAVAILABLE_PACKAGES records blocked platform packages", () => {
+  assert.ok(platform.UNAVAILABLE_PACKAGES.has("do-harness-win32-x64"));
+});
+
 /** Stages a node_modules tree containing the shim and an optional platform package. */
 function stage({ withPlatform, binary = null }) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "do-harness-npm-"));
@@ -85,6 +89,21 @@ test("shim execs the platform binary with args and propagates the exit code", (t
 
   assert.equal(result.status, 7);
   assert.match(result.stdout, /args:verify --changed/);
+
+  // Also verify exit code 0 and exit code 2 propagation
+  const { shim: shim0 } = stage({
+    withPlatform: true,
+    binary: '#!/bin/sh\nexit 0\n',
+  });
+  const res0 = spawnSync(process.execPath, [shim0, "version"], { encoding: "utf8" });
+  assert.equal(res0.status, 0);
+
+  const { shim: shim2 } = stage({
+    withPlatform: true,
+    binary: '#!/bin/sh\nexit 2\n',
+  });
+  const res2 = spawnSync(process.execPath, [shim2, "version"], { encoding: "utf8" });
+  assert.equal(res2.status, 2);
 });
 
 test("shim fails with guidance when the platform package is missing", (t) => {

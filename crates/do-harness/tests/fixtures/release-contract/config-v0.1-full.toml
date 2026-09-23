@@ -1,0 +1,30 @@
+# Release contract fixture: config-v0.1-full.toml (release v0.1 full config)
+language = "rust"
+jobs = 2
+
+[hooks]
+pre-commit = ["fmt", "loc"]
+pre-push = ["check"]
+
+[signal-sets]
+feedback = ["fmt", "check"]
+verification = ["fmt", "check", "clippy", "test"]
+
+[[sensors]]
+name = "fmt"
+argv = ["cargo", "fmt", "--check"]
+severity = "error"
+when-changed = ["**/*.rs"]
+
+[[sensors]]
+name = "check"
+argv = ["cargo", "check"]
+when-changed = ["**/*.rs"]
+
+[[sensors]]
+name = "clippy"
+argv = ["cargo", "clippy"]
+
+[[sensors]]
+name = "test"
+argv = ["cargo", "test"]

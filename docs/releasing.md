@@ -113,8 +113,7 @@ verification set and every build target dogfoods green.
    ```
 
 3. The `release` workflow runs:
-   - `preflight` — asserts tag == version and runs
-     `verify --set verification --format json --strict` on the tagged commit.
+   - `preflight` — asserts tag == version, compares public Rust APIs of all three published crates (`do-harness-types`, `do-harness-db`, `do-harness`) against their latest crates.io baselines using `cargo-semver-checks`, verifies package contract file inclusions (`scripts/check-package-contract.sh`), and runs `verify --set verification --format json --strict` (including `crates/do-harness/tests/release_contract.rs`) on the tagged commit.
    - `build` — Linux static-musl (x86_64/aarch64) and macOS (x86_64/arm64)
      tarballs plus a Windows x86_64 zip, each dogfooded with `init && verify`
      and each attested for build provenance in the job that produced it.
@@ -274,10 +273,36 @@ resolves outside the crate.
 
 **The tag preflight installs every tool its sensor set runs.** The `verification`
 set's sensors need `cargo-deny` (deps), `cargo-audit` (audit), `cargo-nextest`
-(test), and `shellcheck`, and the preflight lists them explicitly; adding a
-sensor that needs a new tool means adding it there too. Measured on the v0.1.2
-tag: a preflight without `cargo-nextest` failed `verify --strict` with
+(test), `shellcheck`, and `cargo-semver-checks` (API compatibility), and the preflight
+lists them explicitly; adding a sensor that needs a new tool means adding it there too.
+Measured on the v0.1.2 tag: a preflight without `cargo-nextest` failed `verify --strict` with
 `error: no such command: nextest` and skipped the whole release.
+
+### Release Preflight Compatibility Checks
+
+Release preflight executes focused contract checks to protect adopters against accidental breaks before publication:
+
+1. **Rust Public-API Compatibility**: `cargo-semver-checks` compares `do-harness-types`, `do-harness-db`, and `do-harness` against their latest published versions on crates.io.
+2. **Package Content Contracts**: `scripts/check-package-contract.sh` checks `cargo package --locked --list` for required files (`LICENSE`, `README.md`, templates, assets), rejects accidental inclusion of local state (`.do-harness`, `.git`, `.env`), target outputs, or secrets, and confirms `guardian-proxy` remains `publish = false`.
+3. **CLI & Evidence Contracts**: `crates/do-harness/tests/release_contract.rs` verifies command/option existence against `cli-required.json`, exit code classifications (0 success, 1 check failure, 2 usage/config error), single JSON value stdout output, evidence v3/v4 deserialization, config fixture parsing, and fail-closed handling of unknown fields.
+
+#### Local Reproduction
+
+Run the preflight compatibility checks locally prior to tagging:
+
+```bash
+cargo semver-checks check-release -p do-harness-types
+cargo semver-checks check-release -p do-harness-db
+cargo semver-checks check-release -p do-harness
+bash scripts/check-package-contract.sh
+cargo test --test release_contract
+```
+
+#### Deliberate Breaking Changes
+
+A deliberate pre-1.0 contract break must be handled via the normal reviewed PR process:
+1. Update the corresponding contract fixture under `crates/do-harness/tests/fixtures/release-contract/` in the same PR.
+2. Document the breaking change and migration guidance in the release notes (`docs/releases/<tag>.md`).
 
 ## npm publishing
 

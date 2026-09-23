@@ -61,6 +61,10 @@ else
     echo "SKIP: cargo-deny not installed; skipping deny check."
 fi
 
+if [[ -f "$ROOT/scripts/check-package-contract.sh" ]]; then
+    bash "$ROOT/scripts/check-package-contract.sh" || FAIL=1
+fi
+
 if (( FAIL )); then
     exit 1
 fi

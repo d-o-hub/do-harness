@@ -262,5 +262,11 @@
     "rationale": "checksums.txt is produced after the artifacts are regrouped and is published from the same origin as the files it protects, so it proves integrity and never origin: a substituted asset would arrive with matching digests. The attestation is minted in the job that produced the archive and is bound to this repository's release.yml, its ref, and its commit, which is the property the install documentation used to describe as needing an out-of-band check. The registry channels carry their own evidence for their own artifacts (npm provenance attestations, crates.io Trusted Publishing).",
     "sensor": ".github/workflows/release.yml build job (attestations: write + id-token: write + actions/attest-build-provenance pinned to v4.2.2)",
     "category": "supply-chain"
+  },
+  {
+    "invariant": "Release publication requires successful public Rust API compatibility comparison against published baselines and shipped contract checks",
+    "rationale": "Protects adopters against accidental CLI, exit-code, JSON schema, evidence, and Rust API contract breaks before publication",
+    "sensor": "cargo-semver-checks && bash scripts/check-package-contract.sh && cargo test --test release_contract",
+    "category": "contracts"
   }
 ]
