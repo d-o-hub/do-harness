@@ -7,10 +7,17 @@ verification set and every build target dogfoods green.
 
 ## One-time setup
 
-- Add the `CARGO_REGISTRY_TOKEN` repository secret: create an API token at
-  <https://crates.io/settings/tokens> (scope: publish new crates and versions)
-  and store it under **Settings → Secrets and variables → Actions**. The
-  publish job fails loudly when the secret is missing.
+- **crates.io publishes through Trusted Publishing (OIDC); there is no publish
+  secret.** For each published crate — `do-harness-types`, `do-harness-db`,
+  `do-harness` — open <https://crates.io> → the crate → **Settings → Trusted
+  Publishing** and add a GitHub publisher with repository `d-o-hub/do-harness`
+  and workflow filename `release.yml`. Leave *environment* empty: the `publish`
+  job declares none, and an environment recorded here but absent from the job
+  fails the exchange. The job takes `id-token: write`, exchanges its OIDC token
+  with `rust-lang/crates-io-auth-action`, and passes the short-lived token to
+  `cargo publish` through `CARGO_REGISTRY_TOKEN` for that step only. A crate
+  with no trusted publisher fails the job loudly at the exchange; revoke any
+  API token created for the previous secret-based path.
 - npm Trusted Publisher setup is per existing package. If a package has not
   been published yet, perform a one-time authenticated bootstrap publish first;
   npm exposes its **Settings → Trusted Publisher** page only afterward.
@@ -111,15 +118,23 @@ verification set and every build target dogfoods green.
    - `build` — Linux static-musl (x86_64/aarch64) and macOS (x86_64/arm64)
      tarballs plus a Windows x86_64 zip, each dogfooded with
      `init && verify`.
-    - `release` — publishes the tarballs, the windows zip, plus `checksums.txt`
-      via `gh release create --verify-tag`.
-    - `publish` — publishes the three crates to crates.io in dependency order.
+    - `publish` — publishes the three crates to crates.io in dependency order,
+      authenticating with a short-lived token exchanged from its OIDC identity.
     - `npm-publish` — publishes the available platform packages, then the
       `do-harness` meta package. It skips `UNAVAILABLE_PKGS` (currently
-      `do-harness-win32-x64`, which npm refuses) and withholds the meta
-      package while any pinned platform package is unavailable, so the job
-      reports the documented decision and stays green instead of aborting on a
-      registry 403. See "Windows has no npm channel" above.
+      `do-harness-win32-x64`, which npm refuses) and **still publishes the meta
+      package**: an unavailable pin is inert because npm filters an
+      `optionalDependency` by `os`/`cpu` before fetching it, and withholding the
+      meta package would break `npx do-harness` for every Linux/macOS user. A
+      trusted publisher whose permissions lack `npm publish` fails the job at
+      the first package instead, naming the package and the remedy. See
+      "Windows has no npm channel" above.
+    - `release` — publishes the tarballs, the Windows zip, and `checksums.txt`
+      via `gh release create --notes-file`. It runs only after `publish` and
+      `npm-publish` succeed, so a Release is never created beside an
+      unpublished registry version; if either publication fails, the tag exists
+      with no Release and the recovery is to re-run the tag-push workflow (a
+      `workflow_dispatch` skips `release`).
 
 ### Release notes
 
@@ -145,9 +160,10 @@ there or goes in afterwards with
 
 ## crates.io publishing
 
-The publish job runs only on tag pushes and is idempotent: a version already
-present on crates.io is skipped, so a partially failed run can be re-run
-safely. Publish order is `do-harness-types` → `do-harness-db` → `do-harness`;
+The publish job runs on a tag push, and on `workflow_dispatch` with
+`publish=true` — the bootstrap and re-run path for a version whose tag already
+exists. It is idempotent: a version already present on crates.io is skipped, so
+a partially failed run can be re-run safely. Publish order is `do-harness-types` → `do-harness-db` → `do-harness`;
 each step retries while the registry index catches up.
 
 Before introducing or publishing a new publishable crate, run the pre-publish name check described in [.agents/skills/crates-io-name-check/SKILL.md](../.agents/skills/crates-io-name-check/SKILL.md). Paste the terminal output (`curl` API status and `cargo search` results) into the release PR or pre-publish record to confirm availability and naming appropriateness before the first publish.

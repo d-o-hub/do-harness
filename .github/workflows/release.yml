@@ -205,7 +205,11 @@ jobs:
           if-no-files-found: error
 
   release:
-    needs: build
+    # A GitHub Release is the user-visible claim that a version shipped, so it
+    # waits for both publication paths: `v0.1.2` created this Release while
+    # `npm-publish` was red, leaving a complete Release next to a version that
+    # was never on npm.
+    needs: [build, publish, npm-publish]
     # Dispatch is a dry run; only a tag push publishes.
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
@@ -279,10 +283,10 @@ jobs:
     timeout-minutes: 45
     permissions:
       contents: read
-    env:
-      # Create a token at https://crates.io/settings/tokens and store it as
-      # the CARGO_REGISTRY_TOKEN repository secret (see docs/releasing.md).
-      CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+      # OIDC: the job exchanges a GitHub-issued identity token for a
+      # short-lived crates.io token, so this pipeline holds no long-lived
+      # publish credential (docs/releasing.md, crates.io Trusted Publishing).
+      id-token: write
     steps:
       # actions/checkout@v7.0.1
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -302,11 +306,20 @@ jobs:
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
         with:
           key: publish
+      # rust-lang/crates-io-auth-action@v1.0.5
+      #
+      # Exchanges the job's OIDC token for a short-lived crates.io token. The
+      # step output is scoped to the publish step below, so the credential never
+      # exists as a secret and expires with the run.
+      - uses: rust-lang/crates-io-auth-action@c6f97d42243bad5fab37ca0427f495c86d5b1a18
+        id: crates-auth
       - name: Publish crates in dependency order
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.crates-auth.outputs.token }}
         run: |
           set -euo pipefail
           if [ -z "${CARGO_REGISTRY_TOKEN:-}" ]; then
-            echo "FAIL: CARGO_REGISTRY_TOKEN is not configured (see docs/releasing.md)" >&2
+            echo "FAIL: no crates.io token was issued; configure Trusted Publishing for every published crate (see docs/releasing.md)" >&2
             exit 1
           fi
           version="$(sed -n '/^\[workspace.package\]/,/^\[/ s/^version *= *"\(.*\)"/\1/p' Cargo.toml)"
