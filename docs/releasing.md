@@ -138,15 +138,61 @@ verification set and every build target dogfoods green.
 
 ### Release notes
 
-The `release` job composes the published notes from two sources:
+The `release` job routes every published body through `scripts/release-notes.sh`,
+which composes it into `release-notes.md` and then refuses a body that is missing
+a section. The shape is fixed:
 
-1. `.github/release-notes-template.md` — the curated header: install commands
-   with the tag substituted, how to verify `checksums.txt`, and the known
-   limitations a generator cannot know.
-2. GitHub's generated changelog — the merged pull requests since the previous
-   tag, categorized by `.github/release.yml` from this repository's own labels
-   (`changelog.categories`, `*` as the catch-all; see
-   [automatically generated release notes](https://docs.github.com/en/repositories/releasing-projects-on-github/automatically-generated-release-notes)).
+| Section | Content |
+|---|---|
+| opening | one paragraph: what `do-harness` is, and what this version ships |
+| `## Breaking changes` | the migration steps, or an explicit `None.` — never silence |
+| `## Install` | every channel, pinned to the tag |
+| `## Verify the download` | `checksums.txt`, plus what each registry attests |
+| `## Requirements` | platforms, MSRV, Node version |
+| `## Known limitations` | what this release does not do yet |
+| `## Changes` | the merged pull requests, grouped by conventional-commit type |
+
+The header above `## Changes` comes from one of two files, both of them reviewed
+in this repository:
+
+- `docs/releases/<tag>.md` — the curated header for a single release. Use it
+  whenever the release has a highlight, a known blocker, or a migration step; it
+  must name the version, which the check enforces.
+- `.github/release-notes-template.md` — the fallback, with `{{TAG}}` and
+  `{{VERSION}}` substituted.
+
+`release-notes.sh compose <tag> <generated> <out>` writes the header above the
+change list, and `release-notes.sh check <tag> <out>` fails the release when a
+required section is missing or empty, a placeholder survived substitution, the
+curated header does not name the version, or the composer lost a pull request.
+That last one matters: a silently dropped change is worse than a badly
+categorized one. A release can therefore not ship a bare commit dump — the shape
+`v0.1.1` shipped.
+
+The change list is GitHub's generated changelog (the merged pull requests since
+the previous tag). `release-notes.sh` regroups its bullets by the
+conventional-commit type in each pull-request title — `feat` → Features, `fix` →
+Fixes, `perf` → Performance, `docs` → Documentation, `refactor` → Refactors,
+`test` → Tests, `chore`/`ci`/`build`/`style` → Maintenance, a `!` subject →
+Breaking changes, anything else → Other changes — instead of by label. No pull
+request in this repository carries a label (0 of 74 merged between `v0.1.1` and
+`v0.1.2`), so the label categories in `.github/release.yml` put every entry in one
+catch-all bucket. Commit subjects are already enforced by the commitlint sensor,
+which is why they are the grouping that exists.
+
+Preview the body without publishing:
+
+```bash
+gh api --method POST repos/d-o-hub/do-harness/releases/generate-notes \
+  -f tag_name=v0.1.3 -f target_commitish=main \
+  -f configuration_file_path=.github/release.yml --jq .body > generated-notes.md
+bash scripts/release-notes.sh compose v0.1.3 generated-notes.md release-notes.md
+bash scripts/release-notes.sh check v0.1.3 release-notes.md
+bash scripts/release-notes.sh --self-test
+```
+
+The generated side needs `gh api` access; the composer and the check are offline
+and hermetic, so they run in CI as the `release-notes` sensor.
 
 The job calls `gh api …/releases/generate-notes` with `previous_tag_name` (from
 `git describe` on the tag's parent) and `configuration_file_path`, then publishes

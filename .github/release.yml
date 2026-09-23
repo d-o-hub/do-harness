@@ -1,9 +1,14 @@
-# Release-note categories for GitHub's generated changelog.
+# Configuration for GitHub's generated changelog.
 #
-# The release job composes these generated notes under the curated header in
-# .github/release-notes-template.md; see docs/releasing.md ("Release notes").
-# Labels are the repository's own (no invented ones): a category that matches no
-# label shows nothing, which is why "Other changes" is the catch-all.
+# `scripts/release-notes.sh compose` keeps only the generated bullet list and its
+# "Full Changelog" trailer, then groups the bullets by the conventional-commit
+# type in each pull-request title. Labels are deliberately not the grouping: no
+# pull request in this repository carries one (0 of 74 merged between v0.1.1 and
+# v0.1.2), so the label categories produced a single catch-all bucket. The
+# category below is the generator's own fallback and is not the published
+# grouping; see docs/releasing.md ("Release notes").
+#
+# `exclude` still applies before the bullets reach the composer.
 changelog:
   exclude:
     labels:
@@ -12,19 +17,6 @@ changelog:
       - question
       - wontfix
   categories:
-    - title: Security
-      labels:
-        - security
-    - title: Fixes
-      labels:
-        - bug
-        - accessibility
-    - title: Features
-      labels:
-        - enhancement
-    - title: Documentation
-      labels:
-        - documentation
-    - title: Other changes
+    - title: Changes
       labels:
         - "*"
