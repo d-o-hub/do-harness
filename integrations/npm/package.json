@@ -4,6 +4,9 @@
   "description": "Zero-install npm wrapper for the do-harness agent execution harness CLI",
   "license": "MIT",
   "homepage": "https://github.com/d-o-hub/do-harness",
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/d-o-hub/do-harness.git"
