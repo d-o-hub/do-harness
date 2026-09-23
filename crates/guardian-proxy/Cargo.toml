@@ -5,6 +5,13 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
+publish = false
+# Internal crate: this workspace publishes exactly three crates to crates.io
+# (`do-harness-types`, `do-harness-db`, `do-harness`, in that order). The proxy is
+# an adjacent, off-by-default sidecar that a do-harness user builds from the
+# repository, so `cargo publish -p guardian-proxy` must fail rather than ship a
+# crate whose release metadata (no `repository`, no `readme`, no keywords) was
+# never prepared. Cargo enforces this flag, so nothing else has to.
 
 [lints]
 workspace = true
