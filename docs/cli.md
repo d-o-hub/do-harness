@@ -280,6 +280,14 @@ The generated `AGENTS.md` embeds a pinned installer command so an agent
 landing in the repository can obtain the exact CLI version it was initialized
 with.
 
+The Rust pack also scaffolds the release step: `plans/RELEASING.md` (runbook)
+and `scripts/check-release-preflight.sh` (read-only; every version pin must
+agree, and `--release` additionally fails when the target is already
+published). The generated config adds a `release-preflight` sensor running
+the offline pin check in the `verification` and `release` sets, so the
+published-release comparison stays at release time without making ordinary
+runs need the network.
+
 Missing required tooling (e.g. `cargo fmt` or `cargo clippy`) is surfaced and
 omitted from the generated config. Missing optional tools (`cargo-deny`,
 `cargo-audit`) degrade the script-backed `deps`/`audit` sensors, which fail

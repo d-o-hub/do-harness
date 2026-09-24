@@ -5,6 +5,7 @@ use super::skills::SKILLS;
 use super::*;
 
 mod node;
+mod release;
 mod web;
 
 /// Default init options with an explicit language.

@@ -141,6 +141,7 @@ fn rust_init_then_full_verify_is_green() {
         "doctest",
         "loc",
         "commitlint",
+        "release-preflight",
     ] {
         assert!(
             sensors.contains(&want),
