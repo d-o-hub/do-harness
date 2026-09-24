@@ -77,6 +77,11 @@ async fn table_columns(conn: &Connection, table: &str) -> Result<Vec<String>> {
 
 /// Concatenates the production repo sources, stripping `#[cfg(test)]` test
 /// modules so test-only column references cannot satisfy the writer guard.
+///
+/// An unreadable source is fatal, not empty: `env!("CARGO_MANIFEST_DIR")` is
+/// baked in at compile time, so a test binary built in a different (or since
+/// deleted) checkout reads nothing, and an empty concatenation reports every
+/// column in the schema as unwritten instead of naming the one missing file.
 fn production_source() -> String {
     let manifest = env!("CARGO_MANIFEST_DIR");
     let mut combined = String::new();
@@ -84,7 +89,7 @@ fn production_source() -> String {
         let path = format!("{manifest}{rel}");
         let contents = std::fs::read_to_string(&path)
             .with_context(|| format!("read production source {path}"))
-            .unwrap_or_default();
+            .expect("every PROD_SOURCES entry must be readable");
         // The tests module is the last block in each file; keep only the
         // non-test portion.
         if let Some(chunk) = contents.split("#[cfg(test)]").next() {
