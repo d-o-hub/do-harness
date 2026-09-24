@@ -1,0 +1,42 @@
+{
+  "schema_version": 4,
+  "tool": "do-harness",
+  "harness_version": "0.1.2",
+  "git_sha": "0000000000000000000000000000000000000000",
+  "started_at": 1700000000,
+  "finished_at": 1700000005,
+  "root": "/workspace",
+  "task_id": null,
+  "sensor_pack": "rust",
+  "signal_set": "verification",
+  "workspace_fingerprint": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "policy_fingerprint": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "config_fingerprint": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "changed": false,
+  "sensors": [
+    {
+      "name": "fmt",
+      "argv": ["cargo", "fmt", "--check"],
+      "verdict": "pass",
+      "exit_code": 0,
+      "duration_ms": 100,
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "artifacts": [],
+      "recorded": true
+    }
+  ],
+  "skipped": [],
+  "coverage": {
+    "test": {
+      "lines": 95.0,
+      "branches": 90.0
+    }
+  },
+  "summary": {
+    "pass": 1,
+    "fail": 0,
+    "skip": 0,
+    "verdict": "pass"
+  },
+  "chain_hash": "0000000000000000000000000000000000000000000000000000000000000000"
+}

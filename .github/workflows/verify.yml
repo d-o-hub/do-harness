@@ -329,9 +329,11 @@ jobs:
         run: npm install --global pnpm@10
       - name: Test workspace on Windows
         # Bounded so a hung test fails in minutes rather than consuming the
-        # job's full 30-minute budget with no output.
+        # job's full 30-minute budget with no output. `nextest` runs each test
+        # in an isolated process to prevent libSQL/SQLite multithreaded teardown
+        # access violations (0xc0000005) on Windows MSVC.
         timeout-minutes: 12
-        run: cargo test --workspace --release --exclude do-harness-db
+        run: cargo nextest run --workspace --release --exclude do-harness-db
       - name: Test do-harness-db on Windows
         # The db tests each open their own temporary libSQL database. On
         # Windows that binary crashed once with STATUS_ACCESS_VIOLATION

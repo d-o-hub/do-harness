@@ -1,0 +1,32 @@
+{
+  "comment": "Release contract fixture for do-harness CLI v0.1: required top-level commands and options",
+  "commands": {
+    "version": ["format"],
+    "verify": ["fail_fast", "format", "set", "changed", "only", "exclude", "jobs", "record", "task", "evidence", "strict", "bless", "approver"],
+    "list": ["sets", "format"],
+    "explain": ["set", "changed", "format"],
+    "status": ["set", "evidence", "format"],
+    "pr": ["action"],
+    "skills": ["action"],
+    "init-db": ["check", "dry_run", "yes"],
+    "seed": ["prune"],
+    "init": ["language", "force", "format", "no_seed", "minimal", "no_gitignore"],
+    "task": ["action"],
+    "trace": ["action"],
+    "distill": ["skill", "pattern", "description", "from_trace", "from_strikes", "min_strikes", "task", "to_fixture", "dry_run", "format"],
+    "errors": ["action"],
+    "loc": ["format", "warn", "paths"],
+    "split": ["file", "dry_run", "target"],
+    "eval": ["skill", "bless", "list_skills", "fail_fast", "dry_run", "format", "approver", "no_lift", "agent_cmd", "agent_timeout", "strict_fixtures"],
+    "hook": ["action"],
+    "doctor": ["format", "strict"],
+    "metrics": ["format", "sensor", "skill", "since"],
+    "overlap": ["threshold", "format"],
+    "maintenance": ["prune_beats", "keep_per_task"],
+    "compliance": ["framework", "format"],
+    "audit-chain": ["format"],
+    "dora": ["days", "format", "record", "source", "now"],
+    "completions": ["shell"],
+    "man": ["dir"]
+  }
+}

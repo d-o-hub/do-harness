@@ -1,0 +1,22 @@
+{
+  "comment": "Release contract fixture for published packages and archives v0.1",
+  "crates": {
+    "do-harness-types": {
+      "required_files": ["LICENSE"]
+    },
+    "do-harness-db": {
+      "required_files": ["LICENSE"]
+    },
+    "do-harness": {
+      "required_files": [
+        "LICENSE",
+        "README.md",
+        "assets/compliance.md",
+        "assets/methods.json",
+        "assets/nextest.toml",
+        "templates/AGENTS.md"
+      ]
+    }
+  },
+  "unpublished_crates": ["guardian-proxy"]
+}

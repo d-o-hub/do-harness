@@ -122,8 +122,12 @@ verification set and every build target dogfoods green.
    ```
 
 3. The `release` workflow runs:
-   - `preflight` — asserts tag == version and runs
+   - `preflight` — asserts tag == version, compares the published Rust API
+     surfaces with `scripts/check-rust-api-compatibility.sh` (including the
+     known empty API of the v0.1.2 binary-only `do-harness` baseline), checks
+     package contents with `scripts/check-package-contract.sh`, and runs
      `verify --set verification --format json --strict` on the tagged commit.
+     The verification set includes `crates/do-harness/tests/release_contract.rs`.
    - `build` — Linux static-musl (x86_64/aarch64) and macOS (x86_64/arm64)
      tarballs plus a Windows x86_64 zip, each dogfooded with `init && verify`
      and each attested for build provenance in the job that produced it.
@@ -295,10 +299,45 @@ resolves outside the crate.
 
 **The tag preflight installs every tool its sensor set runs.** The `verification`
 set's sensors need `cargo-deny` (deps), `cargo-audit` (audit), `cargo-nextest`
-(test), and `shellcheck`, and the preflight lists them explicitly; adding a
-sensor that needs a new tool means adding it there too. Measured on the v0.1.2
-tag: a preflight without `cargo-nextest` failed `verify --strict` with
+(test), `shellcheck`, and `cargo-semver-checks` (API compatibility). The
+preflight lists them explicitly; adding a sensor that needs a new tool means
+adding it there too. Measured on the v0.1.2 tag: a preflight without
+`cargo-nextest` failed `verify --strict` with
 `error: no such command: nextest` and skipped the whole release.
+
+### Release Preflight Compatibility Checks
+
+Release preflight runs focused contract checks before publication:
+
+1. **Rust public APIs:** `scripts/check-rust-api-compatibility.sh` compares
+   `do-harness-types` and `do-harness-db` with their latest crates.io versions.
+   Published `do-harness` v0.1.2 has no library target; the checker represents
+   its empty Rust API with a committed baseline fixture. That fallback is pinned
+   to v0.1.2 and fails closed for any other no-library baseline. The CLI is
+   covered by the separate contract test below.
+2. **Package contents:** `scripts/check-package-contract.sh` checks required
+   package files, rejects local state and build output, and confirms
+   `guardian-proxy` remains unpublished.
+3. **CLI and evidence:** `crates/do-harness/tests/release_contract.rs` checks
+   command and option availability, exit-code classes, JSON stdout, evidence v3/v4,
+   previous-release configuration fixtures, and unknown-field rejection.
+
+#### Local reproduction
+
+Install the pinned API checker, then run the same preflight checks locally:
+
+```bash
+ cargo install cargo-semver-checks --version 0.50.0 --locked
+ bash scripts/check-rust-api-compatibility.sh
+ bash scripts/check-package-contract.sh
+ cargo test -p do-harness --test release_contract
+```
+
+#### Deliberate breaking changes
+
+A deliberate pre-1.0 contract break follows the normal reviewed version-change
+process: update the corresponding fixture in the same PR and document the break
+and migration guidance in the release notes. No waiver mechanism is added.
 
 ## npm publishing
 

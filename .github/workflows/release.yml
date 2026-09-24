@@ -74,11 +74,22 @@ jobs:
           # Adding a sensor that needs a new tool means adding it here too:
           # the absence of cargo-nextest failed the v0.1.2 tag preflight with
           # "error: no such command: `nextest`" -> weak evidence.
-          tool: cargo-deny,cargo-audit,cargo-nextest,shellcheck
+          tool: cargo-deny,cargo-audit,cargo-nextest,shellcheck,cargo-semver-checks@0.50.0
       - name: Install markdownlint and yamllint
         run: |
           python3 -m pip install --disable-pip-version-check yamllint
           npm install -g markdownlint-cli2
+      - name: Check Rust public API compatibility
+        run: bash scripts/check-rust-api-compatibility.sh
+      - name: Upload API compatibility report on failure
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: semver-checks-report
+          path: target/semver-checks-reports/*
+          if-no-files-found: ignore
+      - name: Check package contracts
+        run: bash scripts/check-package-contract.sh
       - name: Build harness CLI
         run: cargo build --release -p do-harness
       - name: Verify the tagged commit
