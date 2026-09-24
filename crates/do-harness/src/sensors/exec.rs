@@ -6,9 +6,10 @@
 //! lets the parallel driver kill in-flight siblings; the flag is never set on
 //! sequential non-fail-fast runs, so that path is unaffected.
 
+use std::ffi::OsString;
 use std::io::Read;
 use std::path::Path;
-use std::process::{Child, Stdio};
+use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -96,8 +97,43 @@ fn apply_ratchet(
     result
 }
 
+/// Environment variables that describe the crate which launched the harness,
+/// rather than the sensor being executed.
+const LAUNCHER_CRATE_VARS: [&str; 6] = [
+    "CARGO_MANIFEST_DIR",
+    "CARGO_MANIFEST_PATH",
+    "CARGO_CRATE_NAME",
+    "CARGO_BIN_NAME",
+    "CARGO_PRIMARY_PACKAGE",
+    "OUT_DIR",
+];
+
+/// Returns whether a key identifies the harness launcher crate.
+///
+/// Cargo-machete uses CARGO plus the absence of `CARGO_PKG_NAME` to detect
+/// Cargo's external-subcommand dispatch. If verify itself was launched by
+/// cargo run, the inherited `CARGO_PKG_NAME` makes cargo machete treat its
+/// dispatch token (machete) as a directory. Sensors are independent tools,
+/// so launcher crate identity must not leak into their environments.
+fn is_launcher_crate_var(key: &str) -> bool {
+    key.starts_with("CARGO_PKG_") || LAUNCHER_CRATE_VARS.contains(&key)
+}
+
+/// Removes launcher crate identity from a sensor command while preserving
+/// toolchain and harness contract variables.
+fn strip_launcher_crate_env<I>(command: &mut Command, variables: I)
+where
+    I: IntoIterator<Item = (OsString, OsString)>,
+{
+    for (key, _) in variables {
+        if key.to_str().is_some_and(is_launcher_crate_var) {
+            command.env_remove(key);
+        }
+    }
+}
+
 /// Spawns the sensor command with piped stdio, reporting a spawn failure as
-/// a failed [`SensorResult`] instead of an error.
+/// a failed `SensorResult` instead of an error.
 ///
 /// `bash`/`sh` programs are resolved through [`crate::shell`] because a bare
 /// `bash` on Windows resolves to the WSL launcher in `System32` rather than Git
@@ -112,20 +148,21 @@ fn spawn_sensor(
     rest: &[String],
     start: Instant,
 ) -> Result<Child, SensorResult> {
-    crate::shell::command(program, rest)
+    let mut command = crate::shell::command(program, rest);
+    command
         .current_dir(root)
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(|err| {
-            sensor_result(
-                spec,
-                false,
-                None,
-                elapsed_ms(start),
-                format!("failed to spawn {program}: {err}"),
-            )
-        })
+        .stderr(Stdio::piped());
+    strip_launcher_crate_env(&mut command, std::env::vars_os());
+    command.spawn().map_err(|err| {
+        sensor_result(
+            spec,
+            false,
+            None,
+            elapsed_ms(start),
+            format!("failed to spawn {program}: {err}"),
+        )
+    })
 }
 
 /// Spawns a thread that drains one piped stream to EOF.
@@ -278,5 +315,74 @@ pub(crate) fn run_sensor(
 
         attempts += 1;
         thread::sleep(Duration::from_millis(50));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::ffi::OsString;
+    use std::process::Command;
+
+    use super::{is_launcher_crate_var, strip_launcher_crate_env};
+
+    #[test]
+    fn recognizes_launcher_crate_identity_without_matching_contract_vars() {
+        for key in [
+            "CARGO_PKG_NAME",
+            "CARGO_PKG_VERSION",
+            "CARGO_MANIFEST_DIR",
+            "CARGO_MANIFEST_PATH",
+            "CARGO_CRATE_NAME",
+            "CARGO_BIN_NAME",
+            "CARGO_PRIMARY_PACKAGE",
+            "OUT_DIR",
+        ] {
+            assert!(is_launcher_crate_var(key), "expected launcher key: {key}");
+        }
+
+        for key in [
+            "CARGO",
+            "CARGO_HOME",
+            "CARGO_PKG",
+            "CARGO_PKGX",
+            "DO_HARNESS_REQUIRE_TOOLS",
+            "PATH",
+        ] {
+            assert!(
+                !is_launcher_crate_var(key),
+                "unexpected launcher key: {key}"
+            );
+        }
+    }
+
+    #[test]
+    fn strips_launcher_identity_and_preserves_sensor_contract_vars() {
+        let mut command = Command::new("true");
+        strip_launcher_crate_env(
+            &mut command,
+            [
+                (
+                    OsString::from("CARGO_PKG_NAME"),
+                    OsString::from("do-harness"),
+                ),
+                (
+                    OsString::from("CARGO_MANIFEST_DIR"),
+                    OsString::from("/launcher"),
+                ),
+                (
+                    OsString::from("DO_HARNESS_REQUIRE_TOOLS"),
+                    OsString::from("1"),
+                ),
+                (OsString::from("PATH"), OsString::from("/usr/bin")),
+            ],
+        );
+
+        let mut removed: Vec<_> = command
+            .get_envs()
+            .filter(|(_, value)| value.is_none())
+            .map(|(key, _)| key.to_string_lossy().into_owned())
+            .collect();
+        removed.sort_unstable();
+        assert_eq!(removed, ["CARGO_MANIFEST_DIR", "CARGO_PKG_NAME"]);
     }
 }
