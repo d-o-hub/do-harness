@@ -380,7 +380,11 @@ Review distilled heuristics and code snippets against the advisory Anti-AI-Slop 
 - `--format <Format>`: Output format (`text` or `json`).
 
 ### `errors`
-Inspect and clear fail-fast error signatures.
+Inspect and clear fail-fast error signatures. `errors list` displays each
+signature's recorded sensor output. Messages over 2,000 characters include a
+truncation marker, the first detected `FAIL [...]`, `ERROR [...]`, `execfail`,
+or `error:` context (or initial output if none), and a separately labeled
+final 500-character excerpt.
 
 - `errors list [--task <ID>] [--format <Format>]`: List open error signatures.
 - `errors clear [--sensor <SENSOR>] [--task <ID>] [--force] [--dry-run]`: Clear error signatures.
