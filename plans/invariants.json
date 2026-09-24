@@ -186,8 +186,14 @@
     "category": "skills"
   },
   {
-    "invariant": "skill-creator <-> skill-distiller guidance overlap (~0.63 cosine, re-measured 2026-09-17; the earlier ~0.53 reading had drifted) is accepted: both govern the same skill lifecycle (scaffold, gate, evaluate) from opposite ends, so lifecycle vocabulary is shared by design",
-    "rationale": "Topical overlap in lifecycle terms is not duplication of guidance; distinctiveness regressions beyond this baseline surface through the advisory check",
+    "invariant": "skill-creator <-> skill-distiller guidance overlap (~0.77 cosine, re-measured 2026-09-24; the earlier ~0.63 reading had drifted) is accepted: skill-creator owns scaffolding, layout, and executable validation; skill-distiller owns trace extraction, generalization, and benchmarking. The shared skill-lifecycle vocabulary is the intentional handoff, not duplicated procedure",
+    "rationale": "The two guides own distinct stages but must share lifecycle terms to hand off a verified pattern into a validated skill. This value is a re-measurement, not a license for further drift; rerun do-harness overlap --format json before additional corpus changes",
+    "sensor": "do-harness overlap (advisory, threshold 0.45)",
+    "category": "skills"
+  },
+  {
+    "invariant": "harness <-> nested-build-isolation guidance overlap (~0.50 cosine, measured 2026-09-24) is accepted: harness owns the general sensor and verification contract; nested-build-isolation owns inherited cargo and llvm-cov environment isolation. Shared cargo/test/sensor/build vocabulary names the handoff, not duplicated procedure",
+    "rationale": "The ownership boundary is distinct: harness defines when sensors run and how their results gate work, while nested-build-isolation specifies how nested builds strip launcher state. The shared terms link the trigger and consumer; re-measure before further corpus changes",
     "sensor": "do-harness overlap (advisory, threshold 0.45)",
     "category": "skills"
   },
