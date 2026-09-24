@@ -7,6 +7,15 @@ verification set and every build target dogfoods green.
 
 ## One-time setup
 
+- **Enable release immutability** (repository **Settings → General → Releases →
+  *Enable release immutability***). It is a repository toggle with no REST field,
+  so it cannot be set from CI, and it applies to **future** releases only —
+  `v0.1.2` and earlier stay mutable. With it on, publishing locks the release
+  assets and the associated tag, and GitHub mints a **release attestation**
+  (`gh release verify <tag>`, see "Verifying a download"). The workflow needs no
+  change: `gh release create` with assets already creates a draft, uploads every
+  asset, and only then publishes, which is the sequence the immutability guidance
+  asks for.
 - **crates.io publishes through Trusted Publishing (OIDC); there is no publish
   secret.** For each published crate — `do-harness-types`, `do-harness-db`,
   `do-harness` — open <https://crates.io> → the crate → **Settings → Trusted
@@ -113,7 +122,11 @@ verification set and every build target dogfoods green.
    ```
 
 3. The `release` workflow runs:
-   - `preflight` — asserts tag == version, compares public Rust APIs of all three published crates (`do-harness-types`, `do-harness-db`, `do-harness`) against their latest crates.io baselines using `cargo-semver-checks`, verifies package contract file inclusions (`scripts/check-package-contract.sh`), and runs `verify --set verification --format json --strict` (including `crates/do-harness/tests/release_contract.rs`) on the tagged commit.
+   - `preflight` — asserts tag == version, compares the three published Rust
+     APIs against their latest crates.io versions with `cargo-semver-checks`,
+     checks package contents with `scripts/check-package-contract.sh`, and runs
+     `verify --set verification --format json --strict` on the tagged commit.
+     The verification set includes `crates/do-harness/tests/release_contract.rs`.
    - `build` — Linux static-musl (x86_64/aarch64) and macOS (x86_64/arm64)
      tarballs plus a Windows x86_64 zip, each dogfooded with `init && verify`
      and each attested for build provenance in the job that produced it.
@@ -137,24 +150,36 @@ verification set and every build target dogfoods green.
 
 ### Verifying a download
 
-Two independent properties, and a user can check both:
+Three checks, each answering a different question:
 
 ```bash
 gh release download v0.1.3 --repo d-o-hub/do-harness
-sha256sum -c checksums.txt                       # integrity
+sha256sum -c checksums.txt                       # is the download intact?
+gh release verify v0.1.3 --repo d-o-hub/do-harness
+gh release verify-asset v0.1.3 \
+  do-harness-v0.1.3-x86_64-unknown-linux-musl.tar.gz --repo d-o-hub/do-harness
 gh attestation verify do-harness-v0.1.3-x86_64-unknown-linux-musl.tar.gz \
-  --repo d-o-hub/do-harness                      # origin
+  --repo d-o-hub/do-harness                      # who built it, from which commit?
 ```
 
 `checksums.txt` is generated in the `release` job from the artifacts it just
 downloaded, so it travels from the same origin as the files it protects: it
-detects a corrupt or truncated download, not a substituted asset. The attestation
-is created by `actions/attest-build-provenance` inside the matrix job that built
-the archive — signed through Sigstore with a token minted for that job, stored
-against the artifact's digest, and checked by `gh attestation verify` against this
-repository's `release.yml`, its ref, and its commit. The registry channels carry
-their own evidence (npm attestations, crates.io Trusted Publishing);
-`docs/provenance-trust-model.md` states what each one proves and what it does not.
+detects a corrupt or truncated download, not a substituted asset.
+
+`gh release verify` checks the **release attestation** that GitHub mints when an
+immutable release is published — it binds the tag, its commit, and the release
+assets — and `gh release verify-asset` checks one local file against it. Both exit
+1 for a release published before immutability was enabled (`v0.1.2` answers `no
+attestations for tag v0.1.2`), so a passing run also proves the release is
+immutable rather than merely present.
+
+`gh attestation verify` checks the **build attestation** created by
+`actions/attest-build-provenance` inside the matrix job that built the archive:
+signed through Sigstore with a token minted for that job, stored against the
+artifact's digest, and verified against this repository's `release.yml`, its ref,
+and its commit. The registry channels carry their own evidence (npm attestations,
+crates.io Trusted Publishing); `docs/provenance-trust-model.md` states what each
+one proves and what it does not.
 
 ### Release notes
 
@@ -273,36 +298,44 @@ resolves outside the crate.
 
 **The tag preflight installs every tool its sensor set runs.** The `verification`
 set's sensors need `cargo-deny` (deps), `cargo-audit` (audit), `cargo-nextest`
-(test), `shellcheck`, and `cargo-semver-checks` (API compatibility), and the preflight
-lists them explicitly; adding a sensor that needs a new tool means adding it there too.
-Measured on the v0.1.2 tag: a preflight without `cargo-nextest` failed `verify --strict` with
+(test), `shellcheck`, and `cargo-semver-checks` (API compatibility). The
+preflight lists them explicitly; adding a sensor that needs a new tool means
+adding it there too. Measured on the v0.1.2 tag: a preflight without
+`cargo-nextest` failed `verify --strict` with
 `error: no such command: nextest` and skipped the whole release.
 
 ### Release Preflight Compatibility Checks
 
-Release preflight executes focused contract checks to protect adopters against accidental breaks before publication:
+Release preflight runs focused contract checks before publication:
 
-1. **Rust Public-API Compatibility**: `cargo-semver-checks` compares `do-harness-types`, `do-harness-db`, and `do-harness` against their latest published versions on crates.io.
-2. **Package Content Contracts**: `scripts/check-package-contract.sh` checks `cargo package --locked --list` for required files (`LICENSE`, `README.md`, templates, assets), rejects accidental inclusion of local state (`.do-harness`, `.git`, `.env`), target outputs, or secrets, and confirms `guardian-proxy` remains `publish = false`.
-3. **CLI & Evidence Contracts**: `crates/do-harness/tests/release_contract.rs` verifies command/option existence against `cli-required.json`, exit code classifications (0 success, 1 check failure, 2 usage/config error), single JSON value stdout output, evidence v3/v4 deserialization, config fixture parsing, and fail-closed handling of unknown fields.
+1. **Rust public APIs:** `cargo-semver-checks` compares
+   `do-harness-types`, `do-harness-db`, and `do-harness` with their latest
+   published crates.io versions.
+2. **Package contents:** `scripts/check-package-contract.sh` checks required
+   package files, rejects local state and build output, and confirms
+   `guardian-proxy` remains unpublished.
+3. **CLI and evidence:** `crates/do-harness/tests/release_contract.rs` checks
+   command and option availability, exit-code classes, JSON stdout, evidence v3/v4,
+   previous-release configuration fixtures, and unknown-field rejection.
 
-#### Local Reproduction
+#### Local reproduction
 
-Run the preflight compatibility checks locally prior to tagging:
+Install the pinned API checker, then run the same preflight checks locally:
 
 ```bash
-cargo semver-checks check-release -p do-harness-types
-cargo semver-checks check-release -p do-harness-db
-cargo semver-checks check-release -p do-harness
-bash scripts/check-package-contract.sh
-cargo test --test release_contract
+ cargo install cargo-semver-checks --version 0.50.0 --locked
+ cargo semver-checks check-release -p do-harness-types
+ cargo semver-checks check-release -p do-harness-db
+ cargo semver-checks check-release -p do-harness
+ bash scripts/check-package-contract.sh
+ cargo test -p do-harness --test release_contract
 ```
 
-#### Deliberate Breaking Changes
+#### Deliberate breaking changes
 
-A deliberate pre-1.0 contract break must be handled via the normal reviewed PR process:
-1. Update the corresponding contract fixture under `crates/do-harness/tests/fixtures/release-contract/` in the same PR.
-2. Document the breaking change and migration guidance in the release notes (`docs/releases/<tag>.md`).
+A deliberate pre-1.0 contract break follows the normal reviewed version-change
+process: update the corresponding fixture in the same PR and document the break
+and migration guidance in the release notes. No waiver mechanism is added.
 
 ## npm publishing
 
@@ -408,8 +441,27 @@ binary) or install the CLI onto `PATH` with the shell installer.
 
 ## Rollback
 
-GitHub release assets can be deleted and the tag re-pointed if a build fails
-before publication. crates.io versions are immutable: a bad version must be
-yanked (`cargo yank --version <v>`) and superseded by a new patch release.
-npm versions can be unpublished within 72 hours of publish, or deprecated
-(`npm deprecate do-harness@<v> "reason"`) and superseded.
+Two different situations, and only the first is a rewrite:
+
+**Before the release is published.** No immutable release exists yet, so the tag
+can still be deleted or re-pointed and the tagged run can simply be re-run. This
+is the path `v0.1.2` took: its tag was pushed three times while the build matrix
+was fixed. (Adding a `v*` tag ruleset that blocks tag updates would break exactly
+this recovery, which is why the immutability setting is preferred over one.)
+
+**After the release is published.** With immutable releases enabled, the assets
+and the tag are locked: an asset cannot be added, replaced, or deleted, the tag
+cannot move, and the tag name cannot be reused — even if the release is deleted
+first. The title, the notes, and the pre-release/latest flags stay editable, so
+`gh release edit <tag> --notes-file <file>` remains a valid fix for a body that
+turned out wrong. Everything else is superseded, never rewritten:
+
+| channel | recovery for a bad published version |
+|---|---|
+| GitHub Release | fix the notes; anything else waits for a new patch release |
+| crates.io | `cargo yank --version <v>` (reversible by `--undo`) and publish a patch |
+| npm | within 72h `npm unpublish do-harness@<v>`; afterwards `npm deprecate do-harness@<v> "superseded by <new>"`, then publish a patch |
+
+Each recovery ends with a new version, so the fix follows "Cutting a release"
+from step 1. A yanked or deprecated version stays installable for anyone who
+already pinned it, which is why the superseding release is the real fix.

@@ -297,8 +297,9 @@ fn test_evidence_v3_and_v4_compatibility() {
     let val_v2: Value = serde_json::from_str(&stdout_v2).expect("status json for v2 evidence");
     assert!(
         val_v2["state"] == serde_json::json!("stale")
-            || val_v2["state"] == serde_json::json!("missing"),
-        "Schema version 2 evidence must be legacy/stale/missing, got:\n{stdout_v2}"
+            || (val_v2["state"] == serde_json::json!("missing")
+                && val_v2["reason"] == serde_json::json!("legacy_schema")),
+        "Schema version 2 evidence must be stale or report legacy_schema, got:\n{stdout_v2}"
     );
 }
 
