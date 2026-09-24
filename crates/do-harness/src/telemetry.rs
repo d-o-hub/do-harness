@@ -8,7 +8,9 @@ use crate::report::VerifyReport;
 
 /// Maximum characters of a failing sensor's output stored in an error
 /// signature message.
-const MAX_SIGNATURE_MESSAGE: usize = 500;
+const MAX_SIGNATURE_MESSAGE: usize = 2_000;
+const FAILURE_CONTEXT_CHARS: usize = 1_200;
+const FINAL_OUTPUT_CHARS: usize = 500;
 
 /// Consecutive failures after which `verify --record` halts a sensor.
 pub const FAIL_FAST_STRIKES: i64 = 3;
@@ -99,13 +101,57 @@ pub async fn record_verify(
     Ok(())
 }
 
-/// Bounds a sensor output to the last [`MAX_SIGNATURE_MESSAGE`] characters.
+/// Bounds a sensor output while preserving its first actionable failure and
+/// final summary.
 fn truncate_message(output: &str) -> String {
     let count = output.chars().count();
     if count <= MAX_SIGNATURE_MESSAGE {
         return output.to_owned();
     }
-    output.chars().skip(count - MAX_SIGNATURE_MESSAGE).collect()
+
+    let mut offset = 0;
+    let mut first_error = None;
+    let failure_start = output
+        .split_inclusive('\n')
+        .find_map(|line| {
+            let start = offset;
+            offset += line.len();
+            let line = line.trim_start();
+            if line.starts_with("FAIL [")
+                || line.starts_with("ERROR [")
+                || line.contains("execfail")
+            {
+                Some(start)
+            } else if line.starts_with("error:") {
+                first_error.get_or_insert(start);
+                None
+            } else {
+                None
+            }
+        })
+        .or(first_error);
+    let context_start = failure_start.unwrap_or(0);
+    let context_end = output[context_start..]
+        .char_indices()
+        .nth(FAILURE_CONTEXT_CHARS)
+        .map_or(output.len(), |(index, _)| context_start + index);
+    let final_start = output
+        .char_indices()
+        .rev()
+        .nth(FINAL_OUTPUT_CHARS - 1)
+        .map_or(0, |(index, _)| index);
+
+    let mut message = String::with_capacity(MAX_SIGNATURE_MESSAGE);
+    message.push_str("[output truncated; showing failure context and final output]\n");
+    if failure_start.is_some() {
+        message.push_str("[first failure context]\n");
+    } else {
+        message.push_str("[initial output]\n");
+    }
+    message.push_str(&output[context_start..context_end]);
+    message.push_str("\n[final output]\n");
+    message.push_str(&output[final_start..]);
+    message
 }
 
 #[cfg(test)]
