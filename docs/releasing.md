@@ -122,9 +122,10 @@ verification set and every build target dogfoods green.
    ```
 
 3. The `release` workflow runs:
-   - `preflight` — asserts tag == version, compares the three published Rust
-     APIs against their latest crates.io versions with `cargo-semver-checks`,
-     checks package contents with `scripts/check-package-contract.sh`, and runs
+   - `preflight` — asserts tag == version, compares the published Rust API
+     surfaces with `scripts/check-rust-api-compatibility.sh` (including the
+     known empty API of the v0.1.2 binary-only `do-harness` baseline), checks
+     package contents with `scripts/check-package-contract.sh`, and runs
      `verify --set verification --format json --strict` on the tagged commit.
      The verification set includes `crates/do-harness/tests/release_contract.rs`.
    - `build` — Linux static-musl (x86_64/aarch64) and macOS (x86_64/arm64)
@@ -308,9 +309,12 @@ adding it there too. Measured on the v0.1.2 tag: a preflight without
 
 Release preflight runs focused contract checks before publication:
 
-1. **Rust public APIs:** `cargo-semver-checks` compares
-   `do-harness-types`, `do-harness-db`, and `do-harness` with their latest
-   published crates.io versions.
+1. **Rust public APIs:** `scripts/check-rust-api-compatibility.sh` compares
+   `do-harness-types` and `do-harness-db` with their latest crates.io versions.
+   Published `do-harness` v0.1.2 has no library target; the checker represents
+   its empty Rust API with a committed baseline fixture. That fallback is pinned
+   to v0.1.2 and fails closed for any other no-library baseline. The CLI is
+   covered by the separate contract test below.
 2. **Package contents:** `scripts/check-package-contract.sh` checks required
    package files, rejects local state and build output, and confirms
    `guardian-proxy` remains unpublished.
@@ -324,9 +328,7 @@ Install the pinned API checker, then run the same preflight checks locally:
 
 ```bash
  cargo install cargo-semver-checks --version 0.50.0 --locked
- cargo semver-checks check-release -p do-harness-types
- cargo semver-checks check-release -p do-harness-db
- cargo semver-checks check-release -p do-harness
+ bash scripts/check-rust-api-compatibility.sh
  bash scripts/check-package-contract.sh
  cargo test -p do-harness --test release_contract
 ```

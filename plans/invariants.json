@@ -272,7 +272,7 @@
   {
     "invariant": "Release publication requires successful public Rust API compatibility comparison against published baselines and shipped contract checks",
     "rationale": "Protects adopters against accidental CLI, exit-code, JSON schema, evidence, and Rust API contract breaks before publication",
-    "sensor": "cargo-semver-checks && bash scripts/check-package-contract.sh && cargo test --test release_contract",
+    "sensor": "bash scripts/check-rust-api-compatibility.sh && bash scripts/check-package-contract.sh && cargo test --test release_contract",
     "category": "contracts"
   }
 ]

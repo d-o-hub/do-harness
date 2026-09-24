@@ -80,19 +80,7 @@ jobs:
           python3 -m pip install --disable-pip-version-check yamllint
           npm install -g markdownlint-cli2
       - name: Check Rust public API compatibility
-        run: |
-          set -euo pipefail
-          echo "cargo-semver-checks version:"
-          cargo semver-checks --version
-          mkdir -p target/semver-checks-reports
-          check_crate() {
-            local crate="$1"
-            echo "=== Checking API compatibility for $crate ==="
-            cargo semver-checks check-release -p "$crate" 2>&1 | tee "target/semver-checks-reports/${crate}.log"
-          }
-          check_crate do-harness-types
-          check_crate do-harness-db
-          check_crate do-harness
+        run: bash scripts/check-rust-api-compatibility.sh
       - name: Upload API compatibility report on failure
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
