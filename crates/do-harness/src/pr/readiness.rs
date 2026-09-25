@@ -114,6 +114,7 @@ pub fn analyze_readiness_data(
     }
 }
 
+#[allow(clippy::too_many_lines)]
 fn analyze_checks(
     check_runs: &[gh::CheckRunItem],
     commit_statuses: &[gh::CommitStatusItem],
