@@ -163,6 +163,65 @@ fn rust_init_then_full_verify_is_green() {
 }
 
 #[test]
+fn rust_release_preflight_rejects_drift_in_release_set() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    let (ok, out) = run(harness(root).arg("init"));
+    assert!(ok, "init failed:\n{out}");
+
+    // A committed version that no longer matches the target is exactly what
+    // doomed the downstream release dispatch; the generated release set must
+    // catch it before anything is tagged.
+    std::fs::write(root.join("VERSION"), "0.0.0\n").unwrap();
+    let (ok, stdout) = run(harness(root).args([
+        "verify",
+        "--set",
+        "release",
+        "--only",
+        "release-preflight",
+        "--format",
+        "json",
+    ]));
+    assert!(!ok, "drifted VERSION must fail the release set:\n{stdout}");
+    let report: Value = serde_json::from_str(&stdout).expect("valid json report");
+    assert_eq!(report["ok"], serde_json::json!(false));
+    let failed = report["failed"].as_array().expect("failed array");
+    assert!(
+        failed.iter().any(|name| name == "release-preflight"),
+        "release-preflight must be the failing sensor: {failed:?}"
+    );
+
+    // Aligning the pin to the scaffolded crate turns the same command green.
+    let manifest = std::fs::read_to_string(root.join("Cargo.toml")).unwrap();
+    let parsed: toml::Value = toml::from_str(&manifest).expect("valid Cargo.toml");
+    let version = parsed["package"]["version"]
+        .as_str()
+        .expect("scaffolded [package].version")
+        .to_owned();
+    std::fs::write(root.join("VERSION"), format!("{version}\n")).unwrap();
+
+    let (ok, stdout) = run(harness(root).args([
+        "verify",
+        "--set",
+        "release",
+        "--only",
+        "release-preflight",
+        "--format",
+        "json",
+    ]));
+    assert!(ok, "aligned VERSION must pass the release set:\n{stdout}");
+    let report: Value = serde_json::from_str(&stdout).expect("valid json report");
+    assert_eq!(report["ok"], serde_json::json!(true));
+    let preflight = report["sensors"]
+        .as_array()
+        .expect("sensors array")
+        .iter()
+        .find(|s| s["name"] == "release-preflight")
+        .expect("release-preflight sensor entry");
+    assert_eq!(preflight["exit_code"], serde_json::json!(0));
+}
+
+#[test]
 fn rust_doctest_only_failure_is_caught_by_verification_set() {
     let dir = tempfile::tempdir().unwrap();
     let (ok, out) = run(harness(dir.path()).arg("init"));

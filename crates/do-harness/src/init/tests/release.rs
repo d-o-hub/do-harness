@@ -278,9 +278,10 @@ fn preflight_skips_when_no_pin_exists() {
 #[tokio::test(flavor = "current_thread")]
 async fn init_rust_writes_release_runbook_and_preflight() {
     let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
     let options = opts(Some(Language::Rust));
 
-    let report = init_workspace(dir.path(), &options).await.unwrap();
+    let report = init_workspace(root, &options).await.unwrap();
 
     assert!(report.written.contains(&"plans/RELEASING.md".to_owned()));
     assert!(
@@ -288,31 +289,77 @@ async fn init_rust_writes_release_runbook_and_preflight() {
             .written
             .contains(&"scripts/check-release-preflight.sh".to_owned())
     );
-    let runbook = fs::read_to_string(dir.path().join("plans/RELEASING.md")).unwrap();
+    let runbook = fs::read_to_string(root.join("plans/RELEASING.md")).unwrap();
     assert!(runbook.contains("check-release-preflight.sh --release"));
-    let script = fs::read_to_string(dir.path().join("scripts/check-release-preflight.sh")).unwrap();
-    assert_eq!(script, CHECK_RELEASE_PREFLIGHT);
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        let mode = fs::metadata(dir.path().join("scripts/check-release-preflight.sh"))
-            .unwrap()
-            .permissions()
-            .mode();
-        assert!(
-            mode & 0o100 != 0,
-            "preflight must be executable (mode {mode:o})"
-        );
-    }
 
-    // A second run skips both rather than clobbering local edits.
-    let again = init_workspace(dir.path(), &options).await.unwrap();
+    // The scaffolded crate declares 0.1.0, so the shipped preflight must accept
+    // that version and reject a drifting pin — the failure a doomed dispatch
+    // is made of.
+    fs::write(root.join("VERSION"), "0.1.0\n").unwrap();
+    let agreed = preflight(root, &[], None, &[]);
+    assert!(agreed.status.success(), "{}", output_text(&agreed));
+    assert!(
+        output_text(&agreed).contains("version pin(s) agree at 0.1.0"),
+        "{}",
+        output_text(&agreed)
+    );
+
+    fs::write(root.join("VERSION"), "0.0.9\n").unwrap();
+    let drifted = preflight(root, &[], None, &[]);
+    assert_eq!(drifted.status.code(), Some(1), "{}", output_text(&drifted));
+    assert!(
+        output_text(&drifted).contains("but the target version is 0.0.9"),
+        "{}",
+        output_text(&drifted)
+    );
+
+    // A plain re-run leaves local copies alone, `--force` restores the shipped
+    // scaffold, and the restored script still works.
+    fs::write(root.join("plans/RELEASING.md"), "# local runbook\n").unwrap();
+    fs::write(root.join("VERSION"), "0.1.0\n").unwrap();
+
+    let again = init_workspace(root, &options).await.unwrap();
     assert!(again.skipped.contains(&"plans/RELEASING.md".to_owned()));
     assert!(
         again
             .skipped
             .contains(&"scripts/check-release-preflight.sh".to_owned())
     );
+    assert_eq!(
+        fs::read_to_string(root.join("plans/RELEASING.md")).unwrap(),
+        "# local runbook\n"
+    );
+
+    let forced = InitOpts {
+        force: true,
+        ..opts(Some(Language::Rust))
+    };
+    init_workspace(root, &forced).await.unwrap();
+
+    let restored = fs::read_to_string(root.join("plans/RELEASING.md")).unwrap();
+    assert!(
+        restored.contains("check-release-preflight.sh --release"),
+        "{restored}"
+    );
+    let rerun = preflight(root, &[], None, &[]);
+    assert!(rerun.status.success(), "{}", output_text(&rerun));
+    assert!(
+        output_text(&rerun).contains("version pin(s) agree at 0.1.0"),
+        "{}",
+        output_text(&rerun)
+    );
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mode = fs::metadata(root.join("scripts/check-release-preflight.sh"))
+            .unwrap()
+            .permissions()
+            .mode();
+        assert!(
+            mode & 0o100 != 0,
+            "restored preflight must be executable (mode {mode:o})"
+        );
+    }
 }
 
 #[tokio::test(flavor = "current_thread")]
