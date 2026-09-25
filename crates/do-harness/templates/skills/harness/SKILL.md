@@ -41,8 +41,8 @@ Two modes:
 
 `do-harness list` — and `do-harness list --sets` for the sets alone — prints
 what this repository actually runs: a pack omits any sensor whose tooling was
-not proven when the workspace was initialized (the Rust-only `loc` sensor
-included), and the generic pack starts with no sensors and no sets at all, so
+not proven when the workspace was initialized (the `loc` sensor among them),
+and the generic pack starts with no sensors and no sets at all, so
 `verify` there is a vacuous pass, not evidence.
 `do-harness explain --set verification --changed` shows which sensors apply to
 the current change.
@@ -53,7 +53,7 @@ the current change.
 | `do-harness verify --set verification --strict` | before calling work done |
 | `do-harness verify --set release` | pre-release, on the whole pack |
 | `do-harness status --set verification` | evidence freshness; runs nothing |
-| `do-harness loc` | file size against the 500-LOC ceiling (Rust packs) |
+| `do-harness loc` | file size against the 500-LOC ceiling (Rust sources; the `loc` sensor scopes further trees) |
 | `do-harness seed --prune` | after editing `plans/invariants.json` |
 | `do-harness init-db --check` | when the state database may be behind |
 | `do-harness hook install` | wire pre-commit, commit-msg, and pre-push |

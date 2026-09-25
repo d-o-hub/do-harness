@@ -8,14 +8,20 @@
 # (spike residue), `.agents/skills/` (markdown/python), `scripts/` (shell),
 # and non-Rust template assets.
 # Fails if any file exceeds MAX lines; warns at the decomposition threshold.
+# `--root`/`--ext` widen or narrow the scan (default `crates/`, `*.rs`), so a
+# front-end tree can carry the same ceiling from `do-harness.toml` without
+# forking this script; `--max`/`--warn` move the ceiling and threshold.
+# Generated trees (`node_modules`, `target`, `dist`, `build`, `coverage`,
+# `vendor`, `.next`, `out`, `.git`) are pruned and cannot be re-included.
 #
-# The output is feedforward, not a bare verdict: every over-limit file lists
-# its largest top-level item spans (`SPAN:`) and every file at or above the
-# threshold reports its code/test line split (`CODE:`/`TEST:`), so a candidate
-# split point is visible without re-reading the file. Boundary detection is a
-# line-based, column-0 heuristic — nested items are attributed to their
-# enclosing top-level item, and attribute/doc lines count toward the item they
-# annotate. A planning aid, not an AST.
+# The output is feedforward, not a bare verdict: every over-limit Rust file
+# lists its largest top-level item spans (`SPAN:`) and every Rust file at or
+# above the threshold reports its code/test line split (`CODE:`/`TEST:`), so a
+# candidate split point is visible without re-reading the file. Boundary
+# detection is a line-based, column-0 heuristic — nested items are attributed
+# to their enclosing top-level item, and attribute/doc lines count toward the
+# item they annotate. A planning aid, not an AST; other extensions report the
+# verdict alone.
 #
 # `FINDINGS: <n>` reports the over-limit file count so the blessed ratchet
 # (`do-harness verify --record --bless`) can pin it.
@@ -23,9 +29,76 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-MAX="${1:-500}"
+
+MAX=500
 THRESHOLD=450
 FAIL_COUNT=0
+declare -a ROOTS=() EXTS=()
+ROOTS_EXPLICIT=0
+
+# Directory names never scanned: build output and vendored trees, not sources.
+PRUNE_NAMES=(node_modules target dist build coverage vendor .next out .git)
+
+usage() {
+    cat <<'EOF'
+Usage: check-loc.sh [--max N] [--warn N] [--root DIR]... [--ext EXT]... [MAX]
+
+  --max N        Per-file ceiling (default 500)
+  --warn N       Decomposition threshold (default 450)
+  --root DIR     Scan this directory, relative to the repository root; a
+                 configured root that does not exist is an error, so a typo
+                 cannot pass as a vacuous green
+                 (repeatable, comma-separated; default crates)
+  --ext EXT      Scan this extension (repeatable, comma-separated; default rs).
+                 A leading dot is accepted.
+  MAX            Legacy positional ceiling, equivalent to --max
+
+Every over-limit file reports a FINDINGS line so `verify --record --bless`
+can pin the count.
+EOF
+}
+
+while (( $# > 0 )); do
+    case "$1" in
+        --max) MAX="${2:?--max needs a value}"; shift 2 ;;
+        --max=*) MAX="${1#*=}"; shift ;;
+        --warn) THRESHOLD="${2:?--warn needs a value}"; shift 2 ;;
+        --warn=*) THRESHOLD="${1#*=}"; shift ;;
+        --root | --root=*)
+            value="${1#*=}"
+            [[ "$1" == "--root" ]] && { value="${2:?--root needs a value}"; shift; }
+            IFS=, read -r -a parts <<<"$value"
+            ROOTS+=("${parts[@]}")
+            ROOTS_EXPLICIT=1
+            shift
+            ;;
+        --ext | --ext=*)
+            value="${1#*=}"
+            [[ "$1" == "--ext" ]] && { value="${2:?--ext needs a value}"; shift; }
+            IFS=, read -r -a parts <<<"$value"
+            EXTS+=("${parts[@]}")
+            shift
+            ;;
+        -h | --help) usage; exit 0 ;;
+        [0-9]*) MAX="$1"; shift ;;
+        *) usage >&2; exit 2 ;;
+    esac
+done
+
+(( ${#ROOTS[@]} > 0 )) || ROOTS=(src crates)
+(( ${#EXTS[@]} > 0 )) || EXTS=(rs)
+
+# A configured root that does not exist fails closed: a typo must not turn the
+# ceiling into a silent vacuous pass. The default roots are optional, because a
+# repository need not have both `src/` and `crates/`.
+if (( ROOTS_EXPLICIT )); then
+    for root in "${ROOTS[@]}"; do
+        if [[ ! -d "$ROOT/$root" ]]; then
+            echo "check-loc: --root $root does not exist under $ROOT" >&2
+            exit 2
+        fi
+    done
+fi
 
 # How many of the largest top-level items to report per over-limit file.
 SPAN_LIMIT=5
@@ -108,17 +181,38 @@ report_density() {
     report_code_test "$file" "$total"
 }
 
+# Every scanned file, relative to `$ROOT`, one per line.
+scan_files() {
+    local ext root
+    local -a not_path=()
+    for name in "${PRUNE_NAMES[@]}"; do
+        not_path+=(-not -path "*/$name/*")
+    done
+    for ext in "${EXTS[@]}"; do
+        ext="${ext#.}"
+        for root in "${ROOTS[@]}"; do
+            [[ -d "$ROOT/$root" ]] || continue
+            find "$ROOT/$root" -type f -name "*.$ext" "${not_path[@]}" 2>/dev/null
+        done
+    done | sort -u
+}
+
 while IFS= read -r file; do
+    [[ -n "$file" ]] || continue
     lines="$(wc -l < "$file")"
     if (( lines > MAX )); then
         echo "FAIL: $file has $lines lines (max $MAX)"
-        report_density "$file" "$lines"
+        case "$file" in
+            *.rs) report_density "$file" "$lines" ;;
+        esac
         FAIL_COUNT=$(( FAIL_COUNT + 1 ))
     elif (( lines >= THRESHOLD )); then
         echo "WARN: $file is nearing the limit: $lines lines"
-        report_code_test "$file" "$lines"
+        case "$file" in
+            *.rs) report_code_test "$file" "$lines" ;;
+        esac
     fi
-done < <(find "$ROOT/crates" -name '*.rs' -not -path '*/target/*')
+done < <(scan_files)
 
 if (( FAIL_COUNT > 0 )); then
     echo "LOC ceiling violated."

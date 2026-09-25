@@ -989,7 +989,7 @@ json\:"Machine-readable JSON output"))' \
 '--help[Print help (see more with '\''--help'\'')]' \
 '-V[Print version]' \
 '--version[Print version]' \
-'*::paths -- Files or directories to measure (default\: all `.rs` under crates/):_files' \
+'*::paths -- Files or directories to measure (default\: every `.rs` under src/ and crates/):_files' \
 && ret=0
 ;;
 (split)

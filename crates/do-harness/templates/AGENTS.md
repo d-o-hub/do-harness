@@ -48,6 +48,9 @@ checks failed. `missing` means no current evidence exists yet.
 - Sensors and signal sets live in `do-harness.toml`; run
   `do-harness explain --set verification --changed` to see which sensors apply
   to the current change and why.
+- The `loc` sensor enforces the per-file ceiling over `*.rs`; widen it with
+  `--root`/`--ext` in `do-harness.toml` (and the matching `when-changed` globs)
+  to cover front-end sources with the same invariant.
 - Noisy checks can ship with `severity = "warn"` and a `FINDINGS: <n>` output
   marker; `do-harness verify --record --bless` initializes and then pins the
   committed `plans/baselines.json` ratchet (absent until the first bless,
