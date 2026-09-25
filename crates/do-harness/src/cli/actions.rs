@@ -138,6 +138,19 @@ pub enum PrAction {
         #[arg(long, value_enum, default_value_t = Format::Text)]
         format: Format,
     },
+    /// Check whether a pull request is ready to merge: merge state, CI checks, and review conversations.
+    #[command(visible_alias = "readiness", visible_alias = "check")]
+    Ready {
+        /// Pull request number.
+        #[arg(value_name = "PR")]
+        pr: u64,
+        /// Output format.
+        #[arg(long, value_enum, default_value_t = Format::Text)]
+        format: Format,
+    },
+    /// Direct PR number invocation (e.g. `do-harness pr 240`).
+    #[command(external_subcommand)]
+    External(Vec<String>),
 }
 
 /// Available error-signature actions.

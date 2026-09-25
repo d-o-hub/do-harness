@@ -229,6 +229,9 @@ _do__harness() {
             do__harness__subcmd__help__subcmd__pr,no-effect)
                 cmd="do__harness__subcmd__help__subcmd__pr__subcmd__no__subcmd__effect"
                 ;;
+            do__harness__subcmd__help__subcmd__pr,ready)
+                cmd="do__harness__subcmd__help__subcmd__pr__subcmd__ready"
+                ;;
             do__harness__subcmd__help__subcmd__pr,review)
                 cmd="do__harness__subcmd__help__subcmd__pr__subcmd__review"
                 ;;
@@ -304,11 +307,20 @@ _do__harness() {
             do__harness__subcmd__hook__subcmd__help,uninstall)
                 cmd="do__harness__subcmd__hook__subcmd__help__subcmd__uninstall"
                 ;;
+            do__harness__subcmd__pr,check)
+                cmd="do__harness__subcmd__pr__subcmd__ready"
+                ;;
             do__harness__subcmd__pr,help)
                 cmd="do__harness__subcmd__pr__subcmd__help"
                 ;;
             do__harness__subcmd__pr,no-effect)
                 cmd="do__harness__subcmd__pr__subcmd__no__subcmd__effect"
+                ;;
+            do__harness__subcmd__pr,readiness)
+                cmd="do__harness__subcmd__pr__subcmd__ready"
+                ;;
+            do__harness__subcmd__pr,ready)
+                cmd="do__harness__subcmd__pr__subcmd__ready"
                 ;;
             do__harness__subcmd__pr,review)
                 cmd="do__harness__subcmd__pr__subcmd__review"
@@ -318,6 +330,9 @@ _do__harness() {
                 ;;
             do__harness__subcmd__pr__subcmd__help,no-effect)
                 cmd="do__harness__subcmd__pr__subcmd__help__subcmd__no__subcmd__effect"
+                ;;
+            do__harness__subcmd__pr__subcmd__help,ready)
+                cmd="do__harness__subcmd__pr__subcmd__help__subcmd__ready"
                 ;;
             do__harness__subcmd__pr__subcmd__help,review)
                 cmd="do__harness__subcmd__pr__subcmd__help__subcmd__review"
@@ -1615,7 +1630,7 @@ _do__harness() {
             return 0
             ;;
         do__subcmd__harness__subcmd__help__subcmd__pr)
-            opts="no-effect review"
+            opts="no-effect review ready"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -1629,6 +1644,20 @@ _do__harness() {
             return 0
             ;;
         do__subcmd__harness__subcmd__help__subcmd__pr__subcmd__no__subcmd__effect)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        do__subcmd__harness__subcmd__help__subcmd__pr__subcmd__ready)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -2828,7 +2857,7 @@ _do__harness() {
             return 0
             ;;
         do__subcmd__harness__subcmd__pr)
-            opts="-v -q -h -V --root --config --verbose --quiet --color --output --dry-run --help --version no-effect review help"
+            opts="-v -q -h -V --root --config --verbose --quiet --color --output --dry-run --help --version no-effect review ready readiness check help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -2883,7 +2912,7 @@ _do__harness() {
             return 0
             ;;
         do__subcmd__harness__subcmd__pr__subcmd__help)
-            opts="no-effect review help"
+            opts="no-effect review ready help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -2911,6 +2940,20 @@ _do__harness() {
             return 0
             ;;
         do__subcmd__harness__subcmd__pr__subcmd__help__subcmd__no__subcmd__effect)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        do__subcmd__harness__subcmd__pr__subcmd__help__subcmd__ready)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -2953,6 +2996,65 @@ _do__harness() {
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;
+                --format)
+                    COMPREPLY=($(compgen -W "text json" -- "${cur}"))
+                    return 0
+                    ;;
+                --root)
+                    COMPREPLY=()
+                    if [[ "${BASH_VERSINFO[0]}" -ge 4 ]]; then
+                        compopt -o plusdirs
+                    fi
+                    return 0
+                    ;;
+                --config)
+                    local oldifs
+                    if [ -n "${IFS+x}" ]; then
+                        oldifs="$IFS"
+                    fi
+                    IFS=$'\n'
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    if [ -n "${oldifs+x}" ]; then
+                        IFS="$oldifs"
+                    fi
+                    if [[ "${BASH_VERSINFO[0]}" -ge 4 ]]; then
+                        compopt -o filenames
+                    fi
+                    return 0
+                    ;;
+                --color)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --output)
+                    local oldifs
+                    if [ -n "${IFS+x}" ]; then
+                        oldifs="$IFS"
+                    fi
+                    IFS=$'\n'
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    if [ -n "${oldifs+x}" ]; then
+                        IFS="$oldifs"
+                    fi
+                    if [[ "${BASH_VERSINFO[0]}" -ge 4 ]]; then
+                        compopt -o filenames
+                    fi
+                    return 0
+                    ;;
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        do__subcmd__harness__subcmd__pr__subcmd__ready)
+            opts="-v -q -h -V --format --root --config --verbose --quiet --color --output --dry-run --help --version"
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
                 --format)
                     COMPREPLY=($(compgen -W "text json" -- "${cur}"))
                     return 0
