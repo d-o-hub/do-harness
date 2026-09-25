@@ -1,6 +1,6 @@
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
-.TH do-harness 1  "do-harness 0.1.1 (e400ef9-dirty 2026-09-18)" 
+.TH do-harness 1  "do-harness 0.1.2 (269bc99 2026-09-25)" 
 .SH NAME
 do\-harness \- do\-harness agent execution harness CLI
 .SH SYNOPSIS
@@ -74,10 +74,16 @@ do\-harness\-trace(1)
 Record and list interaction traces
 .TP
 do\-harness\-distill(1)
-Extract a heuristic from a resolved trace
+Extract a heuristic from a resolved trace into a skill. Review output against the anti\-AI\-slop checklist (.agents/skills/skill\-creator/references/anti_ai_slop.md)
 .TP
 do\-harness\-errors(1)
 Inspect and clear fail\-fast error signatures
+.TP
+do\-harness\-loc(1)
+Report line\-of\-code state for the 500\-LOC invariant
+.TP
+do\-harness\-split(1)
+Extract a large top\-level item into a sibling module
 .TP
 do\-harness\-eval(1)
 Validate skill structure and benchmark skill evals
@@ -126,4 +132,4 @@ Exit Codes:
   1  Verification or check failure
   2  Usage, configuration, or environment error
 .SH VERSION
-v0.1.1 (e400ef9\-dirty 2026\-09\-18)
+v0.1.2 (269bc99 2026\-09\-25)

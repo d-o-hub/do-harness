@@ -246,7 +246,7 @@ pub enum Command {
         /// Show only files at or above the 450-line decomposition threshold.
         #[arg(long)]
         warn: bool,
-        /// Files or directories to measure (default: all `.rs` under crates/).
+        /// Files or directories to measure (default: every `.rs` under src/ and crates/).
         #[arg(value_hint = ValueHint::AnyPath, value_name = "PATH")]
         paths: Vec<PathBuf>,
     },

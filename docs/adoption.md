@@ -144,6 +144,24 @@ sensor names. `when-changed` globs make a sensor apply only to the current
 change (`verify --changed`), and selection fails closed when git state cannot
 be read.
 
+The LOC ceiling is not Rust-only: the rust pack ships `loc` over `*.rs` by
+default, and a front-end tree gets the same invariant by scoping that sensor
+instead of forking the script.
+
+```toml
+[[sensors]]
+name = "loc"
+argv = ["bash", "scripts/check-loc.sh", "--root", "web", "--ext", "ts,tsx"]
+when-changed = ["**/*.rs", "web/**/*.ts", "web/**/*.tsx"]
+```
+
+`--root`/`--ext` accept repeats or comma-separated lists, `--max`/`--warn` move
+the ceiling (500) and the split threshold (450), generated trees
+(`node_modules`, `target`, `dist`, `build`, …) are always pruned, and a
+configured root that does not exist fails the run instead of passing vacuously. See
+`docs/cli.md` for the full flag list; the `FINDINGS: <n>` contract that
+`verify --record --bless` pins is unchanged.
+
 ## The agent loop
 
 Agents (and CI) only need three commands:

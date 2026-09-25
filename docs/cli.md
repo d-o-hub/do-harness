@@ -427,9 +427,31 @@ threshold, `FAIL` above the ceiling), and the code/test split when an inline
 `#[cfg(test)]` module is present.
 
 - `[PATH]...`: Files or directories to measure (default: every `.rs` under
-  `crates/`).
+  `src/` and `crates/`).
 - `--warn`: Show only files at or above the decomposition threshold.
 - `--format <Format>`: Output format (`text` or `json`).
+
+This command is Rust-shaped: the default scope, the `SPAN:` spans, and the
+`CODE:`/`TEST:` split all come from `*.rs`. The `loc` *sensor*
+(`scripts/check-loc.sh`) is the part that carries the ceiling to other trees, so
+a repository with a front-end scopes it from `do-harness.toml` instead of
+forking the script:
+
+```toml
+[[sensors]]
+name = "loc"
+argv = ["bash", "scripts/check-loc.sh", "--root", "web", "--ext", "ts,tsx"]
+when-changed = ["**/*.rs", "web/**/*.ts", "web/**/*.tsx"]
+```
+
+`--root` and `--ext` repeat, or take one comma-separated value; `--max` and
+`--warn` move the ceiling (500) and the decomposition threshold (450). A
+configured `--root` that does not exist fails the run (exit 2) rather than
+reporting an empty, vacuous green; the default roots stay optional. Generated
+trees — `node_modules`, `target`, `dist`, `build`, `coverage`, `vendor`,
+`.next`, `out`, `.git` — are always pruned. The output contract is unchanged:
+`FAIL:`/`WARN:` lines plus a trailing `FINDINGS: <n>`, which stays the ratchet's
+input; `SPAN:`/`CODE:`/`TEST:` hints are emitted for Rust files only.
 
 ### `split`
 Extract one large top-level item — or an inline `#[cfg(test)]` module — into a
