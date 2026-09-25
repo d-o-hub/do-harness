@@ -271,7 +271,7 @@ fn local_effect(root: &Path, base: &str, head: &str) -> Option<Effect> {
     if !no_effect::rev_exists(root, head) {
         return None;
     }
-    for candidate in [base.to_owned(), format!("origin/{base}")] {
+    for candidate in no_effect::base_refs(base) {
         if no_effect::rev_exists(root, &candidate) {
             if let Ok(effect) = no_effect::effective_change(root, &candidate, head) {
                 return Some(effect);

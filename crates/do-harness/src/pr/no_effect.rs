@@ -24,6 +24,17 @@ impl Effect {
     }
 }
 
+/// Candidate refs for a pull request's base branch, most authoritative first.
+///
+/// A PR's base is the *remote* branch, so the remote-tracking ref is the honest
+/// local proxy. A same-named local branch is refreshed only by checking it out
+/// or pulling it, and a stale one silently reports already-merged upstream
+/// commits as this PR's change — it would also flip a no-effect verdict.
+#[must_use]
+pub fn base_refs(base: &str) -> [String; 2] {
+    [format!("origin/{base}"), base.to_owned()]
+}
+
 /// Returns the merge base of `base` and `head`.
 ///
 /// # Errors
