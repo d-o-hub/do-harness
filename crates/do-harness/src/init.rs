@@ -184,6 +184,11 @@ pub async fn init_workspace(root: &Path, opts: &InitOpts) -> Result<InitReport> 
     if !opts.no_gitignore {
         append_gitignore(root, &mut report)?;
     }
+    // The metrics-event tree the scaffolded harness skill writes into; it is
+    // ignored local state, so the directory is created rather than reported as
+    // a scaffolded file.
+    fs::create_dir_all(root.join(".agents/events"))
+        .with_context(|| format!("failed to create {}", root.join(".agents/events").display()))?;
 
     if !opts.no_seed {
         report.seeded = seed_invariants(root, false).await?;

@@ -16,8 +16,8 @@ See references/heuristics.md for distilled heuristics.
 
 Scaffold and evolve skills in `.agents/skills/` so they pass the structure
 gate (`scripts/quick_validate.py`) and the hermetic evaluator
-(`do-harness eval`). Read `AGENTS.md` §5 first: skills must obey the same
-repo invariants as production code.
+(`do-harness eval`). Read `AGENTS.md` first: skills must obey the same
+contract as production code.
 
 ## Local Skill Layout
 
@@ -71,8 +71,8 @@ flow, walkthrough env contract) get exact scripts; judgment calls
 6. Anti-AI-slop audit: review written code and guidance against the checklist in
    `references/anti_ai_slop.md` (purpose-per-struct, real error handling,
    meaningful names, no speculative abstraction, why-focused docs).
-7. Iterate from eval evidence. New reusable patterns go through
-   `.agents/skills/skill-distiller`, never straight into prose.
+7. Iterate from eval evidence. New reusable patterns go through the scaffold →
+   validate → eval loop this skill defines, never straight into prose.
 
 ## References
 
@@ -81,7 +81,9 @@ flow, walkthrough env contract) get exact scripts; judgment calls
 - UI metadata (`agents/openai.yaml`): see
   [references/openai_yaml.md](references/openai_yaml.md).
 - Operating invariants and workflow: `AGENTS.md`.
-- Assertion DSL semantics: `crates/do-harness/src/eval_assert.rs`.
+- Assertion DSL semantics: the scaffolded `.agents/skills/harness/evals/evals.json`
+  is a worked example; the grammar ships with the CLI source:
+  <https://github.com/d-o-hub/do-harness/blob/main/crates/do-harness/src/eval_assert.rs>.
 
 ## Gotchas
 
