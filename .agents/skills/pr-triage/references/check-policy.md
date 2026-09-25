@@ -30,6 +30,13 @@ link: the browser link's trailing number is a job number, not the check-run id
 carries no annotations keeps its evidence in the job log:
 
 ```bash
+do-harness ci-explain <run_id>   # failing step, local sensor, exact repro command
+```
+
+`ci-explain` resolves the failing step, the sensor that reproduces it, and the
+newest error line, reading the same log by hand when it cannot:
+
+```bash
 gh run view <run_id> --json jobs --jq '.jobs[] | {name, databaseId}'
 gh run view --job <databaseId> --log-failed | tail -40
 ```
@@ -40,6 +47,10 @@ Then classify:
 
 - **Real failure.** An annotation points at a file the PR changed, or the failing
   step reproduces locally. Fix it; do not re-run it.
+- **Cancellation.** Conclusion `cancelled` is not a failure: the job stops on an
+  external cause (superseded push, concurrency group, runner loss), usually with
+  no failing step and no annotations. Re-run it
+  (`gh run rerun <run_id> --job <databaseId>`); never "fix" code for it.
 - **Infrastructure flake.** Re-run once with `gh run rerun <run_id> --failed`,
   never "fix" it:
   - third-party action authentication breakage (FlakeHub and similar);

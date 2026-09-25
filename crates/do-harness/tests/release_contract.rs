@@ -105,7 +105,10 @@ fn test_cli_commands_and_required_options() {
         let flags = req_flags.as_array().expect("array of flags");
         for flag in flags {
             let flag_str = flag.as_str().expect("string flag");
-            let is_positional = matches!(flag_str, "action" | "shell" | "dir" | "file" | "paths");
+            let is_positional = matches!(
+                flag_str,
+                "action" | "shell" | "dir" | "file" | "paths" | "run_id"
+            );
             if is_positional {
                 let upper = flag_str.to_uppercase();
                 let singular_upper = upper.trim_end_matches('S');

@@ -21,6 +21,7 @@ mod audit;
 mod baselines;
 mod binary;
 mod changes;
+mod ci_explain;
 mod cli;
 mod commands;
 mod config;
@@ -393,6 +394,7 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
             source,
             now,
         } => dora::command::run(&root, days, format, record, source, now).await,
+        Command::CiExplain { run_id, format } => ci_explain::run(&root, &run_id, format).await,
         Command::Metrics {
             format,
             sensor,

@@ -85,7 +85,11 @@ Run these steps in order. Stop the sweep on any escalation and report it.
    checks. A check that fails in CI plumbing (upload, runner,
    rerun-forbidden) with zero diff causation is infrastructure, not a
    finding: follow [references/gh-resilience.md](references/gh-resilience.md)
-   (empty retrigger commit, one cycle, then escalate). Never merge with a
+   (empty retrigger commit, one cycle, then escalate). When a run needs more
+   than the check list shows, `do-harness ci-explain <run-id|url>` names the
+   failing step, the local sensor, and the exact command that reproduces it,
+   and reports a cancelled job with `gh run rerun` advice instead of letting
+   `cancelled` read as a failure. Never merge with a
    failing or unknown check.
 9. **Conversations.** Run `scripts/threads.sh list PR`. For each unresolved
    thread: fix the code or reply with a concrete answer, then
