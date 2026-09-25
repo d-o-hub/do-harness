@@ -31,25 +31,32 @@ Two modes:
 
 | Guide | Path | Purpose |
 |-------|------|---------|
-| Agent contract | `AGENTS.md` | Operating invariants and 6-phase workflow |
-| HTN planning | `.agents/skills/htn-planner` | Task decomposition |
-| Event modeling | `.agents/skills/event-modeler` | Event-slice schemas |
-| Spike running | `.agents/skills/spike-runner` | De-risking spikes |
-| Distillation | `.agents/skills/skill-distiller` | Distillation loop |
+| Agent contract | `AGENTS.md` | Operating invariants and the scaffolded workflow |
+| Sensor contract | `do-harness.toml` | `[[sensors]]` and `[signal-sets]` this repository runs |
+| Decision headers | `plans/invariants.json` | invariant / rationale / sensor records |
+| Harness skill | `.agents/skills/harness` | This skill |
+| Guide authoring | `.agents/skills/skill-creator` | Scaffold, validate, and eval a new guide |
 
 ## Feedback Sensors
 
-| Sensor | Command | Stage |
-|--------|---------|-------|
-| verify | `do-harness verify` | pre-commit (subset) + pre-push + CI (full) |
-| fmt | `do-harness verify --only fmt` | pre-commit |
-| loc | `do-harness verify --only loc` | pre-commit |
-| check | `do-harness verify --only check` | pre-push + CI |
-| clippy | `do-harness verify --only clippy` | pre-push + CI |
-| test | `do-harness verify --only test` | pre-push + CI |
-| deps | `do-harness verify --only deps` | pre-push + CI |
-| migrate | `cargo run -p do-harness-db --bin init_db` | on schema change |
-| seed | `cargo run -p do-harness-db --bin seed_invariants` | when `plans/invariants.json` changes |
+`do-harness list` — and `do-harness list --sets` for the sets alone — prints
+what this repository actually runs: a pack omits any sensor whose tooling was
+not proven when the workspace was initialized (the Rust-only `loc` sensor
+included), and the generic pack starts with no sensors and no sets at all, so
+`verify` there is a vacuous pass, not evidence.
+`do-harness explain --set verification --changed` shows which sensors apply to
+the current change.
+
+| Command | Stage |
+|---------|-------|
+| `do-harness verify --set feedback` | the edit loop (fast subset) |
+| `do-harness verify --set verification --strict` | before calling work done |
+| `do-harness verify --set release` | pre-release, on the whole pack |
+| `do-harness status --set verification` | evidence freshness; runs nothing |
+| `do-harness loc` | file size against the 500-LOC ceiling (Rust packs) |
+| `do-harness seed --prune` | after editing `plans/invariants.json` |
+| `do-harness init-db --check` | when the state database may be behind |
+| `do-harness hook install` | wire pre-commit, commit-msg, and pre-push |
 
 ## Self-Correction Protocol
 
@@ -59,7 +66,7 @@ When a computational sensor fires:
 3. Apply the minimal fix — do not refactor unrelated code.
 4. Re-run the specific sensor.
 5. Only proceed when the sensor is green.
-6. Write a metrics event to `.agents/events/YYYY/MM/DD/` if the fix was non-trivial.
+6. Write a metrics event under `.agents/events/<YYYY>/<MM>/<DD>/` (ignored local state) if the fix was non-trivial.
 
 ## Fail-Fast Policy
 
@@ -70,7 +77,7 @@ If the same subtask fails a sensor 3 consecutive times: halt, record the error s
 When any sensor fires repeatedly (>2 times in one sprint):
 1. Identify the root cause category (maintainability / architecture / behaviour).
 2. Update the corresponding feedforward guide to prevent recurrence.
-3. If no guide exists, create one in `.agents/skills/` using the `skill-distiller` skill.
+3. If no guide exists, create one with `.agents/skills/skill-creator` (scaffold, validate, then grade it with `do-harness eval`).
 4. The loop closes: sensors fire -> guides update -> sensors fire less.
 
 The trigger is recorded, not remembered. `verify --record` maintains a strike
@@ -112,9 +119,9 @@ Using the harness in another codebase is proven, never assumed:
   existing crates are never touched, not even with `--force`.
 - The generic pack ships zero sensors: its `verify` pass is vacuous until
   real `[[sensors]]` are configured — do not report it as evidence.
-- The green/red paths are dogfooded by `crates/do-harness/tests/dogfood.rs`
-  and CI (`init && verify` on a fresh temp workspace every push); re-prove
-  with `do-harness verify --format json` in the consumer repo.
+- Upstream CI dogfoods both paths (`init && verify` on a fresh temp workspace
+  every push); re-prove with `do-harness verify --format json` in the consumer
+  repo.
 
 ## Progressive Disclosure
 

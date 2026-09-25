@@ -101,7 +101,8 @@ do-harness doctor                  # binary resolution, hooks, db skew
 line for future agents), `plans/invariants.json`, `.agents/skills/`
 (`harness` + `skill-creator`), the rust pack's `scripts/check-*.sh` helpers
 plus `scripts/check-release-preflight.sh` and its `plans/RELEASING.md`
-runbook, `.gitignore` entries, and the local libSQL state. Existing files are never overwritten without `--force`, and existing
+runbook, `.gitignore` entries, the ignored `.agents/events/` metrics-event
+tree, and the local libSQL state. Existing files are never overwritten without `--force`, and existing
 application source is never touched. The run ends with
 `Initial verification: GREEN | RED | VACUOUS`; RED exits non-zero.
 
