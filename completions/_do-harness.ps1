@@ -233,6 +233,9 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('--version', '--version', [CompletionResultType]::ParameterName, 'Print version')
             [CompletionResult]::new('no-effect', 'no-effect', [CompletionResultType]::ParameterValue, 'Report whether a PR or revision range introduces any effective change')
             [CompletionResult]::new('review', 'review', [CompletionResultType]::ParameterValue, 'Emit the semantic residual: changed units evidence could not prove')
+            [CompletionResult]::new('ready', 'ready', [CompletionResultType]::ParameterValue, 'Check whether a pull request is ready to merge: merge state, CI checks, and review conversations')
+            [CompletionResult]::new('readiness', 'readiness', [CompletionResultType]::ParameterValue, 'Check whether a pull request is ready to merge: merge state, CI checks, and review conversations')
+            [CompletionResult]::new('check', 'check', [CompletionResultType]::ParameterValue, 'Check whether a pull request is ready to merge: merge state, CI checks, and review conversations')
             [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
             break
         }
@@ -275,9 +278,61 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('--version', '--version', [CompletionResultType]::ParameterName, 'Print version')
             break
         }
+        'do-harness;pr;ready' {
+            [CompletionResult]::new('--format', '--format', [CompletionResultType]::ParameterName, 'Output format')
+            [CompletionResult]::new('--root', '--root', [CompletionResultType]::ParameterName, 'Workspace root override (default: walk up from cwd)')
+            [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Explicit path to do-harness.toml')
+            [CompletionResult]::new('--color', '--color', [CompletionResultType]::ParameterName, 'Color output (auto, always, never)')
+            [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Default output file path')
+            [CompletionResult]::new('-v', '-v', [CompletionResultType]::ParameterName, 'Verbosity level (-v, -vv)')
+            [CompletionResult]::new('--verbose', '--verbose', [CompletionResultType]::ParameterName, 'Verbosity level (-v, -vv)')
+            [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Suppress non-error messages')
+            [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Suppress non-error messages')
+            [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Dry run without side effects')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            [CompletionResult]::new('-V', '-V ', [CompletionResultType]::ParameterName, 'Print version')
+            [CompletionResult]::new('--version', '--version', [CompletionResultType]::ParameterName, 'Print version')
+            break
+        }
+        'do-harness;pr;readiness' {
+            [CompletionResult]::new('--format', '--format', [CompletionResultType]::ParameterName, 'Output format')
+            [CompletionResult]::new('--root', '--root', [CompletionResultType]::ParameterName, 'Workspace root override (default: walk up from cwd)')
+            [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Explicit path to do-harness.toml')
+            [CompletionResult]::new('--color', '--color', [CompletionResultType]::ParameterName, 'Color output (auto, always, never)')
+            [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Default output file path')
+            [CompletionResult]::new('-v', '-v', [CompletionResultType]::ParameterName, 'Verbosity level (-v, -vv)')
+            [CompletionResult]::new('--verbose', '--verbose', [CompletionResultType]::ParameterName, 'Verbosity level (-v, -vv)')
+            [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Suppress non-error messages')
+            [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Suppress non-error messages')
+            [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Dry run without side effects')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            [CompletionResult]::new('-V', '-V ', [CompletionResultType]::ParameterName, 'Print version')
+            [CompletionResult]::new('--version', '--version', [CompletionResultType]::ParameterName, 'Print version')
+            break
+        }
+        'do-harness;pr;check' {
+            [CompletionResult]::new('--format', '--format', [CompletionResultType]::ParameterName, 'Output format')
+            [CompletionResult]::new('--root', '--root', [CompletionResultType]::ParameterName, 'Workspace root override (default: walk up from cwd)')
+            [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Explicit path to do-harness.toml')
+            [CompletionResult]::new('--color', '--color', [CompletionResultType]::ParameterName, 'Color output (auto, always, never)')
+            [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Default output file path')
+            [CompletionResult]::new('-v', '-v', [CompletionResultType]::ParameterName, 'Verbosity level (-v, -vv)')
+            [CompletionResult]::new('--verbose', '--verbose', [CompletionResultType]::ParameterName, 'Verbosity level (-v, -vv)')
+            [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Suppress non-error messages')
+            [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Suppress non-error messages')
+            [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Dry run without side effects')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            [CompletionResult]::new('-V', '-V ', [CompletionResultType]::ParameterName, 'Print version')
+            [CompletionResult]::new('--version', '--version', [CompletionResultType]::ParameterName, 'Print version')
+            break
+        }
         'do-harness;pr;help' {
             [CompletionResult]::new('no-effect', 'no-effect', [CompletionResultType]::ParameterValue, 'Report whether a PR or revision range introduces any effective change')
             [CompletionResult]::new('review', 'review', [CompletionResultType]::ParameterValue, 'Emit the semantic residual: changed units evidence could not prove')
+            [CompletionResult]::new('ready', 'ready', [CompletionResultType]::ParameterValue, 'Check whether a pull request is ready to merge: merge state, CI checks, and review conversations')
             [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
             break
         }
@@ -285,6 +340,9 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             break
         }
         'do-harness;pr;help;review' {
+            break
+        }
+        'do-harness;pr;help;ready' {
             break
         }
         'do-harness;pr;help;help' {
@@ -1222,12 +1280,16 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
         'do-harness;help;pr' {
             [CompletionResult]::new('no-effect', 'no-effect', [CompletionResultType]::ParameterValue, 'Report whether a PR or revision range introduces any effective change')
             [CompletionResult]::new('review', 'review', [CompletionResultType]::ParameterValue, 'Emit the semantic residual: changed units evidence could not prove')
+            [CompletionResult]::new('ready', 'ready', [CompletionResultType]::ParameterValue, 'Check whether a pull request is ready to merge: merge state, CI checks, and review conversations')
             break
         }
         'do-harness;help;pr;no-effect' {
             break
         }
         'do-harness;help;pr;review' {
+            break
+        }
+        'do-harness;help;pr;ready' {
             break
         }
         'do-harness;help;skills' {

@@ -102,6 +102,28 @@ pub fn run(root: &Path, action: PrAction) -> Result<(), CliError> {
             let target = target_from(pr, base, head)?;
             run_review(root, &target, recompute, format).map_err(CliError::Verify)
         }
+        PrAction::Ready { pr, format } => {
+            super::readiness::run(root, pr, format).map_err(CliError::Verify)
+        }
+        PrAction::External(args) => {
+            if let Some(first) = args.first() {
+                if let Ok(pr) = first.parse::<u64>() {
+                    let format = if args
+                        .iter()
+                        .any(|a| a == "--json" || a == "json" || a == "--format=json")
+                    {
+                        Format::Json
+                    } else {
+                        Format::Text
+                    };
+                    return super::readiness::run(root, pr, format).map_err(CliError::Verify);
+                }
+            }
+            Err(CliError::Usage(anyhow::anyhow!(
+                "unknown pr subcommand or invalid PR number: {}",
+                args.join(" ")
+            )))
+        }
     }
 }
 
