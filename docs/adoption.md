@@ -99,8 +99,9 @@ do-harness doctor                  # binary resolution, hooks, db skew
 
 `init` writes `do-harness.toml`, `AGENTS.md` (including a pinned installer
 line for future agents), `plans/invariants.json`, `.agents/skills/`
-(`harness` + `skill-creator`), `.gitignore` entries, and the local libSQL
-state. Existing files are never overwritten without `--force`, and existing
+(`harness` + `skill-creator`), the rust pack's `scripts/check-*.sh` helpers
+plus `scripts/check-release-preflight.sh` and its `plans/RELEASING.md`
+runbook, `.gitignore` entries, and the local libSQL state. Existing files are never overwritten without `--force`, and existing
 application source is never touched. The run ends with
 `Initial verification: GREEN | RED | VACUOUS`; RED exits non-zero.
 
@@ -182,6 +183,54 @@ verify:
     - export PATH="$HOME/.local/bin:$PATH"
     - do-harness verify --set verification --format json --strict
 ```
+
+## Releasing
+
+The rust pack scaffolds the release step so it is not re-invented per
+repository: a runbook (`plans/RELEASING.md`) and a read-only preflight
+(`scripts/check-release-preflight.sh`) that never tags, pushes, or publishes.
+
+```bash
+bash scripts/check-release-preflight.sh            # pins agree (offline)
+bash scripts/check-release-preflight.sh --release  # + target not already published
+```
+
+The preflight reads `VERSION`, `Cargo.toml` (`[workspace.package]` first, then
+`[package]`) and every tracked, non-private `package.json`; a mismatch names
+every pin that disagrees. A manifest's own top-level `version` is the pin: a
+`version` key inside a dependency, override, or `publishConfig` object is not
+one. `--release` lists the published releases through
+`gh` (repository from `GH_REPO` or the `origin` remote) and fails with
+`already has a GitHub Release` when the target already shipped — the failure
+mode behind doomed release dispatches. It prints `WARN` and exits 0 when `gh`
+or the network is unavailable, unless `CI=true` or
+`DO_HARNESS_REQUIRE_TOOLS=1`, where a skipped guard fails instead. A manifest
+whose version is stamped at publish time is not a pin: mark the package
+`"private": true`, or pass `--no-package-json` (adding it to the generated
+sensor's `argv`) to keep the `VERSION`/`Cargo.toml` check without it.
+
+`init` puts the offline half in the generated config, so the dev loop never
+needs the network:
+
+```toml
+[signal-sets]
+# release-preflight also joins `verification`; it is offline, so neither set
+# needs the network.
+release = ["fmt", "check", "clippy", "test", "doctest", "coverage", "loc", "deps", "audit", "commitlint", "release-preflight"]
+
+[[sensors]]
+name = "release-preflight"
+argv = ["bash", "scripts/check-release-preflight.sh"]
+when-changed = ["VERSION", "Cargo.toml", "**/Cargo.toml", "**/package.json"]
+```
+
+Editing a pin re-runs the sensor under `verify --changed`, and
+`do-harness verify --set release` runs it with everything else before a tag;
+the published-release comparison stays in the runbook's release step, because
+between releases the committed version legitimately equals the last released
+one. Repositories initialized before this scaffold can copy the script and
+runbook and add the block above. do-harness's own tag-triggered process is
+documented in `docs/releasing.md`.
 
 ## Troubleshooting
 

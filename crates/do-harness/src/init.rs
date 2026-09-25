@@ -88,11 +88,14 @@ const CONFIG_GENERIC: &str = include_str!("../templates/do-harness.toml.generic"
 const CONFIG_WEB: &str = include_str!("../templates/do-harness.toml.web");
 const INVARIANTS_RUST: &str = include_str!("../templates/plans/invariants.json.rust");
 const INVARIANTS_GENERIC: &str = include_str!("../templates/plans/invariants.json.generic");
+const RELEASING_RUNBOOK: &str = include_str!("../templates/plans/RELEASING.md");
 const CHECK_LOC: &str = include_str!("../templates/scripts/check-loc.sh");
 const CHECK_COMMITLINT: &str = include_str!("../templates/scripts/check-commitlint.sh");
 const CHECK_DEPS: &str = include_str!("../templates/scripts/check-deps.sh");
 const CHECK_AUDIT: &str = include_str!("../templates/scripts/check-audit.sh");
 const CHECK_COVERAGE: &str = include_str!("../templates/scripts/check-coverage.sh");
+const CHECK_RELEASE_PREFLIGHT: &str =
+    include_str!("../templates/scripts/check-release-preflight.sh");
 const NEXTEST_CONFIG: &str = include_str!("../assets/nextest.toml");
 const CRATE_MANIFEST: &str = include_str!("../templates/crate/Cargo.toml.template");
 const CRATE_LIB: &str = include_str!("../templates/crate/src/lib.rs");
@@ -161,6 +164,15 @@ pub async fn init_workspace(root: &Path, opts: &InitOpts) -> Result<InitReport> 
     )?;
     if report.language == Language::Rust {
         scaffold_scripts(root, opts, &mut report)?;
+        // The runbook documents the release step the pack otherwise leaves to
+        // each adopter to re-invent; it ships with the preflight it names.
+        write_if_absent(
+            root,
+            "plans/RELEASING.md",
+            RELEASING_RUNBOOK,
+            opts.force,
+            &mut report,
+        )?;
         scaffold_crate(root, &mut report)?;
     }
     if report.language == Language::Web {
@@ -190,12 +202,57 @@ pub async fn run_baseline(root: &Path, report: &mut InitReport) -> Result<()> {
     Ok(())
 }
 
+/// Version pins the release preflight compares; also the generated sensor's
+/// applicability scope, so editing a pin re-runs it in a `--changed` run.
+const RELEASE_PIN_GLOBS: &[&str] = &["VERSION", "Cargo.toml", "**/Cargo.toml", "**/package.json"];
+
+/// The `release-preflight` sensor for the generated config.
+///
+/// It is generated here rather than shipped in `config::rust_pack()` because
+/// `init` writes the script it calls: the sensor only exists where that file
+/// does. It runs the preflight's offline half (version pins agree) so
+/// `feedback`/`verification` need no network; the release-time comparison
+/// against published releases stays in `plans/RELEASING.md`, because the
+/// committed version legitimately equals the last release between releases
+/// and a sensor failing on that would gate every ordinary run.
+fn release_preflight_spec() -> crate::config::SensorSpec {
+    crate::config::SensorSpec {
+        name: "release-preflight".to_owned(),
+        argv: vec![
+            "bash".to_owned(),
+            "scripts/check-release-preflight.sh".to_owned(),
+        ],
+        retry: None,
+        timeout: None,
+        severity: None,
+        allow_failure: false,
+        transient_exit_codes: Vec::new(),
+        when_changed: RELEASE_PIN_GLOBS
+            .iter()
+            .map(|glob| (*glob).to_owned())
+            .collect(),
+        artifacts: Vec::new(),
+        coverage_inputs: Vec::new(),
+    }
+}
+
 /// Renders the Rust `do-harness.toml` for the included sensors.
 ///
 /// Signal sets are derived from the pack: feedback is the fast subset,
-/// verification/release cover every included sensor. Hooks are filtered to
-/// included sensors too, so a missing tool cannot make a hook fail.
+/// verification/release cover every included sensor (`release-preflight`
+/// included — it is offline — while `coverage` stays out of verification).
+/// Hooks are filtered to included sensors too, so a missing tool cannot make a
+/// hook fail.
 fn generate_rust_config(sensors: &[crate::config::SensorSpec]) -> Result<String> {
+    let mut sensors = sensors.to_vec();
+    // Only where the pack proved a shell: the other script-backed sensors are
+    // omitted without one, and the preflight script is shell too.
+    if sensors
+        .iter()
+        .any(|spec| spec.argv.first().is_some_and(|arg| arg == "bash"))
+    {
+        sensors.push(release_preflight_spec());
+    }
     let names: Vec<&str> = sensors.iter().map(|spec| spec.name.as_str()).collect();
     let mut signal_sets: BTreeMap<String, Vec<String>> = BTreeMap::new();
     let feedback = ["fmt", "check", "clippy"]
@@ -224,7 +281,7 @@ fn generate_rust_config(sensors: &[crate::config::SensorSpec]) -> Result<String>
             pre_push: Vec::new(),
         },
         signal_sets,
-        sensors: sensors.to_vec(),
+        sensors,
         jobs: None,
     };
     let body = toml::to_string(&cfg).context("failed to render generated config")?;
@@ -274,6 +331,10 @@ fn scaffold_scripts(root: &Path, opts: &InitOpts, report: &mut InitReport) -> Re
         ("scripts/check-deps.sh", CHECK_DEPS),
         ("scripts/check-audit.sh", CHECK_AUDIT),
         ("scripts/check-coverage.sh", CHECK_COVERAGE),
+        (
+            "scripts/check-release-preflight.sh",
+            CHECK_RELEASE_PREFLIGHT,
+        ),
     ] {
         write_if_absent(root, relative, body, opts.force, report)?;
         crate::fs_perm::set_owner_exec(&root.join(relative))?;
