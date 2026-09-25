@@ -99,7 +99,8 @@ fn pr_positional_and_readiness_subcommand_parse() {
         panic!("expected Command::Pr");
     }
 
-    let pos_json = Cli::try_parse_from(["do-harness", "pr", "1041", "--format", "json"]).expect("positional pr json parses");
+    let pos_json = Cli::try_parse_from(["do-harness", "pr", "1041", "--format", "json"])
+        .expect("positional pr json parses");
     if let Command::Pr { pr, format, action } = pos_json.command {
         assert_eq!(pr, Some(1041));
         assert_eq!(format, Format::Json);
@@ -108,8 +109,13 @@ fn pr_positional_and_readiness_subcommand_parse() {
         panic!("expected Command::Pr");
     }
 
-    let sub = Cli::try_parse_from(["do-harness", "pr", "readiness", "1041"]).expect("readiness subcommand parses");
-    if let Command::Pr { action: Some(PrAction::Readiness { pr, format }), .. } = sub.command {
+    let sub = Cli::try_parse_from(["do-harness", "pr", "readiness", "1041"])
+        .expect("readiness subcommand parses");
+    if let Command::Pr {
+        action: Some(PrAction::Readiness { pr, format }),
+        ..
+    } = sub.command
+    {
         assert_eq!(pr, 1041);
         assert_eq!(format, Format::Text);
     } else {

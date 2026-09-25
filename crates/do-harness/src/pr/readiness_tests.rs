@@ -2,8 +2,8 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-use crate::pr::gh;
 use super::*;
+use crate::pr::gh;
 
 fn mock_view(number: u64, merge_state: &str) -> gh::PrViewExtended {
     gh::PrViewExtended {

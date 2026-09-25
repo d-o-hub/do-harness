@@ -91,17 +91,32 @@ pub fn run(
         (Some(PrAction::Readiness { pr, format }), _) => {
             readiness::run(root, *pr, *format).map_err(CliError::Verify)
         }
-        (Some(PrAction::NoEffect { pr, base, head, format }), _) => {
+        (
+            Some(PrAction::NoEffect {
+                pr,
+                base,
+                head,
+                format,
+            }),
+            _,
+        ) => {
             let target = target_from(*pr, base.clone(), head.clone())?;
             run_no_effect(root, target, *format).map_err(CliError::Verify)
         }
-        (Some(PrAction::Review { pr, base, head, recompute, format }), _) => {
+        (
+            Some(PrAction::Review {
+                pr,
+                base,
+                head,
+                recompute,
+                format,
+            }),
+            _,
+        ) => {
             let target = target_from(*pr, base.clone(), head.clone())?;
             run_review(root, &target, *recompute, *format).map_err(CliError::Verify)
         }
-        (None, Some(number)) => {
-            readiness::run(root, number, format).map_err(CliError::Verify)
-        }
+        (None, Some(number)) => readiness::run(root, number, format).map_err(CliError::Verify),
         (None, None) => Err(CliError::Usage(anyhow::anyhow!(
             "provide a PR number or a subcommand (readiness, no-effect, review)"
         ))),

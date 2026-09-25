@@ -10,6 +10,7 @@ pub mod gh;
 pub mod no_effect;
 pub mod proof;
 pub mod readiness;
+pub mod readiness_types;
 pub mod review;
 
 #[cfg(test)]

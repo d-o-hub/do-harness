@@ -38,7 +38,7 @@ pub struct PrViewExtended {
     pub head_ref_oid: String,
 }
 
-/// User login structure in GitHub REST responses.
+/// User login structure in `GitHub` REST responses.
 #[derive(Debug, Clone, Deserialize, Default)]
 pub struct UserLogin {
     #[serde(default)]
@@ -120,7 +120,7 @@ pub struct IssueCommentItem {
     pub html_url: Option<String>,
 }
 
-/// GraphQL review thread item.
+/// `GraphQL` review thread item.
 #[derive(Debug, Clone, Deserialize)]
 #[allow(dead_code)]
 pub struct GqlThreadItem {
@@ -140,11 +140,20 @@ pub struct GqlThreadItem {
 pub fn view(root: &Path, number: u64) -> Result<PrView> {
     let output = Command::new("gh")
         .current_dir(root)
-        .args(["pr", "view", &number.to_string(), "--json", "number,baseRefName,headRefOid"])
+        .args([
+            "pr",
+            "view",
+            &number.to_string(),
+            "--json",
+            "number,baseRefName,headRefOid",
+        ])
         .output()
         .context("failed to run gh (is the GitHub CLI installed?)")?;
     if !output.status.success() {
-        bail!("gh pr view {number} failed: {}", String::from_utf8_lossy(&output.stderr).trim());
+        bail!(
+            "gh pr view {number} failed: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        );
     }
     serde_json::from_slice(&output.stdout).context("unexpected gh pr view JSON")
 }
@@ -153,11 +162,20 @@ pub fn view(root: &Path, number: u64) -> Result<PrView> {
 pub fn view_extended(root: &Path, number: u64) -> Result<PrViewExtended> {
     let output = Command::new("gh")
         .current_dir(root)
-        .args(["pr", "view", &number.to_string(), "--json", "number,title,url,state,mergeable,mergeStateStatus,baseRefName,headRefOid"])
+        .args([
+            "pr",
+            "view",
+            &number.to_string(),
+            "--json",
+            "number,title,url,state,mergeable,mergeStateStatus,baseRefName,headRefOid",
+        ])
         .output()
         .context("failed to run gh")?;
     if !output.status.success() {
-        bail!("gh pr view {number} failed: {}", String::from_utf8_lossy(&output.stderr).trim());
+        bail!(
+            "gh pr view {number} failed: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        );
     }
     serde_json::from_slice(&output.stdout).context("unexpected gh pr view JSON")
 }
@@ -165,51 +183,93 @@ pub fn view_extended(root: &Path, number: u64) -> Result<PrViewExtended> {
 /// Fetches check runs for a head commit SHA via `gh api`.
 pub fn fetch_check_runs(root: &Path, head_sha: &str) -> Result<Vec<CheckRunItem>> {
     let endpoint = format!("repos/{{owner}}/{{repo}}/commits/{head_sha}/check-runs?per_page=100");
-    let output = Command::new("gh").current_dir(root).args(["api", &endpoint]).output().context("failed to run gh api check-runs")?;
-    if !output.status.success() { return Ok(Vec::new()); }
-    let resp: CheckRunsResponse = serde_json::from_slice(&output.stdout).unwrap_or(CheckRunsResponse { check_runs: Vec::new() });
+    let output = Command::new("gh")
+        .current_dir(root)
+        .args(["api", &endpoint])
+        .output()
+        .context("failed to run gh api check-runs")?;
+    if !output.status.success() {
+        return Ok(Vec::new());
+    }
+    let resp: CheckRunsResponse =
+        serde_json::from_slice(&output.stdout).unwrap_or(CheckRunsResponse {
+            check_runs: Vec::new(),
+        });
     Ok(resp.check_runs)
 }
 
 /// Fetches commit status context items for a head commit SHA via `gh api`.
 pub fn fetch_commit_statuses(root: &Path, head_sha: &str) -> Result<Vec<CommitStatusItem>> {
     let endpoint = format!("repos/{{owner}}/{{repo}}/commits/{head_sha}/status");
-    let output = Command::new("gh").current_dir(root).args(["api", &endpoint]).output().context("failed to run gh api status")?;
-    if !output.status.success() { return Ok(Vec::new()); }
-    let resp: CommitStatusResponse = serde_json::from_slice(&output.stdout).unwrap_or(CommitStatusResponse { statuses: Vec::new() });
+    let output = Command::new("gh")
+        .current_dir(root)
+        .args(["api", &endpoint])
+        .output()
+        .context("failed to run gh api status")?;
+    if !output.status.success() {
+        return Ok(Vec::new());
+    }
+    let resp: CommitStatusResponse =
+        serde_json::from_slice(&output.stdout).unwrap_or(CommitStatusResponse {
+            statuses: Vec::new(),
+        });
     Ok(resp.statuses)
 }
 
 /// Fetches PR review comments via `gh api`.
 pub fn fetch_review_comments(root: &Path, number: u64) -> Result<Vec<ReviewCommentItem>> {
     let endpoint = format!("repos/{{owner}}/{{repo}}/pulls/{number}/comments?per_page=100");
-    let output = Command::new("gh").current_dir(root).args(["api", &endpoint]).output().context("failed to run gh api pulls/comments")?;
-    if !output.status.success() { return Ok(Vec::new()); }
+    let output = Command::new("gh")
+        .current_dir(root)
+        .args(["api", &endpoint])
+        .output()
+        .context("failed to run gh api pulls/comments")?;
+    if !output.status.success() {
+        return Ok(Vec::new());
+    }
     Ok(serde_json::from_slice(&output.stdout).unwrap_or_default())
 }
 
 /// Fetches PR reviews via `gh api`.
 pub fn fetch_reviews(root: &Path, number: u64) -> Result<Vec<PrReviewItem>> {
     let endpoint = format!("repos/{{owner}}/{{repo}}/pulls/{number}/reviews?per_page=100");
-    let output = Command::new("gh").current_dir(root).args(["api", &endpoint]).output().context("failed to run gh api pulls/reviews")?;
-    if !output.status.success() { return Ok(Vec::new()); }
+    let output = Command::new("gh")
+        .current_dir(root)
+        .args(["api", &endpoint])
+        .output()
+        .context("failed to run gh api pulls/reviews")?;
+    if !output.status.success() {
+        return Ok(Vec::new());
+    }
     Ok(serde_json::from_slice(&output.stdout).unwrap_or_default())
 }
 
 /// Fetches PR issue comments via `gh api`.
 pub fn fetch_issue_comments(root: &Path, number: u64) -> Result<Vec<IssueCommentItem>> {
     let endpoint = format!("repos/{{owner}}/{{repo}}/issues/{number}/comments?per_page=100");
-    let output = Command::new("gh").current_dir(root).args(["api", &endpoint]).output().context("failed to run gh api issues/comments")?;
-    if !output.status.success() { return Ok(Vec::new()); }
+    let output = Command::new("gh")
+        .current_dir(root)
+        .args(["api", &endpoint])
+        .output()
+        .context("failed to run gh api issues/comments")?;
+    if !output.status.success() {
+        return Ok(Vec::new());
+    }
     Ok(serde_json::from_slice(&output.stdout).unwrap_or_default())
 }
 
 #[derive(Deserialize)]
-struct GqlAuthor { login: Option<String> }
+struct GqlAuthor {
+    login: Option<String>,
+}
 #[derive(Deserialize)]
-struct GqlNode { author: Option<GqlAuthor> }
+struct GqlNode {
+    author: Option<GqlAuthor>,
+}
 #[derive(Deserialize)]
-struct GqlComments { nodes: Vec<GqlNode> }
+struct GqlComments {
+    nodes: Vec<GqlNode>,
+}
 #[derive(Deserialize)]
 struct GqlThread {
     id: String,
@@ -220,19 +280,32 @@ struct GqlThread {
     comments: Option<GqlComments>,
 }
 #[derive(Deserialize)]
-struct GqlThreads { nodes: Vec<GqlThread> }
+struct GqlThreads {
+    nodes: Vec<GqlThread>,
+}
 #[derive(Deserialize)]
-struct GqlPR { #[serde(rename = "reviewThreads")] review_threads: GqlThreads }
+struct GqlPR {
+    #[serde(rename = "reviewThreads")]
+    review_threads: GqlThreads,
+}
 #[derive(Deserialize)]
-struct GqlRepo { #[serde(rename = "pullRequest")] pull_request: GqlPR }
+struct GqlRepo {
+    #[serde(rename = "pullRequest")]
+    pull_request: GqlPR,
+}
 #[derive(Deserialize)]
-struct GqlData { repository: GqlRepo }
+struct GqlData {
+    repository: GqlRepo,
+}
 #[derive(Deserialize)]
-struct GqlResp { data: GqlData }
+struct GqlResp {
+    data: GqlData,
+}
 
-/// Fetches PR review threads via GraphQL.
+/// Fetches PR review threads via `GraphQL`.
+#[allow(clippy::unnecessary_wraps)]
 pub fn fetch_review_threads(root: &Path, number: u64) -> Result<Vec<GqlThreadItem>> {
-    let query = r#"
+    let query = r"
 query Threads($owner: String!, $name: String!, $number: Int!) {
   repository(owner: $owner, name: $name) {
     pullRequest(number: $number) {
@@ -242,12 +315,18 @@ query Threads($owner: String!, $name: String!, $number: Int!) {
     }
   }
 }
-"#;
-    let owner_out = Command::new("gh").current_dir(root).args(["repo", "view", "--json", "owner,name"]).output();
+";
+    let owner_out = Command::new("gh")
+        .current_dir(root)
+        .args(["repo", "view", "--json", "owner,name"])
+        .output();
     let (owner, repo_name) = match owner_out {
         Ok(out) if out.status.success() => {
             #[derive(Deserialize)]
-            struct RepoInfo { owner: UserLogin, name: String }
+            struct RepoInfo {
+                owner: UserLogin,
+                name: String,
+            }
             match serde_json::from_slice::<RepoInfo>(&out.stdout) {
                 Ok(i) => (i.owner.login, i.name),
                 Err(_) => return Ok(Vec::new()),
@@ -256,11 +335,21 @@ query Threads($owner: String!, $name: String!, $number: Int!) {
         _ => return Ok(Vec::new()),
     };
 
-    let output = Command::new("gh").current_dir(root).args([
-        "api", "graphql", "-f", &format!("query={query}"),
-        "-f", &format!("owner={owner}"), "-f", &format!("name={repo_name}"),
-        "-F", &format!("number={number}"),
-    ]).output();
+    let output = Command::new("gh")
+        .current_dir(root)
+        .args([
+            "api",
+            "graphql",
+            "-f",
+            &format!("query={query}"),
+            "-f",
+            &format!("owner={owner}"),
+            "-f",
+            &format!("name={repo_name}"),
+            "-F",
+            &format!("number={number}"),
+        ])
+        .output();
 
     let output = match output {
         Ok(out) if out.status.success() => out,
@@ -274,8 +363,12 @@ query Threads($owner: String!, $name: String!, $number: Int!) {
 
     let mut threads = Vec::new();
     for node in resp.data.repository.pull_request.review_threads.nodes {
-        let author = node.comments.and_then(|c| c.nodes.into_iter().next())
-            .and_then(|c| c.author).and_then(|a| a.login).unwrap_or_else(|| "unknown".to_string());
+        let author = node
+            .comments
+            .and_then(|c| c.nodes.into_iter().next())
+            .and_then(|c| c.author)
+            .and_then(|a| a.login)
+            .unwrap_or_else(|| "unknown".to_string());
         threads.push(GqlThreadItem {
             id: node.id,
             is_resolved: node.is_resolved,
@@ -289,9 +382,16 @@ query Threads($owner: String!, $name: String!, $number: Int!) {
 
 /// Reads the unified diff of a PR through `gh pr diff`.
 pub fn diff(root: &Path, number: u64) -> Result<String> {
-    let output = Command::new("gh").current_dir(root).args(["pr", "diff", &number.to_string()]).output().context("failed to run gh (is the GitHub CLI installed?)")?;
+    let output = Command::new("gh")
+        .current_dir(root)
+        .args(["pr", "diff", &number.to_string()])
+        .output()
+        .context("failed to run gh (is the GitHub CLI installed?)")?;
     if !output.status.success() {
-        bail!("gh pr diff {number} failed: {}", String::from_utf8_lossy(&output.stderr).trim());
+        bail!(
+            "gh pr diff {number} failed: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        );
     }
     Ok(String::from_utf8_lossy(&output.stdout).into_owned())
 }
@@ -299,9 +399,19 @@ pub fn diff(root: &Path, number: u64) -> Result<String> {
 /// Counts changed files for `base...head` through the compare API.
 pub fn compare_file_count(root: &Path, base: &str, head: &str) -> Result<usize> {
     let endpoint = format!("repos/{{owner}}/{{repo}}/compare/{base}...{head}");
-    let output = Command::new("gh").current_dir(root).args(["api", &endpoint, "--jq", ".files | length"]).output().context("failed to run gh api")?;
+    let output = Command::new("gh")
+        .current_dir(root)
+        .args(["api", &endpoint, "--jq", ".files | length"])
+        .output()
+        .context("failed to run gh api")?;
     if !output.status.success() {
-        bail!("gh api compare {base}...{head} failed: {}", String::from_utf8_lossy(&output.stderr).trim());
+        bail!(
+            "gh api compare {base}...{head} failed: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        );
     }
-    String::from_utf8_lossy(&output.stdout).trim().parse::<usize>().context("unexpected compare API output")
+    String::from_utf8_lossy(&output.stdout)
+        .trim()
+        .parse::<usize>()
+        .context("unexpected compare API output")
 }
