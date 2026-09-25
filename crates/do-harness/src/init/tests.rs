@@ -6,6 +6,7 @@ use super::*;
 
 mod node;
 mod release;
+mod release_package_json;
 mod web;
 
 /// Default init options with an explicit language.

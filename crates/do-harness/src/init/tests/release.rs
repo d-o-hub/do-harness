@@ -16,7 +16,7 @@ fn write_preflight(root: &Path) -> PathBuf {
 }
 
 /// A fixture pinning `VERSION` and a workspace `Cargo.toml` at `version`.
-fn versioned_fixture(root: &Path, version: &str) -> PathBuf {
+pub(super) fn versioned_fixture(root: &Path, version: &str) -> PathBuf {
     let script = write_preflight(root);
     fs::write(root.join("VERSION"), format!("{version}\n")).unwrap();
     fs::write(
@@ -31,7 +31,12 @@ fn versioned_fixture(root: &Path, version: &str) -> PathBuf {
 ///
 /// `gh` is always injected — `Some(stub)` for the stubbed case, `None` for a
 /// path that does not exist — so no test can reach the network or a real `gh`.
-fn preflight(root: &Path, args: &[&str], gh: Option<&Path>, envs: &[(&str, &str)]) -> Output {
+pub(super) fn preflight(
+    root: &Path,
+    args: &[&str],
+    gh: Option<&Path>,
+    envs: &[(&str, &str)],
+) -> Output {
     let mut cmd = Command::new("bash");
     cmd.arg(root.join("scripts/check-release-preflight.sh"))
         .args(args)
@@ -58,7 +63,7 @@ fn stub_gh(root: &Path, body: &str) -> PathBuf {
 }
 
 /// Both streams, so assertions do not depend on which one carries a message.
-fn output_text(output: &Output) -> String {
+pub(super) fn output_text(output: &Output) -> String {
     format!(
         "{}{}",
         String::from_utf8_lossy(&output.stdout),
@@ -292,31 +297,14 @@ async fn init_rust_writes_release_runbook_and_preflight() {
     let runbook = fs::read_to_string(root.join("plans/RELEASING.md")).unwrap();
     assert!(runbook.contains("check-release-preflight.sh --release"));
 
-    // The scaffolded crate declares 0.1.0, so the shipped preflight must accept
-    // that version and reject a drifting pin — the failure a doomed dispatch
-    // is made of.
-    fs::write(root.join("VERSION"), "0.1.0\n").unwrap();
-    let agreed = preflight(root, &[], None, &[]);
-    assert!(agreed.status.success(), "{}", output_text(&agreed));
-    assert!(
-        output_text(&agreed).contains("version pin(s) agree at 0.1.0"),
-        "{}",
-        output_text(&agreed)
-    );
-
-    fs::write(root.join("VERSION"), "0.0.9\n").unwrap();
-    let drifted = preflight(root, &[], None, &[]);
-    assert_eq!(drifted.status.code(), Some(1), "{}", output_text(&drifted));
-    assert!(
-        output_text(&drifted).contains("but the target version is 0.0.9"),
-        "{}",
-        output_text(&drifted)
-    );
-
-    // A plain re-run leaves local copies alone, `--force` restores the shipped
-    // scaffold, and the restored script still works.
+    // A plain re-run leaves local copies alone; `--force` restores the shipped
+    // pair.
     fs::write(root.join("plans/RELEASING.md"), "# local runbook\n").unwrap();
-    fs::write(root.join("VERSION"), "0.1.0\n").unwrap();
+    fs::write(
+        root.join("scripts/check-release-preflight.sh"),
+        "#!/usr/bin/env bash\n# local preflight\n",
+    )
+    .unwrap();
 
     let again = init_workspace(root, &options).await.unwrap();
     assert!(again.skipped.contains(&"plans/RELEASING.md".to_owned()));
@@ -328,6 +316,11 @@ async fn init_rust_writes_release_runbook_and_preflight() {
     assert_eq!(
         fs::read_to_string(root.join("plans/RELEASING.md")).unwrap(),
         "# local runbook\n"
+    );
+    assert!(
+        fs::read_to_string(root.join("scripts/check-release-preflight.sh"))
+            .unwrap()
+            .contains("local preflight")
     );
 
     let forced = InitOpts {
@@ -341,16 +334,51 @@ async fn init_rust_writes_release_runbook_and_preflight() {
         restored.contains("check-release-preflight.sh --release"),
         "{restored}"
     );
-    let rerun = preflight(root, &[], None, &[]);
-    assert!(rerun.status.success(), "{}", output_text(&rerun));
     assert!(
-        output_text(&rerun).contains("version pin(s) agree at 0.1.0"),
-        "{}",
-        output_text(&rerun)
+        !fs::read_to_string(root.join("scripts/check-release-preflight.sh"))
+            .unwrap()
+            .contains("local preflight"),
+        "--force must restore the shipped preflight"
     );
+
+    // Executing it is Unix-only: on Windows a bare `bash` may resolve to the
+    // WSL stub, so the CLI's own shell resolution is what the dogfood test
+    // exercises there.
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
+
+        // The scaffolded crate declares 0.1.0, so the shipped preflight must
+        // accept that version and reject a drifting pin — the failure a doomed
+        // dispatch is made of.
+        fs::write(root.join("VERSION"), "0.1.0\n").unwrap();
+        let agreed = preflight(root, &[], None, &[]);
+        assert!(agreed.status.success(), "{}", output_text(&agreed));
+        assert!(
+            output_text(&agreed).contains("version pin(s) agree at 0.1.0"),
+            "{}",
+            output_text(&agreed)
+        );
+
+        fs::write(root.join("VERSION"), "0.0.9\n").unwrap();
+        let drifted = preflight(root, &[], None, &[]);
+        assert_eq!(drifted.status.code(), Some(1), "{}", output_text(&drifted));
+        assert!(
+            output_text(&drifted).contains("but the target version is 0.0.9"),
+            "{}",
+            output_text(&drifted)
+        );
+
+        // The restored script still runs.
+        fs::write(root.join("VERSION"), "0.1.0\n").unwrap();
+        let rerun = preflight(root, &[], None, &[]);
+        assert!(rerun.status.success(), "{}", output_text(&rerun));
+        assert!(
+            output_text(&rerun).contains("version pin(s) agree at 0.1.0"),
+            "{}",
+            output_text(&rerun)
+        );
+
         let mode = fs::metadata(root.join("scripts/check-release-preflight.sh"))
             .unwrap()
             .permissions()

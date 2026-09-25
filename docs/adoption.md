@@ -197,7 +197,9 @@ bash scripts/check-release-preflight.sh --release  # + target not already publis
 
 The preflight reads `VERSION`, `Cargo.toml` (`[workspace.package]` first, then
 `[package]`) and every tracked, non-private `package.json`; a mismatch names
-every pin that disagrees. `--release` lists the published releases through
+every pin that disagrees. A manifest's own top-level `version` is the pin: a
+`version` key inside a dependency, override, or `publishConfig` object is not
+one. `--release` lists the published releases through
 `gh` (repository from `GH_REPO` or the `origin` remote) and fails with
 `already has a GitHub Release` when the target already shipped — the failure
 mode behind doomed release dispatches. It prints `WARN` and exits 0 when `gh`

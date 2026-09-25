@@ -6,9 +6,9 @@
 # Two checks, both read-only. This script never tags, pushes, or publishes:
 #   1. every version pin agrees — `VERSION`, `Cargo.toml`
 #      (`[workspace.package]` first, then `[package]`), and every tracked
-#      `package.json` that declares a version and is not `"private": true`
-#      (`--no-package-json` drops the manifest pins when they are stamped at
-#      publish time instead);
+#      `package.json` that declares its own top-level version and is not
+#      `"private": true` (`--no-package-json` drops the manifest pins when
+#      they are stamped at publish time instead);
 #   2. with `--release`, the target version is not already published as a
 #      GitHub Release, and the latest release is printed for context.
 #
@@ -100,6 +100,52 @@ tracked_package_json() {
     fi
 }
 
+# Prints a JSON manifest's own top-level `version` string and `private`
+# literal, tab-separated. Only keys at brace depth 1 count: a dependency,
+# override, or `publishConfig` sub-object carries its own `version` key, and
+# treating that as a release pin would fail a correct repository.
+json_toplevel_fields() {
+    awk '
+        function flush() {
+            if (capture != "" && depth == 1) {
+                if (capture == "version") { out_version = buf } else { out_private = buf }
+            }
+            capture = ""
+            buf = ""
+        }
+        {
+            line = $0
+            for (i = 1; i <= length(line); i++) {
+                c = substr(line, i, 1)
+                if (in_str) {
+                    if (esc) { buf = buf c; esc = 0; continue }
+                    if (c == "\\") { esc = 1; continue }
+                    if (c == "\"") {
+                        in_str = 0
+                        if (is_key) {
+                            key = buf
+                            buf = ""
+                            if (depth == 1 && (key == "version" || key == "private")) { capture = key }
+                        } else {
+                            flush()
+                        }
+                        continue
+                    }
+                    buf = buf c
+                    continue
+                }
+                if (c == "\"") { in_str = 1; buf = ""; is_key = expect_key; expect_key = 0; continue }
+                if (c == "{" || c == "[") { flush(); depth++; if (depth == 1) { expect_key = 1 } continue }
+                if (c == "}" || c == "]") { flush(); depth--; continue }
+                if (c == ",") { flush(); if (depth == 1) { expect_key = 1 } continue }
+                if (c == ":") { continue }
+                if (capture != "") { buf = buf c }
+            }
+        }
+        END { printf "%s\t%s\n", out_version, out_private }
+    ' "$1"
+}
+
 if [[ -f VERSION ]]; then
     add_pin "VERSION" "$(head -n 1 VERSION | tr -d '[:space:]' | sed 's/^v//')"
 fi
@@ -112,14 +158,13 @@ fi
 if [[ "$package_json" -eq 1 ]]; then
     while IFS= read -r manifest; do
         [[ -n "$manifest" ]] || continue
+        IFS=$'\t' read -r manifest_version manifest_private < <(json_toplevel_fields "$manifest")
         # Private packages are free to carry a placeholder version (npm
         # workspaces commonly park them at 0.0.0), so they are not release pins.
-        if grep -q '"private"[[:space:]]*:[[:space:]]*true' "$manifest"; then
+        if [[ "$(printf '%s' "${manifest_private:-}" | tr -d '[:space:]')" == "true" ]]; then
             continue
         fi
-        # First `"version": "x"` anywhere in the manifest, so minified and
-        # pretty-printed package.json files parse the same way.
-        manifest_version="$(grep -o -E '"version"[[:space:]]*:[[:space:]]*"[^"]*"' "$manifest" | head -n 1 | sed -E 's/.*:[[:space:]]*"([^"]*)"/\1/' || true)"
+        manifest_version="$(printf '%s' "${manifest_version:-}" | tr -d '[:space:]')"
         if [[ -n "$manifest_version" ]]; then
             add_pin "$manifest" "$manifest_version"
         fi
