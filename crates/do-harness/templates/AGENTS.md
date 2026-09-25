@@ -49,8 +49,9 @@ checks failed. `missing` means no current evidence exists yet.
   `do-harness explain --set verification --changed` to see which sensors apply
   to the current change and why.
 - Noisy checks can ship with `severity = "warn"` and a `FINDINGS: <n>` output
-  marker; `do-harness verify --record --bless` pins the committed
-  `plans/baselines.json` ratchet, which only ever lowers.
+  marker; `do-harness verify --record --bless` initializes and then pins the
+  committed `plans/baselines.json` ratchet (absent until the first bless,
+  which means no ceiling), and only ever lowers it.
 
 ## Adoption notes
 
