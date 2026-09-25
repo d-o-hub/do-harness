@@ -733,6 +733,38 @@ validation, and status rules; `crates/do-harness/tests/skills_drift.rs` drives
 the real binary's exit codes, output determinism, and unmanaged-skill
 isolation.
 
+### `ci-explain`
+Explain a `GitHub` Actions workflow run: why did it fail or cancel, and what do
+I run locally to reproduce it? Read-only; works in any git repository without
+harness initialization (`gh` resolves the repository, honoring `GH_REPO`).
+
+```bash
+do-harness ci-explain 35885635041
+do-harness ci-explain https://github.com/d-o-hub/do-harness/actions/runs/36166912302 --format json
+```
+
+- `<RUN_ID|URL>`: A numeric workflow-run ID or the run's URL.
+- `--format <Format>`: Output format (`text` or `json`).
+
+`cancelled` is its own outcome, never folded into `failure`: a cancelled job
+carries `gh run rerun <run-id> --job <job-id>` plus the warning that
+cancellation is usually an external cause (superseded push, concurrency group,
+runner loss) rather than a code defect. Failed jobs carry the failing step, the
+newest compiler or test error line, and a local repro:
+`FAIL <sensor>` markers printed by `verify` in the failed step's log name the
+sensor directly (and its configured `argv` is the command); without a marker,
+the failed step names a configured sensor or a tool signature (`clippy`,
+`nextest`, a rustc `error[E....]`) and falls back to that sensor's canonical
+command. The failed-step log is streamed and reduced to bounded signals, so a
+tens-of-megabytes log costs nothing extra.
+
+Exit `0` when a report is produced (a failing run is still a successful
+explanation), and `2` for an unparseable run ID, a run that cannot be read, or a
+missing/unauthenticated `gh`.
+
+`crates/do-harness/tests/ci_explain.rs` covers the cancelled classification and
+rerun advice, compile-error mapping, `FAIL`-marker precedence, and URL parsing.
+
 ### `completions`
 Generate shell completions for `bash`, `zsh`, `fish`, `powershell`, `elvish`.
 

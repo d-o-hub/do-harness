@@ -402,6 +402,16 @@ pub enum Command {
         #[arg(long, value_name = "UNIX_SECONDS")]
         now: Option<i64>,
     },
+    /// Explain a CI run's failures and cancellations with local repro commands.
+    #[command(visible_alias = "ci")]
+    CiExplain {
+        /// Workflow run ID or the run's URL.
+        #[arg(value_name = "RUN_ID")]
+        run_id: String,
+        /// Output format.
+        #[arg(long, value_enum, default_value_t = Format::Text)]
+        format: Format,
+    },
     /// Generate shell completions.
     Completions {
         /// Target shell (bash, zsh, fish, powershell, elvish).

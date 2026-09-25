@@ -26,6 +26,7 @@
     "compliance": ["framework", "format"],
     "audit-chain": ["format"],
     "dora": ["days", "format", "record", "source", "now"],
+    "ci-explain": ["run_id", "format"],
     "completions": ["shell"],
     "man": ["dir"]
   }

@@ -192,6 +192,8 @@ export PATH="$HOME/.local/bin:$PATH"
 | `doctor` | Run diagnostic checks on binary resolution, git hook health, and state-database migration skew (fails when the database outruns the binary) |
 | `pr no-effect <PR\|--base REV --head REV>` | Report whether a PR or revision range introduces any effective change, from the merge-base tree delta (read-only; works in any git repo) |
 | `pr review <PR\|--base REV --head REV> [--recompute]` | Emit the semantic residual evidence could not prove, with skipped units and revocable `false_proven` claims (read-only) |
+| `pr ready <PR>` | Inspect end-to-end merge readiness: merge state, CI check buckets (cancelled kept distinct from failed, with rerun commands), unresolved review threads, and unanswered coverage gaps (`1` when a blocker exists) |
+| `ci-explain <RUN_ID\|URL> [--format text\|json]` | Explain a workflow run's jobs: failures map to the local sensor and its exact repro command, cancellations get `gh run rerun` advice (read-only) |
 | `skills suggest --query TEXT [--limit N] [--format text\|json]` | Rank skills by frontmatter metadata for progressive disclosure (offline; metadata only, never a skill body); `DO_HARNESS_SKILL_SELECTOR` optionally reorders the shortlist |
 | `skills drift [--manifest FILE] [--format text\|json]` | Check manifest-managed shared skills against their pinned commit and tree digest (offline, check-only; `2` when the manifest is absent or invalid, or a managed tree cannot be described) |
 | `version [--format text\|json]` | Print the running binary's name, version, commit, commit date, and dirty flag |

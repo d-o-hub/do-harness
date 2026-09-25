@@ -58,6 +58,8 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand compliance 'Print compliance mapping to OWASP Agentic Top 10, NIST AI RMF, and EU AI Act'
             cand audit-chain 'Recompute workflow event hash chain and report first divergence'
             cand dora 'Derive DORA deployment metrics from git history (deterministic, read-only)'
+            cand ci-explain 'Explain a CI run''s failures and cancellations with local repro commands'
+            cand ci 'Explain a CI run''s failures and cancellations with local repro commands'
             cand completions 'Generate shell completions'
             cand man 'Generate man page documentation'
             cand help 'Print this message or the help of the given subcommand(s)'
@@ -1108,6 +1110,38 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand -V 'Print version'
             cand --version 'Print version'
         }
+        &'do-harness;ci-explain'= {
+            cand --format 'Output format'
+            cand --root 'Workspace root override (default: walk up from cwd)'
+            cand --config 'Explicit path to do-harness.toml'
+            cand --color 'Color output (auto, always, never)'
+            cand --output 'Default output file path'
+            cand -v 'Verbosity level (-v, -vv)'
+            cand --verbose 'Verbosity level (-v, -vv)'
+            cand -q 'Suppress non-error messages'
+            cand --quiet 'Suppress non-error messages'
+            cand --dry-run 'Dry run without side effects'
+            cand -h 'Print help (see more with ''--help'')'
+            cand --help 'Print help (see more with ''--help'')'
+            cand -V 'Print version'
+            cand --version 'Print version'
+        }
+        &'do-harness;ci'= {
+            cand --format 'Output format'
+            cand --root 'Workspace root override (default: walk up from cwd)'
+            cand --config 'Explicit path to do-harness.toml'
+            cand --color 'Color output (auto, always, never)'
+            cand --output 'Default output file path'
+            cand -v 'Verbosity level (-v, -vv)'
+            cand --verbose 'Verbosity level (-v, -vv)'
+            cand -q 'Suppress non-error messages'
+            cand --quiet 'Suppress non-error messages'
+            cand --dry-run 'Dry run without side effects'
+            cand -h 'Print help (see more with ''--help'')'
+            cand --help 'Print help (see more with ''--help'')'
+            cand -V 'Print version'
+            cand --version 'Print version'
+        }
         &'do-harness;completions'= {
             cand --root 'Workspace root override (default: walk up from cwd)'
             cand --config 'Explicit path to do-harness.toml'
@@ -1164,6 +1198,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand compliance 'Print compliance mapping to OWASP Agentic Top 10, NIST AI RMF, and EU AI Act'
             cand audit-chain 'Recompute workflow event hash chain and report first divergence'
             cand dora 'Derive DORA deployment metrics from git history (deterministic, read-only)'
+            cand ci-explain 'Explain a CI run''s failures and cancellations with local repro commands'
             cand completions 'Generate shell completions'
             cand man 'Generate man page documentation'
             cand help 'Print this message or the help of the given subcommand(s)'
@@ -1286,6 +1321,8 @@ set edit:completion:arg-completer[do-harness] = {|@words|
         &'do-harness;help;audit-chain'= {
         }
         &'do-harness;help;dora'= {
+        }
+        &'do-harness;help;ci-explain'= {
         }
         &'do-harness;help;completions'= {
         }
