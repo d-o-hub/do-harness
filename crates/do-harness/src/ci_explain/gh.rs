@@ -115,12 +115,17 @@ pub fn fetch_run_metadata(root: &Path, run_id: u64) -> Result<RunMetadata> {
     serde_json::from_slice(&output).context("unexpected run metadata JSON")
 }
 
-/// Lists every job of `run_id` (single page; workflows stay under 100 jobs).
+/// Lists every job of `run_id`, one page of 100 at a time.
 pub fn fetch_jobs(root: &Path, run_id: u64) -> Result<Vec<JobItem>> {
     let endpoint = format!("repos/{{owner}}/{{repo}}/actions/runs/{run_id}/jobs?per_page=100");
-    let output = api(root, &endpoint).with_context(|| format!("gh api jobs {run_id} failed"))?;
-    let res: JobsResponse = serde_json::from_slice(&output).context("unexpected run jobs JSON")?;
-    Ok(res.jobs)
+    let output = api_with(root, &["api", "--paginate", "--slurp", &endpoint])
+        .with_context(|| format!("gh api jobs {run_id} failed"))?;
+    if let Ok(pages) = serde_json::from_slice::<Vec<JobsResponse>>(&output) {
+        return Ok(pages.into_iter().flat_map(|page| page.jobs).collect());
+    }
+    let single: JobsResponse =
+        serde_json::from_slice(&output).context("unexpected run jobs JSON")?;
+    Ok(single.jobs)
 }
 
 /// Fetches job annotations; unavailable annotations are not an error.
@@ -174,9 +179,14 @@ fn log_message(line: &str) -> &str {
 
 /// Runs `gh api <endpoint>` and returns stdout when it exits 0.
 fn api(root: &Path, endpoint: &str) -> Result<Vec<u8>> {
+    api_with(root, &["api", endpoint])
+}
+
+/// Runs `gh` with `args` and returns stdout when it exits 0.
+fn api_with(root: &Path, args: &[&str]) -> Result<Vec<u8>> {
     let output = Command::new("gh")
         .current_dir(root)
-        .args(["api", endpoint])
+        .args(args)
         .output()
         .context("failed to run gh (is the GitHub CLI installed?)")?;
     if !output.status.success() {

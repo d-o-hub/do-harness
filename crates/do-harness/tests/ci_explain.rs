@@ -54,7 +54,14 @@ fn fake_gh(root: &Path) -> PathBuf {
 MOCK_DIR="{}"
 case "$1" in
     api)
-        case "$2" in
+        # Endpoint selection ignores `--paginate`/`--slurp` flags.
+        endpoint=""
+        for arg in "$@"; do
+            case "$arg" in
+                repos/*) endpoint="$arg" ;;
+            esac
+        done
+        case "$endpoint" in
             */jobs*)
                 cat "$MOCK_DIR/jobs.json"
                 exit 0
@@ -331,6 +338,57 @@ fn harness_fail_marker_wins_over_job_name_heuristics() {
         failed["local_repro_command"],
         "cargo clippy --workspace --all-targets -- -D warnings"
     );
+    let _ = dir;
+}
+
+#[cfg(unix)]
+#[test]
+fn jobs_spanning_multiple_pages_are_merged_and_approvals_read_as_pending() {
+    let (dir, root) = fixture_root("");
+    let bin = fake_gh(&root);
+
+    std::fs::write(
+        root.join("run.json"),
+        r#"{"id": 150, "name": "Release", "status": "in_progress", "conclusion": null, "html_url": ""}"#,
+    )
+    .unwrap();
+    // `gh api --paginate --slurp` returns an array of pages, not one object.
+    std::fs::write(
+        root.join("jobs.json"),
+        r#"[
+            {"jobs": [
+                {"id": 1, "name": "build", "status": "completed", "conclusion": "success", "html_url": "", "steps": []}
+            ]},
+            {"jobs": [
+                {"id": 2, "name": "deploy", "status": "completed", "conclusion": "action_required", "html_url": "", "steps": []},
+                {"id": 3, "name": "e2e", "status": "completed", "conclusion": "timed_out", "html_url": "", "steps": [{"name": "Run e2e", "conclusion": "failure"}]}
+            ]}
+        ]"#,
+    )
+    .unwrap();
+    std::fs::write(
+        root.join("log-3.txt"),
+        "e2e\tRun e2e\t2026-09-25T17:40:00.0000000Z timeout after 30m\n",
+    )
+    .unwrap();
+
+    let (code, stdout, stderr) = run_ci(&root, &bin, &["ci-explain", "150", "--format", "json"]);
+    assert_eq!(code, Some(0), "stderr:\n{stderr}");
+    let json = report(&stdout);
+    assert_eq!(
+        json["jobs"].as_array().unwrap().len(),
+        3,
+        "both pages must merge"
+    );
+    assert_eq!(json["summary"]["total"], 3);
+    assert_eq!(json["summary"]["passed"], 1);
+    assert_eq!(json["summary"]["pending"], 1);
+    assert_eq!(json["summary"]["failed"], 1);
+    assert_eq!(json["jobs"][1]["classification"], "pending");
+
+    let (_, text, _) = run_ci(&root, &bin, &["ci-explain", "150"]);
+    assert!(text.contains("PENDING: deploy"), "{text}");
+    assert!(text.contains("FAILED (timed_out): e2e"), "{text}");
     let _ = dir;
 }
 

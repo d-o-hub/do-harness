@@ -75,11 +75,13 @@ pub struct CiSummary {
 ///
 /// # Errors
 ///
-/// Returns a usage error for an unparseable run ID and a verify error when the
-/// run cannot be read from `GitHub`.
+/// Returns a usage error (exit 2) for an unparseable run ID and for a run that
+/// cannot be read from `GitHub` - a failing run is still a successful
+/// explanation, and an unreadable one is an environment problem, not a sensor
+/// verdict.
 pub async fn run(root: &Path, raw_run_id: &str, format: Format) -> Result<(), CliError> {
     let run_id = parse_run_id(raw_run_id).map_err(CliError::Usage)?;
-    let report = explain(root, run_id).await.map_err(CliError::Verify)?;
+    let report = explain(root, run_id).await.map_err(CliError::Usage)?;
     match format {
         Format::Json => println!(
             "{}",
@@ -198,7 +200,9 @@ impl JobCounts {
     }
 }
 
-/// Buckets a job outcome, keeping `cancelled` distinct from `failure`.
+/// Buckets a job outcome, keeping `cancelled` distinct from `failure` and
+/// treating a pending deployment approval (`action_required`) as waiting rather
+/// than failing.
 fn classify(job: &gh::JobItem) -> JobClassification {
     if job.status != "completed" {
         return JobClassification::Pending;
@@ -206,6 +210,7 @@ fn classify(job: &gh::JobItem) -> JobClassification {
     match job.conclusion.as_deref() {
         Some("success") => JobClassification::Passed,
         Some("skipped" | "neutral") => JobClassification::Skipped,
+        Some("action_required") => JobClassification::Pending,
         Some("cancelled") => JobClassification::Cancelled,
         _ => JobClassification::Failed,
     }
@@ -281,7 +286,13 @@ fn print_text(report: &CiExplainReport) {
     for job in &report.jobs {
         match job.classification {
             JobClassification::Failed => {
-                println!("  FAILED: {}", job.name);
+                match job.conclusion.as_deref() {
+                    None | Some("failure") => println!("  FAILED: {}", job.name),
+                    // `timed_out`, `stale`, `startup_failure`: a human still has
+                    // to act, but the raw conclusion says which kind of problem
+                    // it is, so it is never hidden behind the word "failure".
+                    Some(conclusion) => println!("  FAILED ({conclusion}): {}", job.name),
+                }
                 if let Some(step) = &job.failed_step {
                     println!("    failed step: {step}");
                 }

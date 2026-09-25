@@ -749,14 +749,19 @@ do-harness ci-explain https://github.com/d-o-hub/do-harness/actions/runs/3616691
 `cancelled` is its own outcome, never folded into `failure`: a cancelled job
 carries `gh run rerun <run-id> --job <job-id>` plus the warning that
 cancellation is usually an external cause (superseded push, concurrency group,
-runner loss) rather than a code defect. Failed jobs carry the failing step, the
+runner loss) rather than a code defect. A job awaiting a deployment approval
+(`action_required`) reads as `pending`, and a non-`failure` conclusion
+(`timed_out`, `stale`, `startup_failure`) prints its raw conclusion as
+`FAILED (<conclusion>)` rather than hiding it behind the word "failure".
+Failed jobs carry the failing step, the
 newest compiler or test error line, and a local repro:
 `FAIL <sensor>` markers printed by `verify` in the failed step's log name the
 sensor directly (and its configured `argv` is the command); without a marker,
 the failed step names a configured sensor or a tool signature (`clippy`,
 `nextest`, a rustc `error[E....]`) and falls back to that sensor's canonical
-command. The failed-step log is streamed and reduced to bounded signals, so a
-tens-of-megabytes log costs nothing extra.
+command. Jobs are listed with `gh api --paginate --slurp`, so a matrix wider
+than 100 jobs is reported whole. The failed-step log is streamed and reduced to
+bounded signals, so a tens-of-megabytes log costs nothing extra.
 
 Exit `0` when a report is produced (a failing run is still a successful
 explanation), and `2` for an unparseable run ID, a run that cannot be read, or a
