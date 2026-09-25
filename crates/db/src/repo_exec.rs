@@ -11,6 +11,8 @@ use libsql::{Connection, params, params::Params};
 pub struct NewBeat<'a> {
     /// Owning task id, when the beat belongs to a task.
     pub task_id: Option<i64>,
+    /// Workstream scope: `task:<id>`, `branch:<name>`, or `global`.
+    pub scope: Option<&'a str>,
     /// Beat kind (e.g. `sensor`).
     pub beat_type: &'a str,
     /// Outcome label (e.g. `ok`, `failed`).
@@ -31,14 +33,26 @@ pub struct NewBeat<'a> {
 ///
 /// Returns an error when the insert statement fails.
 pub(crate) async fn insert_beat(conn: &Connection, beat: &NewBeat<'_>) -> Result<i64> {
+    let task_scope_buf;
+    let scope_str = match beat.scope {
+        Some(s) => s,
+        None => match beat.task_id {
+            Some(task_id) => {
+                task_scope_buf = format!("task:{task_id}");
+                &task_scope_buf
+            }
+            None => "global",
+        },
+    };
     let mut rows = conn
         .query(
-            "INSERT INTO beats (task_id, beat_type, status, sensor_exit_code, sensor_name, \
+            "INSERT INTO beats (task_id, scope, beat_type, status, sensor_exit_code, sensor_name, \
              started_at, completed_at) \
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7) \
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8) \
              RETURNING id",
             params!(
                 beat.task_id,
+                scope_str,
                 beat.beat_type,
                 beat.status,
                 beat.sensor_exit_code,
@@ -78,7 +92,7 @@ pub async fn list_beats_page(
     let mut rows = match task_id {
         Some(id) => {
             conn.query(
-                "SELECT id, task_id, beat_type, status, sensor_exit_code, sensor_name, \
+                "SELECT id, task_id, scope, beat_type, status, sensor_exit_code, sensor_name, \
                  started_at, completed_at FROM beats WHERE task_id = ?1 ORDER BY id \
                  LIMIT ?2 OFFSET ?3",
                 params!(id, limit, offset),
@@ -87,7 +101,7 @@ pub async fn list_beats_page(
         }
         None => {
             conn.query(
-                "SELECT id, task_id, beat_type, status, sensor_exit_code, sensor_name, \
+                "SELECT id, task_id, scope, beat_type, status, sensor_exit_code, sensor_name, \
                  started_at, completed_at FROM beats ORDER BY id LIMIT ?1 OFFSET ?2",
                 params!(limit, offset),
             )
@@ -99,12 +113,43 @@ pub async fn list_beats_page(
         beats.push(Beat {
             id: row.get(0)?,
             task_id: row.get(1)?,
-            beat_type: row.get(2)?,
-            status: row.get(3)?,
-            sensor_exit_code: row.get(4)?,
-            sensor_name: row.get(5)?,
-            started_at: row.get(6)?,
-            completed_at: row.get(7)?,
+            scope: row.get(2)?,
+            beat_type: row.get(3)?,
+            status: row.get(4)?,
+            sensor_exit_code: row.get(5)?,
+            sensor_name: row.get(6)?,
+            started_at: row.get(7)?,
+            completed_at: row.get(8)?,
+        });
+    }
+    Ok(beats)
+}
+
+/// Lists beats scoped to `scope` (e.g. `branch:main`, `task:1`, `global`).
+///
+/// # Errors
+///
+/// Returns an error when the query fails.
+pub async fn list_beats_by_scope(conn: &Connection, scope: &str) -> Result<Vec<Beat>> {
+    let mut rows = conn
+        .query(
+            "SELECT id, task_id, scope, beat_type, status, sensor_exit_code, sensor_name, \
+             started_at, completed_at FROM beats WHERE scope = ?1 ORDER BY id",
+            params!(scope),
+        )
+        .await?;
+    let mut beats = Vec::new();
+    while let Some(row) = rows.next().await? {
+        beats.push(Beat {
+            id: row.get(0)?,
+            task_id: row.get(1)?,
+            scope: row.get(2)?,
+            beat_type: row.get(3)?,
+            status: row.get(4)?,
+            sensor_exit_code: row.get(5)?,
+            sensor_name: row.get(6)?,
+            started_at: row.get(7)?,
+            completed_at: row.get(8)?,
         });
     }
     Ok(beats)

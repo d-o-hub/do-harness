@@ -86,9 +86,12 @@ pub enum Command {
         /// Persist beats and error signatures into the state database.
         #[arg(long)]
         record: bool,
-        /// Scope records and fail-fast strikes to this task id.
+        /// Scope records and fail-fast strikes to this task id (or 'global').
         #[arg(long, requires = "record", value_name = "ID")]
-        task: Option<i64>,
+        task: Option<String>,
+        /// Record unscoped beats in the global namespace.
+        #[arg(long, requires = "record", conflicts_with = "task")]
+        global: bool,
         /// Write a machine-readable evidence artifact to path.
         #[arg(long, value_hint = ValueHint::FilePath, value_name = "FILE")]
         evidence: Option<PathBuf>,
@@ -334,6 +337,19 @@ pub enum Command {
         /// Filter metrics since a Unix timestamp in seconds.
         #[arg(long, value_name = "UNIX_SECONDS")]
         since: Option<String>,
+        /// Filter by workstream scope (e.g. `branch:main`, `task:1`, `global`, or `all`).
+        /// Defaults to the current git branch.
+        #[arg(long, value_name = "SCOPE")]
+        scope: Option<String>,
+        /// Filter by task id (equivalent to `--scope task:<ID>`).
+        #[arg(long, value_name = "ID", conflicts_with = "scope")]
+        task: Option<i64>,
+        /// Filter by branch name (equivalent to `--scope branch:<NAME>`).
+        #[arg(long, value_name = "BRANCH", conflicts_with = "scope")]
+        branch: Option<String>,
+        /// Aggregate across all workstreams and scopes.
+        #[arg(long, conflicts_with_all = ["scope", "task", "branch"])]
+        all: bool,
     },
     /// Rank skill pairs by guidance overlap (Tier-2 distinctiveness advisory).
     Overlap {

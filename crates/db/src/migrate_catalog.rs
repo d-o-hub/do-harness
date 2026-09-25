@@ -102,4 +102,9 @@ pub const MIGRATIONS: &[Migration] = &[
         name: "dora_snapshots",
         sql: include_str!("../migrations/0018_dora_snapshots.sql"),
     },
+    Migration {
+        version: 19,
+        name: "beat_scope",
+        sql: include_str!("../migrations/0019_beat_scope.sql"),
+    },
 ];

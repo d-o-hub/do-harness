@@ -14,6 +14,9 @@ pub struct Beat {
     pub id: i64,
     /// Owning task id, when the beat belongs to a task.
     pub task_id: Option<i64>,
+    /// Workstream scope: `task:<id>`, `branch:<name>`, or `global`.
+    #[serde(default = "default_scope")]
+    pub scope: String,
     /// Beat kind (e.g. `sensor`, `step`).
     pub beat_type: String,
     /// Outcome label (e.g. `ok`, `failed`).
@@ -26,4 +29,8 @@ pub struct Beat {
     pub started_at: i64,
     /// Unix timestamp when the beat completed, when known.
     pub completed_at: Option<i64>,
+}
+
+fn default_scope() -> String {
+    "global".to_string()
 }

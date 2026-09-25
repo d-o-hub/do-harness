@@ -48,6 +48,8 @@ pub struct DimTrend {
 /// The full metrics snapshot.
 #[derive(Debug, Clone, Serialize)]
 pub struct MetricsSnapshot {
+    /// Workstream scope for this snapshot (e.g. `branch:main`, `task:1`, or `all`).
+    pub scope: String,
     /// Per-sensor beat statistics.
     pub sensors: Vec<do_harness_db::SensorStat>,
     /// Open error signatures (fail-fast strikes), worst first.
@@ -56,46 +58,75 @@ pub struct MetricsSnapshot {
     pub skills: Vec<SkillTrend>,
 }
 
-/// Collects and prints the harness metrics snapshot.
-///
-/// # Errors
-///
-/// Returns an error when `--since` is not a Unix timestamp, or the state
-/// database cannot be read.
-pub async fn run_metrics(
-    root: &Path,
-    format: Format,
-    sensor_filter: Option<&str>,
-    skill_filter: Option<&str>,
-    since_filter: Option<&str>,
-) -> Result<()> {
-    let since = match since_filter {
-        Some(raw) => Some(raw.parse::<i64>().map_err(|_| {
-            anyhow::anyhow!("invalid --since '{raw}': expected a Unix timestamp in seconds")
-        })?),
-        None => None,
-    };
-    let conn = do_harness_db::connect_and_migrate(root).await?;
-    let mut sensors = do_harness_db::sensor_stats(&conn, since).await?;
-    if let Some(s) = sensor_filter {
-        sensors.retain(|st| st.name == s);
-    }
+/// Query filters for `do-harness metrics`.
+#[derive(Debug, Default)]
+pub struct MetricsFilter<'a> {
+    pub sensor: Option<&'a str>,
+    pub skill: Option<&'a str>,
+    pub since: Option<&'a str>,
+    pub scope: Option<&'a str>,
+    pub task: Option<i64>,
+    pub branch: Option<&'a str>,
+    pub all: bool,
+}
 
-    let strikes = do_harness_db::list_error_signatures(&conn, None).await?;
+/// Resolves the workstream scope and optional task ID for metrics filtering.
+fn resolve_effective_scope(
+    root: &Path,
+    filter: &MetricsFilter<'_>,
+) -> (Option<String>, Option<i64>) {
+    if filter.all {
+        return (None, None);
+    }
+    if let Some(id) = filter.task {
+        return (Some(format!("task:{id}")), Some(id));
+    }
+    if let Some(branch) = filter.branch {
+        return (Some(format!("branch:{branch}")), None);
+    }
+    if let Some(raw) = filter.scope {
+        if raw == "all" {
+            return (None, None);
+        }
+        if let Some(rest) = raw.strip_prefix("task:") {
+            let id = rest.parse::<i64>().ok();
+            return (Some(raw.to_owned()), id);
+        }
+        if raw.starts_with("branch:") || raw == "global" {
+            return (Some(raw.to_owned()), None);
+        }
+        if let Ok(id) = raw.parse::<i64>() {
+            return (Some(format!("task:{id}")), Some(id));
+        }
+        return (Some(format!("branch:{raw}")), None);
+    }
+    if let Some(branch) = crate::changes::current_branch(root) {
+        (Some(format!("branch:{branch}")), None)
+    } else {
+        (None, None)
+    }
+}
+
+/// Collects per-skill evaluation trends and lift metrics.
+async fn collect_skill_trends(
+    conn: &do_harness_db::Connection,
+    since: Option<i64>,
+    skill_filter: Option<&str>,
+) -> Result<Vec<SkillTrend>> {
     let latest_by_skill: std::collections::HashMap<String, Option<f64>> =
-        do_harness_db::list_all_skill_evals(&conn)
+        do_harness_db::list_all_skill_evals(conn)
             .await?
             .into_iter()
             .map(|eval| (eval.skill_name, eval.pass_rate))
             .collect();
     let mut skills = Vec::new();
-    for summary in do_harness_db::skill_eval_summary(&conn, since).await? {
+    for summary in do_harness_db::skill_eval_summary(conn, since).await? {
         if let Some(sk) = skill_filter {
             if summary.skill_name != sk {
                 continue;
             }
         }
-        let latest_run = do_harness_db::latest_eval_run(&conn, &summary.skill_name).await?;
+        let latest_run = do_harness_db::latest_eval_run(conn, &summary.skill_name).await?;
         let (lift, mode, skill_words, walk_secs, dims) = match latest_run {
             Some(run) => {
                 let lift = match (run.pass_rate, run.without_pass_rate) {
@@ -105,7 +136,7 @@ pub async fn run_metrics(
                 // The baseline grades the same assertions, so the with-run
                 // denominator serves both rates.
                 let mut dims = Vec::new();
-                for rate in do_harness_db::dim_rates_for_run(&conn, run.id).await? {
+                for rate in do_harness_db::dim_rates_for_run(conn, run.id).await? {
                     dims.push(DimTrend {
                         rate: dim_rate(rate.passed, rate.graded),
                         without_rate: rate.without_passed.and_then(|passed| {
@@ -120,18 +151,15 @@ pub async fn run_metrics(
             }
             None => (None, None, None, None, Vec::new()),
         };
-        // Floors are mode-scoped: report the floors that govern the latest
-        // run's mode, so the numbers shown can actually fail the next run.
         let floors_mode = mode.unwrap_or_default();
         skills.push(SkillTrend {
             latest_pass_rate: latest_by_skill.get(&summary.skill_name).copied().flatten(),
-            bar_floor: do_harness_db::get_skill_bar(&conn, &summary.skill_name, floors_mode)
-                .await?,
+            bar_floor: do_harness_db::get_skill_bar(conn, &summary.skill_name, floors_mode).await?,
             name: summary.skill_name.clone(),
             best_pass_rate: summary.best_pass_rate,
             runs: summary.runs,
             lift,
-            lift_floor: do_harness_db::get_lift_floor(&conn, &summary.skill_name, floors_mode)
+            lift_floor: do_harness_db::get_lift_floor(conn, &summary.skill_name, floors_mode)
                 .await?,
             mode,
             skill_words,
@@ -140,8 +168,33 @@ pub async fn run_metrics(
         });
     }
     skills.sort_by(|a, b| a.name.cmp(&b.name));
+    Ok(skills)
+}
+
+/// Collects and prints the harness metrics snapshot.
+///
+/// # Errors
+///
+/// Returns an error when `--since` is not a Unix timestamp, or the state
+/// database cannot be read.
+pub async fn run_metrics(root: &Path, format: Format, filter: &MetricsFilter<'_>) -> Result<()> {
+    let since = match filter.since {
+        Some(raw) => Some(raw.parse::<i64>().map_err(|_| {
+            anyhow::anyhow!("invalid --since '{raw}': expected a Unix timestamp in seconds")
+        })?),
+        None => None,
+    };
+    let (effective_scope, strike_task_id) = resolve_effective_scope(root, filter);
+    let conn = do_harness_db::connect_and_migrate(root).await?;
+    let mut sensors = do_harness_db::sensor_stats(&conn, since, effective_scope.as_deref()).await?;
+    if let Some(s) = filter.sensor {
+        sensors.retain(|st| st.name == s);
+    }
+    let strikes = do_harness_db::list_error_signatures(&conn, strike_task_id).await?;
+    let skills = collect_skill_trends(&conn, since, filter.skill).await?;
 
     let snapshot = MetricsSnapshot {
+        scope: effective_scope.unwrap_or_else(|| "all".to_owned()),
         sensors,
         strikes,
         skills,
@@ -160,6 +213,7 @@ fn dim_rate(passed: i64, graded: i64) -> Option<f64> {
 }
 
 fn print_text(snapshot: &MetricsSnapshot) {
+    println!("scope: {}", snapshot.scope);
     println!("sensors:");
     if snapshot.sensors.is_empty() {
         println!("  (no recorded beats; run verify --record)");

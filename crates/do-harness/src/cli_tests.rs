@@ -26,7 +26,25 @@ fn verify_task_flag_requires_record() {
     let ok = Cli::try_parse_from(["do-harness", "verify", "--record", "--task", "42"])
         .expect("task with record must pass");
     if let Command::Verify { task, record, .. } = ok.command {
-        assert_eq!(task, Some(42));
+        assert_eq!(task.as_deref(), Some("42"));
+        assert!(record);
+    } else {
+        panic!("expected Command::Verify");
+    }
+
+    let global_opt = Cli::try_parse_from(["do-harness", "verify", "--record", "--global"])
+        .expect("--global with record must pass");
+    if let Command::Verify { global, record, .. } = global_opt.command {
+        assert!(global);
+        assert!(record);
+    } else {
+        panic!("expected Command::Verify");
+    }
+
+    let task_global = Cli::try_parse_from(["do-harness", "verify", "--record", "--task", "global"])
+        .expect("--task global with record must pass");
+    if let Command::Verify { task, record, .. } = task_global.command {
+        assert_eq!(task.as_deref(), Some("global"));
         assert!(record);
     } else {
         panic!("expected Command::Verify");

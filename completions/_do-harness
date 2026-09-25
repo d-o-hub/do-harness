@@ -64,7 +64,7 @@ json\:"Machine-readable JSON output"))' \
 '*--only=[Run only the named sensor (repeatable or comma-separated)]:SENSOR:_default' \
 '*--exclude=[Exclude named sensors from the run]:SENSOR:_default' \
 '--jobs=[Maximum sensors in flight (overrides \`jobs\` in do-harness.toml)]:N:_default' \
-'--task=[Scope records and fail-fast strikes to this task id]:ID:_default' \
+'--task=[Scope records and fail-fast strikes to this task id (or '\''global'\'')]:ID:_default' \
 '--evidence=[Write a machine-readable evidence artifact to path]:FILE:_files' \
 '--approver=[Approver identity recorded with \`--bless\` (defaults to \`DO_HARNESS_APPROVER\` or the git user email)]:NAME:_default' \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
@@ -74,6 +74,7 @@ json\:"Machine-readable JSON output"))' \
 '--fail-fast[Halt at the first failing sensor]' \
 '--changed[Run only sensors applicable to the working-tree change]' \
 '--record[Persist beats and error signatures into the state database]' \
+'(--task)--global[Record unscoped beats in the global namespace]' \
 '--strict[Enforce strong evidence\: exit non-zero on skips or missing timing/exit codes]' \
 '--bless[Lower or initialize blessed findings baselines from this run (requires --record; a bless never raises a baseline)]' \
 '*-v[Verbosity level (-v, -vv)]' \
@@ -95,7 +96,7 @@ json\:"Machine-readable JSON output"))' \
 '*--only=[Run only the named sensor (repeatable or comma-separated)]:SENSOR:_default' \
 '*--exclude=[Exclude named sensors from the run]:SENSOR:_default' \
 '--jobs=[Maximum sensors in flight (overrides \`jobs\` in do-harness.toml)]:N:_default' \
-'--task=[Scope records and fail-fast strikes to this task id]:ID:_default' \
+'--task=[Scope records and fail-fast strikes to this task id (or '\''global'\'')]:ID:_default' \
 '--evidence=[Write a machine-readable evidence artifact to path]:FILE:_files' \
 '--approver=[Approver identity recorded with \`--bless\` (defaults to \`DO_HARNESS_APPROVER\` or the git user email)]:NAME:_default' \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
@@ -105,6 +106,7 @@ json\:"Machine-readable JSON output"))' \
 '--fail-fast[Halt at the first failing sensor]' \
 '--changed[Run only sensors applicable to the working-tree change]' \
 '--record[Persist beats and error signatures into the state database]' \
+'(--task)--global[Record unscoped beats in the global namespace]' \
 '--strict[Enforce strong evidence\: exit non-zero on skips or missing timing/exit codes]' \
 '--bless[Lower or initialize blessed findings baselines from this run (requires --record; a bless never raises a baseline)]' \
 '*-v[Verbosity level (-v, -vv)]' \
@@ -1202,10 +1204,14 @@ json\:"Machine-readable JSON output"))' \
 '--sensor=[Filter by sensor name]:SENSOR:_default' \
 '--skill=[Filter by skill name]:SKILL:_default' \
 '--since=[Filter metrics since a Unix timestamp in seconds]:UNIX_SECONDS:_default' \
+'--scope=[Filter by workstream scope (e.g. \`branch\:main\`, \`task\:1\`, \`global\`, or \`all\`). Defaults to the current git branch]:SCOPE:_default' \
+'(--scope)--task=[Filter by task id (equivalent to \`--scope task\:<ID>\`)]:ID:_default' \
+'(--scope)--branch=[Filter by branch name (equivalent to \`--scope branch\:<NAME>\`)]:BRANCH:_default' \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
 '--config=[Explicit path to do-harness.toml]:FILE:_files' \
 '--color=[Color output (auto, always, never)]:WHEN:_default' \
 '--output=[Default output file path]:FILE:_files' \
+'(--scope --task --branch)--all[Aggregate across all workstreams and scopes]' \
 '*-v[Verbosity level (-v, -vv)]' \
 '*--verbose[Verbosity level (-v, -vv)]' \
 '-q[Suppress non-error messages]' \

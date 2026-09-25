@@ -51,6 +51,9 @@ checks failed. `missing` means no current evidence exists yet.
 - The `loc` sensor enforces the per-file ceiling over `*.rs`; widen it with
   `--root`/`--ext` in `do-harness.toml` (and the matching `when-changed` globs)
   to cover front-end sources with the same invariant.
+- Beats from `verify --record` scope to the current git branch by default, to
+  `--task <id>` when passed, or `--global`. `metrics` filters by that workstream
+  so branches do not mix.
 - Noisy checks can ship with `severity = "warn"` and a `FINDINGS: <n>` output
   marker; `do-harness verify --record --bless` initializes and then pins the
   committed `plans/baselines.json` ratchet (absent until the first bless,

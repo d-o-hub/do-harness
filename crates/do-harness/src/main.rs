@@ -198,11 +198,24 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
             jobs,
             record,
             task,
+            global,
             evidence,
             strict,
             bless,
             approver,
         } => {
+            let (task_id, raw_task) = match task.as_deref() {
+                Some("global") => (None, Some("global".to_string())),
+                Some(raw) => {
+                    let id = raw.parse::<i64>().map_err(|_| {
+                        CliError::Usage(anyhow::anyhow!(
+                            "invalid --task '{raw}': expected an integer task ID or 'global'"
+                        ))
+                    })?;
+                    (Some(id), Some(raw.to_string()))
+                }
+                None => (None, None),
+            };
             let opts = sensors::VerifyOpts {
                 fail_fast,
                 set,
@@ -211,7 +224,9 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
                 exclude,
                 jobs,
                 record,
-                task,
+                task: task_id,
+                raw_task,
+                global,
                 evidence,
                 strict,
                 bless,
@@ -383,15 +398,24 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
             sensor,
             skill,
             since,
-        } => metrics::run_metrics(
-            &root,
-            format,
-            sensor.as_deref(),
-            skill.as_deref(),
-            since.as_deref(),
-        )
-        .await
-        .map_err(CliError::Usage),
+            scope,
+            task,
+            branch,
+            all,
+        } => {
+            let filter = metrics::MetricsFilter {
+                sensor: sensor.as_deref(),
+                skill: skill.as_deref(),
+                since: since.as_deref(),
+                scope: scope.as_deref(),
+                task,
+                branch: branch.as_deref(),
+                all,
+            };
+            metrics::run_metrics(&root, format, &filter)
+                .await
+                .map_err(CliError::Usage)
+        }
         Command::Overlap { threshold, format } => {
             overlap::run_overlap(&root, threshold, format).map_err(CliError::Usage)
         }

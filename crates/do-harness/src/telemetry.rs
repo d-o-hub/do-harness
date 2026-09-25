@@ -40,8 +40,61 @@ pub async fn struck_sensors(
     }
     Ok(struck)
 }
+/// Workstream scope for persisted beats.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum BeatScope {
+    /// Explicit task ID (`task:<id>`).
+    Task(i64),
+    /// Branch name (`branch:<name>`).
+    Branch(String),
+    /// Unscoped / global beats.
+    Global,
+}
 
-/// Records each sensor result atomically, scoped to `task_id`: the beat and
+impl BeatScope {
+    /// Formatted scope string persisted in the `beats` table (e.g. `task:1`, `branch:main`, `global`).
+    #[must_use]
+    pub fn key(&self) -> String {
+        match self {
+            Self::Task(id) => format!("task:{id}"),
+            Self::Branch(name) => format!("branch:{name}"),
+            Self::Global => "global".to_owned(),
+        }
+    }
+
+    /// Task ID when scoped to a task.
+    #[must_use]
+    pub fn task_id(&self) -> Option<i64> {
+        match self {
+            Self::Task(id) => Some(*id),
+            Self::Branch(_) | Self::Global => None,
+        }
+    }
+
+    /// Resolves the effective beat scope.
+    #[must_use]
+    pub fn resolve(root: &Path, task: Option<&str>, global: bool) -> Self {
+        if global {
+            return Self::Global;
+        }
+        if let Some(t) = task {
+            if t == "global" {
+                return Self::Global;
+            }
+            if let Ok(id) = t.parse::<i64>() {
+                return Self::Task(id);
+            }
+            return Self::Branch(t.to_owned());
+        }
+        if let Some(branch) = crate::changes::current_branch(root) {
+            Self::Branch(branch)
+        } else {
+            Self::Global
+        }
+    }
+}
+
+/// Records each sensor result atomically, scoped to `scope`: the beat and
 /// its error-signature update (bump on failure, reset on pass) commit in one
 /// transaction, and any observed findings count is upserted. Skipped sensors
 /// (halted or quarantined) are omitted.
@@ -53,10 +106,12 @@ pub async fn record_verify(
     root: &Path,
     report: &VerifyReport,
     skipped: &[String],
-    task_id: Option<i64>,
+    scope: &BeatScope,
 ) -> Result<()> {
     let conn = do_harness_db::connect_and_migrate(root).await?;
     let now = do_harness_db::unix_now();
+    let scope_key = scope.key();
+    let task_id = scope.task_id();
     let messages: Vec<String> = report
         .sensors
         .iter()
@@ -70,6 +125,7 @@ pub async fn record_verify(
         .map(|(sensor, message)| do_harness_db::SensorOutcome {
             beat: do_harness_db::NewBeat {
                 task_id,
+                scope: Some(&scope_key),
                 beat_type: "sensor",
                 status: if sensor.ok {
                     "ok"

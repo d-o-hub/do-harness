@@ -25,6 +25,7 @@ async fn insert_beat_roundtrips_and_filters_by_task() {
         &conn,
         &NewBeat {
             task_id: Some(task_id),
+            scope: None,
             beat_type: "sensor",
             status: "failed",
             sensor_exit_code: Some(1),
@@ -40,6 +41,7 @@ async fn insert_beat_roundtrips_and_filters_by_task() {
     assert_eq!(beats.len(), 1);
     assert_eq!(beats[0].beat_type, "sensor");
     assert_eq!(beats[0].status, "failed");
+    assert_eq!(beats[0].scope, format!("task:{task_id}"));
     assert_eq!(beats[0].sensor_exit_code, Some(1));
     assert_eq!(beats[0].started_at, 1);
     assert_eq!(list_beats(&conn, None).await.unwrap().len(), 1);
@@ -63,6 +65,7 @@ async fn insert_beat_rejects_missing_task_fk() {
         &conn,
         &NewBeat {
             task_id: Some(9999),
+            scope: None,
             beat_type: "sensor",
             status: "ok",
             sensor_exit_code: Some(0),
@@ -105,6 +108,7 @@ async fn record_sensor_outcome_is_atomic_beat_plus_strike() {
 
     let beat = |status: &'static str| NewBeat {
         task_id: None,
+        scope: None,
         beat_type: "sensor",
         status,
         sensor_exit_code: Some(0),
@@ -185,6 +189,7 @@ async fn record_verify_batch_rolls_back_everything_on_failure() {
         SensorOutcome {
             beat: NewBeat {
                 task_id: None,
+                scope: None,
                 beat_type: "sensor",
                 status: "ok",
                 sensor_exit_code: Some(0),
@@ -199,6 +204,7 @@ async fn record_verify_batch_rolls_back_everything_on_failure() {
             // FK violation: task 9999 does not exist.
             beat: NewBeat {
                 task_id: Some(9999),
+                scope: None,
                 beat_type: "sensor",
                 status: "failed",
                 sensor_exit_code: Some(1),
@@ -239,6 +245,7 @@ async fn prune_beats_keeps_newest_per_task() {
             &conn,
             &NewBeat {
                 task_id: None,
+                scope: None,
                 beat_type: "sensor",
                 status: "ok",
                 sensor_exit_code: Some(0),
@@ -257,4 +264,82 @@ async fn prune_beats_keeps_newest_per_task() {
     assert_eq!(remaining.len(), 2);
     assert_eq!(remaining[0].id, 4);
     assert_eq!(remaining[1].id, 5);
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn beats_scope_isolates_workstreams_and_filters_stats() {
+    let dir = tempfile::tempdir().unwrap();
+    let conn = crate::migrate::connect_and_migrate(dir.path())
+        .await
+        .unwrap();
+
+    // Beat on branch:main
+    insert_beat(
+        &conn,
+        &NewBeat {
+            task_id: None,
+            scope: Some("branch:main"),
+            beat_type: "sensor",
+            status: "ok",
+            sensor_exit_code: Some(0),
+            sensor_name: Some("fmt"),
+            started_at: 10,
+            completed_at: Some(11),
+        },
+    )
+    .await
+    .unwrap();
+
+    // Beat on branch:feat
+    insert_beat(
+        &conn,
+        &NewBeat {
+            task_id: None,
+            scope: Some("branch:feat"),
+            beat_type: "sensor",
+            status: "failed",
+            sensor_exit_code: Some(1),
+            sensor_name: Some("fmt"),
+            started_at: 20,
+            completed_at: Some(21),
+        },
+    )
+    .await
+    .unwrap();
+
+    let main_beats = crate::repo_exec::list_beats_by_scope(&conn, "branch:main")
+        .await
+        .unwrap();
+    assert_eq!(main_beats.len(), 1);
+    assert_eq!(main_beats[0].scope, "branch:main");
+
+    let feat_beats = crate::repo_exec::list_beats_by_scope(&conn, "branch:feat")
+        .await
+        .unwrap();
+    assert_eq!(feat_beats.len(), 1);
+    assert_eq!(feat_beats[0].scope, "branch:feat");
+
+    // Unfiltered sensor stats sums both runs:
+    let all_stats = crate::repo_metrics::sensor_stats(&conn, None, None)
+        .await
+        .unwrap();
+    assert_eq!(all_stats.len(), 1);
+    assert_eq!(all_stats[0].runs, 2);
+    assert_eq!(all_stats[0].failures, 1);
+
+    // Filtered by branch:main:
+    let main_stats = crate::repo_metrics::sensor_stats(&conn, None, Some("branch:main"))
+        .await
+        .unwrap();
+    assert_eq!(main_stats.len(), 1);
+    assert_eq!(main_stats[0].runs, 1);
+    assert_eq!(main_stats[0].failures, 0);
+
+    // Filtered by branch:feat:
+    let feat_stats = crate::repo_metrics::sensor_stats(&conn, None, Some("branch:feat"))
+        .await
+        .unwrap();
+    assert_eq!(feat_stats.len(), 1);
+    assert_eq!(feat_stats[0].runs, 1);
+    assert_eq!(feat_stats[0].failures, 1);
 }

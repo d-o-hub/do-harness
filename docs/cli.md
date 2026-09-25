@@ -54,9 +54,13 @@ Runs computational sensors defined in `do-harness.toml`.
   in-flight siblings and never starts a later chunk. A `jobs = 0` config is
   rejected at load.
 - `--record`: Persist beats and error signatures into `.do-harness/agent_state.db`.
-- `--task <ID>`: Scope recorded beats to task ID. Requires `--record`. An
-  unscoped `--record` prints a global-namespace advisory; managed git hooks
-  export `DO_HARNESS_HOOK=1` (a hook has no task context) and skip it.
+  Beats are scoped to the current git branch by default (`branch:<name>`).
+- `--task <ID>`: Scope recorded beats to this task ID (`task:<id>`), or pass
+  `global` to record in the global namespace. Requires `--record`.
+- `--global`: Explicitly record unscoped beats into the global namespace.
+  Requires `--record`. Falling back to the global namespace without an explicit
+  flag (e.g. on detached HEAD or outside git) prints an advisory; managed git
+  hooks export `DO_HARNESS_HOOK=1` and skip it.
 - `--evidence <FILE>`: Write machine-readable evidence artifact JSON.
 - `--strict`: Exit non-zero if any sensors were skipped or evidence checks fail. Default evidence artifact path: `.do-harness/evidence.json`.
 - `--bless`: Lower or initialize blessed findings baselines from this run
@@ -413,12 +417,18 @@ Git hook management (`pre-commit`, `pre-push`, `commit-msg`).
 - `hook diff`: Show diff between installed hooks and templates.
 
 ### `metrics`
-Longitudinal trends: sensor stats, strikes, and skill pass rates.
+Longitudinal trends: sensor stats, strikes, and skill pass rates. By default,
+sensor statistics are scoped to the current git branch so unrelated workstreams
+do not mix; pass `--all` to aggregate across all workstreams.
 
 - `--format <Format>`: Output format (`text` or `json`).
 - `--sensor <SENSOR>`: Filter by sensor name.
 - `--skill <SKILL>`: Filter by skill name.
 - `--since <UNIX_SECONDS>`: Filter metrics since a Unix timestamp in seconds.
+- `--scope <SCOPE>`: Filter by workstream scope (e.g. `branch:main`, `task:1`, `global`, or `all`).
+- `--task <ID>`: Filter by task ID (equivalent to `--scope task:<ID>`).
+- `--branch <NAME>`: Filter by branch name (equivalent to `--scope branch:<NAME>`).
+- `--all`: Aggregate metrics across all workstreams and scopes.
 
 ### `loc`
 Report line-of-code state against the 500-line invariant: one line per file with

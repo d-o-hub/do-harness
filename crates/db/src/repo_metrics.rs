@@ -16,20 +16,25 @@ pub struct SensorStat {
 }
 
 /// Aggregates sensor-beat statistics per sensor name, optionally ignoring
-/// beats older than `since` (Unix seconds; [`None`] means all history).
+/// beats older than `since` or outside `scope`.
 ///
 /// # Errors
 ///
 /// Returns an error when the query fails.
-pub async fn sensor_stats(conn: &Connection, since: Option<i64>) -> Result<Vec<SensorStat>> {
+pub async fn sensor_stats(
+    conn: &Connection,
+    since: Option<i64>,
+    scope: Option<&str>,
+) -> Result<Vec<SensorStat>> {
     let mut rows = conn
         .query(
             "SELECT sensor_name, COUNT(*), \
              SUM(CASE WHEN status != 'ok' THEN 1 ELSE 0 END) \
              FROM beats WHERE beat_type = 'sensor' AND sensor_name IS NOT NULL \
              AND (?1 IS NULL OR started_at >= ?1) \
+             AND (?2 IS NULL OR scope = ?2) \
              GROUP BY sensor_name ORDER BY sensor_name",
-            libsql::params!(since),
+            libsql::params!(since, scope),
         )
         .await?;
     let mut stats = Vec::new();

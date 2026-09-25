@@ -2682,7 +2682,7 @@ _do__harness() {
             return 0
             ;;
         do__subcmd__harness__subcmd__metrics)
-            opts="-v -q -h -V --format --sensor --skill --since --root --config --verbose --quiet --color --output --dry-run --help --version"
+            opts="-v -q -h -V --format --sensor --skill --since --scope --task --branch --all --root --config --verbose --quiet --color --output --dry-run --help --version"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -2701,6 +2701,18 @@ _do__harness() {
                     return 0
                     ;;
                 --since)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --scope)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --task)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --branch)
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;
@@ -4597,7 +4609,7 @@ _do__harness() {
             return 0
             ;;
         do__subcmd__harness__subcmd__verify)
-            opts="-v -q -h -V --fail-fast --format --set --changed --only --exclude --jobs --record --task --evidence --strict --bless --approver --root --config --verbose --quiet --color --output --dry-run --help --version"
+            opts="-v -q -h -V --fail-fast --format --set --changed --only --exclude --jobs --record --task --global --evidence --strict --bless --approver --root --config --verbose --quiet --color --output --dry-run --help --version"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
