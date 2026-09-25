@@ -12,6 +12,7 @@ use crate::report::Format;
 use super::diff::Change;
 use super::gh;
 use super::no_effect::{self, Effect};
+use super::readiness;
 use super::review::{self, Reduction, ReviewReport};
 
 /// What to analyze.
@@ -74,34 +75,36 @@ pub fn resolve_root(explicit: Option<&Path>) -> Result<PathBuf> {
     Ok(PathBuf::from(path))
 }
 
-/// Dispatches a `pr` action.
+/// Dispatches a `pr` command action or positional PR merge-readiness check.
 ///
 /// # Errors
 ///
 /// Returns [`CliError::Usage`] for invalid argument combinations and
-/// [`CliError::Verify`] when the verdict cannot be determined; an analysis
-/// error is never reported as "no effect".
-pub fn run(root: &Path, action: PrAction) -> Result<(), CliError> {
-    match action {
-        PrAction::NoEffect {
-            pr,
-            base,
-            head,
-            format,
-        } => {
-            let target = target_from(pr, base, head)?;
-            run_no_effect(root, target, format).map_err(CliError::Verify)
+/// [`CliError::Verify`] when the merge readiness / PR verdict cannot be determined.
+pub fn run(
+    root: &Path,
+    pr_num: Option<u64>,
+    format: Format,
+    action: Option<&PrAction>,
+) -> Result<(), CliError> {
+    match (action, pr_num) {
+        (Some(PrAction::Readiness { pr, format }), _) => {
+            readiness::run(root, *pr, *format).map_err(CliError::Verify)
         }
-        PrAction::Review {
-            pr,
-            base,
-            head,
-            recompute,
-            format,
-        } => {
-            let target = target_from(pr, base, head)?;
-            run_review(root, &target, recompute, format).map_err(CliError::Verify)
+        (Some(PrAction::NoEffect { pr, base, head, format }), _) => {
+            let target = target_from(*pr, base.clone(), head.clone())?;
+            run_no_effect(root, target, *format).map_err(CliError::Verify)
         }
+        (Some(PrAction::Review { pr, base, head, recompute, format }), _) => {
+            let target = target_from(*pr, base.clone(), head.clone())?;
+            run_review(root, &target, *recompute, *format).map_err(CliError::Verify)
+        }
+        (None, Some(number)) => {
+            readiness::run(root, number, format).map_err(CliError::Verify)
+        }
+        (None, None) => Err(CliError::Usage(anyhow::anyhow!(
+            "provide a PR number or a subcommand (readiness, no-effect, review)"
+        ))),
     }
 }
 

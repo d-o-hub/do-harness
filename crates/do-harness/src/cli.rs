@@ -143,8 +143,16 @@ pub enum Command {
     },
     /// Deterministic PR analysis (read-only; works in any git repository).
     Pr {
+        /// Pull request number for merge-readiness check.
+        #[arg(value_name = "PR")]
+        pr: Option<u64>,
+
+        /// Output format.
+        #[arg(long, value_enum, default_value_t = Format::Text)]
+        format: Format,
+
         #[command(subcommand)]
-        action: PrAction,
+        action: Option<PrAction>,
     },
     /// Inspect and select skills by progressive disclosure.
     Skills {

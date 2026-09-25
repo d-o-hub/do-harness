@@ -172,18 +172,32 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand status" -s q -l qu
 complete -c do-harness -n "__fish_do_harness_using_subcommand status" -l dry-run -d 'Dry run without side effects'
 complete -c do-harness -n "__fish_do_harness_using_subcommand status" -s h -l help -d 'Print help (see more with \'--help\')'
 complete -c do-harness -n "__fish_do_harness_using_subcommand status" -s V -l version -d 'Print version'
-complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and not __fish_seen_subcommand_from no-effect review help" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
-complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and not __fish_seen_subcommand_from no-effect review help" -l config -d 'Explicit path to do-harness.toml' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and not __fish_seen_subcommand_from no-effect review help" -l color -d 'Color output (auto, always, never)' -r
-complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and not __fish_seen_subcommand_from no-effect review help" -l output -d 'Default output file path' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and not __fish_seen_subcommand_from no-effect review help" -s v -l verbose -d 'Verbosity level (-v, -vv)'
-complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and not __fish_seen_subcommand_from no-effect review help" -s q -l quiet -d 'Suppress non-error messages'
-complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and not __fish_seen_subcommand_from no-effect review help" -l dry-run -d 'Dry run without side effects'
-complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and not __fish_seen_subcommand_from no-effect review help" -s h -l help -d 'Print help'
-complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and not __fish_seen_subcommand_from no-effect review help" -s V -l version -d 'Print version'
-complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and not __fish_seen_subcommand_from no-effect review help" -f -a "no-effect" -d 'Report whether a PR or revision range introduces any effective change'
-complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and not __fish_seen_subcommand_from no-effect review help" -f -a "review" -d 'Emit the semantic residual: changed units evidence could not prove'
-complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and not __fish_seen_subcommand_from no-effect review help" -f -a "help" -d 'Print this message or the help of the given subcommand(s)'
+complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and not __fish_seen_subcommand_from readiness no-effect review help" -l format -d 'Output format' -r -f -a "text\t'Human-readable text output'
+json\t'Machine-readable JSON output'"
+complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and not __fish_seen_subcommand_from readiness no-effect review help" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
+complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and not __fish_seen_subcommand_from readiness no-effect review help" -l config -d 'Explicit path to do-harness.toml' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and not __fish_seen_subcommand_from readiness no-effect review help" -l color -d 'Color output (auto, always, never)' -r
+complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and not __fish_seen_subcommand_from readiness no-effect review help" -l output -d 'Default output file path' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and not __fish_seen_subcommand_from readiness no-effect review help" -s v -l verbose -d 'Verbosity level (-v, -vv)'
+complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and not __fish_seen_subcommand_from readiness no-effect review help" -s q -l quiet -d 'Suppress non-error messages'
+complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and not __fish_seen_subcommand_from readiness no-effect review help" -l dry-run -d 'Dry run without side effects'
+complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and not __fish_seen_subcommand_from readiness no-effect review help" -s h -l help -d 'Print help (see more with \'--help\')'
+complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and not __fish_seen_subcommand_from readiness no-effect review help" -s V -l version -d 'Print version'
+complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and not __fish_seen_subcommand_from readiness no-effect review help" -a "readiness" -d 'Check merge readiness for a pull request'
+complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and not __fish_seen_subcommand_from readiness no-effect review help" -a "no-effect" -d 'Report whether a PR or revision range introduces any effective change'
+complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and not __fish_seen_subcommand_from readiness no-effect review help" -a "review" -d 'Emit the semantic residual: changed units evidence could not prove'
+complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and not __fish_seen_subcommand_from readiness no-effect review help" -a "help" -d 'Print this message or the help of the given subcommand(s)'
+complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from readiness" -l format -d 'Output format' -r -f -a "text\t'Human-readable text output'
+json\t'Machine-readable JSON output'"
+complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from readiness" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
+complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from readiness" -l config -d 'Explicit path to do-harness.toml' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from readiness" -l color -d 'Color output (auto, always, never)' -r
+complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from readiness" -l output -d 'Default output file path' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from readiness" -s v -l verbose -d 'Verbosity level (-v, -vv)'
+complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from readiness" -s q -l quiet -d 'Suppress non-error messages'
+complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from readiness" -l dry-run -d 'Dry run without side effects'
+complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from readiness" -s h -l help -d 'Print help (see more with \'--help\')'
+complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from readiness" -s V -l version -d 'Print version'
 complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from no-effect" -l base -d 'Base revision (local mode; requires --head)' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from no-effect" -l head -d 'Head revision (local mode; requires --base)' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from no-effect" -l format -d 'Output format' -r -f -a "text\t'Human-readable text output'
@@ -211,6 +225,7 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_see
 complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from review" -l dry-run -d 'Dry run without side effects'
 complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from review" -s h -l help -d 'Print help (see more with \'--help\')'
 complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from review" -s V -l version -d 'Print version'
+complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from help" -f -a "readiness" -d 'Check merge readiness for a pull request'
 complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from help" -f -a "no-effect" -d 'Report whether a PR or revision range introduces any effective change'
 complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from help" -f -a "review" -d 'Emit the semantic residual: changed units evidence could not prove'
 complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from help" -f -a "help" -d 'Print this message or the help of the given subcommand(s)'
@@ -769,6 +784,7 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand help; and not __fi
 complete -c do-harness -n "__fish_do_harness_using_subcommand help; and not __fish_seen_subcommand_from version verify list explain status pr skills init-db seed init task trace distill errors loc split eval hook doctor metrics overlap maintenance compliance audit-chain dora completions man help" -f -a "completions" -d 'Generate shell completions'
 complete -c do-harness -n "__fish_do_harness_using_subcommand help; and not __fish_seen_subcommand_from version verify list explain status pr skills init-db seed init task trace distill errors loc split eval hook doctor metrics overlap maintenance compliance audit-chain dora completions man help" -f -a "man" -d 'Generate man page documentation'
 complete -c do-harness -n "__fish_do_harness_using_subcommand help; and not __fish_seen_subcommand_from version verify list explain status pr skills init-db seed init task trace distill errors loc split eval hook doctor metrics overlap maintenance compliance audit-chain dora completions man help" -f -a "help" -d 'Print this message or the help of the given subcommand(s)'
+complete -c do-harness -n "__fish_do_harness_using_subcommand help; and __fish_seen_subcommand_from pr" -f -a "readiness" -d 'Check merge readiness for a pull request'
 complete -c do-harness -n "__fish_do_harness_using_subcommand help; and __fish_seen_subcommand_from pr" -f -a "no-effect" -d 'Report whether a PR or revision range introduces any effective change'
 complete -c do-harness -n "__fish_do_harness_using_subcommand help; and __fish_seen_subcommand_from pr" -f -a "review" -d 'Emit the semantic residual: changed units evidence could not prove'
 complete -c do-harness -n "__fish_do_harness_using_subcommand help; and __fish_seen_subcommand_from skills" -f -a "suggest" -d 'Rank skills by relevance to a query using metadata only'

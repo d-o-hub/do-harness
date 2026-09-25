@@ -89,6 +89,35 @@ fn completions_and_man_subcommands_parse() {
 }
 
 #[test]
+fn pr_positional_and_readiness_subcommand_parse() {
+    let pos = Cli::try_parse_from(["do-harness", "pr", "1041"]).expect("positional pr parses");
+    if let Command::Pr { pr, format, action } = pos.command {
+        assert_eq!(pr, Some(1041));
+        assert_eq!(format, Format::Text);
+        assert!(action.is_none());
+    } else {
+        panic!("expected Command::Pr");
+    }
+
+    let pos_json = Cli::try_parse_from(["do-harness", "pr", "1041", "--format", "json"]).expect("positional pr json parses");
+    if let Command::Pr { pr, format, action } = pos_json.command {
+        assert_eq!(pr, Some(1041));
+        assert_eq!(format, Format::Json);
+        assert!(action.is_none());
+    } else {
+        panic!("expected Command::Pr");
+    }
+
+    let sub = Cli::try_parse_from(["do-harness", "pr", "readiness", "1041"]).expect("readiness subcommand parses");
+    if let Command::Pr { action: Some(PrAction::Readiness { pr, format }), .. } = sub.command {
+        assert_eq!(pr, 1041);
+        assert_eq!(format, Format::Text);
+    } else {
+        panic!("expected Command::Pr with Readiness action");
+    }
+}
+
+#[test]
 fn pr_no_effect_parses_range_and_rejects_mixed_modes() {
     let range = Cli::try_parse_from([
         "do-harness",

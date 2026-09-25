@@ -105,6 +105,15 @@ pub enum TaskAction {
 /// Available deterministic PR analysis actions.
 #[derive(Debug, Subcommand)]
 pub enum PrAction {
+    /// Check merge readiness for a pull request.
+    Readiness {
+        /// Pull request number.
+        #[arg(value_name = "PR")]
+        pr: u64,
+        /// Output format.
+        #[arg(long, value_enum, default_value_t = Format::Text)]
+        format: Format,
+    },
     /// Report whether a PR or revision range introduces any effective change.
     NoEffect {
         /// Pull request number; resolves base and head through `gh`.

@@ -207,6 +207,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand --version 'Print version'
         }
         &'do-harness;pr'= {
+            cand --format 'Output format'
             cand --root 'Workspace root override (default: walk up from cwd)'
             cand --config 'Explicit path to do-harness.toml'
             cand --color 'Color output (auto, always, never)'
@@ -216,13 +217,30 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand -q 'Suppress non-error messages'
             cand --quiet 'Suppress non-error messages'
             cand --dry-run 'Dry run without side effects'
-            cand -h 'Print help'
-            cand --help 'Print help'
+            cand -h 'Print help (see more with ''--help'')'
+            cand --help 'Print help (see more with ''--help'')'
             cand -V 'Print version'
             cand --version 'Print version'
+            cand readiness 'Check merge readiness for a pull request'
             cand no-effect 'Report whether a PR or revision range introduces any effective change'
             cand review 'Emit the semantic residual: changed units evidence could not prove'
             cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'do-harness;pr;readiness'= {
+            cand --format 'Output format'
+            cand --root 'Workspace root override (default: walk up from cwd)'
+            cand --config 'Explicit path to do-harness.toml'
+            cand --color 'Color output (auto, always, never)'
+            cand --output 'Default output file path'
+            cand -v 'Verbosity level (-v, -vv)'
+            cand --verbose 'Verbosity level (-v, -vv)'
+            cand -q 'Suppress non-error messages'
+            cand --quiet 'Suppress non-error messages'
+            cand --dry-run 'Dry run without side effects'
+            cand -h 'Print help (see more with ''--help'')'
+            cand --help 'Print help (see more with ''--help'')'
+            cand -V 'Print version'
+            cand --version 'Print version'
         }
         &'do-harness;pr;no-effect'= {
             cand --base 'Base revision (local mode; requires --head)'
@@ -262,9 +280,12 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand --version 'Print version'
         }
         &'do-harness;pr;help'= {
+            cand readiness 'Check merge readiness for a pull request'
             cand no-effect 'Report whether a PR or revision range introduces any effective change'
             cand review 'Emit the semantic residual: changed units evidence could not prove'
             cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'do-harness;pr;help;readiness'= {
         }
         &'do-harness;pr;help;no-effect'= {
         }
@@ -1125,8 +1146,11 @@ set edit:completion:arg-completer[do-harness] = {|@words|
         &'do-harness;help;status'= {
         }
         &'do-harness;help;pr'= {
+            cand readiness 'Check merge readiness for a pull request'
             cand no-effect 'Report whether a PR or revision range introduces any effective change'
             cand review 'Emit the semantic residual: changed units evidence could not prove'
+        }
+        &'do-harness;help;pr;readiness'= {
         }
         &'do-harness;help;pr;no-effect'= {
         }
