@@ -57,8 +57,9 @@ pub use repo_eval::{
     skill_eval_summary,
 };
 pub use repo_exec::{
-    NewBeat, SensorOutcome, bump_error_signature, get_error_signature, list_beats, list_beats_page,
-    prune_beats, record_sensor_outcome, record_verify_batch, vacuum,
+    NewBeat, SensorOutcome, bump_error_signature, get_error_signature, list_beats,
+    list_beats_by_scope, list_beats_page, prune_beats, record_sensor_outcome, record_verify_batch,
+    vacuum,
 };
 pub use repo_heuristic::{NewHeuristic, insert_heuristic, list_heuristics};
 pub use repo_metrics::{SensorStat, has_ok_beat, sensor_stats};

@@ -146,6 +146,7 @@ async fn db_assertion_valid_identifiers_grade_against_real_db() {
         &conn,
         &do_harness_db::NewBeat {
             task_id: None,
+            scope: None,
             beat_type: "sensor",
             status: "ok",
             sensor_exit_code: Some(0),

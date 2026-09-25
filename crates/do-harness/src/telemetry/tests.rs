@@ -25,7 +25,9 @@ async fn record_verify_persists_beats_and_signatures() {
         signal_set: None,
     };
 
-    record_verify(dir.path(), &report, &[], None).await.unwrap();
+    record_verify(dir.path(), &report, &[], &BeatScope::Global)
+        .await
+        .unwrap();
 
     let conn = do_harness_db::connect_and_migrate(dir.path())
         .await
@@ -65,7 +67,9 @@ async fn record_verify_skips_signatures_when_all_pass() {
         signal_set: None,
     };
 
-    record_verify(dir.path(), &report, &[], None).await.unwrap();
+    record_verify(dir.path(), &report, &[], &BeatScope::Global)
+        .await
+        .unwrap();
 
     let conn = do_harness_db::connect_and_migrate(dir.path())
         .await
@@ -104,9 +108,14 @@ async fn record_verify_skips_blocked_sensor_signature() {
         signal_set: None,
     };
 
-    record_verify(dir.path(), &report, &["halted".to_owned()], None)
-        .await
-        .unwrap();
+    record_verify(
+        dir.path(),
+        &report,
+        &["halted".to_owned()],
+        &BeatScope::Global,
+    )
+    .await
+    .unwrap();
 
     let conn = do_harness_db::connect_and_migrate(dir.path())
         .await
@@ -203,7 +212,9 @@ async fn record_verify_persists_actionable_nextest_failure_context() {
         }],
         signal_set: None,
     };
-    record_verify(dir.path(), &report, &[], None).await.unwrap();
+    record_verify(dir.path(), &report, &[], &BeatScope::Global)
+        .await
+        .unwrap();
 
     let conn = do_harness_db::connect_and_migrate(dir.path())
         .await
@@ -254,7 +265,9 @@ async fn record_verify_resets_strikes_on_pass() {
         }],
         signal_set: None,
     };
-    record_verify(dir.path(), &report, &[], None).await.unwrap();
+    record_verify(dir.path(), &report, &[], &BeatScope::Global)
+        .await
+        .unwrap();
 
     let conn = do_harness_db::connect_and_migrate(dir.path())
         .await
@@ -312,7 +325,7 @@ async fn record_verify_scopes_to_task() {
         }],
         signal_set: None,
     };
-    record_verify(dir.path(), &report, &[], Some(task_id))
+    record_verify(dir.path(), &report, &[], &BeatScope::Task(task_id))
         .await
         .unwrap();
 
@@ -339,5 +352,79 @@ async fn record_verify_scopes_to_task() {
             .unwrap()
             .attempt_count,
         1
+    );
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn record_verify_scopes_to_branch() {
+    let dir = tempfile::tempdir().unwrap();
+    let report = VerifyReport {
+        ok: true,
+        root: dir.path().display().to_string(),
+        failed: Vec::new(),
+        sensors: vec![SensorResult {
+            name: "fmt".to_owned(),
+            ok: true,
+            exit_code: Some(0),
+            duration_ms: 1,
+            severity: crate::config::SensorSeverity::Error,
+            allow_failure: false,
+            warned: false,
+            findings: None,
+            baseline: None,
+            output: String::new(),
+        }],
+        signal_set: None,
+    };
+
+    let scope = BeatScope::Branch("feat/feature-a".to_string());
+    record_verify(dir.path(), &report, &[], &scope)
+        .await
+        .unwrap();
+
+    let conn = do_harness_db::connect_and_migrate(dir.path())
+        .await
+        .unwrap();
+    let beats = do_harness_db::list_beats(&conn, None).await.unwrap();
+    assert_eq!(beats.len(), 1);
+    assert_eq!(beats[0].scope, "branch:feat/feature-a");
+    assert_eq!(beats[0].task_id, None);
+
+    let scoped = do_harness_db::list_beats_by_scope(&conn, "branch:feat/feature-a")
+        .await
+        .unwrap();
+    assert_eq!(scoped.len(), 1);
+}
+
+#[test]
+fn beat_scope_resolution_precedence() {
+    let dir = tempfile::tempdir().unwrap();
+
+    // Explicit global flag wins:
+    assert_eq!(
+        BeatScope::resolve(dir.path(), Some("42"), true),
+        BeatScope::Global
+    );
+    assert_eq!(
+        BeatScope::resolve(dir.path(), None, true),
+        BeatScope::Global
+    );
+
+    // Explicit task ID:
+    assert_eq!(
+        BeatScope::resolve(dir.path(), Some("42"), false),
+        BeatScope::Task(42)
+    );
+
+    // Explicit task = "global":
+    assert_eq!(
+        BeatScope::resolve(dir.path(), Some("global"), false),
+        BeatScope::Global
+    );
+
+    // Outside git repo with no task/global defaults to Global:
+    assert_eq!(
+        BeatScope::resolve(dir.path(), None, false),
+        BeatScope::Global
     );
 }

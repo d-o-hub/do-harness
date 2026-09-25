@@ -113,6 +113,21 @@ fn is_work_tree(root: &Path) -> bool {
         })
 }
 
+/// Returns the current git branch name, when `root` lies inside a git working
+/// tree and is on an attached branch. Returns `None` on detached HEAD or outside
+/// git.
+pub(crate) fn current_branch(root: &Path) -> Option<String> {
+    let output = git_command(root)
+        .args(["branch", "--show-current"])
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let name = String::from_utf8_lossy(&output.stdout).trim().to_owned();
+    (!name.is_empty()).then_some(name)
+}
+
 /// Tracked staged and unstaged changes versus `HEAD`, NUL-separated.
 ///
 /// An unborn `HEAD` (no commits yet) yields no tracked changes, which is

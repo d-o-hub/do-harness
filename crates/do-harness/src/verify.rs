@@ -20,10 +20,11 @@ const HOOK_MARKER: &str = "DO_HARNESS_HOOK";
 /// advisory so the scoping hint is not silently lost.
 fn warn_unscoped_record(
     record: bool,
-    task: Option<i64>,
+    scope: &telemetry::BeatScope,
+    explicit_global: bool,
     hook_marker: Option<&std::ffi::OsStr>,
 ) -> bool {
-    record && task.is_none() && hook_marker.is_none()
+    record && scope == &telemetry::BeatScope::Global && !explicit_global && hook_marker.is_none()
 }
 
 /// Runs the `verify` subcommand: sensors, optional beat recording, report.
@@ -34,9 +35,14 @@ pub(crate) async fn run(root: &Path, mut opts: VerifyOpts) -> std::result::Resul
     let (cfg, config_bytes) = config::load_raw(root, opts.config.as_deref())
         .await
         .map_err(CliError::Usage)?;
+    let beat_scope = telemetry::BeatScope::resolve(root, opts.raw_task.as_deref(), opts.global);
+    if opts.task.is_none() {
+        opts.task = beat_scope.task_id();
+    }
     if warn_unscoped_record(
         opts.record,
-        opts.task,
+        &beat_scope,
+        opts.global,
         std::env::var_os(HOOK_MARKER).as_deref(),
     ) {
         eprintln!(
@@ -51,7 +57,7 @@ pub(crate) async fn run(root: &Path, mut opts: VerifyOpts) -> std::result::Resul
     }
     opts.baselines = Baselines::load(root).await.map_err(CliError::Usage)?;
     if opts.record {
-        let struck = telemetry::struck_sensors(root, &cfg.sensor_names(), opts.task)
+        let struck = telemetry::struck_sensors(root, &cfg.sensor_names(), beat_scope.task_id())
             .await
             .map_err(CliError::Usage)?;
         for name in struck {
@@ -76,7 +82,7 @@ pub(crate) async fn run(root: &Path, mut opts: VerifyOpts) -> std::result::Resul
                 .cloned()
                 .collect();
             if opts.record {
-                telemetry::record_verify(root, &report, &skipped, opts.task)
+                telemetry::record_verify(root, &report, &skipped, &beat_scope)
                     .await
                     .map_err(CliError::Usage)?;
             }
@@ -288,14 +294,26 @@ async fn write_evidence(
 #[cfg(test)]
 mod tests {
     use super::warn_unscoped_record;
+    use crate::telemetry::BeatScope;
     use std::ffi::OsStr;
 
     #[test]
     fn hook_runs_skip_the_unscoped_record_advisory() {
         let marker = Some(OsStr::new("1"));
-        assert!(warn_unscoped_record(true, None, None));
-        assert!(!warn_unscoped_record(true, None, marker));
-        assert!(!warn_unscoped_record(true, Some(42), None));
-        assert!(!warn_unscoped_record(false, None, None));
+        let global = BeatScope::Global;
+        let branch = BeatScope::Branch("main".to_string());
+        let task = BeatScope::Task(42);
+
+        // Global fallback without explicit flag warns outside hooks:
+        assert!(warn_unscoped_record(true, &global, false, None));
+        // Suppressed under git hook:
+        assert!(!warn_unscoped_record(true, &global, false, marker));
+        // Explicit global flag suppresses warning:
+        assert!(!warn_unscoped_record(true, &global, true, None));
+        // Scoped runs (branch or task) never warn:
+        assert!(!warn_unscoped_record(true, &branch, false, None));
+        assert!(!warn_unscoped_record(true, &task, false, None));
+        // Record disabled never warns:
+        assert!(!warn_unscoped_record(false, &global, false, None));
     }
 }

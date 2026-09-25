@@ -76,6 +76,10 @@ pub struct VerifyOpts {
     pub record: bool,
     /// Task id scoping persisted beats when `record` is set.
     pub task: Option<i64>,
+    /// Raw task argument passed to `--task` (ID or `global`).
+    pub raw_task: Option<String>,
+    /// Record unscoped beats into the global namespace.
+    pub global: bool,
     /// Evidence artifact path; relative paths resolve against the root.
     pub evidence: Option<PathBuf>,
     /// Fail the run when the evidence artifact is not strictly clean.

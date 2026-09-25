@@ -34,6 +34,7 @@ pub(super) async fn insert_ok_beat(root: &Path, task_id: i64, sensor: &str) {
         &conn,
         &do_harness_db::NewBeat {
             task_id: Some(task_id),
+            scope: None,
             beat_type: "sensor",
             status: "ok",
             sensor_exit_code: Some(0),

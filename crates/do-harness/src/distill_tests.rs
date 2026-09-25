@@ -34,6 +34,7 @@ async fn seed_ok_beat(root: &Path) {
         &conn,
         &do_harness_db::NewBeat {
             task_id: None,
+            scope: None,
             beat_type: "sensor",
             status: "ok",
             sensor_exit_code: Some(0),

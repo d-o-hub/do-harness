@@ -80,7 +80,7 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand verify" -l set -d 
 complete -c do-harness -n "__fish_do_harness_using_subcommand verify" -l only -d 'Run only the named sensor (repeatable or comma-separated)' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand verify" -l exclude -d 'Exclude named sensors from the run' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand verify" -l jobs -d 'Maximum sensors in flight (overrides `jobs` in do-harness.toml)' -r
-complete -c do-harness -n "__fish_do_harness_using_subcommand verify" -l task -d 'Scope records and fail-fast strikes to this task id' -r
+complete -c do-harness -n "__fish_do_harness_using_subcommand verify" -l task -d 'Scope records and fail-fast strikes to this task id (or \'global\')' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand verify" -l evidence -d 'Write a machine-readable evidence artifact to path' -r -F
 complete -c do-harness -n "__fish_do_harness_using_subcommand verify" -l approver -d 'Approver identity recorded with `--bless` (defaults to `DO_HARNESS_APPROVER` or the git user email)' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand verify" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
@@ -90,6 +90,7 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand verify" -l output 
 complete -c do-harness -n "__fish_do_harness_using_subcommand verify" -l fail-fast -d 'Halt at the first failing sensor'
 complete -c do-harness -n "__fish_do_harness_using_subcommand verify" -l changed -d 'Run only sensors applicable to the working-tree change'
 complete -c do-harness -n "__fish_do_harness_using_subcommand verify" -l record -d 'Persist beats and error signatures into the state database'
+complete -c do-harness -n "__fish_do_harness_using_subcommand verify" -l global -d 'Record unscoped beats in the global namespace'
 complete -c do-harness -n "__fish_do_harness_using_subcommand verify" -l strict -d 'Enforce strong evidence: exit non-zero on skips or missing timing/exit codes'
 complete -c do-harness -n "__fish_do_harness_using_subcommand verify" -l bless -d 'Lower or initialize blessed findings baselines from this run (requires --record; a bless never raises a baseline)'
 complete -c do-harness -n "__fish_do_harness_using_subcommand verify" -s v -l verbose -d 'Verbosity level (-v, -vv)'
@@ -103,7 +104,7 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand check" -l set -d '
 complete -c do-harness -n "__fish_do_harness_using_subcommand check" -l only -d 'Run only the named sensor (repeatable or comma-separated)' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand check" -l exclude -d 'Exclude named sensors from the run' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand check" -l jobs -d 'Maximum sensors in flight (overrides `jobs` in do-harness.toml)' -r
-complete -c do-harness -n "__fish_do_harness_using_subcommand check" -l task -d 'Scope records and fail-fast strikes to this task id' -r
+complete -c do-harness -n "__fish_do_harness_using_subcommand check" -l task -d 'Scope records and fail-fast strikes to this task id (or \'global\')' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand check" -l evidence -d 'Write a machine-readable evidence artifact to path' -r -F
 complete -c do-harness -n "__fish_do_harness_using_subcommand check" -l approver -d 'Approver identity recorded with `--bless` (defaults to `DO_HARNESS_APPROVER` or the git user email)' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand check" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
@@ -113,6 +114,7 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand check" -l output -
 complete -c do-harness -n "__fish_do_harness_using_subcommand check" -l fail-fast -d 'Halt at the first failing sensor'
 complete -c do-harness -n "__fish_do_harness_using_subcommand check" -l changed -d 'Run only sensors applicable to the working-tree change'
 complete -c do-harness -n "__fish_do_harness_using_subcommand check" -l record -d 'Persist beats and error signatures into the state database'
+complete -c do-harness -n "__fish_do_harness_using_subcommand check" -l global -d 'Record unscoped beats in the global namespace'
 complete -c do-harness -n "__fish_do_harness_using_subcommand check" -l strict -d 'Enforce strong evidence: exit non-zero on skips or missing timing/exit codes'
 complete -c do-harness -n "__fish_do_harness_using_subcommand check" -l bless -d 'Lower or initialize blessed findings baselines from this run (requires --record; a bless never raises a baseline)'
 complete -c do-harness -n "__fish_do_harness_using_subcommand check" -s v -l verbose -d 'Verbosity level (-v, -vv)'
@@ -646,10 +648,14 @@ json\t'Machine-readable JSON output'"
 complete -c do-harness -n "__fish_do_harness_using_subcommand metrics" -l sensor -d 'Filter by sensor name' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand metrics" -l skill -d 'Filter by skill name' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand metrics" -l since -d 'Filter metrics since a Unix timestamp in seconds' -r
+complete -c do-harness -n "__fish_do_harness_using_subcommand metrics" -l scope -d 'Filter by workstream scope (e.g. `branch:main`, `task:1`, `global`, or `all`). Defaults to the current git branch' -r
+complete -c do-harness -n "__fish_do_harness_using_subcommand metrics" -l task -d 'Filter by task id (equivalent to `--scope task:<ID>`)' -r
+complete -c do-harness -n "__fish_do_harness_using_subcommand metrics" -l branch -d 'Filter by branch name (equivalent to `--scope branch:<NAME>`)' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand metrics" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
 complete -c do-harness -n "__fish_do_harness_using_subcommand metrics" -l config -d 'Explicit path to do-harness.toml' -r -F
 complete -c do-harness -n "__fish_do_harness_using_subcommand metrics" -l color -d 'Color output (auto, always, never)' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand metrics" -l output -d 'Default output file path' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand metrics" -l all -d 'Aggregate across all workstreams and scopes'
 complete -c do-harness -n "__fish_do_harness_using_subcommand metrics" -s v -l verbose -d 'Verbosity level (-v, -vv)'
 complete -c do-harness -n "__fish_do_harness_using_subcommand metrics" -s q -l quiet -d 'Suppress non-error messages'
 complete -c do-harness -n "__fish_do_harness_using_subcommand metrics" -l dry-run -d 'Dry run without side effects'

@@ -176,6 +176,7 @@ async fn advance_rechecks_sensor_gate_inside_transaction() {
         &conn,
         &NewBeat {
             task_id: Some(id),
+            scope: None,
             beat_type: "sensor",
             status: "ok",
             sensor_exit_code: Some(0),
