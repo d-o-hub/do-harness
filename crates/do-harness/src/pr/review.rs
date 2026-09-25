@@ -266,11 +266,7 @@ fn local_pr_inputs(root: &Path, view: &gh::PrView) -> Option<(String, String, St
     if !no_effect::rev_exists(root, &view.head_ref_oid) {
         return None;
     }
-    let candidates = [
-        view.base_ref_name.clone(),
-        format!("origin/{}", view.base_ref_name),
-    ];
-    for candidate in candidates {
+    for candidate in no_effect::base_refs(&view.base_ref_name) {
         if !no_effect::rev_exists(root, &candidate) {
             continue;
         }

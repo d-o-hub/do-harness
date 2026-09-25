@@ -527,6 +527,12 @@ harness initialization.
 - `--base <REV> --head <REV>`: Local mode without GitHub.
 - `--format <Format>`: Output format (`text` or `json`).
 
+In PR mode the base is the *remote* branch, so `origin/<base>` is preferred
+whenever that ref exists and a same-named local branch is only the fallback: a
+local `main` that lags behind the remote would otherwise report already-merged
+upstream commits as this PR's change. The reported `merge_base` names the exact
+commit the verdict was computed against.
+
 Exit `0` when the verdict is determined (whether `no-effect` or `has-effect`),
 `1` when it cannot be determined, and `2` for invalid arguments. An analysis
 error is never reported as `no-effect`.
@@ -554,7 +560,10 @@ residual, and recorded in `false_proven`. Absent, malformed, or partially
 invalid policy — including invalid globs — proves nothing and adds a warning.
 
 - `<PR>`: Pull request number; base and head are resolved through `gh`,
-  falling back to `gh pr diff` when the clone cannot resolve them.
+  falling back to `gh pr diff` when the clone cannot resolve them. As in
+  `pr no-effect`, `origin/<base>` is preferred over a stale local branch of the
+  same name, and the report's `merge_base` (also part of the cache key) names
+  the commit the residual was computed against.
 - `--base <REV> --head <REV>`: Local mode without GitHub.
 - `--recompute`: Ignore the cached report and recompute from scratch.
 - `--format <Format>`: Output format (`text` or `json`).
