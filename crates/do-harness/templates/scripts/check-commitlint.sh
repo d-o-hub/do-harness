@@ -17,6 +17,12 @@
 
 set -euo pipefail
 
+# Git exports `GIT_DIR` (and friends) to hooks; left in place, the `git log`
+# calls below would target the hook's repository instead of this work tree.
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY \
+    GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_CEILING_DIRECTORIES GIT_NAMESPACE \
+    GIT_PREFIX
+
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 # Lints a single subject line against the conventional-commit + lowercase rules.

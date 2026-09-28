@@ -112,6 +112,69 @@ fn rust_init_on_empty_git_repo_is_green() {
 }
 
 #[test]
+fn rust_init_ignores_a_hook_inherited_git_dir() {
+    // Git exports `GIT_DIR` to every hook. A generated script that follows it
+    // reads the caller's repository instead of the workspace being
+    // initialised, so `init`'s baseline verify goes RED under any hook (and
+    // every local `git push` fails for a reason unrelated to the diff).
+    let foreign = tempfile::tempdir().unwrap();
+    let status = isolated_command("git")
+        .args(["init", "-q"])
+        .current_dir(foreign.path())
+        .status()
+        .expect("git init");
+    assert!(status.success(), "git init failed");
+    std::fs::create_dir_all(foreign.path().join("packages/app")).unwrap();
+    std::fs::write(
+        foreign.path().join("packages/app/package.json"),
+        "{\"name\":\"app\",\"version\":\"1.0.0\"}\n",
+    )
+    .unwrap();
+    let status = isolated_command("git")
+        .args(["add", "-A"])
+        .current_dir(foreign.path())
+        .status()
+        .expect("git add");
+    assert!(status.success(), "git add failed");
+    let status = isolated_command("git")
+        .args([
+            "-c",
+            "user.name=t",
+            "-c",
+            "user.email=t@t",
+            "commit",
+            "-qm",
+            "base",
+        ])
+        .current_dir(foreign.path())
+        .status()
+        .expect("git commit");
+    assert!(status.success(), "git commit failed");
+
+    let target = tempfile::tempdir().unwrap();
+    let mut cmd = harness(target.path());
+    cmd.env("GIT_DIR", foreign.path().join(".git"));
+    let (ok, out) = run(cmd.arg("init"));
+    assert!(
+        ok,
+        "init must ignore a hook-inherited GIT_DIR and read its own root:\n{out}"
+    );
+
+    // The generated scripts must be the ones doing the ignoring: run the
+    // release preflight directly with the foreign GIT_DIR still set.
+    let status = isolated_command("bash")
+        .arg("scripts/check-release-preflight.sh")
+        .current_dir(target.path())
+        .env("GIT_DIR", foreign.path().join(".git"))
+        .status()
+        .expect("run check-release-preflight.sh");
+    assert!(
+        status.success(),
+        "check-release-preflight.sh must not follow a foreign GIT_DIR"
+    );
+}
+
+#[test]
 fn rust_init_then_full_verify_is_green() {
     let dir = tempfile::tempdir().unwrap();
     let (ok, out) = run(harness(dir.path()).arg("init"));

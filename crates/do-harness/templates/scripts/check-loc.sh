@@ -32,6 +32,12 @@
 
 set -euo pipefail
 
+# Git exports `GIT_DIR` (and friends) to hooks; left in place, `rev-parse`
+# below would resolve the hook's repository instead of this work tree.
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY \
+    GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_CEILING_DIRECTORIES GIT_NAMESPACE \
+    GIT_PREFIX
+
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 
 MAX=500
