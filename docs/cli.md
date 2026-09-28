@@ -117,7 +117,11 @@ advisory `WARN` verdict instead of halting the run — until a passing run or
 
 A sensor opts into unchanged-input reuse by declaring
 `inputs = ["glob", ...]`: the complete set of repository files whose content
-can change its outcome. A `verify --record` run that exits zero cleanly (no
+can change its outcome. Identity is computed over the git index plus
+nonignored untracked files; a declared pattern that resolves only to
+gitignored (or otherwise excluded) paths contributes nothing and must not
+be declared — generated outputs and ignored state cannot describe a
+complete input set. A `verify --record` run that exits zero cleanly (no
 `SKIP:`/`COVERAGE:` marker, no findings above zero, no declared `artifacts`)
 stores one SHA-256 identity of the matched files (path, bytes, file mode),
 the full sensor definition, the raw config bytes, the harness version, the
