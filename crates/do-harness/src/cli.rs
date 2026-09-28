@@ -83,6 +83,11 @@ pub enum Command {
         /// Maximum sensors in flight (overrides `jobs` in do-harness.toml).
         #[arg(long, value_name = "N")]
         jobs: Option<usize>,
+        /// Reuse recorded passing beats for sensors whose declared inputs are
+        /// unchanged: `warn` (default) executes and advises, `skip` reuses
+        /// without executing (requires --record), `run` always executes.
+        #[arg(long, value_enum, value_name = "MODE", default_value_t = crate::sensors::UnchangedMode::Warn)]
+        unchanged: crate::sensors::UnchangedMode,
         /// Persist beats and error signatures into the state database.
         #[arg(long)]
         record: bool,

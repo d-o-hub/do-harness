@@ -30,6 +30,7 @@ fn config_with(specs: &[(&str, &[&str])]) -> Config {
                 transient_exit_codes: vec![],
                 artifacts: Vec::new(),
                 coverage_inputs: Vec::new(),
+                inputs: Vec::new(),
                 when_changed: vec![],
             })
             .collect(),

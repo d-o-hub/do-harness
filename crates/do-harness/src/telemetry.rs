@@ -1,5 +1,6 @@
 //! Optional persistence of verify runs into the agent-state database.
 
+use std::collections::BTreeMap;
 use std::path::Path;
 
 use anyhow::Result;
@@ -97,7 +98,14 @@ impl BeatScope {
 /// Records each sensor result atomically, scoped to `scope`: the beat and
 /// its error-signature update (bump on failure, reset on pass) commit in one
 /// transaction, and any observed findings count is upserted. Skipped sensors
-/// (halted or quarantined) are omitted.
+/// (halted or quarantined) and results that did not execute in this run
+/// (reused or cancelled) are omitted, so reuse can never look like a fresh
+/// observation.
+///
+/// A clean pass whose declared input identity is unchanged across execution
+/// (`pre_digests` was captured before the run and still matches now) stores
+/// that identity on the beat, making the pass eligible for a later
+/// `--unchanged=skip` reuse.
 ///
 /// # Errors
 ///
@@ -107,8 +115,16 @@ pub async fn record_verify(
     report: &VerifyReport,
     skipped: &[String],
     scope: &BeatScope,
+    cfg: &crate::config::Config,
+    config_bytes: Option<&[u8]>,
+    pre_digests: &BTreeMap<String, String>,
 ) -> Result<()> {
     let conn = do_harness_db::connect_and_migrate(root).await?;
+    let specs: BTreeMap<&str, &crate::config::SensorSpec> = cfg
+        .effective_sensors()
+        .iter()
+        .map(|spec| (spec.name.as_str(), spec))
+        .collect();
     let now = do_harness_db::unix_now();
     let scope_key = scope.key();
     let task_id = scope.task_id();
@@ -117,12 +133,28 @@ pub async fn record_verify(
         .iter()
         .map(|sensor| truncate_message(&sensor.output))
         .collect();
+    let digests: Vec<Option<String>> = report
+        .sensors
+        .iter()
+        .map(|sensor| {
+            cache_digest(
+                root,
+                sensor,
+                specs.get(sensor.name.as_str()).copied(),
+                config_bytes,
+                pre_digests,
+            )
+        })
+        .collect();
     let outcomes: Vec<do_harness_db::SensorOutcome<'_>> = report
         .sensors
         .iter()
         .zip(&messages)
-        .filter(|(sensor, _)| !skipped.contains(&sensor.name))
-        .map(|(sensor, message)| do_harness_db::SensorOutcome {
+        .zip(&digests)
+        .filter(|((sensor, _), _)| {
+            sensor.execution == crate::report::Execution::Ran && !skipped.contains(&sensor.name)
+        })
+        .map(|((sensor, message), digest)| do_harness_db::SensorOutcome {
             beat: do_harness_db::NewBeat {
                 task_id,
                 scope: Some(&scope_key),
@@ -141,12 +173,13 @@ pub async fn record_verify(
             },
             ok: sensor.ok,
             message: Some(message),
+            input_digest: digest.as_deref(),
         })
         .collect();
     do_harness_db::record_verify_batch(&conn, &outcomes).await?;
 
     for sensor in &report.sensors {
-        if skipped.contains(&sensor.name) {
+        if sensor.execution != crate::report::Execution::Ran || skipped.contains(&sensor.name) {
             continue;
         }
         if let Some(findings) = sensor.findings {
@@ -155,6 +188,41 @@ pub async fn record_verify(
         }
     }
     Ok(())
+}
+
+/// Input identity to store on a beat, or `None` when the sensor is not
+/// cache-eligible.
+///
+/// Eligibility is deliberately narrow: the process ran and exited zero, no
+/// `SKIP:`/`COVERAGE:` marker or findings were reported, no artifact globs
+/// are declared (reuse would not re-produce outputs), the sensor declares
+/// `inputs`, the pre-execution identity is known, and the identity is
+/// unchanged after execution (a file that changed while the sensor ran
+/// invalidates the entry rather than pinning a stale digest).
+fn cache_digest(
+    root: &Path,
+    sensor: &crate::report::SensorResult,
+    spec: Option<&crate::config::SensorSpec>,
+    config_bytes: Option<&[u8]>,
+    pre_digests: &BTreeMap<String, String>,
+) -> Option<String> {
+    let spec = spec?;
+    if !sensor.ok || sensor.exit_code != Some(0) || sensor.warned {
+        return None;
+    }
+    if sensor.findings.is_some_and(|findings| findings > 0) || !spec.artifacts.is_empty() {
+        return None;
+    }
+    if sensor
+        .output
+        .lines()
+        .any(|line| line.trim_start().starts_with("COVERAGE:"))
+    {
+        return None;
+    }
+    let pre = pre_digests.get(&sensor.name)?;
+    let post = crate::sensor_inputs::digest(root, spec, config_bytes)?;
+    (post == *pre).then_some(post)
 }
 
 /// Bounds a sensor output while preserving its first actionable failure and

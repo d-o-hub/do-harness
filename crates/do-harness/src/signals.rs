@@ -139,6 +139,7 @@ mod tests {
                     transient_exit_codes: Vec::new(),
                     artifacts: Vec::new(),
                     coverage_inputs: Vec::new(),
+                    inputs: Vec::new(),
                     when_changed: Vec::new(),
                 })
                 .collect(),

@@ -24,6 +24,7 @@ fn artifacts_and_coverage_are_recorded() {
         when_changed: vec![],
         artifacts: vec!["out/*.txt".into()],
         coverage_inputs: vec![],
+        inputs: vec![],
     }];
     let report = VerifyReport {
         ok: true,
@@ -40,6 +41,8 @@ fn artifacts_and_coverage_are_recorded() {
             warned: false,
             findings: None,
             baseline: None,
+            execution: crate::report::Execution::Ran,
+            reused_beat_id: None,
             output: "COVERAGE: {\"routes\":2,\"viewports\":3}".into(),
         }],
     };
@@ -56,6 +59,7 @@ fn artifacts_and_coverage_are_recorded() {
         changed: false,
         skipped: Vec::new(),
         task: None,
+        record: true,
         started_at: 0,
         finished_at: 1,
     };
@@ -90,6 +94,7 @@ fn missing_declared_artifact_records_warn() {
         when_changed: vec![],
         artifacts: vec!["out/*.png".into()],
         coverage_inputs: vec![],
+        inputs: vec![],
     }];
     let report = VerifyReport {
         ok: true,
@@ -106,6 +111,8 @@ fn missing_declared_artifact_records_warn() {
             warned: false,
             findings: None,
             baseline: None,
+            execution: crate::report::Execution::Ran,
+            reused_beat_id: None,
             output: String::new(),
         }],
     };
@@ -122,6 +129,7 @@ fn missing_declared_artifact_records_warn() {
         changed: false,
         skipped: Vec::new(),
         task: None,
+        record: true,
         started_at: 0,
         finished_at: 1,
     };

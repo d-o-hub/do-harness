@@ -64,6 +64,9 @@ json\:"Machine-readable JSON output"))' \
 '*--only=[Run only the named sensor (repeatable or comma-separated)]:SENSOR:_default' \
 '*--exclude=[Exclude named sensors from the run]:SENSOR:_default' \
 '--jobs=[Maximum sensors in flight (overrides \`jobs\` in do-harness.toml)]:N:_default' \
+'--unchanged=[Reuse recorded passing beats for sensors whose declared inputs are unchanged\: \`warn\` (default) executes and advises, \`skip\` reuses without executing (requires --record), \`run\` always executes]:MODE:((warn\:"Execute the sensor, but print an advisory when a recorded pass is eligible for reuse (the conservative default\: evidence stays fresh)"
+skip\:"Reuse the eligible recorded pass without executing the sensor"
+run\:"Execute unconditionally; no reuse lookup at all"))' \
 '--task=[Scope records and fail-fast strikes to this task id (or '\''global'\'')]:ID:_default' \
 '--evidence=[Write a machine-readable evidence artifact to path]:FILE:_files' \
 '--approver=[Approver identity recorded with \`--bless\` (defaults to \`DO_HARNESS_APPROVER\` or the git user email)]:NAME:_default' \
@@ -96,6 +99,9 @@ json\:"Machine-readable JSON output"))' \
 '*--only=[Run only the named sensor (repeatable or comma-separated)]:SENSOR:_default' \
 '*--exclude=[Exclude named sensors from the run]:SENSOR:_default' \
 '--jobs=[Maximum sensors in flight (overrides \`jobs\` in do-harness.toml)]:N:_default' \
+'--unchanged=[Reuse recorded passing beats for sensors whose declared inputs are unchanged\: \`warn\` (default) executes and advises, \`skip\` reuses without executing (requires --record), \`run\` always executes]:MODE:((warn\:"Execute the sensor, but print an advisory when a recorded pass is eligible for reuse (the conservative default\: evidence stays fresh)"
+skip\:"Reuse the eligible recorded pass without executing the sensor"
+run\:"Execute unconditionally; no reuse lookup at all"))' \
 '--task=[Scope records and fail-fast strikes to this task id (or '\''global'\'')]:ID:_default' \
 '--evidence=[Write a machine-readable evidence artifact to path]:FILE:_files' \
 '--approver=[Approver identity recorded with \`--bless\` (defaults to \`DO_HARNESS_APPROVER\` or the git user email)]:NAME:_default' \

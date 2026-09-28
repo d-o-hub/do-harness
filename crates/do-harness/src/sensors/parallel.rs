@@ -60,7 +60,13 @@ fn run_chunk(
             .iter()
             .map(|item| {
                 let handle = scope.spawn(|| {
-                    let result = if opts.fail_fast && cancel.load(Ordering::SeqCst) {
+                    // A reused verdict spawns nothing, so fail-fast
+                    // cancellation must not rewrite it as `cancelled before
+                    // start`; the sequential path checks reuse with no cancel
+                    // guard either, and both must agree.
+                    let result = if let Some(beat_id) = opts.reused.get(&item.spec.name) {
+                        super::sensor_reused(item.spec, *beat_id)
+                    } else if opts.fail_fast && cancel.load(Ordering::SeqCst) {
                         SensorResult {
                             name: item.spec.name.clone(),
                             ok: false,
@@ -72,6 +78,8 @@ fn run_chunk(
                             warned: false,
                             findings: None,
                             baseline: None,
+                            execution: crate::report::Execution::NotRun,
+                            reused_beat_id: None,
                             output: format!(
                                 "sensor '{}' cancelled before start: fail-fast stopped this run",
                                 item.spec.name
@@ -127,6 +135,8 @@ fn run_sequential(
             sensor_blocked(spec)
         } else if opts.quarantined.contains(&spec.name) {
             super::sensor_quarantined(spec)
+        } else if let Some(beat_id) = opts.reused.get(&spec.name) {
+            super::sensor_reused(spec, *beat_id)
         } else {
             run_sensor(spec, root, cancel, &opts.baselines)
         };
@@ -200,6 +210,7 @@ mod tests {
             transient_exit_codes: vec![],
             artifacts: Vec::new(),
             coverage_inputs: Vec::new(),
+            inputs: Vec::new(),
             when_changed: vec![],
         }
     }

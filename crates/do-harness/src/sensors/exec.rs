@@ -60,6 +60,8 @@ pub(crate) fn sensor_result(
         warned,
         findings: parse_findings(&output),
         baseline: None,
+        execution: crate::report::Execution::Ran,
+        reused_beat_id: None,
         output,
     }
 }

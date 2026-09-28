@@ -80,6 +80,7 @@ fn soft_failure_is_recorded_as_warn_not_pass() {
         transient_exit_codes: vec![],
         artifacts: Vec::new(),
         coverage_inputs: Vec::new(),
+        inputs: Vec::new(),
         when_changed: vec![],
     }];
     let report = VerifyReport {
@@ -97,6 +98,8 @@ fn soft_failure_is_recorded_as_warn_not_pass() {
             warned: false,
             findings: None,
             baseline: None,
+            execution: crate::report::Execution::Ran,
+            reused_beat_id: None,
             output: "boom".into(),
         }],
     };
@@ -113,6 +116,7 @@ fn soft_failure_is_recorded_as_warn_not_pass() {
         changed: false,
         skipped: Vec::new(),
         task: None,
+        record: true,
         started_at: 0,
         finished_at: 1,
     };
@@ -139,6 +143,7 @@ fn warned_sensor_is_recorded_as_warn_and_fails_summary() {
         transient_exit_codes: vec![],
         artifacts: Vec::new(),
         coverage_inputs: Vec::new(),
+        inputs: Vec::new(),
         when_changed: vec![],
     }];
     let report = VerifyReport {
@@ -156,6 +161,8 @@ fn warned_sensor_is_recorded_as_warn_and_fails_summary() {
             warned: true,
             findings: None,
             baseline: None,
+            execution: crate::report::Execution::Ran,
+            reused_beat_id: None,
             output: "SKIP: tool missing".into(),
         }],
     };
@@ -172,6 +179,7 @@ fn warned_sensor_is_recorded_as_warn_and_fails_summary() {
         changed: false,
         skipped: Vec::new(),
         task: None,
+        record: true,
         started_at: 0,
         finished_at: 1,
     };
