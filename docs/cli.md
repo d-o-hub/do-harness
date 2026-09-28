@@ -53,6 +53,15 @@ Runs computational sensors defined in `do-harness.toml`.
   order, so text and JSON output are deterministic. `--fail-fast` cancels
   in-flight siblings and never starts a later chunk. A `jobs = 0` config is
   rejected at load.
+- `--unchanged <MODE>`: How to treat sensors whose declared `inputs` are
+  unchanged since a recorded passing beat. `warn` (default) executes the
+  sensor and prints an advisory when the recorded pass would be reusable;
+  `skip` reuses the recorded beat without executing the sensor (requires
+  `--record`); `run` always executes and never consults the cache. Reuse is
+  reported as `SKIP` with `execution = "reused"` and the reused beat id, never
+  as a fresh `PASS`; a run containing any reuse records `skip` evidence, so
+  `--strict` fails and `status` stays red until a fresh `--unchanged=run` run.
+  `--bless` always executes (a bless needs current observations).
 - `--record`: Persist beats and error signatures into `.do-harness/agent_state.db`.
   Beats are scoped to the current git branch by default (`branch:<name>`).
 - `--task <ID>`: Scope recorded beats to this task ID (`task:<id>`), or pass
@@ -105,6 +114,23 @@ the developer loop, never to the evidence artifact. Warn-severity sensors that
 warn `3` consecutive times under `--record` are quarantined — skipped with an
 advisory `WARN` verdict instead of halting the run — until a passing run or
 `errors clear` resets their strikes.
+
+A sensor opts into unchanged-input reuse by declaring
+`inputs = ["glob", ...]`: the complete set of repository files whose content
+can change its outcome. A `verify --record` run that exits zero cleanly (no
+`SKIP:`/`COVERAGE:` marker, no findings above zero, no declared `artifacts`)
+stores one SHA-256 identity of the matched files (path, bytes, file mode),
+the full sensor definition, the raw config bytes, the harness version, the
+blessed-baseline digest, the sensor's `coverage-inputs` matches, and `HEAD`;
+a later run reuses the recorded beat only when that identity is identical and
+the beat is still the latest sensor beat in the same scope (`branch:<name>`,
+`task:<id>`, or `global`, so one branch or task can never reuse another's
+beat — a later failed or warned beat always shadows the recorded pass).
+Missing declarations, unreadable or symlinked matches, changes during
+execution, and any git failure force a fresh run — the cache never turns
+missing information into a pass. Commands that read the environment, network,
+generated outputs, or history cannot declare a complete input set and must
+stay undeclared; the built-in pack therefore ships no cached sensors.
 
 Evidence schema v4 records each sensor's exact `argv` and a SHA-256 of its
 captured output, the selected `signal_set`, the post-run workspace

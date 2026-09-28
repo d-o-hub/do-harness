@@ -215,11 +215,12 @@ fn policy_sensor(spec: &SensorSpec) -> serde_json::Value {
         "when_changed": spec.when_changed,
         "artifacts": spec.artifacts,
         "coverage_inputs": spec.coverage_inputs,
+        "inputs": spec.inputs,
     })
 }
 
 /// Config identity: hex of the raw bytes, or the built-in marker.
-fn config_digest(config_bytes: Option<&[u8]>) -> String {
+pub(crate) fn config_digest(config_bytes: Option<&[u8]>) -> String {
     match config_bytes {
         Some(bytes) => hex::encode(Sha256::digest(bytes)),
         None => BUILTIN_CONFIG_MARKER.to_owned(),
@@ -237,7 +238,7 @@ fn hash_bytes(bytes: &[u8]) -> String {
 }
 
 /// `sha256:`-prefixed hex of the canonical JSON encoding.
-fn hash_canonical(value: &serde_json::Value) -> String {
+pub(crate) fn hash_canonical(value: &serde_json::Value) -> String {
     match do_harness_types::canonical_value(value) {
         Ok(canonical) => {
             let bytes = serde_json::to_vec(&canonical).unwrap_or_default();
@@ -270,6 +271,7 @@ mod tests {
                 transient_exit_codes: Vec::new(),
                 artifacts: Vec::new(),
                 coverage_inputs: Vec::new(),
+                inputs: Vec::new(),
                 when_changed: Vec::new(),
             }],
             jobs: None,

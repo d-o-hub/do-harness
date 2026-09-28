@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicBool;
 
 use anyhow::{Result, anyhow};
+use clap::ValueEnum;
 
 use crate::config::{Config, SensorSpec};
 use crate::report::{Format, SensorResult, VerifyReport};
@@ -12,7 +13,7 @@ use crate::report::{Format, SensorResult, VerifyReport};
 /// refuses to execute (ok=false, no exit code, zero duration).
 pub(crate) fn sensor_blocked(spec: &SensorSpec) -> SensorResult {
     use crate::telemetry::FAIL_FAST_STRIKES;
-    exec::sensor_result(
+    let mut result = exec::sensor_result(
         spec,
         false,
         None,
@@ -21,7 +22,9 @@ pub(crate) fn sensor_blocked(spec: &SensorSpec) -> SensorResult {
             "halted: sensor '{}' has failed {} consecutive times; resolve the underlying issue before re-running",
             spec.name, FAIL_FAST_STRIKES
         ),
-    )
+    );
+    result.execution = crate::report::Execution::NotRun;
+    result
 }
 
 /// Builds the quarantined result for a warn-severity sensor that has warned
@@ -41,7 +44,43 @@ pub(crate) fn sensor_quarantined(spec: &SensorSpec) -> SensorResult {
     );
     result.allow_failure = true;
     result.warned = true;
+    result.execution = crate::report::Execution::NotRun;
     result
+}
+
+/// Builds the reused-verdict result for a sensor whose declared inputs are
+/// unchanged since a recorded passing beat: the beat is the evidence, so the
+/// result carries no exit code or duration and never masquerades as a fresh
+/// process exit.
+pub(crate) fn sensor_reused(spec: &SensorSpec, beat_id: i64) -> SensorResult {
+    SensorResult {
+        name: spec.name.clone(),
+        ok: true,
+        exit_code: None,
+        duration_ms: 0,
+        severity: spec.effective_severity(),
+        allow_failure: spec.effective_severity() == crate::config::SensorSeverity::Warn,
+        warned: false,
+        findings: None,
+        baseline: None,
+        execution: crate::report::Execution::Reused,
+        reused_beat_id: Some(beat_id),
+        output: "unchanged inputs; reused recorded passing beat".to_owned(),
+    }
+}
+
+/// How `verify` treats sensors whose declared inputs are unchanged since a
+/// recorded passing beat.
+#[derive(ValueEnum, Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub enum UnchangedMode {
+    /// Execute the sensor, but print an advisory when a recorded pass is
+    /// eligible for reuse (the conservative default: evidence stays fresh).
+    #[default]
+    Warn,
+    /// Reuse the eligible recorded pass without executing the sensor.
+    Skip,
+    /// Execute unconditionally; no reuse lookup at all.
+    Run,
 }
 
 /// Options controlling a verify run.
@@ -92,6 +131,15 @@ pub struct VerifyOpts {
     pub format: Format,
     /// Explicit config file override.
     pub config: Option<PathBuf>,
+    /// How to treat sensors whose declared inputs are unchanged.
+    pub unchanged: UnchangedMode,
+    /// Pre-execution input identity per selected sensor, computed before any
+    /// sensor runs so a changed input during execution invalidates the cache
+    /// entry instead of persisting a stale digest.
+    pub pre_digests: std::collections::BTreeMap<String, String>,
+    /// Sensors reused from recorded passing beats (`--unchanged=skip`):
+    /// sensor name to reused beat id.
+    pub reused: std::collections::BTreeMap<String, i64>,
 }
 
 /// Runs the selected sensors from `root` and returns the aggregate report.

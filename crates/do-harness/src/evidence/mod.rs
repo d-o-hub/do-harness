@@ -181,6 +181,14 @@ impl EvidenceDocument {
 
         for spec in selected_specs {
             if let Some(res) = report.sensors.iter().find(|r| r.name == spec.name) {
+                // A reused pass is not a fresh observation: it is recorded
+                // as a skip with no exit code, duration, output, or
+                // artifacts, and it makes the summary non-pass.
+                if res.execution == crate::report::Execution::Reused {
+                    skip_count += 1;
+                    sensors.push(reused_sensor(spec));
+                    continue;
+                }
                 let artifacts = crate::artifacts::resolve(meta.root, &spec.artifacts);
                 let mut verdict = if res.ok && res.warned {
                     "warn"
@@ -216,7 +224,10 @@ impl EvidenceDocument {
                     duration_ms: Some(res.duration_ms),
                     output_sha256: output_sha256(&res.output),
                     artifacts,
-                    recorded: true,
+                    // A beat exists only for results this run executed and
+                    // persisted; a blocked, quarantined, or cancelled sensor
+                    // never wrote one.
+                    recorded: meta.record && res.execution == crate::report::Execution::Ran,
                 });
             } else {
                 skip_count += 1;
@@ -233,7 +244,14 @@ impl EvidenceDocument {
             }
         }
 
-        let summary_verdict = if fail_count == 0 { "pass" } else { "fail" };
+        // Any skip (reused pass, cancelled, or unreported selection) makes
+        // the evidence non-pass: `status` must never report green on a run
+        // that did not freshly observe every selected sensor.
+        let summary_verdict = if fail_count == 0 && skip_count == 0 {
+            "pass"
+        } else {
+            "fail"
+        };
 
         EvidenceDocument {
             schema_version: EVIDENCE_SCHEMA_VERSION,
@@ -286,10 +304,28 @@ pub struct RunMeta<'a> {
     pub skipped: Vec<EvidenceSkipped>,
     /// Task id scoping persisted beats, when recording.
     pub task: Option<i64>,
+    /// Whether `--record` persisted executed results as beats; evidence
+    /// marks a sensor `recorded` only when a beat was actually written.
+    pub record: bool,
     /// Unix timestamp when the run started.
     pub started_at: i64,
     /// Unix timestamp when the run finished.
     pub finished_at: i64,
+}
+
+/// Evidence record for a sensor whose verdict was reused from a recorded
+/// passing beat: a skip that carries no fresh observation.
+fn reused_sensor(spec: &crate::config::SensorSpec) -> EvidenceSensor {
+    EvidenceSensor {
+        name: spec.name.clone(),
+        argv: spec.argv.clone(),
+        verdict: "skip".to_string(),
+        exit_code: None,
+        duration_ms: None,
+        output_sha256: String::new(),
+        artifacts: Vec::new(),
+        recorded: false,
+    }
 }
 
 /// Lowercase hex SHA-256 of a sensor's captured output.

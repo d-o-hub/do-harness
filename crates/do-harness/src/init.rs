@@ -238,6 +238,7 @@ fn release_preflight_spec() -> crate::config::SensorSpec {
             .collect(),
         artifacts: Vec::new(),
         coverage_inputs: Vec::new(),
+        inputs: Vec::new(),
     }
 }
 

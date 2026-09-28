@@ -72,6 +72,8 @@ fn run_chunk(
                             warned: false,
                             findings: None,
                             baseline: None,
+                            execution: crate::report::Execution::NotRun,
+                            reused_beat_id: None,
                             output: format!(
                                 "sensor '{}' cancelled before start: fail-fast stopped this run",
                                 item.spec.name
@@ -81,6 +83,8 @@ fn run_chunk(
                         sensor_blocked(item.spec)
                     } else if opts.quarantined.contains(&item.spec.name) {
                         super::sensor_quarantined(item.spec)
+                    } else if let Some(beat_id) = opts.reused.get(&item.spec.name) {
+                        super::sensor_reused(item.spec, *beat_id)
                     } else {
                         let result = run_sensor(item.spec, root, cancel, &opts.baselines);
                         if opts.fail_fast && !result.ok && !result.allow_failure {
@@ -127,6 +131,8 @@ fn run_sequential(
             sensor_blocked(spec)
         } else if opts.quarantined.contains(&spec.name) {
             super::sensor_quarantined(spec)
+        } else if let Some(beat_id) = opts.reused.get(&spec.name) {
+            super::sensor_reused(spec, *beat_id)
         } else {
             run_sensor(spec, root, cancel, &opts.baselines)
         };
@@ -200,6 +206,7 @@ mod tests {
             transient_exit_codes: vec![],
             artifacts: Vec::new(),
             coverage_inputs: Vec::new(),
+            inputs: Vec::new(),
             when_changed: vec![],
         }
     }

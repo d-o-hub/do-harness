@@ -113,6 +113,16 @@ pub struct SensorSpec {
         skip_serializing_if = "Vec::is_empty"
     )]
     pub coverage_inputs: Vec<String>,
+    /// Repository-relative glob patterns of every file whose content can
+    /// change this sensor's outcome (sources, configs, fixtures, lockfiles).
+    /// A nonempty declaration opts the sensor into unchanged-input reuse:
+    /// `verify --unchanged` may reuse a recorded passing beat when every
+    /// matched path and its content is identical. Empty (the default) means
+    /// the sensor always runs. The declaration must be complete — commands
+    /// that also read the environment, network, generated outputs, or
+    /// history cannot safely reuse and must stay undeclared.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub inputs: Vec<String>,
 }
 
 impl SensorSpec {
@@ -148,6 +158,7 @@ fn spec(name: &str, argv: &[&str], when_changed: &[&str]) -> SensorSpec {
         when_changed: when_changed.iter().map(|glob| (*glob).to_owned()).collect(),
         artifacts: Vec::new(),
         coverage_inputs: Vec::new(),
+        inputs: Vec::new(),
     }
 }
 
@@ -195,6 +206,7 @@ pub fn rust_pack() -> Vec<SensorSpec> {
             when_changed: RUST_INPUTS.iter().map(|glob| (*glob).to_owned()).collect(),
             artifacts: Vec::new(),
             coverage_inputs: Vec::new(),
+            inputs: Vec::new(),
         },
         spec("loc", &["bash", "scripts/check-loc.sh"], &["**/*.rs"]),
         spec("deps", &["bash", "scripts/check-deps.sh"], &[]),
@@ -270,6 +282,7 @@ impl Config {
             validate_globs(&sensor.name, "when-changed", &sensor.when_changed)?;
             validate_globs(&sensor.name, "artifacts", &sensor.artifacts)?;
             validate_globs(&sensor.name, "coverage-inputs", &sensor.coverage_inputs)?;
+            validate_globs(&sensor.name, "inputs", &sensor.inputs)?;
             if sensor.allow_failure && sensor.severity == Some(SensorSeverity::Error) {
                 anyhow::bail!(
                     "sensor '{}' sets both allow_failure = true and severity = \"error\"; \

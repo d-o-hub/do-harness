@@ -286,6 +286,9 @@ pub struct SensorOutcome<'a> {
     pub ok: bool,
     /// Failure output kept as the signature message.
     pub message: Option<&'a str>,
+    /// Identity of the sensor's declared inputs at a clean pass, when the
+    /// sensor opts into unchanged-input reuse.
+    pub input_digest: Option<&'a str>,
 }
 
 /// Persists every sensor outcome in one transaction, so a crash can never
@@ -311,7 +314,14 @@ pub async fn record_verify_batch(conn: &Connection, outcomes: &[SensorOutcome<'_
 async fn record_verify_batch_once(conn: &Connection, outcomes: &[SensorOutcome<'_>]) -> Result<()> {
     let tx = crate::tx::begin_immediate(conn).await?;
     for outcome in outcomes {
-        insert_beat(&tx, &outcome.beat).await?;
+        let beat_id = insert_beat(&tx, &outcome.beat).await?;
+        if let Some(digest) = outcome.input_digest {
+            tx.execute(
+                "UPDATE beats SET input_digest = ?1 WHERE id = ?2",
+                params!(digest, beat_id),
+            )
+            .await?;
+        }
         let signature = format!("sensor:{}", outcome.beat.sensor_name.unwrap_or("unknown"));
         if outcome.ok {
             reset_error_signature(&tx, &signature, outcome.beat.task_id).await?;
@@ -321,6 +331,36 @@ async fn record_verify_batch_once(conn: &Connection, outcomes: &[SensorOutcome<'
     }
     tx.commit().await?;
     Ok(())
+}
+
+/// Returns the most recent sensor beat for `sensor_name` in `scope`
+/// (`branch:<name>`, `task:<id>`, or `global`): id, status, exit code, and
+/// recorded input digest.
+///
+/// A later failed or warned beat always shadows an earlier pass, so reuse can
+/// never search past the newest outcome. The lookup is exact-scope: a beat
+/// recorded on one branch never satisfies a query for another.
+///
+/// # Errors
+///
+/// Returns an error when the query fails.
+pub async fn latest_sensor_beat(
+    conn: &Connection,
+    sensor_name: &str,
+    scope: &str,
+) -> Result<Option<(i64, String, Option<i32>, Option<String>)>> {
+    let mut rows = conn
+        .query(
+            "SELECT id, status, sensor_exit_code, input_digest FROM beats \
+             WHERE beat_type = 'sensor' AND sensor_name = ?1 AND scope = ?2 \
+             ORDER BY id DESC LIMIT 1",
+            params!(sensor_name, scope),
+        )
+        .await?;
+    match rows.next().await? {
+        Some(row) => Ok(Some((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))),
+        None => Ok(None),
+    }
 }
 
 /// Fetches an error signature by its `(signature, task_id)` key.

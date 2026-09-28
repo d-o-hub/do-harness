@@ -3,6 +3,8 @@
 use super::*;
 use crate::repo::NewTask;
 
+mod reuse;
+
 #[tokio::test(flavor = "current_thread")]
 async fn insert_beat_roundtrips_and_filters_by_task() {
     let dir = tempfile::tempdir().unwrap();
@@ -199,6 +201,7 @@ async fn record_verify_batch_rolls_back_everything_on_failure() {
             },
             ok: true,
             message: None,
+            input_digest: None,
         },
         SensorOutcome {
             // FK violation: task 9999 does not exist.
@@ -214,6 +217,7 @@ async fn record_verify_batch_rolls_back_everything_on_failure() {
             },
             ok: false,
             message: Some("boom"),
+            input_digest: None,
         },
     ];
 

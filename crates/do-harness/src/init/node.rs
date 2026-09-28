@@ -162,6 +162,7 @@ pub fn probe_node(root: &Path) -> (Vec<Candidate>, Vec<SensorSpec>) {
             when_changed: ts_globs,
             artifacts: Vec::new(),
             coverage_inputs: Vec::new(),
+            inputs: Vec::new(),
         });
     } else {
         candidates.push(Candidate {
@@ -219,6 +220,7 @@ pub fn probe_node(root: &Path) -> (Vec<Candidate>, Vec<SensorSpec>) {
             when_changed: code_globs.clone(),
             artifacts: Vec::new(),
             coverage_inputs: Vec::new(),
+            inputs: Vec::new(),
         });
     } else {
         candidates.push(Candidate {
@@ -273,6 +275,7 @@ pub fn probe_node(root: &Path) -> (Vec<Candidate>, Vec<SensorSpec>) {
             when_changed: code_globs,
             artifacts: Vec::new(),
             coverage_inputs: Vec::new(),
+            inputs: Vec::new(),
         });
     } else {
         candidates.push(Candidate {
@@ -314,6 +317,7 @@ pub fn probe_node(root: &Path) -> (Vec<Candidate>, Vec<SensorSpec>) {
             when_changed: build_globs,
             artifacts: Vec::new(),
             coverage_inputs: Vec::new(),
+            inputs: Vec::new(),
         });
     } else {
         candidates.push(Candidate {

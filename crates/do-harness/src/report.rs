@@ -13,6 +13,23 @@ pub enum Format {
     Json,
 }
 
+/// How a sensor produced its verdict.
+///
+/// Reuse is never reported as an observed pass: a reused result carries no
+/// exit code or duration and serializes as `"reused"`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Execution {
+    /// The sensor process executed in this run.
+    #[default]
+    Ran,
+    /// A recorded passing beat was reused because the sensor's declared
+    /// inputs are unchanged.
+    Reused,
+    /// The sensor did not execute: blocked, quarantined, or cancelled.
+    NotRun,
+}
+
 /// Sensor verdict with timing and exit information.
 #[derive(Debug, Clone, Serialize)]
 pub struct SensorResult {
@@ -41,6 +58,13 @@ pub struct SensorResult {
     /// Blessed ratchet baseline for this sensor, when one exists.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub baseline: Option<u64>,
+    /// How this verdict was produced (`ran` | `reused` | `not_run`).
+    #[serde(default)]
+    pub execution: Execution,
+    /// Recorded passing beat reused for an unchanged-input skip, when
+    /// `execution == "reused"`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reused_beat_id: Option<i64>,
     /// Captured combined output; excluded from serialization.
     #[serde(skip)]
     pub output: String,
@@ -72,18 +96,31 @@ const OUTPUT_TAIL_LINES: usize = 80;
 /// go to stderr, prefixed with six spaces.
 pub fn print_report(report: &VerifyReport, format: Format) {
     for sensor in &report.sensors {
-        let verdict = match (sensor.ok, sensor.warned, sensor.allow_failure) {
-            (true, false, _) => "PASS",
-            (false, _, false) => "FAIL",
-            (true, true, _) | (false, _, true) => "WARN",
+        let verdict = match sensor.execution {
+            Execution::Reused => "SKIP",
+            Execution::Ran | Execution::NotRun => {
+                match (sensor.ok, sensor.warned, sensor.allow_failure) {
+                    (true, false, _) => "PASS",
+                    (false, _, false) => "FAIL",
+                    (true, true, _) | (false, _, true) => "WARN",
+                }
+            }
         };
-        let line = format!("{verdict}  {}{}", sensor.name, findings_suffix(sensor));
+        let detail = if sensor.execution == Execution::Reused {
+            match sensor.reused_beat_id {
+                Some(id) => format!(" (unchanged inputs; reused beat {id})"),
+                None => " (unchanged inputs; reused recorded passing beat)".to_owned(),
+            }
+        } else {
+            findings_suffix(sensor)
+        };
+        let line = format!("{verdict}  {}{detail}", sensor.name);
         if format == Format::Json {
             eprintln!("{line}");
         } else {
             println!("{line}");
         }
-        if !sensor.ok {
+        if !sensor.ok && sensor.execution != Execution::Reused {
             let lines: Vec<&str> = sensor.output.lines().collect();
             let start = lines.len().saturating_sub(OUTPUT_TAIL_LINES);
             for line in &lines[start..] {
@@ -92,10 +129,22 @@ pub fn print_report(report: &VerifyReport, format: Format) {
         }
     }
     if report.ok {
-        if format == Format::Json {
-            eprintln!("All sensors passed.");
+        // A reused run is green but produced no fresh observations, so the
+        // unconditional pass footer is replaced by an explicit reuse count.
+        let reused = report
+            .sensors
+            .iter()
+            .filter(|sensor| sensor.execution == Execution::Reused)
+            .count();
+        let footer = if reused == 0 {
+            "All sensors passed.".to_owned()
         } else {
-            println!("All sensors passed.");
+            format!("All sensors passed ({reused} reused from unchanged inputs).")
+        };
+        if format == Format::Json {
+            eprintln!("{footer}");
+        } else {
+            println!("{footer}");
         }
     } else {
         eprintln!("Failed sensors: {}", report.failed.join(", "));
@@ -161,6 +210,8 @@ mod tests {
                 warned: false,
                 findings: None,
                 baseline: None,
+                execution: Execution::Ran,
+                reused_beat_id: None,
                 output: "hidden".to_owned(),
             }],
             signal_set: None,
@@ -172,6 +223,7 @@ mod tests {
         assert!(value.get("failed").is_some());
         assert!(value["sensors"][0].get("exit_code").is_some());
         assert!(value["sensors"][0].get("warned").is_some());
+        assert_eq!(value["sensors"][0]["execution"], "ran");
         assert!(value["sensors"][0].get("output").is_none());
     }
 }

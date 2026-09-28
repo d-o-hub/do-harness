@@ -50,6 +50,7 @@ mod metrics;
 mod overlap;
 mod pr;
 mod report;
+mod sensor_inputs;
 mod sensors;
 mod shell;
 mod signals;
@@ -197,6 +198,7 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
             only,
             exclude,
             jobs,
+            unchanged,
             record,
             task,
             global,
@@ -224,6 +226,7 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
                 only,
                 exclude,
                 jobs,
+                unchanged,
                 record,
                 task: task_id,
                 raw_task,

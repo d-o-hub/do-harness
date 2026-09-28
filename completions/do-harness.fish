@@ -82,6 +82,9 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand verify" -l set -d 
 complete -c do-harness -n "__fish_do_harness_using_subcommand verify" -l only -d 'Run only the named sensor (repeatable or comma-separated)' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand verify" -l exclude -d 'Exclude named sensors from the run' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand verify" -l jobs -d 'Maximum sensors in flight (overrides `jobs` in do-harness.toml)' -r
+complete -c do-harness -n "__fish_do_harness_using_subcommand verify" -l unchanged -d 'Reuse recorded passing beats for sensors whose declared inputs are unchanged: `warn` (default) executes and advises, `skip` reuses without executing (requires --record), `run` always executes' -r -f -a "warn\t'Execute the sensor, but print an advisory when a recorded pass is eligible for reuse (the conservative default: evidence stays fresh)'
+skip\t'Reuse the eligible recorded pass without executing the sensor'
+run\t'Execute unconditionally; no reuse lookup at all'"
 complete -c do-harness -n "__fish_do_harness_using_subcommand verify" -l task -d 'Scope records and fail-fast strikes to this task id (or \'global\')' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand verify" -l evidence -d 'Write a machine-readable evidence artifact to path' -r -F
 complete -c do-harness -n "__fish_do_harness_using_subcommand verify" -l approver -d 'Approver identity recorded with `--bless` (defaults to `DO_HARNESS_APPROVER` or the git user email)' -r
@@ -106,6 +109,9 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand check" -l set -d '
 complete -c do-harness -n "__fish_do_harness_using_subcommand check" -l only -d 'Run only the named sensor (repeatable or comma-separated)' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand check" -l exclude -d 'Exclude named sensors from the run' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand check" -l jobs -d 'Maximum sensors in flight (overrides `jobs` in do-harness.toml)' -r
+complete -c do-harness -n "__fish_do_harness_using_subcommand check" -l unchanged -d 'Reuse recorded passing beats for sensors whose declared inputs are unchanged: `warn` (default) executes and advises, `skip` reuses without executing (requires --record), `run` always executes' -r -f -a "warn\t'Execute the sensor, but print an advisory when a recorded pass is eligible for reuse (the conservative default: evidence stays fresh)'
+skip\t'Reuse the eligible recorded pass without executing the sensor'
+run\t'Execute unconditionally; no reuse lookup at all'"
 complete -c do-harness -n "__fish_do_harness_using_subcommand check" -l task -d 'Scope records and fail-fast strikes to this task id (or \'global\')' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand check" -l evidence -d 'Write a machine-readable evidence artifact to path' -r -F
 complete -c do-harness -n "__fish_do_harness_using_subcommand check" -l approver -d 'Approver identity recorded with `--bless` (defaults to `DO_HARNESS_APPROVER` or the git user email)' -r

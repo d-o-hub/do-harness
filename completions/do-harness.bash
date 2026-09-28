@@ -4793,7 +4793,7 @@ _do__harness() {
             return 0
             ;;
         do__subcmd__harness__subcmd__verify)
-            opts="-v -q -h -V --fail-fast --format --set --changed --only --exclude --jobs --record --task --global --evidence --strict --bless --approver --root --config --verbose --quiet --color --output --dry-run --help --version"
+            opts="-v -q -h -V --fail-fast --format --set --changed --only --exclude --jobs --unchanged --record --task --global --evidence --strict --bless --approver --root --config --verbose --quiet --color --output --dry-run --help --version"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -4817,6 +4817,10 @@ _do__harness() {
                     ;;
                 --jobs)
                     COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --unchanged)
+                    COMPREPLY=($(compgen -W "warn skip run" -- "${cur}"))
                     return 0
                     ;;
                 --task)

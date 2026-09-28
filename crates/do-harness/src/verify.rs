@@ -6,7 +6,7 @@ use crate::baselines::{Baselines, BlessOutcome};
 use crate::config::SensorSeverity;
 use crate::evidence::EvidenceSkipped;
 use crate::sensors::VerifyOpts;
-use crate::{CliError, config, evidence, report, sensors, telemetry};
+use crate::{CliError, config, evidence, report, sensor_inputs, sensors, telemetry};
 
 /// Marker exported by managed git hooks (`hook install`); see
 /// `hook_script::EXEC_VERIFY`.
@@ -55,6 +55,11 @@ pub(crate) async fn run(root: &Path, mut opts: VerifyOpts) -> std::result::Resul
             "--bless requires --record (a bless writes state)"
         )));
     }
+    if opts.unchanged == sensors::UnchangedMode::Skip && !opts.record {
+        return Err(CliError::Usage(anyhow::anyhow!(
+            "--unchanged=skip requires --record (reuse reads recorded beats)"
+        )));
+    }
     opts.baselines = Baselines::load(root).await.map_err(CliError::Usage)?;
     if opts.record {
         let struck = telemetry::struck_sensors(root, &cfg.sensor_names(), beat_scope.task_id())
@@ -72,6 +77,7 @@ pub(crate) async fn run(root: &Path, mut opts: VerifyOpts) -> std::result::Resul
                 opts.blocked.push(name);
             }
         }
+        prepare_reuse(root, &cfg, config_bytes.as_deref(), &beat_scope, &mut opts).await?;
     }
     match sensors::verify(&cfg, root, &opts) {
         Ok(report) => {
@@ -82,9 +88,17 @@ pub(crate) async fn run(root: &Path, mut opts: VerifyOpts) -> std::result::Resul
                 .cloned()
                 .collect();
             if opts.record {
-                telemetry::record_verify(root, &report, &skipped, &beat_scope)
-                    .await
-                    .map_err(CliError::Usage)?;
+                telemetry::record_verify(
+                    root,
+                    &report,
+                    &skipped,
+                    &beat_scope,
+                    &cfg,
+                    config_bytes.as_deref(),
+                    &opts.pre_digests,
+                )
+                .await
+                .map_err(CliError::Usage)?;
             }
             if opts.bless {
                 bless_baselines(root, &report, &opts).await?;
@@ -112,6 +126,72 @@ pub(crate) async fn run(root: &Path, mut opts: VerifyOpts) -> std::result::Resul
         }
         Err(err) => Err(CliError::Usage(err)),
     }
+}
+
+/// Resolves which selected sensors may reuse a recorded passing beat.
+///
+/// Only `--record` runs consult the cache. For every selected sensor that is
+/// neither blocked nor quarantined, the declared-input identity is computed
+/// *before* anything executes and stored in `pre_digests` so the recorder can
+/// reject a digest whose inputs changed while the sensor ran. Unless `--bless`
+/// (which needs current observations) or `--unchanged=run` (the forcing path)
+/// is set, the latest beat in the same scope decides eligibility:
+/// the newest beat must be `ok`, exit 0, with an identical stored digest — a
+/// later failed or warned beat always shadows an earlier pass. Eligible beats
+/// are reused under `--unchanged=skip` and reported as an advisory otherwise.
+///
+/// # Errors
+///
+/// Returns an error when selection resolution or the state database fails.
+async fn prepare_reuse(
+    root: &Path,
+    cfg: &config::Config,
+    config_bytes: Option<&[u8]>,
+    scope: &telemetry::BeatScope,
+    opts: &mut VerifyOpts,
+) -> std::result::Result<(), CliError> {
+    let selection = sensors::resolve_selection(cfg, root, opts).map_err(CliError::Usage)?;
+    let lookup = !opts.bless && opts.unchanged != sensors::UnchangedMode::Run;
+    // Opened on first need: a run whose sensors declare no `inputs` never
+    // consults the cache and must not pay for a state-database connection.
+    let mut conn: Option<do_harness_db::Connection> = None;
+    for spec in &selection.specs {
+        if opts.blocked.contains(&spec.name) || opts.quarantined.contains(&spec.name) {
+            continue;
+        }
+        let Some(digest) = sensor_inputs::digest(root, spec, config_bytes) else {
+            continue;
+        };
+        if lookup {
+            let db = match conn.take() {
+                Some(db) => db,
+                None => do_harness_db::connect_and_migrate(root)
+                    .await
+                    .map_err(|e| CliError::Usage(e.into()))?,
+            };
+            let latest = do_harness_db::latest_sensor_beat(&db, &spec.name, &scope.key())
+                .await
+                .map_err(|e| CliError::Usage(e.into()))?;
+            if let Some((beat_id, status, exit_code, stored)) = latest {
+                let eligible = status == "ok"
+                    && exit_code == Some(0)
+                    && stored.as_deref() == Some(digest.as_str());
+                if eligible {
+                    if opts.unchanged == sensors::UnchangedMode::Skip {
+                        opts.reused.insert(spec.name.clone(), beat_id);
+                    } else {
+                        eprintln!(
+                            "warning: {}: unchanged inputs; would reuse beat {beat_id} with --unchanged=skip",
+                            spec.name
+                        );
+                    }
+                }
+            }
+            conn = Some(db);
+        }
+        opts.pre_digests.insert(spec.name.clone(), digest);
+    }
+    Ok(())
 }
 
 /// Applies `--bless` to the run's observed findings counts: initializes or
@@ -252,6 +332,7 @@ async fn write_evidence(
         changed: opts.changed,
         skipped,
         task: opts.task,
+        record: opts.record,
         started_at,
         finished_at,
     };

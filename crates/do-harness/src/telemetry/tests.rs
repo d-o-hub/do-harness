@@ -20,14 +20,24 @@ async fn record_verify_persists_beats_and_signatures() {
             warned: false,
             findings: None,
             baseline: None,
+            execution: crate::report::Execution::Ran,
+            reused_beat_id: None,
             output: "boom".to_owned(),
         }],
         signal_set: None,
     };
 
-    record_verify(dir.path(), &report, &[], &BeatScope::Global)
-        .await
-        .unwrap();
+    record_verify(
+        dir.path(),
+        &report,
+        &[],
+        &BeatScope::Global,
+        &crate::config::rust_default(),
+        None,
+        &std::collections::BTreeMap::new(),
+    )
+    .await
+    .unwrap();
 
     let conn = do_harness_db::connect_and_migrate(dir.path())
         .await
@@ -62,14 +72,24 @@ async fn record_verify_skips_signatures_when_all_pass() {
             warned: false,
             findings: None,
             baseline: None,
+            execution: crate::report::Execution::Ran,
+            reused_beat_id: None,
             output: String::new(),
         }],
         signal_set: None,
     };
 
-    record_verify(dir.path(), &report, &[], &BeatScope::Global)
-        .await
-        .unwrap();
+    record_verify(
+        dir.path(),
+        &report,
+        &[],
+        &BeatScope::Global,
+        &crate::config::rust_default(),
+        None,
+        &std::collections::BTreeMap::new(),
+    )
+    .await
+    .unwrap();
 
     let conn = do_harness_db::connect_and_migrate(dir.path())
         .await
@@ -103,6 +123,8 @@ async fn record_verify_skips_blocked_sensor_signature() {
             warned: false,
             findings: None,
             baseline: None,
+            execution: crate::report::Execution::Ran,
+            reused_beat_id: None,
             output: "halted: ...".to_owned(),
         }],
         signal_set: None,
@@ -113,6 +135,9 @@ async fn record_verify_skips_blocked_sensor_signature() {
         &report,
         &["halted".to_owned()],
         &BeatScope::Global,
+        &crate::config::rust_default(),
+        None,
+        &std::collections::BTreeMap::new(),
     )
     .await
     .unwrap();
@@ -208,13 +233,23 @@ async fn record_verify_persists_actionable_nextest_failure_context() {
             warned: false,
             findings: None,
             baseline: None,
+            execution: crate::report::Execution::Ran,
+            reused_beat_id: None,
             output: synthetic_nextest_output(),
         }],
         signal_set: None,
     };
-    record_verify(dir.path(), &report, &[], &BeatScope::Global)
-        .await
-        .unwrap();
+    record_verify(
+        dir.path(),
+        &report,
+        &[],
+        &BeatScope::Global,
+        &crate::config::rust_default(),
+        None,
+        &std::collections::BTreeMap::new(),
+    )
+    .await
+    .unwrap();
 
     let conn = do_harness_db::connect_and_migrate(dir.path())
         .await
@@ -261,13 +296,23 @@ async fn record_verify_resets_strikes_on_pass() {
             warned: false,
             findings: None,
             baseline: None,
+            execution: crate::report::Execution::Ran,
+            reused_beat_id: None,
             output: String::new(),
         }],
         signal_set: None,
     };
-    record_verify(dir.path(), &report, &[], &BeatScope::Global)
-        .await
-        .unwrap();
+    record_verify(
+        dir.path(),
+        &report,
+        &[],
+        &BeatScope::Global,
+        &crate::config::rust_default(),
+        None,
+        &std::collections::BTreeMap::new(),
+    )
+    .await
+    .unwrap();
 
     let conn = do_harness_db::connect_and_migrate(dir.path())
         .await
@@ -321,13 +366,23 @@ async fn record_verify_scopes_to_task() {
             warned: false,
             findings: None,
             baseline: None,
+            execution: crate::report::Execution::Ran,
+            reused_beat_id: None,
             output: "E0308".to_owned(),
         }],
         signal_set: None,
     };
-    record_verify(dir.path(), &report, &[], &BeatScope::Task(task_id))
-        .await
-        .unwrap();
+    record_verify(
+        dir.path(),
+        &report,
+        &[],
+        &BeatScope::Task(task_id),
+        &crate::config::rust_default(),
+        None,
+        &std::collections::BTreeMap::new(),
+    )
+    .await
+    .unwrap();
 
     let conn = do_harness_db::connect_and_migrate(dir.path())
         .await
@@ -372,15 +427,25 @@ async fn record_verify_scopes_to_branch() {
             warned: false,
             findings: None,
             baseline: None,
+            execution: crate::report::Execution::Ran,
+            reused_beat_id: None,
             output: String::new(),
         }],
         signal_set: None,
     };
 
     let scope = BeatScope::Branch("feat/feature-a".to_string());
-    record_verify(dir.path(), &report, &[], &scope)
-        .await
-        .unwrap();
+    record_verify(
+        dir.path(),
+        &report,
+        &[],
+        &scope,
+        &crate::config::rust_default(),
+        None,
+        &std::collections::BTreeMap::new(),
+    )
+    .await
+    .unwrap();
 
     let conn = do_harness_db::connect_and_migrate(dir.path())
         .await

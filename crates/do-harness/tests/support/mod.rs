@@ -30,3 +30,4 @@ pub fn git_command(root: &Path) -> Command {
 }
 
 pub mod dora;
+pub mod reuse;

@@ -107,4 +107,9 @@ pub const MIGRATIONS: &[Migration] = &[
         name: "beat_scope",
         sql: include_str!("../migrations/0019_beat_scope.sql"),
     },
+    Migration {
+        version: 20,
+        name: "beat_input_digest",
+        sql: include_str!("../migrations/0020_beat_input_digest.sql"),
+    },
 ];
