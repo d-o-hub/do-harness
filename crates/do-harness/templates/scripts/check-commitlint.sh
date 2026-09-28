@@ -17,11 +17,14 @@
 
 set -euo pipefail
 
-# Git exports `GIT_DIR` (and friends) to hooks; left in place, the `git log`
-# calls below would target the hook's repository instead of this work tree.
+# Git exports `GIT_DIR` (and friends) to hooks, and a caller can set the
+# other view overrides below (`GIT_COMMON_DIR`, `GIT_SHALLOW_FILE`, ...); left
+# in place, the `git log` calls below would read that repository or a
+# truncated history instead of this work tree's.
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY \
     GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_CEILING_DIRECTORIES GIT_NAMESPACE \
-    GIT_PREFIX
+    GIT_PREFIX GIT_COMMON_DIR GIT_SHALLOW_FILE GIT_GRAFT_FILE \
+    GIT_REPLACE_REF_BASE
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 

@@ -7,8 +7,11 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
+use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+
+mod support;
 
 /// The shipped shell resolver, reused rather than re-derived.
 ///
@@ -30,19 +33,7 @@ mod shell;
 /// `pre-push` hook runs `cargo test`. Without this, `git -C <fixture>` still
 /// resolves the real repository, so the fixtures would lint the wrong history.
 fn isolate(command: &mut Command) -> &mut Command {
-    for key in [
-        "GIT_DIR",
-        "GIT_WORK_TREE",
-        "GIT_INDEX_FILE",
-        "GIT_OBJECT_DIRECTORY",
-        "GIT_ALTERNATE_OBJECT_DIRECTORIES",
-        "GIT_CEILING_DIRECTORIES",
-        "GIT_NAMESPACE",
-        "GIT_PREFIX",
-    ] {
-        command.env_remove(key);
-    }
-    command
+    support::clear_git_view(command)
 }
 
 /// Builds a program command with hook-inherited repository environment removed.
@@ -72,20 +63,29 @@ fn fixture() -> (tempfile::TempDir, PathBuf) {
     (dir, root)
 }
 
-/// Runs the script in `root`, returning (success, stdout, stderr).
-fn lint(root: &Path, args: &[&str]) -> (bool, String, String) {
-    let output = isolate(&mut shell::bash())
+/// Runs the script in `root` with extra environment overrides, returning
+/// (success, stdout, stderr).
+fn lint_env(root: &Path, args: &[&str], env: &[(&str, &OsStr)]) -> (bool, String, String) {
+    let mut bash = shell::bash();
+    let command = isolate(&mut bash)
         .arg(root.join("scripts/check-commitlint.sh"))
         .args(args)
         .current_dir(root)
-        .env_remove("DO_HARNESS_COMMITLINT_COUNT")
-        .output()
-        .expect("spawn check-commitlint.sh");
+        .env_remove("DO_HARNESS_COMMITLINT_COUNT");
+    for (key, value) in env {
+        command.env(key, value);
+    }
+    let output = command.output().expect("spawn check-commitlint.sh");
     (
         output.status.success(),
         String::from_utf8_lossy(&output.stdout).into_owned(),
         String::from_utf8_lossy(&output.stderr).into_owned(),
     )
+}
+
+/// Runs the script in `root` without extra overrides.
+fn lint(root: &Path, args: &[&str]) -> (bool, String, String) {
+    lint_env(root, args, &[])
 }
 
 /// Runs `git` in `root`, optionally pinning author and committer dates.
@@ -110,6 +110,17 @@ fn git(root: &Path, args: &[&str], date: Option<&str>) {
         "git {args:?} failed:\n{}",
         String::from_utf8_lossy(&output.stderr)
     );
+}
+
+/// `git rev-parse HEAD` in `root`.
+fn head_sha(root: &Path) -> String {
+    let output = isolated_command("git")
+        .args(["rev-parse", "HEAD"])
+        .current_dir(root)
+        .output()
+        .expect("spawn git");
+    assert!(output.status.success(), "git rev-parse HEAD failed");
+    String::from_utf8_lossy(&output.stdout).trim().to_owned()
 }
 
 /// Commits an empty change with a pinned date.
@@ -306,5 +317,61 @@ fn commitlint_excludes_the_base_in_github_test_merge_shape() {
     assert!(
         stdout.contains("not on origin/main"),
         "the window must be scoped to the branch's commits:\n{stdout}"
+    );
+}
+
+/// A caller-set git view override must not redirect or truncate the lint.
+///
+/// `GIT_SHALLOW_FILE` otherwise hides the older bad commit — a false green in
+/// a gating sensor — and `GIT_COMMON_DIR`/`GIT_GRAFT_FILE` otherwise make the
+/// script read another repository or graft advice instead of the subjects
+/// under test, so the script clears them before its first git call.
+#[test]
+fn commitlint_ignores_foreign_git_view_overrides() {
+    let (_dir, root) = fixture();
+    let (_foreign_dir, foreign) = fixture();
+    git(&root, &["init", "-q"], None);
+    commit(&root, "BAD: First", "2024-01-01T00:00:00Z");
+    commit(&root, "feat: second", "2024-01-02T00:00:00Z");
+    git(&foreign, &["init", "-q"], None);
+    commit(&foreign, "fix: foreign", "2024-01-01T00:00:00Z");
+
+    // Baseline: the bad subject in the window is caught.
+    let (ok, stdout, stderr) = lint(&root, &["--count", "2"]);
+    assert!(
+        !ok,
+        "baseline must catch the bad subject:\n{stdout}\n{stderr}"
+    );
+    assert!(stdout.contains("BAD: First"), "baseline:\n{stdout}");
+
+    // Truncated history: a shallow/graft file pinned at HEAD hides "BAD: First".
+    let shallow = root.join("shallow-file");
+    std::fs::write(&shallow, format!("{}\n", head_sha(&root))).unwrap();
+    let (ok, stdout, stderr) = lint_env(
+        &root,
+        &["--count", "2"],
+        &[
+            ("GIT_SHALLOW_FILE", shallow.as_os_str()),
+            ("GIT_GRAFT_FILE", shallow.as_os_str()),
+        ],
+    );
+    assert!(
+        !ok && stdout.contains("BAD: First"),
+        "a shallow/graft file must not hide the bad subject:\n{stdout}\n{stderr}"
+    );
+
+    // Foreign repository: a common dir that holds one valid subject.
+    let (ok, stdout, stderr) = lint_env(
+        &root,
+        &["--count", "2"],
+        &[("GIT_COMMON_DIR", foreign.join(".git").as_os_str())],
+    );
+    assert!(
+        !ok && stdout.contains("BAD: First"),
+        "GIT_COMMON_DIR must not redirect the lint:\n{stdout}\n{stderr}"
+    );
+    assert!(
+        !stderr.contains("bad object"),
+        "git must read this repository, not the foreign one:\n{stderr}"
     );
 }

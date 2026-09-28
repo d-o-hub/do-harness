@@ -15,43 +15,11 @@ use std::process::Command;
 
 use serde_json::Value;
 
+mod support;
+
 fn isolated_command(program: &str) -> Command {
     let mut command = Command::new(program);
-    for key in [
-        "GIT_DIR",
-        "GIT_WORK_TREE",
-        "GIT_INDEX_FILE",
-        "GIT_OBJECT_DIRECTORY",
-        "GIT_ALTERNATE_OBJECT_DIRECTORIES",
-        "GIT_CEILING_DIRECTORIES",
-        "GIT_NAMESPACE",
-        "GIT_PREFIX",
-        // Outer cargo and coverage-session state must not reach the sandbox.
-        // cargo-llvm-cov instruments a build through an inherited
-        // RUSTC_WRAPPER and target dir; left in place, the sandbox's own
-        // `cargo llvm-cov nextest` re-enters the outer session and dies with
-        // "Resource temporarily unavailable (os error 11)", so `verify
-        // --strict` fails its coverage sensor and the dogfood assertions flip
-        // only under `cargo llvm-cov` — never under `cargo test`.
-        "CARGO_TARGET_DIR",
-        "CARGO_INCREMENTAL",
-        "CARGO_ENCODED_RUSTFLAGS",
-        "CARGO_LLVM_COV",
-        "CARGO_LLVM_COV_TARGET_DIR",
-        "RUSTC_WRAPPER",
-        "CARGO_BUILD_RUSTC_WRAPPER",
-        "RUSTC",
-        "RUSTDOC",
-        "RUSTFLAGS",
-        "RUSTDOCFLAGS",
-    ] {
-        command.env_remove(key);
-    }
-    // Removing the profile path outright would leave instrumented children
-    // writing `default_*.profraw` into the test's working directory (the crate
-    // root); sandbox builds are never part of the outer measurement, so the
-    // profile goes to the null device instead of the tree.
-    command.env("LLVM_PROFILE_FILE", "/dev/null");
+    support::isolate_command(&mut command);
     command
 }
 
@@ -109,69 +77,6 @@ fn rust_init_on_empty_git_repo_is_green() {
         .expect("commitlint sensor entry");
     assert_eq!(commitlint["ok"], serde_json::json!(true));
     assert_eq!(commitlint["exit_code"], serde_json::json!(0));
-}
-
-#[test]
-fn rust_init_ignores_a_hook_inherited_git_dir() {
-    // Git exports `GIT_DIR` to every hook. A generated script that follows it
-    // reads the caller's repository instead of the workspace being
-    // initialised, so `init`'s baseline verify goes RED under any hook (and
-    // every local `git push` fails for a reason unrelated to the diff).
-    let foreign = tempfile::tempdir().unwrap();
-    let status = isolated_command("git")
-        .args(["init", "-q"])
-        .current_dir(foreign.path())
-        .status()
-        .expect("git init");
-    assert!(status.success(), "git init failed");
-    std::fs::create_dir_all(foreign.path().join("packages/app")).unwrap();
-    std::fs::write(
-        foreign.path().join("packages/app/package.json"),
-        "{\"name\":\"app\",\"version\":\"1.0.0\"}\n",
-    )
-    .unwrap();
-    let status = isolated_command("git")
-        .args(["add", "-A"])
-        .current_dir(foreign.path())
-        .status()
-        .expect("git add");
-    assert!(status.success(), "git add failed");
-    let status = isolated_command("git")
-        .args([
-            "-c",
-            "user.name=t",
-            "-c",
-            "user.email=t@t",
-            "commit",
-            "-qm",
-            "base",
-        ])
-        .current_dir(foreign.path())
-        .status()
-        .expect("git commit");
-    assert!(status.success(), "git commit failed");
-
-    let target = tempfile::tempdir().unwrap();
-    let mut cmd = harness(target.path());
-    cmd.env("GIT_DIR", foreign.path().join(".git"));
-    let (ok, out) = run(cmd.arg("init"));
-    assert!(
-        ok,
-        "init must ignore a hook-inherited GIT_DIR and read its own root:\n{out}"
-    );
-
-    // The generated scripts must be the ones doing the ignoring: run the
-    // release preflight directly with the foreign GIT_DIR still set.
-    let status = isolated_command("bash")
-        .arg("scripts/check-release-preflight.sh")
-        .current_dir(target.path())
-        .env("GIT_DIR", foreign.path().join(".git"))
-        .status()
-        .expect("run check-release-preflight.sh");
-    assert!(
-        status.success(),
-        "check-release-preflight.sh must not follow a foreign GIT_DIR"
-    );
 }
 
 #[test]

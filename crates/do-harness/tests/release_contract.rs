@@ -11,13 +11,11 @@ use serde_json::Value;
 
 mod support;
 
-/// The real binary, with hook-inherited git variables removed so a fixture
-/// never targets the caller's repository.
+/// The real binary, with hook-inherited state removed so a fixture never
+/// targets the caller's repository or cargo session.
 fn harness_bin() -> Command {
     let mut command = Command::new(env!("CARGO_BIN_EXE_do-harness"));
-    command.env_remove("GIT_DIR");
-    command.env_remove("GIT_WORK_TREE");
-    command.env_remove("GIT_INDEX_FILE");
+    support::isolate_command(&mut command);
     command
 }
 
