@@ -9,8 +9,14 @@ use std::process::Command;
 
 use serde_json::Value;
 
+mod support;
+
+/// The real binary, with hook-inherited state removed so a fixture never
+/// targets the caller's repository or cargo session.
 fn harness_bin() -> Command {
-    Command::new(env!("CARGO_BIN_EXE_do-harness"))
+    let mut command = Command::new(env!("CARGO_BIN_EXE_do-harness"));
+    support::isolate_command(&mut command);
+    command
 }
 
 fn fixture_dir() -> PathBuf {
@@ -28,14 +34,12 @@ fn run_cmd(cmd: &mut Command) -> (Option<i32>, String, String) {
 
 /// Creates a minimal workspace root with git repo, do-harness.toml, dummy Rust source, and plans/dora.json.
 fn setup_workspace(dir: &Path) {
-    let _ = Command::new("git").args(["init"]).current_dir(dir).output();
-    let _ = Command::new("git")
+    let _ = support::git_command(dir).args(["init"]).output();
+    let _ = support::git_command(dir)
         .args(["config", "user.name", "Test"])
-        .current_dir(dir)
         .output();
-    let _ = Command::new("git")
+    let _ = support::git_command(dir)
         .args(["config", "user.email", "test@example.com"])
-        .current_dir(dir)
         .output();
 
     fs::create_dir_all(dir.join("src")).expect("src dir");
@@ -73,13 +77,9 @@ argv = ["true"]
     )
     .expect("write do-harness.toml in temp workspace");
 
-    let _ = Command::new("git")
-        .args(["add", "."])
-        .current_dir(dir)
-        .output();
-    let _ = Command::new("git")
+    let _ = support::git_command(dir).args(["add", "."]).output();
+    let _ = support::git_command(dir)
         .args(["commit", "-m", "feat: initial commit"])
-        .current_dir(dir)
         .output();
 }
 

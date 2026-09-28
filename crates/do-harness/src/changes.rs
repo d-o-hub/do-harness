@@ -78,26 +78,39 @@ pub fn discover(root: &Path) -> ChangedFiles {
     }
 }
 
+/// Environment variables through which `git` selects which repository and
+/// history it reads.
+///
+/// Git exports `GIT_DIR` (and friends) to hooks, and a caller can set the view
+/// overrides (`GIT_COMMON_DIR`, `GIT_SHALLOW_FILE`, graft/replace files). Left
+/// in place, a git call silently targets another repository, or reports a
+/// rewritten history, instead of `root`; the same set is cleared by the
+/// generated scripts (`templates/scripts/check-*.sh`) and by the test fixtures
+/// (`tests/support/mod.rs`).
+const GIT_VIEW_ENV: [&str; 12] = [
+    "GIT_DIR",
+    "GIT_WORK_TREE",
+    "GIT_INDEX_FILE",
+    "GIT_OBJECT_DIRECTORY",
+    "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+    "GIT_CEILING_DIRECTORIES",
+    "GIT_NAMESPACE",
+    "GIT_PREFIX",
+    "GIT_COMMON_DIR",
+    "GIT_SHALLOW_FILE",
+    "GIT_GRAFT_FILE",
+    "GIT_REPLACE_REF_BASE",
+];
+
 /// Builds a `git` command rooted at `root` with hook-inherited repository
 /// environment removed.
 ///
-/// Git exports `GIT_DIR` (and related variables) to hooks; leaving them in
-/// place makes every git call silently target the hook's repository instead
-/// of `root`. Clearing them keeps `--root` authoritative and makes change
+/// Clearing [`GIT_VIEW_ENV`] keeps `--root` authoritative and makes change
 /// discovery deterministic regardless of how the CLI was invoked.
 pub(crate) fn git_command(root: &Path) -> Command {
     let mut command = Command::new("git");
     command.current_dir(root);
-    for key in [
-        "GIT_DIR",
-        "GIT_WORK_TREE",
-        "GIT_INDEX_FILE",
-        "GIT_OBJECT_DIRECTORY",
-        "GIT_ALTERNATE_OBJECT_DIRECTORIES",
-        "GIT_CEILING_DIRECTORIES",
-        "GIT_NAMESPACE",
-        "GIT_PREFIX",
-    ] {
+    for key in GIT_VIEW_ENV {
         command.env_remove(key);
     }
     command

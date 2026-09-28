@@ -32,6 +32,14 @@
 
 set -euo pipefail
 
+# Git exports `GIT_DIR` (and friends) to hooks, and a caller can set the
+# other view overrides below; left in place, `rev-parse` would resolve that
+# repository instead of this work tree.
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY \
+    GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_CEILING_DIRECTORIES GIT_NAMESPACE \
+    GIT_PREFIX GIT_COMMON_DIR GIT_SHALLOW_FILE GIT_GRAFT_FILE \
+    GIT_REPLACE_REF_BASE
+
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 
 MAX=500

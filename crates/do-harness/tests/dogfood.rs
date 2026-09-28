@@ -15,43 +15,11 @@ use std::process::Command;
 
 use serde_json::Value;
 
+mod support;
+
 fn isolated_command(program: &str) -> Command {
     let mut command = Command::new(program);
-    for key in [
-        "GIT_DIR",
-        "GIT_WORK_TREE",
-        "GIT_INDEX_FILE",
-        "GIT_OBJECT_DIRECTORY",
-        "GIT_ALTERNATE_OBJECT_DIRECTORIES",
-        "GIT_CEILING_DIRECTORIES",
-        "GIT_NAMESPACE",
-        "GIT_PREFIX",
-        // Outer cargo and coverage-session state must not reach the sandbox.
-        // cargo-llvm-cov instruments a build through an inherited
-        // RUSTC_WRAPPER and target dir; left in place, the sandbox's own
-        // `cargo llvm-cov nextest` re-enters the outer session and dies with
-        // "Resource temporarily unavailable (os error 11)", so `verify
-        // --strict` fails its coverage sensor and the dogfood assertions flip
-        // only under `cargo llvm-cov` — never under `cargo test`.
-        "CARGO_TARGET_DIR",
-        "CARGO_INCREMENTAL",
-        "CARGO_ENCODED_RUSTFLAGS",
-        "CARGO_LLVM_COV",
-        "CARGO_LLVM_COV_TARGET_DIR",
-        "RUSTC_WRAPPER",
-        "CARGO_BUILD_RUSTC_WRAPPER",
-        "RUSTC",
-        "RUSTDOC",
-        "RUSTFLAGS",
-        "RUSTDOCFLAGS",
-    ] {
-        command.env_remove(key);
-    }
-    // Removing the profile path outright would leave instrumented children
-    // writing `default_*.profraw` into the test's working directory (the crate
-    // root); sandbox builds are never part of the outer measurement, so the
-    // profile goes to the null device instead of the tree.
-    command.env("LLVM_PROFILE_FILE", "/dev/null");
+    support::isolate_command(&mut command);
     command
 }
 
