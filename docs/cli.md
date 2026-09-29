@@ -421,6 +421,27 @@ Review distilled heuristics and code snippets against the advisory Anti-AI-Slop 
 - `--dry-run`: Perform dry run without modifying files.
 - `--format <Format>`: Output format (`text` or `json`).
 
+### `learn`
+Drafts skill/guide updates from sensors that keep firing (the steering loop in
+`AGENTS.md` §6), reading recorded beats for the current scope plus
+`sensor-fire` events under `.agents/events/**`. It never applies anything: the
+draft is a proposal for an operator to act on.
+
+- `learn --draft [--days <DAYS>] [--min-fires <N>] [--format <Format>]`:
+  `--draft` is required (the command writes nothing). `--days` sets the window
+  (default 30), `--min-fires` the threshold a sensor must reach (default 3).
+- Per recurring sensor the draft names the sensor, its fire count split into
+  beats and events, the guide to update and the row template to add, the
+  `trace add` + `distill` commands that record it, a `skill-creator` scaffold
+  command, and a CHANGELOG line. Sensors under the threshold are listed as
+  `below threshold`.
+- Event records count when `event` is `sensor-fire` and `payload.sensor` names
+  the sensor; a record whose `status` is `ok` or whose `ok` is `true` is not a
+  fire. Records are dated by their `date` field or their `YYYY/MM/DD` path.
+- Proposed skill names follow the published Agent Skills specification
+  (<https://agentskills.io/specification>): lowercase alphanumerics and
+  hyphens, no leading/trailing or consecutive hyphens, at most 64 characters.
+
 ### `errors`
 Inspect and clear fail-fast error signatures. `errors list` displays each
 signature's recorded sensor output. Messages over 2,000 characters include a

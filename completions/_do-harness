@@ -1293,6 +1293,28 @@ json\:"Machine-readable JSON output"))' \
 '--version[Print version]' \
 && ret=0
 ;;
+(learn)
+_arguments "${_arguments_options[@]}" : \
+'--days=[Window in days the fires are counted over]:DAYS:_default' \
+'--min-fires=[Fires a sensor needs to appear in the draft]:N:_default' \
+'--format=[Output format]:FORMAT:((text\:"Human-readable text output"
+json\:"Machine-readable JSON output"))' \
+'--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
+'--config=[Explicit path to do-harness.toml]:FILE:_files' \
+'--color=[Color output (auto, always, never)]:WHEN:_default' \
+'--output=[Default output file path]:FILE:_files' \
+'--draft[Draft the steering actions without applying anything (required\: \`learn\` writes nothing)]' \
+'*-v[Verbosity level (-v, -vv)]' \
+'*--verbose[Verbosity level (-v, -vv)]' \
+'-q[Suppress non-error messages]' \
+'--quiet[Suppress non-error messages]' \
+'--dry-run[Dry run without side effects]' \
+'-h[Print help (see more with '\''--help'\'')]' \
+'--help[Print help (see more with '\''--help'\'')]' \
+'-V[Print version]' \
+'--version[Print version]' \
+&& ret=0
+;;
 (overlap)
 _arguments "${_arguments_options[@]}" : \
 '--threshold=[Cosine similarity at or above which a pair prints as WARN]:THRESHOLD:_default' \
@@ -1727,6 +1749,10 @@ _arguments "${_arguments_options[@]}" : \
 _arguments "${_arguments_options[@]}" : \
 && ret=0
 ;;
+(learn)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
 (overlap)
 _arguments "${_arguments_options[@]}" : \
 && ret=0
@@ -1797,6 +1823,7 @@ _do-harness_commands() {
 'hook:Manage git hooks that run \`do-harness verify\`' \
 'doctor:Run diagnostic checks on binary resolution and git hook health' \
 'metrics:Report harness trends\: sensor stats, strikes, eval pass-rate history' \
+'learn:Draft skill/guide updates from sensors that keep firing (never applies them)' \
 'overlap:Rank skill pairs by guidance overlap (Tier-2 distinctiveness advisory)' \
 'maintenance:Prune old beats and compact the state database' \
 'compliance:Print compliance mapping to OWASP Agentic Top 10, NIST AI RMF, and EU AI Act' \
@@ -1921,6 +1948,7 @@ _do-harness__subcmd__help_commands() {
 'hook:Manage git hooks that run \`do-harness verify\`' \
 'doctor:Run diagnostic checks on binary resolution and git hook health' \
 'metrics:Report harness trends\: sensor stats, strikes, eval pass-rate history' \
+'learn:Draft skill/guide updates from sensors that keep firing (never applies them)' \
 'overlap:Rank skill pairs by guidance overlap (Tier-2 distinctiveness advisory)' \
 'maintenance:Prune old beats and compact the state database' \
 'compliance:Print compliance mapping to OWASP Agentic Top 10, NIST AI RMF, and EU AI Act' \
@@ -2040,6 +2068,11 @@ _do-harness__subcmd__help__subcmd__init_commands() {
 _do-harness__subcmd__help__subcmd__init-db_commands() {
     local commands; commands=()
     _describe -t commands 'do-harness help init-db commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__help__subcmd__learn_commands] )) ||
+_do-harness__subcmd__help__subcmd__learn_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness help learn commands' commands "$@"
 }
 (( $+functions[_do-harness__subcmd__help__subcmd__list_commands] )) ||
 _do-harness__subcmd__help__subcmd__list_commands() {
@@ -2298,6 +2331,11 @@ _do-harness__subcmd__init_commands() {
 _do-harness__subcmd__init-db_commands() {
     local commands; commands=()
     _describe -t commands 'do-harness init-db commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__learn_commands] )) ||
+_do-harness__subcmd__learn_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness learn commands' commands "$@"
 }
 (( $+functions[_do-harness__subcmd__list_commands] )) ||
 _do-harness__subcmd__list_commands() {

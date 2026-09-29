@@ -161,6 +161,20 @@ pub async fn write_event(
 /// Converts a Unix timestamp to `(year, month, day)` in UTC.
 ///
 /// Uses Howard Hinnant's `civil_from_days` so the harness needs no date
+/// Days since 1970-01-01 for a proleptic Gregorian date (Hinnant's
+/// `days_from_civil`), exact for every representable input and the inverse of
+/// [`civil_from_unix`]'s date half.
+#[must_use]
+pub fn days_from_civil(year: i64, month: i64, day: i64) -> i64 {
+    let year = if month <= 2 { year - 1 } else { year };
+    let era = if year >= 0 { year } else { year - 399 } / 400;
+    let year_of_era = year - era * 400;
+    let month_shift = if month > 2 { month - 3 } else { month + 9 };
+    let day_of_year = (153 * month_shift + 2) / 5 + day - 1;
+    let day_of_era = year_of_era * 365 + year_of_era / 4 - year_of_era / 100 + day_of_year;
+    era * 146_097 + day_of_era - 719_468
+}
+
 /// dependency just to name an event directory.
 #[must_use]
 pub fn civil_from_unix(seconds: i64) -> (i64, u32, u32) {

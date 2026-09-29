@@ -56,6 +56,7 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('hook', 'hook', [CompletionResultType]::ParameterValue, 'Manage git hooks that run `do-harness verify`')
             [CompletionResult]::new('doctor', 'doctor', [CompletionResultType]::ParameterValue, 'Run diagnostic checks on binary resolution and git hook health')
             [CompletionResult]::new('metrics', 'metrics', [CompletionResultType]::ParameterValue, 'Report harness trends: sensor stats, strikes, eval pass-rate history')
+            [CompletionResult]::new('learn', 'learn', [CompletionResultType]::ParameterValue, 'Draft skill/guide updates from sensors that keep firing (never applies them)')
             [CompletionResult]::new('overlap', 'overlap', [CompletionResultType]::ParameterValue, 'Rank skill pairs by guidance overlap (Tier-2 distinctiveness advisory)')
             [CompletionResult]::new('maintenance', 'maintenance', [CompletionResultType]::ParameterValue, 'Prune old beats and compact the state database')
             [CompletionResult]::new('compliance', 'compliance', [CompletionResultType]::ParameterValue, 'Print compliance mapping to OWASP Agentic Top 10, NIST AI RMF, and EU AI Act')
@@ -1111,6 +1112,26 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('--version', '--version', [CompletionResultType]::ParameterName, 'Print version')
             break
         }
+        'do-harness;learn' {
+            [CompletionResult]::new('--days', '--days', [CompletionResultType]::ParameterName, 'Window in days the fires are counted over')
+            [CompletionResult]::new('--min-fires', '--min-fires', [CompletionResultType]::ParameterName, 'Fires a sensor needs to appear in the draft')
+            [CompletionResult]::new('--format', '--format', [CompletionResultType]::ParameterName, 'Output format')
+            [CompletionResult]::new('--root', '--root', [CompletionResultType]::ParameterName, 'Workspace root override (default: walk up from cwd)')
+            [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Explicit path to do-harness.toml')
+            [CompletionResult]::new('--color', '--color', [CompletionResultType]::ParameterName, 'Color output (auto, always, never)')
+            [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Default output file path')
+            [CompletionResult]::new('--draft', '--draft', [CompletionResultType]::ParameterName, 'Draft the steering actions without applying anything (required: `learn` writes nothing)')
+            [CompletionResult]::new('-v', '-v', [CompletionResultType]::ParameterName, 'Verbosity level (-v, -vv)')
+            [CompletionResult]::new('--verbose', '--verbose', [CompletionResultType]::ParameterName, 'Verbosity level (-v, -vv)')
+            [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Suppress non-error messages')
+            [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Suppress non-error messages')
+            [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Dry run without side effects')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            [CompletionResult]::new('-V', '-V ', [CompletionResultType]::ParameterName, 'Print version')
+            [CompletionResult]::new('--version', '--version', [CompletionResultType]::ParameterName, 'Print version')
+            break
+        }
         'do-harness;overlap' {
             [CompletionResult]::new('--threshold', '--threshold', [CompletionResultType]::ParameterName, 'Cosine similarity at or above which a pair prints as WARN')
             [CompletionResult]::new('--format', '--format', [CompletionResultType]::ParameterName, 'Output format')
@@ -1290,6 +1311,7 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('hook', 'hook', [CompletionResultType]::ParameterValue, 'Manage git hooks that run `do-harness verify`')
             [CompletionResult]::new('doctor', 'doctor', [CompletionResultType]::ParameterValue, 'Run diagnostic checks on binary resolution and git hook health')
             [CompletionResult]::new('metrics', 'metrics', [CompletionResultType]::ParameterValue, 'Report harness trends: sensor stats, strikes, eval pass-rate history')
+            [CompletionResult]::new('learn', 'learn', [CompletionResultType]::ParameterValue, 'Draft skill/guide updates from sensors that keep firing (never applies them)')
             [CompletionResult]::new('overlap', 'overlap', [CompletionResultType]::ParameterValue, 'Rank skill pairs by guidance overlap (Tier-2 distinctiveness advisory)')
             [CompletionResult]::new('maintenance', 'maintenance', [CompletionResultType]::ParameterValue, 'Prune old beats and compact the state database')
             [CompletionResult]::new('compliance', 'compliance', [CompletionResultType]::ParameterValue, 'Print compliance mapping to OWASP Agentic Top 10, NIST AI RMF, and EU AI Act')
@@ -1451,6 +1473,9 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             break
         }
         'do-harness;help;metrics' {
+            break
+        }
+        'do-harness;help;learn' {
             break
         }
         'do-harness;help;overlap' {

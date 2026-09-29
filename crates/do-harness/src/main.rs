@@ -44,6 +44,7 @@ mod fs_perm;
 mod hook_script;
 mod hooks;
 mod init;
+mod learn;
 mod loc;
 mod methods;
 mod metrics;
@@ -398,6 +399,17 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
             now,
         } => dora::command::run(&root, days, format, record, source, now).await,
         Command::CiExplain { run_id, format } => ci_explain::run(&root, &run_id, format).await,
+        Command::Learn { args } => {
+            if !args.draft {
+                return Err(CliError::Usage(anyhow::anyhow!(
+                    "learn requires --draft: it only proposes changes, never applies them"
+                )));
+            }
+            let () = learn::run(&root, Some(args.days), Some(args.min_fires), args.format)
+                .await
+                .map_err(CliError::Usage)?;
+            Ok(())
+        }
         Command::Metrics {
             format,
             sensor,
