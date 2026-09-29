@@ -11,7 +11,7 @@
 #
 #   [[sensors]]
 #   name = "loc"
-#   argv = ["bash", "scripts/check-loc.sh", "--root", "web", "--ext", "ts,tsx"]
+#   argv = ["bash", "scripts/check-loc.sh", "--root", "web,src,crates", "--ext", "rs,ts,tsx"]
 #   when-changed = ["**/*.rs", "web/**/*.ts", "web/**/*.tsx"]
 #
 # `--max` sets the ceiling and `--warn` the decomposition threshold. Generated
@@ -89,7 +89,12 @@ while (( $# > 0 )); do
             value="${1#*=}"
             [[ "$1" == "--root" ]] && { value="${2:?--root needs a value}"; shift; }
             IFS=, read -r -a parts <<<"$value"
-            ROOTS+=("${parts[@]}")
+            # Normalize each root so `web` and `./web` are one tree, not two
+            # (aliases double-count files in the FINDINGS ratchet).
+            for root_part in "${parts[@]}"; do
+                root_part="${root_part#./}"
+                ROOTS+=("${root_part%/}")
+            done
             ROOTS_EXPLICIT=1
             shift
             ;;
@@ -97,7 +102,8 @@ while (( $# > 0 )); do
             value="${1#*=}"
             [[ "$1" == "--ext" ]] && { value="${2:?--ext needs a value}"; shift; }
             IFS=, read -r -a parts <<<"$value"
-            EXTS+=("${parts[@]}")
+            # `--ext "ts, tsx"` must not silently drop the space-padded type.
+            EXTS+=("${parts[@]//[[:space:]]/}")
             shift
             ;;
         -h | --help) usage; exit 0 ;;
@@ -198,16 +204,21 @@ report_density() {
 
 # Every scanned file, relative to `$ROOT`, one per line.
 scan_files() {
-    local ext root
-    local -a not_path=()
+    local ext root name
+    # Prune by traversal, not by path string: `-not -path "*/build/*"` also
+    # matches any *ancestor* directory of the checkout, so a repository under
+    # `~/build/` reported FINDINGS: 0 with over-limit files present.
+    local -a prune_args=()
     for name in "${PRUNE_NAMES[@]}"; do
-        not_path+=(-not -path "*/$name/*")
+        (( ${#prune_args[@]} == 0 )) || prune_args+=(-o)
+        prune_args+=(-name "$name")
     done
     for ext in "${EXTS[@]}"; do
         ext="${ext#.}"
         for root in "${ROOTS[@]}"; do
             [[ -d "$ROOT/$root" ]] || continue
-            find "$ROOT/$root" -type f -name "*.$ext" "${not_path[@]}" 2>/dev/null
+            find "$ROOT/$root" -type d \( "${prune_args[@]}" \) -prune -o \
+                -type f -name "*.$ext" -print 2>/dev/null
         done
     done | sort -u
 }

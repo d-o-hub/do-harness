@@ -214,12 +214,6 @@ pub struct ReviewThreadComment {
     pub body: String,
 }
 #[derive(Deserialize)]
-struct CheckRunsResponse {
-    #[serde(default)]
-    check_runs: Vec<CheckRun>,
-}
-
-#[derive(Deserialize)]
 struct CommitStatusesResponse {
     #[serde(default)]
     statuses: Vec<CommitStatus>,
@@ -228,6 +222,13 @@ struct CommitStatusesResponse {
 #[derive(Deserialize)]
 struct GqlResponse {
     data: Option<GqlData>,
+    #[serde(default)]
+    errors: Vec<GqlError>,
+}
+
+#[derive(Deserialize)]
+struct GqlError {
+    message: String,
 }
 
 #[derive(Deserialize)]
@@ -287,9 +288,11 @@ pub fn readiness_view(root: &Path, number: u64) -> Result<PrReadinessView> {
 /// Returns an error when `gh api` fails.
 pub fn check_runs(root: &Path, head: &str) -> Result<Vec<CheckRun>> {
     let endpoint = format!("repos/{{owner}}/{{repo}}/commits/{head}/check-runs?per_page=100");
+    // `--jq` streams one object per line so every page is read: a commit can
+    // carry more than the 100 runs of the first page.
     let output = Command::new("gh")
         .current_dir(root)
-        .args(["api", &endpoint])
+        .args(["api", "--paginate", "--jq", ".check_runs[]", &endpoint])
         .output()
         .context("failed to run gh api check-runs")?;
     if !output.status.success() {
@@ -298,9 +301,13 @@ pub fn check_runs(root: &Path, head: &str) -> Result<Vec<CheckRun>> {
             String::from_utf8_lossy(&output.stderr).trim()
         );
     }
-    let wrapper: CheckRunsResponse =
-        serde_json::from_slice(&output.stdout).context("unexpected check-runs JSON")?;
-    Ok(wrapper.check_runs)
+    let text = String::from_utf8_lossy(&output.stdout);
+    let mut runs = Vec::new();
+    for line in text.lines().filter(|line| !line.trim().is_empty()) {
+        let run: CheckRun = serde_json::from_str(line).context("unexpected check-runs JSON")?;
+        runs.push(run);
+    }
+    Ok(runs)
 }
 
 /// Reads commit statuses for a commit.
@@ -309,10 +316,10 @@ pub fn check_runs(root: &Path, head: &str) -> Result<Vec<CheckRun>> {
 ///
 /// Returns an error when `gh api` fails.
 pub fn commit_statuses(root: &Path, head: &str) -> Result<Vec<CommitStatus>> {
-    let endpoint = format!("repos/{{owner}}/{{repo}}/commits/{head}/status");
+    let endpoint = format!("repos/{{owner}}/{{repo}}/commits/{head}/status?per_page=100");
     let output = Command::new("gh")
         .current_dir(root)
-        .args(["api", &endpoint])
+        .args(["api", "--paginate", &endpoint])
         .output()
         .context("failed to run gh api status")?;
     if !output.status.success() {
@@ -321,12 +328,22 @@ pub fn commit_statuses(root: &Path, head: &str) -> Result<Vec<CommitStatus>> {
             String::from_utf8_lossy(&output.stderr).trim()
         );
     }
-    let wrapper: CommitStatusesResponse =
-        serde_json::from_slice(&output.stdout).context("unexpected commit status JSON")?;
-    Ok(wrapper.statuses)
+    // `--paginate` concatenates one page document per page.
+    let pages =
+        serde_json::Deserializer::from_slice(&output.stdout).into_iter::<CommitStatusesResponse>();
+    let mut statuses = Vec::new();
+    for page in pages {
+        statuses.extend(page.context("unexpected commit status JSON")?.statuses);
+    }
+    Ok(statuses)
 }
 
 /// Reads top-level issue comments for a PR.
+///
+/// `--paginate` merges array pages into one array (verified on gh 2.45: 184
+/// single-item pages return one 184-element array), so the whole history is
+/// read — the API returns oldest-first, and a busy PR has more than one page.
+/// The streaming parse also tolerates concatenated page documents.
 ///
 /// # Errors
 ///
@@ -335,7 +352,7 @@ pub fn issue_comments(root: &Path, number: u64) -> Result<Vec<Comment>> {
     let endpoint = format!("repos/{{owner}}/{{repo}}/issues/{number}/comments?per_page=100");
     let output = Command::new("gh")
         .current_dir(root)
-        .args(["api", &endpoint])
+        .args(["api", "--paginate", &endpoint])
         .output()
         .context("failed to run gh api issue comments")?;
     if !output.status.success() {
@@ -344,7 +361,12 @@ pub fn issue_comments(root: &Path, number: u64) -> Result<Vec<Comment>> {
             String::from_utf8_lossy(&output.stderr).trim()
         );
     }
-    serde_json::from_slice(&output.stdout).context("unexpected issue comments JSON")
+    let pages = serde_json::Deserializer::from_slice(&output.stdout).into_iter::<Vec<Comment>>();
+    let mut comments = Vec::new();
+    for page in pages {
+        comments.extend(page.context("unexpected issue comments JSON")?);
+    }
+    Ok(comments)
 }
 
 /// Reads review threads for a PR via `GraphQL`.
@@ -374,6 +396,9 @@ pub fn review_threads(root: &Path, number: u64) -> Result<Vec<ReviewThread>> {
             }
         }
     }"#;
+    // `-F` (not `-f`) so `gh` substitutes the `{owner}`/`{repo}` placeholders;
+    // a raw `-f` field sends them verbatim and every query fails with
+    // "Could not resolve to a Repository with the name '{owner}/{repo}'".
     let output = Command::new("gh")
         .current_dir(root)
         .args([
@@ -381,21 +406,30 @@ pub fn review_threads(root: &Path, number: u64) -> Result<Vec<ReviewThread>> {
             "graphql",
             "-F",
             &format!("number={number}"),
-            "-f",
+            "-F",
             &format!("query={query}"),
         ])
         .output()
         .context("failed to run gh api graphql reviewThreads")?;
     if !output.status.success() {
-        return Ok(Vec::new());
+        bail!(
+            "gh api graphql reviewThreads failed: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        );
     }
     let res: GqlResponse =
-        serde_json::from_slice(&output.stdout).unwrap_or(GqlResponse { data: None });
-    Ok(res
+        serde_json::from_slice(&output.stdout).context("unexpected reviewThreads JSON")?;
+    if let Some(error) = res.errors.first() {
+        bail!(
+            "gh api graphql reviewThreads returned an error: {}",
+            error.message
+        );
+    }
+    let threads = res
         .data
         .and_then(|d| d.repository)
         .and_then(|r| r.pull_request)
         .and_then(|p| p.review_threads)
-        .map(|t| t.nodes)
-        .unwrap_or_default())
+        .ok_or_else(|| anyhow::anyhow!("gh api graphql reviewThreads returned no data"))?;
+    Ok(threads.nodes)
 }

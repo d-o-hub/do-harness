@@ -245,3 +245,63 @@ when-changed = ["web/**/*.ts"]
         "a Rust-only edit must not select the scoped sensor: {stdout}"
     );
 }
+
+/// A checkout whose *ancestor* is named after a generated tree (a Docker
+/// `WORKDIR /build`, `~/build/project`) must still be scanned: pruning by
+/// absolute path string used to match every file in the tree.
+#[cfg(unix)]
+#[test]
+fn ancestor_named_after_a_generated_tree_does_not_disable_the_scan() {
+    let dir = tempdir().unwrap();
+    let root = dir.path().join("build").join("probe");
+    std::fs::create_dir_all(&root).unwrap();
+    git(&root, &["init", "-q"]);
+    let (code, stdout, stderr) = run(harness(&root).arg("init").arg("--language").arg("rust"));
+    assert_eq!(code, Some(0), "init failed:\n{stdout}\n{stderr}");
+    write_frontend(&root);
+
+    let (code, stdout, _) = loc_script(&root, &["--root", "web", "--ext", "ts"]);
+    assert_eq!(
+        code,
+        Some(1),
+        "an ancestor named `build` must not silence the ceiling:\n{stdout}"
+    );
+    assert!(stdout.contains("FINDINGS: 1"), "{stdout}");
+    assert!(stdout.contains("big.ts"), "{stdout}");
+}
+
+/// `--ext "ts, tsx"` split on the comma but kept the space, so the padded type
+/// matched no file and was silently unenforced.
+#[cfg(unix)]
+#[test]
+fn space_padded_extension_lists_keep_every_type() {
+    let (_dir, root) = scaffolded_repo();
+    let file = root.join("web/components/big.tsx");
+    std::fs::create_dir_all(file.parent().unwrap()).unwrap();
+    std::fs::write(&file, big_module(600)).unwrap();
+
+    let (code, stdout, _) = loc_script(&root, &["--root", "web", "--ext", "ts, tsx"]);
+    assert_eq!(
+        code,
+        Some(1),
+        "the space-padded type must still be scanned:\n{stdout}"
+    );
+    assert!(stdout.contains("FINDINGS: 1"), "{stdout}");
+    assert!(stdout.contains("big.tsx"), "{stdout}");
+}
+
+/// Aliases of one tree (`web` and `./web`) are one scan, not two: a doubled
+/// count inflates the blessed `FINDINGS` ratchet.
+#[cfg(unix)]
+#[test]
+fn aliased_roots_do_not_double_count_findings() {
+    let (_dir, root) = scaffolded_repo();
+    write_frontend(&root);
+
+    let (code, stdout, _) = loc_script(&root, &["--root", "web", "--root", "./web", "--ext", "ts"]);
+    assert_eq!(code, Some(1), "{stdout}");
+    assert!(
+        stdout.contains("FINDINGS: 1"),
+        "one tree, one count:\n{stdout}"
+    );
+}

@@ -9,10 +9,11 @@
 
 use std::path::Path;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
 use super::gh;
+use crate::CliError;
 use crate::report::Format;
 
 /// Merge readiness evaluation report.
@@ -128,10 +129,10 @@ pub fn evaluate(root: &Path, number: u64) -> Result<ReadinessReport> {
     };
 
     // 2. Checks & Statuses
-    let checks = evaluate_checks(root, &view.head_ref_oid, &mut blockers);
+    let checks = evaluate_checks(root, &view.head_ref_oid, &mut blockers)?;
 
     // 3. Review Threads & Issue Comments
-    let (conversations, codecov) = evaluate_conversations(root, number, &mut blockers);
+    let (conversations, codecov) = evaluate_conversations(root, number, &mut blockers)?;
 
     let ready = blockers.is_empty();
     Ok(ReadinessReport {
@@ -145,9 +146,15 @@ pub fn evaluate(root: &Path, number: u64) -> Result<ReadinessReport> {
     })
 }
 
-fn evaluate_checks(root: &Path, head_ref_oid: &str, blockers: &mut Vec<String>) -> CheckSummary {
-    let check_runs = gh::check_runs(root, head_ref_oid).unwrap_or_default();
-    let statuses = gh::commit_statuses(root, head_ref_oid).unwrap_or_default();
+fn evaluate_checks(
+    root: &Path,
+    head_ref_oid: &str,
+    blockers: &mut Vec<String>,
+) -> Result<CheckSummary> {
+    // Fail closed: a `gh` failure means the check state is unknown, not empty.
+    let check_runs = gh::check_runs(root, head_ref_oid).context("could not read check runs")?;
+    let statuses =
+        gh::commit_statuses(root, head_ref_oid).context("could not read commit statuses")?;
 
     let mut passed = 0;
     let mut skipped = 0;
@@ -214,22 +221,22 @@ fn evaluate_checks(root: &Path, head_ref_oid: &str, blockers: &mut Vec<String>) 
     }
 
     let total = passed + skipped + pending.len() + failed.len() + cancelled.len();
-    CheckSummary {
+    Ok(CheckSummary {
         total,
         passed,
         failed,
         cancelled,
         pending,
         skipped,
-    }
+    })
 }
 
 fn evaluate_conversations(
     root: &Path,
     number: u64,
     blockers: &mut Vec<String>,
-) -> (ConversationSummary, Option<CodecovSummary>) {
-    let threads = gh::review_threads(root, number).unwrap_or_default();
+) -> Result<(ConversationSummary, Option<CodecovSummary>)> {
+    let threads = gh::review_threads(root, number).context("could not read review threads")?;
     let mut unresolved_threads = Vec::new();
     for thread in threads {
         if !thread.is_resolved && !thread.is_outdated {
@@ -263,7 +270,7 @@ fn evaluate_conversations(
         }
     }
 
-    let comments = gh::issue_comments(root, number).unwrap_or_default();
+    let comments = gh::issue_comments(root, number).context("could not read issue comments")?;
     let mut actionable_comments = Vec::new();
     let mut codecov = None;
 
@@ -316,7 +323,7 @@ fn evaluate_conversations(
         unresolved_threads,
         actionable_comments,
     };
-    (conversations, codecov)
+    Ok((conversations, codecov))
 }
 
 fn first_line(text: &str, max: usize) -> String {
@@ -325,15 +332,21 @@ fn first_line(text: &str, max: usize) -> String {
         .find(|l| !l.trim().is_empty())
         .unwrap_or("")
         .trim();
-    if line.len() > max {
-        format!("{}...", &line[..max])
+    // Truncate by characters: a byte slice at `max` panics whenever it falls
+    // inside a multi-byte character, and comment bodies are arbitrary text.
+    if line.chars().count() > max {
+        let mut excerpt: String = line.chars().take(max).collect();
+        excerpt.push_str("...");
+        excerpt
     } else {
         line.to_owned()
     }
 }
 
 fn parse_patch_coverage(body: &str) -> Option<f64> {
-    let lower = body.to_lowercase();
+    // `to_ascii_lowercase` preserves byte offsets, so the index stays valid in
+    // `body`; `to_lowercase` can change length (`İ` -> 2 bytes -> 3).
+    let lower = body.to_ascii_lowercase();
     let idx = lower.find("patch coverage")?;
     let rest = &body[idx..];
     let pct_idx = rest.find('%')?;
@@ -342,7 +355,7 @@ fn parse_patch_coverage(body: &str) -> Option<f64> {
 }
 
 fn parse_missing_lines(body: &str) -> Option<u64> {
-    let lower = body.to_lowercase();
+    let lower = body.to_ascii_lowercase();
     let idx = lower.find("lines in your changes missing coverage")?;
     let prefix = &body[..idx];
     let count_word = prefix.split_whitespace().last()?;
@@ -355,20 +368,25 @@ fn parse_missing_lines(body: &str) -> Option<u64> {
 ///
 /// # Errors
 ///
-/// Returns an error when evaluation fails or when blockers prevent merging.
-pub fn run(root: &Path, number: u64, format: Format) -> Result<()> {
-    let report = evaluate(root, number)?;
+/// Returns [`CliError::Usage`] (exit 2) when `gh` cannot be read — unknown
+/// check state must never read as a silent pass — and [`CliError::Verify`]
+/// (exit 1) when blockers prevent merging.
+pub fn run(root: &Path, number: u64, format: Format) -> std::result::Result<(), CliError> {
+    let report = evaluate(root, number).map_err(CliError::Usage)?;
     match format {
-        Format::Json => println!("{}", serde_json::to_string_pretty(&report)?),
+        Format::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&report).map_err(|e| CliError::Verify(e.into()))?
+        ),
         Format::Text => print_text(&report),
     }
     if report.ready {
         Ok(())
     } else {
-        anyhow::bail!(
+        Err(CliError::Verify(anyhow::anyhow!(
             "PR {number} is not ready to merge ({} blocker(s))",
             report.blockers.len()
-        );
+        )))
     }
 }
 

@@ -139,7 +139,7 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
         Command::Init { .. } => {
             commands::init_target(cli.root.as_deref()).map_err(CliError::Usage)?
         }
-        Command::Pr { .. } => {
+        Command::Pr { .. } | Command::CiExplain { .. } => {
             pr::command::resolve_root(cli.root.as_deref()).map_err(CliError::Usage)?
         }
         _ => commands::resolve_root(cli.root.as_deref()).map_err(CliError::Usage)?,
