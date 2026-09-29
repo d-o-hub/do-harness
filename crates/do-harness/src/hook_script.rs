@@ -253,18 +253,7 @@ mod tests {
         std::fs::write(&msg, "fix: typo\n").unwrap();
         let mut command = crate::shell::bash();
         command.arg(&hook).arg(&msg).current_dir(dir);
-        for key in [
-            "GIT_DIR",
-            "GIT_WORK_TREE",
-            "GIT_INDEX_FILE",
-            "GIT_OBJECT_DIRECTORY",
-            "GIT_ALTERNATE_OBJECT_DIRECTORIES",
-            "GIT_CEILING_DIRECTORIES",
-            "GIT_NAMESPACE",
-            "GIT_PREFIX",
-        ] {
-            command.env_remove(key);
-        }
+        crate::changes::clear_git_view(&mut command);
         command.status().unwrap().code()
     }
 

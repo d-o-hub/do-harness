@@ -1,26 +1,14 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use std::path::Path;
-use std::process::Command;
 
 use super::no_effect::{Effect, effective_change, merge_base, rev_exists};
 
 fn git(dir: &Path, args: &[&str]) {
-    let mut command = Command::new("git");
-    command.current_dir(dir);
-    for key in [
-        "GIT_DIR",
-        "GIT_WORK_TREE",
-        "GIT_INDEX_FILE",
-        "GIT_OBJECT_DIRECTORY",
-        "GIT_ALTERNATE_OBJECT_DIRECTORIES",
-        "GIT_CEILING_DIRECTORIES",
-        "GIT_NAMESPACE",
-        "GIT_PREFIX",
-    ] {
-        command.env_remove(key);
-    }
-    let output = command.args(args).output().expect("spawn git");
+    let output = crate::changes::git_command(dir)
+        .args(args)
+        .output()
+        .expect("spawn git");
     assert!(
         output.status.success(),
         "git {args:?} failed: {}",

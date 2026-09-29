@@ -16,6 +16,8 @@
 use std::path::Path;
 use std::process::Command;
 
+mod support;
+
 #[path = "../src/shell.rs"]
 #[allow(dead_code)]
 mod shell;
@@ -33,18 +35,7 @@ const LCOV_WITHOUT_BRANCHES: &str =
 /// run's repository.
 fn isolated_command(program: &str) -> Command {
     let mut command = Command::new(program);
-    for key in [
-        "GIT_DIR",
-        "GIT_WORK_TREE",
-        "GIT_INDEX_FILE",
-        "GIT_OBJECT_DIRECTORY",
-        "GIT_ALTERNATE_OBJECT_DIRECTORIES",
-        "GIT_CEILING_DIRECTORIES",
-        "GIT_NAMESPACE",
-        "GIT_PREFIX",
-    ] {
-        command.env_remove(key);
-    }
+    support::clear_git_view(&mut command);
     command
 }
 
