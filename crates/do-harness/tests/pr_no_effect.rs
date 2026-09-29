@@ -7,22 +7,13 @@ use std::process::Command;
 
 use serde_json::Value;
 
+mod support;
+
 fn git(dir: &Path, args: &[&str]) {
-    let mut command = Command::new("git");
-    command.current_dir(dir);
-    for key in [
-        "GIT_DIR",
-        "GIT_WORK_TREE",
-        "GIT_INDEX_FILE",
-        "GIT_OBJECT_DIRECTORY",
-        "GIT_ALTERNATE_OBJECT_DIRECTORIES",
-        "GIT_CEILING_DIRECTORIES",
-        "GIT_NAMESPACE",
-        "GIT_PREFIX",
-    ] {
-        command.env_remove(key);
-    }
-    let output = command.args(args).output().expect("spawn git");
+    let output = support::git_command(dir)
+        .args(args)
+        .output()
+        .expect("spawn git");
     assert!(
         output.status.success(),
         "git {args:?} failed: {}",

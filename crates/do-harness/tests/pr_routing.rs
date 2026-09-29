@@ -31,6 +31,8 @@ use std::process::{Command, Output};
 
 use serde_json::Value;
 
+mod support;
+
 /// Repository root, derived from this crate's manifest directory.
 fn repo_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -64,18 +66,7 @@ fn run_benchmark_at(fixtures: &Path) -> Output {
     cmd.env("DO_HARNESS_BIN", env!("CARGO_BIN_EXE_do-harness"));
     cmd.env("PR_TRIAGE_ROUTER", fixtures.join("fake-router.sh"));
     cmd.env("PR_TRIAGE_ROUTER_TIMEOUT", "5");
-    for key in [
-        "GIT_DIR",
-        "GIT_WORK_TREE",
-        "GIT_INDEX_FILE",
-        "GIT_OBJECT_DIRECTORY",
-        "GIT_ALTERNATE_OBJECT_DIRECTORIES",
-        "GIT_CEILING_DIRECTORIES",
-        "GIT_NAMESPACE",
-        "GIT_PREFIX",
-    ] {
-        cmd.env_remove(key);
-    }
+    support::clear_git_view(&mut cmd);
     cmd.output().expect("spawn pr-routing-benchmark.sh")
 }
 

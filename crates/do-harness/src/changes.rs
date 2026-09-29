@@ -87,7 +87,7 @@ pub fn discover(root: &Path) -> ChangedFiles {
 /// rewritten history, instead of `root`; the same set is cleared by the
 /// generated scripts (`templates/scripts/check-*.sh`) and by the test fixtures
 /// (`tests/support/mod.rs`).
-const GIT_VIEW_ENV: [&str; 12] = [
+pub(crate) const GIT_VIEW_ENV: [&str; 12] = [
     "GIT_DIR",
     "GIT_WORK_TREE",
     "GIT_INDEX_FILE",
@@ -102,6 +102,14 @@ const GIT_VIEW_ENV: [&str; 12] = [
     "GIT_REPLACE_REF_BASE",
 ];
 
+/// Removes [`GIT_VIEW_ENV`] from `command`.
+pub(crate) fn clear_git_view(command: &mut Command) -> &mut Command {
+    for key in GIT_VIEW_ENV {
+        command.env_remove(key);
+    }
+    command
+}
+
 /// Builds a `git` command rooted at `root` with hook-inherited repository
 /// environment removed.
 ///
@@ -110,9 +118,7 @@ const GIT_VIEW_ENV: [&str; 12] = [
 pub(crate) fn git_command(root: &Path) -> Command {
     let mut command = Command::new("git");
     command.current_dir(root);
-    for key in GIT_VIEW_ENV {
-        command.env_remove(key);
-    }
+    clear_git_view(&mut command);
     command
 }
 
