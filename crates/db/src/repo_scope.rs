@@ -4,7 +4,7 @@ use crate::error::Result;
 use do_harness_types::ErrorSignature;
 use libsql::{Connection, params, params::Params};
 
-/// Resets a `(signature, task_id)` pair back to zero attempts by deleting it.
+/// Resets a `(signature, scope)` pair back to zero attempts by deleting it.
 ///
 /// Called by `verify --record` when a sensor passes, so the fail-fast strike
 /// counter starts fresh on the next failure. Returns whether a row was
@@ -16,38 +16,38 @@ use libsql::{Connection, params, params::Params};
 pub async fn reset_error_signature(
     conn: &Connection,
     signature: &str,
-    task_id: Option<i64>,
+    scope: &str,
 ) -> Result<bool> {
     let deleted = conn
         .execute(
-            "DELETE FROM error_signatures WHERE signature = ?1 AND task_id IS ?2",
-            params!(signature, task_id),
+            "DELETE FROM error_signatures WHERE signature = ?1 AND scope = ?2",
+            params!(signature, scope),
         )
         .await?;
     Ok(deleted > 0)
 }
 
-/// Lists error signatures, optionally scoped to one task.
+/// Lists error signatures, optionally scoped to one workstream.
 ///
 /// # Errors
 ///
 /// Returns an error when the query fails.
 pub async fn list_error_signatures(
     conn: &Connection,
-    task_id: Option<i64>,
+    scope: Option<&str>,
 ) -> Result<Vec<ErrorSignature>> {
-    let mut rows = match task_id {
-        Some(id) => {
+    let mut rows = match scope {
+        Some(scope) => {
             conn.query(
-                "SELECT id, signature, task_id, attempt_count, message, created_at \
-                 FROM error_signatures WHERE task_id = ?1 ORDER BY attempt_count DESC",
-                params!(id),
+                "SELECT id, signature, scope, task_id, attempt_count, message, created_at \
+                 FROM error_signatures WHERE scope = ?1 ORDER BY attempt_count DESC",
+                params!(scope),
             )
             .await?
         }
         None => {
             conn.query(
-                "SELECT id, signature, task_id, attempt_count, message, created_at \
+                "SELECT id, signature, scope, task_id, attempt_count, message, created_at \
                  FROM error_signatures ORDER BY attempt_count DESC",
                 Params::None,
             )
@@ -59,16 +59,18 @@ pub async fn list_error_signatures(
         signatures.push(ErrorSignature {
             id: row.get(0)?,
             signature: row.get(1)?,
-            task_id: row.get(2)?,
-            attempt_count: row.get(3)?,
-            message: row.get(4)?,
-            created_at: row.get(5)?,
+            scope: row.get(2)?,
+            task_id: row.get(3)?,
+            attempt_count: row.get(4)?,
+            message: row.get(5)?,
+            created_at: row.get(6)?,
         });
     }
     Ok(signatures)
 }
 
-/// Clears signatures, optionally limited to one task and/or one signature key.
+/// Clears signatures, optionally limited to one workstream and/or one
+/// signature key.
 ///
 /// Returns the number of rows removed.
 ///
@@ -77,18 +79,18 @@ pub async fn list_error_signatures(
 /// Returns an error when the delete statement fails.
 pub async fn clear_error_signatures(
     conn: &Connection,
-    task_id: Option<i64>,
+    scope: Option<&str>,
     signature: Option<&str>,
 ) -> Result<usize> {
-    match (task_id, signature) {
+    match (scope, signature) {
         (None, None) => Ok(usize::try_from(
             conn.execute("DELETE FROM error_signatures", Params::None)
                 .await?,
         )?),
-        (Some(id), None) => Ok(usize::try_from(
+        (Some(scope), None) => Ok(usize::try_from(
             conn.execute(
-                "DELETE FROM error_signatures WHERE task_id = ?1",
-                params!(id),
+                "DELETE FROM error_signatures WHERE scope = ?1",
+                params!(scope),
             )
             .await?,
         )?),
@@ -99,10 +101,10 @@ pub async fn clear_error_signatures(
             )
             .await?,
         )?),
-        (Some(id), Some(sig)) => Ok(usize::try_from(
+        (Some(scope), Some(sig)) => Ok(usize::try_from(
             conn.execute(
-                "DELETE FROM error_signatures WHERE task_id = ?1 AND signature = ?2",
-                params!(id, sig),
+                "DELETE FROM error_signatures WHERE scope = ?1 AND signature = ?2",
+                params!(scope, sig),
             )
             .await?,
         )?),
@@ -149,33 +151,33 @@ mod tests {
         .unwrap();
 
         assert_eq!(
-            bump_error_signature(&conn, "sensor:clippy", Some(one), Some("m"))
+            bump_error_signature(&conn, "sensor:clippy", &format!("task:{one}"), Some("m"))
                 .await
                 .unwrap(),
             1
         );
         assert_eq!(
-            bump_error_signature(&conn, "sensor:clippy", Some(one), None)
+            bump_error_signature(&conn, "sensor:clippy", &format!("task:{one}"), None)
                 .await
                 .unwrap(),
             2
         );
         // A different task and the workspace-global key start fresh.
         assert_eq!(
-            bump_error_signature(&conn, "sensor:clippy", Some(two), None)
+            bump_error_signature(&conn, "sensor:clippy", &format!("task:{two}"), None)
                 .await
                 .unwrap(),
             1
         );
         assert_eq!(
-            bump_error_signature(&conn, "sensor:clippy", None, None)
+            bump_error_signature(&conn, "sensor:clippy", "global", None)
                 .await
                 .unwrap(),
             1
         );
 
         assert_eq!(
-            get_error_signature(&conn, "sensor:clippy", Some(one))
+            get_error_signature(&conn, "sensor:clippy", &format!("task:{one}"))
                 .await
                 .unwrap()
                 .unwrap()
@@ -183,7 +185,7 @@ mod tests {
             2
         );
         assert_eq!(
-            get_error_signature(&conn, "sensor:clippy", Some(two))
+            get_error_signature(&conn, "sensor:clippy", &format!("task:{two}"))
                 .await
                 .unwrap()
                 .unwrap()
@@ -191,7 +193,10 @@ mod tests {
             1
         );
         assert_eq!(
-            list_error_signatures(&conn, Some(one)).await.unwrap().len(),
+            list_error_signatures(&conn, Some(&format!("task:{one}")))
+                .await
+                .unwrap()
+                .len(),
             1
         );
         assert_eq!(list_error_signatures(&conn, None).await.unwrap().len(), 3);
@@ -227,31 +232,31 @@ mod tests {
         )
         .await
         .unwrap();
-        bump_error_signature(&conn, "sensor:clippy", Some(one), Some("m"))
+        bump_error_signature(&conn, "sensor:clippy", &format!("task:{one}"), Some("m"))
             .await
             .unwrap();
-        bump_error_signature(&conn, "sensor:clippy", Some(two), Some("m"))
+        bump_error_signature(&conn, "sensor:clippy", &format!("task:{two}"), Some("m"))
             .await
             .unwrap();
 
         assert!(
-            reset_error_signature(&conn, "sensor:clippy", Some(one))
+            reset_error_signature(&conn, "sensor:clippy", &format!("task:{one}"))
                 .await
                 .unwrap()
         );
         assert!(
-            !reset_error_signature(&conn, "sensor:clippy", Some(one))
+            !reset_error_signature(&conn, "sensor:clippy", &format!("task:{one}"))
                 .await
                 .unwrap()
         );
         assert!(
-            get_error_signature(&conn, "sensor:clippy", Some(one))
+            get_error_signature(&conn, "sensor:clippy", &format!("task:{one}"))
                 .await
                 .unwrap()
                 .is_none()
         );
         assert!(
-            get_error_signature(&conn, "sensor:clippy", Some(two))
+            get_error_signature(&conn, "sensor:clippy", &format!("task:{two}"))
                 .await
                 .unwrap()
                 .is_some()
@@ -276,10 +281,10 @@ mod tests {
         )
         .await
         .unwrap();
-        bump_error_signature(&conn, "sensor:clippy", Some(one), None)
+        bump_error_signature(&conn, "sensor:clippy", &format!("task:{one}"), None)
             .await
             .unwrap();
-        bump_error_signature(&conn, "sensor:fmt", None, None)
+        bump_error_signature(&conn, "sensor:fmt", "global", None)
             .await
             .unwrap();
 

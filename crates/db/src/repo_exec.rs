@@ -69,6 +69,23 @@ pub(crate) async fn insert_beat(conn: &Connection, beat: &NewBeat<'_>) -> Result
     Ok(row.get(0)?)
 }
 
+/// Derives the workstream scope of a beat, mirroring [`insert_beat`]'s scope
+/// column so beats and strikes always agree on the key.
+fn beat_scope(beat: &NewBeat<'_>) -> String {
+    match beat.scope {
+        Some(scope) => scope.to_owned(),
+        None => match beat.task_id {
+            Some(id) => format!("task:{id}"),
+            None => "global".to_owned(),
+        },
+    }
+}
+
+/// Task id encoded by a scope key, kept for the legacy `task_id` column.
+fn scope_task_id(scope: &str) -> Option<i64> {
+    scope.strip_prefix("task:").and_then(|id| id.parse().ok())
+}
+
 /// Lists beats, optionally filtered to one task.
 ///
 /// # Errors
@@ -188,12 +205,13 @@ pub async fn vacuum(conn: &Connection) -> Result<()> {
 }
 
 /// Records a new error-signature attempt or increments an existing one,
-/// scoped by `(signature, task_id)`.
+/// scoped by `(signature, scope)` where `scope` is the same workstream key as
+/// beats (`task:<id>`, `branch:<name>`, or `global`).
 ///
 /// The pair is unique; a fresh pair starts at 1, subsequent calls increment
-/// it. `task_id = None` scopes the signature to the whole workspace. Returns
-/// the new attempt count. The update-or-insert sequence runs in a transaction
-/// so concurrent bumps cannot race between the `UPDATE` and the `INSERT`.
+/// it. Returns the new attempt count. The update-or-insert sequence runs in a
+/// transaction so concurrent bumps cannot race between the `UPDATE` and the
+/// `INSERT`.
 ///
 /// # Errors
 ///
@@ -201,11 +219,11 @@ pub async fn vacuum(conn: &Connection) -> Result<()> {
 pub async fn bump_error_signature(
     conn: &Connection,
     signature: &str,
-    task_id: Option<i64>,
+    scope: &str,
     message: Option<&str>,
 ) -> Result<i64> {
     let tx = crate::tx::begin_immediate(conn).await?;
-    let count = bump_error_signature_on(&tx, signature, task_id, message).await?;
+    let count = bump_error_signature_on(&tx, signature, scope, message).await?;
     tx.commit().await?;
     Ok(count)
 }
@@ -215,7 +233,7 @@ pub async fn bump_error_signature(
 async fn bump_error_signature_on(
     conn: &Connection,
     signature: &str,
-    task_id: Option<i64>,
+    scope: &str,
     message: Option<&str>,
 ) -> Result<i64> {
     let updated = conn
@@ -223,22 +241,23 @@ async fn bump_error_signature_on(
             "UPDATE error_signatures \
              SET attempt_count = attempt_count + 1, \
                  message = COALESCE(?1, message) \
-             WHERE signature = ?2 AND task_id IS ?3",
-            params!(message, signature, task_id),
+             WHERE signature = ?2 AND scope = ?3",
+            params!(message, signature, scope),
         )
         .await?;
     if updated == 0 {
         conn.execute(
-            "INSERT INTO error_signatures (signature, task_id, attempt_count, message, created_at) \
-             VALUES (?1, ?2, 1, ?3, ?4)",
-            params!(signature, task_id, message, unix_now()),
+            "INSERT INTO error_signatures \
+             (signature, scope, task_id, attempt_count, message, created_at) \
+             VALUES (?1, ?2, ?3, 1, ?4, ?5)",
+            params!(signature, scope, scope_task_id(scope), message, unix_now()),
         )
         .await?;
     }
     let mut rows = conn
         .query(
-            "SELECT attempt_count FROM error_signatures WHERE signature = ?1 AND task_id IS ?2",
-            params!(signature, task_id),
+            "SELECT attempt_count FROM error_signatures WHERE signature = ?1 AND scope = ?2",
+            params!(signature, scope),
         )
         .await?;
     let row = rows
@@ -265,13 +284,14 @@ pub async fn record_sensor_outcome(
     message: Option<&str>,
 ) -> Result<i64> {
     let signature = format!("sensor:{}", beat.sensor_name.unwrap_or("unknown"));
+    let scope = beat_scope(beat);
     let tx = crate::tx::begin_immediate(conn).await?;
     insert_beat(&tx, beat).await?;
     let count = if ok {
-        reset_error_signature(&tx, &signature, beat.task_id).await?;
+        reset_error_signature(&tx, &signature, &scope).await?;
         0
     } else {
-        bump_error_signature_on(&tx, &signature, beat.task_id, message).await?
+        bump_error_signature_on(&tx, &signature, &scope, message).await?
     };
     tx.commit().await?;
     Ok(count)
@@ -323,10 +343,11 @@ async fn record_verify_batch_once(conn: &Connection, outcomes: &[SensorOutcome<'
             .await?;
         }
         let signature = format!("sensor:{}", outcome.beat.sensor_name.unwrap_or("unknown"));
+        let scope = beat_scope(&outcome.beat);
         if outcome.ok {
-            reset_error_signature(&tx, &signature, outcome.beat.task_id).await?;
+            reset_error_signature(&tx, &signature, &scope).await?;
         } else {
-            bump_error_signature_on(&tx, &signature, outcome.beat.task_id, outcome.message).await?;
+            bump_error_signature_on(&tx, &signature, &scope, outcome.message).await?;
         }
     }
     tx.commit().await?;
@@ -363,7 +384,7 @@ pub async fn latest_sensor_beat(
     }
 }
 
-/// Fetches an error signature by its `(signature, task_id)` key.
+/// Fetches an error signature by its `(signature, scope)` key.
 ///
 /// # Errors
 ///
@@ -371,23 +392,24 @@ pub async fn latest_sensor_beat(
 pub async fn get_error_signature(
     conn: &Connection,
     signature: &str,
-    task_id: Option<i64>,
+    scope: &str,
 ) -> Result<Option<ErrorSignature>> {
     let mut rows = conn
         .query(
-            "SELECT id, signature, task_id, attempt_count, message, created_at \
-             FROM error_signatures WHERE signature = ?1 AND task_id IS ?2",
-            params!(signature, task_id),
+            "SELECT id, signature, scope, task_id, attempt_count, message, created_at \
+             FROM error_signatures WHERE signature = ?1 AND scope = ?2",
+            params!(signature, scope),
         )
         .await?;
     match rows.next().await? {
         Some(row) => Ok(Some(ErrorSignature {
             id: row.get(0)?,
             signature: row.get(1)?,
-            task_id: row.get(2)?,
-            attempt_count: row.get(3)?,
-            message: row.get(4)?,
-            created_at: row.get(5)?,
+            scope: row.get(2)?,
+            task_id: row.get(3)?,
+            attempt_count: row.get(4)?,
+            message: row.get(5)?,
+            created_at: row.get(6)?,
         })),
         None => Ok(None),
     }

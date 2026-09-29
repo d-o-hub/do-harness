@@ -80,25 +80,118 @@ async fn insert_beat_rejects_missing_task_fk() {
     assert!(result.is_err(), "FK violation must surface as an error");
 }
 
-/// Workspace-global strikes (NULL `task_id`) are unique per signature: a
-/// raw duplicate insert violates the partial unique index.
+/// Strikes are unique per `(signature, scope)`: a raw duplicate insert of the
+/// same workstream is rejected, while another branch keeps its own row for the
+/// same sensor.
 #[tokio::test(flavor = "current_thread")]
-async fn duplicate_global_signature_insert_is_rejected() {
+async fn duplicate_workstream_signature_insert_is_rejected() {
     let dir = tempfile::tempdir().unwrap();
     let conn = crate::migrate::connect_and_migrate(dir.path())
         .await
         .unwrap();
-    bump_error_signature(&conn, "sensor:clippy", None, Some("m1"))
+    bump_error_signature(&conn, "sensor:clippy", "branch:main", Some("m1"))
         .await
         .unwrap();
     let dupe = conn
         .execute(
-            "INSERT INTO error_signatures (signature, task_id, attempt_count, message, \
-             created_at) VALUES ('sensor:clippy', NULL, 1, NULL, 0)",
+            "INSERT INTO error_signatures (signature, scope, task_id, attempt_count, message, \
+             created_at) VALUES ('sensor:clippy', 'branch:main', NULL, 1, NULL, 0)",
             Params::None,
         )
         .await;
-    assert!(dupe.is_err(), "duplicate global strike must be rejected");
+    assert!(
+        dupe.is_err(),
+        "duplicate workstream strike must be rejected"
+    );
+
+    bump_error_signature(&conn, "sensor:clippy", "branch:feat", Some("m1"))
+        .await
+        .unwrap();
+    let rows = crate::repo_scope::list_error_signatures(&conn, None)
+        .await
+        .unwrap();
+    assert_eq!(rows.len(), 2, "each branch owns its own strike row");
+}
+
+/// Three strikes on one branch leave every other workstream untouched — the
+/// regression the `scope` column fixes (they used to share one NULL `task_id`
+/// row, so one branch halted the others).
+#[tokio::test(flavor = "current_thread")]
+async fn strikes_are_isolated_per_workstream() {
+    let dir = tempfile::tempdir().unwrap();
+    let conn = crate::migrate::connect_and_migrate(dir.path())
+        .await
+        .unwrap();
+    for _ in 0..3 {
+        bump_error_signature(&conn, "sensor:clippy", "branch:main", Some("boom"))
+            .await
+            .unwrap();
+    }
+    let main = get_error_signature(&conn, "sensor:clippy", "branch:main")
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(main.attempt_count, 3);
+    assert_eq!(main.scope, "branch:main");
+    assert!(main.task_id.is_none(), "a branch scope carries no task id");
+    for scope in ["branch:feat", "global", "task:7"] {
+        assert!(
+            get_error_signature(&conn, "sensor:clippy", scope)
+                .await
+                .unwrap()
+                .is_none(),
+            "{scope} must not see another workstream's strikes"
+        );
+    }
+
+    let task_id = crate::repo::insert_task(
+        &conn,
+        &NewTask {
+            title: "slice",
+            method: Some("vertical-event-slice"),
+            subtask_index: 0,
+            precondition: None,
+            parent_id: None,
+        },
+    )
+    .await
+    .unwrap();
+    bump_error_signature(
+        &conn,
+        "sensor:clippy",
+        &format!("task:{task_id}"),
+        Some("boom"),
+    )
+    .await
+    .unwrap();
+    let task = get_error_signature(&conn, "sensor:clippy", &format!("task:{task_id}"))
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        task.task_id,
+        Some(task_id),
+        "a task scope keeps its task id"
+    );
+
+    // Resetting one workstream leaves the others alone.
+    assert!(
+        reset_error_signature(&conn, "sensor:clippy", "branch:main")
+            .await
+            .unwrap()
+    );
+    assert!(
+        get_error_signature(&conn, "sensor:clippy", "branch:main")
+            .await
+            .unwrap()
+            .is_none()
+    );
+    assert!(
+        get_error_signature(&conn, "sensor:clippy", &format!("task:{task_id}"))
+            .await
+            .unwrap()
+            .is_some()
+    );
 }
 
 #[tokio::test(flavor = "current_thread")]
@@ -125,7 +218,7 @@ async fn record_sensor_outcome_is_atomic_beat_plus_strike() {
         .await
         .unwrap();
     assert_eq!(
-        get_error_signature(&conn, "sensor:atomic", None)
+        get_error_signature(&conn, "sensor:atomic", "global")
             .await
             .unwrap()
             .unwrap()
@@ -136,7 +229,7 @@ async fn record_sensor_outcome_is_atomic_beat_plus_strike() {
         .await
         .unwrap();
     assert!(
-        get_error_signature(&conn, "sensor:atomic", None)
+        get_error_signature(&conn, "sensor:atomic", "global")
             .await
             .unwrap()
             .is_none(),
@@ -153,25 +246,25 @@ async fn bump_error_signature_starts_at_one_and_increments() {
         .unwrap();
 
     assert_eq!(
-        bump_error_signature(&conn, "sensor:clippy", None, Some("m1"))
+        bump_error_signature(&conn, "sensor:clippy", "global", Some("m1"))
             .await
             .unwrap(),
         1
     );
     assert_eq!(
-        bump_error_signature(&conn, "sensor:clippy", None, Some("m2"))
+        bump_error_signature(&conn, "sensor:clippy", "global", Some("m2"))
             .await
             .unwrap(),
         2
     );
     assert_eq!(
-        bump_error_signature(&conn, "sensor:clippy", None, None)
+        bump_error_signature(&conn, "sensor:clippy", "global", None)
             .await
             .unwrap(),
         3
     );
 
-    let sig = get_error_signature(&conn, "sensor:clippy", None)
+    let sig = get_error_signature(&conn, "sensor:clippy", "global")
         .await
         .unwrap()
         .unwrap();
@@ -227,7 +320,7 @@ async fn record_verify_batch_rolls_back_everything_on_failure() {
         "first beat must be rolled back with the failed batch"
     );
     assert!(
-        get_error_signature(&conn, "sensor:test", Some(9999))
+        get_error_signature(&conn, "sensor:test", "task:9999")
             .await
             .unwrap()
             .is_none(),

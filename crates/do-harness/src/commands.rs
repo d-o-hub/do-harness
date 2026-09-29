@@ -212,10 +212,22 @@ pub async fn trace_cmd(root: &Path, action: TraceAction) -> Result<()> {
 /// Dispatches error-signature actions.
 pub async fn errors_cmd(root: &Path, action: ErrorsAction) -> Result<()> {
     match action {
-        ErrorsAction::List { task, format } => errors::list(root, task, format).await,
+        ErrorsAction::List {
+            task,
+            scope,
+            format,
+        } => {
+            errors::list(
+                root,
+                scope_filter(scope.as_deref(), task).as_deref(),
+                format,
+            )
+            .await
+        }
         ErrorsAction::Clear {
             sensor,
             task,
+            scope,
             force: _,
             dry_run,
         } => {
@@ -230,10 +242,25 @@ pub async fn errors_cmd(root: &Path, action: ErrorsAction) -> Result<()> {
                     format!("sensor:{s}")
                 }
             });
-            let removed = errors::clear(root, task, key.as_deref()).await?;
+            let removed = errors::clear(
+                root,
+                scope_filter(scope.as_deref(), task).as_deref(),
+                key.as_deref(),
+            )
+            .await?;
             println!("Cleared {removed} error signature(s)");
             Ok(())
         }
+    }
+}
+
+/// Resolves the workstream filter from `--scope`/`--task`: `all` (or no flag)
+/// means every workstream, `--task <ID>` means `task:<ID>`.
+fn scope_filter(scope: Option<&str>, task: Option<i64>) -> Option<String> {
+    match scope {
+        Some("all") => None,
+        Some(raw) => Some(raw.to_owned()),
+        None => task.map(|id| format!("task:{id}")),
     }
 }
 

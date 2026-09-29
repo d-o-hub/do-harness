@@ -112,4 +112,9 @@ pub const MIGRATIONS: &[Migration] = &[
         name: "beat_input_digest",
         sql: include_str!("../migrations/0020_beat_input_digest.sql"),
     },
+    Migration {
+        version: 21,
+        name: "error_signature_scope",
+        sql: include_str!("../migrations/0021_error_signature_scope.sql"),
+    },
 ];

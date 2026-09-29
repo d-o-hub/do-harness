@@ -849,6 +849,7 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
         }
         'do-harness;errors;list' {
             [CompletionResult]::new('--task', '--task', [CompletionResultType]::ParameterName, 'Scope to one task id')
+            [CompletionResult]::new('--scope', '--scope', [CompletionResultType]::ParameterName, 'Filter by workstream scope (`branch:<name>`, `task:<id>`, `global`, or `all` for every workstream)')
             [CompletionResult]::new('--format', '--format', [CompletionResultType]::ParameterName, 'Output format')
             [CompletionResult]::new('--root', '--root', [CompletionResultType]::ParameterName, 'Workspace root override (default: walk up from cwd)')
             [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Explicit path to do-harness.toml')
@@ -868,6 +869,7 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
         'do-harness;errors;clear' {
             [CompletionResult]::new('--sensor', '--sensor', [CompletionResultType]::ParameterName, 'Only clear this signature key (e.g. `sensor:<name>`)')
             [CompletionResult]::new('--task', '--task', [CompletionResultType]::ParameterName, 'Only clear signatures for this task id')
+            [CompletionResult]::new('--scope', '--scope', [CompletionResultType]::ParameterName, 'Only clear signatures for this workstream scope (`branch:<name>`, `task:<id>`, `global`, or `all` for every workstream)')
             [CompletionResult]::new('--root', '--root', [CompletionResultType]::ParameterName, 'Workspace root override (default: walk up from cwd)')
             [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Explicit path to do-harness.toml')
             [CompletionResult]::new('--color', '--color', [CompletionResultType]::ParameterName, 'Color output (auto, always, never)')

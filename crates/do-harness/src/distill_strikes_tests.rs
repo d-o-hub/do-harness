@@ -8,6 +8,7 @@ fn signature(key: &str, count: i64) -> ErrorSignature {
     ErrorSignature {
         id: 1,
         signature: key.to_owned(),
+        scope: "global".to_owned(),
         task_id: None,
         attempt_count: count,
         message: Some("boom".to_owned()),
@@ -93,7 +94,7 @@ async fn scaffold_skips_an_existing_skill_and_dry_run_writes_nothing() {
         .await
         .unwrap();
     for _ in 0..3 {
-        do_harness_db::bump_error_signature(&conn, "sensor:clippy", None, Some("boom"))
+        do_harness_db::bump_error_signature(&conn, "sensor:clippy", "global", Some("boom"))
             .await
             .unwrap();
     }
@@ -124,7 +125,7 @@ async fn scaffold_skips_an_existing_skill_and_dry_run_writes_nothing() {
         .await
         .unwrap();
     for _ in 0..3 {
-        do_harness_db::bump_error_signature(&conn, "sensor:shell", None, Some("boom"))
+        do_harness_db::bump_error_signature(&conn, "sensor:shell", "global", Some("boom"))
             .await
             .unwrap();
     }

@@ -13,6 +13,8 @@ pub struct ErrorSignature {
     pub id: i64,
     /// Stable error signature (e.g. `sensor:clippy` or a compiler fingerprint).
     pub signature: String,
+    /// Workstream scope of the strike (`task:<id>`, `branch:<name>`, `global`).
+    pub scope: String,
     /// Owning task id, when the signature belongs to a task.
     pub task_id: Option<i64>,
     /// Number of consecutive recorded attempts.

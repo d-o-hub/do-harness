@@ -11,19 +11,19 @@ use crate::report::Format;
 /// # Errors
 ///
 /// Returns an error when the state database cannot be opened.
-pub async fn list(root: &Path, task_id: Option<i64>, format: Format) -> Result<()> {
+pub async fn list(root: &Path, scope: Option<&str>, format: Format) -> Result<()> {
     let conn = do_harness_db::connect_and_migrate(root).await?;
-    let signatures = do_harness_db::list_error_signatures(&conn, task_id).await?;
+    let signatures = do_harness_db::list_error_signatures(&conn, scope).await?;
     match format {
         Format::Text => {
             if signatures.is_empty() {
                 println!("No error signatures recorded.");
             }
             for sig in &signatures {
-                print!("{} attempt_count={}", sig.signature, sig.attempt_count);
-                if let Some(id) = sig.task_id {
-                    print!(" task={id}");
-                }
+                print!(
+                    "{} attempt_count={} scope={}",
+                    sig.signature, sig.attempt_count, sig.scope
+                );
                 println!();
                 if let Some(msg) = &sig.message {
                     println!("  {msg}");
@@ -40,16 +40,16 @@ pub async fn list(root: &Path, task_id: Option<i64>, format: Format) -> Result<(
     Ok(())
 }
 
-/// Clears error signatures, scoped by optional sensor and task.
+/// Clears error signatures, scoped by optional workstream and sensor.
 ///
 /// Returns the number of rows removed.
 ///
 /// # Errors
 ///
 /// Returns an error when the state database cannot be opened.
-pub async fn clear(root: &Path, task_id: Option<i64>, sensor: Option<&str>) -> Result<usize> {
+pub async fn clear(root: &Path, scope: Option<&str>, sensor: Option<&str>) -> Result<usize> {
     let conn = do_harness_db::connect_and_migrate(root).await?;
-    let removed = do_harness_db::clear_error_signatures(&conn, task_id, sensor).await?;
+    let removed = do_harness_db::clear_error_signatures(&conn, scope, sensor).await?;
     Ok(removed)
 }
 
@@ -71,10 +71,10 @@ mod tests {
         let conn = do_harness_db::connect_and_migrate(dir.path())
             .await
             .unwrap();
-        do_harness_db::bump_error_signature(&conn, "sensor:clippy", None, Some("m"))
+        do_harness_db::bump_error_signature(&conn, "sensor:clippy", "global", Some("m"))
             .await
             .unwrap();
-        do_harness_db::bump_error_signature(&conn, "sensor:fmt", None, Some("m"))
+        do_harness_db::bump_error_signature(&conn, "sensor:fmt", "global", Some("m"))
             .await
             .unwrap();
         drop(conn);
@@ -87,13 +87,13 @@ mod tests {
             .await
             .unwrap();
         assert!(
-            do_harness_db::get_error_signature(&conn, "sensor:clippy", None)
+            do_harness_db::get_error_signature(&conn, "sensor:clippy", "global")
                 .await
                 .unwrap()
                 .is_none()
         );
         assert!(
-            do_harness_db::get_error_signature(&conn, "sensor:fmt", None)
+            do_harness_db::get_error_signature(&conn, "sensor:fmt", "global")
                 .await
                 .unwrap()
                 .is_some()

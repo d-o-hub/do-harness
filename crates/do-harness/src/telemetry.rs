@@ -25,16 +25,12 @@ pub const FAIL_FAST_STRIKES: i64 = 3;
 /// # Errors
 ///
 /// Returns an error when the state database cannot be initialized or queried.
-pub async fn struck_sensors(
-    root: &Path,
-    names: &[String],
-    task_id: Option<i64>,
-) -> Result<Vec<String>> {
+pub async fn struck_sensors(root: &Path, names: &[String], scope: &str) -> Result<Vec<String>> {
     let conn = do_harness_db::connect_and_migrate(root).await?;
     let mut struck = Vec::new();
     for name in names {
         let sig =
-            do_harness_db::get_error_signature(&conn, &format!("sensor:{name}"), task_id).await?;
+            do_harness_db::get_error_signature(&conn, &format!("sensor:{name}"), scope).await?;
         if sig.is_some_and(|s| s.attempt_count >= FAIL_FAST_STRIKES) {
             struck.push(name.clone());
         }

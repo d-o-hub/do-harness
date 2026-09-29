@@ -449,8 +449,17 @@ truncation marker, the first detected `FAIL [...]`, `ERROR [...]`, `execfail`,
 or `error:` context (or initial output if none), and a separately labeled
 final 500-character excerpt.
 
-- `errors list [--task <ID>] [--format <Format>]`: List open error signatures.
-- `errors clear [--sensor <SENSOR>] [--task <ID>] [--force] [--dry-run]`: Clear error signatures.
+- `errors list [--task <ID>] [--scope <SCOPE>] [--format <Format>]`: List open
+  error signatures.
+- `errors clear [--sensor <SENSOR>] [--task <ID>] [--scope <SCOPE>] [--force] [--dry-run]`:
+  Clear error signatures.
+
+Strikes are keyed by workstream scope exactly like beats — `branch:<name>` for a
+bare `verify --record`, `task:<id>` for `--task`, `global` for `--global` — so a
+sensor struck out on one branch keeps failing fast on that branch and stays
+runnable everywhere else. `--scope` accepts `branch:<name>`, `task:<id>`,
+`global`, or `all` (every workstream, the default when no filter is given);
+`--task <ID>` is short for `--scope task:<ID>`.
 
 ### `trace`
 Record and query command execution traces.
@@ -469,8 +478,10 @@ Git hook management (`pre-commit`, `pre-push`, `commit-msg`).
 
 ### `metrics`
 Longitudinal trends: sensor stats, strikes, and skill pass rates. By default,
-sensor statistics are scoped to the current git branch so unrelated workstreams
-do not mix; pass `--all` to aggregate across all workstreams.
+sensor statistics *and* strikes are scoped to the current git branch (or to
+`global` when there is none, matching where `verify --record` writes), so
+unrelated workstreams do not mix; pass `--all` to aggregate across all
+workstreams.
 
 - `--format <Format>`: Output format (`text` or `json`).
 - `--sensor <SENSOR>`: Filter by sensor name.

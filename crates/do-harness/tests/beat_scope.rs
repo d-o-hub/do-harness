@@ -177,3 +177,98 @@ fn verify_record_on_branch_scopes_and_metrics_isolates() {
     let metrics_g: Value = serde_json::from_str(&stdout).unwrap();
     assert_eq!(metrics_g["sensors"][0]["runs"], 1);
 }
+
+/// Like [`fixture_repo`], plus a sensor that always fails, so strikes accrue.
+fn fixture_repo_with_failing_sensor() -> (TempDir, PathBuf) {
+    let dir = tempdir().unwrap();
+    let root = dir.path().to_path_buf();
+    git(&root, &["init", "-q", "-b", "main"]);
+    let config = r#"
+language = "generic"
+
+[signal-sets]
+all = ["s1", "s2"]
+
+[[sensors]]
+name = "s1"
+argv = ["true"]
+
+[[sensors]]
+name = "s2"
+argv = ["false"]
+"#;
+    std::fs::write(root.join("do-harness.toml"), config).unwrap();
+    git(&root, &["add", "-A"]);
+    git(&root, &["commit", "-qm", "base"]);
+    (dir, root)
+}
+
+/// Fail-fast strikes are workstream-scoped: three failures on one branch must
+/// not halt the sensor on another branch, and `metrics` must not show the
+/// other workstream's strikes.
+#[test]
+fn fail_fast_strikes_do_not_cross_workstreams() {
+    let (_dir, root) = fixture_repo_with_failing_sensor();
+
+    for _ in 0..3 {
+        let (code, stdout, stderr) = run(harness(&root)
+            .arg("verify")
+            .arg("--set")
+            .arg("all")
+            .arg("--record"));
+        assert_eq!(
+            code,
+            Some(1),
+            "the failing sensor must fail the run:\n{stdout}\n{stderr}"
+        );
+    }
+    let (_, stdout, stderr) = run(harness(&root)
+        .arg("verify")
+        .arg("--set")
+        .arg("all")
+        .arg("--record"));
+    assert!(
+        stderr.contains("halted: sensor 's2'"),
+        "main must be halted after three strikes:\n{stdout}\n{stderr}"
+    );
+
+    // A different branch starts clean: strikes are not shared.
+    git(&root, &["switch", "-q", "-c", "feat/other"]);
+    let (code, stdout, _) = run(harness(&root).arg("metrics").arg("--format").arg("json"));
+    assert_eq!(code, Some(0));
+    let metrics: Value = serde_json::from_str(&stdout).unwrap();
+    assert_eq!(metrics["scope"], "branch:feat/other");
+    assert_eq!(
+        metrics["strikes"].as_array().unwrap().len(),
+        0,
+        "another branch's strikes must not leak into this snapshot: {stdout}"
+    );
+
+    // Recording here fails once and strikes only this branch.
+    let (_, stdout, stderr) = run(harness(&root)
+        .arg("verify")
+        .arg("--set")
+        .arg("all")
+        .arg("--record"));
+    assert!(
+        !stderr.contains("halted: sensor 's2'"),
+        "another branch must not inherit the strikes:\n{stdout}\n{stderr}"
+    );
+    let (_, stdout, _) = run(harness(&root).arg("metrics").arg("--format").arg("json"));
+    let metrics_feat: Value = serde_json::from_str(&stdout).unwrap();
+    let feat_strikes = metrics_feat["strikes"].as_array().unwrap();
+    assert_eq!(feat_strikes.len(), 1, "this branch has its own strike");
+    assert_eq!(feat_strikes[0]["scope"], "branch:feat/other");
+    assert_eq!(feat_strikes[0]["attempt_count"], 1);
+
+    // Back on `main` the strike is still recorded, under its own scope.
+    git(&root, &["switch", "-q", "main"]);
+    let (code, stdout, _) = run(harness(&root).arg("metrics").arg("--format").arg("json"));
+    assert_eq!(code, Some(0));
+    let metrics_main: Value = serde_json::from_str(&stdout).unwrap();
+    let strikes = metrics_main["strikes"].as_array().unwrap();
+    assert_eq!(strikes.len(), 1, "main keeps its strike: {stdout}");
+    assert_eq!(strikes[0]["scope"], "branch:main");
+    assert_eq!(strikes[0]["signature"], "sensor:s2");
+    assert_eq!(strikes[0]["attempt_count"], 3);
+}
