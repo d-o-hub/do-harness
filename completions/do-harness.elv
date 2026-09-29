@@ -53,6 +53,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand hook 'Manage git hooks that run `do-harness verify`'
             cand doctor 'Run diagnostic checks on binary resolution and git hook health'
             cand metrics 'Report harness trends: sensor stats, strikes, eval pass-rate history'
+            cand learn 'Draft skill/guide updates from sensors that keep firing (never applies them)'
             cand overlap 'Rank skill pairs by guidance overlap (Tier-2 distinctiveness advisory)'
             cand maintenance 'Prune old beats and compact the state database'
             cand compliance 'Print compliance mapping to OWASP Agentic Top 10, NIST AI RMF, and EU AI Act'
@@ -1025,6 +1026,25 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand -V 'Print version'
             cand --version 'Print version'
         }
+        &'do-harness;learn'= {
+            cand --days 'Window in days the fires are counted over'
+            cand --min-fires 'Fires a sensor needs to appear in the draft'
+            cand --format 'Output format'
+            cand --root 'Workspace root override (default: walk up from cwd)'
+            cand --config 'Explicit path to do-harness.toml'
+            cand --color 'Color output (auto, always, never)'
+            cand --output 'Default output file path'
+            cand --draft 'Draft the steering actions without applying anything (required: `learn` writes nothing)'
+            cand -v 'Verbosity level (-v, -vv)'
+            cand --verbose 'Verbosity level (-v, -vv)'
+            cand -q 'Suppress non-error messages'
+            cand --quiet 'Suppress non-error messages'
+            cand --dry-run 'Dry run without side effects'
+            cand -h 'Print help (see more with ''--help'')'
+            cand --help 'Print help (see more with ''--help'')'
+            cand -V 'Print version'
+            cand --version 'Print version'
+        }
         &'do-harness;overlap'= {
             cand --threshold 'Cosine similarity at or above which a pair prints as WARN'
             cand --format 'Output format'
@@ -1195,6 +1215,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand hook 'Manage git hooks that run `do-harness verify`'
             cand doctor 'Run diagnostic checks on binary resolution and git hook health'
             cand metrics 'Report harness trends: sensor stats, strikes, eval pass-rate history'
+            cand learn 'Draft skill/guide updates from sensors that keep firing (never applies them)'
             cand overlap 'Rank skill pairs by guidance overlap (Tier-2 distinctiveness advisory)'
             cand maintenance 'Prune old beats and compact the state database'
             cand compliance 'Print compliance mapping to OWASP Agentic Top 10, NIST AI RMF, and EU AI Act'
@@ -1313,6 +1334,8 @@ set edit:completion:arg-completer[do-harness] = {|@words|
         &'do-harness;help;doctor'= {
         }
         &'do-harness;help;metrics'= {
+        }
+        &'do-harness;help;learn'= {
         }
         &'do-harness;help;overlap'= {
         }

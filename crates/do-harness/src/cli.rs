@@ -9,9 +9,11 @@ use clap::{ArgAction, Parser, Subcommand, ValueHint};
 use crate::init;
 
 mod actions;
+mod learn;
 
 use crate::report::Format;
 pub use actions::{ErrorsAction, HookAction, PrAction, SkillsAction, TaskAction, TraceAction};
+pub use learn::LearnArgs;
 
 /// Unified entrypoint for harness sensors and database maintenance.
 #[derive(Debug, Parser)]
@@ -355,6 +357,12 @@ pub enum Command {
         /// Aggregate across all workstreams and scopes.
         #[arg(long, conflicts_with_all = ["scope", "task", "branch"])]
         all: bool,
+    },
+    /// Draft skill/guide updates from sensors that keep firing (never applies them).
+    Learn {
+        /// Draft arguments (`--draft` is required; the command writes nothing).
+        #[command(flatten)]
+        args: LearnArgs,
     },
     /// Rank skill pairs by guidance overlap (Tier-2 distinctiveness advisory).
     Overlap {
