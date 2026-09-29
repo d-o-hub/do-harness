@@ -79,6 +79,39 @@ fn foreign_repo_with_package_json() -> (tempfile::TempDir, PathBuf) {
 }
 
 #[test]
+fn support_covers_gits_local_environment() {
+    // `githooks(5)` documents clearing `git rev-parse --local-env-vars` before
+    // invoking git on another repository; the fixture list mirrors the
+    // harness's (`changes::GIT_VIEW_ENV`), so a future git release adding a
+    // variable must fail here rather than leak the caller's repository.
+    let output = std::process::Command::new("git")
+        .args(["rev-parse", "--local-env-vars"])
+        .output()
+        .expect("spawn git");
+    assert!(output.status.success(), "git rev-parse failed");
+    let reported: Vec<String> = String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .map(str::to_owned)
+        .collect();
+    assert!(!reported.is_empty(), "git reported no local variables");
+    for name in &reported {
+        if support::GIT_VIEW_ENV_EXEMPT.contains(&name.as_str()) {
+            assert!(
+                !support::GIT_VIEW_ENV.contains(&name.as_str()),
+                "{name} carries caller configuration and must stay inherited"
+            );
+            continue;
+        }
+        assert!(
+            support::GIT_VIEW_ENV.contains(&name.as_str()),
+            "support::GIT_VIEW_ENV must clear {name}"
+        );
+    }
+}
+
+#[test]
 fn rust_init_ignores_a_hook_inherited_git_dir() {
     let (_foreign_dir, foreign) = foreign_repo_with_package_json();
     let target = tempfile::tempdir().unwrap();

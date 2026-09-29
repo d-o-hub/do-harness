@@ -81,26 +81,46 @@ pub fn discover(root: &Path) -> ChangedFiles {
 /// Environment variables through which `git` selects which repository and
 /// history it reads.
 ///
-/// Git exports `GIT_DIR` (and friends) to hooks, and a caller can set the view
-/// overrides (`GIT_COMMON_DIR`, `GIT_SHALLOW_FILE`, graft/replace files). Left
-/// in place, a git call silently targets another repository, or reports a
-/// rewritten history, instead of `root`; the same set is cleared by the
-/// generated scripts (`templates/scripts/check-*.sh`) and by the test fixtures
-/// (`tests/support/mod.rs`).
-pub(crate) const GIT_VIEW_ENV: [&str; 12] = [
+/// Git exports these to hooks and documents the clearing recipe itself —
+/// `githooks(5)`: "If your hook needs to invoke Git commands in a foreign
+/// repository ... it should clear these environment variables", with
+/// `unset $(git rev-parse --local-env-vars)` as the example. This list is
+/// `git rev-parse --local-env-vars` plus `GIT_CEILING_DIRECTORIES`,
+/// `GIT_NAMESPACE`, and `GIT_DISCOVERY_ACROSS_FILESYSTEM` (which steer
+/// repository discovery and ref visibility), minus the `GIT_CONFIG*` trio:
+/// those carry the caller's `-c` configuration (`safe.directory` among it)
+/// rather than a repository identity, and dropping them would make the
+/// harness ignore deliberate per-invocation configuration.
+///
+/// Left in place, a git call silently targets another repository, or reports a
+/// rewritten history, instead of `root`; `git_view_env_covers_gits_local_environment`
+/// keeps the coverage honest, and the generated scripts
+/// (`templates/scripts/check-*.sh`) and the test fixtures
+/// (`tests/support/mod.rs`) clear the same set.
+pub(crate) const GIT_VIEW_ENV: [&str; 15] = [
     "GIT_DIR",
     "GIT_WORK_TREE",
+    "GIT_IMPLICIT_WORK_TREE",
     "GIT_INDEX_FILE",
     "GIT_OBJECT_DIRECTORY",
     "GIT_ALTERNATE_OBJECT_DIRECTORIES",
     "GIT_CEILING_DIRECTORIES",
+    "GIT_DISCOVERY_ACROSS_FILESYSTEM",
     "GIT_NAMESPACE",
     "GIT_PREFIX",
     "GIT_COMMON_DIR",
     "GIT_SHALLOW_FILE",
     "GIT_GRAFT_FILE",
     "GIT_REPLACE_REF_BASE",
+    "GIT_NO_REPLACE_OBJECTS",
 ];
+
+/// `GIT_CONFIG*` variables git also publishes as "local", deliberately kept:
+/// they carry the caller's `-c` configuration instead of a repository
+/// identity. Test-only: production code never needs to name them.
+#[cfg(test)]
+pub(crate) const GIT_VIEW_ENV_EXEMPT: [&str; 3] =
+    ["GIT_CONFIG", "GIT_CONFIG_COUNT", "GIT_CONFIG_PARAMETERS"];
 
 /// Removes [`GIT_VIEW_ENV`] from `command`.
 pub(crate) fn clear_git_view(command: &mut Command) -> &mut Command {
@@ -267,6 +287,47 @@ mod tests {
         assert_eq!(normalize("a/b"), "a/b");
         assert_eq!(normalize("a\\b"), "a/b");
         assert_eq!(normalize("./a/b"), "a/b");
+    }
+
+    /// `GIT_VIEW_ENV` must cover what git itself calls the local environment.
+    ///
+    /// `githooks(5)` documents clearing exactly `git rev-parse
+    /// --local-env-vars` before invoking git on another repository, so a
+    /// future git release that adds a variable to that list must fail here
+    /// instead of silently leaking the caller's repository.
+    #[test]
+    fn git_view_env_covers_gits_local_environment() {
+        let output = Command::new("git")
+            .args(["rev-parse", "--local-env-vars"])
+            .output()
+            .expect("spawn git");
+        assert!(
+            output.status.success(),
+            "git rev-parse --local-env-vars failed"
+        );
+        let reported: Vec<String> = String::from_utf8_lossy(&output.stdout)
+            .lines()
+            .map(str::trim)
+            .filter(|line| !line.is_empty())
+            .map(str::to_owned)
+            .collect();
+        assert!(
+            reported.len() >= GIT_VIEW_ENV.len() - 3,
+            "git reported implausibly few local variables: {reported:?}"
+        );
+        for name in &reported {
+            if GIT_VIEW_ENV_EXEMPT.contains(&name.as_str()) {
+                assert!(
+                    !GIT_VIEW_ENV.contains(&name.as_str()),
+                    "{name} carries caller configuration and must stay inherited"
+                );
+                continue;
+            }
+            assert!(
+                GIT_VIEW_ENV.contains(&name.as_str()),
+                "GIT_VIEW_ENV must clear {name}"
+            );
+        }
     }
 
     /// Outside a git checkout discovery fails closed.
