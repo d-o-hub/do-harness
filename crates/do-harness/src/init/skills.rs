@@ -43,6 +43,10 @@ const SKILL_CREATOR_QUICK_VALIDATE: &str =
     include_str!("../../templates/skills/skill-creator/scripts/quick_validate.py");
 const SKILL_CREATOR_OPENAI_YAML: &str =
     include_str!("../../templates/skills/skill-creator/references/openai_yaml.md");
+const SKILL_CREATOR_ANTI_AI_SLOP: &str =
+    include_str!("../../templates/skills/skill-creator/references/anti_ai_slop.md");
+const SKILL_CREATOR_HEURISTICS: &str =
+    include_str!("../../templates/skills/skill-creator/references/heuristics.md");
 const SKILL_CREATOR_GENERATE_YAML: &str =
     include_str!("../../templates/skills/skill-creator/scripts/generate_openai_yaml.py");
 
@@ -113,6 +117,22 @@ pub(super) fn scaffold_skills(root: &Path, opts: &InitOpts, report: &mut InitRep
         root,
         ".agents/skills/skill-creator/references/openai_yaml.md",
         SKILL_CREATOR_OPENAI_YAML,
+        opts.force,
+        report,
+    )?;
+    // `SKILL.md` points at both of these, so a consumer without them loses the
+    // anti-AI-slop audit and the distilled heuristics list.
+    write_if_absent(
+        root,
+        ".agents/skills/skill-creator/references/anti_ai_slop.md",
+        SKILL_CREATOR_ANTI_AI_SLOP,
+        opts.force,
+        report,
+    )?;
+    write_if_absent(
+        root,
+        ".agents/skills/skill-creator/references/heuristics.md",
+        SKILL_CREATOR_HEURISTICS,
         opts.force,
         report,
     )?;

@@ -151,7 +151,7 @@ instead of forking the script.
 ```toml
 [[sensors]]
 name = "loc"
-argv = ["bash", "scripts/check-loc.sh", "--root", "web", "--ext", "ts,tsx"]
+argv = ["bash", "scripts/check-loc.sh", "--root", "web,src,crates", "--ext", "rs,ts,tsx"]
 when-changed = ["**/*.rs", "web/**/*.ts", "web/**/*.tsx"]
 ```
 

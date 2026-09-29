@@ -99,5 +99,6 @@ pub fn git_command(root: &Path) -> Command {
     command
 }
 
+pub mod ci_explain;
 pub mod dora;
 pub mod reuse;

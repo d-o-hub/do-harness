@@ -501,7 +501,7 @@ forking the script:
 ```toml
 [[sensors]]
 name = "loc"
-argv = ["bash", "scripts/check-loc.sh", "--root", "web", "--ext", "ts,tsx"]
+argv = ["bash", "scripts/check-loc.sh", "--root", "web,src,crates", "--ext", "rs,ts,tsx"]
 when-changed = ["**/*.rs", "web/**/*.ts", "web/**/*.tsx"]
 ```
 
@@ -810,8 +810,8 @@ newest compiler or test error line, and a local repro:
 sensor directly (and its configured `argv` is the command); without a marker,
 the failed step names a configured sensor or a tool signature (`clippy`,
 `nextest`, a rustc `error[E....]`) and falls back to that sensor's canonical
-command. Jobs are listed with `gh api --paginate --slurp`, so a matrix wider
-than 100 jobs is reported whole. The failed-step log is streamed and reduced to
+command. Jobs are listed with `gh api --paginate` and read back as a stream of
+page documents, so a matrix wider than 100 jobs is reported whole. The failed-step log is streamed and reduced to
 bounded signals, so a tens-of-megabytes log costs nothing extra.
 
 Exit `0` when a report is produced (a failing run is still a successful

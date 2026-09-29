@@ -68,6 +68,42 @@ fn mentioned_agent_path(span: &str) -> Option<&str> {
     Some(rest[..end].trim_end_matches(['.', ':', ',', ')']))
 }
 
+/// Relative `references/…`/`scripts/…` targets named by `text`, resolved
+/// against `doc`'s own directory.
+///
+/// A path that is only the suffix of a longer path
+/// (`.agents/skills/other/scripts/x`) is not a relative reference, so an
+/// occurrence preceded by a path character is skipped; the bare directory
+/// forms (`references/`) stay in, because they exist as directories.
+fn mentioned_relative_resources(doc: &str, text: &str) -> Vec<String> {
+    let dir = doc.rsplit_once('/').map_or("", |(dir, _)| dir);
+    let mut found = Vec::new();
+    for prefix in ["references/", "scripts/"] {
+        let mut rest = text;
+        while let Some(idx) = rest.find(prefix) {
+            let preceded_by_path = idx > 0
+                && rest[..idx]
+                    .chars()
+                    .next_back()
+                    .is_some_and(|c| c.is_alphanumeric() || c == '/' || c == '.' || c == '-');
+            let tail = &rest[idx..];
+            let end = tail
+                .find(|c: char| {
+                    c.is_whitespace() || c == '`' || c == ')' || c == ']' || c == '(' || c == ','
+                })
+                .unwrap_or(tail.len());
+            if !preceded_by_path {
+                let resource = tail[..end].trim_end_matches(['.', ':', ',']);
+                found.push(format!("{dir}/{resource}"));
+            }
+            rest = &tail[end.max(1)..];
+        }
+    }
+    found.sort();
+    found.dedup();
+    found
+}
+
 /// The `do-harness …` invocation a backticked span claims, if it is one.
 fn mentioned_command(span: &str) -> Option<Vec<String>> {
     let normalized = span.split_whitespace().collect::<Vec<_>>().join(" ");
@@ -134,6 +170,7 @@ async fn scaffolded_skills_reference_only_paths_init_writes() {
         .unwrap();
 
     let mut checked = 0;
+    let mut resources_checked = 0;
     for (doc, text) in scaffolded_skill_docs(dir.path()) {
         for span in code_spans(&text) {
             let Some(path) = mentioned_agent_path(&span) else {
@@ -145,10 +182,21 @@ async fn scaffolded_skills_reference_only_paths_init_writes() {
                 "{doc} names `{path}`, which init does not write"
             );
         }
+        for resource in mentioned_relative_resources(&doc, &text) {
+            resources_checked += 1;
+            assert!(
+                dir.path().join(&resource).exists(),
+                "{doc} links `{resource}` relative to itself, which init does not write"
+            );
+        }
     }
     assert!(
         checked > 0,
         "no `.agents/...` path was extracted; the guard would pass vacuously"
+    );
+    assert!(
+        resources_checked > 5,
+        "no relative `references/`/`scripts/` target was extracted; the guard would pass vacuously"
     );
 }
 
