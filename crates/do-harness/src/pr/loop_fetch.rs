@@ -134,10 +134,16 @@ pub fn pull_requests(
         let endpoint = format!(
             "repos/{repo}/pulls?state=all&sort=updated&direction=desc&per_page={PAGE_SIZE}&page={page}"
         );
-        let bytes = api(root, &endpoint, None)?;
+        // This loop walks pages itself; `--paginate` here would follow the
+        // link header and refetch the tail of the list once per page.
+        let bytes = api(root, &endpoint, None, false)?;
         let chunk: Vec<PullRequest> =
             serde_json::from_slice(&bytes).context("unexpected pulls JSON")?;
         let short_page = chunk.len() < PAGE_SIZE;
+        let oldest = chunk
+            .last()
+            .and_then(|pr| super::super::dora::gh::parse_rfc3339_utc(&pr.updated_at));
+        let reached_window = oldest.is_some_and(|at| at < since_epoch);
         // A pull request updated between two pages can appear twice; the list
         // is only ever measured once per number.
         for pr in chunk {
@@ -158,10 +164,6 @@ pub fn pull_requests(
         // The list is sorted by `updated_at`: a short page is the last one, and
         // a full page whose oldest entry is already outside the window means
         // every later page is too.
-        let reached_window = prs
-            .last()
-            .and_then(|pr| super::super::dora::gh::parse_rfc3339_utc(&pr.updated_at))
-            .is_some_and(|at| at < since_epoch);
         if short_page || reached_window {
             break;
         }
@@ -176,7 +178,7 @@ pub fn pull_requests(
 /// Returns an error when `gh api` fails or a page does not parse.
 pub fn commits(root: &Path, repo: &str, number: u64) -> Result<Vec<Commit>> {
     let endpoint = format!("repos/{repo}/pulls/{number}/commits?per_page={PAGE_SIZE}");
-    let bytes = api(root, &endpoint, Some(".[]"))?;
+    let bytes = api(root, &endpoint, Some(".[]"), true)?;
     stream(&bytes, "commit")
 }
 
@@ -187,7 +189,7 @@ pub fn commits(root: &Path, repo: &str, number: u64) -> Result<Vec<Commit>> {
 /// Returns an error when `gh api` fails or a page does not parse.
 pub fn runs(root: &Path, repo: &str, head: &str) -> Result<Vec<WorkflowRun>> {
     let endpoint = format!("repos/{repo}/actions/runs?head_sha={head}&per_page={PAGE_SIZE}");
-    let bytes = api(root, &endpoint, Some(".workflow_runs[]"))?;
+    let bytes = api(root, &endpoint, Some(".workflow_runs[]"), true)?;
     stream(&bytes, "workflow run")
 }
 
@@ -198,7 +200,7 @@ pub fn runs(root: &Path, repo: &str, head: &str) -> Result<Vec<WorkflowRun>> {
 /// Returns an error when `gh api` fails or a page does not parse.
 pub fn check_runs(root: &Path, repo: &str, head: &str) -> Result<Vec<CheckRun>> {
     let endpoint = format!("repos/{repo}/commits/{head}/check-runs?per_page={PAGE_SIZE}");
-    let bytes = api(root, &endpoint, Some(".check_runs[]"))?;
+    let bytes = api(root, &endpoint, Some(".check_runs[]"), true)?;
     stream(&bytes, "check run")
 }
 
@@ -209,14 +211,17 @@ pub fn check_runs(root: &Path, repo: &str, head: &str) -> Result<Vec<CheckRun>> 
 /// Returns an error when `gh api` fails or a page does not parse.
 pub fn comments(root: &Path, repo: &str, number: u64) -> Result<Vec<Comment>> {
     let endpoint = format!("repos/{repo}/issues/{number}/comments?per_page={PAGE_SIZE}");
-    let bytes = api(root, &endpoint, Some(".[]"))?;
+    let bytes = api(root, &endpoint, Some(".[]"), true)?;
     stream(&bytes, "comment")
 }
 
-/// Runs `gh api`, optionally streamed through `jq`, returning stdout.
-fn api(root: &Path, endpoint: &str, jq: Option<&str>) -> Result<Vec<u8>> {
+/// Runs `gh api`, optionally paginated and streamed through `jq`.
+fn api(root: &Path, endpoint: &str, jq: Option<&str>, paginate: bool) -> Result<Vec<u8>> {
     let mut command = Command::new("gh");
-    command.current_dir(root).args(["api", "--paginate"]);
+    command.current_dir(root).arg("api");
+    if paginate {
+        command.arg("--paginate");
+    }
     if let Some(filter) = jq {
         command.args(["--jq", filter]);
     }

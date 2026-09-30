@@ -167,3 +167,26 @@ fn a_failing_gh_read_fails_the_run_instead_of_reporting_zero() {
     assert_eq!(code, Some(1), "stdout: {stdout}");
     assert!(stderr.contains("cannot list pull requests"), "{stderr}");
 }
+
+#[test]
+fn sensor_report_filters_are_rejected_next_to_the_pr_subcommand() {
+    let (dir, bin) = fixture_root();
+    let path = std::env::var("PATH").unwrap_or_default();
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_do-harness"))
+        .arg("--root")
+        .arg(dir.path())
+        .args([
+            "metrics",
+            "--sensor",
+            "fmt",
+            "pr",
+            "--repo",
+            "d-o-hub/do-harness",
+        ])
+        .env("PATH", format!("{}:{path}", bin.display()))
+        .output()
+        .expect("run do-harness");
+    assert_eq!(output.status.code(), Some(2));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("do not apply to `metrics pr`"), "{stderr}");
+}

@@ -94,6 +94,22 @@ pub async fn dispatch(
         format,
     }) = action
     {
+        // The snapshot filters (`--sensor`, `--scope`, …) describe the sensor
+        // report; silently ignoring them next to a subcommand would make a
+        // filtered run look like it had been applied.
+        if filter.sensor.is_some()
+            || filter.skill.is_some()
+            || filter.since.is_some()
+            || filter.scope.is_some()
+            || filter.task.is_some()
+            || filter.branch.is_some()
+            || filter.all
+        {
+            return Err(CliError::Usage(anyhow::anyhow!(
+                "--sensor/--skill/--since/--scope/--task/--branch/--all filter the sensor report \
+                 and do not apply to `metrics pr`; its window is `metrics pr --since <WINDOW>`"
+            )));
+        }
         let opts = pr_loop::PrOpts {
             repo,
             since,
