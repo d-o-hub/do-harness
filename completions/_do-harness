@@ -974,6 +974,7 @@ _arguments "${_arguments_options[@]}" : \
             (list)
 _arguments "${_arguments_options[@]}" : \
 '--task=[Scope to one task id]:ID:_default' \
+'(--task)--scope=[Filter by workstream scope (\`branch\:<name>\`, \`task\:<id>\`, \`global\`, or \`all\` for every workstream)]:SCOPE:_default' \
 '--format=[Output format]:FORMAT:((text\:"Human-readable text output"
 json\:"Machine-readable JSON output"))' \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
@@ -995,6 +996,7 @@ json\:"Machine-readable JSON output"))' \
 _arguments "${_arguments_options[@]}" : \
 '--sensor=[Only clear this signature key (e.g. \`sensor\:<name>\`)]:SENSOR:_default' \
 '--task=[Only clear signatures for this task id]:ID:_default' \
+'(--task)--scope=[Only clear signatures for this workstream scope (\`branch\:<name>\`, \`task\:<id>\`, \`global\`, or \`all\` for every workstream)]:SCOPE:_default' \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
 '--config=[Explicit path to do-harness.toml]:FILE:_files' \
 '--color=[Color output (auto, always, never)]:WHEN:_default' \

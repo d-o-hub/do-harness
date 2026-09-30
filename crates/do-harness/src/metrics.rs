@@ -70,41 +70,38 @@ pub struct MetricsFilter<'a> {
     pub all: bool,
 }
 
-/// Resolves the workstream scope and optional task ID for metrics filtering.
-fn resolve_effective_scope(
-    root: &Path,
-    filter: &MetricsFilter<'_>,
-) -> (Option<String>, Option<i64>) {
+/// Resolves the workstream scope for metrics filtering.
+///
+/// One key serves beats, sensors, and strikes — the same string `verify
+/// --record` writes — so a snapshot can never mix another branch's rows in.
+fn resolve_effective_scope(root: &Path, filter: &MetricsFilter<'_>) -> Option<String> {
     if filter.all {
-        return (None, None);
+        return None;
     }
     if let Some(id) = filter.task {
-        return (Some(format!("task:{id}")), Some(id));
+        return Some(format!("task:{id}"));
     }
     if let Some(branch) = filter.branch {
-        return (Some(format!("branch:{branch}")), None);
+        return Some(format!("branch:{branch}"));
     }
     if let Some(raw) = filter.scope {
         if raw == "all" {
-            return (None, None);
+            return None;
         }
-        if let Some(rest) = raw.strip_prefix("task:") {
-            let id = rest.parse::<i64>().ok();
-            return (Some(raw.to_owned()), id);
-        }
-        if raw.starts_with("branch:") || raw == "global" {
-            return (Some(raw.to_owned()), None);
+        if raw.starts_with("task:") || raw.starts_with("branch:") || raw == "global" {
+            return Some(raw.to_owned());
         }
         if let Ok(id) = raw.parse::<i64>() {
-            return (Some(format!("task:{id}")), Some(id));
+            return Some(format!("task:{id}"));
         }
-        return (Some(format!("branch:{raw}")), None);
+        return Some(format!("branch:{raw}"));
     }
-    if let Some(branch) = crate::changes::current_branch(root) {
-        (Some(format!("branch:{branch}")), None)
-    } else {
-        (None, None)
-    }
+    // Mirror `verify --record`: an unknown branch (detached HEAD, no git)
+    // records into `global`, so this must not silently widen to every scope.
+    Some(match crate::changes::current_branch(root) {
+        Some(branch) => format!("branch:{branch}"),
+        None => "global".to_owned(),
+    })
 }
 
 /// Collects per-skill evaluation trends and lift metrics.
@@ -184,13 +181,13 @@ pub async fn run_metrics(root: &Path, format: Format, filter: &MetricsFilter<'_>
         })?),
         None => None,
     };
-    let (effective_scope, strike_task_id) = resolve_effective_scope(root, filter);
+    let effective_scope = resolve_effective_scope(root, filter);
     let conn = do_harness_db::connect_and_migrate(root).await?;
     let mut sensors = do_harness_db::sensor_stats(&conn, since, effective_scope.as_deref()).await?;
     if let Some(s) = filter.sensor {
         sensors.retain(|st| st.name == s);
     }
-    let strikes = do_harness_db::list_error_signatures(&conn, strike_task_id).await?;
+    let strikes = do_harness_db::list_error_signatures(&conn, effective_scope.as_deref()).await?;
     let skills = collect_skill_trends(&conn, since, filter.skill).await?;
 
     let snapshot = MetricsSnapshot {
@@ -229,10 +226,7 @@ fn print_text(snapshot: &MetricsSnapshot) {
         println!("  (no open error signatures)");
     }
     for sig in &snapshot.strikes {
-        let scope = sig
-            .task_id
-            .map_or_else(|| "global".to_owned(), |task_id| format!("task {task_id}"));
-        println!("  {} [{}] x{}", sig.signature, scope, sig.attempt_count);
+        println!("  {} [{}] x{}", sig.signature, sig.scope, sig.attempt_count);
     }
     println!("skills:");
     if snapshot.skills.is_empty() {

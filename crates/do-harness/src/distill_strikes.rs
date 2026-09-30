@@ -222,7 +222,8 @@ pub async fn scaffold_from_strikes(
     format: Format,
 ) -> Result<Vec<ScaffoldOutcome>> {
     let conn = do_harness_db::connect_and_migrate(root).await?;
-    let signatures = do_harness_db::list_error_signatures(&conn, task).await?;
+    let scope = task.map(|id| format!("task:{id}"));
+    let signatures = do_harness_db::list_error_signatures(&conn, scope.as_deref()).await?;
     let striking = striking_signatures(&signatures, threshold);
     let mut outcomes = Vec::new();
     for signature in striking {

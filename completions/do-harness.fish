@@ -551,6 +551,7 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand errors; and not __
 complete -c do-harness -n "__fish_do_harness_using_subcommand errors; and not __fish_seen_subcommand_from list clear help" -f -a "clear" -d 'Clear fail-fast error signatures (e.g. `sensor:<name>`)'
 complete -c do-harness -n "__fish_do_harness_using_subcommand errors; and not __fish_seen_subcommand_from list clear help" -f -a "help" -d 'Print this message or the help of the given subcommand(s)'
 complete -c do-harness -n "__fish_do_harness_using_subcommand errors; and __fish_seen_subcommand_from list" -l task -d 'Scope to one task id' -r
+complete -c do-harness -n "__fish_do_harness_using_subcommand errors; and __fish_seen_subcommand_from list" -l scope -d 'Filter by workstream scope (`branch:<name>`, `task:<id>`, `global`, or `all` for every workstream)' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand errors; and __fish_seen_subcommand_from list" -l format -d 'Output format' -r -f -a "text\t'Human-readable text output'
 json\t'Machine-readable JSON output'"
 complete -c do-harness -n "__fish_do_harness_using_subcommand errors; and __fish_seen_subcommand_from list" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
@@ -564,6 +565,7 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand errors; and __fish
 complete -c do-harness -n "__fish_do_harness_using_subcommand errors; and __fish_seen_subcommand_from list" -s V -l version -d 'Print version'
 complete -c do-harness -n "__fish_do_harness_using_subcommand errors; and __fish_seen_subcommand_from clear" -l sensor -d 'Only clear this signature key (e.g. `sensor:<name>`)' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand errors; and __fish_seen_subcommand_from clear" -l task -d 'Only clear signatures for this task id' -r
+complete -c do-harness -n "__fish_do_harness_using_subcommand errors; and __fish_seen_subcommand_from clear" -l scope -d 'Only clear signatures for this workstream scope (`branch:<name>`, `task:<id>`, `global`, or `all` for every workstream)' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand errors; and __fish_seen_subcommand_from clear" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
 complete -c do-harness -n "__fish_do_harness_using_subcommand errors; and __fish_seen_subcommand_from clear" -l config -d 'Explicit path to do-harness.toml' -r -F
 complete -c do-harness -n "__fish_do_harness_using_subcommand errors; and __fish_seen_subcommand_from clear" -l color -d 'Color output (auto, always, never)' -r

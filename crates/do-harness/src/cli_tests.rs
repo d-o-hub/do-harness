@@ -124,6 +124,39 @@ fn pr_no_effect_parses_range_and_rejects_mixed_modes() {
 }
 
 #[test]
+fn errors_task_and_scope_conflict() {
+    // `--task <id>` is a shorthand for `--scope task:<id>`, so passing both
+    // must be a parse error rather than silently preferring one of them.
+    for args in [
+        vec![
+            "do-harness",
+            "errors",
+            "list",
+            "--task",
+            "5",
+            "--scope",
+            "global",
+        ],
+        vec![
+            "do-harness",
+            "errors",
+            "clear",
+            "--task",
+            "5",
+            "--scope",
+            "global",
+        ],
+    ] {
+        let conflict = Cli::try_parse_from(&args).expect_err("task+scope must conflict");
+        let text = conflict.to_string();
+        assert!(
+            text.contains("--task") || text.contains("--scope"),
+            "{text}"
+        );
+    }
+}
+
+#[test]
 fn pr_review_parses_recompute_and_rejects_mixed_modes() {
     let range = Cli::try_parse_from([
         "do-harness",

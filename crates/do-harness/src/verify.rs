@@ -62,7 +62,7 @@ pub(crate) async fn run(root: &Path, mut opts: VerifyOpts) -> std::result::Resul
     }
     opts.baselines = Baselines::load(root).await.map_err(CliError::Usage)?;
     if opts.record {
-        let struck = telemetry::struck_sensors(root, &cfg.sensor_names(), beat_scope.task_id())
+        let struck = telemetry::struck_sensors(root, &cfg.sensor_names(), &beat_scope.key())
             .await
             .map_err(CliError::Usage)?;
         for name in struck {

@@ -785,6 +785,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
         }
         &'do-harness;errors;list'= {
             cand --task 'Scope to one task id'
+            cand --scope 'Filter by workstream scope (`branch:<name>`, `task:<id>`, `global`, or `all` for every workstream)'
             cand --format 'Output format'
             cand --root 'Workspace root override (default: walk up from cwd)'
             cand --config 'Explicit path to do-harness.toml'
@@ -803,6 +804,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
         &'do-harness;errors;clear'= {
             cand --sensor 'Only clear this signature key (e.g. `sensor:<name>`)'
             cand --task 'Only clear signatures for this task id'
+            cand --scope 'Only clear signatures for this workstream scope (`branch:<name>`, `task:<id>`, `global`, or `all` for every workstream)'
             cand --root 'Workspace root override (default: walk up from cwd)'
             cand --config 'Explicit path to do-harness.toml'
             cand --color 'Color output (auto, always, never)'

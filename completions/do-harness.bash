@@ -1020,7 +1020,7 @@ _do__harness() {
             return 0
             ;;
         do__subcmd__harness__subcmd__errors__subcmd__clear)
-            opts="-v -q -h -V --sensor --task --force --dry-run --root --config --verbose --quiet --color --output --help --version"
+            opts="-v -q -h -V --sensor --task --scope --force --dry-run --root --config --verbose --quiet --color --output --help --version"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -1031,6 +1031,10 @@ _do__harness() {
                     return 0
                     ;;
                 --task)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --scope)
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;
@@ -1139,13 +1143,17 @@ _do__harness() {
             return 0
             ;;
         do__subcmd__harness__subcmd__errors__subcmd__list)
-            opts="-v -q -h -V --task --format --root --config --verbose --quiet --color --output --dry-run --help --version"
+            opts="-v -q -h -V --task --scope --format --root --config --verbose --quiet --color --output --dry-run --help --version"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
             fi
             case "${prev}" in
                 --task)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --scope)
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;

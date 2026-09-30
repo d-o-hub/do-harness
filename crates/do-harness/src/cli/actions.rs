@@ -161,6 +161,10 @@ pub enum ErrorsAction {
         /// Scope to one task id.
         #[arg(long, value_name = "ID")]
         task: Option<i64>,
+        /// Filter by workstream scope (`branch:<name>`, `task:<id>`, `global`,
+        /// or `all` for every workstream).
+        #[arg(long, value_name = "SCOPE", conflicts_with = "task")]
+        scope: Option<String>,
         /// Output format.
         #[arg(long, value_enum, default_value_t = Format::Text)]
         format: Format,
@@ -173,6 +177,10 @@ pub enum ErrorsAction {
         /// Only clear signatures for this task id.
         #[arg(long, value_name = "ID")]
         task: Option<i64>,
+        /// Only clear signatures for this workstream scope (`branch:<name>`,
+        /// `task:<id>`, `global`, or `all` for every workstream).
+        #[arg(long, value_name = "SCOPE", conflicts_with = "task")]
+        scope: Option<String>,
         /// Force clearing without prompt.
         #[arg(long)]
         force: bool,

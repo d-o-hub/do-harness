@@ -220,6 +220,9 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
                 }
                 None => (None, None),
             };
+            // `--task global` names the namespace just as explicitly as
+            // `--global`, so it must not trigger the unscoped-record advisory.
+            let explicit_global = global || raw_task.as_deref() == Some("global");
             let opts = sensors::VerifyOpts {
                 fail_fast,
                 set,
@@ -231,7 +234,7 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
                 record,
                 task: task_id,
                 raw_task,
-                global,
+                global: explicit_global,
                 evidence,
                 strict,
                 bless,

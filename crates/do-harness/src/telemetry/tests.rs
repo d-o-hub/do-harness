@@ -47,7 +47,7 @@ async fn record_verify_persists_beats_and_signatures() {
     assert_eq!(beats[0].beat_type, "sensor");
     assert_eq!(beats[0].status, "failed");
     assert_eq!(beats[0].sensor_exit_code, Some(1));
-    let sig = do_harness_db::get_error_signature(&conn, "sensor:fail", None)
+    let sig = do_harness_db::get_error_signature(&conn, "sensor:fail", "global")
         .await
         .unwrap()
         .unwrap();
@@ -98,7 +98,7 @@ async fn record_verify_skips_signatures_when_all_pass() {
     assert_eq!(beats.len(), 1);
     assert_eq!(beats[0].status, "ok");
     assert!(
-        do_harness_db::get_error_signature(&conn, "sensor:fmt", None)
+        do_harness_db::get_error_signature(&conn, "sensor:fmt", "global")
             .await
             .unwrap()
             .is_none()
@@ -148,7 +148,7 @@ async fn record_verify_skips_blocked_sensor_signature() {
     let beats = do_harness_db::list_beats(&conn, None).await.unwrap();
     assert!(beats.is_empty());
     assert!(
-        do_harness_db::get_error_signature(&conn, "sensor:halted", None)
+        do_harness_db::get_error_signature(&conn, "sensor:halted", "global")
             .await
             .unwrap()
             .is_none()
@@ -163,21 +163,21 @@ async fn struck_sensors_halts_only_struck_out_names() {
         .await
         .unwrap();
     for _ in 0..FAIL_FAST_STRIKES {
-        do_harness_db::bump_error_signature(&conn, "sensor:struck", None, Some("boom"))
+        do_harness_db::bump_error_signature(&conn, "sensor:struck", "global", Some("boom"))
             .await
             .unwrap();
     }
     for _ in 0..FAIL_FAST_STRIKES - 1 {
-        do_harness_db::bump_error_signature(&conn, "sensor:close", None, Some("boom"))
+        do_harness_db::bump_error_signature(&conn, "sensor:close", "global", Some("boom"))
             .await
             .unwrap();
     }
 
     let names = vec!["struck".to_owned(), "close".to_owned(), "fresh".to_owned()];
-    let blocked = struck_sensors(dir.path(), &names, None).await.unwrap();
+    let blocked = struck_sensors(dir.path(), &names, "global").await.unwrap();
     assert_eq!(blocked, vec!["struck".to_owned()]);
     assert!(
-        struck_sensors(dir.path(), &[], None)
+        struck_sensors(dir.path(), &[], "global")
             .await
             .unwrap()
             .is_empty()
@@ -254,7 +254,7 @@ async fn record_verify_persists_actionable_nextest_failure_context() {
     let conn = do_harness_db::connect_and_migrate(dir.path())
         .await
         .unwrap();
-    let signature = do_harness_db::get_error_signature(&conn, "sensor:coverage", None)
+    let signature = do_harness_db::get_error_signature(&conn, "sensor:coverage", "global")
         .await
         .unwrap()
         .unwrap();
@@ -276,7 +276,7 @@ async fn record_verify_resets_strikes_on_pass() {
         .await
         .unwrap();
     for _ in 0..FAIL_FAST_STRIKES {
-        do_harness_db::bump_error_signature(&conn, "sensor:fmt", None, Some("boom"))
+        do_harness_db::bump_error_signature(&conn, "sensor:fmt", "global", Some("boom"))
             .await
             .unwrap();
     }
@@ -318,13 +318,13 @@ async fn record_verify_resets_strikes_on_pass() {
         .await
         .unwrap();
     assert!(
-        do_harness_db::get_error_signature(&conn, "sensor:fmt", None)
+        do_harness_db::get_error_signature(&conn, "sensor:fmt", "global")
             .await
             .unwrap()
             .is_none()
     );
     assert!(
-        struck_sensors(dir.path(), &["fmt".to_owned()], None)
+        struck_sensors(dir.path(), &["fmt".to_owned()], "global")
             .await
             .unwrap()
             .is_empty()
@@ -395,13 +395,13 @@ async fn record_verify_scopes_to_task() {
         1
     );
     assert!(
-        do_harness_db::get_error_signature(&conn, "sensor:check", None)
+        do_harness_db::get_error_signature(&conn, "sensor:check", "global")
             .await
             .unwrap()
             .is_none()
     );
     assert_eq!(
-        do_harness_db::get_error_signature(&conn, "sensor:check", Some(task_id))
+        do_harness_db::get_error_signature(&conn, "sensor:check", &format!("task:{task_id}"))
             .await
             .unwrap()
             .unwrap()
