@@ -5,6 +5,11 @@
 //! whole path — fetch, measure, cache, render — runs without network access.
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
+// The fixture serves `gh` through a POSIX shell script on `PATH`; on Windows the
+// name does not resolve to it (no extension) and the runner's real `gh` would
+// answer without a token. The command itself is platform-neutral — only these
+// fixtures are not, matching the other fake-binary suites.
+#![cfg(unix)]
 
 use std::path::Path;
 
