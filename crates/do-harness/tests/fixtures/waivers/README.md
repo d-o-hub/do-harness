@@ -27,14 +27,14 @@ Ground truth per case (line numbers in the `src/` file):
 
 | case | line(s) | class | evidence |
 |---|---|---|---|
-| a | 89-92 | guarded-arm | inside the `let ... else { … }` fallback, under the "Every lookup succeeds" comment |
+| a | 89-92 | guarded-arm | the `let … else` fallback itself (the comment above it records why the lookup cannot fail) |
 | a | 115, 116 | macro-field | `outcome = %…as_str()`, `candidate_count = candidates.len()` inside `info!` |
 | a | 127, 128 | macro-field | same shape in the rejection branch |
 | b | 86, 91 | macro-field | `%status.as_str()`, `f64::from(report.avg_confidence)` inside `info!` |
 | b | 97-105 | guarded-arm | arm body after the equality-guarded `Ok(Some(judgments)) if … == …` arm |
-| b | 107 | guarded-arm | under the "Unreachable while a judge is configured" comment |
+| b | 107 | guarded-arm | the "Unreachable while a judge is configured" comment above it (the comment line itself has no coverage record: comments are not instrumented) |
 | b | cascade/mod.rs 19-38 | feature-gated | added inside `#[cfg(feature = "csm")]`, absent from the report |
-| b | rerank.rs 110-113 | missing | the real report covers them; the fixture keeps them as a control |
+| b | rerank.rs 109-113 | not residue (control) | the report records hits for them, so a covered line is never classified |
 
 The `SF:` line of `case-a` carries a runner-absolute prefix, as the real report
 does, so path resolution is exercised rather than assumed.

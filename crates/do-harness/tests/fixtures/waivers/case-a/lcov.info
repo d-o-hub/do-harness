@@ -3,7 +3,6 @@ FN:53,validate_and_align_judgments
 FNDA:3,validate_and_align_judgments
 FN:100,evaluate_judgments
 FNDA:2,evaluate_judgments
-DA:80,3
 DA:83,3
 DA:84,3
 DA:86,3
@@ -35,6 +34,6 @@ DA:128,0
 DA:129,1
 DA:130,1
 DA:131,1
-LF:33
-LH:23
+LF:31
+LH:22
 end_of_record

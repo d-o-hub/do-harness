@@ -107,7 +107,7 @@ fn case_b_reproduces_all_three_classes() {
             "macro-field"
         );
     }
-    for line in 97..=107 {
+    for line in (97..=105).chain(std::iter::once(107)) {
         assert_eq!(
             class(&report, "src/retrieval/rerank.rs", line),
             "guarded-arm"
@@ -115,7 +115,7 @@ fn case_b_reproduces_all_three_classes() {
     }
     assert_eq!(report["counts"]["feature-gated"], 20);
     assert_eq!(report["counts"]["macro-field"], 2);
-    assert_eq!(report["counts"]["guarded-arm"], 11);
+    assert_eq!(report["counts"]["guarded-arm"], 10);
     assert!(report["counts"].get("missing").is_none(), "{report}");
 }
 
