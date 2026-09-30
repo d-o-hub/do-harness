@@ -239,7 +239,13 @@ fn truncate_message(output: &str) -> String {
             let line = line.trim_start();
             if line.starts_with("FAIL [")
                 || line.starts_with("ERROR [")
-                || line.contains("execfail")
+                // nextest prints its exec-failure header as the bare token
+                // between rule characters (` execfail `), and diagnostics use
+                // the `execfail: …` form; either anchors. A test *name* such
+                // as `handles_execfail_semantics` must not.
+                || line
+                    .split(|c: char| !(c.is_alphanumeric() || c == '-' || c == '_'))
+                    .any(|token| token == "execfail")
             {
                 Some(start)
             } else if line.starts_with("error:") {
