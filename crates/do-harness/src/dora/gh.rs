@@ -273,7 +273,7 @@ fn gh_json<T: serde::de::DeserializeOwned>(root: &Path, args: &[&str]) -> Result
 /// month's real length rather than `1..=31`, because Hinnant's civil-day
 /// algorithm rolls Feb 30 into March instead of rejecting it.
 #[must_use]
-fn parse_rfc3339_utc(value: &str) -> Option<i64> {
+pub(crate) fn parse_rfc3339_utc(value: &str) -> Option<i64> {
     let (date, rest) = value.split_once('T')?;
     let time = rest.strip_suffix('Z')?;
     let time = time.split('.').next()?;

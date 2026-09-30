@@ -1,10 +1,14 @@
 //! `do-harness metrics`: longitudinal harness trends.
 
+pub mod pr_loop;
+
 use std::path::Path;
 
 use anyhow::Result;
 use serde::Serialize;
 
+use crate::CliError;
+use crate::cli::MetricsAction;
 use crate::report::Format;
 
 /// Per-skill evaluation trend.
@@ -68,6 +72,39 @@ pub struct MetricsFilter<'a> {
     pub task: Option<i64>,
     pub branch: Option<&'a str>,
     pub all: bool,
+}
+
+/// Runs the `metrics` command: the PR-loop report, or the sensor snapshot.
+///
+/// # Errors
+///
+/// Returns [`CliError`] for an unreadable window or repository, a failed `gh`
+/// read, or a filter the snapshot cannot apply.
+pub async fn dispatch(
+    root: &Path,
+    action: Option<MetricsAction>,
+    format: Format,
+    filter: MetricsFilter<'_>,
+) -> std::result::Result<(), CliError> {
+    if let Some(MetricsAction::Pr {
+        repo,
+        since,
+        limit,
+        recompute,
+        format,
+    }) = action
+    {
+        let opts = pr_loop::PrOpts {
+            repo,
+            since,
+            limit,
+            recompute,
+        };
+        return pr_loop::run(root, &opts, format);
+    }
+    run_metrics(root, format, &filter)
+        .await
+        .map_err(CliError::Usage)
 }
 
 /// Resolves the workstream scope for metrics filtering.

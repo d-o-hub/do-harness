@@ -1,0 +1,2 @@
+{"id": 5, "user": {"login": "github-actions[bot]"}, "body": "Coverage report ready: 85.37% lines.", "created_at": "2026-09-30T15:50:00Z", "html_url": null}
+{"id": 6, "user": {"login": "d-o-hub"}, "body": "Sweep review: no blocking findings; the minor `guarded-arm` waiver is recorded above.", "created_at": "2026-09-30T15:52:00Z", "html_url": null}

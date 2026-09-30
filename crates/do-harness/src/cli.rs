@@ -12,7 +12,9 @@ mod actions;
 mod learn;
 
 use crate::report::Format;
-pub use actions::{ErrorsAction, HookAction, PrAction, SkillsAction, TaskAction, TraceAction};
+pub use actions::{
+    ErrorsAction, HookAction, MetricsAction, PrAction, SkillsAction, TaskAction, TraceAction,
+};
 pub use learn::LearnArgs;
 
 /// Unified entrypoint for harness sensors and database maintenance.
@@ -332,6 +334,9 @@ pub enum Command {
     },
     /// Report harness trends: sensor stats, strikes, eval pass-rate history.
     Metrics {
+        /// Report the PR loop instead: `metrics pr --repo OWNER/NAME`.
+        #[command(subcommand)]
+        action: Option<MetricsAction>,
         /// Output format.
         #[arg(long, value_enum, default_value_t = Format::Text)]
         format: Format,

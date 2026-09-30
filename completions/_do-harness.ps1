@@ -1140,6 +1140,40 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
             [CompletionResult]::new('-V', '-V ', [CompletionResultType]::ParameterName, 'Print version')
             [CompletionResult]::new('--version', '--version', [CompletionResultType]::ParameterName, 'Print version')
+            [CompletionResult]::new('pr', 'pr', [CompletionResultType]::ParameterValue, 'PR-loop measures: time-to-green, pushes per green, waivers, comments, cancelled runs, reruns')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'do-harness;metrics;pr' {
+            [CompletionResult]::new('--repo', '--repo', [CompletionResultType]::ParameterName, 'Repository as OWNER/NAME (any repository the caller can read)')
+            [CompletionResult]::new('--since', '--since', [CompletionResultType]::ParameterName, 'Window: a duration (`30d`, `12h`, `2w`) or a date (`YYYY-MM-DD`)')
+            [CompletionResult]::new('--limit', '--limit', [CompletionResultType]::ParameterName, 'Maximum pull requests measured, newest first')
+            [CompletionResult]::new('--format', '--format', [CompletionResultType]::ParameterName, 'Output format')
+            [CompletionResult]::new('--root', '--root', [CompletionResultType]::ParameterName, 'Workspace root override (default: walk up from cwd)')
+            [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Explicit path to do-harness.toml')
+            [CompletionResult]::new('--color', '--color', [CompletionResultType]::ParameterName, 'Color output (auto, always, never)')
+            [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Default output file path')
+            [CompletionResult]::new('--recompute', '--recompute', [CompletionResultType]::ParameterName, 'Ignore the cached snapshot and refetch')
+            [CompletionResult]::new('-v', '-v', [CompletionResultType]::ParameterName, 'Verbosity level (-v, -vv)')
+            [CompletionResult]::new('--verbose', '--verbose', [CompletionResultType]::ParameterName, 'Verbosity level (-v, -vv)')
+            [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Suppress non-error messages')
+            [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Suppress non-error messages')
+            [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Dry run without side effects')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            [CompletionResult]::new('-V', '-V ', [CompletionResultType]::ParameterName, 'Print version')
+            [CompletionResult]::new('--version', '--version', [CompletionResultType]::ParameterName, 'Print version')
+            break
+        }
+        'do-harness;metrics;help' {
+            [CompletionResult]::new('pr', 'pr', [CompletionResultType]::ParameterValue, 'PR-loop measures: time-to-green, pushes per green, waivers, comments, cancelled runs, reruns')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'do-harness;metrics;help;pr' {
+            break
+        }
+        'do-harness;metrics;help;help' {
             break
         }
         'do-harness;learn' {
@@ -1507,6 +1541,10 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             break
         }
         'do-harness;help;metrics' {
+            [CompletionResult]::new('pr', 'pr', [CompletionResultType]::ParameterValue, 'PR-loop measures: time-to-green, pushes per green, waivers, comments, cancelled runs, reruns')
+            break
+        }
+        'do-harness;help;metrics;pr' {
             break
         }
         'do-harness;help;learn' {

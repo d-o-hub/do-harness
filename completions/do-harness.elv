@@ -1053,6 +1053,36 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand --help 'Print help (see more with ''--help'')'
             cand -V 'Print version'
             cand --version 'Print version'
+            cand pr 'PR-loop measures: time-to-green, pushes per green, waivers, comments, cancelled runs, reruns'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'do-harness;metrics;pr'= {
+            cand --repo 'Repository as OWNER/NAME (any repository the caller can read)'
+            cand --since 'Window: a duration (`30d`, `12h`, `2w`) or a date (`YYYY-MM-DD`)'
+            cand --limit 'Maximum pull requests measured, newest first'
+            cand --format 'Output format'
+            cand --root 'Workspace root override (default: walk up from cwd)'
+            cand --config 'Explicit path to do-harness.toml'
+            cand --color 'Color output (auto, always, never)'
+            cand --output 'Default output file path'
+            cand --recompute 'Ignore the cached snapshot and refetch'
+            cand -v 'Verbosity level (-v, -vv)'
+            cand --verbose 'Verbosity level (-v, -vv)'
+            cand -q 'Suppress non-error messages'
+            cand --quiet 'Suppress non-error messages'
+            cand --dry-run 'Dry run without side effects'
+            cand -h 'Print help (see more with ''--help'')'
+            cand --help 'Print help (see more with ''--help'')'
+            cand -V 'Print version'
+            cand --version 'Print version'
+        }
+        &'do-harness;metrics;help'= {
+            cand pr 'PR-loop measures: time-to-green, pushes per green, waivers, comments, cancelled runs, reruns'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'do-harness;metrics;help;pr'= {
+        }
+        &'do-harness;metrics;help;help'= {
         }
         &'do-harness;learn'= {
             cand --days 'Window in days the fires are counted over'
@@ -1365,6 +1395,9 @@ set edit:completion:arg-completer[do-harness] = {|@words|
         &'do-harness;help;doctor'= {
         }
         &'do-harness;help;metrics'= {
+            cand pr 'PR-loop measures: time-to-green, pushes per green, waivers, comments, cancelled runs, reruns'
+        }
+        &'do-harness;help;metrics;pr'= {
         }
         &'do-harness;help;learn'= {
         }

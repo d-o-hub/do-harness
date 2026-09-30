@@ -414,6 +414,7 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
             Ok(())
         }
         Command::Metrics {
+            action,
             format,
             sensor,
             skill,
@@ -432,9 +433,7 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
                 branch: branch.as_deref(),
                 all,
             };
-            metrics::run_metrics(&root, format, &filter)
-                .await
-                .map_err(CliError::Usage)
+            metrics::dispatch(&root, action, format, filter).await
         }
         Command::Overlap { threshold, format } => {
             overlap::run_overlap(&root, threshold, format).map_err(CliError::Usage)

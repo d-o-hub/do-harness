@@ -8,6 +8,7 @@ pub mod command;
 pub mod diff;
 pub mod gh;
 pub mod lcov;
+pub mod loop_fetch;
 pub mod no_effect;
 pub mod proof;
 pub mod readiness;

@@ -61,7 +61,7 @@ fn entry_path(root: &Path, key: &CacheKey) -> Result<PathBuf> {
 }
 
 /// Absolute git directory of the repository containing `root`.
-fn git_dir(root: &Path) -> Result<PathBuf> {
+pub(crate) fn git_dir(root: &Path) -> Result<PathBuf> {
     let output = git_command(root)
         .args(["rev-parse", "--absolute-git-dir"])
         .output()

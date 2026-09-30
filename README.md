@@ -190,6 +190,7 @@ export PATH="$HOME/.local/bin:$PATH"
 | `learn --draft [--days N] [--min-fires N] [--format text\|json]` | Draft skill/guide updates from sensors that keep firing (recorded beats plus `.agents/events/**` `sensor-fire` records); proposes the guide row, the `trace add` + `distill` pair, a skill scaffold command, and a CHANGELOG line — never applies them |
 | `eval [--skill NAME] [--bless] [--agent-cmd CMD]` | Validate skills via skill-creator's quick_validate.py and persist skill_evals; `--bless` re-baselines graders and raises the pass-rate bar after a fully green run; `--agent-cmd` runs an external agent per case for true Skill Lift |
 | `metrics [--format text\|json]` | Report sensor stats, strike counts, and eval pass-rate history |
+| `metrics pr --repo OWNER/NAME [--since 30d\|YYYY-MM-DD] [--limit N] [--recompute]` | Measure the PR loop: time-to-green, pushes per green, waiver comments by class, actionable vs informational comments, cancelled runs, re-runs (read-only; `gh`-backed with a local snapshot cache) |
 | `dora [--days N] [--format text\|json] [--record] [--source git\|gh] [--now UNIX]` | Derive DORA metrics (deployment frequency, lead time, change failure rate, time to restore) from git history plus the pinned `plans/dora.json` policy; every number carries its derivation manifest |
 | `compliance [--format text\|json]` | Print compliance mapping to OWASP Agentic Top 10, NIST AI RMF, and EU AI Act |
 | `init [--language rust\|generic\|web\|node] [--force]` | Scaffold a harness workspace in the current directory |
