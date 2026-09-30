@@ -22,7 +22,7 @@ const CODECOV_AUTHORS: [&str; 3] = ["codecov", "codecov[bot]", "codecov-commente
 
 /// Whether `login` is a bot account: `GitHub` Apps (`[bot]` suffix) and the
 /// well-known dependency bots.
-fn is_bot_login(login: &str) -> bool {
+pub(crate) fn is_bot_login(login: &str) -> bool {
     login.ends_with("[bot]") || login == "dependabot" || login == "renovate"
 }
 

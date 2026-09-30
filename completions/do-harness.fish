@@ -710,24 +710,43 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand doctor" -s q -l qu
 complete -c do-harness -n "__fish_do_harness_using_subcommand doctor" -l dry-run -d 'Dry run without side effects'
 complete -c do-harness -n "__fish_do_harness_using_subcommand doctor" -s h -l help -d 'Print help (see more with \'--help\')'
 complete -c do-harness -n "__fish_do_harness_using_subcommand doctor" -s V -l version -d 'Print version'
-complete -c do-harness -n "__fish_do_harness_using_subcommand metrics" -l format -d 'Output format' -r -f -a "text\t'Human-readable text output'
+complete -c do-harness -n "__fish_do_harness_using_subcommand metrics; and not __fish_seen_subcommand_from pr help" -l format -d 'Output format' -r -f -a "text\t'Human-readable text output'
 json\t'Machine-readable JSON output'"
-complete -c do-harness -n "__fish_do_harness_using_subcommand metrics" -l sensor -d 'Filter by sensor name' -r
-complete -c do-harness -n "__fish_do_harness_using_subcommand metrics" -l skill -d 'Filter by skill name' -r
-complete -c do-harness -n "__fish_do_harness_using_subcommand metrics" -l since -d 'Filter metrics since a Unix timestamp in seconds' -r
-complete -c do-harness -n "__fish_do_harness_using_subcommand metrics" -l scope -d 'Filter by workstream scope (e.g. `branch:main`, `task:1`, `global`, or `all`). Defaults to the current git branch' -r
-complete -c do-harness -n "__fish_do_harness_using_subcommand metrics" -l task -d 'Filter by task id (equivalent to `--scope task:<ID>`)' -r
-complete -c do-harness -n "__fish_do_harness_using_subcommand metrics" -l branch -d 'Filter by branch name (equivalent to `--scope branch:<NAME>`)' -r
-complete -c do-harness -n "__fish_do_harness_using_subcommand metrics" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
-complete -c do-harness -n "__fish_do_harness_using_subcommand metrics" -l config -d 'Explicit path to do-harness.toml' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand metrics" -l color -d 'Color output (auto, always, never)' -r
-complete -c do-harness -n "__fish_do_harness_using_subcommand metrics" -l output -d 'Default output file path' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand metrics" -l all -d 'Aggregate across all workstreams and scopes'
-complete -c do-harness -n "__fish_do_harness_using_subcommand metrics" -s v -l verbose -d 'Verbosity level (-v, -vv)'
-complete -c do-harness -n "__fish_do_harness_using_subcommand metrics" -s q -l quiet -d 'Suppress non-error messages'
-complete -c do-harness -n "__fish_do_harness_using_subcommand metrics" -l dry-run -d 'Dry run without side effects'
-complete -c do-harness -n "__fish_do_harness_using_subcommand metrics" -s h -l help -d 'Print help (see more with \'--help\')'
-complete -c do-harness -n "__fish_do_harness_using_subcommand metrics" -s V -l version -d 'Print version'
+complete -c do-harness -n "__fish_do_harness_using_subcommand metrics; and not __fish_seen_subcommand_from pr help" -l sensor -d 'Filter by sensor name' -r
+complete -c do-harness -n "__fish_do_harness_using_subcommand metrics; and not __fish_seen_subcommand_from pr help" -l skill -d 'Filter by skill name' -r
+complete -c do-harness -n "__fish_do_harness_using_subcommand metrics; and not __fish_seen_subcommand_from pr help" -l since -d 'Filter metrics since a Unix timestamp in seconds' -r
+complete -c do-harness -n "__fish_do_harness_using_subcommand metrics; and not __fish_seen_subcommand_from pr help" -l scope -d 'Filter by workstream scope (e.g. `branch:main`, `task:1`, `global`, or `all`). Defaults to the current git branch' -r
+complete -c do-harness -n "__fish_do_harness_using_subcommand metrics; and not __fish_seen_subcommand_from pr help" -l task -d 'Filter by task id (equivalent to `--scope task:<ID>`)' -r
+complete -c do-harness -n "__fish_do_harness_using_subcommand metrics; and not __fish_seen_subcommand_from pr help" -l branch -d 'Filter by branch name (equivalent to `--scope branch:<NAME>`)' -r
+complete -c do-harness -n "__fish_do_harness_using_subcommand metrics; and not __fish_seen_subcommand_from pr help" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
+complete -c do-harness -n "__fish_do_harness_using_subcommand metrics; and not __fish_seen_subcommand_from pr help" -l config -d 'Explicit path to do-harness.toml' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand metrics; and not __fish_seen_subcommand_from pr help" -l color -d 'Color output (auto, always, never)' -r
+complete -c do-harness -n "__fish_do_harness_using_subcommand metrics; and not __fish_seen_subcommand_from pr help" -l output -d 'Default output file path' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand metrics; and not __fish_seen_subcommand_from pr help" -l all -d 'Aggregate across all workstreams and scopes'
+complete -c do-harness -n "__fish_do_harness_using_subcommand metrics; and not __fish_seen_subcommand_from pr help" -s v -l verbose -d 'Verbosity level (-v, -vv)'
+complete -c do-harness -n "__fish_do_harness_using_subcommand metrics; and not __fish_seen_subcommand_from pr help" -s q -l quiet -d 'Suppress non-error messages'
+complete -c do-harness -n "__fish_do_harness_using_subcommand metrics; and not __fish_seen_subcommand_from pr help" -l dry-run -d 'Dry run without side effects'
+complete -c do-harness -n "__fish_do_harness_using_subcommand metrics; and not __fish_seen_subcommand_from pr help" -s h -l help -d 'Print help (see more with \'--help\')'
+complete -c do-harness -n "__fish_do_harness_using_subcommand metrics; and not __fish_seen_subcommand_from pr help" -s V -l version -d 'Print version'
+complete -c do-harness -n "__fish_do_harness_using_subcommand metrics; and not __fish_seen_subcommand_from pr help" -f -a "pr" -d 'PR-loop measures: time-to-green, pushes per green, waivers, comments, cancelled runs, reruns'
+complete -c do-harness -n "__fish_do_harness_using_subcommand metrics; and not __fish_seen_subcommand_from pr help" -f -a "help" -d 'Print this message or the help of the given subcommand(s)'
+complete -c do-harness -n "__fish_do_harness_using_subcommand metrics; and __fish_seen_subcommand_from pr" -l repo -d 'Repository as OWNER/NAME (any repository the caller can read)' -r
+complete -c do-harness -n "__fish_do_harness_using_subcommand metrics; and __fish_seen_subcommand_from pr" -l since -d 'Window: a duration (`30d`, `12h`, `2w`) or a date (`YYYY-MM-DD`)' -r
+complete -c do-harness -n "__fish_do_harness_using_subcommand metrics; and __fish_seen_subcommand_from pr" -l limit -d 'Maximum pull requests measured, newest first' -r
+complete -c do-harness -n "__fish_do_harness_using_subcommand metrics; and __fish_seen_subcommand_from pr" -l format -d 'Output format' -r -f -a "text\t'Human-readable text output'
+json\t'Machine-readable JSON output'"
+complete -c do-harness -n "__fish_do_harness_using_subcommand metrics; and __fish_seen_subcommand_from pr" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
+complete -c do-harness -n "__fish_do_harness_using_subcommand metrics; and __fish_seen_subcommand_from pr" -l config -d 'Explicit path to do-harness.toml' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand metrics; and __fish_seen_subcommand_from pr" -l color -d 'Color output (auto, always, never)' -r
+complete -c do-harness -n "__fish_do_harness_using_subcommand metrics; and __fish_seen_subcommand_from pr" -l output -d 'Default output file path' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand metrics; and __fish_seen_subcommand_from pr" -l recompute -d 'Ignore the cached snapshot and refetch'
+complete -c do-harness -n "__fish_do_harness_using_subcommand metrics; and __fish_seen_subcommand_from pr" -s v -l verbose -d 'Verbosity level (-v, -vv)'
+complete -c do-harness -n "__fish_do_harness_using_subcommand metrics; and __fish_seen_subcommand_from pr" -s q -l quiet -d 'Suppress non-error messages'
+complete -c do-harness -n "__fish_do_harness_using_subcommand metrics; and __fish_seen_subcommand_from pr" -l dry-run -d 'Dry run without side effects'
+complete -c do-harness -n "__fish_do_harness_using_subcommand metrics; and __fish_seen_subcommand_from pr" -s h -l help -d 'Print help (see more with \'--help\')'
+complete -c do-harness -n "__fish_do_harness_using_subcommand metrics; and __fish_seen_subcommand_from pr" -s V -l version -d 'Print version'
+complete -c do-harness -n "__fish_do_harness_using_subcommand metrics; and __fish_seen_subcommand_from help" -f -a "pr" -d 'PR-loop measures: time-to-green, pushes per green, waivers, comments, cancelled runs, reruns'
+complete -c do-harness -n "__fish_do_harness_using_subcommand metrics; and __fish_seen_subcommand_from help" -f -a "help" -d 'Print this message or the help of the given subcommand(s)'
 complete -c do-harness -n "__fish_do_harness_using_subcommand learn" -l days -d 'Window in days the fires are counted over' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand learn" -l min-fires -d 'Fires a sensor needs to appear in the draft' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand learn" -l format -d 'Output format' -r -f -a "text\t'Human-readable text output'
@@ -898,3 +917,4 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand help; and __fish_s
 complete -c do-harness -n "__fish_do_harness_using_subcommand help; and __fish_seen_subcommand_from hook" -f -a "uninstall" -d 'Remove managed hooks, leaving foreign hook files untouched'
 complete -c do-harness -n "__fish_do_harness_using_subcommand help; and __fish_seen_subcommand_from hook" -f -a "status" -d 'Show whether the managed hooks and release binary are present'
 complete -c do-harness -n "__fish_do_harness_using_subcommand help; and __fish_seen_subcommand_from hook" -f -a "diff" -d 'Show diff between installed hooks and current templates'
+complete -c do-harness -n "__fish_do_harness_using_subcommand help; and __fish_seen_subcommand_from metrics" -f -a "pr" -d 'PR-loop measures: time-to-green, pushes per green, waivers, comments, cancelled runs, reruns'

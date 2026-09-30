@@ -180,6 +180,29 @@ pub enum PrAction {
     External(Vec<String>),
 }
 
+/// Available `metrics` report scopes.
+#[derive(Debug, Subcommand)]
+pub enum MetricsAction {
+    /// PR-loop measures: time-to-green, pushes per green, waivers, comments, cancelled runs, reruns.
+    Pr {
+        /// Repository as OWNER/NAME (any repository the caller can read).
+        #[arg(long, value_name = "OWNER/NAME")]
+        repo: String,
+        /// Window: a duration (`30d`, `12h`, `2w`) or a date (`YYYY-MM-DD`).
+        #[arg(long, value_name = "WINDOW", default_value = "30d")]
+        since: String,
+        /// Maximum pull requests measured, newest first.
+        #[arg(long, value_name = "N", default_value_t = 30)]
+        limit: usize,
+        /// Ignore the cached snapshot and refetch.
+        #[arg(long)]
+        recompute: bool,
+        /// Output format.
+        #[arg(long, value_enum, default_value_t = Format::Text)]
+        format: Format,
+    },
+}
+
 /// Available error-signature actions.
 #[derive(Debug, Subcommand)]
 pub enum ErrorsAction {

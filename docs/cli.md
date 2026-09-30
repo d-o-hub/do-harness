@@ -513,6 +513,52 @@ workstreams.
 - `--branch <NAME>`: Filter by branch name (equivalent to `--scope branch:<NAME>`).
 - `--all`: Aggregate metrics across all workstreams and scopes.
 
+#### `metrics pr`
+Measure the PR loop itself rather than the sensors: time-to-green, pushes per
+green, waiver comments by class, comment classes, cancelled runs, and re-runs.
+Every number is computed from `gh` reads of the named repository (pull requests,
+their commits, check runs, workflow runs, and comments); a snapshot is cached
+under the repository git directory for ten minutes, so repeated runs in a session
+do not re-hit the API.
+
+- `--repo <OWNER/NAME>`: Repository to measure (required; any repository the
+  caller can read, not just the current checkout).
+- `--since <WINDOW>`: Window as a duration (`30d`, `12h`, `2w`) or a date
+  (`YYYY-MM-DD`); default `30d`.
+- `--limit <N>`: Maximum pull requests measured, newest first; default `30`.
+- `--recompute`: Ignore the cached snapshot and refetch.
+- `--format <Format>`: `text` (the table) or `json` (the raw counts).
+
+The rules are fixed so the numbers are reproducible:
+
+- **time-to-green** — the head commit's check runs are all `completed` with a
+  conclusion in `success`/`neutral`/`skipped`; the measure is the latest
+  completion timestamp minus the earliest commit timestamp on the PR. The commit
+  timestamp is the first-push proxy (the timeline API would cost one paginated
+  call per PR); a head that is not fully green has no time-to-green rather than
+  a partial one.
+- **pushes** — commits on the PR head; **pushes per green** divides the sum by
+  the number of green pull requests.
+- **waivers by class** — comments whose text names a patch-coverage waiver class:
+  `macro-field` (`field expression`, `field span`, `tracing::`, `log::`,
+  `subscriber`), `guarded-arm` (`unreachable`, `defensive arm`, `cannot
+  execute`, `cannot happen`, `let-else`), `feature-gated` (`feature-gated`,
+  `cfg(feature`, `no CI job enables`). The labels are the ones `pr waivers`
+  prints, so a waiver here and a verdict there name the same class.
+- **comment classes** — a bot login (`[bot]` suffix, `dependabot`, `renovate`)
+  is informational; a human comment is actionable when its body contains one of
+  `must`, `should`, `please`, `needs`, `needed`, `fix`, `add`, `remove`,
+  `rename`, `rerun`, `revert` (whole words) or the prefix `waiv` (so `waive`,
+  `waiver`, and `waived` all match), and informational otherwise.
+- **cancelled runs** and **reruns** — workflow runs for the head commit, counting
+  `conclusion == "cancelled"` and `run_attempt - 1` respectively (run-level, so
+  a cancelled matrix leg counts once for the run).
+
+A `gh` read that fails on a single pull request is reported as a warning and the
+snapshot keeps the pull requests it could measure; a failed *list* read exits `1`
+rather than reporting an empty window. An unreadable window or repository is a
+usage error (`2`).
+
 ### `loc`
 Report line-of-code state against the 500-line invariant: one line per file with
 `lines/500`, the band (`OK`, `WARN` at or above the 450-line decomposition

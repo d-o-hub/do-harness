@@ -126,6 +126,12 @@ pub struct CheckRun {
     pub status: String,
     pub conclusion: Option<String>,
     pub html_url: Option<String>,
+    /// ISO-8601 start timestamp, when the payload carries one.
+    #[serde(default)]
+    pub started_at: Option<String>,
+    /// ISO-8601 completion timestamp, when the payload carries one.
+    #[serde(default)]
+    pub completed_at: Option<String>,
 }
 
 impl CheckRun {
