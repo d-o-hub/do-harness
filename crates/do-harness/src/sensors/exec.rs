@@ -58,6 +58,7 @@ pub(crate) fn sensor_result(
         severity,
         allow_failure: severity == SensorSeverity::Warn,
         warned,
+        fix: if ok { None } else { spec.fix.clone() },
         findings: parse_findings(&output),
         baseline: None,
         execution: crate::report::Execution::Ran,
@@ -143,6 +144,10 @@ where
 /// diagnostic, so a stock rust-pack sensor (`["bash", "scripts/..."]`) would
 /// fail confusingly on every Windows machine. Other programs are spawned as
 /// declared.
+// The `Err` payload is the finished "spawn failed" verdict, which the caller
+// forwards like any other result; boxing it only here would churn every call
+// site for a cold path.
+#[allow(clippy::result_large_err)]
 fn spawn_sensor(
     spec: &SensorSpec,
     root: &Path,

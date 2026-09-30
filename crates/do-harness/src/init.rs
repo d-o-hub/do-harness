@@ -90,6 +90,7 @@ const INVARIANTS_RUST: &str = include_str!("../templates/plans/invariants.json.r
 const INVARIANTS_GENERIC: &str = include_str!("../templates/plans/invariants.json.generic");
 const RELEASING_RUNBOOK: &str = include_str!("../templates/plans/RELEASING.md");
 const CHECK_LOC: &str = include_str!("../templates/scripts/check-loc.sh");
+const CHECK_TRACKER_DRIFT: &str = include_str!("../templates/scripts/check-tracker-drift.sh");
 const CHECK_COMMITLINT: &str = include_str!("../templates/scripts/check-commitlint.sh");
 const CHECK_DEPS: &str = include_str!("../templates/scripts/check-deps.sh");
 const CHECK_AUDIT: &str = include_str!("../templates/scripts/check-audit.sh");
@@ -162,6 +163,17 @@ pub async fn init_workspace(root: &Path, opts: &InitOpts) -> Result<InitReport> 
         opts.force,
         &mut report,
     )?;
+    // Language-agnostic: the drift check reads a status document and `gh`, so
+    // every scaffold gets it (undeclared scripts are inert until a config
+    // declares the `project-check` sensor).
+    write_if_absent(
+        root,
+        "scripts/check-tracker-drift.sh",
+        CHECK_TRACKER_DRIFT,
+        opts.force,
+        &mut report,
+    )?;
+    crate::fs_perm::set_owner_exec(&root.join("scripts/check-tracker-drift.sh"))?;
     if report.language == Language::Rust {
         scaffold_scripts(root, opts, &mut report)?;
         // The runbook documents the release step the pack otherwise leaves to
@@ -222,6 +234,8 @@ const RELEASE_PIN_GLOBS: &[&str] = &["VERSION", "Cargo.toml", "**/Cargo.toml", "
 /// and a sensor failing on that would gate every ordinary run.
 fn release_preflight_spec() -> crate::config::SensorSpec {
     crate::config::SensorSpec {
+        kind: None,
+        fix: None,
         name: "release-preflight".to_owned(),
         argv: vec![
             "bash".to_owned(),

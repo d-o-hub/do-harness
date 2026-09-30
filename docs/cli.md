@@ -98,6 +98,27 @@ the run; `severity = "warn"` makes failures advisory: a non-strict run prints
 `feedback` set. The deprecated `allow_failure = true` alias maps to
 `severity = "warn"`; setting both inconsistently is a config error.
 
+`kind = "project-check"` declares a soft, project-specific facts check (status
+documents, tracker counts, published claims) instead of a gate: it defaults to
+`severity = "warn"` — an explicit `severity` always wins — and its optional
+`fix` string is printed as a `FIX:` line when the check fails, so the report
+carries the remediation instead of leaving it in a runbook:
+
+```toml
+[[sensors]]
+name = "tracker-drift"
+kind = "project-check"
+argv = ["bash", "scripts/check-tracker-drift.sh", "--doc", "plans/ROADMAP_ACTIVE.md"]
+fix = "refresh the open-PR/issue counts in the status document"
+when-changed = ["plans/**/*.md", "scripts/check-tracker-drift.sh"]
+```
+
+`init` scaffolds that particular check as a reference implementation: it reads
+`<n> open PRs` / `<n> open issues` claims from a status document, compares them
+with `gh pr list` / `gh issue list`, and fails closed (a missing document or an
+unreadable tracker is a finding, never a pass). Point `--doc` at your status
+document and declare the sensor to enable it.
+
 A sensor may print a `FINDINGS: <n>` marker (last occurrence wins) to opt into
 the findings ratchet. Blessed ceilings live in the committed
 `plans/baselines.json` (`{"sensors": {"<name>": <max>}}`), which `verify`

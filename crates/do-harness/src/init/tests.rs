@@ -69,6 +69,12 @@ async fn init_generic_has_no_loc_script() {
         .unwrap();
 
     assert!(!report.written.iter().any(|p| p == "scripts/check-loc.sh"));
+    assert!(
+        report
+            .written
+            .contains(&"scripts/check-tracker-drift.sh".to_owned()),
+        "the language-agnostic drift check ships for every scaffold"
+    );
     let config = fs::read_to_string(dir.path().join("do-harness.toml")).unwrap();
     assert!(config.contains("language = \"generic\""));
     assert_eq!(report.seeded, 2);

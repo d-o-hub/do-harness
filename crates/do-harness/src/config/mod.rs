@@ -57,12 +57,29 @@ pub enum SensorSeverity {
     Warn,
 }
 
+/// The role a sensor plays in the gate.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum SensorKind {
+    /// A gate whose failure is judged by its severity.
+    #[default]
+    Command,
+    /// A soft, project-specific facts check (status documents, tracker
+    /// counts, published-claim drift). Warn-only unless `severity` says
+    /// otherwise, and it carries a `fix` hint shown on failure.
+    ProjectCheck,
+}
+
 /// A single computational sensor.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct SensorSpec {
     /// Unique sensor name (e.g. "fmt").
     pub name: String,
+    /// Sensor kind: `command` (the default gate) or `project-check` (a soft
+    /// facts-drift check, warn-only unless `severity` overrides it).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kind: Option<SensorKind>,
     /// Command line, program first (e.g. `["cargo", "fmt", "--all", "--", "--check"]`).
     pub argv: Vec<String>,
     /// Optional number of retry attempts on failure.
@@ -74,6 +91,10 @@ pub struct SensorSpec {
     /// Gate severity (`error` default, `warn` advisory).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub severity: Option<SensorSeverity>,
+    /// Remediation hint printed with a failing sensor (e.g. how to refresh a
+    /// drifted status document).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fix: Option<String>,
     /// Deprecated alias for `severity = "warn"`.
     #[serde(
         default,
@@ -127,11 +148,14 @@ pub struct SensorSpec {
 
 impl SensorSpec {
     /// Effective severity after folding in the deprecated `allow_failure`
-    /// alias: warn when either source says warn, error otherwise.
+    /// alias and the `project-check` kind: warn when either source says warn
+    /// or when a soft check leaves the severity unset; an explicit `severity`
+    /// always wins.
     #[must_use]
     pub fn effective_severity(&self) -> SensorSeverity {
         match (self.severity, self.allow_failure) {
             (Some(SensorSeverity::Warn), _) | (None, true) => SensorSeverity::Warn,
+            (None, false) if self.kind == Some(SensorKind::ProjectCheck) => SensorSeverity::Warn,
             _ => SensorSeverity::Error,
         }
     }
@@ -149,10 +173,12 @@ static RUST_SENSORS: std::sync::LazyLock<Vec<SensorSpec>> = std::sync::LazyLock:
 fn spec(name: &str, argv: &[&str], when_changed: &[&str]) -> SensorSpec {
     SensorSpec {
         name: name.to_owned(),
+        kind: None,
         argv: argv.iter().map(|arg| (*arg).to_owned()).collect(),
         retry: None,
         timeout: None,
         severity: None,
+        fix: None,
         allow_failure: false,
         transient_exit_codes: Vec::new(),
         when_changed: when_changed.iter().map(|glob| (*glob).to_owned()).collect(),
@@ -196,6 +222,8 @@ pub fn rust_pack() -> Vec<SensorSpec> {
             RUST_INPUTS,
         ),
         SensorSpec {
+            kind: None,
+            fix: None,
             name: "coverage".to_owned(),
             argv: vec!["bash".to_owned(), "scripts/check-coverage.sh".to_owned()],
             retry: None,

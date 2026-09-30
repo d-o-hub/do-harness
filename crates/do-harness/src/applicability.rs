@@ -134,6 +134,8 @@ mod tests {
     /// Builds a sensor spec with the given applicability patterns.
     fn spec(name: &str, when_changed: &[&str]) -> SensorSpec {
         SensorSpec {
+            kind: None,
+            fix: None,
             name: name.to_owned(),
             argv: vec!["true".to_owned()],
             retry: None,

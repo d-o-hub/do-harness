@@ -52,6 +52,9 @@ pub struct SensorResult {
     /// evidence records this as a non-pass.
     #[serde(default)]
     pub warned: bool,
+    /// Remediation hint for a failing sensor, from the spec's `fix`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fix: Option<String>,
     /// Findings count reported by a `FINDINGS: <n>` marker, when present.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub findings: Option<u64>,
@@ -121,6 +124,9 @@ pub fn print_report(report: &VerifyReport, format: Format) {
             println!("{line}");
         }
         if !sensor.ok && sensor.execution != Execution::Reused {
+            if let Some(fix) = &sensor.fix {
+                eprintln!("      FIX: {fix}");
+            }
             let lines: Vec<&str> = sensor.output.lines().collect();
             let start = lines.len().saturating_sub(OUTPUT_TAIL_LINES);
             for line in &lines[start..] {
@@ -201,6 +207,7 @@ mod tests {
             root: "/tmp/root".to_owned(),
             failed: vec!["check".to_owned()],
             sensors: vec![SensorResult {
+                fix: None,
                 name: "check".to_owned(),
                 ok: false,
                 exit_code: Some(1),

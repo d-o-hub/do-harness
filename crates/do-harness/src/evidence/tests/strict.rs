@@ -71,6 +71,8 @@ fn soft_failure_is_recorded_as_warn_not_pass() {
     let dir = tempfile::tempdir().unwrap();
     let mut cfg = crate::config::rust_default();
     cfg.sensors = vec![crate::config::SensorSpec {
+        kind: None,
+        fix: None,
         name: "links".into(),
         argv: vec!["true".into()],
         retry: None,
@@ -89,6 +91,7 @@ fn soft_failure_is_recorded_as_warn_not_pass() {
         failed: vec![],
         signal_set: None,
         sensors: vec![crate::report::SensorResult {
+            fix: None,
             name: "links".into(),
             ok: false,
             exit_code: Some(1),
@@ -134,6 +137,8 @@ fn warned_sensor_is_recorded_as_warn_and_fails_summary() {
     let dir = tempfile::tempdir().unwrap();
     let mut cfg = crate::config::rust_default();
     cfg.sensors = vec![crate::config::SensorSpec {
+        kind: None,
+        fix: None,
         name: "tool".into(),
         argv: vec!["true".into()],
         retry: None,
@@ -152,6 +157,7 @@ fn warned_sensor_is_recorded_as_warn_and_fails_summary() {
         failed: vec![],
         signal_set: None,
         sensors: vec![crate::report::SensorResult {
+            fix: None,
             name: "tool".into(),
             ok: true,
             exit_code: Some(0),

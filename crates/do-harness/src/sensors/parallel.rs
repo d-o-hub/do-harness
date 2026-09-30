@@ -68,6 +68,7 @@ fn run_chunk(
                         super::sensor_reused(item.spec, *beat_id)
                     } else if opts.fail_fast && cancel.load(Ordering::SeqCst) {
                         SensorResult {
+                            fix: None,
                             name: item.spec.name.clone(),
                             ok: false,
                             exit_code: None,
@@ -201,6 +202,8 @@ mod tests {
 
     fn spec(name: &str, argv: &[&str]) -> SensorSpec {
         SensorSpec {
+            kind: None,
+            fix: None,
             name: name.to_owned(),
             argv: argv.iter().map(|a| (*a).to_owned()).collect(),
             retry: None,

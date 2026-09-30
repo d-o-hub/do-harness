@@ -19,6 +19,8 @@ fn severity_config(name: &str, argv: &[&str], severity: SensorSeverity) -> Confi
         hooks: HooksConfig::default(),
         signal_sets,
         sensors: vec![SensorSpec {
+            kind: None,
+            fix: None,
             name: name.to_owned(),
             argv: argv.iter().map(|a| (*a).to_owned()).collect(),
             retry: None,
