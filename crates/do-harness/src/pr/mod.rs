@@ -7,16 +7,31 @@ pub mod cache;
 pub mod command;
 pub mod diff;
 pub mod gh;
+pub mod lcov;
 pub mod no_effect;
 pub mod proof;
 pub mod readiness;
 pub mod review;
+pub mod waiver_classify;
+pub mod waiver_comment;
+pub mod waiver_scan;
+pub mod waiver_text;
+pub mod waivers;
 
 #[cfg(test)]
 mod diff_tests;
+
+#[cfg(test)]
+mod lcov_tests;
 
 #[cfg(test)]
 mod proof_tests;
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod waiver_scan_tests;
+
+#[cfg(test)]
+mod waivers_tests;

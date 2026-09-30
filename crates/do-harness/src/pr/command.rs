@@ -6,6 +6,7 @@ use anyhow::{Context, Result, bail};
 use serde::Serialize;
 
 use crate::CliError;
+use crate::changes::git_command;
 use crate::cli::PrAction;
 use crate::report::Format;
 
@@ -13,6 +14,7 @@ use super::diff::Change;
 use super::gh;
 use super::no_effect::{self, Effect};
 use super::review::{self, Reduction, ReviewReport};
+use super::waivers;
 
 /// What to analyze.
 #[derive(Debug, Clone)]
@@ -103,6 +105,28 @@ pub fn run(root: &Path, action: PrAction) -> Result<(), CliError> {
             run_review(root, &target, recompute, format).map_err(CliError::Verify)
         }
         PrAction::Ready { pr, format } => super::readiness::run(root, pr, format),
+        PrAction::Waivers {
+            pr,
+            base,
+            head,
+            patch,
+            lcov,
+            since,
+            strip_prefix,
+            format,
+        } => run_waivers(
+            root,
+            &WaiversArgs {
+                pr,
+                base,
+                head,
+                patch,
+                lcov,
+                since,
+                strip_prefix,
+                format,
+            },
+        ),
         PrAction::External(args) => {
             if let Some(first) = args.first() {
                 if let Ok(pr) = first.parse::<u64>() {
@@ -299,4 +323,105 @@ fn local_effect(root: &Path, base: &str, head: &str) -> Option<Effect> {
         }
     }
     None
+}
+
+/// `pr waivers` inputs as parsed from the CLI.
+pub struct WaiversArgs {
+    /// Pull request number; resolves base and head through `gh`.
+    pub pr: Option<u64>,
+    /// Base revision (local mode).
+    pub base: Option<String>,
+    /// Head revision (local mode).
+    pub head: Option<String>,
+    /// Patch file instead of a revision range.
+    pub patch: Option<PathBuf>,
+    /// Measured lcov report.
+    pub lcov: PathBuf,
+    /// Previous lcov report.
+    pub since: Option<PathBuf>,
+    /// Prefix stripped from `SF:` paths.
+    pub strip_prefix: Option<String>,
+    /// Output format.
+    pub format: Format,
+}
+
+/// Classifies patch-coverage residue and prints the review comment.
+///
+/// An unreadable input file is a usage error (exit 2); a patch that cannot be
+/// computed is an analysis failure (exit 1). A completed analysis exits 0 and
+/// leaves the verdict to the caller: `counts.missing` in the JSON report is the
+/// number of changed lines a test still has to cover.
+fn run_waivers(root: &Path, args: &WaiversArgs) -> Result<(), CliError> {
+    let patch = if let Some(path) = &args.patch {
+        read_input(path, "patch")?
+    } else {
+        let target = target_from(args.pr, args.base.clone(), args.head.clone())?;
+        patch_text(root, &target).map_err(CliError::Verify)?
+    };
+    let lcov = read_input(&args.lcov, "lcov report")?;
+    let since = args
+        .since
+        .as_ref()
+        .map(|path| read_input(path, "previous lcov report"))
+        .transpose()?;
+    let report = waivers::analyze(&waivers::Inputs {
+        patch: &patch,
+        lcov: &lcov,
+        since: since.as_deref(),
+        root,
+        strip_prefix: args.strip_prefix.as_deref(),
+    });
+    if matches!(args.format, Format::Json) {
+        let json = serde_json::to_string_pretty(&report)
+            .map_err(|err| CliError::Verify(anyhow::anyhow!("cannot serialize report: {err}")))?;
+        println!("{json}");
+    } else {
+        print!("{}", waivers::render_markdown(&report));
+    }
+    Ok(())
+}
+
+/// Reads a CLI input file, reporting an unreadable file as a usage error.
+fn read_input(path: &Path, what: &str) -> Result<String, CliError> {
+    std::fs::read_to_string(path).map_err(|err| {
+        CliError::Usage(anyhow::anyhow!(
+            "cannot read {what} {}: {err}",
+            path.display()
+        ))
+    })
+}
+
+/// Unified-diff text for a target.
+fn patch_text(root: &Path, target: &Target) -> Result<String> {
+    match target {
+        Target::Range { base, head } => {
+            let merge_base = no_effect::merge_base(root, base, head)
+                .with_context(|| format!("cannot resolve the merge base of {base} and {head}"))?;
+            local_diff(root, &merge_base, head)
+        }
+        Target::Pr(number) => gh::diff(root, *number),
+    }
+}
+
+/// `git diff` text between two revisions, with the flags the review input uses.
+fn local_diff(root: &Path, base: &str, head: &str) -> Result<String> {
+    let output = git_command(root)
+        .args([
+            "diff",
+            "--no-color",
+            "--find-renames",
+            "--unified=3",
+            base,
+            head,
+            "--",
+        ])
+        .output()
+        .context("failed to run git diff")?;
+    if !output.status.success() {
+        bail!(
+            "git diff {base} {head} failed: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        );
+    }
+    Ok(String::from_utf8_lossy(&output.stdout).into_owned())
 }

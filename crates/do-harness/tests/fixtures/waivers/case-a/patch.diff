@@ -1,0 +1,54 @@
+diff --git a/src/retrieval/judgment.rs b/src/retrieval/judgment.rs
+index 20524fb..d57c99c 100644
+--- a/src/retrieval/judgment.rs
++++ b/src/retrieval/judgment.rs
+@@ -77,6 +77,22 @@ pub fn validate_and_align_judgments(
+         }
+     }
+ 
++    // Re-align judgments to match input candidate order. Every lookup
++    // succeeds: the set check above rejects unknown or missing IDs and the
++    // duplicate check rejects repeats, so each ID is consumed exactly once.
++    let mut judgment_map: HashMap<String, CandidateJudgment> =
++        judgments.into_iter().map(|j| (j.id.clone(), j)).collect();
++
++    let mut aligned = Vec::with_capacity(candidates.len());
++    for c in candidates {
++        let Some(j) = judgment_map.remove(c.id.as_str()) else {
++            return Err(JudgmentError::invalid(format!(
++                "unknown candidate ID mismatch during alignment: '{}'",
++                c.id
++            )));
++        };
++        aligned.push(j);
++    }
+ 
+     Ok(aligned)
+ }
+@@ -94,11 +110,26 @@ pub fn evaluate_judgments(
+     match raw {
+         Ok(raw_judgments) => match validate_and_align_judgments(candidates, raw_judgments) {
+             Ok(aligned) => {
++                info!(
++                    judge_configured = true,
++                    outcome = %JudgmentOutcome::Ok.as_str(),
++                    candidate_count = candidates.len(),
++                    elapsed_ms = elapsed_ms,
++                    "semantic candidate judgment completed successfully"
++                );
+                 Ok(aligned)
+             }
+             Err(err) => Err(err),
+         },
+         Err(err) => {
++            info!(
++                judge_configured = true,
++                outcome = %JudgmentOutcome::Invalid.as_str(),
++                candidate_count = candidates.len(),
++                elapsed_ms = elapsed_ms,
++                error = %err.0,
++                "semantic candidate judgment rejected the provider response"
++            );
+             Err(err)
+         }
+     }

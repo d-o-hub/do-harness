@@ -693,6 +693,44 @@ Inspect a pull request's end-to-end merge readiness:
 Exit `0` when the PR is ready to merge, `1` when any blocker exists (non-`CLEAN`
 merge state, cancelled or failed check, unresolved thread, unanswered Codecov
 gap), and `2` when `gh` fails.
+
+### `pr waivers`
+Classify the patch-coverage residue of a change: every changed line the measured
+lcov report marks as executed zero times gets a waiver class or a "needs a test"
+verdict. The text output is a comment a reviewer can paste into the pull
+request, with per-class evidence and per-file counts:
+
+- `macro-field`: a logging macro's field expression. A subscriber evaluates
+  those expressions only when it consumes the event, so a suite that installs no
+  subscriber never executes them although every path around them is covered.
+- `guarded-arm`: a fallback a prior guard already proved unreachable — the
+  `else` block of a `let … else`, an arm that follows an arm with the same
+  pattern plus an equality-style guard, or a body under an explicit
+  `unreachable`/`cannot happen`/`guaranteed`/`defensive` comment.
+- `feature-gated`: a line inside a `#[cfg(feature = "…")]` item. Gated code is
+  absent from the report entirely when the measured pipeline never compiled it,
+  so this class comes from the patch set and the head source.
+- `missing`: everything else — a test is the fix. The classifier never invents a
+  waiver it cannot justify.
+
+- `<PR>` or `--base <REV> --head <REV>`: where the patch set comes from; the
+  diff is computed like `pr review` (merge base, `--find-renames`).
+- `--patch <PATH>`: read a unified diff from a file instead (exclusive with a PR
+  or a revision range).
+- `--lcov <PATH>`: the measured report to classify. An `SF:` path resolves to
+  the longest suffix that exists under the workspace root, so a CI checkout
+  prefix (`/home/runner/work/<repo>/<repo>/…`) needs no configuration.
+- `--strip-prefix <PREFIX>`: strip a known prefix before that resolution.
+- `--since <PATH>`: a previous report; changed lines it missed and the current
+  one covers are reported as **covered since**.
+- `--format <Format>`: `text` (the paste-ready comment) or `json`.
+
+Read-only and offline: a PR target reads the diff through `gh`, everything else
+is local. Exit `2` when an input file is unreadable or the arguments conflict,
+`1` when the patch set cannot be computed, and `0` when the analysis completes —
+the verdict lives in the report, where `counts.missing` is the number of changed
+lines a test still has to cover.
+
 ### `skills`
 Progressive-disclosure skill selection and opt-in drift checks for shared
 skills. `skills suggest` ranks the skills under
