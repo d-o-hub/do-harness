@@ -1,0 +1,94 @@
+diff --git a/src/retrieval/rerank.rs b/src/retrieval/rerank.rs
+index f91572a..71337f2 100644
+--- a/src/retrieval/rerank.rs
++++ b/src/retrieval/rerank.rs
+@@ -1,9 +1,9 @@
+ //! Fixture: the residue shapes PR #1042 waived (see ../README.md).
+ //!
+-//! Base revision of the head fixture; the diff adds the visibility log and
+-//! the defensive count-mismatch arm.
++//! Extracted from `memory-core/src/retrieval/rerank.rs` at
++//! `69e50f3592e7fb95ae0a3d29c023f35905e1b282`.
+ 
+-use tracing::debug;
++use tracing::{debug, info};
+ 
+ /// Rerank outcome for the caller.
+ #[derive(Debug)]
+@@ -72,6 +72,8 @@ pub enum JudgeError {
+ ///
+ /// Returns a status when the provider result cannot be used.
+ pub fn apply_rerank(
++    report: &Report,
++    status: Status,
+     shortlist_len: usize,
+     result: Result<Option<Vec<Judgment>>, JudgeError>,
+     provider_ms: u64,
+@@ -80,8 +82,29 @@ pub fn apply_rerank(
+         return Err((RerankStatus::Ok, provider_ms));
+     }
+ 
++    info!(
++        status = %status.as_str(),
++        shortlist_len = report.outcome.shortlist_len,
++        output_len = report.outcome.output_len,
++        top1_changed = report.outcome.top1_changed,
++        provider_ms = report.provider_ms,
++        avg_relevance_confidence = f64::from(report.avg_confidence),
++        "semantic rerank finished"
++    );
++
+     match result {
+-        Ok(Some(judgments)) => Ok((judgments, provider_ms)),
++        Ok(Some(judgments)) if judgments.len() == shortlist_len => Ok((judgments, provider_ms)),
++        Ok(Some(judgments)) => {
++            let count = judgments.len();
++            debug!(
++                shortlist_len = shortlist_len,
++                judgment_count = count,
++                "count mismatch"
++            );
++            Err((RerankStatus::Invalid, provider_ms))
++        }
++        // Unreachable while a judge is configured: never invent a ranking.
++        Ok(None) => Err((RerankStatus::NotConfigured, provider_ms)),
+         Err(err) => {
+             let status = match err {
+                 JudgeError::Timeout => RerankStatus::NotConfigured,
+@@ -89,6 +112,5 @@ pub fn apply_rerank(
+             };
+             Err((status, provider_ms))
+         }
+-        _ => Err((RerankStatus::NotConfigured, provider_ms)),
+     }
+ }
+
+diff --git a/src/retrieval/cascade/mod.rs b/src/retrieval/cascade/mod.rs
+index a5891a0..bf91fcd 100644
+--- a/src/retrieval/cascade/mod.rs
++++ b/src/retrieval/cascade/mod.rs
+@@ -15,3 +15,24 @@ pub struct Ranking {
+     /// Ordered candidate IDs.
+     pub ids: Vec<String>,
+ }
++
++#[cfg(feature = "csm")]
++pub mod semantic_rerank {
++    //! `csm`-gated semantic rerank wiring.
++
++    use super::{Ranking, Tier};
++
++    /// Reranks the top tier through the semantic judge.
++    ///
++    /// # Errors
++    ///
++    /// Returns the tier when the judge cannot be reached.
++    pub fn rerank_tiers(ids: &[String], enabled: bool) -> Result<Ranking, Tier> {
++        if !enabled {
++            return Err(Tier::Keyword);
++        }
++        let mut ordered = ids.to_vec();
++        ordered.sort();
++        Ok(Ranking { ids: ordered })
++    }
++}

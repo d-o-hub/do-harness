@@ -148,6 +148,33 @@ pub enum PrAction {
         #[arg(long, value_enum, default_value_t = Format::Text)]
         format: Format,
     },
+    /// Classify patch-coverage residue: waivable classes and lines needing tests.
+    Waivers {
+        /// Pull request number; resolves base and head through `gh`.
+        #[arg(value_name = "PR", conflicts_with_all = ["base", "head", "patch"])]
+        pr: Option<u64>,
+        /// Base revision (local mode; requires --head).
+        #[arg(long, value_name = "REV", requires = "head", conflicts_with = "patch")]
+        base: Option<String>,
+        /// Head revision (local mode; requires --base).
+        #[arg(long, value_name = "REV", requires = "base", conflicts_with = "patch")]
+        head: Option<String>,
+        /// Patch file (unified diff) instead of a revision range.
+        #[arg(long, value_hint = ValueHint::FilePath, value_name = "PATH")]
+        patch: Option<PathBuf>,
+        /// Measured lcov report to classify.
+        #[arg(long, value_hint = ValueHint::FilePath, value_name = "PATH")]
+        lcov: PathBuf,
+        /// Previous lcov report: also report the changed lines covered since.
+        #[arg(long, value_hint = ValueHint::FilePath, value_name = "PATH")]
+        since: Option<PathBuf>,
+        /// Prefix stripped from `SF:` paths (a CI checkout path).
+        #[arg(long, value_name = "PREFIX")]
+        strip_prefix: Option<String>,
+        /// Output format; `text` prints the paste-ready review comment.
+        #[arg(long, value_enum, default_value_t = Format::Text)]
+        format: Format,
+    },
     /// Direct PR number invocation (e.g. `do-harness pr 240`).
     #[command(external_subcommand)]
     External(Vec<String>),
