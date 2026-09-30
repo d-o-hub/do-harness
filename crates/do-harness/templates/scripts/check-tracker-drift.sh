@@ -69,7 +69,10 @@ count_open() {
     local kind="$1" output
     if ! output="$(gh "${gh_args[@]}" "$kind" list --state open --limit 1000 \
         --json number --jq 'length' 2>&1)"; then
-        echo "drift: could not read open $kind from the tracker: $output"
+        # stderr, not stdout: the caller captures stdout to read the count, so a
+        # diagnostic written there is discarded together with the empty result
+        # and the operator only sees a bare `FINDINGS: 1`.
+        echo "drift: could not read open $kind from the tracker: $output" >&2
         return 1
     fi
     printf '%s' "$output"

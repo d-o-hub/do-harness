@@ -135,3 +135,40 @@ fn missing_status_document_declines_to_green() {
     assert!(output.contains("not found"), "{output}");
     assert!(output.contains("FINDINGS: 1"), "{output}");
 }
+
+#[test]
+fn an_unreadable_tracker_reports_the_reason() {
+    let (_dir, root, bin) = fixture();
+    let doc = root.join("STATUS.md");
+    std::fs::write(&doc, "Active: 0 open PRs, 0 open issues.\n").unwrap();
+    // An unauthenticated `gh` fails before it can count anything, and the
+    // reason travels on stderr: the wrapper captures stdout to read the count,
+    // so an error printed there is discarded with the empty result.
+    std::fs::write(
+        bin.join("gh"),
+        "#!/bin/sh\necho 'gh: not logged in; run gh auth login' >&2\nexit 4\n",
+    )
+    .unwrap();
+
+    let (code, output) = run_drift(
+        &root,
+        &bin,
+        &doc,
+        [("FAKE_OPEN_PRS", "0"), ("FAKE_OPEN_ISSUES", "0")],
+    );
+
+    assert_eq!(
+        code,
+        Some(1),
+        "an unreadable tracker must not green the check:\n{output}"
+    );
+    assert!(
+        output.contains("could not read open pr from the tracker"),
+        "the reason must survive the failure:\n{output}"
+    );
+    assert!(
+        output.contains("gh: not logged in; run gh auth login"),
+        "the tracker's own error must be shown:\n{output}"
+    );
+    assert!(output.contains("FINDINGS: 1"), "{output}");
+}
