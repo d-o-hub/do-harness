@@ -62,12 +62,15 @@ if ! command -v gh >/dev/null 2>&1; then
     exit 1
 fi
 
-gh_args=()
+# The command lives in the array so the expansion is never empty: `"${arr[@]}"`
+# on an empty array is an unbound-variable error under `set -u` before bash 4.4,
+# which is still the `#!/usr/bin/env bash` a stock macOS resolves.
+gh_args=(gh)
 [[ -n "$REPO" ]] && gh_args+=(--repo "$REPO")
 
 count_open() {
     local kind="$1" output
-    if ! output="$(gh "${gh_args[@]}" "$kind" list --state open --limit 1000 \
+    if ! output="$("${gh_args[@]}" "$kind" list --state open --limit 1000 \
         --json number --jq 'length' 2>&1)"; then
         # stderr, not stdout: the caller captures stdout to read the count, so a
         # diagnostic written there is discarded together with the empty result
