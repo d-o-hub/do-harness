@@ -14,6 +14,8 @@ fn artifacts_and_coverage_are_recorded() {
 
     let mut cfg = crate::config::rust_default();
     cfg.sensors = vec![crate::config::SensorSpec {
+        kind: None,
+        fix: None,
         name: "web".into(),
         argv: vec!["true".into()],
         retry: None,
@@ -32,6 +34,7 @@ fn artifacts_and_coverage_are_recorded() {
         failed: vec![],
         signal_set: None,
         sensors: vec![crate::report::SensorResult {
+            fix: None,
             name: "web".into(),
             ok: true,
             exit_code: Some(0),
@@ -84,6 +87,8 @@ fn missing_declared_artifact_records_warn() {
     let dir = tempfile::tempdir().unwrap();
     let mut cfg = crate::config::rust_default();
     cfg.sensors = vec![crate::config::SensorSpec {
+        kind: None,
+        fix: None,
         name: "web".into(),
         argv: vec!["true".into()],
         retry: None,
@@ -102,6 +107,7 @@ fn missing_declared_artifact_records_warn() {
         failed: vec![],
         signal_set: None,
         sensors: vec![crate::report::SensorResult {
+            fix: None,
             name: "web".into(),
             ok: true,
             exit_code: Some(0),

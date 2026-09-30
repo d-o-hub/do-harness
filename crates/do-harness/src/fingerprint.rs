@@ -262,6 +262,8 @@ mod tests {
             hooks: crate::config::HooksConfig::default(),
             signal_sets: std::collections::BTreeMap::new(),
             sensors: vec![SensorSpec {
+                kind: None,
+                fix: None,
                 name: "a".to_owned(),
                 argv: vec!["true".to_owned()],
                 retry: None,

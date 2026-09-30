@@ -116,6 +116,8 @@ mod tests {
     /// Builds a sensor spec running `argv`.
     fn spec(name: &str, argv: &[&str]) -> crate::config::SensorSpec {
         crate::config::SensorSpec {
+            kind: None,
+            fix: None,
             name: name.to_owned(),
             argv: argv.iter().map(ToString::to_string).collect(),
             retry: None,

@@ -54,6 +54,7 @@ pub(crate) fn sensor_quarantined(spec: &SensorSpec) -> SensorResult {
 /// process exit.
 pub(crate) fn sensor_reused(spec: &SensorSpec, beat_id: i64) -> SensorResult {
     SensorResult {
+        fix: None,
         name: spec.name.clone(),
         ok: true,
         exit_code: None,

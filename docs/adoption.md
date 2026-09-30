@@ -144,6 +144,25 @@ sensor names. `when-changed` globs make a sensor apply only to the current
 change (`verify --changed`), and selection fails closed when git state cannot
 be read.
 
+Status documents rot silently, so `init` also scaffolds a reference
+`project-check`: `scripts/check-tracker-drift.sh` compares `<n> open PRs` /
+`<n> open issues` claims in a status document with `gh pr list` / `gh issue
+list`, prints the drift with its line number, and fails closed when it cannot
+verify a claim. Declare it (soft by default) to enable it:
+
+```toml
+[[sensors]]
+name = "tracker-drift"
+kind = "project-check"
+argv = ["bash", "scripts/check-tracker-drift.sh", "--doc", "plans/ROADMAP_ACTIVE.md"]
+fix = "refresh the open-PR/issue counts in the status document"
+when-changed = ["plans/**/*.md", "scripts/check-tracker-drift.sh"]
+```
+
+`kind = "project-check"` is the general form: any `argv` whose failure is
+advisory. It defaults to `severity = "warn"`, and `fix` is printed as a `FIX:`
+line when the check fails.
+
 The LOC ceiling is not Rust-only: the rust pack ships `loc` over `*.rs` by
 default, and a front-end tree gets the same invariant by scoping that sensor
 instead of forking the script.

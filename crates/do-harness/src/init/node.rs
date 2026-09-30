@@ -152,6 +152,8 @@ pub fn probe_node(root: &Path) -> (Vec<Candidate>, Vec<SensorSpec>) {
             detail: String::new(),
         });
         specs.push(SensorSpec {
+            kind: None,
+            fix: None,
             name: "typecheck".to_string(),
             argv,
             retry: None,
@@ -210,6 +212,8 @@ pub fn probe_node(root: &Path) -> (Vec<Candidate>, Vec<SensorSpec>) {
             detail: String::new(),
         });
         specs.push(SensorSpec {
+            kind: None,
+            fix: None,
             name: "lint".to_string(),
             argv,
             retry: None,
@@ -265,6 +269,8 @@ pub fn probe_node(root: &Path) -> (Vec<Candidate>, Vec<SensorSpec>) {
             detail: String::new(),
         });
         specs.push(SensorSpec {
+            kind: None,
+            fix: None,
             name: "test".to_string(),
             argv,
             retry: None,
@@ -307,6 +313,8 @@ pub fn probe_node(root: &Path) -> (Vec<Candidate>, Vec<SensorSpec>) {
             detail: String::new(),
         });
         specs.push(SensorSpec {
+            kind: None,
+            fix: None,
             name: "build".to_string(),
             argv,
             retry: None,

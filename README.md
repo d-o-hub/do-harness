@@ -110,6 +110,10 @@ The harness is designed to be adopted by any codebase, Rust or not:
    diffs, i18n), and `node` (Node/JS/TS pack: typecheck, lint, test, build).
    With zero sensors `verify` exits 0 without running any command: a vacuous
    pass, not evidence. Define real sensors before treating verify output as proof.
+   For soft, project-specific facts checks (status-document drift, tracker
+   counts) declare `kind = "project-check"`: warn-only unless `severity` says
+   otherwise, with an optional `fix` hint printed on failure. `init` scaffolds
+   the `scripts/check-tracker-drift.sh` reference implementation.
 
 3. Wire the git hooks:
 

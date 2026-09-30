@@ -130,6 +130,8 @@ mod tests {
             sensors: ["a", "b"]
                 .iter()
                 .map(|name| SensorSpec {
+                    kind: None,
+                    fix: None,
                     name: (*name).to_owned(),
                     argv: vec!["true".to_owned()],
                     retry: None,

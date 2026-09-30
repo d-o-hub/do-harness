@@ -21,6 +21,8 @@ fn config_with(specs: &[(&str, &[&str])]) -> Config {
         sensors: specs
             .iter()
             .map(|(name, argv)| SensorSpec {
+                kind: None,
+                fix: None,
                 name: (*name).to_owned(),
                 argv: argv.iter().map(|a| (*a).to_owned()).collect(),
                 retry: None,

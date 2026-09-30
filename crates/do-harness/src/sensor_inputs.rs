@@ -183,6 +183,8 @@ mod tests {
 
     fn spec(inputs: &[&str]) -> SensorSpec {
         SensorSpec {
+            kind: None,
+            fix: None,
             name: "probe".to_owned(),
             argv: vec!["true".to_owned()],
             retry: None,
