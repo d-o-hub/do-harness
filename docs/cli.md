@@ -602,8 +602,10 @@ harness initialization.
 In PR mode the base is the *remote* branch, so `origin/<base>` is preferred
 whenever that ref exists and a same-named local branch is only the fallback: a
 local `main` that lags behind the remote would otherwise report already-merged
-upstream commits as this PR's change. The reported `merge_base` names the exact
-commit the verdict was computed against.
+upstream commits as this PR's change. The verdict is the tree delta between
+`merge-base(origin/<base>, <head>)` and `<head>`; when the clone cannot resolve
+those revisions it falls back to the compare API and reports
+`"method": "compare-api"` instead of `"git"`.
 
 Exit `0` when the verdict is determined (whether `no-effect` or `has-effect`),
 `1` when it cannot be determined, and `2` for invalid arguments. An analysis
@@ -634,8 +636,11 @@ invalid policy — including invalid globs — proves nothing and adds a warning
 - `<PR>`: Pull request number; base and head are resolved through `gh`,
   falling back to `gh pr diff` when the clone cannot resolve them. As in
   `pr no-effect`, `origin/<base>` is preferred over a stale local branch of the
-  same name, and the report's `merge_base` (also part of the cache key) names
-  the commit the residual was computed against.
+  same name; when the clone resolves the revisions, the report's `merge_base`
+  names the commit the residual was computed against and is part of the cache
+  key. Under the `gh pr diff` fallback `merge_base` is only the base branch name
+  and the report is not cached (`cacheable: false`), so use the commit form when
+  the report must pin the comparison.
 - `--base <REV> --head <REV>`: Local mode without GitHub.
 - `--recompute`: Ignore the cached report and recompute from scratch.
 - `--format <Format>`: Output format (`text` or `json`).

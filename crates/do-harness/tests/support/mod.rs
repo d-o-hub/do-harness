@@ -101,4 +101,5 @@ pub fn git_command(root: &Path) -> Command {
 
 pub mod ci_explain;
 pub mod dora;
+pub mod pr_readiness;
 pub mod reuse;

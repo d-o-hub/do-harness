@@ -133,10 +133,13 @@ pub fn map_sensor(
         context.push_str(&line.to_lowercase());
     }
 
-    if let Some(spec) = sensors
-        .iter()
-        .find(|spec| context.contains(&spec.name.to_lowercase()))
-    {
+    // Token-boundary match: a short sensor name must not be captured by an
+    // unrelated word (`latest` must not select `test`, `blocked` not `loc`),
+    // while a multi-word sensor name still matches as a phrase.
+    if let Some(spec) = sensors.iter().find(|spec| {
+        let name = spec.name.to_lowercase();
+        contains_name(&context, &name)
+    }) {
         return (Some(spec.name.clone()), Some(spec.argv.join(" ")));
     }
 
@@ -148,6 +151,24 @@ pub fn map_sensor(
     }
 
     (None, None)
+}
+
+/// Whether `haystack` contains `needle` on token boundaries: `latest` does not
+/// contain `test`, and a multi-word name matches as a phrase.
+fn contains_name(haystack: &str, needle: &str) -> bool {
+    let is_sep = |c: char| !(c.is_alphanumeric() || c == '-' || c == '_');
+    let mut from = 0;
+    while let Some(offset) = haystack[from..].find(needle) {
+        let start = from + offset;
+        let end = start + needle.len();
+        let before_ok = haystack[..start].chars().next_back().is_none_or(is_sep);
+        let after_ok = haystack[end..].chars().next().is_none_or(is_sep);
+        if before_ok && after_ok {
+            return true;
+        }
+        from = end;
+    }
+    false
 }
 
 /// Resolves a sensor name against the config, else the tool's canonical

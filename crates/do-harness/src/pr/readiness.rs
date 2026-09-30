@@ -16,6 +16,16 @@ use super::gh;
 use crate::CliError;
 use crate::report::Format;
 
+/// Logins that post Codecov's own report comments: the app (`codecov[bot]`),
+/// the legacy bot user (`codecov`), and the comment-bot account.
+const CODECOV_AUTHORS: [&str; 3] = ["codecov", "codecov[bot]", "codecov-commenter"];
+
+/// Whether `login` is a bot account: `GitHub` Apps (`[bot]` suffix) and the
+/// well-known dependency bots.
+fn is_bot_login(login: &str) -> bool {
+    login.ends_with("[bot]") || login == "dependabot" || login == "renovate"
+}
+
 /// Merge readiness evaluation report.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ReadinessReport {
@@ -277,18 +287,20 @@ fn evaluate_conversations(
     let mut seen_codecov_actionable = false;
     for (idx, comment) in comments.iter().enumerate() {
         let author = comment.user.as_ref().map_or("", |u| u.login.as_str());
-        let is_codecov =
-            author == "codecov" || author == "codecov[bot]" || comment.body.contains("Codecov");
+        // Only Codecov's own logins post a report: a human comment that merely
+        // mentions "Codecov" must not overwrite the real summary.
+        let is_codecov = CODECOV_AUTHORS.contains(&author);
 
         if is_codecov {
             let has_gap = comment.body.contains("missing coverage")
                 || comment.body.contains("Patch coverage is 0")
                 || comment.body.contains("Decreases by");
-            let has_subsequent_human = comments[idx + 1..].iter().any(|c| {
+            // A human reply waives the gap; another bot's notice does not.
+            let has_subsequent_answer = comments[idx + 1..].iter().any(|c| {
                 let a = c.user.as_ref().map_or("", |u| u.login.as_str());
-                a != "codecov" && a != "codecov[bot]"
+                !CODECOV_AUTHORS.contains(&a) && !is_bot_login(a)
             });
-            let is_actionable = has_gap && !has_subsequent_human;
+            let is_actionable = has_gap && !has_subsequent_answer;
             let patch_cov = parse_patch_coverage(&comment.body);
             let missing_lines = parse_missing_lines(&comment.body);
             let excerpt = first_line(&comment.body, 80);

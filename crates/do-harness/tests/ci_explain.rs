@@ -276,6 +276,96 @@ fn jobs_spanning_multiple_pages_are_merged_and_approvals_read_as_pending() {
 
 #[cfg(unix)]
 #[test]
+fn unrelated_job_words_do_not_name_a_sensor() {
+    // The `test` sensor is configured, so a substring rule would match the
+    // `latest` word in the job name below; only whole tokens may match.
+    let (dir, root) =
+        fixture_root("\n[[sensors]]\nname = \"test\"\nargv = [\"cargo\", \"nextest\", \"run\"]\n");
+    let bin = fake_gh(&root);
+
+    std::fs::write(
+        root.join("run.json"),
+        r#"{"id": 88, "name": "verify", "status": "completed", "conclusion": "failure", "html_url": ""}"#,
+    )
+    .unwrap();
+    // "latest" contains the sensor name `test`; only whole tokens may match.
+    std::fs::write(
+        root.join("jobs.json"),
+        r#"{
+            "jobs": [
+                {
+                    "id": 904,
+                    "name": "Install latest stable Rust",
+                    "status": "completed",
+                    "conclusion": "failure",
+                    "html_url": "",
+                    "steps": [{"name": "Install", "conclusion": "failure"}]
+                }
+            ]
+        }"#,
+    )
+    .unwrap();
+
+    let (code, stdout, stderr) = run_ci(&root, &bin, &["ci-explain", "88", "--format", "json"]);
+    assert_eq!(code, Some(0), "stderr:\n{stderr}");
+    let json = report(&stdout);
+    let failed = &json["jobs"][0];
+    assert!(
+        failed["local_sensor"].is_null(),
+        "`latest` must not select a sensor: {stdout}"
+    );
+    assert!(failed["local_repro_command"].is_null());
+    assert_eq!(
+        json["summary"]["recommended_action"],
+        "inspect the failed job logs; no local sensor matched"
+    );
+    let _ = dir;
+}
+
+#[cfg(unix)]
+#[test]
+fn multi_word_sensor_names_still_match_their_step() {
+    let (dir, root) = fixture_root(
+        "\n[[sensors]]\nname = \"do-harness eval\"\nargv = [\"do-harness\", \"eval\", \"--set\", \"all\"]\n",
+    );
+    let bin = fake_gh(&root);
+
+    std::fs::write(
+        root.join("run.json"),
+        r#"{"id": 88, "name": "verify", "status": "completed", "conclusion": "failure", "html_url": ""}"#,
+    )
+    .unwrap();
+    std::fs::write(
+        root.join("jobs.json"),
+        r#"{
+            "jobs": [
+                {
+                    "id": 905,
+                    "name": "verify",
+                    "status": "completed",
+                    "conclusion": "failure",
+                    "html_url": "",
+                    "steps": [{"name": "Run do-harness eval", "conclusion": "failure"}]
+                }
+            ]
+        }"#,
+    )
+    .unwrap();
+
+    let (code, stdout, stderr) = run_ci(&root, &bin, &["ci-explain", "88", "--format", "json"]);
+    assert_eq!(code, Some(0), "stderr:\n{stderr}");
+    let json = report(&stdout);
+    let failed = &json["jobs"][0];
+    assert_eq!(
+        failed["local_sensor"], "do-harness eval",
+        "a multi-word sensor name must still match: {stdout}"
+    );
+    assert_eq!(failed["local_repro_command"], "do-harness eval --set all");
+    let _ = dir;
+}
+
+#[cfg(unix)]
+#[test]
 fn workflow_url_is_accepted_and_unparseable_ids_are_a_usage_error() {
     let (dir, root) = fixture_root("");
     let bin = fake_gh(&root);
