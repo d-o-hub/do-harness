@@ -62,6 +62,19 @@ fn macro_spans_cover_only_the_requested_macros() {
 }
 
 #[test]
+fn a_non_ascii_line_before_the_macro_does_not_shift_the_span() {
+    // The macro's `(` is found as a byte offset; the paren scan counts
+    // characters, so a multi-byte character earlier on the line must not shift
+    // the span.
+    let source = lines(
+        "    let café = 1; info!(\n        value = %café.to_string(),\n        \"done\"\n    );\n",
+    );
+    let spans = scan::macro_spans(&source, &["info"]);
+    assert_eq!(spans.len(), 1, "{spans:?}");
+    assert_eq!(spans[0].span, scan::Span { start: 1, end: 4 });
+}
+
+#[test]
 fn let_else_spans_capture_the_binding_and_body() {
     let source = lines(
         "    for c in candidates {\n        let Some(j) = map.remove(c.id.as_str()) else {\n            return Err(err(c.id));\n        };\n    }\n",

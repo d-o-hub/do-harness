@@ -309,6 +309,26 @@ fn a_missing_head_source_warns_instead_of_guessing() {
 }
 
 #[test]
+fn an_unresolved_previous_report_path_warns() {
+    let dir = tempfile::tempdir().unwrap();
+    let report = waivers::analyze(&Inputs {
+        patch: &patch("src/lib.rs", "fn f() {}\n"),
+        lcov: &lcov("src/lib.rs", 1, &[]),
+        since: Some(&lcov("/elsewhere/src/lib.rs", 1, &[])),
+        root: dir.path(),
+        strip_prefix: None,
+    });
+    assert!(
+        report
+            .warnings
+            .iter()
+            .any(|warning| warning.contains("--since path unresolved")),
+        "{:?}",
+        report.warnings
+    );
+}
+
+#[test]
 fn an_unresolved_lcov_path_is_reported_not_dropped() {
     let dir = tempfile::tempdir().unwrap();
     let report = waivers::analyze(&Inputs {

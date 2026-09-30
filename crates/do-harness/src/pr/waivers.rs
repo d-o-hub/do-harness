@@ -162,7 +162,13 @@ pub fn analyze(inputs: &Inputs<'_>) -> Report {
     let since = inputs.since.map(lcov::parse);
     let since_by_path = since.as_ref().map(|since| {
         let mut unresolved = Vec::new();
-        resolve_files(since, inputs.strip_prefix, inputs.root, &mut unresolved)
+        let resolved = resolve_files(since, inputs.strip_prefix, inputs.root, &mut unresolved);
+        for path in unresolved {
+            report
+                .warnings
+                .push(format!("--since path unresolved under the root: {path}"));
+        }
+        resolved
     });
 
     let mut candidates: BTreeMap<String, BTreeSet<u32>> = BTreeMap::new();

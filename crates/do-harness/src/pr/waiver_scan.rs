@@ -130,7 +130,10 @@ pub fn macro_spans(lines: &[String], macros: &[&str]) -> Vec<MacroSpan> {
             }
             spans.push(MacroSpan {
                 name,
-                span: paren_span(lines, line_number(index), cursor),
+                // `paren_span` counts characters, so a byte offset must be
+                // converted: a line with non-ASCII text before the macro would
+                // otherwise start counting parens in the wrong place.
+                span: paren_span(lines, line_number(index), code[..cursor].chars().count()),
             });
         }
     }
