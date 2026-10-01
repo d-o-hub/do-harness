@@ -10,7 +10,10 @@ do-harness [GLOBAL OPTIONS] <SUBCOMMAND>
 
 ## Global Options
 
-- `--root <DIR>`: Workspace root override (default: walk up from cwd).
+- `--root <DIR>`: Workspace root override (default: walk up from cwd). An
+  explicit root selects exactly `<DIR>/do-harness.toml`; a missing file is a
+  usage error (exit 2) before any sensor, recording, or evidence write, unless
+  `--config <FILE>` names another file.
 - `--config <FILE>`: Explicit path to `do-harness.toml`.
 - `-v, --verbose`: Increase verbosity level.
 - `-q, --quiet`: Suppress non-error output.
