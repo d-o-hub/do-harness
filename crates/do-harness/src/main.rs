@@ -145,6 +145,14 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
         _ => commands::resolve_root(cli.root.as_deref()).map_err(CliError::Usage)?,
     };
 
+    // An explicitly targeted directory selects exactly `<root>/do-harness.toml`
+    // as a required explicit file: it must not silently fall back to the
+    // built-in pack, nor to a policy discovered from the invocation cwd. With
+    // neither override, implicit discovery and the built-in default remain.
+    let config_path = cli
+        .config
+        .or_else(|| cli.root.as_ref().map(|_| root.join("do-harness.toml")));
+
     match cli.command {
         Command::Version { .. }
         | Command::Compliance { .. }
@@ -240,13 +248,13 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
                 bless,
                 approver,
                 format,
-                config: cli.config.clone(),
+                config: config_path,
                 ..Default::default()
             };
             verify::run(&root, opts).await
         }
         Command::List { sets, format } => {
-            let cfg = config::load(&root, cli.config.as_deref())
+            let cfg = config::load(&root, config_path.as_deref())
                 .await
                 .map_err(CliError::Usage)?;
             if sets {
@@ -260,12 +268,12 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
             set,
             changed,
             format,
-        } => explain::run(&root, cli.config.as_deref(), set, changed, format).await,
+        } => explain::run(&root, config_path.as_deref(), set, changed, format).await,
         Command::Status {
             set,
             evidence,
             format,
-        } => status::run(&root, cli.config.as_deref(), set, evidence, format).await,
+        } => status::run(&root, config_path.as_deref(), set, evidence, format).await,
         Command::Loc {
             format,
             warn,
@@ -384,7 +392,7 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
         .await
         .map_err(CliError::Verify),
         Command::Hook { action } => {
-            commands::hook(&root, cli.config.as_deref(), action, cli.dry_run)
+            commands::hook(&root, config_path.as_deref(), action, cli.dry_run)
                 .await
                 .map_err(CliError::Usage)
         }
