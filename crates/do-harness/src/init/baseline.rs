@@ -147,7 +147,7 @@ mod tests {
         let baseline = run(&config(vec![spec("ok", &["true"])]), dir.path()).unwrap();
         assert_eq!(baseline.state, BaselineState::Green);
         assert_eq!(baseline.passed, 1);
-        assert!(baseline.failed.is_empty());
+        assert_eq!(baseline.failed.len(), 0);
     }
 
     /// Failing sensors report red with a bounded diagnostic tail.

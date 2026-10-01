@@ -42,7 +42,7 @@ fn missing_selector_keeps_the_deterministic_order() {
     let candidates = two_candidates(root);
     let (selection, warnings) = suggest::select(root, "sensors", &candidates, &config(None, 10.0));
     assert_eq!(selection, suggest::Selection::Deterministic);
-    assert!(warnings.is_empty());
+    assert_eq!(warnings.len(), 0);
 }
 
 #[cfg(unix)]

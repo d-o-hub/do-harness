@@ -148,7 +148,7 @@ mod tests {
         assert_eq!(traces.len(), 1);
         assert_eq!(traces[0].command.as_deref(), Some("cargo check"));
         assert_eq!(traces[0].error_diff.as_deref(), Some("E0308"));
-        assert!(list_traces(&conn, "s2").await.unwrap().is_empty());
+        assert_eq!(list_traces(&conn, "s2").await.unwrap().len(), 0);
     }
 
     #[tokio::test(flavor = "current_thread")]

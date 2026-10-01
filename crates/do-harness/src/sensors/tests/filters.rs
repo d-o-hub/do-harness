@@ -127,5 +127,5 @@ fn verify_with_no_effective_sensors_succeeds() {
     .expect("verify");
     assert!(report.ok);
     assert!(report.sensors.is_empty());
-    assert!(report.failed.is_empty());
+    assert_eq!(report.failed.len(), 0);
 }

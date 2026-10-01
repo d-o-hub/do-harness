@@ -101,7 +101,7 @@ fn rename_only_emits_synthetic_unit() {
     assert_eq!(parsed.units[0].path, "new.rs");
     assert_eq!(parsed.units[0].change, Change::Renamed);
     assert_eq!(parsed.units[0].header.as_deref(), Some("rename-only"));
-    assert!(parsed.units[0].lines.is_empty());
+    assert_eq!(parsed.units[0].lines.len(), 0);
 }
 
 #[test]

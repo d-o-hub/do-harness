@@ -47,12 +47,7 @@ async fn insert_beat_roundtrips_and_filters_by_task() {
     assert_eq!(beats[0].sensor_exit_code, Some(1));
     assert_eq!(beats[0].started_at, 1);
     assert_eq!(list_beats(&conn, None).await.unwrap().len(), 1);
-    assert!(
-        list_beats(&conn, Some(task_id + 1))
-            .await
-            .unwrap()
-            .is_empty()
-    );
+    assert_eq!(list_beats(&conn, Some(task_id + 1)).await.unwrap().len(), 0);
 }
 
 /// Foreign keys are enforced: a beat referencing a missing task is

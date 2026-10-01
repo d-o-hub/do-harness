@@ -58,7 +58,7 @@ fn rate_breach_is_exact_integer_cross_multiplication() {
     snap.deploys_failed = 1;
     snap.lead_p90_seconds = Some(0);
     snap.mttr_unrestored = 0;
-    assert!(breaches(&snap, &policy()).is_empty());
+    assert_eq!(breaches(&snap, &policy()).len(), 0);
     snap.deploy_count = 6;
     assert_eq!(
         breaches(&snap, &policy())
@@ -85,7 +85,7 @@ fn zero_incidents_report_no_restore_failure() {
     snap.deploys_failed = 0;
     snap.lead_p90_seconds = Some(0);
     snap.mttr_unrestored = 0;
-    assert!(breaches(&snap, &policy()).is_empty());
+    assert_eq!(breaches(&snap, &policy()).len(), 0);
 }
 
 #[test]

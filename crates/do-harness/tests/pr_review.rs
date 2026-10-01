@@ -80,7 +80,7 @@ fn range_review_lists_residual_units_and_serves_cache() {
     assert_eq!(report["policy"]["present"], serde_json::json!(false));
     assert_eq!(report["skipped"].as_array().unwrap().len(), 0);
     assert_eq!(report["false_proven"].as_array().unwrap().len(), 0);
-    assert!(!report["merge_base"].as_str().unwrap().is_empty());
+    assert_ne!(report["merge_base"].as_str().unwrap().len(), 0);
     let measurement = &report["measurement"];
     assert!(measurement["t_raw"].as_u64().unwrap() > 0);
     assert!(measurement["t_res"].as_u64().unwrap() > 0);
@@ -115,7 +115,7 @@ fn no_effect_range_reports_empty_residual() {
 
     let report = json(&review(dir.path(), &["--format", "json"]));
     assert_eq!(report["residual"].as_array().unwrap().len(), 0);
-    assert!(report["warnings"].as_array().unwrap().is_empty());
+    assert_eq!(report["warnings"].as_array().unwrap().len(), 0);
 }
 
 #[test]
@@ -171,8 +171,8 @@ fn malformed_base_policy_warns_but_keeps_reviewing() {
 
     let report = json(&review(dir.path(), &["--format", "json"]));
     assert_eq!(report["policy"]["present"], serde_json::json!(true));
-    assert!(!report["warnings"].as_array().unwrap().is_empty());
-    assert!(report["skipped"].as_array().unwrap().is_empty());
+    assert_ne!(report["warnings"].as_array().unwrap().len(), 0);
+    assert_eq!(report["skipped"].as_array().unwrap().len(), 0);
 }
 
 #[test]
@@ -203,8 +203,8 @@ fn policy_skips_mechanical_units_and_audits_them() {
     };
     assert_eq!(paths("skipped"), vec!["Cargo.lock"]);
     assert_eq!(paths("residual"), vec!["src/lib.rs"]);
-    assert!(report["false_proven"].as_array().unwrap().is_empty());
-    assert!(report["warnings"].as_array().unwrap().is_empty());
+    assert_eq!(report["false_proven"].as_array().unwrap().len(), 0);
+    assert_eq!(report["warnings"].as_array().unwrap().len(), 0);
     assert_eq!(
         report["measurement"]["verdict"],
         serde_json::json!("reduced")
@@ -239,9 +239,9 @@ fn seeded_defect_is_never_skipped() {
     );
 
     let report = json(&review(dir.path(), &["--format", "json"]));
-    assert!(report["skipped"].as_array().unwrap().is_empty());
+    assert_eq!(report["skipped"].as_array().unwrap().len(), 0);
     assert_eq!(report["residual"].as_array().unwrap().len(), 1);
-    assert!(!report["false_proven"].as_array().unwrap().is_empty());
+    assert_ne!(report["false_proven"].as_array().unwrap().len(), 0);
 }
 
 #[test]
@@ -259,8 +259,8 @@ fn invalid_glob_proves_nothing() {
     commit_file(dir.path(), "Cargo.lock", "# lock\n# dep\n", "lock change");
 
     let report = json(&review(dir.path(), &["--format", "json"]));
-    assert!(report["skipped"].as_array().unwrap().is_empty());
-    assert!(!report["warnings"].as_array().unwrap().is_empty());
+    assert_eq!(report["skipped"].as_array().unwrap().len(), 0);
+    assert_ne!(report["warnings"].as_array().unwrap().len(), 0);
 }
 
 #[test]
@@ -275,7 +275,7 @@ fn structural_rename_is_proven_with_policy() {
     git(dir.path(), &["commit", "-q", "-m", "rename"]);
 
     let report = json(&review(dir.path(), &["--format", "json"]));
-    assert!(report["residual"].as_array().unwrap().is_empty());
+    assert_eq!(report["residual"].as_array().unwrap().len(), 0);
     let skipped = report["skipped"].as_array().unwrap();
     assert_eq!(skipped.len(), 1);
     assert_eq!(skipped[0]["path"], serde_json::json!("new.txt"));

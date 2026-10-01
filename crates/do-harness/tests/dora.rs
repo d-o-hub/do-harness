@@ -98,7 +98,7 @@ fn clean_deploy_history_reports_no_breach() {
     let (_stdout, stderr, snapshot) = dora_json(&root, T0 + 86_400, 0);
     assert_eq!(snapshot["deploy_count"], serde_json::json!(1));
     assert_eq!(snapshot["deploys_failed"], serde_json::json!(0));
-    assert!(breach_names(&snapshot).is_empty());
+    assert_eq!(breach_names(&snapshot).len(), 0);
     assert!(stderr.contains("FINDINGS: 0"), "stderr: {stderr}");
 }
 

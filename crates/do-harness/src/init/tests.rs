@@ -88,7 +88,7 @@ async fn init_is_idempotent_without_force() {
 
     let report = init_workspace(dir.path(), &opts).await.unwrap();
 
-    assert!(report.written.is_empty());
+    assert_eq!(report.written.len(), 0);
     assert!(report.skipped.contains(&"do-harness.toml".to_owned()));
 }
 

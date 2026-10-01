@@ -117,7 +117,7 @@ async fn unknown_dim_fails_fixture_closed() {
 
     // Invalid fixture surfaces evals-invalid without persisting a score.
     eval_run_with_lift(dir.path(), None).await.unwrap();
-    assert!(persisted(dir.path()).await.is_empty());
+    assert_eq!(persisted(dir.path()).await.len(), 0);
 }
 
 #[tokio::test(flavor = "current_thread")]

@@ -286,7 +286,7 @@ async fn failing_walkthrough_fails_all_graded_assertions() {
 async fn skill_without_evals_skips_persistence() {
     let dir = fixture_root(VALID_SKILL_MD, None);
     eval_run(dir.path(), None, false).await.unwrap();
-    assert!(persisted(dir.path()).await.is_empty());
+    assert_eq!(persisted(dir.path()).await.len(), 0);
 }
 
 #[tokio::test(flavor = "current_thread")]

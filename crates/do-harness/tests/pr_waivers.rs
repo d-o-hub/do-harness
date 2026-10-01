@@ -86,7 +86,7 @@ fn case_a_reproduces_the_waived_classes() {
     assert_eq!(report["counts"]["guarded-arm"], 4);
     assert_eq!(report["counts"]["macro-field"], 4);
     assert!(report["counts"].get("missing").is_none(), "{report}");
-    assert!(report["unresolved_files"].as_array().unwrap().is_empty());
+    assert_eq!(report["unresolved_files"].as_array().unwrap().len(), 0);
 }
 
 #[test]

@@ -1,6 +1,8 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+
+use parking_lot::Mutex;
 
 use axum::body::Body as AxumBody;
 use axum::http::{HeaderMap, Request, StatusCode};
@@ -31,8 +33,8 @@ async fn spawn_mock_upstream() -> MockUpstream {
             let calls = Arc::clone(&recorded_calls);
             let names = Arc::clone(&recorded_names);
             async move {
-                calls.lock().unwrap().push(body.clone());
-                names.lock().unwrap().push(
+                calls.lock().push(body.clone());
+                names.lock().push(
                     headers
                         .get("mcp-name")
                         .and_then(|value| value.to_str().ok())
@@ -190,7 +192,7 @@ async fn list_tools_forwards_to_upstream() {
         .expect("response");
     let value = body_json(response).await;
     assert_eq!(value["result"]["tools"][0]["name"], json!("echo"));
-    let calls = upstream.calls.lock().unwrap();
+    let calls = upstream.calls.lock();
     assert_eq!(calls.len(), 1);
     assert_eq!(calls[0]["method"], json!("tools/list"));
 }
@@ -214,11 +216,11 @@ async fn call_tool_forwards_after_allow() {
     assert_eq!(value["result"]["isError"], json!(false));
 
     {
-        let names = upstream.names.lock().unwrap();
+        let names = upstream.names.lock();
         assert_eq!(names.last(), Some(&Some("echo".to_string())));
     }
     {
-        let calls = upstream.calls.lock().unwrap();
+        let calls = upstream.calls.lock();
         assert_eq!(calls.last().unwrap()["method"], json!("tools/call"));
     }
 
@@ -255,7 +257,7 @@ async fn call_tool_in_degraded_mode_never_reaches_upstream() {
     let value = body_json(response).await;
     let message = value["error"]["message"].as_str().unwrap_or_default();
     assert!(message.contains("governance unavailable"), "{message}");
-    assert!(upstream.calls.lock().unwrap().is_empty());
+    assert!(upstream.calls.lock().is_empty());
 }
 
 #[tokio::test(flavor = "current_thread")]

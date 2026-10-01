@@ -53,12 +53,7 @@ async fn eval_runs_append_and_list_in_order() {
     assert_eq!(runs.len(), 2);
     assert_eq!(runs[0].passed, 3);
     assert_eq!(runs[1].passed, 4);
-    assert!(
-        list_skill_eval_runs(&conn, "other")
-            .await
-            .unwrap()
-            .is_empty()
-    );
+    assert_eq!(list_skill_eval_runs(&conn, "other").await.unwrap().len(), 0);
 }
 
 #[tokio::test(flavor = "current_thread")]
@@ -223,7 +218,7 @@ async fn skill_eval_summary_aggregates_history() {
 
     // A future cutoff filters every run out.
     let empty = skill_eval_summary(&conn, Some(i64::MAX)).await.unwrap();
-    assert!(empty.is_empty());
+    assert_eq!(empty.len(), 0);
 }
 
 /// Lift columns round-trip and dim breakdown rows attach to their run.
@@ -282,11 +277,9 @@ async fn lift_columns_and_dim_rates_roundtrip() {
     assert_eq!(rates[1].dim, "effectiveness");
     assert_eq!(rates[1].passed, 6);
     assert_eq!(rates[1].without_passed, Some(2));
-    assert!(
-        dim_rates_for_run(&conn, run_id + 999)
-            .await
-            .unwrap()
-            .is_empty()
+    assert_eq!(
+        dim_rates_for_run(&conn, run_id + 999).await.unwrap().len(),
+        0
     );
 }
 

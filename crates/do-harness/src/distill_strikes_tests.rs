@@ -36,7 +36,7 @@ fn slug_strips_sensor_namespace_and_unsafe_chars() {
         slug_from_signature("sensor:eval_walk::tests::x"),
         "eval-walk-tests-x"
     );
-    assert!(!slug_from_signature("!!!").is_empty());
+    assert_ne!(slug_from_signature("!!!").len(), 0);
     assert_eq!(slug_from_signature("sensor:!!!"), "sensor-strike");
 }
 

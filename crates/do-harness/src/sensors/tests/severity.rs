@@ -64,7 +64,7 @@ fn warn_severity_is_advisory_but_strict_fails() {
     )
     .expect("verify");
     assert!(report.ok, "non-strict warn failure must not fail the gate");
-    assert!(report.failed.is_empty());
+    assert_eq!(report.failed.len(), 0);
     assert!(!report.sensors[0].ok);
     assert!(report.sensors[0].allow_failure);
 
@@ -99,7 +99,7 @@ fn strict_promotion_skips_feedback_set() {
     )
     .expect("verify");
     assert!(report.ok, "feedback strict must stay advisory");
-    assert!(report.failed.is_empty());
+    assert_eq!(report.failed.len(), 0);
     assert!(report.sensors[0].allow_failure);
 }
 
@@ -123,7 +123,7 @@ fn quarantined_sensor_is_skipped_advisory() {
     )
     .expect("verify");
     assert!(report.ok);
-    assert!(report.failed.is_empty());
+    assert_eq!(report.failed.len(), 0);
     assert_eq!(
         report.sensors.len(),
         2,
@@ -184,7 +184,7 @@ fn findings_below_baseline_warn_with_counts() {
     )
     .expect("verify");
     assert!(report.ok, "below-baseline findings must stay advisory");
-    assert!(report.failed.is_empty());
+    assert_eq!(report.failed.len(), 0);
     assert!(!report.sensors[0].ok);
     assert!(report.sensors[0].allow_failure);
     assert!(report.sensors[0].warned);

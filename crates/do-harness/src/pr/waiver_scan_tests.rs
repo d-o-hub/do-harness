@@ -88,7 +88,7 @@ fn let_else_spans_capture_the_binding_and_body() {
 #[test]
 fn an_if_else_without_a_let_binding_is_not_a_let_else() {
     let source = lines("    if x {\n    } else {\n        y();\n    }\n");
-    assert!(scan::let_else_spans(&source).is_empty());
+    assert_eq!(scan::let_else_spans(&source).len(), 0);
 }
 
 #[test]

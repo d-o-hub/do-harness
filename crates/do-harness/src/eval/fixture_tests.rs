@@ -88,7 +88,10 @@ fn fixture_diagnostics_flags_thin_datasets() {
     );
 
     let rich: SkillEvals = serde_json::from_str(&rich_case_json()).unwrap();
-    assert!(fixture_diagnostics_mode(&rich, AgentMode::Deterministic).is_empty());
+    assert_eq!(
+        fixture_diagnostics_mode(&rich, AgentMode::Deterministic).len(),
+        0
+    );
 }
 
 /// A fixture whose assertions never read the skill's own guidance cannot
