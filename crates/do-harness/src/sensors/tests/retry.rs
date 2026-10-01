@@ -54,7 +54,7 @@ fn retries_failing_sensor_until_success() {
     .expect("verify");
 
     assert!(report.ok);
-    assert!(report.failed.is_empty());
+    assert_eq!(report.failed.len(), 0);
     assert!(report.sensors[0].ok);
     assert_eq!(
         std::fs::read_to_string(&counter_file)

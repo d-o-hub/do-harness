@@ -149,7 +149,7 @@ async fn record_verify_skips_blocked_sensor_signature() {
         .await
         .unwrap();
     let beats = do_harness_db::list_beats(&conn, None).await.unwrap();
-    assert!(beats.is_empty());
+    assert_eq!(beats.len(), 0);
     assert!(
         do_harness_db::get_error_signature(&conn, "sensor:halted", "global")
             .await
@@ -179,11 +179,12 @@ async fn struck_sensors_halts_only_struck_out_names() {
     let names = vec!["struck".to_owned(), "close".to_owned(), "fresh".to_owned()];
     let blocked = struck_sensors(dir.path(), &names, "global").await.unwrap();
     assert_eq!(blocked, vec!["struck".to_owned()]);
-    assert!(
+    assert_eq!(
         struck_sensors(dir.path(), &[], "global")
             .await
             .unwrap()
-            .is_empty()
+            .len(),
+        0
     );
 }
 
@@ -245,11 +246,12 @@ async fn record_verify_resets_strikes_on_pass() {
             .unwrap()
             .is_none()
     );
-    assert!(
+    assert_eq!(
         struck_sensors(dir.path(), &["fmt".to_owned()], "global")
             .await
             .unwrap()
-            .is_empty()
+            .len(),
+        0
     );
 }
 

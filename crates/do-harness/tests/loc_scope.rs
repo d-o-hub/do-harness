@@ -21,6 +21,7 @@ use support::git_command;
 /// Builds a `do-harness --root <root>` command using the real binary.
 fn harness(root: &Path) -> Command {
     let mut cmd = Command::new(env!("CARGO_BIN_EXE_do-harness"));
+    support::isolate_command(&mut cmd);
     cmd.arg("--root").arg(root);
     cmd
 }

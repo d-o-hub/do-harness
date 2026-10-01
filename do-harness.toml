@@ -156,7 +156,7 @@ coverage-inputs = ["plans/dora.json"]
 [[sensors]]
 # Feature-powerset sensor for guardian-proxy feature combinations (--features
 # agt-governance / mcp-surface on/off). Exact-pin policy: dependency pins
-# (agent-governance = "=3.2.2", rmcp = "=3.3.0") remain exact per policy;
+# (agent-governance = "=3.2.2", rmcp = "=3.5.0") remain exact per policy;
 # this sensor verifies all feature combinations build. Kept out of fast-loop hooks.
 name = "powerset"
 argv = ["bash", "scripts/check-powerset.sh"]

@@ -36,7 +36,7 @@ fn no_policy_proves_nothing() {
 #[test]
 fn mechanical_glob_is_proven_and_others_stay_residual() {
     let matcher = Matcher::compile(Some(&rules(&["**/Cargo.lock"], &[])));
-    assert!(matcher.warnings().is_empty());
+    assert_eq!(matcher.warnings().len(), 0);
     let lockfile = unit("Cargo.lock", None, &["+dep = \"1\""]);
     assert_eq!(matcher.evaluate(&lockfile), Verdict::Proven);
     let source = unit("src/lib.rs", None, &["+fn a() {}"]);
@@ -89,7 +89,7 @@ fn policy_path_is_never_proven() {
 #[test]
 fn invalid_glob_disables_all_proofs() {
     let matcher = Matcher::compile(Some(&rules(&["["], &[])));
-    assert!(!matcher.warnings().is_empty());
+    assert_ne!(matcher.warnings().len(), 0);
     let lockfile = unit("Cargo.lock", None, &["+dep = \"1\""]);
     assert_eq!(matcher.evaluate(&lockfile), Verdict::Residual);
 }

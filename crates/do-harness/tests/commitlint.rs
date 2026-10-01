@@ -33,7 +33,7 @@ mod shell;
 /// `pre-push` hook runs `cargo test`. Without this, `git -C <fixture>` still
 /// resolves the real repository, so the fixtures would lint the wrong history.
 fn isolate(command: &mut Command) -> &mut Command {
-    support::clear_git_view(command)
+    support::isolate_command(command)
 }
 
 /// Builds a program command with hook-inherited repository environment removed.

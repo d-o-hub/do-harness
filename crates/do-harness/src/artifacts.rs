@@ -163,6 +163,6 @@ mod tests {
     #[test]
     fn invalid_glob_is_ignored() {
         let dir = tempfile::tempdir().unwrap();
-        assert!(resolve(dir.path(), &["[unclosed".to_owned()]).is_empty());
+        assert_eq!(resolve(dir.path(), &["[unclosed".to_owned()]).len(), 0);
     }
 }

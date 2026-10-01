@@ -97,7 +97,7 @@ fn v3_payload_parses_with_v4_defaults() {
          "chain_hash":"sealed-hash"}"#;
     let doc: EvidenceDocument = serde_json::from_str(document).expect("v3 must stay readable");
     assert_eq!(doc.schema_version, 3);
-    assert!(doc.sensors[0].artifacts.is_empty());
+    assert_eq!(doc.sensors[0].artifacts.len(), 0);
     assert!(doc.coverage.is_empty());
     assert!(doc.is_strict_clean());
 }

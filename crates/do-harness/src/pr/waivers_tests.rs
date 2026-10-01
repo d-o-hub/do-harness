@@ -297,7 +297,7 @@ fn a_missing_head_source_warns_instead_of_guessing() {
         root: dir.path(),
         strip_prefix: None,
     });
-    assert!(report.files.is_empty());
+    assert_eq!(report.files.len(), 0);
     assert!(
         report
             .warnings

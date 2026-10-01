@@ -336,7 +336,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let changed = discover(dir.path());
         assert!(changed.discovery_failed);
-        assert!(changed.files.is_empty());
+        assert_eq!(changed.files.len(), 0);
     }
 
     /// A committed repo reports staged, unstaged, deleted, and untracked files.

@@ -46,7 +46,7 @@ fn limit_excludes_lower_scoring_candidates() {
     write_named(root, "gamma", "gamma", "gamma topic");
 
     assert_eq!(rank(root, "topic", 2).len(), 2);
-    assert!(rank(root, "topic", 0).is_empty());
+    assert_eq!(rank(root, "topic", 0).len(), 0);
 }
 
 #[test]
@@ -145,7 +145,7 @@ fn path_escaping_skill_root_is_rejected() {
     std::os::unix::fs::symlink(outside.path(), skills.join("escape")).unwrap();
 
     let catalog = catalog::scan(root).unwrap();
-    assert!(catalog.skills.is_empty());
+    assert_eq!(catalog.skills.len(), 0);
     assert!(
         catalog.warnings[0].contains("outside"),
         "{:?}",
@@ -157,8 +157,8 @@ fn path_escaping_skill_root_is_rejected() {
 fn missing_skill_root_yields_an_empty_catalog() {
     let temp = tempfile::tempdir().unwrap();
     let catalog = catalog::scan(temp.path()).unwrap();
-    assert!(catalog.skills.is_empty());
-    assert!(catalog.warnings.is_empty());
+    assert_eq!(catalog.skills.len(), 0);
+    assert_eq!(catalog.warnings.len(), 0);
 }
 
 #[test]

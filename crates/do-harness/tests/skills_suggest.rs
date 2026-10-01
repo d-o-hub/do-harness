@@ -125,7 +125,7 @@ fn suggest_without_a_skill_root_exits_zero_with_no_candidates() {
     assert_eq!(output.status.code(), Some(0));
     let report = json(&output);
     assert_eq!(report["catalog_size"], 0);
-    assert!(report["candidates"].as_array().unwrap().is_empty());
+    assert_eq!(report["candidates"].as_array().unwrap().len(), 0);
 }
 
 #[test]

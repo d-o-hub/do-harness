@@ -3,7 +3,7 @@
 #
 # Sensor: scripts/check-powerset.sh
 # Checks feature combinations of guardian-proxy (--features agt-governance / mcp-surface on/off).
-# Exact-pin policy: pins stay exact (=3.2.2 for agent-governance, =3.3.0 for rmcp);
+# Exact-pin policy: pins stay exact (=3.2.2 for agent-governance, =3.5.0 for rmcp);
 # this sensor verifies feature combinations build.
 #
 # Enforcement policy (fail-open locally with SKIP marker, fail-closed on demand):

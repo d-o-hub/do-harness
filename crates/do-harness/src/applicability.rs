@@ -176,7 +176,7 @@ mod tests {
         assert_eq!(selection.selected[0].reason, "matched `**/*.rs`");
         assert_eq!(selection.skipped.len(), 1);
         assert_eq!(selection.skipped[0].name, "docs");
-        assert!(!selection.skipped[0].reason.is_empty());
+        assert_ne!(selection.skipped[0].reason.len(), 0);
     }
 
     /// Sensors without `when-changed` are always applicable.
@@ -232,7 +232,7 @@ mod tests {
                 .iter()
                 .all(|s| s.reason == FAIL_CLOSED_REASON)
         );
-        assert!(selection.skipped.is_empty());
+        assert_eq!(selection.skipped.len(), 0);
     }
 
     /// Separator semantics are platform-independent: `*` never crosses `/`
@@ -258,7 +258,7 @@ mod tests {
         let candidates = vec![&rs];
 
         let selection = select(&candidates, &changed(&["src/lib.rs"]));
-        assert!(selection.selected.is_empty());
+        assert_eq!(selection.selected.len(), 0);
         assert_eq!(selection.skipped.len(), 1);
     }
 }

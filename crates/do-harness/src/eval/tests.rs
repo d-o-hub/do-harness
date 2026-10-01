@@ -145,7 +145,7 @@ fn referenced_paths_is_empty_for_a_self_contained_skill() {
     let dir = tempfile::tempdir().unwrap();
     fs::create_dir_all(dir.path().join("evals")).unwrap();
     fs::write(dir.path().join("SKILL.md"), "No repo paths named here.\n").unwrap();
-    assert!(referenced_paths(dir.path()).is_empty());
+    assert_eq!(referenced_paths(dir.path()).len(), 0);
 }
 
 /// Regenerable bytecode caches must not be mirrored into a sandbox: they are

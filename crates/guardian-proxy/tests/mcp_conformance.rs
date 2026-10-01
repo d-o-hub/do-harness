@@ -6,7 +6,9 @@
 #![cfg(feature = "mcp-surface")]
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+
+use parking_lot::Mutex;
 
 use axum::routing::post;
 use axum::{Json, Router};
@@ -66,7 +68,7 @@ async fn spawn_mcp_upstream() -> (String, Arc<Mutex<Vec<Value>>>) {
         post(move |Json(body): Json<Value>| {
             let recorded = Arc::clone(&recorded);
             async move {
-                recorded.lock().unwrap().push(body.clone());
+                recorded.lock().push(body.clone());
                 let id = body.get("id").cloned().unwrap_or(json!(1));
                 let result = if body.get("method").and_then(Value::as_str) == Some("tools/call") {
                     json!({"content": [{"type": "text", "text": "e2e-ok"}], "isError": false})
@@ -113,7 +115,7 @@ async fn tool_call_round_trip_records_audit_and_metrics() {
     assert_eq!(value["result"]["content"][0]["text"], json!("e2e-ok"));
 
     {
-        let calls = calls.lock().unwrap();
+        let calls = calls.lock();
         assert_eq!(calls.len(), 1);
         assert_eq!(calls[0]["params"]["name"], json!("weather"));
     }
@@ -164,7 +166,7 @@ async fn ingress_token_gates_the_mcp_endpoint() {
             .and_then(|value| value.to_str().ok()),
         Some("Bearer realm=\"guardian-proxy\"")
     );
-    assert!(calls.lock().unwrap().is_empty());
+    assert!(calls.lock().is_empty());
 
     let allowed = mcp_post(&proxy, &call_body("weather"))
         .header("authorization", "Bearer s3cret")
@@ -174,7 +176,7 @@ async fn ingress_token_gates_the_mcp_endpoint() {
     assert_eq!(allowed.status(), reqwest::StatusCode::OK);
     let value: Value = allowed.json().await.expect("json");
     assert_eq!(value["result"]["content"][0]["text"], json!("e2e-ok"));
-    assert_eq!(calls.lock().unwrap().len(), 1);
+    assert_eq!(calls.lock().len(), 1);
 }
 
 #[tokio::test(flavor = "current_thread")]
@@ -186,7 +188,7 @@ async fn oversized_mcp_body_is_rejected() {
 
     let response = mcp_post(&proxy, &body).send().await.expect("send");
     assert_eq!(response.status(), reqwest::StatusCode::PAYLOAD_TOO_LARGE);
-    assert!(calls.lock().unwrap().is_empty());
+    assert!(calls.lock().is_empty());
 }
 
 #[tokio::test(flavor = "current_thread")]
@@ -201,5 +203,5 @@ async fn degraded_mcp_call_returns_error_and_skips_upstream() {
     let value: Value = response.json().await.expect("json");
     let message = value["error"]["message"].as_str().unwrap_or_default();
     assert!(message.contains("governance unavailable"), "{message}");
-    assert!(calls.lock().unwrap().is_empty());
+    assert!(calls.lock().is_empty());
 }

@@ -11,10 +11,12 @@ use std::path::Path;
 use std::process::Command;
 
 use serde_json::Value;
+mod support;
 
 /// Builds a `do-harness --root <root>` command using the real binary.
 fn harness(root: &Path) -> Command {
     let mut cmd = Command::new(env!("CARGO_BIN_EXE_do-harness"));
+    support::isolate_command(&mut cmd);
     cmd.arg("--root").arg(root);
     cmd
 }

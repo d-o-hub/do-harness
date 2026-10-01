@@ -52,7 +52,7 @@ fn allow_failure_sensor_does_not_fail_gate_but_surfaces_output() {
     .expect("verify");
 
     assert!(report.ok);
-    assert!(report.failed.is_empty());
+    assert_eq!(report.failed.len(), 0);
     assert!(!report.sensors[0].ok);
     assert!(report.sensors[0].allow_failure);
     assert!(report.sensors[0].output.contains("something wrong"));
@@ -81,7 +81,7 @@ fn skip_marker_warns_without_failing_gate() {
     .expect("verify");
 
     assert!(report.ok);
-    assert!(report.failed.is_empty());
+    assert_eq!(report.failed.len(), 0);
     assert!(report.sensors[0].ok);
     assert!(report.sensors[0].warned);
 }

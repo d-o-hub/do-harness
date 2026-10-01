@@ -113,6 +113,6 @@ mod tests {
         assert_eq!(heuristics.len(), 1);
         assert_eq!(heuristics[0].pattern, "derive serde before thiserror");
         assert_eq!(heuristics[0].source_trace_id, Some(trace_id));
-        assert!(list_heuristics(&conn, "other").await.unwrap().is_empty());
+        assert_eq!(list_heuristics(&conn, "other").await.unwrap().len(), 0);
     }
 }

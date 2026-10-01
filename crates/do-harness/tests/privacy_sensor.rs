@@ -16,7 +16,7 @@ mod shell;
 
 fn isolated_command(program: &str) -> Command {
     let mut command = Command::new(program);
-    support::clear_git_view(&mut command);
+    support::isolate_command(&mut command);
     command
 }
 

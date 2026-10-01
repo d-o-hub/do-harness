@@ -30,6 +30,7 @@ axum = { version = "0.7" }
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 tower = { version = "0.5" }
 http-body-util = "0.1"
+parking_lot = "0.12"
 # Exact pin (exemption from the caret-range policy in AGENTS.md): the
 # Agent Governance Toolkit Rust SDK is pre-GA (upstream CHANGELOG: "all releases
 # are currently public preview releases"), so floating it risks silent API
@@ -48,7 +49,7 @@ agent-governance = "=3.2.2"
 # feature enables it. Update with `cargo update -p rmcp --precise <ver>` and
 # re-run `cargo deny check` + `cargo audit`; see plans/mcp-conformance-epic.md
 # before bumping.
-rmcp = { version = "=3.3.0", features = ["server", "transport-streamable-http-server", "macros"] }
+rmcp = { version = "=3.5.0", features = ["server", "transport-streamable-http-server", "macros"] }
 
 # Dev-profile tuning lives here (Cargo only honors [profile.*] in manifests,
 # never in .cargo/config.toml).

@@ -26,7 +26,7 @@ async fn parses_valid_config() {
         cfg.hooks.pre_commit,
         vec!["fmt".to_owned(), "loc".to_owned()]
     );
-    assert!(cfg.hooks.pre_push.is_empty());
+    assert_eq!(cfg.hooks.pre_push.len(), 0);
     assert_eq!(cfg.sensors.len(), 2);
     assert_eq!(
         cfg.sensors[0].argv,
@@ -200,7 +200,7 @@ async fn missing_file_returns_rust_default() {
         cfg.hooks.pre_commit,
         vec!["fmt".to_owned(), "loc".to_owned()]
     );
-    assert!(cfg.hooks.pre_push.is_empty());
+    assert_eq!(cfg.hooks.pre_push.len(), 0);
     assert_eq!(cfg.sensors.len(), 10);
     assert_eq!(cfg.sensor_names().len(), 10);
     assert_eq!(cfg.effective_sensors().len(), 10);
@@ -226,7 +226,7 @@ async fn generic_language_yields_no_effective_sensors() {
     std::fs::write(&path, "language = \"generic\"\n").expect("write config");
     let cfg = load(dir.path(), Some(&path)).await.expect("load config");
     assert!(cfg.effective_sensors().is_empty());
-    assert!(cfg.sensor_names().is_empty());
+    assert_eq!(cfg.sensor_names().len(), 0);
 }
 
 /// The rust pack with no sensors falls back to the built-in Rust sensors.
@@ -270,7 +270,7 @@ async fn parses_signal_sets_and_when_changed() {
         Some(&vec!["fmt".to_owned(), "check".to_owned()])
     );
     assert_eq!(cfg.sensors[0].when_changed, vec!["**/*.rs", "Cargo.toml"]);
-    assert!(cfg.sensors[1].when_changed.is_empty());
+    assert_eq!(cfg.sensors[1].when_changed.len(), 0);
 }
 
 /// A signal set referencing an unknown sensor fails config validation.

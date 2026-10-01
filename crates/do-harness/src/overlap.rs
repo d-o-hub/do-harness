@@ -242,9 +242,9 @@ mod tests {
     #[test]
     fn empty_and_missing_corpus_yields_no_pairs() {
         let root = tempfile::tempdir().unwrap();
-        assert!(corpus_pairs(root.path()).unwrap().is_empty());
+        assert_eq!(corpus_pairs(root.path()).unwrap().len(), 0);
         skill_at(root.path(), "solo", "# Solo\nOnly skill present here.");
-        assert!(corpus_pairs(root.path()).unwrap().is_empty());
+        assert_eq!(corpus_pairs(root.path()).unwrap().len(), 0);
     }
 
     #[test]

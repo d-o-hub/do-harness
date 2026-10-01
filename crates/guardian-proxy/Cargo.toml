@@ -39,3 +39,8 @@ default = []
 agt-governance = ["dep:agent-governance", "dep:serde_yaml"]
 # rmcp requires Rust 1.88; default builds and the MSRV job stay on 1.85.
 mcp-surface = ["dep:rmcp"]
+
+[dev-dependencies]
+# Test fixtures share call recorders across spawned upstreams; parking_lot
+# keeps that lock free of poisoning results (already in the graph via libsql).
+parking_lot.workspace = true

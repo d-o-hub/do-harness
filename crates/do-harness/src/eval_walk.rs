@@ -364,6 +364,6 @@ mod tests {
         let bin = fs::read_to_string(dir.path().join("bin.txt")).unwrap();
         assert_eq!(bin, std::env::current_exe().unwrap().to_str().unwrap());
         // The bin path is non-empty and resolves back to the harness binary.
-        assert!(!bin.is_empty());
+        assert_ne!(bin.len(), 0);
     }
 }

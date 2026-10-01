@@ -181,11 +181,9 @@ mod tests {
         let conn = do_harness_db::connect_and_migrate(dir.path())
             .await
             .unwrap();
-        assert!(
-            do_harness_db::list_traces(&conn, "s1")
-                .await
-                .unwrap()
-                .is_empty()
+        assert_eq!(
+            do_harness_db::list_traces(&conn, "s1").await.unwrap().len(),
+            0
         );
     }
 }
