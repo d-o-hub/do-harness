@@ -77,13 +77,15 @@ fn deps_sensor_fails_closed_only_when_required() {
     );
 }
 
-/// The sensor must fail open (`SKIP`) unless `CI=true` or
-/// `DO_HARNESS_REQUIRE_TOOLS=1`, independent of host tool availability.
-/// A private `bin` holding only `dirname` (needed for the script's root
-/// resolution) makes every lint runner unreachable, including `npx`.
+/// Asserts a lint sensor fails open (`SKIP`) locally and closed (`FAIL`) under
+/// `CI=true` or `DO_HARNESS_REQUIRE_TOOLS=1`, independent of host tools.
+///
+/// The private `bin` holds only a copied `dirname` — the one external program
+/// the scripts need before their missing-tool branch — so host-installed
+/// `markdownlint-cli2`/`markdownlint`/`yamllint`/`npx` cannot change the
+/// outcome and the test never needs to skip.
 #[cfg(unix)]
-#[test]
-fn markdownlint_sensor_fails_closed_only_when_required() {
+fn assert_missing_tool_policy(name: &str) {
     use std::fs;
     use std::path::Path;
 
@@ -98,7 +100,7 @@ fn markdownlint_sensor_fails_closed_only_when_required() {
 
     let run_scenario = |ci: bool, require_tools: bool| -> Output {
         let mut cmd = Command::new("/bin/bash");
-        cmd.arg(script("check-markdownlint.sh"));
+        cmd.arg(script(name));
         cmd.env("PATH", &bin);
         cmd.env_remove("BASH_ENV");
         cmd.env_remove("ENV");
@@ -118,12 +120,12 @@ fn markdownlint_sensor_fails_closed_only_when_required() {
     assert_eq!(
         local.status.code(),
         Some(0),
-        "local run must SKIP without a lint runner: stdout={stdout} stderr={}",
+        "{name}: local run must SKIP without a lint runner: stdout={stdout} stderr={}",
         String::from_utf8_lossy(&local.stderr)
     );
     assert!(
         stdout.contains("SKIP:"),
-        "local run must emit the SKIP: marker: {stdout}"
+        "{name}: local run must emit the SKIP: marker: {stdout}"
     );
 
     for (label, ci, require_tools) in [
@@ -135,33 +137,26 @@ fn markdownlint_sensor_fails_closed_only_when_required() {
         assert_eq!(
             output.status.code(),
             Some(1),
-            "{label} run must fail closed without a lint runner: stdout={stdout} stderr={}",
+            "{name}: {label} run must fail closed without a lint runner: stdout={stdout} stderr={}",
             String::from_utf8_lossy(&output.stderr)
         );
         assert!(
             stdout.contains("FAIL:"),
-            "{label} run must emit the FAIL: marker: {stdout}"
+            "{name}: {label} run must emit the FAIL: marker: {stdout}"
         );
     }
 }
 
+#[cfg(unix)]
+#[test]
+fn markdownlint_sensor_fails_closed_only_when_required() {
+    assert_missing_tool_policy("check-markdownlint.sh");
+}
+
+#[cfg(unix)]
 #[test]
 fn yamllint_sensor_fails_closed_only_when_required() {
-    if !tool_hidden("yamllint") {
-        eprintln!("yamllint visible under /usr/bin:/bin; skipping parity check");
-        return;
-    }
-    let local = run("check-yamllint.sh", false);
-    assert!(
-        local.status.success(),
-        "local run must WARN-skip: {}",
-        String::from_utf8_lossy(&local.stderr)
-    );
-    let ci = run("check-yamllint.sh", true);
-    assert!(
-        !ci.status.success(),
-        "CI run must fail closed without yamllint"
-    );
+    assert_missing_tool_policy("check-yamllint.sh");
 }
 
 #[test]
