@@ -77,23 +77,72 @@ fn deps_sensor_fails_closed_only_when_required() {
     );
 }
 
+/// The sensor must fail open (`SKIP`) unless `CI=true` or
+/// `DO_HARNESS_REQUIRE_TOOLS=1`, independent of host tool availability.
+/// A private `bin` holding only `dirname` (needed for the script's root
+/// resolution) makes every lint runner unreachable, including `npx`.
+#[cfg(unix)]
 #[test]
 fn markdownlint_sensor_fails_closed_only_when_required() {
-    if !tool_hidden("markdownlint-cli2") || !tool_hidden("markdownlint") {
-        eprintln!("markdownlint tool visible under /usr/bin:/bin; skipping parity check");
-        return;
-    }
-    let local = run("check-markdownlint.sh", false);
-    assert!(
-        local.status.success(),
-        "local run must WARN-skip: {}",
+    use std::fs;
+    use std::path::Path;
+
+    let temp = tempfile::tempdir().expect("create temp dir");
+    let bin = temp.path().join("bin");
+    fs::create_dir(&bin).expect("create private bin");
+    let dirname = ["/usr/bin/dirname", "/bin/dirname"]
+        .into_iter()
+        .find(|candidate| Path::new(candidate).is_file())
+        .unwrap_or_else(|| panic!("neither /usr/bin/dirname nor /bin/dirname is present"));
+    fs::copy(dirname, bin.join("dirname")).expect("copy dirname into private bin");
+
+    let run_scenario = |ci: bool, require_tools: bool| -> Output {
+        let mut cmd = Command::new("/bin/bash");
+        cmd.arg(script("check-markdownlint.sh"));
+        cmd.env("PATH", &bin);
+        cmd.env_remove("BASH_ENV");
+        cmd.env_remove("ENV");
+        cmd.env_remove("CI");
+        cmd.env_remove("DO_HARNESS_REQUIRE_TOOLS");
+        if ci {
+            cmd.env("CI", "true");
+        }
+        if require_tools {
+            cmd.env("DO_HARNESS_REQUIRE_TOOLS", "1");
+        }
+        cmd.output().expect("spawn script")
+    };
+
+    let local = run_scenario(false, false);
+    let stdout = String::from_utf8_lossy(&local.stdout);
+    assert_eq!(
+        local.status.code(),
+        Some(0),
+        "local run must SKIP without a lint runner: stdout={stdout} stderr={}",
         String::from_utf8_lossy(&local.stderr)
     );
-    let ci = run("check-markdownlint.sh", true);
     assert!(
-        !ci.status.success(),
-        "CI run must fail closed without markdownlint"
+        stdout.contains("SKIP:"),
+        "local run must emit the SKIP: marker: {stdout}"
     );
+
+    for (label, ci, require_tools) in [
+        ("CI=true", true, false),
+        ("DO_HARNESS_REQUIRE_TOOLS=1", false, true),
+    ] {
+        let output = run_scenario(ci, require_tools);
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert_eq!(
+            output.status.code(),
+            Some(1),
+            "{label} run must fail closed without a lint runner: stdout={stdout} stderr={}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(
+            stdout.contains("FAIL:"),
+            "{label} run must emit the FAIL: marker: {stdout}"
+        );
+    }
 }
 
 #[test]

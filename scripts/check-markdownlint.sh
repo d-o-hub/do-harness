@@ -13,6 +13,7 @@ set -euo pipefail
 require_tools() { [[ "${CI:-}" == "true" || "${DO_HARNESS_REQUIRE_TOOLS:-}" == "1" ]]; }
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT"
 
 if command -v markdownlint-cli2 >/dev/null 2>&1; then
     RUNNER=(markdownlint-cli2)
