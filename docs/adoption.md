@@ -21,7 +21,7 @@ curl -fsSL https://raw.githubusercontent.com/d-o-hub/do-harness/main/scripts/ins
 
 # Pinned and reproducible (recommended for CI and agent instructions).
 curl -fsSL https://raw.githubusercontent.com/d-o-hub/do-harness/main/scripts/install.sh \
-  | sh -s -- --version v0.1.3
+  | sh -s -- --version v0.2.0
 ```
 
 The installer places `do-harness` in `$HOME/.local/bin` by default. Override
@@ -73,7 +73,7 @@ Rust toolchains can install from crates.io instead, either building from
 source or fetching the release artifact:
 
 ```bash
-cargo install do-harness --version 0.1.3
+cargo install do-harness --version 0.2.0
 cargo binstall do-harness          # prebuilt, no compile
 ```
 
@@ -206,7 +206,7 @@ GitHub Actions:
 - name: Install do-harness
   run: |
     curl -fsSL https://raw.githubusercontent.com/d-o-hub/do-harness/main/scripts/install.sh \
-      | sh -s -- --version v0.1.3
+      | sh -s -- --version v0.2.0
     echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 - name: Verify
   run: do-harness verify --set verification --format json --strict
@@ -217,7 +217,7 @@ GitLab CI:
 ```yaml
 verify:
   script:
-    - curl -fsSL https://raw.githubusercontent.com/d-o-hub/do-harness/main/scripts/install.sh | sh -s -- --version v0.1.3
+    - curl -fsSL https://raw.githubusercontent.com/d-o-hub/do-harness/main/scripts/install.sh | sh -s -- --version v0.2.0
     - export PATH="$HOME/.local/bin:$PATH"
     - do-harness verify --set verification --format json --strict
 ```

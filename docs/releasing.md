@@ -154,12 +154,12 @@ verification set and every build target dogfoods green.
 Three checks, each answering a different question:
 
 ```bash
-gh release download v0.1.3 --repo d-o-hub/do-harness
+gh release download v0.2.0 --repo d-o-hub/do-harness
 sha256sum -c checksums.txt                       # is the download intact?
-gh release verify v0.1.3 --repo d-o-hub/do-harness
-gh release verify-asset v0.1.3 \
-  do-harness-v0.1.3-x86_64-unknown-linux-musl.tar.gz --repo d-o-hub/do-harness
-gh attestation verify do-harness-v0.1.3-x86_64-unknown-linux-musl.tar.gz \
+gh release verify v0.2.0 --repo d-o-hub/do-harness
+gh release verify-asset v0.2.0 \
+  do-harness-v0.2.0-x86_64-unknown-linux-musl.tar.gz --repo d-o-hub/do-harness
+gh attestation verify do-harness-v0.2.0-x86_64-unknown-linux-musl.tar.gz \
   --repo d-o-hub/do-harness                      # who built it, from which commit?
 ```
 
@@ -230,10 +230,10 @@ Preview the body without publishing:
 
 ```bash
 gh api --method POST repos/d-o-hub/do-harness/releases/generate-notes \
-  -f tag_name=v0.1.3 -f target_commitish=main \
+  -f tag_name=v0.2.0 -f target_commitish=main \
   -f configuration_file_path=.github/release.yml --jq .body > generated-notes.md
-bash scripts/release-notes.sh compose v0.1.3 generated-notes.md release-notes.md
-bash scripts/release-notes.sh check v0.1.3 release-notes.md
+bash scripts/release-notes.sh compose v0.2.0 generated-notes.md release-notes.md
+bash scripts/release-notes.sh check v0.2.0 release-notes.md
 bash scripts/release-notes.sh --self-test
 ```
 
