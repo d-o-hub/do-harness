@@ -375,3 +375,51 @@ fn commitlint_ignores_foreign_git_view_overrides() {
         "git must read this repository, not the foreign one:\n{stderr}"
     );
 }
+
+/// A linked worktree's `.git` is a file, so a directory guard skips the whole
+/// gate there and still exits 0.
+///
+/// Regression: `[[ ! -d "$ROOT/.git" ]]` reported "skipped: no .git directory"
+/// in every `git worktree add` checkout — including this repository's own fix
+/// worktrees — so the history sensor linted nothing and called it green.
+#[test]
+fn commitlint_lints_from_a_linked_worktree() {
+    let (dir, root) = fixture();
+    git(&root, &["init", "-q", "-b", "main"], None);
+    commit(&root, "chore: seed", "1700000000");
+    commit(&root, "Bad subject in worktree history", "1700000100");
+
+    let linked = dir.path().join("linked");
+    git(
+        &root,
+        &[
+            "worktree",
+            "add",
+            "-q",
+            "-b",
+            "linked",
+            linked.to_str().unwrap(),
+        ],
+        None,
+    );
+    assert!(
+        linked.join(".git").is_file(),
+        "git worktree add must produce a .git file"
+    );
+    std::fs::create_dir(linked.join("scripts")).unwrap();
+    std::fs::write(linked.join("scripts/check-commitlint.sh"), script_source()).unwrap();
+
+    let (ok, stdout, stderr) = lint(&linked, &["--count", "2"]);
+    assert!(
+        !ok,
+        "a worktree's non-conventional subject must fail the gate:\n{stdout}\n{stderr}"
+    );
+    assert!(
+        stdout.contains("Bad subject in worktree history"),
+        "the worktree's own history must be linted, not skipped:\n{stdout}"
+    );
+    assert!(
+        !stdout.contains("skipped"),
+        "the .git file must not be read as a missing repository:\n{stdout}"
+    );
+}

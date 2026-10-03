@@ -73,8 +73,10 @@ if [[ "${1:-}" == "--message" ]]; then
     exit 0
 fi
 
-if [[ ! -d "$ROOT/.git" ]]; then
-    echo "check-commitlint skipped: no .git directory"
+# A linked worktree carries a .git *file* pointing at the main repository, so
+# a directory test would skip — and silently pass — inside `git worktree add`.
+if [[ ! -e "$ROOT/.git" ]] || ! git -C "$ROOT" rev-parse --git-dir >/dev/null 2>&1; then
+    echo "check-commitlint skipped: no git repository"
     exit 0
 fi
 
