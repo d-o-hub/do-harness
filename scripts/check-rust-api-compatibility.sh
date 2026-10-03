@@ -27,7 +27,12 @@ check_crate() {
     return "$status"
   fi
 
-  baseline_version=$(printf '%s\n' "$output" | python3 -c 'import re, sys; match = re.search(r"Building do-harness v(\S+) \(baseline\)", sys.stdin.read()); print(match.group(1) if match else "")')
+  # CARGO_TERM_COLOR=always in CI colorizes semver-checks output even when
+  # piped, so `Building^[[0m do-harness v0.1.2 (baseline)` does not match the
+  # plain-text regex below (measured: the v0.2.0 tag preflight took the FAIL
+  # branch and aborted while the identical flow passed locally without color).
+  # Strip ANSI SGR sequences before parsing.
+  baseline_version=$(printf '%s\n' "$output" | python3 -c 'import re, sys; plain = re.sub(r"\x1b\[[0-9;]*m", "", sys.stdin.read()); match = re.search(r"Building do-harness v(\S+) \(baseline\)", plain); print(match.group(1) if match else "")')
   if [[ "$baseline_version" != "0.1.2" ]]; then
     display_version="$baseline_version"
     if [[ -z "$display_version" ]]; then display_version=unknown; fi
