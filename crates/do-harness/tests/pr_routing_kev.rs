@@ -50,7 +50,7 @@ fn run_adapter_with_input(input_json: &Value) -> Value {
     }
 
     let output = child.wait_with_output().expect("wait for adapter");
-    assert!(output.status.success(), "adapter failed: {:?}", output);
+    assert!(output.status.success(), "adapter failed: {output:?}");
 
     serde_json::from_slice(&output.stdout).expect("valid JSON stdout")
 }
@@ -100,7 +100,10 @@ fn adapter_truncation_forces_unknown_answers_and_zero_confidence() {
 #[test]
 fn security_and_public_api_diffs_are_never_downgraded() {
     let cases = [
-        ("+# doc comment touching auth_token verification\n", "security"),
+        (
+            "+# doc comment touching auth_token verification\n",
+            "security",
+        ),
         ("+pub fn exported_api_contract() {}\n", "public-api"),
         ("+PRAGMA journal_mode = WAL;\n", "mixed"),
         ("+let lock = mutex.lock();\n", "mixed"),
