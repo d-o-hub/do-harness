@@ -1,0 +1,9 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/shared_lib",
+    "crates/proc_macro_lib",
+    "crates/leaf_a",
+    "crates/leaf_b",
+    "crates/codegen_crate",
+]

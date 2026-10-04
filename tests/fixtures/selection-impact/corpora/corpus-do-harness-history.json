@@ -1,0 +1,56 @@
+{
+  "corpus_id": "do-harness-history",
+  "repository": "do-harness",
+  "cases": [
+    {
+      "id": "dh-commit-01-types-only",
+      "changed_files": [
+        {"path": "crates/types/src/lib.rs", "kind": "modified"}
+      ],
+      "affected_components": [
+        {"id": "crates/types", "root": "crates/types"},
+        {"id": "crates/db", "root": "crates/db", "reason": "depends_on:crates/types"},
+        {"id": "crates/guardian-proxy", "root": "crates/guardian-proxy", "reason": "depends_on:crates/types"},
+        {"id": "crates/do-harness", "root": "crates/do-harness", "reason": "depends_on:crates/types"}
+      ],
+      "global_change": false
+    },
+    {
+      "id": "dh-commit-02-db-only",
+      "changed_files": [
+        {"path": "crates/db/src/lib.rs", "kind": "modified"}
+      ],
+      "affected_components": [
+        {"id": "crates/db", "root": "crates/db"},
+        {"id": "crates/do-harness", "root": "crates/do-harness", "reason": "depends_on:crates/db"}
+      ],
+      "global_change": false
+    },
+    {
+      "id": "dh-commit-03-guardian-proxy-only",
+      "changed_files": [
+        {"path": "crates/guardian-proxy/src/lib.rs", "kind": "modified"}
+      ],
+      "affected_components": [
+        {"id": "crates/guardian-proxy", "root": "crates/guardian-proxy"}
+      ],
+      "global_change": false
+    },
+    {
+      "id": "dh-commit-04-docs-readme",
+      "changed_files": [
+        {"path": "README.md", "kind": "modified"}
+      ],
+      "affected_components": [],
+      "global_change": false
+    },
+    {
+      "id": "dh-commit-05-root-cargo-lock",
+      "changed_files": [
+        {"path": "Cargo.lock", "kind": "modified"}
+      ],
+      "affected_components": [],
+      "global_change": true
+    }
+  ]
+}

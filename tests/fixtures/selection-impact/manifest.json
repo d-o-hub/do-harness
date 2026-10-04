@@ -1,0 +1,214 @@
+{
+  "schema_version": 1,
+  "cases": [
+    {
+      "id": "01-leaf-crate-source",
+      "change_class": "leaf crate source",
+      "root": "tests/fixtures/selection-impact/workspace",
+      "changed_files": [
+        {"path": "crates/leaf_a/src/lib.rs", "kind": "modified"}
+      ],
+      "affected_components": [
+        {"id": "crates/leaf_a", "root": "crates/leaf_a"}
+      ],
+      "global_change": false,
+      "planted_defect": {
+        "file": "crates/leaf_a/src/lib.rs",
+        "patch": "compile_error!(\"Planted error in leaf_a\");",
+        "detecting_sensor": "check"
+      }
+    },
+    {
+      "id": "02-shared-crate-source",
+      "change_class": "shared crate used by multiple dependants",
+      "root": "tests/fixtures/selection-impact/workspace",
+      "changed_files": [
+        {"path": "crates/shared_lib/src/lib.rs", "kind": "modified"}
+      ],
+      "affected_components": [
+        {"id": "crates/shared_lib", "root": "crates/shared_lib"},
+        {"id": "crates/leaf_a", "root": "crates/leaf_a", "reason": "depends_on:crates/shared_lib"},
+        {"id": "crates/leaf_b", "root": "crates/leaf_b", "reason": "depends_on:crates/shared_lib"}
+      ],
+      "global_change": false,
+      "planted_defect": {
+        "file": "crates/shared_lib/src/lib.rs",
+        "patch": "pub fn compute_value() -> String { \"changed\".to_string() }",
+        "detecting_sensor": "test"
+      }
+    },
+    {
+      "id": "03-proc-macro-source",
+      "change_class": "procedural macro",
+      "root": "tests/fixtures/selection-impact/workspace",
+      "changed_files": [
+        {"path": "crates/proc_macro_lib/src/lib.rs", "kind": "modified"}
+      ],
+      "affected_components": [
+        {"id": "crates/proc_macro_lib", "root": "crates/proc_macro_lib"},
+        {"id": "crates/leaf_a", "root": "crates/leaf_a", "reason": "proc_macro_dependant:crates/proc_macro_lib"}
+      ],
+      "global_change": false,
+      "planted_defect": {
+        "file": "crates/proc_macro_lib/src/lib.rs",
+        "patch": "compile_error!(\"Proc macro syntax error\");",
+        "detecting_sensor": "check"
+      }
+    },
+    {
+      "id": "04-build-script",
+      "change_class": "build.rs",
+      "root": "tests/fixtures/selection-impact/workspace",
+      "changed_files": [
+        {"path": "crates/codegen_crate/build.rs", "kind": "modified"}
+      ],
+      "affected_components": [
+        {"id": "crates/codegen_crate", "root": "crates/codegen_crate"}
+      ],
+      "global_change": false,
+      "planted_defect": {
+        "file": "crates/codegen_crate/build.rs",
+        "patch": "fn main() { panic!(\"Planted build script failure\"); }",
+        "detecting_sensor": "check"
+      }
+    },
+    {
+      "id": "05-workspace-manifest",
+      "change_class": "workspace and member manifests",
+      "root": "tests/fixtures/selection-impact/workspace",
+      "changed_files": [
+        {"path": "Cargo.toml", "kind": "modified"}
+      ],
+      "affected_components": [],
+      "global_change": true,
+      "planted_defect": {
+        "file": "Cargo.toml",
+        "patch": "invalid_toml = [[[",
+        "detecting_sensor": "check"
+      }
+    },
+    {
+      "id": "06-cargo-lock",
+      "change_class": "Cargo.lock",
+      "root": "tests/fixtures/selection-impact/workspace",
+      "changed_files": [
+        {"path": "Cargo.lock", "kind": "modified"}
+      ],
+      "affected_components": [],
+      "global_change": true,
+      "planted_defect": {
+        "file": "Cargo.lock",
+        "patch": "# corrupted lockfile",
+        "detecting_sensor": "check"
+      }
+    },
+    {
+      "id": "07-feature-dependency",
+      "change_class": "feature-only dependency",
+      "root": "tests/fixtures/selection-impact/workspace",
+      "changed_files": [
+        {"path": "crates/leaf_a/Cargo.toml", "kind": "modified"}
+      ],
+      "affected_components": [
+        {"id": "crates/leaf_a", "root": "crates/leaf_a"}
+      ],
+      "global_change": true,
+      "planted_defect": {
+        "file": "crates/leaf_a/Cargo.toml",
+        "patch": "[features]\ndefault = [\"non_existent_feature\"]",
+        "detecting_sensor": "check"
+      }
+    },
+    {
+      "id": "08-generated-code-input",
+      "change_class": "generated-code input",
+      "root": "tests/fixtures/selection-impact/workspace",
+      "changed_files": [
+        {"path": "crates/codegen_crate/data/schema.json", "kind": "modified"}
+      ],
+      "affected_components": [
+        {"id": "crates/codegen_crate", "root": "crates/codegen_crate"}
+      ],
+      "global_change": false,
+      "planted_defect": {
+        "file": "crates/codegen_crate/data/schema.json",
+        "patch": "{ \"invalid\": true }",
+        "detecting_sensor": "test"
+      }
+    },
+    {
+      "id": "09-root-lint-config",
+      "change_class": "root lint/test/toolchain configuration",
+      "root": "tests/fixtures/selection-impact/workspace",
+      "changed_files": [
+        {"path": ".clippy.toml", "kind": "modified"}
+      ],
+      "affected_components": [],
+      "global_change": true,
+      "planted_defect": {
+        "file": ".clippy.toml",
+        "patch": "invalid-key = 123",
+        "detecting_sensor": "clippy"
+      }
+    },
+    {
+      "id": "10-docs-only",
+      "change_class": "documentation-only change",
+      "root": "tests/fixtures/selection-impact/workspace",
+      "changed_files": [
+        {"path": "README.md", "kind": "modified"}
+      ],
+      "affected_components": [],
+      "global_change": false,
+      "planted_defect": null
+    },
+    {
+      "id": "11-unknown-file",
+      "change_class": "unknown file",
+      "root": "tests/fixtures/selection-impact/workspace",
+      "changed_files": [
+        {"path": "unknown/random_script.xyz", "kind": "modified"}
+      ],
+      "affected_components": [],
+      "global_change": true,
+      "planted_defect": null
+    },
+    {
+      "id": "12-deleted-renamed-component",
+      "change_class": "deleted/renamed component",
+      "root": "tests/fixtures/selection-impact/workspace",
+      "changed_files": [
+        {"path": "crates/removed_crate/src/lib.rs", "kind": "deleted"}
+      ],
+      "affected_components": [],
+      "global_change": true,
+      "planted_defect": null
+    },
+    {
+      "id": "13-shallow-unreadable-git",
+      "change_class": "shallow/unreadable git state",
+      "root": "tests/fixtures/selection-impact/workspace",
+      "changed_files": [],
+      "affected_components": [],
+      "global_change": true,
+      "planted_defect": null,
+      "simulated_error": "unreadable_git_state"
+    },
+    {
+      "id": "14-mixed-source-global-policy",
+      "change_class": "mixed source and global-policy change",
+      "root": "tests/fixtures/selection-impact/workspace",
+      "changed_files": [
+        {"path": "crates/leaf_a/src/lib.rs", "kind": "modified"},
+        {"path": "do-harness.toml", "kind": "modified"}
+      ],
+      "affected_components": [],
+      "global_change": true,
+      "planted_defect": {
+        "file": "crates/leaf_a/src/lib.rs",
+        "patch": "compile_error!(\"Planted error\");",
+        "detecting_sensor": "check"
+      }
+    }
+  ]
+}
