@@ -1,6 +1,6 @@
 # Epic: pr-triage Agent Skill
 
-> **Status:** phases 1–7 complete (skill + evals; `pr no-effect` + `pr review` with cache; proof skipping + `false_proven`; measurement + benchmark; semantic routing cost/safety benchmark with a recorded `no-go` verdict; realistic large-diff corpus + route-aware cost model; cheap-metadata input investigated and **rejected** as strictly worse than the proof gate)
+> **Status:** phases 1–8 complete (skill + evals; `pr no-effect` + `pr review` with cache; proof skipping + `false_proven`; measurement + benchmark; semantic routing cost/safety benchmark with a recorded `no-go` verdict; realistic large-diff corpus + route-aware cost model; cheap-metadata input investigated and **rejected**; domain fine-tuned Kev router evaluated and recorded as an **explicit no-go** for default promotion)
 > **Related:** Agent Skills open standard, GitHub PR lifecycle, optional `do-harness` token reduction
 > **Created:** 2026-09-11
 
@@ -29,6 +29,7 @@ residual plus evidence; the skill works with `gh` + `git` alone.
 | Phase 5: semantic routing | optional typed router selects review depth; all error/uncertain states fail toward depth; end-to-end cost + seeded-route oracle over 12 classes; regression gate in `cargo test` | `scripts/pr-routing-benchmark.sh` + `tests/pr_routing.rs`; recorded `no-go` verdict |
 | Phase 6: realistic corpus economy | route-aware cost model in the benchmark + a 12-class large-diff corpus (`tests/fixtures/pr-routing-large/`, 2.8–25 KB per case) generated deterministically; both corpora gated in `cargo test` | `scripts/generate-large-fixtures.sh` + route-aware fields; recorded `ROUTED_VERDICT no-go` with the structural reason |
 | Phase 7: cheap-metadata input | test the last hypothesis for a routing `go`: classify from a path/hunk/stat view so the router reads far less than it decides about | rejected — saving and safety are the same bytes (stripped view: 4/12 oracle failures; contextual view −10.7% vs raw diff); routing costs 46.0% *more* than the deterministic proof gate it competes with |
+| Phase 8: fine-tuned Kev router evaluation | evaluate domain fine-tuned Kev as optional router provider; deliver adapter, handbook, manifests, eval script, hermetic tests, and go/no-go recommendation | `integrations/pr-triage/kev/RESULTS.md` + `crates/do-harness/tests/pr_routing_kev.rs`; recorded **explicit no-go** verdict |
 
 ## Phase 1 requirements (roast findings)
 
@@ -313,6 +314,20 @@ this negative result plus the survey instrumentation in Phase 6; no production
 code changes, so no sensor cost. Reopening this needs a cheaper view that
 *retains* hunk context (which is not cheaper) or dropping the `cheap` route
 (which removes the only savings mechanism).
+
+## Phase 8 completion — fine-tuned Kev router evaluation (2026-09-19)
+
+- Evaluated domain fine-tuned Kev (`kev-v1-pr-triage-ft-20260919`) as an optional
+  provider implementing #112's typed semantic router interface via executable adapter
+  `integrations/pr-triage/kev/kev_router_adapter.py`.
+- Delivered dataset manifests (`dataset_manifest.json`, `split_manifest.json`), version 1.0 label
+  handbook (`LABEL_HANDBOOK.md`), reproducible training/eval driver (`train_and_eval.py`), hermetic
+  tests (`crates/do-harness/tests/pr_routing_kev.rs`), and comprehensive evaluation report
+  (`integrations/pr-triage/kev/RESULTS.md`).
+- Result: **0 seeded high-impact downgrades** (100% safety gate compliance), but **+28.8% cost overhead**
+  compared to the deterministic proof gate (Baseline B).
+- Recorded Verdict: **Explicit NO-GO**. Kev remains available as an optional experimental integration,
+  while deterministic proof semantics remain the default.
 
 ## Task tracking note
 

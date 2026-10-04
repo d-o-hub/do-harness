@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "model_checkpoint_digest": "sha256:a1b2c3d4e5f67890123456789abcdef0123456789abcdef0123456789abcdef0",
+  "base_model": "kev-v1-released",
+  "mode": "offline",
+  "confidence_threshold": 0.80,
+  "max_context_bytes": 16384,
+  "policy_version": "1.0",
+  "temperature": 0.0,
+  "calibrated_probabilities": true
+}

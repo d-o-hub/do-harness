@@ -1,0 +1,208 @@
+{
+  "schema_version": 1,
+  "created_at": "2026-09-19T00:00:00Z",
+  "dataset_id": "kev-pr-triage-multilang-v1",
+  "description": "Sanitized multi-language PR dataset for fine-tuning and evaluating Kev router on PR review depth classification.",
+  "languages": ["rust", "go", "typescript"],
+  "total_prs": 18,
+  "pr_samples": [
+    {
+      "id": "pr-rust-001",
+      "repo": "do-harness/do-harness",
+      "language": "rust",
+      "head_sha": "a111111111111111111111111111111111111111",
+      "merge_base": "a000000000000000000000000000000000000000",
+      "risk_class": "docs-only",
+      "expected_change_kind": "docs",
+      "expected_min_route": "cheap",
+      "sha256_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "id": "pr-rust-002",
+      "repo": "do-harness/do-harness",
+      "language": "rust",
+      "head_sha": "a222222222222222222222222222222222222222",
+      "merge_base": "a000000000000000000000000000000000000000",
+      "risk_class": "tests-only",
+      "expected_change_kind": "tests",
+      "expected_min_route": "cheap",
+      "sha256_digest": "41a134a65ef5e2d1d441f3e7921a941f531393c52e697a5f2ec39316335a11ef"
+    },
+    {
+      "id": "pr-rust-003",
+      "repo": "do-harness/do-harness",
+      "language": "rust",
+      "head_sha": "a333333333333333333333333333333333333333",
+      "merge_base": "a000000000000000000000000000000000000000",
+      "risk_class": "lockfile-only",
+      "expected_change_kind": "dependency",
+      "expected_min_route": "cheap",
+      "sha256_digest": "4c22be7d4a6f6f96ec35b8004f98124231f4963e691238ef1f2a30b777a83d73"
+    },
+    {
+      "id": "pr-rust-004",
+      "repo": "do-harness/do-harness",
+      "language": "rust",
+      "head_sha": "a444444444444444444444444444444444444444",
+      "merge_base": "a000000000000000000000000000000000000000",
+      "risk_class": "internal-refactor",
+      "expected_change_kind": "internal",
+      "expected_min_route": "focused",
+      "sha256_digest": "18f51a9c35d97e743a14e9102434e320f7f3299763fb4e9c7333671f1e9c8f00"
+    },
+    {
+      "id": "pr-rust-005",
+      "repo": "do-harness/do-harness",
+      "language": "rust",
+      "head_sha": "a555555555555555555555555555555555555555",
+      "merge_base": "a000000000000000000000000000000000000000",
+      "risk_class": "public-api-break",
+      "expected_change_kind": "public-api",
+      "expected_min_route": "deep",
+      "sha256_digest": "a73950ff4f440d99fb35c106428eb192d6e3c5a6104847e17c06ec1e0954b9d0"
+    },
+    {
+      "id": "pr-rust-006",
+      "repo": "do-harness/do-harness",
+      "language": "rust",
+      "head_sha": "a666666666666666666666666666666666666666",
+      "merge_base": "a000000000000000000000000000000000000000",
+      "risk_class": "security",
+      "expected_change_kind": "security",
+      "expected_min_route": "deep",
+      "sha256_digest": "62cdb70200929215037d2f95c1106f2ec55e7144e1d52033c4852c4228c2e684"
+    },
+    {
+      "id": "pr-go-001",
+      "repo": "example/go-service",
+      "language": "go",
+      "head_sha": "b111111111111111111111111111111111111111",
+      "merge_base": "b000000000000000000000000000000000000000",
+      "risk_class": "docs-only",
+      "expected_change_kind": "docs",
+      "expected_min_route": "cheap",
+      "sha256_digest": "c6225e36e78ecae95a32b210c4f826354673e5bf0d4186f2b4e74366d795b602"
+    },
+    {
+      "id": "pr-go-002",
+      "repo": "example/go-service",
+      "language": "go",
+      "head_sha": "b222222222222222222222222222222222222222",
+      "merge_base": "b000000000000000000000000000000000000000",
+      "risk_class": "concurrency",
+      "expected_change_kind": "internal",
+      "expected_min_route": "deep",
+      "sha256_digest": "18f45a8e0f6354a85fb9d1b0d268a73752c0032e8d35f6a911a3b3e34b11e292"
+    },
+    {
+      "id": "pr-go-003",
+      "repo": "example/go-service",
+      "language": "go",
+      "head_sha": "b333333333333333333333333333333333333333",
+      "merge_base": "b000000000000000000000000000000000000000",
+      "risk_class": "persistence-schema",
+      "expected_change_kind": "internal",
+      "expected_min_route": "deep",
+      "sha256_digest": "a50c3a8174f63c810e7dd535a782b6831d0442e92c283838042454a852899451"
+    },
+    {
+      "id": "pr-go-004",
+      "repo": "example/go-service",
+      "language": "go",
+      "head_sha": "b444444444444444444444444444444444444444",
+      "merge_base": "b000000000000000000000000000000000000000",
+      "risk_class": "error-handling",
+      "expected_change_kind": "internal",
+      "expected_min_route": "focused",
+      "sha256_digest": "f041ff9d231945c74233f208156d1bf473855ff4bbff0422d36f8f5e6a3c617b"
+    },
+    {
+      "id": "pr-go-005",
+      "repo": "example/go-service",
+      "language": "go",
+      "head_sha": "b555555555555555555555555555555555555555",
+      "merge_base": "b000000000000000000000000000000000000000",
+      "risk_class": "mixed-buried",
+      "expected_change_kind": "mixed",
+      "expected_min_route": "deep",
+      "sha256_digest": "48b61c9e84606992d9f8c6b16d123e4b025a7a72688b77d61eb4284534f31c2c"
+    },
+    {
+      "id": "pr-ts-001",
+      "repo": "example/web-app",
+      "language": "typescript",
+      "head_sha": "c111111111111111111111111111111111111111",
+      "merge_base": "c000000000000000000000000000000000000000",
+      "risk_class": "docs-only",
+      "expected_change_kind": "docs",
+      "expected_min_route": "cheap",
+      "sha256_digest": "b5a22d2813c9a6338b556f082e66487e66f8e7a089903b1b6088236113824f8a"
+    },
+    {
+      "id": "pr-ts-002",
+      "repo": "example/web-app",
+      "language": "typescript",
+      "head_sha": "c222222222222222222222222222222222222222",
+      "merge_base": "c000000000000000000000000000000000000000",
+      "risk_class": "lockfile-only",
+      "expected_change_kind": "dependency",
+      "expected_min_route": "cheap",
+      "sha256_digest": "18f03761eb8538ef8f8a1291ef7e12e84e27f0d04c351f0f29910a30b8058200"
+    },
+    {
+      "id": "pr-ts-003",
+      "repo": "example/web-app",
+      "language": "typescript",
+      "head_sha": "c333333333333333333333333333333333333333",
+      "merge_base": "c000000000000000000000000000000000000000",
+      "risk_class": "public-api-break",
+      "expected_change_kind": "public-api",
+      "expected_min_route": "deep",
+      "sha256_digest": "82650058e578c74070a7df844838612176971932311f9f220f862ef6c4e09f83"
+    },
+    {
+      "id": "pr-ts-004",
+      "repo": "example/web-app",
+      "language": "typescript",
+      "head_sha": "c444444444444444444444444444444444444444",
+      "merge_base": "c000000000000000000000000000000000000000",
+      "risk_class": "security",
+      "expected_change_kind": "security",
+      "expected_min_route": "deep",
+      "sha256_digest": "356a192b7913b04c54574d18c28d46e6395428ab2e4cb135a29339247eb866d9"
+    },
+    {
+      "id": "pr-ood-001",
+      "repo": "example/python-core",
+      "language": "python",
+      "head_sha": "d111111111111111111111111111111111111111",
+      "merge_base": "d000000000000000000000000000000000000000",
+      "risk_class": "ood-out-of-domain",
+      "expected_change_kind": "unknown",
+      "expected_min_route": "deep",
+      "sha256_digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    {
+      "id": "pr-ood-002",
+      "repo": "example/cpp-engine",
+      "language": "cpp",
+      "head_sha": "d222222222222222222222222222222222222222",
+      "merge_base": "d000000000000000000000000000000000000000",
+      "risk_class": "ood-out-of-domain",
+      "expected_change_kind": "unknown",
+      "expected_min_route": "deep",
+      "sha256_digest": "900150983cd24fb0d6963f7d28e17f72"
+    },
+    {
+      "id": "pr-ood-003",
+      "repo": "example/cpp-engine",
+      "language": "cpp",
+      "head_sha": "d333333333333333333333333333333333333333",
+      "merge_base": "d000000000000000000000000000000000000000",
+      "risk_class": "concurrency",
+      "expected_change_kind": "internal",
+      "expected_min_route": "deep",
+      "sha256_digest": "f2ca1bb6c7e907d06dafe4687e579fce"
+    }
+  ]
+}

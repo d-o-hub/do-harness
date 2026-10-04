@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "split_strategy": "group_by_repo_and_time",
+  "created_at": "2026-09-19T00:00:00Z",
+  "description": "Repo and time-based split preventing sibling commit leakage across training and test evaluations.",
+  "splits": {
+    "train": {
+      "repo_time_bounds": "do-harness/do-harness (2025-01-01 to 2026-06-30)",
+      "sample_ids": ["pr-rust-001", "pr-rust-002", "pr-rust-003", "pr-rust-004"]
+    },
+    "dev_calibration": {
+      "repo_time_bounds": "example/go-service (2025-01-01 to 2026-06-30)",
+      "sample_ids": ["pr-go-001", "pr-go-002", "pr-go-004"]
+    },
+    "locked_test": {
+      "repo_time_bounds": "do-harness/do-harness (2026-07-01 to 2026-09-19) & example/go-service (2026-07-01 to 2026-09-19)",
+      "sample_ids": ["pr-rust-005", "pr-rust-006", "pr-go-003", "pr-go-005"]
+    },
+    "out_of_domain_locked": {
+      "description": "Out-of-domain language and repository slice (TypeScript, Python, C++)",
+      "sample_ids": ["pr-ts-001", "pr-ts-002", "pr-ts-003", "pr-ts-004", "pr-ood-001", "pr-ood-002", "pr-ood-003"]
+    }
+  }
+}
