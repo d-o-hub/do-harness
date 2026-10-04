@@ -6,6 +6,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BIN="${DO_HARNESS_BIN:-$ROOT/target/debug/do-harness}"
 MANIFEST="${1:-$ROOT/tests/fixtures/selection-impact/manifest.json}"
+export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$ROOT/target/selection-impact-target}"
 RESOLVER="$ROOT/scripts/selection-impact/cargo-resolver.py"
 POLICY_EVAL="$ROOT/scripts/selection-impact/evaluate-policy.py"
 SAMPLES="${SAMPLES:-3}"

@@ -3,6 +3,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$ROOT/target/selection-impact-target}"
 RESOLVER="$ROOT/scripts/selection-impact/cargo-resolver.py"
 POLICY_EVAL="$ROOT/scripts/selection-impact/evaluate-policy.py"
 WORKSPACE="$ROOT/tests/fixtures/selection-impact/workspace"
