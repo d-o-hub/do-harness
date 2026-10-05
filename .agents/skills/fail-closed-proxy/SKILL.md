@@ -34,12 +34,20 @@ plus audit and metrics evidence. Decisions never depend on observability.
 ## Routes
 - `GET /health` — liveness probe (200 only while the mediator is initialized; 503 degraded).
 - `GET /metrics` — JSON snapshot of `ProxyMetrics` (bearer token when `metrics_token` is set).
-- `POST /mcp/tools/call` — the single mediation entry point (no `POST /` alias).
+- `POST /mcp/tools/call` — the deprecated flat mediation route; every response carries
+  `Deprecation: true` and, with `mcp-surface`, `Link: </mcp>; rel="successor-version"`.
+- `POST /mcp` — the MCP Streamable HTTP ingress, mounted at `/mcp` only with the
+  `mcp-surface` feature (the flat route keeps precedence for its exact path).
+
+Both mediation routes sit behind the optional `ingress_token` bearer check, applied
+after routing so an unauthenticated request never reaches mediation, audit, or the
+upstream; a rejected request moves no counter and writes no audit record. There is
+intentionally no `POST /` alias.
 
 ## Counters (`ProxyMetrics`)
 `allow`, `deny`, `mediator_errors`, `upstream_ok`, `upstream_failures`,
-`audit_write_failures`. Expose via `GET /metrics`; counters never change
-routing.
+`audit_write_failures`, `stub_decisions` (decisions taken with `agt-governance`
+off). Expose via `GET /metrics`; counters never change routing.
 
 ## State Sharing
 - Hold `metrics: Arc<ProxyMetrics>` inside shared `AppState`.
