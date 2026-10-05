@@ -1,10 +1,10 @@
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
-.TH do-harness 1  "do-harness 0.1.2 (c8188dc-dirty 2026-09-30)" 
+.TH do-harness 1  "do-harness 0.2.0 (01f6e3e-dirty 2026-10-03)" 
 .SH NAME
 do\-harness \- do\-harness agent execution harness CLI
 .SH SYNOPSIS
-\fBdo\-harness\fR [\fB\-\-root\fR] [\fB\-\-config\fR] [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-color\fR] [\fB\-\-output\fR] [\fB\-\-dry\-run\fR] [\fB\-h\fR|\fB\-\-help\fR] [\fB\-V\fR|\fB\-\-version\fR] <\fIsubcommands\fR>
+\fBdo\-harness\fR [\fB\-\-root\fR] [\fB\-\-config\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-\-output\fR] [\fB\-\-dry\-run\fR] [\fB\-h\fR|\fB\-\-help\fR] [\fB\-V\fR|\fB\-\-version\fR] <\fIsubcommands\fR>
 .SH DESCRIPTION
 do\-harness agent execution harness CLI
 .SH OPTIONS
@@ -15,17 +15,11 @@ Workspace root override (default: walk up from cwd)
 \fB\-\-config\fR \fI<FILE>\fR
 Explicit path to do\-harness.toml
 .TP
-\fB\-v\fR, \fB\-\-verbose\fR
-Verbosity level (\-v, \-vv)
-.TP
 \fB\-q\fR, \fB\-\-quiet\fR
-Suppress non\-error messages
-.TP
-\fB\-\-color\fR \fI<WHEN>\fR
-Color output (auto, always, never)
+Suppress PASS/WARN verdict lines and the success footer
 .TP
 \fB\-\-output\fR \fI<FILE>\fR
-Default output file path
+Default evidence artifact path for verify (overrides the \-\-set default; an explicit \-\-evidence still wins)
 .TP
 \fB\-\-dry\-run\fR
 Dry run without side effects
@@ -138,4 +132,4 @@ Exit Codes:
   1  Verification or check failure
   2  Usage, configuration, or environment error
 .SH VERSION
-v0.1.2 (c8188dc\-dirty 2026\-09\-30)
+v0.2.0 (01f6e3e\-dirty 2026\-10\-03)

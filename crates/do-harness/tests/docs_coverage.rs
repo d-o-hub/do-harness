@@ -17,18 +17,23 @@ fn repo_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
 }
 
-/// The subcommands `--help` advertises; `help` itself is not a feature.
-fn subcommands() -> BTreeSet<String> {
+/// Runs `do-harness <path> --help` and returns the text.
+fn help_text(path: &[String]) -> String {
     let output = Command::new(env!("CARGO_BIN_EXE_do-harness"))
+        .args(path)
         .arg("--help")
         .output()
         .expect("run do-harness --help");
-    assert!(output.status.success(), "--help must exit 0");
-    let text = String::from_utf8_lossy(&output.stdout).into_owned();
+    assert!(output.status.success(), "--help must exit 0 for {path:?}");
+    String::from_utf8_lossy(&output.stdout).into_owned()
+}
 
+/// Command names in a help text's `Commands:` section; `help` is not a
+/// feature.
+fn commands_section(help: &str) -> BTreeSet<String> {
     let mut names = BTreeSet::new();
     let mut in_commands = false;
-    for line in text.lines() {
+    for line in help.lines() {
         if line.starts_with("Commands:") {
             in_commands = true;
             continue;
@@ -45,11 +50,71 @@ fn subcommands() -> BTreeSet<String> {
             }
         }
     }
+    names
+}
+
+/// The subcommands `--help` advertises.
+fn subcommands() -> BTreeSet<String> {
+    let text = help_text(&[]);
+    let names = commands_section(&text);
     assert!(
         !names.is_empty(),
         "no subcommands parsed from --help:\n{text}"
     );
     names
+}
+
+/// Long flags advertised by any command's `--help`, walking nested
+/// subcommands to depth two (`task add`, `pr review`).
+fn help_flags() -> BTreeSet<String> {
+    let mut flags = BTreeSet::new();
+    let mut queue: Vec<Vec<String>> = vec![Vec::new()];
+    let mut seen: BTreeSet<Vec<String>> = BTreeSet::new();
+    while let Some(path) = queue.pop() {
+        if path.len() > 2 || !seen.insert(path.clone()) {
+            continue;
+        }
+        let text = help_text(&path);
+        flags.extend(flag_entries(&text));
+        for child in commands_section(&text) {
+            let mut next = path.clone();
+            next.push(child);
+            queue.push(next);
+        }
+    }
+    flags
+}
+
+/// Long flags from option-entry lines of clap `--help` output. clap's
+/// built-in `--help`/`--version` are not feature flags.
+fn flag_entries(help: &str) -> BTreeSet<String> {
+    let mut flags = BTreeSet::new();
+    for line in help.lines() {
+        let indent = line.len() - line.trim_start().len();
+        // Option entries are indented 2-6 columns; wrapped description lines
+        // align much further right.
+        if !(2..=6).contains(&indent) {
+            continue;
+        }
+        let trimmed = line.trim_start();
+        let Some(rest) = trimmed.strip_prefix('-') else {
+            continue;
+        };
+        let long = match rest.strip_prefix('-') {
+            Some(long) => Some(long),
+            None => rest.split_once(", --").map(|(_, long)| long),
+        };
+        let Some(long) = long else { continue };
+        let name: String = long
+            .chars()
+            .take_while(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || *c == '-')
+            .collect();
+        if name.is_empty() || name == "help" || name == "version" {
+            continue;
+        }
+        flags.insert(name);
+    }
+    flags
 }
 
 /// Commands named by level-3 headings in the reference, e.g. a heading for
@@ -98,5 +163,24 @@ fn every_subcommand_is_documented_and_no_documented_command_is_stale() {
     assert!(
         stale.is_empty(),
         "docs/cli.md documents commands the CLI does not expose: {stale:?}"
+    );
+}
+
+#[test]
+fn every_long_flag_is_documented() {
+    let root = repo_root();
+    let docs = std::fs::read_to_string(root.join("docs/cli.md")).unwrap();
+
+    let flags = help_flags();
+    assert!(!flags.is_empty(), "no flags parsed from --help output");
+
+    let undocumented: Vec<_> = flags
+        .iter()
+        .filter(|flag| !docs.contains(&format!("--{flag}")))
+        .cloned()
+        .collect();
+    assert!(
+        undocumented.is_empty(),
+        "flags advertised by --help but missing from docs/cli.md: {undocumented:?}"
     );
 }

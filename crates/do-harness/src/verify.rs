@@ -103,7 +103,7 @@ pub(crate) async fn run(root: &Path, mut opts: VerifyOpts) -> std::result::Resul
             if opts.bless {
                 bless_baselines(root, &report, &opts).await?;
             }
-            report::print_report(&report, opts.format);
+            report::print_report(&report, opts.format, opts.quiet);
 
             write_evidence(
                 root,
@@ -285,6 +285,11 @@ async fn write_evidence(
         .evidence
         .clone()
         .map(|p| if p.is_relative() { root.join(p) } else { p })
+        .or_else(|| {
+            opts.output
+                .clone()
+                .map(|p| if p.is_relative() { root.join(p) } else { p })
+        })
         .or_else(|| {
             opts.set
                 .as_ref()

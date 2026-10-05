@@ -96,8 +96,9 @@ const OUTPUT_TAIL_LINES: usize = 80;
 ///
 /// Verdict lines go to stdout in text mode; in JSON mode they go to stderr so
 /// stdout carries exactly one JSON object. Failing-sensor output tails always
-/// go to stderr, prefixed with six spaces.
-pub fn print_report(report: &VerifyReport, format: Format) {
+/// go to stderr, prefixed with six spaces. With `quiet` set, PASS/WARN verdict
+/// lines and the green footer are omitted; failures stay visible.
+pub fn print_report(report: &VerifyReport, format: Format, quiet: bool) {
     for sensor in &report.sensors {
         let verdict = match sensor.execution {
             Execution::Reused => "SKIP",
@@ -109,6 +110,11 @@ pub fn print_report(report: &VerifyReport, format: Format) {
                 }
             }
         };
+        // `--quiet` suppresses the non-error surface: PASS/WARN verdict lines
+        // and their detail tails. Failures and the failure footer stay.
+        if quiet && matches!(verdict, "PASS" | "WARN") {
+            continue;
+        }
         let detail = if sensor.execution == Execution::Reused {
             match sensor.reused_beat_id {
                 Some(id) => format!(" (unchanged inputs; reused beat {id})"),
@@ -147,10 +153,12 @@ pub fn print_report(report: &VerifyReport, format: Format) {
         } else {
             format!("All sensors passed ({reused} reused from unchanged inputs).")
         };
-        if format == Format::Json {
-            eprintln!("{footer}");
-        } else {
-            println!("{footer}");
+        if !quiet {
+            if format == Format::Json {
+                eprintln!("{footer}");
+            } else {
+                println!("{footer}");
+            }
         }
     } else {
         eprintln!("Failed sensors: {}", report.failed.join(", "));
