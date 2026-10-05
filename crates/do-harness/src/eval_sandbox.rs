@@ -136,11 +136,19 @@ fn copy_gate_scripts(real_root: &Path, skills_root: &Path) -> Result<()> {
 /// mirrored into its sandbox.
 ///
 /// Scans the skill's text for `scripts/...`, `docs/...`, `integrations/...`,
-/// and `.github/...` tokens. Whole-tree copies are deliberately avoided (agent
-/// mode builds one sandbox per case), but the granularity differs by tree:
+/// `.github/...`, and `crates/...` tokens. Whole-tree copies are deliberately
+/// avoided (agent mode builds one sandbox per case), but the granularity
+/// differs by tree:
 ///
 /// * `scripts/...`, `docs/...`, and `.github/...` tokens mirror the exact named
 ///   file.
+/// * `crates/...` tokens mirror the exact named file **only from files under
+///   the skill's `evals/` directory**: a fixture that checks a source-level
+///   contract (routes, counters, feature gates) can read the file it names,
+///   while a prose mention in SKILL.md or a reference cannot drop a visible
+///   `crates/` tree into the sandbox of a fixture that runs `init` (where any
+///   non-hidden entry flips detection away from greenfield Rust). A bare
+///   `crates/` copies nothing.
 /// * `integrations/<pkg>/...` mirrors `integrations/<pkg>` wholesale, because an
 ///   `integrations/` entry is a self-contained package whose manifest defines
 ///   its own file closure. A repo script the skill invokes (e.g.
@@ -152,7 +160,7 @@ fn copy_gate_scripts(real_root: &Path, skills_root: &Path) -> Result<()> {
 /// unrelated tools and, being non-hidden, could change what `init::detect` sees.
 /// A `.github/` file is dot-prefixed, so mirroring one never affects detection.
 pub(super) fn referenced_paths(skill_dir: &Path) -> Vec<String> {
-    const PREFIXES: [&str; 4] = ["scripts/", "docs/", "integrations/", ".github/"];
+    const PREFIXES: [&str; 5] = ["scripts/", "docs/", "integrations/", ".github/", "crates/"];
     let mut found: Vec<String> = Vec::new();
     let mut stack = vec![skill_dir.to_path_buf()];
     while let Some(dir) = stack.pop() {
@@ -168,6 +176,15 @@ pub(super) fn referenced_paths(skill_dir: &Path) -> Vec<String> {
             let Ok(text) = fs::read_to_string(&path) else {
                 continue;
             };
+            // `crates/` is mirrored only from files under `evals/`: a fixture
+            // that reads a named source file needs it in the sandbox, but a
+            // prose mention elsewhere (a reference listing crate paths) must
+            // not drop a visible `crates/` tree into a sandbox whose fixture
+            // runs `init`, where any non-hidden entry flips language detection
+            // away from greenfield Rust.
+            let in_evals = path
+                .strip_prefix(skill_dir)
+                .is_ok_and(|relative| relative.starts_with("evals"));
             for raw in text.split(|c: char| c.is_whitespace() || c == '`' || c == '"' || c == '\'')
             {
                 // `.` is deliberately absent from the trim set: a leading dot
@@ -176,9 +193,15 @@ pub(super) fn referenced_paths(skill_dir: &Path) -> Vec<String> {
                 let token = raw.trim_matches(|c: char| {
                     c == '(' || c == ')' || c == ',' || c == ':' || c == '|'
                 });
-                let Some(start) = PREFIXES.iter().find_map(|prefix| token.find(prefix)) else {
+                let Some((prefix, start)) = PREFIXES
+                    .iter()
+                    .find_map(|prefix| token.find(prefix).map(|start| (*prefix, start)))
+                else {
                     continue;
                 };
+                if prefix == "crates/" && !in_evals {
+                    continue;
+                }
                 let cleaned: String = token[start..]
                     .chars()
                     .take_while(|c| c.is_ascii_alphanumeric() || matches!(c, '/' | '-' | '_' | '.'))

@@ -86,7 +86,16 @@ fn referenced_paths_selects_concrete_files_only() {
         skill.join("SKILL.md"),
         "Run `bash scripts/publish-npm.sh --dist dist` and read docs/releasing.md.\n\
          The wrapper lives in integrations/npm/platforms/linux-x64/package.json.\n\
-         See integrations/ for the layout and scripts/ generally.\n",
+         Prose may mention crates/do-harness/src/lib.rs without needing it mirrored.\n\
+         See integrations/, scripts/, and crates/ generally.\n",
+    )
+    .unwrap();
+    // A crate file named by the fixture itself is mirrored; a prose mention in
+    // SKILL.md is not, so a visible crates/ tree never enters a sandbox whose
+    // fixture runs `init` (where non-hidden entries flip language detection).
+    fs::write(
+        skill.join("evals/walkthrough.sh"),
+        "cat crates/guardian-proxy/src/server.rs\n",
     )
     .unwrap();
     let found = referenced_paths(&skill);
@@ -101,9 +110,20 @@ fn referenced_paths_selects_concrete_files_only() {
         !found.contains(&"integrations/npm/platforms/linux-x64/package.json".to_owned()),
         "{found:?}"
     );
+    // A crate file a fixture names is mirrored so a source-contract fixture
+    // can read it; a prose-only mention must not drag a crates/ tree in.
+    assert!(
+        found.contains(&"crates/guardian-proxy/src/server.rs".to_owned()),
+        "{found:?}"
+    );
+    assert!(
+        !found.contains(&"crates/do-harness/src/lib.rs".to_owned()),
+        "{found:?}"
+    );
     // Bare prefixes must not be mirrored.
     assert!(!found.contains(&"scripts".to_owned()), "{found:?}");
     assert!(!found.contains(&"integrations".to_owned()), "{found:?}");
+    assert!(!found.contains(&"crates".to_owned()), "{found:?}");
 }
 
 /// A `.github/` path a skill names is mirrored as that exact file. The release

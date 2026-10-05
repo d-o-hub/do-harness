@@ -19,7 +19,7 @@ Prebuilt binaries for Linux (x86_64/aarch64, static musl), macOS
 with SHA-256 checksums. The Windows zip is the only supported Windows
 install path, because npm rejects the `do-harness-win32-x64` package name
 (HTTP 403, "Package name triggered spam detection"); see
-[docs/adoption.md](docs/adoption.md#windows) for details.
+[docs/adoption.md](https://github.com/d-o-hub/do-harness/blob/main/docs/adoption.md#windows) for details.
 
 ```bash
 # latest release (resolved from the releases/latest redirect)
@@ -34,7 +34,7 @@ The installer verifies the artifact against the release `checksums.txt` before
 installing to `$HOME/.local/bin` (override with `--bin-dir` /
 `DO_HARNESS_INSTALL_DIR`). Checksums share the release origin, so they detect
 corruption and truncated downloads, not a compromised origin. See
-[docs/provenance-trust-model.md](docs/provenance-trust-model.md) for the complete
+[docs/provenance-trust-model.md](https://github.com/d-o-hub/do-harness/blob/main/docs/provenance-trust-model.md) for the complete
 provenance trust boundary and verification model.
 
 Rust users can also install from crates.io (source build) or fetch the
@@ -85,6 +85,12 @@ The harness is designed to be adopted by any codebase, Rust or not:
    do-harness init --language web       # web UI audit pack (viewport, a11y, console, perf, visual, i18n)
    do-harness init --language node      # Node/JS/TS pack (typecheck, lint, test, build)
    ```
+
+   The web pack's sensors require the `WEB_AUDIT_*` environment plus the
+   `playwright`, `@axe-core/playwright`, and `lighthouse` peer dependencies
+   before they run: an unconfigured web pack SKIPs, and `--strict` treats a
+   SKIP as a failure. See [docs/adoption.md web pack
+   configuration](https://github.com/d-o-hub/do-harness/blob/main/docs/adoption.md#web-pack-configuration).
 
    This writes `do-harness.toml`, `AGENTS.md`, `plans/invariants.json`,
    `.agents/skills/` (the `harness` skill plus `skill-creator` for building
@@ -151,8 +157,8 @@ do-harness doctor
 do-harness verify
 ```
 
-See [docs/adoption.md](docs/adoption.md) for per-ecosystem quickstarts,
-air-gapped mirrors, and the agent evidence loop. See [docs/fast-builds.md](docs/fast-builds.md)
+See [docs/adoption.md](https://github.com/d-o-hub/do-harness/blob/main/docs/adoption.md) for per-ecosystem quickstarts,
+air-gapped mirrors, and the agent evidence loop. See [docs/fast-builds.md](https://github.com/d-o-hub/do-harness/blob/main/docs/fast-builds.md)
 for opt-in `sccache` + `mold` build performance notes and measurements.
 
 The green path is dogfooded, not assumed: `crates/do-harness/tests/dogfood.rs`
@@ -283,7 +289,7 @@ optional strict completion gate. The Rust core has no DeepSeek, Cordis, or
 Node.js dependency, and removing the bundle leaves normal CLI use unaffected.
 All verification policy stays in the CLI; the bundle only invokes it through
 DSH's managed subprocess seam. See
-[`integrations/deepseek-harness/README.md`](integrations/deepseek-harness/README.md)
+[`integrations/deepseek-harness/README.md`](https://github.com/d-o-hub/do-harness/blob/main/integrations/deepseek-harness/README.md)
 for the install walkthrough and configuration.
 
 GitLab CI:
@@ -300,7 +306,7 @@ verify:
 
 `do-harness` enforces deterministic, computational controls over the agent development loop (build-time verification sensors, workflow gates, tamper-evident logs, and machine-readable evidence artifacts). It is designed to satisfy dev-loop assurance requirements in regulated environments without over-claiming runtime policy or proxy capabilities.
 
-See [docs/compliance.md](docs/compliance.md) for full mappings against the **OWASP Agentic Top 10 (2026)**, **NIST AI RMF 1.0**, and the **EU AI Act**.
+See [docs/compliance.md](https://github.com/d-o-hub/do-harness/blob/main/docs/compliance.md) for full mappings against the **OWASP Agentic Top 10 (2026)**, **NIST AI RMF 1.0**, and the **EU AI Act**.
 
 ## Configuration
 

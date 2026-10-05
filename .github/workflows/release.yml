@@ -29,7 +29,9 @@ concurrency:
 jobs:
   preflight:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # The release set includes `coverage`, which instruments and re-runs the
+    # workspace tests on top of the verification set; keep headroom.
+    timeout-minutes: 45
     steps:
       # actions/checkout@v7.0.1
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -67,14 +69,14 @@ jobs:
       # taiki-e/install-action@v2
       - uses: taiki-e/install-action@ba47c86ac325773530516bb756137ac718732518
         with:
-          # Every tool the `verification` set's sensors invoke: cargo-deny
-          # (deps), cargo-audit (audit), cargo-nextest (test). rustfmt and
-          # clippy come from the toolchain components above, shellcheck from
-          # the runner image, markdownlint/yamllint from the step below.
-          # Adding a sensor that needs a new tool means adding it here too:
-          # the absence of cargo-nextest failed the v0.1.2 tag preflight with
-          # "error: no such command: `nextest`" -> weak evidence.
-          tool: cargo-deny,cargo-audit,cargo-nextest,shellcheck,cargo-semver-checks@0.50.0
+          # Every tool the `release` set's sensors invoke: cargo-deny (deps),
+          # cargo-audit (audit), cargo-nextest (test), cargo-llvm-cov
+          # (coverage). rustfmt and clippy come from the toolchain components
+          # above, shellcheck from the runner image, markdownlint/yamllint from
+          # the step below. Adding a sensor that needs a new tool means adding
+          # it here too: the absence of cargo-nextest failed the v0.1.2 tag
+          # preflight with "error: no such command: `nextest`" -> weak evidence.
+          tool: cargo-deny,cargo-audit,cargo-nextest,cargo-llvm-cov,shellcheck,cargo-semver-checks@0.50.0
       - name: Install markdownlint and yamllint
         run: |
           python3 -m pip install --disable-pip-version-check yamllint
@@ -98,7 +100,11 @@ jobs:
           # CI=true; cargo-audit and cargo-deny are installed above.
           CI: "true"
           DO_HARNESS_REQUIRE_TOOLS: "1"
-        run: ./target/release/do-harness verify --set verification --format json --strict
+        # The whole release pack, not just `verification`: the `release` set is
+        # where `coverage` lives, so this is the one place the 70% line
+        # threshold actually gates an artifact. Coverage is warn-severity and
+        # `--strict` turns a sub-threshold run into a failure here.
+        run: ./target/release/do-harness verify --set release --format json --strict
 
   build:
     needs: preflight

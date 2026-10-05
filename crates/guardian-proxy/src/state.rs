@@ -42,12 +42,16 @@ impl AppState {
     /// Creates state from a mediator.
     #[must_use]
     pub fn new(mediator: Arc<ProxyMediator>) -> Self {
+        let client = match upstream_client() {
+            Ok(client) => client,
+            Err(err) => return Self::degraded(err.to_string()),
+        };
         let upstream = mediator.upstream().to_string();
         let allowed_origins = mediator.allowed_origins().to_vec();
         Self {
             mediator: Some(mediator),
             upstream,
-            client: upstream_client(),
+            client,
             audit: None,
             metrics: Arc::new(ProxyMetrics::new()),
             init_error: None,
@@ -60,12 +64,16 @@ impl AppState {
     /// Creates state with audit log.
     #[must_use]
     pub fn with_audit(mediator: Arc<ProxyMediator>, audit: AuditLog) -> Self {
+        let client = match upstream_client() {
+            Ok(client) => client,
+            Err(err) => return Self::degraded(err.to_string()),
+        };
         let upstream = mediator.upstream().to_string();
         let allowed_origins = mediator.allowed_origins().to_vec();
         Self {
             mediator: Some(mediator),
             upstream,
-            client: upstream_client(),
+            client,
             audit: Some(Arc::new(tokio::sync::Mutex::new(audit))),
             metrics: Arc::new(ProxyMetrics::new()),
             init_error: None,
@@ -81,7 +89,7 @@ impl AppState {
         Self {
             mediator: None,
             upstream: String::new(),
-            client: upstream_client(),
+            client: degraded_client(),
             audit: None,
             metrics: Arc::new(ProxyMetrics::new()),
             init_error: Some(error),
@@ -129,13 +137,33 @@ fn bearer(headers: &HeaderMap) -> Option<&str> {
 
 /// Builds the upstream client with a finite timeout.
 ///
-/// A builder failure (TLS configuration) is reported to stderr; the default
-/// client still works, just without the timeout.
-fn upstream_client() -> reqwest::Client {
-    match reqwest::Client::builder().timeout(REQUEST_TIMEOUT).build() {
+/// Fail-closed: a builder failure (TLS backend or resolver initialization) is
+/// returned so the forwarding constructors can serve degraded state instead of
+/// forwarding without [`REQUEST_TIMEOUT`]. There is deliberately no fallback to
+/// [`reqwest::Client::new`] here — it carries no timeout at all and panics on
+/// the same failure, so it would only have hidden the loss of the timeout.
+fn upstream_client() -> crate::error::Result<reqwest::Client> {
+    reqwest::Client::builder()
+        .timeout(REQUEST_TIMEOUT)
+        .build()
+        .map_err(|err| {
+            crate::error::GuardianError::Config(format!("upstream client build failed: {err}"))
+        })
+}
+
+/// Builds the client for degraded state, which never forwards.
+///
+/// Degraded state denies every call before the upstream is reached, so this
+/// client is inert: its timeout never governs a request. The timed client is
+/// still preferred when it builds. If it cannot, [`reqwest::Client::new`] hits
+/// the identical TLS/resolver failure and panics — the same terminal outcome as
+/// the timed builder, since a non-`Option` client field has no safer value to
+/// fall back to.
+fn degraded_client() -> reqwest::Client {
+    match upstream_client() {
         Ok(client) => client,
         Err(err) => {
-            eprintln!("guardian-proxy: client build failed ({err}); using default client");
+            eprintln!("guardian-proxy: degraded client build failed ({err})");
             reqwest::Client::new()
         }
     }

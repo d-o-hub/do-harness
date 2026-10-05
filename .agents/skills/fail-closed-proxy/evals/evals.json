@@ -11,21 +11,22 @@
       "assertions": [
         "walk:",
         "exists:proxy-checklist.md",
-        "contains:proxy-checklist.md|fail-closed",
+        "contains:proxy-checklist.md|route=/mcp/tools/call",
+        "contains:proxy-checklist.md|counter=stub_decisions",
         "contains:.agents/skills/fail-closed-proxy/SKILL.md|forward only on allow"
       ]
     },
     {
       "id": 2,
       "prompt": "The proxy needs observability without affecting routing. Which counters and endpoint apply?",
-      "expected_output": "ProxyMetrics counters (allow, deny, mediator_errors, upstream_ok, upstream_failures, audit_write_failures) exposed as JSON at GET /metrics; counters never affect decisions.",
+      "expected_output": "ProxyMetrics counters (allow, deny, mediator_errors, upstream_ok, upstream_failures, audit_write_failures, stub_decisions) exposed as JSON at GET /metrics; counters never affect decisions.",
       "files": [],
       "dim": "efficiency",
       "kind": "explicit",
       "assertions": [
         "exists:proxy-checklist.md",
-        "contains:proxy-checklist.md|GET /metrics",
-        "contains:proxy-checklist.md|audit_write_failures",
+        "contains:proxy-checklist.md|route=/metrics",
+        "contains:proxy-checklist.md|counter=audit_write_failures",
         "contains:.agents/skills/fail-closed-proxy/SKILL.md|audit_write_failures"
       ]
     },
@@ -38,8 +39,8 @@
       "kind": "contextual",
       "assertions": [
         "contains:proxy_negative.txt|well-formed allow forwards",
-        "contains:proxy-checklist.md|never allow on error",
-        "contains:proxy-checklist.md|hash-chained",
+        "contains:proxy_negative.txt|never allow on error",
+        "contains:proxy-checklist.md|config=ingress_token documented",
         "contains:.agents/skills/fail-closed-proxy/SKILL.md|Decisions never depend on observability"
       ]
     },

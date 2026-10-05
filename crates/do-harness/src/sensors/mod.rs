@@ -130,6 +130,10 @@ pub struct VerifyOpts {
     pub approver: Option<String>,
     /// Report output format.
     pub format: Format,
+    /// Suppress PASS/WARN verdict lines and the success footer.
+    pub quiet: bool,
+    /// Default evidence artifact path; `evidence` wins when both are set.
+    pub output: Option<PathBuf>,
     /// Explicit config file override.
     pub config: Option<PathBuf>,
     /// How to treat sensors whose declared inputs are unchanged.
@@ -242,8 +246,8 @@ pub fn resolve_selection<'a>(
         .collect();
 
     let mut unknown: Vec<&str> = Vec::new();
-    for name in &effective_only {
-        if !sensors.iter().any(|s| &s.name == name) {
+    for name in effective_only.iter().chain(&effective_exclude) {
+        if !sensors.iter().any(|s| &s.name == name) && !unknown.contains(&name.as_str()) {
             unknown.push(name);
         }
     }

@@ -42,7 +42,18 @@ Isolate and resolve uncertainty before committing to a vertical slice. A spike i
 - Success = exit code 0. The prototype must compile and run; no LLM self-assessment.
 
 ### 3. Record Findings
-- Store the outcome in `.do-harness/agent_state.db` (heuristics / traces tables): what worked, what failed, the chosen approach, and error signatures.
+- Record the verified fix as a trace:
+  ```bash
+  do-harness trace add --session <spike> --command "<probe command>" \
+    --error-diff "<failure output>" --resolution-steps "<what worked and the error signatures>"
+  ```
+- Distill the heuristic into the relevant skill, citing that trace id:
+  ```bash
+  do-harness distill --skill <skill> --from-trace <id> \
+    --pattern "<one-line pattern>" --description "<when it applies>"
+  ```
+  Both steps need evidence: `trace add` must carry `--resolution-steps`, and
+  `distill` also requires an ok sensor beat (`do-harness verify --record`).
 
 ### 4. Clean Spike
 - Remove ephemeral files and scratch code once findings are recorded.
