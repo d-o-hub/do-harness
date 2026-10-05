@@ -1,6 +1,6 @@
 # Epic: pr-triage Agent Skill
 
-> **Status:** phases 1–7 complete (skill + evals; `pr no-effect` + `pr review` with cache; proof skipping + `false_proven`; measurement + benchmark; semantic routing cost/safety benchmark with a recorded `no-go` verdict; realistic large-diff corpus + route-aware cost model; cheap-metadata input investigated and **rejected** as strictly worse than the proof gate)
+> **Status:** phases 1–7 complete (skill + evals; `pr no-effect` + `pr review` with cache; proof skipping + `false_proven`; measurement + benchmark; semantic routing cost/safety benchmark with a recorded `no-go` verdict; realistic large-diff corpus + route-aware cost model; cheap-metadata input investigated and **rejected** as strictly worse than the proof gate; fine-tuned Kev router rejected structurally without a training run)
 > **Related:** Agent Skills open standard, GitHub PR lifecycle, optional `do-harness` token reduction
 > **Created:** 2026-09-11
 
@@ -29,6 +29,7 @@ residual plus evidence; the skill works with `gh` + `git` alone.
 | Phase 5: semantic routing | optional typed router selects review depth; all error/uncertain states fail toward depth; end-to-end cost + seeded-route oracle over 12 classes; regression gate in `cargo test` | `scripts/pr-routing-benchmark.sh` + `tests/pr_routing.rs`; recorded `no-go` verdict |
 | Phase 6: realistic corpus economy | route-aware cost model in the benchmark + a 12-class large-diff corpus (`tests/fixtures/pr-routing-large/`, 2.8–25 KB per case) generated deterministically; both corpora gated in `cargo test` | `scripts/generate-large-fixtures.sh` + route-aware fields; recorded `ROUTED_VERDICT no-go` with the structural reason |
 | Phase 7: cheap-metadata input | test the last hypothesis for a routing `go`: classify from a path/hunk/stat view so the router reads far less than it decides about | rejected — saving and safety are the same bytes (stripped view: 4/12 oracle failures; contextual view −10.7% vs raw diff); routing costs 46.0% *more* than the deterministic proof gate it competes with |
+| Phase 8: fine-tuned Kev router (#224) | would a better classifier rescue routing? | rejected structurally — the Phase 7 bound holds for any classifier; candidate PR #280 closed because its results were not measured |
 
 ## Phase 1 requirements (roast findings)
 
@@ -313,6 +314,30 @@ this negative result plus the survey instrumentation in Phase 6; no production
 code changes, so no sensor cost. Reopening this needs a cheaper view that
 *retains* hunk context (which is not cheaper) or dropping the `cheap` route
 (which removes the only savings mechanism).
+
+## Phase 8 — fine-tuned Kev router rejected without a training run (2026-10-05)
+
+Issue #224 proposed evaluating a domain fine-tuned Kev checkpoint as one more
+provider for the Phase 5 router. Closed as not planned: the Phase 7 bound does
+not depend on how good the classifier is. For every non-inert change the router
+has to read the review payload to decide, and the reviewer still reads that
+payload afterwards, so a routed review costs payload + envelope + payload against
+a proof gate that costs payload at most and nothing for mechanical units. A better
+classifier only changes which route it picks, and the measured upside of picking
+correctly is already negative (Phase 7: +46.0% versus the gate). Training and
+serving a checkpoint would add GPU infrastructure to measure a ceiling that is
+already known to be below the baseline.
+
+The candidate implementation (PR #280) was closed unmerged. Its `RESULTS.md`
+reported a +28.8% overhead, calibration, and latency figures that no model run
+produced: the adapter's default mode is keyword regexes with a placeholder
+checkpoint digest, the byte costs were `len(digest) * 100` with a constant 0.75
+proof-gate factor, and the +2.3% raw-diff row was copied from Phase 7. None of it
+is recorded here as evidence.
+
+Reopening needs a router whose input is **strictly smaller** than the payload it
+replaces while keeping enough context to stay safe. Phase 7 showed those are the
+same bytes. A different model does not change that.
 
 ## Task tracking note
 
