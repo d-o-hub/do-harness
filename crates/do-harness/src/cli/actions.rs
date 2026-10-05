@@ -231,7 +231,7 @@ pub enum ErrorsAction {
         /// `task:<id>`, `global`, or `all` for every workstream).
         #[arg(long, value_name = "SCOPE", conflicts_with = "task")]
         scope: Option<String>,
-        /// Force clearing without prompt.
+        /// Allow clearing every workstream without a filter.
         #[arg(long)]
         force: bool,
         /// Perform dry run without clearing.

@@ -2,8 +2,8 @@
 
 Releases are cut from `main` by pushing a `v<version>` tag. The tag must equal
 `[workspace.package].version` in `Cargo.toml`; the release preflight fails
-otherwise. Nothing publishes unless the tagged commit passes the full
-verification set and every build target dogfoods green.
+otherwise. Nothing publishes unless the tagged commit passes the full release
+set (verification plus `coverage`) and every build target dogfoods green.
 
 ## One-time setup
 
@@ -112,8 +112,12 @@ verification set and every build target dogfoods green.
 ## Cutting a release
 
 1. Bump `[workspace.package].version` in `Cargo.toml`, run
-   `cargo update --workspace` (or `cargo check`) so `Cargo.lock` matches, and
-   merge that change to `main`.
+   `cargo update --workspace` (or `cargo check`) so `Cargo.lock` matches,
+   update `integrations/npm/package.json` and the five
+   `integrations/npm/platforms/*/package.json` versions to match, and merge
+   that change to `main`. The release preflight enforces every managed
+   manifest against the workspace version
+   (`scripts/check-package-contract.sh`).
 2. Tag the merge commit and push the tag:
 
    ```bash
@@ -126,8 +130,9 @@ verification set and every build target dogfoods green.
      surfaces with `scripts/check-rust-api-compatibility.sh` (including the
      known empty API of the v0.1.2 binary-only `do-harness` baseline), checks
      package contents with `scripts/check-package-contract.sh`, and runs
-     `verify --set verification --format json --strict` on the tagged commit.
-     The verification set includes `crates/do-harness/tests/release_contract.rs`.
+     `verify --set release --format json --strict` on the tagged commit.
+     The release set is verification plus `coverage`, so the 70% line
+     threshold gates the tag; it includes `crates/do-harness/tests/release_contract.rs`.
    - `build` — Linux static-musl (x86_64/aarch64) and macOS (x86_64/arm64)
      tarballs plus a Windows x86_64 zip, each dogfooded with `init && verify`
      and each attested for build provenance in the job that produced it.

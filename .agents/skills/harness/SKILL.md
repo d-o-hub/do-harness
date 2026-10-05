@@ -50,13 +50,17 @@ the current change.
 | Command | Stage |
 |---------|-------|
 | `do-harness verify --set feedback` | the edit loop (fast subset) |
-| `do-harness verify --set verification --strict` | before calling work done |
+| `do-harness verify --set verification --strict --record --task <id>` | before calling work done; the recorded beats satisfy the `task done` gate |
 | `do-harness verify --set release` | pre-release, on the whole pack |
 | `do-harness status --set verification` | evidence freshness; runs nothing |
 | `do-harness loc` | file size against the 500-LOC ceiling (Rust sources; the `loc` sensor scopes further trees) |
 | `do-harness seed --prune` | after editing `plans/invariants.json` |
 | `do-harness init-db --check` | when the state database may be behind |
 | `do-harness hook install` | wire pre-commit, commit-msg, and pre-push |
+
+Strikes are scoped per workstream — `branch:<name>`, `task:<id>`, or `global` —
+so `--task <id>` records the beats a task-scoped `task done` gate reads; an
+unscoped run lands in the current branch (or `global` on a detached HEAD).
 
 ## Self-Correction Protocol
 

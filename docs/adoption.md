@@ -181,6 +181,32 @@ configured root that does not exist fails the run instead of passing vacuously. 
 `docs/cli.md` for the full flag list; the `FINDINGS: <n>` contract that
 `verify --record --bless` pins is unchanged.
 
+## Web pack configuration
+
+`init --language web` scaffolds the web UI audit pack (viewport text, axe
+accessibility, console noise, performance, visual diffs, i18n). The generated
+sensors **SKIP until configured**: each needs `WEB_AUDIT_ROUTES` and a running
+app at `WEB_AUDIT_BASE_URL`. A SKIP is recorded as `warn`, so `verify --strict`
+fails on an unconfigured web pack instead of passing vacuously.
+
+| Env var | Purpose |
+|---------|---------|
+| `WEB_AUDIT_ROUTES` | Comma-separated app routes to audit (required; unset ⇒ SKIP). |
+| `WEB_AUDIT_BASE_URL` | Base URL the sensors navigate (default `http://127.0.0.1:3000`). |
+| `WEB_AUDIT_LOCALES` | Locales for the i18n audit, baseline first (fewer than two ⇒ SKIP). |
+| `WEB_AUDIT_LOCALE_PARAM` | Query parameter used to switch locale (default `lang`). |
+| `WEB_AUDIT_LOCALE_COOKIE` | Cookie name used to switch locale instead of the query parameter. |
+| `WEB_PERF_BUDGETS` | JSON perf budgets, keys `performanceScore`/`lcpMs`/`cls`/`tbtMs`. |
+| `WEB_VISUAL_BASELINE_DIR` | Visual baseline PNG directory (default `.do-harness/visual`). |
+| `WEB_VISUAL_UPDATE` | Set to `1` to re-bless visual baselines (only after verifying the change is intended). |
+
+Peer dependencies must be installed in the adopting repository's `node_modules`
+(a missing one makes the corresponding sensor SKIP): `playwright`,
+`@axe-core/playwright` (a11y), and `lighthouse` (perf).
+
+See [`integrations/web-ui/README.md`](../integrations/web-ui/README.md) for the
+audit stages, matrix contract, and visual-baseline semantics.
+
 ## The agent loop
 
 Agents (and CI) only need three commands:
@@ -209,6 +235,9 @@ GitHub Actions:
       | sh -s -- --version v0.2.0
     echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 - name: Verify
+  env:
+    CI: "true"
+    DO_HARNESS_REQUIRE_TOOLS: "1"
   run: do-harness verify --set verification --format json --strict
 ```
 
@@ -219,8 +248,14 @@ verify:
   script:
     - curl -fsSL https://raw.githubusercontent.com/d-o-hub/do-harness/main/scripts/install.sh | sh -s -- --version v0.2.0
     - export PATH="$HOME/.local/bin:$PATH"
+    - export CI=true DO_HARNESS_REQUIRE_TOOLS=1
     - do-harness verify --set verification --format json --strict
 ```
+
+Set `CI=true` and `DO_HARNESS_REQUIRE_TOOLS=1` (the repo's own
+`.github/workflows/verify.yml` does this): without them `check-deps.sh` /
+`check-audit.sh` print `SKIP` when `cargo-deny`/`cargo-audit` are absent, and
+since a SKIP records as `warn`, a strict run fails on an otherwise clean repo.
 
 ## Releasing
 

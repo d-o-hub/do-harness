@@ -86,7 +86,7 @@ pub async fn maintenance(root: &Path, prune_beats: Option<i64>, keep_per_task: i
         let cutoff = do_harness_db::unix_now().saturating_sub(days.max(0).saturating_mul(86_400));
         let deleted = do_harness_db::prune_beats(&conn, cutoff, keep_per_task.max(0)).await?;
         println!(
-            "Pruned {deleted} beat(s) older than {days} day(s) (kept >= {keep_per_task} per task)"
+            "Pruned {deleted} beat(s) older than {days} day(s) (kept >= {keep_per_task} per task/workstream)"
         );
     }
     do_harness_db::vacuum(&conn).await?;
@@ -95,7 +95,17 @@ pub async fn maintenance(root: &Path, prune_beats: Option<i64>, keep_per_task: i
 }
 
 /// Seeds the `invariants` table from `plans/invariants.json`.
-pub async fn seed(root: &Path, prune: bool) -> Result<()> {
+pub async fn seed(root: &Path, prune: bool, dry_run: bool) -> Result<()> {
+    if dry_run {
+        let headers = crate::init::load_invariants(root).await?;
+        println!(
+            "Dry run: would seed {} invariants from {} (prune: {})",
+            headers.len(),
+            root.join("plans/invariants.json").display(),
+            if prune { "on" } else { "off" }
+        );
+        return Ok(());
+    }
     let written = crate::init::seed_invariants(root, prune).await?;
     println!(
         "Seeded {written} invariants from {}",

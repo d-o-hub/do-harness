@@ -57,10 +57,21 @@ pub fn print_compliance_filtered(framework: Option<&str>, format: Format) {
         "EU AI Act",
         "SOC 2",
     ];
+    // Compare on lowercase alphanumerics only, so the hyphenated ids the help
+    // advertises (`owasp-agentic-top10`, `nist-ai-rmf`, `eu-ai-act`, `soc2`)
+    // match the spaced display names as well as `owasp`/`nist`/`eu`/`soc` do.
+    let normalize = |value: &str| -> String {
+        value
+            .to_lowercase()
+            .chars()
+            .filter(char::is_ascii_alphanumeric)
+            .collect()
+    };
     let filtered_frameworks: Vec<&str> = if let Some(fw) = framework {
+        let needle = normalize(fw);
         frameworks
             .into_iter()
-            .filter(|f| f.to_lowercase().contains(&fw.to_lowercase()))
+            .filter(|f| !needle.is_empty() && normalize(f).contains(&needle))
             .collect()
     } else {
         frameworks
@@ -228,12 +239,13 @@ pub async fn errors_cmd(root: &Path, action: ErrorsAction) -> Result<()> {
             sensor,
             task,
             scope,
-            force: _,
+            force,
             dry_run,
         } => {
-            if dry_run {
-                println!("Dry run: would clear error signatures");
-                return Ok(());
+            if sensor.is_none() && task.is_none() && scope.is_none() && !force {
+                anyhow::bail!(
+                    "refusing to clear every workstream; pass --sensor, --task or --scope (or --force to clear all)"
+                );
             }
             let key = sensor.as_deref().map(|s| {
                 if s.starts_with("sensor:") {
@@ -242,13 +254,19 @@ pub async fn errors_cmd(root: &Path, action: ErrorsAction) -> Result<()> {
                     format!("sensor:{s}")
                 }
             });
-            let removed = errors::clear(
-                root,
-                scope_filter(scope.as_deref(), task).as_deref(),
-                key.as_deref(),
-            )
-            .await?;
-            println!("Cleared {removed} error signature(s)");
+            let scope_key = scope_filter(scope.as_deref(), task);
+            let target = match (&scope_key, &key) {
+                (Some(s), Some(k)) => format!("scope {s}, {k}"),
+                (Some(s), None) => format!("scope {s}"),
+                (None, Some(k)) => format!("{k} across ALL scopes"),
+                (None, None) => "ALL scopes".to_owned(),
+            };
+            if dry_run {
+                println!("Dry run: would clear error signatures for {target}");
+                return Ok(());
+            }
+            let removed = errors::clear(root, scope_key.as_deref(), key.as_deref()).await?;
+            println!("Cleared {removed} error signature(s) for {target}");
             Ok(())
         }
     }
@@ -262,6 +280,25 @@ fn scope_filter(scope: Option<&str>, task: Option<i64>) -> Option<String> {
         Some(raw) => Some(raw.to_owned()),
         None => task.map(|id| format!("task:{id}")),
     }
+}
+
+/// Prints the first line where an installed managed hook diverges from its
+/// template body (line-based comparison; no LCS).
+fn print_first_difference(name: &str, installed: &str, expected: &str) {
+    let installed_lines: Vec<&str> = installed.lines().collect();
+    let expected_lines: Vec<&str> = expected.lines().collect();
+    let max = installed_lines.len().max(expected_lines.len());
+    for idx in 0..max {
+        let actual = installed_lines.get(idx).copied();
+        let template = expected_lines.get(idx).copied();
+        if actual != template {
+            println!("  {name}: first difference at line {}", idx + 1);
+            println!("    installed: {}", actual.unwrap_or("<end of file>"));
+            println!("    template:  {}", template.unwrap_or("<end of file>"));
+            return;
+        }
+    }
+    println!("  {name}: content differs only by trailing bytes");
 }
 
 /// Dispatches hook management using the configured sensor split.
@@ -364,13 +401,60 @@ pub async fn hook(
             }
         }
         HookAction::Diff => {
+            // Compare installed hook content against the bodies `hook install`
+            // would write now; marker presence alone cannot detect a stale or
+            // hand-edited managed hook.
+            let cfg = config::load(root, config_path).await?;
             let status = hooks::status(&git_dir, root);
-            if status.is_shadowed() {
-                println!("One or more hooks differ or are missing.");
-            } else if status.is_all_installed() {
+            let expected = [
+                (
+                    "pre-commit",
+                    crate::hook_script::script_body(&crate::hook_script::only_args(
+                        &cfg.hooks.pre_commit,
+                    )),
+                ),
+                (
+                    "pre-push",
+                    crate::hook_script::script_body(&crate::hook_script::only_args(
+                        &cfg.hooks.pre_push,
+                    )),
+                ),
+                ("commit-msg", crate::hook_script::commit_msg_body()),
+            ];
+            let mut differences: Vec<(&str, Option<String>)> = Vec::new();
+            for (name, body) in &expected {
+                let path = status.hooks_dir.join(name);
+                match std::fs::read_to_string(&path) {
+                    Ok(installed) if installed == *body => {}
+                    Ok(installed) => differences.push((name, Some(installed))),
+                    Err(_) => differences.push((name, None)),
+                }
+            }
+            if differences.is_empty() {
                 println!("Hooks match installed templates.");
             } else {
-                println!("One or more hooks differ or are missing.");
+                println!("One or more hooks differ or are missing:");
+                for (name, installed) in &differences {
+                    match installed {
+                        Some(installed) => {
+                            let template = expected
+                                .iter()
+                                .find(|(expected_name, _)| expected_name == name)
+                                .map(|(_, body)| body.as_str())
+                                .unwrap_or_default();
+                            print_first_difference(name, installed, template);
+                        }
+                        None => println!("  {name}: missing"),
+                    }
+                }
+                if status.is_shadowed() {
+                    eprintln!(
+                        "hint: managed hooks are shadowed by core.hooksPath; run `do-harness hook install` to install into the configured directory or unset core.hooksPath"
+                    );
+                } else {
+                    eprintln!("hint: run `do-harness hook install` to (re)install managed hooks");
+                }
+                anyhow::bail!("managed hooks are out of date");
             }
         }
     }

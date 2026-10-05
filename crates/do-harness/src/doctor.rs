@@ -18,6 +18,19 @@ pub async fn run(root: &Path, format: Format, strict: bool) -> Result<()> {
     run_with_status(root, format, strict, &status).await
 }
 
+/// Reads the task-health counters used by the doctor's event-log checks.
+///
+/// # Errors
+///
+/// Returns an error when the state database cannot be connected or queried;
+/// the caller records that as a failure instead of the all-clear.
+async fn read_task_health(root: &Path) -> Result<(i64, Option<i64>)> {
+    let conn = do_harness_db::connect_and_migrate(root).await?;
+    let orphans = do_harness_db::count_tasks_without_added_event(&conn).await?;
+    let latest = do_harness_db::latest_task_update(&conn).await?;
+    Ok((orphans, latest))
+}
+
 /// Core diagnostics over an already-resolved hook/binary status.
 ///
 /// Split from [`run`] so tests are hermetic: binary resolution reads
@@ -74,28 +87,32 @@ pub(crate) async fn run_with_status(
     }
 
     // Out-of-band task writes leave tasks with no TaskAdded event; they break
-    // the append-only workflow log and would otherwise go unnoticed.
-    let (orphan_tasks, latest_task_update) = if do_harness_db::db_path(root).exists() {
-        match do_harness_db::connect_and_migrate(root).await {
-            Ok(conn) => (
-                do_harness_db::count_tasks_without_added_event(&conn)
-                    .await
-                    .unwrap_or(0),
-                do_harness_db::latest_task_update(&conn)
-                    .await
-                    .unwrap_or(None),
-            ),
-            Err(_) => (0, None),
+    // the append-only workflow log and would otherwise go unnoticed. A read
+    // failure must not masquerade as the all-clear: it is recorded as a
+    // failure and the counts serialize as null instead of zero.
+    let task_health = if do_harness_db::db_path(root).exists() {
+        match read_task_health(root).await {
+            Ok(pair) => Some(pair),
+            Err(err) => {
+                failures.push(format!("task/event checks unreadable: {err:#}"));
+                None
+            }
         }
     } else {
-        (0, None)
+        Some((0, None))
     };
-    if orphan_tasks > 0 {
-        failures.push(format!(
-            "{orphan_tasks} task(s) have no TaskAdded event (out-of-band write)"
-        ));
-    }
-    let stale_export = check_task_export(root, latest_task_update, &mut failures).await;
+    let (orphan_tasks, stale_export) = match task_health {
+        Some((orphans, latest_task_update)) => {
+            if orphans > 0 {
+                failures.push(format!(
+                    "{orphans} task(s) have no TaskAdded event (out-of-band write)"
+                ));
+            }
+            let stale = check_task_export(root, latest_task_update, &mut failures).await;
+            (Some(orphans), Some(stale))
+        }
+        None => (None, None),
+    };
 
     if format == Format::Json {
         let json = serde_json::json!({
@@ -171,18 +188,18 @@ pub(crate) async fn run_with_status(
             }
         }
 
-        if orphan_tasks > 0 {
-            println!(
-                "  [FAIL] event log: {orphan_tasks} task(s) without a TaskAdded event (out-of-band write)"
-            );
-        } else {
-            println!("  [OK] event log: no orphan tasks");
+        match orphan_tasks {
+            Some(0) => println!("  [OK] event log: no orphan tasks"),
+            Some(count) => println!(
+                "  [FAIL] event log: {count} task(s) without a TaskAdded event (out-of-band write)"
+            ),
+            None => println!("  [FAIL] event log: unreadable (see failures)"),
         }
 
-        if stale_export {
-            println!("  [FAIL] task export: plans/tasks.json lags the database");
-        } else {
-            println!("  [OK] task export: up to date or absent");
+        match stale_export {
+            Some(true) => println!("  [FAIL] task export: plans/tasks.json lags the database"),
+            Some(false) => println!("  [OK] task export: up to date or absent"),
+            None => println!("  [FAIL] task export: unreadable (see failures)"),
         }
 
         if do_harness_db::db_path(root).exists() {
@@ -192,11 +209,13 @@ pub(crate) async fn run_with_status(
                         println!("  [OK] event chain: intact ({count} event(s))");
                     }
                     crate::audit::ChainReport::Tampered { seq } => {
-                        println!("  [WARN] event chain: tampered at seq {seq}");
+                        failures.push(format!("event chain tampered at seq {seq}"));
+                        println!("  [FAIL] event chain: tampered at seq {seq}");
                     }
                 },
                 Err(err) => {
-                    println!("  [WARN] event chain: unreadable ({err:#})");
+                    failures.push(format!("event chain unreadable: {err:#}"));
+                    println!("  [FAIL] event chain: unreadable ({err:#})");
                 }
             }
         }
@@ -430,5 +449,38 @@ mod tests {
             .unwrap_err()
             .to_string();
         assert!(message.contains("lags the database"), "{message}");
+    }
+
+    /// A tampered event hash chain is a hard failure, matching `audit-chain`.
+    #[tokio::test(flavor = "current_thread")]
+    async fn fails_on_tampered_event_chain() {
+        let (_temp, root) = fake_repo_with_git();
+        stub_binary(&root);
+        let conn = do_harness_db::connect_and_migrate(&root).await.unwrap();
+        do_harness_db::insert_task_with_event(
+            &conn,
+            &do_harness_db::NewTask {
+                title: "tampered",
+                method: Some("mini"),
+                subtask_index: 0,
+                precondition: None,
+                parent_id: None,
+            },
+        )
+        .await
+        .unwrap();
+        conn.execute(
+            "UPDATE workflow_events SET payload = '{}' WHERE seq = 1",
+            (),
+        )
+        .await
+        .unwrap();
+        drop(conn);
+
+        let message = run_with_status(&root, Format::Text, false, &repo_status(&root))
+            .await
+            .unwrap_err()
+            .to_string();
+        assert!(message.contains("tampered"), "{message}");
     }
 }

@@ -34,16 +34,11 @@ pub struct Cli {
     /// Explicit path to do-harness.toml.
     #[arg(long, global = true, value_hint = ValueHint::FilePath, value_name = "FILE")]
     pub config: Option<PathBuf>,
-    /// Verbosity level (-v, -vv).
-    #[arg(short, long, global = true, action = ArgAction::Count)]
-    pub verbose: u8,
-    /// Suppress non-error messages.
+    /// Suppress PASS/WARN verdict lines and the success footer.
     #[arg(short, long, global = true)]
     pub quiet: bool,
-    /// Color output (auto, always, never).
-    #[arg(long, global = true, value_name = "WHEN")]
-    pub color: Option<String>,
-    /// Default output file path.
+    /// Default evidence artifact path for verify (overrides the --set default;
+    /// an explicit --evidence still wins).
     #[arg(long, global = true, value_hint = ValueHint::FilePath, value_name = "FILE")]
     pub output: Option<PathBuf>,
     /// Dry run without side effects.
@@ -389,7 +384,7 @@ pub enum Command {
     },
     /// Print compliance mapping to OWASP Agentic Top 10, NIST AI RMF, and EU AI Act.
     Compliance {
-        /// Filter framework (owasp-agentic-top10, nist-ai-rmf, eu-ai-act, soc2).
+        /// Filter framework (owasp, nist, eu, soc; hyphenated ids accepted).
         #[arg(long)]
         framework: Option<String>,
         /// Output format.

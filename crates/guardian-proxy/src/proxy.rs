@@ -166,8 +166,8 @@ fn validate_credentials(config: &ProxyConfig) -> Result<()> {
 /// SSRF guard: `Ok` only when the configured upstream is safe to call.
 ///
 /// Rules (checked at construction, fail-closed):
-/// - link-local/metadata addresses (`169.254.0.0/16`, `metadata.google.internal`)
-///   are always rejected;
+/// - link-local/metadata addresses (`169.254.0.0/16`, `metadata.google.internal`,
+///   `IPv6` `fe80::/10`) are always rejected;
 /// - loopback/private hosts require `allow_private_upstreams = true`;
 /// - when `upstream_allowlist` is non-empty the host must match exactly.
 ///
@@ -221,7 +221,13 @@ fn upstream_host(upstream: &str) -> Option<&str> {
 
 /// Cloud metadata / link-local ranges that are never valid upstreams.
 fn is_link_local(host: &str) -> bool {
-    host.starts_with("169.254.") || host == "metadata.google.internal"
+    // IPv4 link-local (169.254.0.0/16) and the cloud metadata aliases.
+    if host.starts_with("169.254.") || host == "metadata.google.internal" {
+        return true;
+    }
+    // IPv6 link-local (fe80::/10) and the deprecated site-local prefixes
+    // (fec0:/fed0:). The host is lowercased before this check.
+    host.starts_with("fe80:") || host.starts_with("fec0:") || host.starts_with("fed0:")
 }
 
 /// Loopback, private, and unique-local ranges; allowed only with an opt-in.
@@ -277,6 +283,18 @@ mod tests {
         cfg.upstream = "http://169.254.169.254/latest/meta-data".into();
         cfg.allow_private_upstreams = true;
         let err = validate_upstream(&cfg).unwrap_err().to_string();
+        assert!(err.contains("link-local"), "{err}");
+    }
+
+    #[test]
+    fn test_ssrf_denies_ipv6_link_local_upstream_always() {
+        let mut cfg = test_config();
+        cfg.upstream = "http://[fe80::1]:8080".into();
+        cfg.allow_private_upstreams = false;
+        let err = match ProxyMediator::new(cfg) {
+            Ok(_) => panic!("link-local upstream must be rejected"),
+            Err(err) => err.to_string(),
+        };
         assert!(err.contains("link-local"), "{err}");
     }
 
