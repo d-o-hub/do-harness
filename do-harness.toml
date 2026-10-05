@@ -6,8 +6,8 @@ pre-push = []
 
 [signal-sets]
 feedback = ["fmt", "check", "clippy"]
-verification = ["fmt", "check", "clippy", "deps", "audit", "test", "doctest", "loc", "skills", "shell", "markdownlint", "yamllint", "check-agt", "check-mcp", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "commitlint"]
-release = ["fmt", "check", "clippy", "deps", "audit", "test", "doctest", "coverage", "loc", "skills", "shell", "markdownlint", "yamllint", "check-agt", "check-mcp", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "commitlint"]
+verification = ["fmt", "check", "clippy", "deps", "audit", "test", "doctest", "loc", "skills", "shell", "markdownlint", "yamllint", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "commitlint"]
+release = ["fmt", "check", "clippy", "deps", "audit", "test", "doctest", "coverage", "loc", "skills", "shell", "markdownlint", "yamllint", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "commitlint"]
 # DORA gets its own set so its evidence is addressable (`status --set metrics`)
 # without joining the gating sets. A no-`--set` status check compares against
 # every configured sensor, so a dora-only run's artifact would report
@@ -75,7 +75,11 @@ when-changed = ["**/*.md", ".markdownlint-cli2.jsonc", "scripts/check-markdownli
 [[sensors]]
 name = "yamllint"
 argv = ["bash", "scripts/check-yamllint.sh"]
-when-changed = ["**/*.yml", "**/*.yaml", ".yamllint.yml", "do-harness.toml", "plans/*.json", "scripts/check-yamllint.sh"]
+# Only YAML inputs: the sensor lints `*.yml`/`*.yaml` only, so promising
+# `do-harness.toml` or `plans/*.json` applicability would select the sensor to
+# check files it never reads. Policy JSON content is guarded by
+# `check-invariants`.
+when-changed = ["**/*.yml", "**/*.yaml", ".yamllint.yml", "scripts/check-yamllint.sh"]
 
 [[sensors]]
 name = "check-agt"
@@ -86,6 +90,15 @@ when-changed = ["crates/guardian-proxy/**", "Cargo.toml", "Cargo.lock"]
 name = "check-mcp"
 argv = ["cargo", "test", "-p", "guardian-proxy", "--features", "mcp-surface"]
 when-changed = ["crates/guardian-proxy/**", "Cargo.toml", "Cargo.lock"]
+
+[[sensors]]
+# Content guard for the policy record itself: every decision header keeps its
+# required fields, no two entries repeat an invariant, and every `scripts/...`
+# path a header points at still exists. Without it, the schema is validated
+# only on `seed`/`init` and a stale or hand-edited entry sits unnoticed.
+name = "check-invariants"
+argv = ["bash", "scripts/check-invariants.sh"]
+when-changed = ["plans/invariants.json", "do-harness.toml", "scripts/check-invariants.sh"]
 
 [[sensors]]
 # Hermetic coherence gate for the *-promotion decisions: a recorded hold must

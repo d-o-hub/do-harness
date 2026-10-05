@@ -75,8 +75,15 @@ speak:
 
 ```python
 import re, sys
-def tokens(path): return " ".join(open(path, encoding="utf-8").read().split())
-old = re.search(r"mod tests \{\n(.*)\n\}$", open(src).read(), re.S).group(1)
+
+def tokens(path):
+    return " ".join(open(path, encoding="utf-8").read().split())
+
+def tokens_body(text):
+    return " ".join(text.split())
+
+src, dest = sys.argv[1], sys.argv[2]
+old = re.search(r"mod tests \{\n(.*)\n\}$", open(src, encoding="utf-8").read(), re.S).group(1)
 print("tokens preserved =", tokens_body(old) == tokens(dest))
 ```
 

@@ -1,6 +1,6 @@
 # Print an optspec for argparse to handle cmd's options that are independent of any subcommand.
 function __fish_do_harness_global_optspecs
-    string join \n root= config= v/verbose q/quiet color= output= dry-run h/help V/version
+    string join \n root= config= q/quiet output= dry-run h/help V/version
 end
 
 function __fish_do_harness_needs_command
@@ -26,10 +26,8 @@ end
 
 complete -c do-harness -n "__fish_do_harness_needs_command" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
 complete -c do-harness -n "__fish_do_harness_needs_command" -l config -d 'Explicit path to do-harness.toml' -r -F
-complete -c do-harness -n "__fish_do_harness_needs_command" -l color -d 'Color output (auto, always, never)' -r
-complete -c do-harness -n "__fish_do_harness_needs_command" -l output -d 'Default output file path' -r -F
-complete -c do-harness -n "__fish_do_harness_needs_command" -s v -l verbose -d 'Verbosity level (-v, -vv)'
-complete -c do-harness -n "__fish_do_harness_needs_command" -s q -l quiet -d 'Suppress non-error messages'
+complete -c do-harness -n "__fish_do_harness_needs_command" -l output -d 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)' -r -F
+complete -c do-harness -n "__fish_do_harness_needs_command" -s q -l quiet -d 'Suppress PASS/WARN verdict lines and the success footer'
 complete -c do-harness -n "__fish_do_harness_needs_command" -l dry-run -d 'Dry run without side effects'
 complete -c do-harness -n "__fish_do_harness_needs_command" -s h -l help -d 'Print help'
 complete -c do-harness -n "__fish_do_harness_needs_command" -s V -l version -d 'Print version'
@@ -70,10 +68,8 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand version" -l format
 json\t'Machine-readable JSON output'"
 complete -c do-harness -n "__fish_do_harness_using_subcommand version" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
 complete -c do-harness -n "__fish_do_harness_using_subcommand version" -l config -d 'Explicit path to do-harness.toml' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand version" -l color -d 'Color output (auto, always, never)' -r
-complete -c do-harness -n "__fish_do_harness_using_subcommand version" -l output -d 'Default output file path' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand version" -s v -l verbose -d 'Verbosity level (-v, -vv)'
-complete -c do-harness -n "__fish_do_harness_using_subcommand version" -s q -l quiet -d 'Suppress non-error messages'
+complete -c do-harness -n "__fish_do_harness_using_subcommand version" -l output -d 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand version" -s q -l quiet -d 'Suppress PASS/WARN verdict lines and the success footer'
 complete -c do-harness -n "__fish_do_harness_using_subcommand version" -l dry-run -d 'Dry run without side effects'
 complete -c do-harness -n "__fish_do_harness_using_subcommand version" -s h -l help -d 'Print help (see more with \'--help\')'
 complete -c do-harness -n "__fish_do_harness_using_subcommand version" -s V -l version -d 'Print version'
@@ -91,16 +87,14 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand verify" -l evidenc
 complete -c do-harness -n "__fish_do_harness_using_subcommand verify" -l approver -d 'Approver identity recorded with `--bless` (defaults to `DO_HARNESS_APPROVER` or the git user email)' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand verify" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
 complete -c do-harness -n "__fish_do_harness_using_subcommand verify" -l config -d 'Explicit path to do-harness.toml' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand verify" -l color -d 'Color output (auto, always, never)' -r
-complete -c do-harness -n "__fish_do_harness_using_subcommand verify" -l output -d 'Default output file path' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand verify" -l output -d 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)' -r -F
 complete -c do-harness -n "__fish_do_harness_using_subcommand verify" -l fail-fast -d 'Halt at the first failing sensor'
 complete -c do-harness -n "__fish_do_harness_using_subcommand verify" -l changed -d 'Run only sensors applicable to the working-tree change'
 complete -c do-harness -n "__fish_do_harness_using_subcommand verify" -l record -d 'Persist beats and error signatures into the state database'
 complete -c do-harness -n "__fish_do_harness_using_subcommand verify" -l global -d 'Record unscoped beats in the global namespace'
 complete -c do-harness -n "__fish_do_harness_using_subcommand verify" -l strict -d 'Enforce strong evidence: exit non-zero on skips or missing timing/exit codes'
 complete -c do-harness -n "__fish_do_harness_using_subcommand verify" -l bless -d 'Lower or initialize blessed findings baselines from this run (requires --record; a bless never raises a baseline)'
-complete -c do-harness -n "__fish_do_harness_using_subcommand verify" -s v -l verbose -d 'Verbosity level (-v, -vv)'
-complete -c do-harness -n "__fish_do_harness_using_subcommand verify" -s q -l quiet -d 'Suppress non-error messages'
+complete -c do-harness -n "__fish_do_harness_using_subcommand verify" -s q -l quiet -d 'Suppress PASS/WARN verdict lines and the success footer'
 complete -c do-harness -n "__fish_do_harness_using_subcommand verify" -l dry-run -d 'Dry run without side effects'
 complete -c do-harness -n "__fish_do_harness_using_subcommand verify" -s h -l help -d 'Print help (see more with \'--help\')'
 complete -c do-harness -n "__fish_do_harness_using_subcommand verify" -s V -l version -d 'Print version'
@@ -118,16 +112,14 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand check" -l evidence
 complete -c do-harness -n "__fish_do_harness_using_subcommand check" -l approver -d 'Approver identity recorded with `--bless` (defaults to `DO_HARNESS_APPROVER` or the git user email)' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand check" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
 complete -c do-harness -n "__fish_do_harness_using_subcommand check" -l config -d 'Explicit path to do-harness.toml' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand check" -l color -d 'Color output (auto, always, never)' -r
-complete -c do-harness -n "__fish_do_harness_using_subcommand check" -l output -d 'Default output file path' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand check" -l output -d 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)' -r -F
 complete -c do-harness -n "__fish_do_harness_using_subcommand check" -l fail-fast -d 'Halt at the first failing sensor'
 complete -c do-harness -n "__fish_do_harness_using_subcommand check" -l changed -d 'Run only sensors applicable to the working-tree change'
 complete -c do-harness -n "__fish_do_harness_using_subcommand check" -l record -d 'Persist beats and error signatures into the state database'
 complete -c do-harness -n "__fish_do_harness_using_subcommand check" -l global -d 'Record unscoped beats in the global namespace'
 complete -c do-harness -n "__fish_do_harness_using_subcommand check" -l strict -d 'Enforce strong evidence: exit non-zero on skips or missing timing/exit codes'
 complete -c do-harness -n "__fish_do_harness_using_subcommand check" -l bless -d 'Lower or initialize blessed findings baselines from this run (requires --record; a bless never raises a baseline)'
-complete -c do-harness -n "__fish_do_harness_using_subcommand check" -s v -l verbose -d 'Verbosity level (-v, -vv)'
-complete -c do-harness -n "__fish_do_harness_using_subcommand check" -s q -l quiet -d 'Suppress non-error messages'
+complete -c do-harness -n "__fish_do_harness_using_subcommand check" -s q -l quiet -d 'Suppress PASS/WARN verdict lines and the success footer'
 complete -c do-harness -n "__fish_do_harness_using_subcommand check" -l dry-run -d 'Dry run without side effects'
 complete -c do-harness -n "__fish_do_harness_using_subcommand check" -s h -l help -d 'Print help (see more with \'--help\')'
 complete -c do-harness -n "__fish_do_harness_using_subcommand check" -s V -l version -d 'Print version'
@@ -135,11 +127,9 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand list" -l format -d
 json\t'Machine-readable JSON output'"
 complete -c do-harness -n "__fish_do_harness_using_subcommand list" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
 complete -c do-harness -n "__fish_do_harness_using_subcommand list" -l config -d 'Explicit path to do-harness.toml' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand list" -l color -d 'Color output (auto, always, never)' -r
-complete -c do-harness -n "__fish_do_harness_using_subcommand list" -l output -d 'Default output file path' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand list" -l output -d 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)' -r -F
 complete -c do-harness -n "__fish_do_harness_using_subcommand list" -l sets -d 'List development signal-set names instead of sensors'
-complete -c do-harness -n "__fish_do_harness_using_subcommand list" -s v -l verbose -d 'Verbosity level (-v, -vv)'
-complete -c do-harness -n "__fish_do_harness_using_subcommand list" -s q -l quiet -d 'Suppress non-error messages'
+complete -c do-harness -n "__fish_do_harness_using_subcommand list" -s q -l quiet -d 'Suppress PASS/WARN verdict lines and the success footer'
 complete -c do-harness -n "__fish_do_harness_using_subcommand list" -l dry-run -d 'Dry run without side effects'
 complete -c do-harness -n "__fish_do_harness_using_subcommand list" -s h -l help -d 'Print help (see more with \'--help\')'
 complete -c do-harness -n "__fish_do_harness_using_subcommand list" -s V -l version -d 'Print version'
@@ -147,11 +137,9 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand ls" -l format -d '
 json\t'Machine-readable JSON output'"
 complete -c do-harness -n "__fish_do_harness_using_subcommand ls" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
 complete -c do-harness -n "__fish_do_harness_using_subcommand ls" -l config -d 'Explicit path to do-harness.toml' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand ls" -l color -d 'Color output (auto, always, never)' -r
-complete -c do-harness -n "__fish_do_harness_using_subcommand ls" -l output -d 'Default output file path' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand ls" -l output -d 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)' -r -F
 complete -c do-harness -n "__fish_do_harness_using_subcommand ls" -l sets -d 'List development signal-set names instead of sensors'
-complete -c do-harness -n "__fish_do_harness_using_subcommand ls" -s v -l verbose -d 'Verbosity level (-v, -vv)'
-complete -c do-harness -n "__fish_do_harness_using_subcommand ls" -s q -l quiet -d 'Suppress non-error messages'
+complete -c do-harness -n "__fish_do_harness_using_subcommand ls" -s q -l quiet -d 'Suppress PASS/WARN verdict lines and the success footer'
 complete -c do-harness -n "__fish_do_harness_using_subcommand ls" -l dry-run -d 'Dry run without side effects'
 complete -c do-harness -n "__fish_do_harness_using_subcommand ls" -s h -l help -d 'Print help (see more with \'--help\')'
 complete -c do-harness -n "__fish_do_harness_using_subcommand ls" -s V -l version -d 'Print version'
@@ -160,11 +148,9 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand explain" -l format
 json\t'Machine-readable JSON output'"
 complete -c do-harness -n "__fish_do_harness_using_subcommand explain" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
 complete -c do-harness -n "__fish_do_harness_using_subcommand explain" -l config -d 'Explicit path to do-harness.toml' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand explain" -l color -d 'Color output (auto, always, never)' -r
-complete -c do-harness -n "__fish_do_harness_using_subcommand explain" -l output -d 'Default output file path' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand explain" -l output -d 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)' -r -F
 complete -c do-harness -n "__fish_do_harness_using_subcommand explain" -l changed -d 'Select by working-tree change instead of listing everything'
-complete -c do-harness -n "__fish_do_harness_using_subcommand explain" -s v -l verbose -d 'Verbosity level (-v, -vv)'
-complete -c do-harness -n "__fish_do_harness_using_subcommand explain" -s q -l quiet -d 'Suppress non-error messages'
+complete -c do-harness -n "__fish_do_harness_using_subcommand explain" -s q -l quiet -d 'Suppress PASS/WARN verdict lines and the success footer'
 complete -c do-harness -n "__fish_do_harness_using_subcommand explain" -l dry-run -d 'Dry run without side effects'
 complete -c do-harness -n "__fish_do_harness_using_subcommand explain" -s h -l help -d 'Print help (see more with \'--help\')'
 complete -c do-harness -n "__fish_do_harness_using_subcommand explain" -s V -l version -d 'Print version'
@@ -174,19 +160,15 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand status" -l format 
 json\t'Machine-readable JSON output'"
 complete -c do-harness -n "__fish_do_harness_using_subcommand status" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
 complete -c do-harness -n "__fish_do_harness_using_subcommand status" -l config -d 'Explicit path to do-harness.toml' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand status" -l color -d 'Color output (auto, always, never)' -r
-complete -c do-harness -n "__fish_do_harness_using_subcommand status" -l output -d 'Default output file path' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand status" -s v -l verbose -d 'Verbosity level (-v, -vv)'
-complete -c do-harness -n "__fish_do_harness_using_subcommand status" -s q -l quiet -d 'Suppress non-error messages'
+complete -c do-harness -n "__fish_do_harness_using_subcommand status" -l output -d 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand status" -s q -l quiet -d 'Suppress PASS/WARN verdict lines and the success footer'
 complete -c do-harness -n "__fish_do_harness_using_subcommand status" -l dry-run -d 'Dry run without side effects'
 complete -c do-harness -n "__fish_do_harness_using_subcommand status" -s h -l help -d 'Print help (see more with \'--help\')'
 complete -c do-harness -n "__fish_do_harness_using_subcommand status" -s V -l version -d 'Print version'
 complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and not __fish_seen_subcommand_from no-effect review ready readiness check waivers help" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
 complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and not __fish_seen_subcommand_from no-effect review ready readiness check waivers help" -l config -d 'Explicit path to do-harness.toml' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and not __fish_seen_subcommand_from no-effect review ready readiness check waivers help" -l color -d 'Color output (auto, always, never)' -r
-complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and not __fish_seen_subcommand_from no-effect review ready readiness check waivers help" -l output -d 'Default output file path' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and not __fish_seen_subcommand_from no-effect review ready readiness check waivers help" -s v -l verbose -d 'Verbosity level (-v, -vv)'
-complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and not __fish_seen_subcommand_from no-effect review ready readiness check waivers help" -s q -l quiet -d 'Suppress non-error messages'
+complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and not __fish_seen_subcommand_from no-effect review ready readiness check waivers help" -l output -d 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and not __fish_seen_subcommand_from no-effect review ready readiness check waivers help" -s q -l quiet -d 'Suppress PASS/WARN verdict lines and the success footer'
 complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and not __fish_seen_subcommand_from no-effect review ready readiness check waivers help" -l dry-run -d 'Dry run without side effects'
 complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and not __fish_seen_subcommand_from no-effect review ready readiness check waivers help" -s h -l help -d 'Print help'
 complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and not __fish_seen_subcommand_from no-effect review ready readiness check waivers help" -s V -l version -d 'Print version'
@@ -203,10 +185,8 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_see
 json\t'Machine-readable JSON output'"
 complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from no-effect" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
 complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from no-effect" -l config -d 'Explicit path to do-harness.toml' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from no-effect" -l color -d 'Color output (auto, always, never)' -r
-complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from no-effect" -l output -d 'Default output file path' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from no-effect" -s v -l verbose -d 'Verbosity level (-v, -vv)'
-complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from no-effect" -s q -l quiet -d 'Suppress non-error messages'
+complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from no-effect" -l output -d 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from no-effect" -s q -l quiet -d 'Suppress PASS/WARN verdict lines and the success footer'
 complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from no-effect" -l dry-run -d 'Dry run without side effects'
 complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from no-effect" -s h -l help -d 'Print help (see more with \'--help\')'
 complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from no-effect" -s V -l version -d 'Print version'
@@ -216,11 +196,9 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_see
 json\t'Machine-readable JSON output'"
 complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from review" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
 complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from review" -l config -d 'Explicit path to do-harness.toml' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from review" -l color -d 'Color output (auto, always, never)' -r
-complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from review" -l output -d 'Default output file path' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from review" -l output -d 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)' -r -F
 complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from review" -l recompute -d 'Ignore the cached report and recompute from scratch'
-complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from review" -s v -l verbose -d 'Verbosity level (-v, -vv)'
-complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from review" -s q -l quiet -d 'Suppress non-error messages'
+complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from review" -s q -l quiet -d 'Suppress PASS/WARN verdict lines and the success footer'
 complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from review" -l dry-run -d 'Dry run without side effects'
 complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from review" -s h -l help -d 'Print help (see more with \'--help\')'
 complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from review" -s V -l version -d 'Print version'
@@ -228,10 +206,8 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_see
 json\t'Machine-readable JSON output'"
 complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from ready" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
 complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from ready" -l config -d 'Explicit path to do-harness.toml' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from ready" -l color -d 'Color output (auto, always, never)' -r
-complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from ready" -l output -d 'Default output file path' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from ready" -s v -l verbose -d 'Verbosity level (-v, -vv)'
-complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from ready" -s q -l quiet -d 'Suppress non-error messages'
+complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from ready" -l output -d 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from ready" -s q -l quiet -d 'Suppress PASS/WARN verdict lines and the success footer'
 complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from ready" -l dry-run -d 'Dry run without side effects'
 complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from ready" -s h -l help -d 'Print help (see more with \'--help\')'
 complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from ready" -s V -l version -d 'Print version'
@@ -239,10 +215,8 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_see
 json\t'Machine-readable JSON output'"
 complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from readiness" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
 complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from readiness" -l config -d 'Explicit path to do-harness.toml' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from readiness" -l color -d 'Color output (auto, always, never)' -r
-complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from readiness" -l output -d 'Default output file path' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from readiness" -s v -l verbose -d 'Verbosity level (-v, -vv)'
-complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from readiness" -s q -l quiet -d 'Suppress non-error messages'
+complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from readiness" -l output -d 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from readiness" -s q -l quiet -d 'Suppress PASS/WARN verdict lines and the success footer'
 complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from readiness" -l dry-run -d 'Dry run without side effects'
 complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from readiness" -s h -l help -d 'Print help (see more with \'--help\')'
 complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from readiness" -s V -l version -d 'Print version'
@@ -250,10 +224,8 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_see
 json\t'Machine-readable JSON output'"
 complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from check" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
 complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from check" -l config -d 'Explicit path to do-harness.toml' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from check" -l color -d 'Color output (auto, always, never)' -r
-complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from check" -l output -d 'Default output file path' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from check" -s v -l verbose -d 'Verbosity level (-v, -vv)'
-complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from check" -s q -l quiet -d 'Suppress non-error messages'
+complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from check" -l output -d 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from check" -s q -l quiet -d 'Suppress PASS/WARN verdict lines and the success footer'
 complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from check" -l dry-run -d 'Dry run without side effects'
 complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from check" -s h -l help -d 'Print help (see more with \'--help\')'
 complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from check" -s V -l version -d 'Print version'
@@ -267,10 +239,8 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_see
 json\t'Machine-readable JSON output'"
 complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from waivers" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
 complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from waivers" -l config -d 'Explicit path to do-harness.toml' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from waivers" -l color -d 'Color output (auto, always, never)' -r
-complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from waivers" -l output -d 'Default output file path' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from waivers" -s v -l verbose -d 'Verbosity level (-v, -vv)'
-complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from waivers" -s q -l quiet -d 'Suppress non-error messages'
+complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from waivers" -l output -d 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from waivers" -s q -l quiet -d 'Suppress PASS/WARN verdict lines and the success footer'
 complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from waivers" -l dry-run -d 'Dry run without side effects'
 complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from waivers" -s h -l help -d 'Print help (see more with \'--help\')'
 complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from waivers" -s V -l version -d 'Print version'
@@ -281,10 +251,8 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_see
 complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from help" -f -a "help" -d 'Print this message or the help of the given subcommand(s)'
 complete -c do-harness -n "__fish_do_harness_using_subcommand skills; and not __fish_seen_subcommand_from suggest drift help" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
 complete -c do-harness -n "__fish_do_harness_using_subcommand skills; and not __fish_seen_subcommand_from suggest drift help" -l config -d 'Explicit path to do-harness.toml' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand skills; and not __fish_seen_subcommand_from suggest drift help" -l color -d 'Color output (auto, always, never)' -r
-complete -c do-harness -n "__fish_do_harness_using_subcommand skills; and not __fish_seen_subcommand_from suggest drift help" -l output -d 'Default output file path' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand skills; and not __fish_seen_subcommand_from suggest drift help" -s v -l verbose -d 'Verbosity level (-v, -vv)'
-complete -c do-harness -n "__fish_do_harness_using_subcommand skills; and not __fish_seen_subcommand_from suggest drift help" -s q -l quiet -d 'Suppress non-error messages'
+complete -c do-harness -n "__fish_do_harness_using_subcommand skills; and not __fish_seen_subcommand_from suggest drift help" -l output -d 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand skills; and not __fish_seen_subcommand_from suggest drift help" -s q -l quiet -d 'Suppress PASS/WARN verdict lines and the success footer'
 complete -c do-harness -n "__fish_do_harness_using_subcommand skills; and not __fish_seen_subcommand_from suggest drift help" -l dry-run -d 'Dry run without side effects'
 complete -c do-harness -n "__fish_do_harness_using_subcommand skills; and not __fish_seen_subcommand_from suggest drift help" -s h -l help -d 'Print help'
 complete -c do-harness -n "__fish_do_harness_using_subcommand skills; and not __fish_seen_subcommand_from suggest drift help" -s V -l version -d 'Print version'
@@ -297,10 +265,8 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand skills; and __fish
 json\t'Machine-readable JSON output'"
 complete -c do-harness -n "__fish_do_harness_using_subcommand skills; and __fish_seen_subcommand_from suggest" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
 complete -c do-harness -n "__fish_do_harness_using_subcommand skills; and __fish_seen_subcommand_from suggest" -l config -d 'Explicit path to do-harness.toml' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand skills; and __fish_seen_subcommand_from suggest" -l color -d 'Color output (auto, always, never)' -r
-complete -c do-harness -n "__fish_do_harness_using_subcommand skills; and __fish_seen_subcommand_from suggest" -l output -d 'Default output file path' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand skills; and __fish_seen_subcommand_from suggest" -s v -l verbose -d 'Verbosity level (-v, -vv)'
-complete -c do-harness -n "__fish_do_harness_using_subcommand skills; and __fish_seen_subcommand_from suggest" -s q -l quiet -d 'Suppress non-error messages'
+complete -c do-harness -n "__fish_do_harness_using_subcommand skills; and __fish_seen_subcommand_from suggest" -l output -d 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand skills; and __fish_seen_subcommand_from suggest" -s q -l quiet -d 'Suppress PASS/WARN verdict lines and the success footer'
 complete -c do-harness -n "__fish_do_harness_using_subcommand skills; and __fish_seen_subcommand_from suggest" -l dry-run -d 'Dry run without side effects'
 complete -c do-harness -n "__fish_do_harness_using_subcommand skills; and __fish_seen_subcommand_from suggest" -s h -l help -d 'Print help (see more with \'--help\')'
 complete -c do-harness -n "__fish_do_harness_using_subcommand skills; and __fish_seen_subcommand_from suggest" -s V -l version -d 'Print version'
@@ -309,10 +275,8 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand skills; and __fish
 json\t'Machine-readable JSON output'"
 complete -c do-harness -n "__fish_do_harness_using_subcommand skills; and __fish_seen_subcommand_from drift" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
 complete -c do-harness -n "__fish_do_harness_using_subcommand skills; and __fish_seen_subcommand_from drift" -l config -d 'Explicit path to do-harness.toml' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand skills; and __fish_seen_subcommand_from drift" -l color -d 'Color output (auto, always, never)' -r
-complete -c do-harness -n "__fish_do_harness_using_subcommand skills; and __fish_seen_subcommand_from drift" -l output -d 'Default output file path' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand skills; and __fish_seen_subcommand_from drift" -s v -l verbose -d 'Verbosity level (-v, -vv)'
-complete -c do-harness -n "__fish_do_harness_using_subcommand skills; and __fish_seen_subcommand_from drift" -s q -l quiet -d 'Suppress non-error messages'
+complete -c do-harness -n "__fish_do_harness_using_subcommand skills; and __fish_seen_subcommand_from drift" -l output -d 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand skills; and __fish_seen_subcommand_from drift" -s q -l quiet -d 'Suppress PASS/WARN verdict lines and the success footer'
 complete -c do-harness -n "__fish_do_harness_using_subcommand skills; and __fish_seen_subcommand_from drift" -l dry-run -d 'Dry run without side effects'
 complete -c do-harness -n "__fish_do_harness_using_subcommand skills; and __fish_seen_subcommand_from drift" -s h -l help -d 'Print help (see more with \'--help\')'
 complete -c do-harness -n "__fish_do_harness_using_subcommand skills; and __fish_seen_subcommand_from drift" -s V -l version -d 'Print version'
@@ -321,22 +285,18 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand skills; and __fish
 complete -c do-harness -n "__fish_do_harness_using_subcommand skills; and __fish_seen_subcommand_from help" -f -a "help" -d 'Print this message or the help of the given subcommand(s)'
 complete -c do-harness -n "__fish_do_harness_using_subcommand init-db" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
 complete -c do-harness -n "__fish_do_harness_using_subcommand init-db" -l config -d 'Explicit path to do-harness.toml' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand init-db" -l color -d 'Color output (auto, always, never)' -r
-complete -c do-harness -n "__fish_do_harness_using_subcommand init-db" -l output -d 'Default output file path' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand init-db" -l output -d 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)' -r -F
 complete -c do-harness -n "__fish_do_harness_using_subcommand init-db" -l check -d 'Report pending migrations and exit non-zero when any are pending'
 complete -c do-harness -n "__fish_do_harness_using_subcommand init-db" -l dry-run -d 'Report pending migrations without applying them (exit 0)'
 complete -c do-harness -n "__fish_do_harness_using_subcommand init-db" -s y -l yes -d 'Skip the interactive confirmation prompt'
-complete -c do-harness -n "__fish_do_harness_using_subcommand init-db" -s v -l verbose -d 'Verbosity level (-v, -vv)'
-complete -c do-harness -n "__fish_do_harness_using_subcommand init-db" -s q -l quiet -d 'Suppress non-error messages'
+complete -c do-harness -n "__fish_do_harness_using_subcommand init-db" -s q -l quiet -d 'Suppress PASS/WARN verdict lines and the success footer'
 complete -c do-harness -n "__fish_do_harness_using_subcommand init-db" -s h -l help -d 'Print help'
 complete -c do-harness -n "__fish_do_harness_using_subcommand init-db" -s V -l version -d 'Print version'
 complete -c do-harness -n "__fish_do_harness_using_subcommand seed" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
 complete -c do-harness -n "__fish_do_harness_using_subcommand seed" -l config -d 'Explicit path to do-harness.toml' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand seed" -l color -d 'Color output (auto, always, never)' -r
-complete -c do-harness -n "__fish_do_harness_using_subcommand seed" -l output -d 'Default output file path' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand seed" -l output -d 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)' -r -F
 complete -c do-harness -n "__fish_do_harness_using_subcommand seed" -l prune -d 'Delete invariants no longer present in plans/invariants.json'
-complete -c do-harness -n "__fish_do_harness_using_subcommand seed" -s v -l verbose -d 'Verbosity level (-v, -vv)'
-complete -c do-harness -n "__fish_do_harness_using_subcommand seed" -s q -l quiet -d 'Suppress non-error messages'
+complete -c do-harness -n "__fish_do_harness_using_subcommand seed" -s q -l quiet -d 'Suppress PASS/WARN verdict lines and the success footer'
 complete -c do-harness -n "__fish_do_harness_using_subcommand seed" -l dry-run -d 'Dry run without side effects'
 complete -c do-harness -n "__fish_do_harness_using_subcommand seed" -s h -l help -d 'Print help'
 complete -c do-harness -n "__fish_do_harness_using_subcommand seed" -s V -l version -d 'Print version'
@@ -348,23 +308,19 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand init" -l format -d
 json\t'Machine-readable JSON output'"
 complete -c do-harness -n "__fish_do_harness_using_subcommand init" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
 complete -c do-harness -n "__fish_do_harness_using_subcommand init" -l config -d 'Explicit path to do-harness.toml' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand init" -l color -d 'Color output (auto, always, never)' -r
-complete -c do-harness -n "__fish_do_harness_using_subcommand init" -l output -d 'Default output file path' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand init" -l output -d 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)' -r -F
 complete -c do-harness -n "__fish_do_harness_using_subcommand init" -l force -d 'Overwrite existing files'
 complete -c do-harness -n "__fish_do_harness_using_subcommand init" -l no-seed -d 'Do not seed invariants'
 complete -c do-harness -n "__fish_do_harness_using_subcommand init" -l minimal -d 'Minimal setup without extra skills'
 complete -c do-harness -n "__fish_do_harness_using_subcommand init" -l no-gitignore -d 'Skip creating/modifying .gitignore'
-complete -c do-harness -n "__fish_do_harness_using_subcommand init" -s v -l verbose -d 'Verbosity level (-v, -vv)'
-complete -c do-harness -n "__fish_do_harness_using_subcommand init" -s q -l quiet -d 'Suppress non-error messages'
+complete -c do-harness -n "__fish_do_harness_using_subcommand init" -s q -l quiet -d 'Suppress PASS/WARN verdict lines and the success footer'
 complete -c do-harness -n "__fish_do_harness_using_subcommand init" -l dry-run -d 'Dry run without side effects'
 complete -c do-harness -n "__fish_do_harness_using_subcommand init" -s h -l help -d 'Print help (see more with \'--help\')'
 complete -c do-harness -n "__fish_do_harness_using_subcommand init" -s V -l version -d 'Print version'
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export import list show add advance done fail remove help" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export import list show add advance done fail remove help" -l config -d 'Explicit path to do-harness.toml' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export import list show add advance done fail remove help" -l color -d 'Color output (auto, always, never)' -r
-complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export import list show add advance done fail remove help" -l output -d 'Default output file path' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export import list show add advance done fail remove help" -s v -l verbose -d 'Verbosity level (-v, -vv)'
-complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export import list show add advance done fail remove help" -s q -l quiet -d 'Suppress non-error messages'
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export import list show add advance done fail remove help" -l output -d 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export import list show add advance done fail remove help" -s q -l quiet -d 'Suppress PASS/WARN verdict lines and the success footer'
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export import list show add advance done fail remove help" -l dry-run -d 'Dry run without side effects'
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export import list show add advance done fail remove help" -s h -l help -d 'Print help'
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export import list show add advance done fail remove help" -s V -l version -d 'Print version'
@@ -383,21 +339,17 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_s
 json\t'Machine-readable JSON output'"
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from export" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from export" -l config -d 'Explicit path to do-harness.toml' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from export" -l color -d 'Color output (auto, always, never)' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from export" -l stdout -d 'Write directly to stdout instead of file'
-complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from export" -s v -l verbose -d 'Verbosity level (-v, -vv)'
-complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from export" -s q -l quiet -d 'Suppress non-error messages'
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from export" -s q -l quiet -d 'Suppress PASS/WARN verdict lines and the success footer'
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from export" -l dry-run -d 'Dry run without side effects'
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from export" -s h -l help -d 'Print help (see more with \'--help\')'
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from export" -s V -l version -d 'Print version'
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from import" -l file -d 'Snapshot file (defaults to plans/tasks.json under the root)' -r -F
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from import" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from import" -l config -d 'Explicit path to do-harness.toml' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from import" -l color -d 'Color output (auto, always, never)' -r
-complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from import" -l output -d 'Default output file path' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from import" -l output -d 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)' -r -F
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from import" -l check -d 'Exit non-zero when the snapshot and database drift'
-complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from import" -s v -l verbose -d 'Verbosity level (-v, -vv)'
-complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from import" -s q -l quiet -d 'Suppress non-error messages'
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from import" -s q -l quiet -d 'Suppress PASS/WARN verdict lines and the success footer'
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from import" -l dry-run -d 'Dry run without side effects'
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from import" -s h -l help -d 'Print help'
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from import" -s V -l version -d 'Print version'
@@ -408,10 +360,8 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_s
 json\t'Machine-readable JSON output'"
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from list" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from list" -l config -d 'Explicit path to do-harness.toml' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from list" -l color -d 'Color output (auto, always, never)' -r
-complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from list" -l output -d 'Default output file path' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from list" -s v -l verbose -d 'Verbosity level (-v, -vv)'
-complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from list" -s q -l quiet -d 'Suppress non-error messages'
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from list" -l output -d 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from list" -s q -l quiet -d 'Suppress PASS/WARN verdict lines and the success footer'
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from list" -l dry-run -d 'Dry run without side effects'
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from list" -s h -l help -d 'Print help (see more with \'--help\')'
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from list" -s V -l version -d 'Print version'
@@ -419,10 +369,8 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_s
 json\t'Machine-readable JSON output'"
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from show" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from show" -l config -d 'Explicit path to do-harness.toml' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from show" -l color -d 'Color output (auto, always, never)' -r
-complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from show" -l output -d 'Default output file path' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from show" -s v -l verbose -d 'Verbosity level (-v, -vv)'
-complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from show" -s q -l quiet -d 'Suppress non-error messages'
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from show" -l output -d 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from show" -s q -l quiet -d 'Suppress PASS/WARN verdict lines and the success footer'
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from show" -l dry-run -d 'Dry run without side effects'
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from show" -s h -l help -d 'Print help (see more with \'--help\')'
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from show" -s V -l version -d 'Print version'
@@ -431,46 +379,36 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_s
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from add" -l precondition -d 'Recorded precondition guard' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from add" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from add" -l config -d 'Explicit path to do-harness.toml' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from add" -l color -d 'Color output (auto, always, never)' -r
-complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from add" -l output -d 'Default output file path' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from add" -s v -l verbose -d 'Verbosity level (-v, -vv)'
-complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from add" -s q -l quiet -d 'Suppress non-error messages'
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from add" -l output -d 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from add" -s q -l quiet -d 'Suppress PASS/WARN verdict lines and the success footer'
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from add" -l dry-run -d 'Dry run without side effects'
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from add" -s h -l help -d 'Print help'
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from add" -s V -l version -d 'Print version'
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from advance" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from advance" -l config -d 'Explicit path to do-harness.toml' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from advance" -l color -d 'Color output (auto, always, never)' -r
-complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from advance" -l output -d 'Default output file path' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from advance" -l output -d 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)' -r -F
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from advance" -l dry-run -d 'Perform dry run without state changes'
-complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from advance" -s v -l verbose -d 'Verbosity level (-v, -vv)'
-complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from advance" -s q -l quiet -d 'Suppress non-error messages'
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from advance" -s q -l quiet -d 'Suppress PASS/WARN verdict lines and the success footer'
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from advance" -s h -l help -d 'Print help'
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from advance" -s V -l version -d 'Print version'
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from done" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from done" -l config -d 'Explicit path to do-harness.toml' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from done" -l color -d 'Color output (auto, always, never)' -r
-complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from done" -l output -d 'Default output file path' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from done" -l output -d 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)' -r -F
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from done" -l dry-run -d 'Perform dry run without state changes'
-complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from done" -s v -l verbose -d 'Verbosity level (-v, -vv)'
-complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from done" -s q -l quiet -d 'Suppress non-error messages'
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from done" -s q -l quiet -d 'Suppress PASS/WARN verdict lines and the success footer'
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from done" -s h -l help -d 'Print help'
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from done" -s V -l version -d 'Print version'
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from fail" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from fail" -l config -d 'Explicit path to do-harness.toml' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from fail" -l color -d 'Color output (auto, always, never)' -r
-complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from fail" -l output -d 'Default output file path' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from fail" -s v -l verbose -d 'Verbosity level (-v, -vv)'
-complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from fail" -s q -l quiet -d 'Suppress non-error messages'
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from fail" -l output -d 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from fail" -s q -l quiet -d 'Suppress PASS/WARN verdict lines and the success footer'
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from fail" -l dry-run -d 'Dry run without side effects'
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from fail" -s h -l help -d 'Print help'
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from fail" -s V -l version -d 'Print version'
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from remove" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from remove" -l config -d 'Explicit path to do-harness.toml' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from remove" -l color -d 'Color output (auto, always, never)' -r
-complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from remove" -l output -d 'Default output file path' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from remove" -s v -l verbose -d 'Verbosity level (-v, -vv)'
-complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from remove" -s q -l quiet -d 'Suppress non-error messages'
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from remove" -l output -d 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from remove" -s q -l quiet -d 'Suppress PASS/WARN verdict lines and the success footer'
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from remove" -l dry-run -d 'Dry run without side effects'
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from remove" -s h -l help -d 'Print help'
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from remove" -s V -l version -d 'Print version'
@@ -486,10 +424,8 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_s
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from help" -f -a "help" -d 'Print this message or the help of the given subcommand(s)'
 complete -c do-harness -n "__fish_do_harness_using_subcommand trace; and not __fish_seen_subcommand_from add list sessions help" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
 complete -c do-harness -n "__fish_do_harness_using_subcommand trace; and not __fish_seen_subcommand_from add list sessions help" -l config -d 'Explicit path to do-harness.toml' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand trace; and not __fish_seen_subcommand_from add list sessions help" -l color -d 'Color output (auto, always, never)' -r
-complete -c do-harness -n "__fish_do_harness_using_subcommand trace; and not __fish_seen_subcommand_from add list sessions help" -l output -d 'Default output file path' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand trace; and not __fish_seen_subcommand_from add list sessions help" -s v -l verbose -d 'Verbosity level (-v, -vv)'
-complete -c do-harness -n "__fish_do_harness_using_subcommand trace; and not __fish_seen_subcommand_from add list sessions help" -s q -l quiet -d 'Suppress non-error messages'
+complete -c do-harness -n "__fish_do_harness_using_subcommand trace; and not __fish_seen_subcommand_from add list sessions help" -l output -d 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand trace; and not __fish_seen_subcommand_from add list sessions help" -s q -l quiet -d 'Suppress PASS/WARN verdict lines and the success footer'
 complete -c do-harness -n "__fish_do_harness_using_subcommand trace; and not __fish_seen_subcommand_from add list sessions help" -l dry-run -d 'Dry run without side effects'
 complete -c do-harness -n "__fish_do_harness_using_subcommand trace; and not __fish_seen_subcommand_from add list sessions help" -s h -l help -d 'Print help'
 complete -c do-harness -n "__fish_do_harness_using_subcommand trace; and not __fish_seen_subcommand_from add list sessions help" -s V -l version -d 'Print version'
@@ -504,10 +440,8 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand trace; and __fish_
 complete -c do-harness -n "__fish_do_harness_using_subcommand trace; and __fish_seen_subcommand_from add" -l resolution-steps -d 'Steps taken to resolve the failure' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand trace; and __fish_seen_subcommand_from add" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
 complete -c do-harness -n "__fish_do_harness_using_subcommand trace; and __fish_seen_subcommand_from add" -l config -d 'Explicit path to do-harness.toml' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand trace; and __fish_seen_subcommand_from add" -l color -d 'Color output (auto, always, never)' -r
-complete -c do-harness -n "__fish_do_harness_using_subcommand trace; and __fish_seen_subcommand_from add" -l output -d 'Default output file path' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand trace; and __fish_seen_subcommand_from add" -s v -l verbose -d 'Verbosity level (-v, -vv)'
-complete -c do-harness -n "__fish_do_harness_using_subcommand trace; and __fish_seen_subcommand_from add" -s q -l quiet -d 'Suppress non-error messages'
+complete -c do-harness -n "__fish_do_harness_using_subcommand trace; and __fish_seen_subcommand_from add" -l output -d 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand trace; and __fish_seen_subcommand_from add" -s q -l quiet -d 'Suppress PASS/WARN verdict lines and the success footer'
 complete -c do-harness -n "__fish_do_harness_using_subcommand trace; and __fish_seen_subcommand_from add" -l dry-run -d 'Dry run without side effects'
 complete -c do-harness -n "__fish_do_harness_using_subcommand trace; and __fish_seen_subcommand_from add" -s h -l help -d 'Print help'
 complete -c do-harness -n "__fish_do_harness_using_subcommand trace; and __fish_seen_subcommand_from add" -s V -l version -d 'Print version'
@@ -516,10 +450,8 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand trace; and __fish_
 json\t'Machine-readable JSON output'"
 complete -c do-harness -n "__fish_do_harness_using_subcommand trace; and __fish_seen_subcommand_from list" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
 complete -c do-harness -n "__fish_do_harness_using_subcommand trace; and __fish_seen_subcommand_from list" -l config -d 'Explicit path to do-harness.toml' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand trace; and __fish_seen_subcommand_from list" -l color -d 'Color output (auto, always, never)' -r
-complete -c do-harness -n "__fish_do_harness_using_subcommand trace; and __fish_seen_subcommand_from list" -l output -d 'Default output file path' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand trace; and __fish_seen_subcommand_from list" -s v -l verbose -d 'Verbosity level (-v, -vv)'
-complete -c do-harness -n "__fish_do_harness_using_subcommand trace; and __fish_seen_subcommand_from list" -s q -l quiet -d 'Suppress non-error messages'
+complete -c do-harness -n "__fish_do_harness_using_subcommand trace; and __fish_seen_subcommand_from list" -l output -d 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand trace; and __fish_seen_subcommand_from list" -s q -l quiet -d 'Suppress PASS/WARN verdict lines and the success footer'
 complete -c do-harness -n "__fish_do_harness_using_subcommand trace; and __fish_seen_subcommand_from list" -l dry-run -d 'Dry run without side effects'
 complete -c do-harness -n "__fish_do_harness_using_subcommand trace; and __fish_seen_subcommand_from list" -s h -l help -d 'Print help (see more with \'--help\')'
 complete -c do-harness -n "__fish_do_harness_using_subcommand trace; and __fish_seen_subcommand_from list" -s V -l version -d 'Print version'
@@ -527,10 +459,8 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand trace; and __fish_
 json\t'Machine-readable JSON output'"
 complete -c do-harness -n "__fish_do_harness_using_subcommand trace; and __fish_seen_subcommand_from sessions" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
 complete -c do-harness -n "__fish_do_harness_using_subcommand trace; and __fish_seen_subcommand_from sessions" -l config -d 'Explicit path to do-harness.toml' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand trace; and __fish_seen_subcommand_from sessions" -l color -d 'Color output (auto, always, never)' -r
-complete -c do-harness -n "__fish_do_harness_using_subcommand trace; and __fish_seen_subcommand_from sessions" -l output -d 'Default output file path' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand trace; and __fish_seen_subcommand_from sessions" -s v -l verbose -d 'Verbosity level (-v, -vv)'
-complete -c do-harness -n "__fish_do_harness_using_subcommand trace; and __fish_seen_subcommand_from sessions" -s q -l quiet -d 'Suppress non-error messages'
+complete -c do-harness -n "__fish_do_harness_using_subcommand trace; and __fish_seen_subcommand_from sessions" -l output -d 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand trace; and __fish_seen_subcommand_from sessions" -s q -l quiet -d 'Suppress PASS/WARN verdict lines and the success footer'
 complete -c do-harness -n "__fish_do_harness_using_subcommand trace; and __fish_seen_subcommand_from sessions" -l dry-run -d 'Dry run without side effects'
 complete -c do-harness -n "__fish_do_harness_using_subcommand trace; and __fish_seen_subcommand_from sessions" -s h -l help -d 'Print help (see more with \'--help\')'
 complete -c do-harness -n "__fish_do_harness_using_subcommand trace; and __fish_seen_subcommand_from sessions" -s V -l version -d 'Print version'
@@ -548,21 +478,17 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand distill" -l format
 json\t'Machine-readable JSON output'"
 complete -c do-harness -n "__fish_do_harness_using_subcommand distill" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
 complete -c do-harness -n "__fish_do_harness_using_subcommand distill" -l config -d 'Explicit path to do-harness.toml' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand distill" -l color -d 'Color output (auto, always, never)' -r
-complete -c do-harness -n "__fish_do_harness_using_subcommand distill" -l output -d 'Default output file path' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand distill" -l output -d 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)' -r -F
 complete -c do-harness -n "__fish_do_harness_using_subcommand distill" -l from-strikes -d 'Generate a starter skill scaffold from recorded sensor strikes (AGENTS.md §6 steering loop) instead of distilling from a trace'
 complete -c do-harness -n "__fish_do_harness_using_subcommand distill" -l to-fixture -d 'Raise the skill\'s pass-rate bar after this recovery (review ticks anti-AI-slop checklist first)'
 complete -c do-harness -n "__fish_do_harness_using_subcommand distill" -l dry-run -d 'Perform dry run without modifying skill files'
-complete -c do-harness -n "__fish_do_harness_using_subcommand distill" -s v -l verbose -d 'Verbosity level (-v, -vv)'
-complete -c do-harness -n "__fish_do_harness_using_subcommand distill" -s q -l quiet -d 'Suppress non-error messages'
+complete -c do-harness -n "__fish_do_harness_using_subcommand distill" -s q -l quiet -d 'Suppress PASS/WARN verdict lines and the success footer'
 complete -c do-harness -n "__fish_do_harness_using_subcommand distill" -s h -l help -d 'Print help (see more with \'--help\')'
 complete -c do-harness -n "__fish_do_harness_using_subcommand distill" -s V -l version -d 'Print version'
 complete -c do-harness -n "__fish_do_harness_using_subcommand errors; and not __fish_seen_subcommand_from list clear help" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
 complete -c do-harness -n "__fish_do_harness_using_subcommand errors; and not __fish_seen_subcommand_from list clear help" -l config -d 'Explicit path to do-harness.toml' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand errors; and not __fish_seen_subcommand_from list clear help" -l color -d 'Color output (auto, always, never)' -r
-complete -c do-harness -n "__fish_do_harness_using_subcommand errors; and not __fish_seen_subcommand_from list clear help" -l output -d 'Default output file path' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand errors; and not __fish_seen_subcommand_from list clear help" -s v -l verbose -d 'Verbosity level (-v, -vv)'
-complete -c do-harness -n "__fish_do_harness_using_subcommand errors; and not __fish_seen_subcommand_from list clear help" -s q -l quiet -d 'Suppress non-error messages'
+complete -c do-harness -n "__fish_do_harness_using_subcommand errors; and not __fish_seen_subcommand_from list clear help" -l output -d 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand errors; and not __fish_seen_subcommand_from list clear help" -s q -l quiet -d 'Suppress PASS/WARN verdict lines and the success footer'
 complete -c do-harness -n "__fish_do_harness_using_subcommand errors; and not __fish_seen_subcommand_from list clear help" -l dry-run -d 'Dry run without side effects'
 complete -c do-harness -n "__fish_do_harness_using_subcommand errors; and not __fish_seen_subcommand_from list clear help" -s h -l help -d 'Print help'
 complete -c do-harness -n "__fish_do_harness_using_subcommand errors; and not __fish_seen_subcommand_from list clear help" -s V -l version -d 'Print version'
@@ -575,10 +501,8 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand errors; and __fish
 json\t'Machine-readable JSON output'"
 complete -c do-harness -n "__fish_do_harness_using_subcommand errors; and __fish_seen_subcommand_from list" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
 complete -c do-harness -n "__fish_do_harness_using_subcommand errors; and __fish_seen_subcommand_from list" -l config -d 'Explicit path to do-harness.toml' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand errors; and __fish_seen_subcommand_from list" -l color -d 'Color output (auto, always, never)' -r
-complete -c do-harness -n "__fish_do_harness_using_subcommand errors; and __fish_seen_subcommand_from list" -l output -d 'Default output file path' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand errors; and __fish_seen_subcommand_from list" -s v -l verbose -d 'Verbosity level (-v, -vv)'
-complete -c do-harness -n "__fish_do_harness_using_subcommand errors; and __fish_seen_subcommand_from list" -s q -l quiet -d 'Suppress non-error messages'
+complete -c do-harness -n "__fish_do_harness_using_subcommand errors; and __fish_seen_subcommand_from list" -l output -d 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand errors; and __fish_seen_subcommand_from list" -s q -l quiet -d 'Suppress PASS/WARN verdict lines and the success footer'
 complete -c do-harness -n "__fish_do_harness_using_subcommand errors; and __fish_seen_subcommand_from list" -l dry-run -d 'Dry run without side effects'
 complete -c do-harness -n "__fish_do_harness_using_subcommand errors; and __fish_seen_subcommand_from list" -s h -l help -d 'Print help (see more with \'--help\')'
 complete -c do-harness -n "__fish_do_harness_using_subcommand errors; and __fish_seen_subcommand_from list" -s V -l version -d 'Print version'
@@ -587,12 +511,10 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand errors; and __fish
 complete -c do-harness -n "__fish_do_harness_using_subcommand errors; and __fish_seen_subcommand_from clear" -l scope -d 'Only clear signatures for this workstream scope (`branch:<name>`, `task:<id>`, `global`, or `all` for every workstream)' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand errors; and __fish_seen_subcommand_from clear" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
 complete -c do-harness -n "__fish_do_harness_using_subcommand errors; and __fish_seen_subcommand_from clear" -l config -d 'Explicit path to do-harness.toml' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand errors; and __fish_seen_subcommand_from clear" -l color -d 'Color output (auto, always, never)' -r
-complete -c do-harness -n "__fish_do_harness_using_subcommand errors; and __fish_seen_subcommand_from clear" -l output -d 'Default output file path' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand errors; and __fish_seen_subcommand_from clear" -l force -d 'Force clearing without prompt'
+complete -c do-harness -n "__fish_do_harness_using_subcommand errors; and __fish_seen_subcommand_from clear" -l output -d 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand errors; and __fish_seen_subcommand_from clear" -l force -d 'Allow clearing every workstream without a filter'
 complete -c do-harness -n "__fish_do_harness_using_subcommand errors; and __fish_seen_subcommand_from clear" -l dry-run -d 'Perform dry run without clearing'
-complete -c do-harness -n "__fish_do_harness_using_subcommand errors; and __fish_seen_subcommand_from clear" -s v -l verbose -d 'Verbosity level (-v, -vv)'
-complete -c do-harness -n "__fish_do_harness_using_subcommand errors; and __fish_seen_subcommand_from clear" -s q -l quiet -d 'Suppress non-error messages'
+complete -c do-harness -n "__fish_do_harness_using_subcommand errors; and __fish_seen_subcommand_from clear" -s q -l quiet -d 'Suppress PASS/WARN verdict lines and the success footer'
 complete -c do-harness -n "__fish_do_harness_using_subcommand errors; and __fish_seen_subcommand_from clear" -s h -l help -d 'Print help'
 complete -c do-harness -n "__fish_do_harness_using_subcommand errors; and __fish_seen_subcommand_from clear" -s V -l version -d 'Print version'
 complete -c do-harness -n "__fish_do_harness_using_subcommand errors; and __fish_seen_subcommand_from help" -f -a "list" -d 'List fail-fast error signatures (prefixed with `sensor:`)'
@@ -602,22 +524,18 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand loc" -l format -d 
 json\t'Machine-readable JSON output'"
 complete -c do-harness -n "__fish_do_harness_using_subcommand loc" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
 complete -c do-harness -n "__fish_do_harness_using_subcommand loc" -l config -d 'Explicit path to do-harness.toml' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand loc" -l color -d 'Color output (auto, always, never)' -r
-complete -c do-harness -n "__fish_do_harness_using_subcommand loc" -l output -d 'Default output file path' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand loc" -l output -d 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)' -r -F
 complete -c do-harness -n "__fish_do_harness_using_subcommand loc" -l warn -d 'Show only files at or above the 450-line decomposition threshold'
-complete -c do-harness -n "__fish_do_harness_using_subcommand loc" -s v -l verbose -d 'Verbosity level (-v, -vv)'
-complete -c do-harness -n "__fish_do_harness_using_subcommand loc" -s q -l quiet -d 'Suppress non-error messages'
+complete -c do-harness -n "__fish_do_harness_using_subcommand loc" -s q -l quiet -d 'Suppress PASS/WARN verdict lines and the success footer'
 complete -c do-harness -n "__fish_do_harness_using_subcommand loc" -l dry-run -d 'Dry run without side effects'
 complete -c do-harness -n "__fish_do_harness_using_subcommand loc" -s h -l help -d 'Print help (see more with \'--help\')'
 complete -c do-harness -n "__fish_do_harness_using_subcommand loc" -s V -l version -d 'Print version'
 complete -c do-harness -n "__fish_do_harness_using_subcommand split" -l target -d 'Name the sibling module instead of deriving it from the item' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand split" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
 complete -c do-harness -n "__fish_do_harness_using_subcommand split" -l config -d 'Explicit path to do-harness.toml' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand split" -l color -d 'Color output (auto, always, never)' -r
-complete -c do-harness -n "__fish_do_harness_using_subcommand split" -l output -d 'Default output file path' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand split" -l output -d 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)' -r -F
 complete -c do-harness -n "__fish_do_harness_using_subcommand split" -l dry-run -d 'Print the plan without writing files'
-complete -c do-harness -n "__fish_do_harness_using_subcommand split" -s v -l verbose -d 'Verbosity level (-v, -vv)'
-complete -c do-harness -n "__fish_do_harness_using_subcommand split" -s q -l quiet -d 'Suppress non-error messages'
+complete -c do-harness -n "__fish_do_harness_using_subcommand split" -s q -l quiet -d 'Suppress PASS/WARN verdict lines and the success footer'
 complete -c do-harness -n "__fish_do_harness_using_subcommand split" -s h -l help -d 'Print help'
 complete -c do-harness -n "__fish_do_harness_using_subcommand split" -s V -l version -d 'Print version'
 complete -c do-harness -n "__fish_do_harness_using_subcommand eval" -l skill -d 'Restrict evaluation to this skill directory name' -r
@@ -628,24 +546,20 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand eval" -l agent-cmd
 complete -c do-harness -n "__fish_do_harness_using_subcommand eval" -l agent-timeout -d 'Kill an agent run after this many seconds' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand eval" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
 complete -c do-harness -n "__fish_do_harness_using_subcommand eval" -l config -d 'Explicit path to do-harness.toml' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand eval" -l color -d 'Color output (auto, always, never)' -r
-complete -c do-harness -n "__fish_do_harness_using_subcommand eval" -l output -d 'Default output file path' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand eval" -l output -d 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)' -r -F
 complete -c do-harness -n "__fish_do_harness_using_subcommand eval" -l bless -d 'Re-baseline graders and update pass-rate floor on green run'
 complete -c do-harness -n "__fish_do_harness_using_subcommand eval" -l list-skills -d 'List available skills'
 complete -c do-harness -n "__fish_do_harness_using_subcommand eval" -l fail-fast -d 'Halt on first failing evaluation'
 complete -c do-harness -n "__fish_do_harness_using_subcommand eval" -l dry-run -d 'Perform dry-run evaluation'
 complete -c do-harness -n "__fish_do_harness_using_subcommand eval" -l no-lift -d 'Skip the without-skill baseline run (no Skill Lift measured)'
 complete -c do-harness -n "__fish_do_harness_using_subcommand eval" -l strict-fixtures -d 'Fail skills whose fixture has dataset-quality gaps (thin cases, no negative out-of-scope case)'
-complete -c do-harness -n "__fish_do_harness_using_subcommand eval" -s v -l verbose -d 'Verbosity level (-v, -vv)'
-complete -c do-harness -n "__fish_do_harness_using_subcommand eval" -s q -l quiet -d 'Suppress non-error messages'
+complete -c do-harness -n "__fish_do_harness_using_subcommand eval" -s q -l quiet -d 'Suppress PASS/WARN verdict lines and the success footer'
 complete -c do-harness -n "__fish_do_harness_using_subcommand eval" -s h -l help -d 'Print help (see more with \'--help\')'
 complete -c do-harness -n "__fish_do_harness_using_subcommand eval" -s V -l version -d 'Print version'
 complete -c do-harness -n "__fish_do_harness_using_subcommand hook; and not __fish_seen_subcommand_from install uninstall status diff help" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
 complete -c do-harness -n "__fish_do_harness_using_subcommand hook; and not __fish_seen_subcommand_from install uninstall status diff help" -l config -d 'Explicit path to do-harness.toml' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand hook; and not __fish_seen_subcommand_from install uninstall status diff help" -l color -d 'Color output (auto, always, never)' -r
-complete -c do-harness -n "__fish_do_harness_using_subcommand hook; and not __fish_seen_subcommand_from install uninstall status diff help" -l output -d 'Default output file path' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand hook; and not __fish_seen_subcommand_from install uninstall status diff help" -s v -l verbose -d 'Verbosity level (-v, -vv)'
-complete -c do-harness -n "__fish_do_harness_using_subcommand hook; and not __fish_seen_subcommand_from install uninstall status diff help" -s q -l quiet -d 'Suppress non-error messages'
+complete -c do-harness -n "__fish_do_harness_using_subcommand hook; and not __fish_seen_subcommand_from install uninstall status diff help" -l output -d 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand hook; and not __fish_seen_subcommand_from install uninstall status diff help" -s q -l quiet -d 'Suppress PASS/WARN verdict lines and the success footer'
 complete -c do-harness -n "__fish_do_harness_using_subcommand hook; and not __fish_seen_subcommand_from install uninstall status diff help" -l dry-run -d 'Dry run without side effects'
 complete -c do-harness -n "__fish_do_harness_using_subcommand hook; and not __fish_seen_subcommand_from install uninstall status diff help" -s h -l help -d 'Print help'
 complete -c do-harness -n "__fish_do_harness_using_subcommand hook; and not __fish_seen_subcommand_from install uninstall status diff help" -s V -l version -d 'Print version'
@@ -656,20 +570,16 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand hook; and not __fi
 complete -c do-harness -n "__fish_do_harness_using_subcommand hook; and not __fish_seen_subcommand_from install uninstall status diff help" -f -a "help" -d 'Print this message or the help of the given subcommand(s)'
 complete -c do-harness -n "__fish_do_harness_using_subcommand hook; and __fish_seen_subcommand_from install" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
 complete -c do-harness -n "__fish_do_harness_using_subcommand hook; and __fish_seen_subcommand_from install" -l config -d 'Explicit path to do-harness.toml' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand hook; and __fish_seen_subcommand_from install" -l color -d 'Color output (auto, always, never)' -r
-complete -c do-harness -n "__fish_do_harness_using_subcommand hook; and __fish_seen_subcommand_from install" -l output -d 'Default output file path' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand hook; and __fish_seen_subcommand_from install" -l output -d 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)' -r -F
 complete -c do-harness -n "__fish_do_harness_using_subcommand hook; and __fish_seen_subcommand_from install" -l force -d 'Overwrite foreign (unmanaged) hook files'
-complete -c do-harness -n "__fish_do_harness_using_subcommand hook; and __fish_seen_subcommand_from install" -s v -l verbose -d 'Verbosity level (-v, -vv)'
-complete -c do-harness -n "__fish_do_harness_using_subcommand hook; and __fish_seen_subcommand_from install" -s q -l quiet -d 'Suppress non-error messages'
+complete -c do-harness -n "__fish_do_harness_using_subcommand hook; and __fish_seen_subcommand_from install" -s q -l quiet -d 'Suppress PASS/WARN verdict lines and the success footer'
 complete -c do-harness -n "__fish_do_harness_using_subcommand hook; and __fish_seen_subcommand_from install" -l dry-run -d 'Dry run without side effects'
 complete -c do-harness -n "__fish_do_harness_using_subcommand hook; and __fish_seen_subcommand_from install" -s h -l help -d 'Print help'
 complete -c do-harness -n "__fish_do_harness_using_subcommand hook; and __fish_seen_subcommand_from install" -s V -l version -d 'Print version'
 complete -c do-harness -n "__fish_do_harness_using_subcommand hook; and __fish_seen_subcommand_from uninstall" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
 complete -c do-harness -n "__fish_do_harness_using_subcommand hook; and __fish_seen_subcommand_from uninstall" -l config -d 'Explicit path to do-harness.toml' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand hook; and __fish_seen_subcommand_from uninstall" -l color -d 'Color output (auto, always, never)' -r
-complete -c do-harness -n "__fish_do_harness_using_subcommand hook; and __fish_seen_subcommand_from uninstall" -l output -d 'Default output file path' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand hook; and __fish_seen_subcommand_from uninstall" -s v -l verbose -d 'Verbosity level (-v, -vv)'
-complete -c do-harness -n "__fish_do_harness_using_subcommand hook; and __fish_seen_subcommand_from uninstall" -s q -l quiet -d 'Suppress non-error messages'
+complete -c do-harness -n "__fish_do_harness_using_subcommand hook; and __fish_seen_subcommand_from uninstall" -l output -d 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand hook; and __fish_seen_subcommand_from uninstall" -s q -l quiet -d 'Suppress PASS/WARN verdict lines and the success footer'
 complete -c do-harness -n "__fish_do_harness_using_subcommand hook; and __fish_seen_subcommand_from uninstall" -l dry-run -d 'Dry run without side effects'
 complete -c do-harness -n "__fish_do_harness_using_subcommand hook; and __fish_seen_subcommand_from uninstall" -s h -l help -d 'Print help'
 complete -c do-harness -n "__fish_do_harness_using_subcommand hook; and __fish_seen_subcommand_from uninstall" -s V -l version -d 'Print version'
@@ -677,19 +587,15 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand hook; and __fish_s
 json\t'Machine-readable JSON output'"
 complete -c do-harness -n "__fish_do_harness_using_subcommand hook; and __fish_seen_subcommand_from status" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
 complete -c do-harness -n "__fish_do_harness_using_subcommand hook; and __fish_seen_subcommand_from status" -l config -d 'Explicit path to do-harness.toml' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand hook; and __fish_seen_subcommand_from status" -l color -d 'Color output (auto, always, never)' -r
-complete -c do-harness -n "__fish_do_harness_using_subcommand hook; and __fish_seen_subcommand_from status" -l output -d 'Default output file path' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand hook; and __fish_seen_subcommand_from status" -s v -l verbose -d 'Verbosity level (-v, -vv)'
-complete -c do-harness -n "__fish_do_harness_using_subcommand hook; and __fish_seen_subcommand_from status" -s q -l quiet -d 'Suppress non-error messages'
+complete -c do-harness -n "__fish_do_harness_using_subcommand hook; and __fish_seen_subcommand_from status" -l output -d 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand hook; and __fish_seen_subcommand_from status" -s q -l quiet -d 'Suppress PASS/WARN verdict lines and the success footer'
 complete -c do-harness -n "__fish_do_harness_using_subcommand hook; and __fish_seen_subcommand_from status" -l dry-run -d 'Dry run without side effects'
 complete -c do-harness -n "__fish_do_harness_using_subcommand hook; and __fish_seen_subcommand_from status" -s h -l help -d 'Print help (see more with \'--help\')'
 complete -c do-harness -n "__fish_do_harness_using_subcommand hook; and __fish_seen_subcommand_from status" -s V -l version -d 'Print version'
 complete -c do-harness -n "__fish_do_harness_using_subcommand hook; and __fish_seen_subcommand_from diff" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
 complete -c do-harness -n "__fish_do_harness_using_subcommand hook; and __fish_seen_subcommand_from diff" -l config -d 'Explicit path to do-harness.toml' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand hook; and __fish_seen_subcommand_from diff" -l color -d 'Color output (auto, always, never)' -r
-complete -c do-harness -n "__fish_do_harness_using_subcommand hook; and __fish_seen_subcommand_from diff" -l output -d 'Default output file path' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand hook; and __fish_seen_subcommand_from diff" -s v -l verbose -d 'Verbosity level (-v, -vv)'
-complete -c do-harness -n "__fish_do_harness_using_subcommand hook; and __fish_seen_subcommand_from diff" -s q -l quiet -d 'Suppress non-error messages'
+complete -c do-harness -n "__fish_do_harness_using_subcommand hook; and __fish_seen_subcommand_from diff" -l output -d 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand hook; and __fish_seen_subcommand_from diff" -s q -l quiet -d 'Suppress PASS/WARN verdict lines and the success footer'
 complete -c do-harness -n "__fish_do_harness_using_subcommand hook; and __fish_seen_subcommand_from diff" -l dry-run -d 'Dry run without side effects'
 complete -c do-harness -n "__fish_do_harness_using_subcommand hook; and __fish_seen_subcommand_from diff" -s h -l help -d 'Print help'
 complete -c do-harness -n "__fish_do_harness_using_subcommand hook; and __fish_seen_subcommand_from diff" -s V -l version -d 'Print version'
@@ -702,11 +608,9 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand doctor" -l format 
 json\t'Machine-readable JSON output'"
 complete -c do-harness -n "__fish_do_harness_using_subcommand doctor" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
 complete -c do-harness -n "__fish_do_harness_using_subcommand doctor" -l config -d 'Explicit path to do-harness.toml' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand doctor" -l color -d 'Color output (auto, always, never)' -r
-complete -c do-harness -n "__fish_do_harness_using_subcommand doctor" -l output -d 'Default output file path' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand doctor" -l output -d 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)' -r -F
 complete -c do-harness -n "__fish_do_harness_using_subcommand doctor" -l strict -d 'Strictly enforce warning checks as failures'
-complete -c do-harness -n "__fish_do_harness_using_subcommand doctor" -s v -l verbose -d 'Verbosity level (-v, -vv)'
-complete -c do-harness -n "__fish_do_harness_using_subcommand doctor" -s q -l quiet -d 'Suppress non-error messages'
+complete -c do-harness -n "__fish_do_harness_using_subcommand doctor" -s q -l quiet -d 'Suppress PASS/WARN verdict lines and the success footer'
 complete -c do-harness -n "__fish_do_harness_using_subcommand doctor" -l dry-run -d 'Dry run without side effects'
 complete -c do-harness -n "__fish_do_harness_using_subcommand doctor" -s h -l help -d 'Print help (see more with \'--help\')'
 complete -c do-harness -n "__fish_do_harness_using_subcommand doctor" -s V -l version -d 'Print version'
@@ -720,11 +624,9 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand metrics; and not _
 complete -c do-harness -n "__fish_do_harness_using_subcommand metrics; and not __fish_seen_subcommand_from pr help" -l branch -d 'Filter by branch name (equivalent to `--scope branch:<NAME>`)' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand metrics; and not __fish_seen_subcommand_from pr help" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
 complete -c do-harness -n "__fish_do_harness_using_subcommand metrics; and not __fish_seen_subcommand_from pr help" -l config -d 'Explicit path to do-harness.toml' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand metrics; and not __fish_seen_subcommand_from pr help" -l color -d 'Color output (auto, always, never)' -r
-complete -c do-harness -n "__fish_do_harness_using_subcommand metrics; and not __fish_seen_subcommand_from pr help" -l output -d 'Default output file path' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand metrics; and not __fish_seen_subcommand_from pr help" -l output -d 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)' -r -F
 complete -c do-harness -n "__fish_do_harness_using_subcommand metrics; and not __fish_seen_subcommand_from pr help" -l all -d 'Aggregate across all workstreams and scopes'
-complete -c do-harness -n "__fish_do_harness_using_subcommand metrics; and not __fish_seen_subcommand_from pr help" -s v -l verbose -d 'Verbosity level (-v, -vv)'
-complete -c do-harness -n "__fish_do_harness_using_subcommand metrics; and not __fish_seen_subcommand_from pr help" -s q -l quiet -d 'Suppress non-error messages'
+complete -c do-harness -n "__fish_do_harness_using_subcommand metrics; and not __fish_seen_subcommand_from pr help" -s q -l quiet -d 'Suppress PASS/WARN verdict lines and the success footer'
 complete -c do-harness -n "__fish_do_harness_using_subcommand metrics; and not __fish_seen_subcommand_from pr help" -l dry-run -d 'Dry run without side effects'
 complete -c do-harness -n "__fish_do_harness_using_subcommand metrics; and not __fish_seen_subcommand_from pr help" -s h -l help -d 'Print help (see more with \'--help\')'
 complete -c do-harness -n "__fish_do_harness_using_subcommand metrics; and not __fish_seen_subcommand_from pr help" -s V -l version -d 'Print version'
@@ -737,11 +639,9 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand metrics; and __fis
 json\t'Machine-readable JSON output'"
 complete -c do-harness -n "__fish_do_harness_using_subcommand metrics; and __fish_seen_subcommand_from pr" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
 complete -c do-harness -n "__fish_do_harness_using_subcommand metrics; and __fish_seen_subcommand_from pr" -l config -d 'Explicit path to do-harness.toml' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand metrics; and __fish_seen_subcommand_from pr" -l color -d 'Color output (auto, always, never)' -r
-complete -c do-harness -n "__fish_do_harness_using_subcommand metrics; and __fish_seen_subcommand_from pr" -l output -d 'Default output file path' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand metrics; and __fish_seen_subcommand_from pr" -l output -d 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)' -r -F
 complete -c do-harness -n "__fish_do_harness_using_subcommand metrics; and __fish_seen_subcommand_from pr" -l recompute -d 'Ignore the cached snapshot and refetch'
-complete -c do-harness -n "__fish_do_harness_using_subcommand metrics; and __fish_seen_subcommand_from pr" -s v -l verbose -d 'Verbosity level (-v, -vv)'
-complete -c do-harness -n "__fish_do_harness_using_subcommand metrics; and __fish_seen_subcommand_from pr" -s q -l quiet -d 'Suppress non-error messages'
+complete -c do-harness -n "__fish_do_harness_using_subcommand metrics; and __fish_seen_subcommand_from pr" -s q -l quiet -d 'Suppress PASS/WARN verdict lines and the success footer'
 complete -c do-harness -n "__fish_do_harness_using_subcommand metrics; and __fish_seen_subcommand_from pr" -l dry-run -d 'Dry run without side effects'
 complete -c do-harness -n "__fish_do_harness_using_subcommand metrics; and __fish_seen_subcommand_from pr" -s h -l help -d 'Print help (see more with \'--help\')'
 complete -c do-harness -n "__fish_do_harness_using_subcommand metrics; and __fish_seen_subcommand_from pr" -s V -l version -d 'Print version'
@@ -753,11 +653,9 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand learn" -l format -
 json\t'Machine-readable JSON output'"
 complete -c do-harness -n "__fish_do_harness_using_subcommand learn" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
 complete -c do-harness -n "__fish_do_harness_using_subcommand learn" -l config -d 'Explicit path to do-harness.toml' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand learn" -l color -d 'Color output (auto, always, never)' -r
-complete -c do-harness -n "__fish_do_harness_using_subcommand learn" -l output -d 'Default output file path' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand learn" -l output -d 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)' -r -F
 complete -c do-harness -n "__fish_do_harness_using_subcommand learn" -l draft -d 'Draft the steering actions without applying anything (required: `learn` writes nothing)'
-complete -c do-harness -n "__fish_do_harness_using_subcommand learn" -s v -l verbose -d 'Verbosity level (-v, -vv)'
-complete -c do-harness -n "__fish_do_harness_using_subcommand learn" -s q -l quiet -d 'Suppress non-error messages'
+complete -c do-harness -n "__fish_do_harness_using_subcommand learn" -s q -l quiet -d 'Suppress PASS/WARN verdict lines and the success footer'
 complete -c do-harness -n "__fish_do_harness_using_subcommand learn" -l dry-run -d 'Dry run without side effects'
 complete -c do-harness -n "__fish_do_harness_using_subcommand learn" -s h -l help -d 'Print help (see more with \'--help\')'
 complete -c do-harness -n "__fish_do_harness_using_subcommand learn" -s V -l version -d 'Print version'
@@ -766,10 +664,8 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand overlap" -l format
 json\t'Machine-readable JSON output'"
 complete -c do-harness -n "__fish_do_harness_using_subcommand overlap" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
 complete -c do-harness -n "__fish_do_harness_using_subcommand overlap" -l config -d 'Explicit path to do-harness.toml' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand overlap" -l color -d 'Color output (auto, always, never)' -r
-complete -c do-harness -n "__fish_do_harness_using_subcommand overlap" -l output -d 'Default output file path' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand overlap" -s v -l verbose -d 'Verbosity level (-v, -vv)'
-complete -c do-harness -n "__fish_do_harness_using_subcommand overlap" -s q -l quiet -d 'Suppress non-error messages'
+complete -c do-harness -n "__fish_do_harness_using_subcommand overlap" -l output -d 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand overlap" -s q -l quiet -d 'Suppress PASS/WARN verdict lines and the success footer'
 complete -c do-harness -n "__fish_do_harness_using_subcommand overlap" -l dry-run -d 'Dry run without side effects'
 complete -c do-harness -n "__fish_do_harness_using_subcommand overlap" -s h -l help -d 'Print help (see more with \'--help\')'
 complete -c do-harness -n "__fish_do_harness_using_subcommand overlap" -s V -l version -d 'Print version'
@@ -777,22 +673,18 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand maintenance" -l pr
 complete -c do-harness -n "__fish_do_harness_using_subcommand maintenance" -l keep-per-task -d 'Minimum most-recent beats kept per task when pruning' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand maintenance" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
 complete -c do-harness -n "__fish_do_harness_using_subcommand maintenance" -l config -d 'Explicit path to do-harness.toml' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand maintenance" -l color -d 'Color output (auto, always, never)' -r
-complete -c do-harness -n "__fish_do_harness_using_subcommand maintenance" -l output -d 'Default output file path' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand maintenance" -s v -l verbose -d 'Verbosity level (-v, -vv)'
-complete -c do-harness -n "__fish_do_harness_using_subcommand maintenance" -s q -l quiet -d 'Suppress non-error messages'
+complete -c do-harness -n "__fish_do_harness_using_subcommand maintenance" -l output -d 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand maintenance" -s q -l quiet -d 'Suppress PASS/WARN verdict lines and the success footer'
 complete -c do-harness -n "__fish_do_harness_using_subcommand maintenance" -l dry-run -d 'Dry run without side effects'
 complete -c do-harness -n "__fish_do_harness_using_subcommand maintenance" -s h -l help -d 'Print help'
 complete -c do-harness -n "__fish_do_harness_using_subcommand maintenance" -s V -l version -d 'Print version'
-complete -c do-harness -n "__fish_do_harness_using_subcommand compliance" -l framework -d 'Filter framework (owasp-agentic-top10, nist-ai-rmf, eu-ai-act, soc2)' -r
+complete -c do-harness -n "__fish_do_harness_using_subcommand compliance" -l framework -d 'Filter framework (owasp, nist, eu, soc; hyphenated ids accepted)' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand compliance" -l format -d 'Output format' -r -f -a "text\t'Human-readable text output'
 json\t'Machine-readable JSON output'"
 complete -c do-harness -n "__fish_do_harness_using_subcommand compliance" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
 complete -c do-harness -n "__fish_do_harness_using_subcommand compliance" -l config -d 'Explicit path to do-harness.toml' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand compliance" -l color -d 'Color output (auto, always, never)' -r
-complete -c do-harness -n "__fish_do_harness_using_subcommand compliance" -l output -d 'Default output file path' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand compliance" -s v -l verbose -d 'Verbosity level (-v, -vv)'
-complete -c do-harness -n "__fish_do_harness_using_subcommand compliance" -s q -l quiet -d 'Suppress non-error messages'
+complete -c do-harness -n "__fish_do_harness_using_subcommand compliance" -l output -d 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand compliance" -s q -l quiet -d 'Suppress PASS/WARN verdict lines and the success footer'
 complete -c do-harness -n "__fish_do_harness_using_subcommand compliance" -l dry-run -d 'Dry run without side effects'
 complete -c do-harness -n "__fish_do_harness_using_subcommand compliance" -s h -l help -d 'Print help (see more with \'--help\')'
 complete -c do-harness -n "__fish_do_harness_using_subcommand compliance" -s V -l version -d 'Print version'
@@ -800,10 +692,8 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand audit-chain" -l fo
 json\t'Machine-readable JSON output'"
 complete -c do-harness -n "__fish_do_harness_using_subcommand audit-chain" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
 complete -c do-harness -n "__fish_do_harness_using_subcommand audit-chain" -l config -d 'Explicit path to do-harness.toml' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand audit-chain" -l color -d 'Color output (auto, always, never)' -r
-complete -c do-harness -n "__fish_do_harness_using_subcommand audit-chain" -l output -d 'Default output file path' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand audit-chain" -s v -l verbose -d 'Verbosity level (-v, -vv)'
-complete -c do-harness -n "__fish_do_harness_using_subcommand audit-chain" -s q -l quiet -d 'Suppress non-error messages'
+complete -c do-harness -n "__fish_do_harness_using_subcommand audit-chain" -l output -d 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand audit-chain" -s q -l quiet -d 'Suppress PASS/WARN verdict lines and the success footer'
 complete -c do-harness -n "__fish_do_harness_using_subcommand audit-chain" -l dry-run -d 'Dry run without side effects'
 complete -c do-harness -n "__fish_do_harness_using_subcommand audit-chain" -s h -l help -d 'Print help (see more with \'--help\')'
 complete -c do-harness -n "__fish_do_harness_using_subcommand audit-chain" -s V -l version -d 'Print version'
@@ -815,11 +705,9 @@ gh\t'Git history plus opt-in `gh` enrichment (network; never in CI)'"
 complete -c do-harness -n "__fish_do_harness_using_subcommand dora" -l now -d 'Measurement clock as Unix seconds (default: system clock)' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand dora" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
 complete -c do-harness -n "__fish_do_harness_using_subcommand dora" -l config -d 'Explicit path to do-harness.toml' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand dora" -l color -d 'Color output (auto, always, never)' -r
-complete -c do-harness -n "__fish_do_harness_using_subcommand dora" -l output -d 'Default output file path' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand dora" -l output -d 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)' -r -F
 complete -c do-harness -n "__fish_do_harness_using_subcommand dora" -l record -d 'Persist the snapshot into the state database'
-complete -c do-harness -n "__fish_do_harness_using_subcommand dora" -s v -l verbose -d 'Verbosity level (-v, -vv)'
-complete -c do-harness -n "__fish_do_harness_using_subcommand dora" -s q -l quiet -d 'Suppress non-error messages'
+complete -c do-harness -n "__fish_do_harness_using_subcommand dora" -s q -l quiet -d 'Suppress PASS/WARN verdict lines and the success footer'
 complete -c do-harness -n "__fish_do_harness_using_subcommand dora" -l dry-run -d 'Dry run without side effects'
 complete -c do-harness -n "__fish_do_harness_using_subcommand dora" -s h -l help -d 'Print help (see more with \'--help\')'
 complete -c do-harness -n "__fish_do_harness_using_subcommand dora" -s V -l version -d 'Print version'
@@ -827,10 +715,8 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand ci-explain" -l for
 json\t'Machine-readable JSON output'"
 complete -c do-harness -n "__fish_do_harness_using_subcommand ci-explain" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
 complete -c do-harness -n "__fish_do_harness_using_subcommand ci-explain" -l config -d 'Explicit path to do-harness.toml' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand ci-explain" -l color -d 'Color output (auto, always, never)' -r
-complete -c do-harness -n "__fish_do_harness_using_subcommand ci-explain" -l output -d 'Default output file path' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand ci-explain" -s v -l verbose -d 'Verbosity level (-v, -vv)'
-complete -c do-harness -n "__fish_do_harness_using_subcommand ci-explain" -s q -l quiet -d 'Suppress non-error messages'
+complete -c do-harness -n "__fish_do_harness_using_subcommand ci-explain" -l output -d 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand ci-explain" -s q -l quiet -d 'Suppress PASS/WARN verdict lines and the success footer'
 complete -c do-harness -n "__fish_do_harness_using_subcommand ci-explain" -l dry-run -d 'Dry run without side effects'
 complete -c do-harness -n "__fish_do_harness_using_subcommand ci-explain" -s h -l help -d 'Print help (see more with \'--help\')'
 complete -c do-harness -n "__fish_do_harness_using_subcommand ci-explain" -s V -l version -d 'Print version'
@@ -838,28 +724,22 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand ci" -l format -d '
 json\t'Machine-readable JSON output'"
 complete -c do-harness -n "__fish_do_harness_using_subcommand ci" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
 complete -c do-harness -n "__fish_do_harness_using_subcommand ci" -l config -d 'Explicit path to do-harness.toml' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand ci" -l color -d 'Color output (auto, always, never)' -r
-complete -c do-harness -n "__fish_do_harness_using_subcommand ci" -l output -d 'Default output file path' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand ci" -s v -l verbose -d 'Verbosity level (-v, -vv)'
-complete -c do-harness -n "__fish_do_harness_using_subcommand ci" -s q -l quiet -d 'Suppress non-error messages'
+complete -c do-harness -n "__fish_do_harness_using_subcommand ci" -l output -d 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand ci" -s q -l quiet -d 'Suppress PASS/WARN verdict lines and the success footer'
 complete -c do-harness -n "__fish_do_harness_using_subcommand ci" -l dry-run -d 'Dry run without side effects'
 complete -c do-harness -n "__fish_do_harness_using_subcommand ci" -s h -l help -d 'Print help (see more with \'--help\')'
 complete -c do-harness -n "__fish_do_harness_using_subcommand ci" -s V -l version -d 'Print version'
 complete -c do-harness -n "__fish_do_harness_using_subcommand completions" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
 complete -c do-harness -n "__fish_do_harness_using_subcommand completions" -l config -d 'Explicit path to do-harness.toml' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand completions" -l color -d 'Color output (auto, always, never)' -r
-complete -c do-harness -n "__fish_do_harness_using_subcommand completions" -l output -d 'Default output file path' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand completions" -s v -l verbose -d 'Verbosity level (-v, -vv)'
-complete -c do-harness -n "__fish_do_harness_using_subcommand completions" -s q -l quiet -d 'Suppress non-error messages'
+complete -c do-harness -n "__fish_do_harness_using_subcommand completions" -l output -d 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand completions" -s q -l quiet -d 'Suppress PASS/WARN verdict lines and the success footer'
 complete -c do-harness -n "__fish_do_harness_using_subcommand completions" -l dry-run -d 'Dry run without side effects'
 complete -c do-harness -n "__fish_do_harness_using_subcommand completions" -s h -l help -d 'Print help'
 complete -c do-harness -n "__fish_do_harness_using_subcommand completions" -s V -l version -d 'Print version'
 complete -c do-harness -n "__fish_do_harness_using_subcommand man" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
 complete -c do-harness -n "__fish_do_harness_using_subcommand man" -l config -d 'Explicit path to do-harness.toml' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand man" -l color -d 'Color output (auto, always, never)' -r
-complete -c do-harness -n "__fish_do_harness_using_subcommand man" -l output -d 'Default output file path' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand man" -s v -l verbose -d 'Verbosity level (-v, -vv)'
-complete -c do-harness -n "__fish_do_harness_using_subcommand man" -s q -l quiet -d 'Suppress non-error messages'
+complete -c do-harness -n "__fish_do_harness_using_subcommand man" -l output -d 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand man" -s q -l quiet -d 'Suppress PASS/WARN verdict lines and the success footer'
 complete -c do-harness -n "__fish_do_harness_using_subcommand man" -l dry-run -d 'Dry run without side effects'
 complete -c do-harness -n "__fish_do_harness_using_subcommand man" -s h -l help -d 'Print help'
 complete -c do-harness -n "__fish_do_harness_using_subcommand man" -s V -l version -d 'Print version'

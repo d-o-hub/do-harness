@@ -17,12 +17,9 @@ _do-harness() {
     _arguments "${_arguments_options[@]}" : \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
 '--config=[Explicit path to do-harness.toml]:FILE:_files' \
-'--color=[Color output (auto, always, never)]:WHEN:_default' \
-'--output=[Default output file path]:FILE:_files' \
-'*-v[Verbosity level (-v, -vv)]' \
-'*--verbose[Verbosity level (-v, -vv)]' \
-'-q[Suppress non-error messages]' \
-'--quiet[Suppress non-error messages]' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
 '--dry-run[Dry run without side effects]' \
 '-h[Print help]' \
 '--help[Print help]' \
@@ -43,12 +40,9 @@ _arguments "${_arguments_options[@]}" : \
 json\:"Machine-readable JSON output"))' \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
 '--config=[Explicit path to do-harness.toml]:FILE:_files' \
-'--color=[Color output (auto, always, never)]:WHEN:_default' \
-'--output=[Default output file path]:FILE:_files' \
-'*-v[Verbosity level (-v, -vv)]' \
-'*--verbose[Verbosity level (-v, -vv)]' \
-'-q[Suppress non-error messages]' \
-'--quiet[Suppress non-error messages]' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
 '--dry-run[Dry run without side effects]' \
 '-h[Print help (see more with '\''--help'\'')]' \
 '--help[Print help (see more with '\''--help'\'')]' \
@@ -72,18 +66,15 @@ run\:"Execute unconditionally; no reuse lookup at all"))' \
 '--approver=[Approver identity recorded with \`--bless\` (defaults to \`DO_HARNESS_APPROVER\` or the git user email)]:NAME:_default' \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
 '--config=[Explicit path to do-harness.toml]:FILE:_files' \
-'--color=[Color output (auto, always, never)]:WHEN:_default' \
-'--output=[Default output file path]:FILE:_files' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
 '--fail-fast[Halt at the first failing sensor]' \
 '--changed[Run only sensors applicable to the working-tree change]' \
 '--record[Persist beats and error signatures into the state database]' \
 '(--task)--global[Record unscoped beats in the global namespace]' \
 '--strict[Enforce strong evidence\: exit non-zero on skips or missing timing/exit codes]' \
 '--bless[Lower or initialize blessed findings baselines from this run (requires --record; a bless never raises a baseline)]' \
-'*-v[Verbosity level (-v, -vv)]' \
-'*--verbose[Verbosity level (-v, -vv)]' \
-'-q[Suppress non-error messages]' \
-'--quiet[Suppress non-error messages]' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
 '--dry-run[Dry run without side effects]' \
 '-h[Print help (see more with '\''--help'\'')]' \
 '--help[Print help (see more with '\''--help'\'')]' \
@@ -107,18 +98,15 @@ run\:"Execute unconditionally; no reuse lookup at all"))' \
 '--approver=[Approver identity recorded with \`--bless\` (defaults to \`DO_HARNESS_APPROVER\` or the git user email)]:NAME:_default' \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
 '--config=[Explicit path to do-harness.toml]:FILE:_files' \
-'--color=[Color output (auto, always, never)]:WHEN:_default' \
-'--output=[Default output file path]:FILE:_files' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
 '--fail-fast[Halt at the first failing sensor]' \
 '--changed[Run only sensors applicable to the working-tree change]' \
 '--record[Persist beats and error signatures into the state database]' \
 '(--task)--global[Record unscoped beats in the global namespace]' \
 '--strict[Enforce strong evidence\: exit non-zero on skips or missing timing/exit codes]' \
 '--bless[Lower or initialize blessed findings baselines from this run (requires --record; a bless never raises a baseline)]' \
-'*-v[Verbosity level (-v, -vv)]' \
-'*--verbose[Verbosity level (-v, -vv)]' \
-'-q[Suppress non-error messages]' \
-'--quiet[Suppress non-error messages]' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
 '--dry-run[Dry run without side effects]' \
 '-h[Print help (see more with '\''--help'\'')]' \
 '--help[Print help (see more with '\''--help'\'')]' \
@@ -132,13 +120,10 @@ _arguments "${_arguments_options[@]}" : \
 json\:"Machine-readable JSON output"))' \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
 '--config=[Explicit path to do-harness.toml]:FILE:_files' \
-'--color=[Color output (auto, always, never)]:WHEN:_default' \
-'--output=[Default output file path]:FILE:_files' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
 '--sets[List development signal-set names instead of sensors]' \
-'*-v[Verbosity level (-v, -vv)]' \
-'*--verbose[Verbosity level (-v, -vv)]' \
-'-q[Suppress non-error messages]' \
-'--quiet[Suppress non-error messages]' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
 '--dry-run[Dry run without side effects]' \
 '-h[Print help (see more with '\''--help'\'')]' \
 '--help[Print help (see more with '\''--help'\'')]' \
@@ -152,13 +137,10 @@ _arguments "${_arguments_options[@]}" : \
 json\:"Machine-readable JSON output"))' \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
 '--config=[Explicit path to do-harness.toml]:FILE:_files' \
-'--color=[Color output (auto, always, never)]:WHEN:_default' \
-'--output=[Default output file path]:FILE:_files' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
 '--sets[List development signal-set names instead of sensors]' \
-'*-v[Verbosity level (-v, -vv)]' \
-'*--verbose[Verbosity level (-v, -vv)]' \
-'-q[Suppress non-error messages]' \
-'--quiet[Suppress non-error messages]' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
 '--dry-run[Dry run without side effects]' \
 '-h[Print help (see more with '\''--help'\'')]' \
 '--help[Print help (see more with '\''--help'\'')]' \
@@ -173,13 +155,10 @@ _arguments "${_arguments_options[@]}" : \
 json\:"Machine-readable JSON output"))' \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
 '--config=[Explicit path to do-harness.toml]:FILE:_files' \
-'--color=[Color output (auto, always, never)]:WHEN:_default' \
-'--output=[Default output file path]:FILE:_files' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
 '--changed[Select by working-tree change instead of listing everything]' \
-'*-v[Verbosity level (-v, -vv)]' \
-'*--verbose[Verbosity level (-v, -vv)]' \
-'-q[Suppress non-error messages]' \
-'--quiet[Suppress non-error messages]' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
 '--dry-run[Dry run without side effects]' \
 '-h[Print help (see more with '\''--help'\'')]' \
 '--help[Print help (see more with '\''--help'\'')]' \
@@ -195,12 +174,9 @@ _arguments "${_arguments_options[@]}" : \
 json\:"Machine-readable JSON output"))' \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
 '--config=[Explicit path to do-harness.toml]:FILE:_files' \
-'--color=[Color output (auto, always, never)]:WHEN:_default' \
-'--output=[Default output file path]:FILE:_files' \
-'*-v[Verbosity level (-v, -vv)]' \
-'*--verbose[Verbosity level (-v, -vv)]' \
-'-q[Suppress non-error messages]' \
-'--quiet[Suppress non-error messages]' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
 '--dry-run[Dry run without side effects]' \
 '-h[Print help (see more with '\''--help'\'')]' \
 '--help[Print help (see more with '\''--help'\'')]' \
@@ -212,12 +188,9 @@ json\:"Machine-readable JSON output"))' \
 _arguments "${_arguments_options[@]}" : \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
 '--config=[Explicit path to do-harness.toml]:FILE:_files' \
-'--color=[Color output (auto, always, never)]:WHEN:_default' \
-'--output=[Default output file path]:FILE:_files' \
-'*-v[Verbosity level (-v, -vv)]' \
-'*--verbose[Verbosity level (-v, -vv)]' \
-'-q[Suppress non-error messages]' \
-'--quiet[Suppress non-error messages]' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
 '--dry-run[Dry run without side effects]' \
 '-h[Print help]' \
 '--help[Print help]' \
@@ -241,12 +214,9 @@ _arguments "${_arguments_options[@]}" : \
 json\:"Machine-readable JSON output"))' \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
 '--config=[Explicit path to do-harness.toml]:FILE:_files' \
-'--color=[Color output (auto, always, never)]:WHEN:_default' \
-'--output=[Default output file path]:FILE:_files' \
-'*-v[Verbosity level (-v, -vv)]' \
-'*--verbose[Verbosity level (-v, -vv)]' \
-'-q[Suppress non-error messages]' \
-'--quiet[Suppress non-error messages]' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
 '--dry-run[Dry run without side effects]' \
 '-h[Print help (see more with '\''--help'\'')]' \
 '--help[Print help (see more with '\''--help'\'')]' \
@@ -263,13 +233,10 @@ _arguments "${_arguments_options[@]}" : \
 json\:"Machine-readable JSON output"))' \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
 '--config=[Explicit path to do-harness.toml]:FILE:_files' \
-'--color=[Color output (auto, always, never)]:WHEN:_default' \
-'--output=[Default output file path]:FILE:_files' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
 '--recompute[Ignore the cached report and recompute from scratch]' \
-'*-v[Verbosity level (-v, -vv)]' \
-'*--verbose[Verbosity level (-v, -vv)]' \
-'-q[Suppress non-error messages]' \
-'--quiet[Suppress non-error messages]' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
 '--dry-run[Dry run without side effects]' \
 '-h[Print help (see more with '\''--help'\'')]' \
 '--help[Print help (see more with '\''--help'\'')]' \
@@ -284,12 +251,9 @@ _arguments "${_arguments_options[@]}" : \
 json\:"Machine-readable JSON output"))' \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
 '--config=[Explicit path to do-harness.toml]:FILE:_files' \
-'--color=[Color output (auto, always, never)]:WHEN:_default' \
-'--output=[Default output file path]:FILE:_files' \
-'*-v[Verbosity level (-v, -vv)]' \
-'*--verbose[Verbosity level (-v, -vv)]' \
-'-q[Suppress non-error messages]' \
-'--quiet[Suppress non-error messages]' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
 '--dry-run[Dry run without side effects]' \
 '-h[Print help (see more with '\''--help'\'')]' \
 '--help[Print help (see more with '\''--help'\'')]' \
@@ -304,12 +268,9 @@ _arguments "${_arguments_options[@]}" : \
 json\:"Machine-readable JSON output"))' \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
 '--config=[Explicit path to do-harness.toml]:FILE:_files' \
-'--color=[Color output (auto, always, never)]:WHEN:_default' \
-'--output=[Default output file path]:FILE:_files' \
-'*-v[Verbosity level (-v, -vv)]' \
-'*--verbose[Verbosity level (-v, -vv)]' \
-'-q[Suppress non-error messages]' \
-'--quiet[Suppress non-error messages]' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
 '--dry-run[Dry run without side effects]' \
 '-h[Print help (see more with '\''--help'\'')]' \
 '--help[Print help (see more with '\''--help'\'')]' \
@@ -324,12 +285,9 @@ _arguments "${_arguments_options[@]}" : \
 json\:"Machine-readable JSON output"))' \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
 '--config=[Explicit path to do-harness.toml]:FILE:_files' \
-'--color=[Color output (auto, always, never)]:WHEN:_default' \
-'--output=[Default output file path]:FILE:_files' \
-'*-v[Verbosity level (-v, -vv)]' \
-'*--verbose[Verbosity level (-v, -vv)]' \
-'-q[Suppress non-error messages]' \
-'--quiet[Suppress non-error messages]' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
 '--dry-run[Dry run without side effects]' \
 '-h[Print help (see more with '\''--help'\'')]' \
 '--help[Print help (see more with '\''--help'\'')]' \
@@ -350,12 +308,9 @@ _arguments "${_arguments_options[@]}" : \
 json\:"Machine-readable JSON output"))' \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
 '--config=[Explicit path to do-harness.toml]:FILE:_files' \
-'--color=[Color output (auto, always, never)]:WHEN:_default' \
-'--output=[Default output file path]:FILE:_files' \
-'*-v[Verbosity level (-v, -vv)]' \
-'*--verbose[Verbosity level (-v, -vv)]' \
-'-q[Suppress non-error messages]' \
-'--quiet[Suppress non-error messages]' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
 '--dry-run[Dry run without side effects]' \
 '-h[Print help (see more with '\''--help'\'')]' \
 '--help[Print help (see more with '\''--help'\'')]' \
@@ -408,12 +363,9 @@ esac
 _arguments "${_arguments_options[@]}" : \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
 '--config=[Explicit path to do-harness.toml]:FILE:_files' \
-'--color=[Color output (auto, always, never)]:WHEN:_default' \
-'--output=[Default output file path]:FILE:_files' \
-'*-v[Verbosity level (-v, -vv)]' \
-'*--verbose[Verbosity level (-v, -vv)]' \
-'-q[Suppress non-error messages]' \
-'--quiet[Suppress non-error messages]' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
 '--dry-run[Dry run without side effects]' \
 '-h[Print help]' \
 '--help[Print help]' \
@@ -437,12 +389,9 @@ _arguments "${_arguments_options[@]}" : \
 json\:"Machine-readable JSON output"))' \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
 '--config=[Explicit path to do-harness.toml]:FILE:_files' \
-'--color=[Color output (auto, always, never)]:WHEN:_default' \
-'--output=[Default output file path]:FILE:_files' \
-'*-v[Verbosity level (-v, -vv)]' \
-'*--verbose[Verbosity level (-v, -vv)]' \
-'-q[Suppress non-error messages]' \
-'--quiet[Suppress non-error messages]' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
 '--dry-run[Dry run without side effects]' \
 '-h[Print help (see more with '\''--help'\'')]' \
 '--help[Print help (see more with '\''--help'\'')]' \
@@ -457,12 +406,9 @@ _arguments "${_arguments_options[@]}" : \
 json\:"Machine-readable JSON output"))' \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
 '--config=[Explicit path to do-harness.toml]:FILE:_files' \
-'--color=[Color output (auto, always, never)]:WHEN:_default' \
-'--output=[Default output file path]:FILE:_files' \
-'*-v[Verbosity level (-v, -vv)]' \
-'*--verbose[Verbosity level (-v, -vv)]' \
-'-q[Suppress non-error messages]' \
-'--quiet[Suppress non-error messages]' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
 '--dry-run[Dry run without side effects]' \
 '-h[Print help (see more with '\''--help'\'')]' \
 '--help[Print help (see more with '\''--help'\'')]' \
@@ -506,16 +452,13 @@ esac
 _arguments "${_arguments_options[@]}" : \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
 '--config=[Explicit path to do-harness.toml]:FILE:_files' \
-'--color=[Color output (auto, always, never)]:WHEN:_default' \
-'--output=[Default output file path]:FILE:_files' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
 '--check[Report pending migrations and exit non-zero when any are pending]' \
 '--dry-run[Report pending migrations without applying them (exit 0)]' \
 '-y[Skip the interactive confirmation prompt]' \
 '--yes[Skip the interactive confirmation prompt]' \
-'*-v[Verbosity level (-v, -vv)]' \
-'*--verbose[Verbosity level (-v, -vv)]' \
-'-q[Suppress non-error messages]' \
-'--quiet[Suppress non-error messages]' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
 '-h[Print help]' \
 '--help[Print help]' \
 '-V[Print version]' \
@@ -526,13 +469,10 @@ _arguments "${_arguments_options[@]}" : \
 _arguments "${_arguments_options[@]}" : \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
 '--config=[Explicit path to do-harness.toml]:FILE:_files' \
-'--color=[Color output (auto, always, never)]:WHEN:_default' \
-'--output=[Default output file path]:FILE:_files' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
 '--prune[Delete invariants no longer present in plans/invariants.json]' \
-'*-v[Verbosity level (-v, -vv)]' \
-'*--verbose[Verbosity level (-v, -vv)]' \
-'-q[Suppress non-error messages]' \
-'--quiet[Suppress non-error messages]' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
 '--dry-run[Dry run without side effects]' \
 '-h[Print help]' \
 '--help[Print help]' \
@@ -550,16 +490,13 @@ node\:"Node/Web JS/TS language pack (typecheck, lint, test, build)"))' \
 json\:"Machine-readable JSON output"))' \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
 '--config=[Explicit path to do-harness.toml]:FILE:_files' \
-'--color=[Color output (auto, always, never)]:WHEN:_default' \
-'--output=[Default output file path]:FILE:_files' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
 '--force[Overwrite existing files]' \
 '--no-seed[Do not seed invariants]' \
 '--minimal[Minimal setup without extra skills]' \
 '--no-gitignore[Skip creating/modifying .gitignore]' \
-'*-v[Verbosity level (-v, -vv)]' \
-'*--verbose[Verbosity level (-v, -vv)]' \
-'-q[Suppress non-error messages]' \
-'--quiet[Suppress non-error messages]' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
 '--dry-run[Dry run without side effects]' \
 '-h[Print help (see more with '\''--help'\'')]' \
 '--help[Print help (see more with '\''--help'\'')]' \
@@ -571,12 +508,9 @@ json\:"Machine-readable JSON output"))' \
 _arguments "${_arguments_options[@]}" : \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
 '--config=[Explicit path to do-harness.toml]:FILE:_files' \
-'--color=[Color output (auto, always, never)]:WHEN:_default' \
-'--output=[Default output file path]:FILE:_files' \
-'*-v[Verbosity level (-v, -vv)]' \
-'*--verbose[Verbosity level (-v, -vv)]' \
-'-q[Suppress non-error messages]' \
-'--quiet[Suppress non-error messages]' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
 '--dry-run[Dry run without side effects]' \
 '-h[Print help]' \
 '--help[Print help]' \
@@ -600,12 +534,9 @@ _arguments "${_arguments_options[@]}" : \
 json\:"Machine-readable JSON output"))' \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
 '--config=[Explicit path to do-harness.toml]:FILE:_files' \
-'--color=[Color output (auto, always, never)]:WHEN:_default' \
 '--stdout[Write directly to stdout instead of file]' \
-'*-v[Verbosity level (-v, -vv)]' \
-'*--verbose[Verbosity level (-v, -vv)]' \
-'-q[Suppress non-error messages]' \
-'--quiet[Suppress non-error messages]' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
 '--dry-run[Dry run without side effects]' \
 '-h[Print help (see more with '\''--help'\'')]' \
 '--help[Print help (see more with '\''--help'\'')]' \
@@ -618,13 +549,10 @@ _arguments "${_arguments_options[@]}" : \
 '--file=[Snapshot file (defaults to plans/tasks.json under the root)]:FILE:_files' \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
 '--config=[Explicit path to do-harness.toml]:FILE:_files' \
-'--color=[Color output (auto, always, never)]:WHEN:_default' \
-'--output=[Default output file path]:FILE:_files' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
 '--check[Exit non-zero when the snapshot and database drift]' \
-'*-v[Verbosity level (-v, -vv)]' \
-'*--verbose[Verbosity level (-v, -vv)]' \
-'-q[Suppress non-error messages]' \
-'--quiet[Suppress non-error messages]' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
 '--dry-run[Dry run without side effects]' \
 '-h[Print help]' \
 '--help[Print help]' \
@@ -641,12 +569,9 @@ _arguments "${_arguments_options[@]}" : \
 json\:"Machine-readable JSON output"))' \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
 '--config=[Explicit path to do-harness.toml]:FILE:_files' \
-'--color=[Color output (auto, always, never)]:WHEN:_default' \
-'--output=[Default output file path]:FILE:_files' \
-'*-v[Verbosity level (-v, -vv)]' \
-'*--verbose[Verbosity level (-v, -vv)]' \
-'-q[Suppress non-error messages]' \
-'--quiet[Suppress non-error messages]' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
 '--dry-run[Dry run without side effects]' \
 '-h[Print help (see more with '\''--help'\'')]' \
 '--help[Print help (see more with '\''--help'\'')]' \
@@ -660,12 +585,9 @@ _arguments "${_arguments_options[@]}" : \
 json\:"Machine-readable JSON output"))' \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
 '--config=[Explicit path to do-harness.toml]:FILE:_files' \
-'--color=[Color output (auto, always, never)]:WHEN:_default' \
-'--output=[Default output file path]:FILE:_files' \
-'*-v[Verbosity level (-v, -vv)]' \
-'*--verbose[Verbosity level (-v, -vv)]' \
-'-q[Suppress non-error messages]' \
-'--quiet[Suppress non-error messages]' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
 '--dry-run[Dry run without side effects]' \
 '-h[Print help (see more with '\''--help'\'')]' \
 '--help[Print help (see more with '\''--help'\'')]' \
@@ -681,12 +603,9 @@ _arguments "${_arguments_options[@]}" : \
 '--precondition=[Recorded precondition guard]:PRECONDITION:_default' \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
 '--config=[Explicit path to do-harness.toml]:FILE:_files' \
-'--color=[Color output (auto, always, never)]:WHEN:_default' \
-'--output=[Default output file path]:FILE:_files' \
-'*-v[Verbosity level (-v, -vv)]' \
-'*--verbose[Verbosity level (-v, -vv)]' \
-'-q[Suppress non-error messages]' \
-'--quiet[Suppress non-error messages]' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
 '--dry-run[Dry run without side effects]' \
 '-h[Print help]' \
 '--help[Print help]' \
@@ -699,13 +618,10 @@ _arguments "${_arguments_options[@]}" : \
 _arguments "${_arguments_options[@]}" : \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
 '--config=[Explicit path to do-harness.toml]:FILE:_files' \
-'--color=[Color output (auto, always, never)]:WHEN:_default' \
-'--output=[Default output file path]:FILE:_files' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
 '--dry-run[Perform dry run without state changes]' \
-'*-v[Verbosity level (-v, -vv)]' \
-'*--verbose[Verbosity level (-v, -vv)]' \
-'-q[Suppress non-error messages]' \
-'--quiet[Suppress non-error messages]' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
 '-h[Print help]' \
 '--help[Print help]' \
 '-V[Print version]' \
@@ -717,13 +633,10 @@ _arguments "${_arguments_options[@]}" : \
 _arguments "${_arguments_options[@]}" : \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
 '--config=[Explicit path to do-harness.toml]:FILE:_files' \
-'--color=[Color output (auto, always, never)]:WHEN:_default' \
-'--output=[Default output file path]:FILE:_files' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
 '--dry-run[Perform dry run without state changes]' \
-'*-v[Verbosity level (-v, -vv)]' \
-'*--verbose[Verbosity level (-v, -vv)]' \
-'-q[Suppress non-error messages]' \
-'--quiet[Suppress non-error messages]' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
 '-h[Print help]' \
 '--help[Print help]' \
 '-V[Print version]' \
@@ -735,12 +648,9 @@ _arguments "${_arguments_options[@]}" : \
 _arguments "${_arguments_options[@]}" : \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
 '--config=[Explicit path to do-harness.toml]:FILE:_files' \
-'--color=[Color output (auto, always, never)]:WHEN:_default' \
-'--output=[Default output file path]:FILE:_files' \
-'*-v[Verbosity level (-v, -vv)]' \
-'*--verbose[Verbosity level (-v, -vv)]' \
-'-q[Suppress non-error messages]' \
-'--quiet[Suppress non-error messages]' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
 '--dry-run[Dry run without side effects]' \
 '-h[Print help]' \
 '--help[Print help]' \
@@ -753,12 +663,9 @@ _arguments "${_arguments_options[@]}" : \
 _arguments "${_arguments_options[@]}" : \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
 '--config=[Explicit path to do-harness.toml]:FILE:_files' \
-'--color=[Color output (auto, always, never)]:WHEN:_default' \
-'--output=[Default output file path]:FILE:_files' \
-'*-v[Verbosity level (-v, -vv)]' \
-'*--verbose[Verbosity level (-v, -vv)]' \
-'-q[Suppress non-error messages]' \
-'--quiet[Suppress non-error messages]' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
 '--dry-run[Dry run without side effects]' \
 '-h[Print help]' \
 '--help[Print help]' \
@@ -831,12 +738,9 @@ esac
 _arguments "${_arguments_options[@]}" : \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
 '--config=[Explicit path to do-harness.toml]:FILE:_files' \
-'--color=[Color output (auto, always, never)]:WHEN:_default' \
-'--output=[Default output file path]:FILE:_files' \
-'*-v[Verbosity level (-v, -vv)]' \
-'*--verbose[Verbosity level (-v, -vv)]' \
-'-q[Suppress non-error messages]' \
-'--quiet[Suppress non-error messages]' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
 '--dry-run[Dry run without side effects]' \
 '-h[Print help]' \
 '--help[Print help]' \
@@ -861,12 +765,9 @@ _arguments "${_arguments_options[@]}" : \
 '--resolution-steps=[Steps taken to resolve the failure]:RESOLUTION_STEPS:_default' \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
 '--config=[Explicit path to do-harness.toml]:FILE:_files' \
-'--color=[Color output (auto, always, never)]:WHEN:_default' \
-'--output=[Default output file path]:FILE:_files' \
-'*-v[Verbosity level (-v, -vv)]' \
-'*--verbose[Verbosity level (-v, -vv)]' \
-'-q[Suppress non-error messages]' \
-'--quiet[Suppress non-error messages]' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
 '--dry-run[Dry run without side effects]' \
 '-h[Print help]' \
 '--help[Print help]' \
@@ -881,12 +782,9 @@ _arguments "${_arguments_options[@]}" : \
 json\:"Machine-readable JSON output"))' \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
 '--config=[Explicit path to do-harness.toml]:FILE:_files' \
-'--color=[Color output (auto, always, never)]:WHEN:_default' \
-'--output=[Default output file path]:FILE:_files' \
-'*-v[Verbosity level (-v, -vv)]' \
-'*--verbose[Verbosity level (-v, -vv)]' \
-'-q[Suppress non-error messages]' \
-'--quiet[Suppress non-error messages]' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
 '--dry-run[Dry run without side effects]' \
 '-h[Print help (see more with '\''--help'\'')]' \
 '--help[Print help (see more with '\''--help'\'')]' \
@@ -900,12 +798,9 @@ _arguments "${_arguments_options[@]}" : \
 json\:"Machine-readable JSON output"))' \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
 '--config=[Explicit path to do-harness.toml]:FILE:_files' \
-'--color=[Color output (auto, always, never)]:WHEN:_default' \
-'--output=[Default output file path]:FILE:_files' \
-'*-v[Verbosity level (-v, -vv)]' \
-'*--verbose[Verbosity level (-v, -vv)]' \
-'-q[Suppress non-error messages]' \
-'--quiet[Suppress non-error messages]' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
 '--dry-run[Dry run without side effects]' \
 '-h[Print help (see more with '\''--help'\'')]' \
 '--help[Print help (see more with '\''--help'\'')]' \
@@ -961,15 +856,12 @@ _arguments "${_arguments_options[@]}" : \
 json\:"Machine-readable JSON output"))' \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
 '--config=[Explicit path to do-harness.toml]:FILE:_files' \
-'--color=[Color output (auto, always, never)]:WHEN:_default' \
-'--output=[Default output file path]:FILE:_files' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
 '--from-strikes[Generate a starter skill scaffold from recorded sensor strikes (AGENTS.md §6 steering loop) instead of distilling from a trace]' \
 '--to-fixture[Raise the skill'\''s pass-rate bar after this recovery (review ticks anti-AI-slop checklist first)]' \
 '--dry-run[Perform dry run without modifying skill files]' \
-'*-v[Verbosity level (-v, -vv)]' \
-'*--verbose[Verbosity level (-v, -vv)]' \
-'-q[Suppress non-error messages]' \
-'--quiet[Suppress non-error messages]' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
 '-h[Print help (see more with '\''--help'\'')]' \
 '--help[Print help (see more with '\''--help'\'')]' \
 '-V[Print version]' \
@@ -980,12 +872,9 @@ json\:"Machine-readable JSON output"))' \
 _arguments "${_arguments_options[@]}" : \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
 '--config=[Explicit path to do-harness.toml]:FILE:_files' \
-'--color=[Color output (auto, always, never)]:WHEN:_default' \
-'--output=[Default output file path]:FILE:_files' \
-'*-v[Verbosity level (-v, -vv)]' \
-'*--verbose[Verbosity level (-v, -vv)]' \
-'-q[Suppress non-error messages]' \
-'--quiet[Suppress non-error messages]' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
 '--dry-run[Dry run without side effects]' \
 '-h[Print help]' \
 '--help[Print help]' \
@@ -1009,12 +898,9 @@ _arguments "${_arguments_options[@]}" : \
 json\:"Machine-readable JSON output"))' \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
 '--config=[Explicit path to do-harness.toml]:FILE:_files' \
-'--color=[Color output (auto, always, never)]:WHEN:_default' \
-'--output=[Default output file path]:FILE:_files' \
-'*-v[Verbosity level (-v, -vv)]' \
-'*--verbose[Verbosity level (-v, -vv)]' \
-'-q[Suppress non-error messages]' \
-'--quiet[Suppress non-error messages]' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
 '--dry-run[Dry run without side effects]' \
 '-h[Print help (see more with '\''--help'\'')]' \
 '--help[Print help (see more with '\''--help'\'')]' \
@@ -1029,14 +915,11 @@ _arguments "${_arguments_options[@]}" : \
 '(--task)--scope=[Only clear signatures for this workstream scope (\`branch\:<name>\`, \`task\:<id>\`, \`global\`, or \`all\` for every workstream)]:SCOPE:_default' \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
 '--config=[Explicit path to do-harness.toml]:FILE:_files' \
-'--color=[Color output (auto, always, never)]:WHEN:_default' \
-'--output=[Default output file path]:FILE:_files' \
-'--force[Force clearing without prompt]' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
+'--force[Allow clearing every workstream without a filter]' \
 '--dry-run[Perform dry run without clearing]' \
-'*-v[Verbosity level (-v, -vv)]' \
-'*--verbose[Verbosity level (-v, -vv)]' \
-'-q[Suppress non-error messages]' \
-'--quiet[Suppress non-error messages]' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
 '-h[Print help]' \
 '--help[Print help]' \
 '-V[Print version]' \
@@ -1081,13 +964,10 @@ _arguments "${_arguments_options[@]}" : \
 json\:"Machine-readable JSON output"))' \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
 '--config=[Explicit path to do-harness.toml]:FILE:_files' \
-'--color=[Color output (auto, always, never)]:WHEN:_default' \
-'--output=[Default output file path]:FILE:_files' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
 '--warn[Show only files at or above the 450-line decomposition threshold]' \
-'*-v[Verbosity level (-v, -vv)]' \
-'*--verbose[Verbosity level (-v, -vv)]' \
-'-q[Suppress non-error messages]' \
-'--quiet[Suppress non-error messages]' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
 '--dry-run[Dry run without side effects]' \
 '-h[Print help (see more with '\''--help'\'')]' \
 '--help[Print help (see more with '\''--help'\'')]' \
@@ -1101,13 +981,10 @@ _arguments "${_arguments_options[@]}" : \
 '--target=[Name the sibling module instead of deriving it from the item]:NAME:_default' \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
 '--config=[Explicit path to do-harness.toml]:FILE:_files' \
-'--color=[Color output (auto, always, never)]:WHEN:_default' \
-'--output=[Default output file path]:FILE:_files' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
 '--dry-run[Print the plan without writing files]' \
-'*-v[Verbosity level (-v, -vv)]' \
-'*--verbose[Verbosity level (-v, -vv)]' \
-'-q[Suppress non-error messages]' \
-'--quiet[Suppress non-error messages]' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
 '-h[Print help]' \
 '--help[Print help]' \
 '-V[Print version]' \
@@ -1125,18 +1002,15 @@ json\:"Machine-readable JSON output"))' \
 '--agent-timeout=[Kill an agent run after this many seconds]:SECS:_default' \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
 '--config=[Explicit path to do-harness.toml]:FILE:_files' \
-'--color=[Color output (auto, always, never)]:WHEN:_default' \
-'--output=[Default output file path]:FILE:_files' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
 '--bless[Re-baseline graders and update pass-rate floor on green run]' \
 '--list-skills[List available skills]' \
 '--fail-fast[Halt on first failing evaluation]' \
 '--dry-run[Perform dry-run evaluation]' \
 '--no-lift[Skip the without-skill baseline run (no Skill Lift measured)]' \
 '--strict-fixtures[Fail skills whose fixture has dataset-quality gaps (thin cases, no negative out-of-scope case)]' \
-'*-v[Verbosity level (-v, -vv)]' \
-'*--verbose[Verbosity level (-v, -vv)]' \
-'-q[Suppress non-error messages]' \
-'--quiet[Suppress non-error messages]' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
 '-h[Print help (see more with '\''--help'\'')]' \
 '--help[Print help (see more with '\''--help'\'')]' \
 '-V[Print version]' \
@@ -1147,12 +1021,9 @@ json\:"Machine-readable JSON output"))' \
 _arguments "${_arguments_options[@]}" : \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
 '--config=[Explicit path to do-harness.toml]:FILE:_files' \
-'--color=[Color output (auto, always, never)]:WHEN:_default' \
-'--output=[Default output file path]:FILE:_files' \
-'*-v[Verbosity level (-v, -vv)]' \
-'*--verbose[Verbosity level (-v, -vv)]' \
-'-q[Suppress non-error messages]' \
-'--quiet[Suppress non-error messages]' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
 '--dry-run[Dry run without side effects]' \
 '-h[Print help]' \
 '--help[Print help]' \
@@ -1172,13 +1043,10 @@ _arguments "${_arguments_options[@]}" : \
 _arguments "${_arguments_options[@]}" : \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
 '--config=[Explicit path to do-harness.toml]:FILE:_files' \
-'--color=[Color output (auto, always, never)]:WHEN:_default' \
-'--output=[Default output file path]:FILE:_files' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
 '--force[Overwrite foreign (unmanaged) hook files]' \
-'*-v[Verbosity level (-v, -vv)]' \
-'*--verbose[Verbosity level (-v, -vv)]' \
-'-q[Suppress non-error messages]' \
-'--quiet[Suppress non-error messages]' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
 '--dry-run[Dry run without side effects]' \
 '-h[Print help]' \
 '--help[Print help]' \
@@ -1190,12 +1058,9 @@ _arguments "${_arguments_options[@]}" : \
 _arguments "${_arguments_options[@]}" : \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
 '--config=[Explicit path to do-harness.toml]:FILE:_files' \
-'--color=[Color output (auto, always, never)]:WHEN:_default' \
-'--output=[Default output file path]:FILE:_files' \
-'*-v[Verbosity level (-v, -vv)]' \
-'*--verbose[Verbosity level (-v, -vv)]' \
-'-q[Suppress non-error messages]' \
-'--quiet[Suppress non-error messages]' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
 '--dry-run[Dry run without side effects]' \
 '-h[Print help]' \
 '--help[Print help]' \
@@ -1209,12 +1074,9 @@ _arguments "${_arguments_options[@]}" : \
 json\:"Machine-readable JSON output"))' \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
 '--config=[Explicit path to do-harness.toml]:FILE:_files' \
-'--color=[Color output (auto, always, never)]:WHEN:_default' \
-'--output=[Default output file path]:FILE:_files' \
-'*-v[Verbosity level (-v, -vv)]' \
-'*--verbose[Verbosity level (-v, -vv)]' \
-'-q[Suppress non-error messages]' \
-'--quiet[Suppress non-error messages]' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
 '--dry-run[Dry run without side effects]' \
 '-h[Print help (see more with '\''--help'\'')]' \
 '--help[Print help (see more with '\''--help'\'')]' \
@@ -1226,12 +1088,9 @@ json\:"Machine-readable JSON output"))' \
 _arguments "${_arguments_options[@]}" : \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
 '--config=[Explicit path to do-harness.toml]:FILE:_files' \
-'--color=[Color output (auto, always, never)]:WHEN:_default' \
-'--output=[Default output file path]:FILE:_files' \
-'*-v[Verbosity level (-v, -vv)]' \
-'*--verbose[Verbosity level (-v, -vv)]' \
-'-q[Suppress non-error messages]' \
-'--quiet[Suppress non-error messages]' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
 '--dry-run[Dry run without side effects]' \
 '-h[Print help]' \
 '--help[Print help]' \
@@ -1285,13 +1144,10 @@ _arguments "${_arguments_options[@]}" : \
 json\:"Machine-readable JSON output"))' \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
 '--config=[Explicit path to do-harness.toml]:FILE:_files' \
-'--color=[Color output (auto, always, never)]:WHEN:_default' \
-'--output=[Default output file path]:FILE:_files' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
 '--strict[Strictly enforce warning checks as failures]' \
-'*-v[Verbosity level (-v, -vv)]' \
-'*--verbose[Verbosity level (-v, -vv)]' \
-'-q[Suppress non-error messages]' \
-'--quiet[Suppress non-error messages]' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
 '--dry-run[Dry run without side effects]' \
 '-h[Print help (see more with '\''--help'\'')]' \
 '--help[Print help (see more with '\''--help'\'')]' \
@@ -1311,13 +1167,10 @@ json\:"Machine-readable JSON output"))' \
 '(--scope)--branch=[Filter by branch name (equivalent to \`--scope branch\:<NAME>\`)]:BRANCH:_default' \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
 '--config=[Explicit path to do-harness.toml]:FILE:_files' \
-'--color=[Color output (auto, always, never)]:WHEN:_default' \
-'--output=[Default output file path]:FILE:_files' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
 '(--scope --task --branch)--all[Aggregate across all workstreams and scopes]' \
-'*-v[Verbosity level (-v, -vv)]' \
-'*--verbose[Verbosity level (-v, -vv)]' \
-'-q[Suppress non-error messages]' \
-'--quiet[Suppress non-error messages]' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
 '--dry-run[Dry run without side effects]' \
 '-h[Print help (see more with '\''--help'\'')]' \
 '--help[Print help (see more with '\''--help'\'')]' \
@@ -1342,13 +1195,10 @@ _arguments "${_arguments_options[@]}" : \
 json\:"Machine-readable JSON output"))' \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
 '--config=[Explicit path to do-harness.toml]:FILE:_files' \
-'--color=[Color output (auto, always, never)]:WHEN:_default' \
-'--output=[Default output file path]:FILE:_files' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
 '--recompute[Ignore the cached snapshot and refetch]' \
-'*-v[Verbosity level (-v, -vv)]' \
-'*--verbose[Verbosity level (-v, -vv)]' \
-'-q[Suppress non-error messages]' \
-'--quiet[Suppress non-error messages]' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
 '--dry-run[Dry run without side effects]' \
 '-h[Print help (see more with '\''--help'\'')]' \
 '--help[Print help (see more with '\''--help'\'')]' \
@@ -1392,13 +1242,10 @@ _arguments "${_arguments_options[@]}" : \
 json\:"Machine-readable JSON output"))' \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
 '--config=[Explicit path to do-harness.toml]:FILE:_files' \
-'--color=[Color output (auto, always, never)]:WHEN:_default' \
-'--output=[Default output file path]:FILE:_files' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
 '--draft[Draft the steering actions without applying anything (required\: \`learn\` writes nothing)]' \
-'*-v[Verbosity level (-v, -vv)]' \
-'*--verbose[Verbosity level (-v, -vv)]' \
-'-q[Suppress non-error messages]' \
-'--quiet[Suppress non-error messages]' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
 '--dry-run[Dry run without side effects]' \
 '-h[Print help (see more with '\''--help'\'')]' \
 '--help[Print help (see more with '\''--help'\'')]' \
@@ -1413,12 +1260,9 @@ _arguments "${_arguments_options[@]}" : \
 json\:"Machine-readable JSON output"))' \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
 '--config=[Explicit path to do-harness.toml]:FILE:_files' \
-'--color=[Color output (auto, always, never)]:WHEN:_default' \
-'--output=[Default output file path]:FILE:_files' \
-'*-v[Verbosity level (-v, -vv)]' \
-'*--verbose[Verbosity level (-v, -vv)]' \
-'-q[Suppress non-error messages]' \
-'--quiet[Suppress non-error messages]' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
 '--dry-run[Dry run without side effects]' \
 '-h[Print help (see more with '\''--help'\'')]' \
 '--help[Print help (see more with '\''--help'\'')]' \
@@ -1432,12 +1276,9 @@ _arguments "${_arguments_options[@]}" : \
 '--keep-per-task=[Minimum most-recent beats kept per task when pruning]:N:_default' \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
 '--config=[Explicit path to do-harness.toml]:FILE:_files' \
-'--color=[Color output (auto, always, never)]:WHEN:_default' \
-'--output=[Default output file path]:FILE:_files' \
-'*-v[Verbosity level (-v, -vv)]' \
-'*--verbose[Verbosity level (-v, -vv)]' \
-'-q[Suppress non-error messages]' \
-'--quiet[Suppress non-error messages]' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
 '--dry-run[Dry run without side effects]' \
 '-h[Print help]' \
 '--help[Print help]' \
@@ -1447,17 +1288,14 @@ _arguments "${_arguments_options[@]}" : \
 ;;
 (compliance)
 _arguments "${_arguments_options[@]}" : \
-'--framework=[Filter framework (owasp-agentic-top10, nist-ai-rmf, eu-ai-act, soc2)]:FRAMEWORK:_default' \
+'--framework=[Filter framework (owasp, nist, eu, soc; hyphenated ids accepted)]:FRAMEWORK:_default' \
 '--format=[Output format]:FORMAT:((text\:"Human-readable text output"
 json\:"Machine-readable JSON output"))' \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
 '--config=[Explicit path to do-harness.toml]:FILE:_files' \
-'--color=[Color output (auto, always, never)]:WHEN:_default' \
-'--output=[Default output file path]:FILE:_files' \
-'*-v[Verbosity level (-v, -vv)]' \
-'*--verbose[Verbosity level (-v, -vv)]' \
-'-q[Suppress non-error messages]' \
-'--quiet[Suppress non-error messages]' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
 '--dry-run[Dry run without side effects]' \
 '-h[Print help (see more with '\''--help'\'')]' \
 '--help[Print help (see more with '\''--help'\'')]' \
@@ -1471,12 +1309,9 @@ _arguments "${_arguments_options[@]}" : \
 json\:"Machine-readable JSON output"))' \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
 '--config=[Explicit path to do-harness.toml]:FILE:_files' \
-'--color=[Color output (auto, always, never)]:WHEN:_default' \
-'--output=[Default output file path]:FILE:_files' \
-'*-v[Verbosity level (-v, -vv)]' \
-'*--verbose[Verbosity level (-v, -vv)]' \
-'-q[Suppress non-error messages]' \
-'--quiet[Suppress non-error messages]' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
 '--dry-run[Dry run without side effects]' \
 '-h[Print help (see more with '\''--help'\'')]' \
 '--help[Print help (see more with '\''--help'\'')]' \
@@ -1494,13 +1329,10 @@ gh\:"Git history plus opt-in \`gh\` enrichment (network; never in CI)"))' \
 '--now=[Measurement clock as Unix seconds (default\: system clock)]:UNIX_SECONDS:_default' \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
 '--config=[Explicit path to do-harness.toml]:FILE:_files' \
-'--color=[Color output (auto, always, never)]:WHEN:_default' \
-'--output=[Default output file path]:FILE:_files' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
 '--record[Persist the snapshot into the state database]' \
-'*-v[Verbosity level (-v, -vv)]' \
-'*--verbose[Verbosity level (-v, -vv)]' \
-'-q[Suppress non-error messages]' \
-'--quiet[Suppress non-error messages]' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
 '--dry-run[Dry run without side effects]' \
 '-h[Print help (see more with '\''--help'\'')]' \
 '--help[Print help (see more with '\''--help'\'')]' \
@@ -1514,12 +1346,9 @@ _arguments "${_arguments_options[@]}" : \
 json\:"Machine-readable JSON output"))' \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
 '--config=[Explicit path to do-harness.toml]:FILE:_files' \
-'--color=[Color output (auto, always, never)]:WHEN:_default' \
-'--output=[Default output file path]:FILE:_files' \
-'*-v[Verbosity level (-v, -vv)]' \
-'*--verbose[Verbosity level (-v, -vv)]' \
-'-q[Suppress non-error messages]' \
-'--quiet[Suppress non-error messages]' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
 '--dry-run[Dry run without side effects]' \
 '-h[Print help (see more with '\''--help'\'')]' \
 '--help[Print help (see more with '\''--help'\'')]' \
@@ -1534,12 +1363,9 @@ _arguments "${_arguments_options[@]}" : \
 json\:"Machine-readable JSON output"))' \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
 '--config=[Explicit path to do-harness.toml]:FILE:_files' \
-'--color=[Color output (auto, always, never)]:WHEN:_default' \
-'--output=[Default output file path]:FILE:_files' \
-'*-v[Verbosity level (-v, -vv)]' \
-'*--verbose[Verbosity level (-v, -vv)]' \
-'-q[Suppress non-error messages]' \
-'--quiet[Suppress non-error messages]' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
 '--dry-run[Dry run without side effects]' \
 '-h[Print help (see more with '\''--help'\'')]' \
 '--help[Print help (see more with '\''--help'\'')]' \
@@ -1552,12 +1378,9 @@ json\:"Machine-readable JSON output"))' \
 _arguments "${_arguments_options[@]}" : \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
 '--config=[Explicit path to do-harness.toml]:FILE:_files' \
-'--color=[Color output (auto, always, never)]:WHEN:_default' \
-'--output=[Default output file path]:FILE:_files' \
-'*-v[Verbosity level (-v, -vv)]' \
-'*--verbose[Verbosity level (-v, -vv)]' \
-'-q[Suppress non-error messages]' \
-'--quiet[Suppress non-error messages]' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
 '--dry-run[Dry run without side effects]' \
 '-h[Print help]' \
 '--help[Print help]' \
@@ -1570,12 +1393,9 @@ _arguments "${_arguments_options[@]}" : \
 _arguments "${_arguments_options[@]}" : \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
 '--config=[Explicit path to do-harness.toml]:FILE:_files' \
-'--color=[Color output (auto, always, never)]:WHEN:_default' \
-'--output=[Default output file path]:FILE:_files' \
-'*-v[Verbosity level (-v, -vv)]' \
-'*--verbose[Verbosity level (-v, -vv)]' \
-'-q[Suppress non-error messages]' \
-'--quiet[Suppress non-error messages]' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
 '--dry-run[Dry run without side effects]' \
 '-h[Print help]' \
 '--help[Print help]' \

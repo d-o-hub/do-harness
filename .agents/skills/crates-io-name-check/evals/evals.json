@@ -14,7 +14,8 @@
         "contains:.agents/skills/crates-io-name-check/SKILL.md|Accept: application/json",
         "contains:.agents/skills/crates-io-name-check/SKILL.md|404",
         "contains:.agents/skills/crates-io-name-check/SKILL.md|200",
-        "exists:name_check_output.txt"
+        "exists:name_check_output.txt",
+        "contains:name_check_output.txt|user_agent=missing"
       ]
     },
     {

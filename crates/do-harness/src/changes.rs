@@ -220,13 +220,21 @@ fn tracked_changes(root: &Path) -> Vec<ChangedFile> {
                 }
             }
             'R' | 'C' => {
-                // Rename/copy records carry `<from>\0<to>\0`.
+                // Rename/copy records carry `<from>\0<to>\0`. Both ends are
+                // recorded because change-aware selection matches on
+                // `paths()`: a file moved out of a watched tree must trigger
+                // that tree's sensors on the deletion side, exactly like a
+                // plain delete does.
                 let from = records.next();
                 let to = records.next();
                 if let (Some(from), Some(to)) = (from, to) {
                     files.push(ChangedFile {
                         path: to,
-                        kind: ChangeKind::Renamed { from },
+                        kind: ChangeKind::Renamed { from: from.clone() },
+                    });
+                    files.push(ChangedFile {
+                        path: from,
+                        kind: ChangeKind::Deleted,
                     });
                 }
             }
@@ -381,7 +389,9 @@ mod tests {
         );
     }
 
-    /// A staged rename surfaces the new path with its origin.
+    /// A staged rename surfaces both ends: the new path with its origin and
+    /// the origin as a deletion, so `when-changed` globs over the source tree
+    /// still fire for a move out of it.
     #[test]
     fn discover_reports_renames() {
         let dir = tempfile::tempdir().unwrap();
@@ -396,12 +406,18 @@ mod tests {
         assert!(!changed.discovery_failed);
         assert_eq!(
             changed.files,
-            vec![ChangedFile {
-                path: "new.rs".to_owned(),
-                kind: ChangeKind::Renamed {
-                    from: "old.rs".to_owned(),
+            vec![
+                ChangedFile {
+                    path: "new.rs".to_owned(),
+                    kind: ChangeKind::Renamed {
+                        from: "old.rs".to_owned(),
+                    },
                 },
-            }]
+                ChangedFile {
+                    path: "old.rs".to_owned(),
+                    kind: ChangeKind::Deleted,
+                },
+            ]
         );
     }
 

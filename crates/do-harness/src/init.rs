@@ -331,14 +331,19 @@ fn validate_existing_invariants(root: &Path, opts: &InitOpts) -> Result<()> {
     Ok(())
 }
 
-/// Upserts `plans/invariants.json` into the state database.
-pub(crate) async fn seed_invariants(root: &Path, prune: bool) -> Result<usize> {
+/// Parses `plans/invariants.json` without touching the state database.
+pub(crate) async fn load_invariants(root: &Path) -> Result<Vec<do_harness_types::DecisionHeader>> {
     let json_path = root.join("plans/invariants.json");
     let json = tokio::fs::read_to_string(&json_path)
         .await
         .with_context(|| format!("failed to read {}", json_path.display()))?;
-    let headers = do_harness_types::parse_invariants_json(&json)
-        .map_err(|e| anyhow::anyhow!("invalid plans/invariants.json: {e}"))?;
+    do_harness_types::parse_invariants_json(&json)
+        .map_err(|e| anyhow::anyhow!("invalid plans/invariants.json: {e}"))
+}
+
+/// Upserts `plans/invariants.json` into the state database.
+pub(crate) async fn seed_invariants(root: &Path, prune: bool) -> Result<usize> {
+    let headers = load_invariants(root).await?;
     let conn = do_harness_db::connect_and_migrate(root).await?;
     Ok(do_harness_db::seed_invariants(&conn, &headers, prune).await?)
 }

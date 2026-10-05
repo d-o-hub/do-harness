@@ -1,0 +1,59 @@
+{
+  "skill_name": "tokio-performance",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Review this async PR: a short JSON parse (<100us) is wrapped in tokio::task::spawn_blocking, and a std::sync::MutexGuard is held across an .await. Which review flags apply?",
+      "expected_output": "Cargo-cult spawn_blocking (keep short bounded CPU on the worker thread) and lock-across-.await (drop the guard before awaiting); no offload for the parse.",
+      "files": [],
+      "dim": "correctness",
+      "kind": "explicit",
+      "assertions": [
+        "walk:",
+        "exists:tokio_playbook.md",
+        "contains:tokio_playbook.md|spawn_blocking",
+        "contains:lock_scope_out.txt|lock scope ok",
+        "contains:.agents/skills/tokio-performance/SKILL.md|Lock-Across"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Our tokio service stalls under load; workers are busy for milliseconds at a time during compression and heavy crypto, and an HTTP fan-out loop spawns unbounded tasks.",
+      "expected_output": "Move sustained heavy CPU to spawn_blocking/pool and bound the fan-out with a Semaphore or bounded channel backpressure.",
+      "files": [],
+      "dim": "efficiency",
+      "kind": "implicit",
+      "assertions": [
+        "contains:tokio_playbook.md|Sustained",
+        "contains:tokio_playbook.md|spawn_blocking",
+        "contains:.agents/skills/tokio-performance/SKILL.md|Semaphore"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Add the async-correctness checks to our PR review loop: which anti-patterns must the reviewer explicitly look for before approving async code?",
+      "expected_output": "Check the four review flags: cargo-cult spawn_blocking, unbounded spawn fan-out, lock-across-await, repeatedly-ready spin loops.",
+      "files": [],
+      "dim": "effectiveness",
+      "kind": "contextual",
+      "assertions": [
+        "contains:tokio_playbook.md|Unbounded Spawn Fan-out",
+        "contains:tokio_playbook.md|Repeatedly-Ready",
+        "contains:.agents/skills/tokio-performance/SKILL.md|backpressure"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "Write a haiku about the ocean. No Rust, async, or Tokio code is involved.",
+      "expected_output": "No async review action: the skill stays unloaded for unrelated requests.",
+      "files": [],
+      "dim": "discoverability",
+      "kind": "negative",
+      "assertions": [
+        "contains:tokio_negative.txt|out-of-scope",
+        "absent:tokio_offload_fix.rs",
+        "not-contains:.agents/skills/tokio-performance/SKILL.md|spawn_blocking is always faster"
+      ]
+    }
+  ]
+}

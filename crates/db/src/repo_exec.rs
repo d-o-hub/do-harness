@@ -173,8 +173,10 @@ pub async fn list_beats_by_scope(conn: &Connection, scope: &str) -> Result<Vec<B
 }
 
 /// Deletes beats older than `older_than` while keeping at least
-/// `keep_per_task` most-recent beats per task (task-less beats form their own
-/// partition). Returns the number of deleted rows.
+/// `keep_per_task` most-recent beats per task or workstream scope (task-less
+/// beats are partitioned by their `scope`, falling back to `global`, so one
+/// branch's history cannot evict another's). Returns the number of deleted
+/// rows.
 ///
 /// # Errors
 ///
@@ -184,7 +186,9 @@ pub async fn prune_beats(conn: &Connection, older_than: i64, keep_per_task: i64)
         .execute(
             "DELETE FROM beats WHERE started_at < ?1 AND id NOT IN (\
                SELECT id FROM (\
-                 SELECT id, ROW_NUMBER() OVER (PARTITION BY task_id ORDER BY id DESC) AS rn \
+                 SELECT id, ROW_NUMBER() OVER (\
+                   PARTITION BY COALESCE(task_id, -1), COALESCE(scope, 'global') ORDER BY id DESC\
+                 ) AS rn \
                  FROM beats\
                ) WHERE rn <= ?2\
              )",

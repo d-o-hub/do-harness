@@ -248,6 +248,8 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
                 bless,
                 approver,
                 format,
+                quiet: cli.quiet,
+                output: cli.output.clone(),
                 config: config_path,
                 ..Default::default()
             };
@@ -298,7 +300,9 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
         )
         .await
         .map_err(CliError::Usage),
-        Command::Seed { prune } => commands::seed(&root, prune).await.map_err(CliError::Usage),
+        Command::Seed { prune } => commands::seed(&root, prune, cli.dry_run)
+            .await
+            .map_err(CliError::Usage),
         Command::Task { action } => commands::task_cmd(&root, action, cli.dry_run)
             .await
             .map_err(CliError::Usage),

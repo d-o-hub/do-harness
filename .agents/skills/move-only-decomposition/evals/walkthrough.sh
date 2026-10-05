@@ -51,12 +51,16 @@ python3 - "$root" <<'PY'
 import pathlib, sys
 
 root = pathlib.Path(sys.argv[1])
-def squeeze(text):
+
+def tokens(path):
+    return " ".join(open(path, encoding="utf-8").read().split())
+
+def tokens_body(text):
     return " ".join(text.split())
 
-old = (root / "move-old-body.txt").read_text()
-new = (root / "sample_tests.rs").read_text()
-preserved = squeeze(old) == squeeze(new)
+old = tokens_body((root / "move-old-body.txt").read_text(encoding="utf-8"))
+new = tokens(root / "sample_tests.rs")
+preserved = old == new
 (root / "move-fidelity.txt").write_text(f"tokens preserved={'true' if preserved else 'false'}\n")
 (root / "move-declaration.txt").write_text(
     "\n".join(line for line in (root / "sample.rs").read_text().splitlines() if line.startswith("mod") or line.startswith("#[path"))
