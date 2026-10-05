@@ -1,0 +1,44 @@
+name: selection-impact-benchmark
+on:
+  workflow_dispatch:
+    inputs:
+      samples:
+        description: 'Number of timing samples per case'
+        required: false
+        default: '3'
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de
+        with:
+          toolchain: 1.99.0
+
+      - name: Build do-harness binary
+        run: cargo build --release --bin do-harness
+
+      - name: Run Hermetic Selection Impact Test Suite
+        run: bash tests/selection_impact_test.sh
+
+      - name: Run Selection Impact Benchmark
+        env:
+          SAMPLES: ${{ inputs.samples || '3' }}
+        run: |
+          ./scripts/selection-impact-benchmark.sh tests/fixtures/selection-impact/manifest.json benchmark-report.json
+
+      - name: Upload Raw Benchmark Artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: selection-impact-report
+          path: benchmark-report.json

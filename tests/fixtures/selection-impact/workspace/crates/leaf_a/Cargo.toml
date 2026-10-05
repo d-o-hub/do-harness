@@ -1,0 +1,12 @@
+[package]
+name = "leaf_a"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+shared_lib = { path = "../shared_lib" }
+proc_macro_lib = { path = "../proc_macro_lib" }
+
+[features]
+default = []
+extra-feature = []

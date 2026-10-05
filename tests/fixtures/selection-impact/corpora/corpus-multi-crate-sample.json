@@ -1,0 +1,54 @@
+{
+  "corpus_id": "multi-crate-sample",
+  "repository": "multi-crate-sample",
+  "cases": [
+    {
+      "id": "mc-commit-01-leaf-a",
+      "changed_files": [
+        {"path": "crates/leaf_a/src/lib.rs", "kind": "modified"}
+      ],
+      "affected_components": [
+        {"id": "crates/leaf_a", "root": "crates/leaf_a"}
+      ],
+      "global_change": false
+    },
+    {
+      "id": "mc-commit-02-leaf-b",
+      "changed_files": [
+        {"path": "crates/leaf_b/src/lib.rs", "kind": "modified"}
+      ],
+      "affected_components": [
+        {"id": "crates/leaf_b", "root": "crates/leaf_b"}
+      ],
+      "global_change": false
+    },
+    {
+      "id": "mc-commit-03-shared-lib",
+      "changed_files": [
+        {"path": "crates/shared_lib/src/lib.rs", "kind": "modified"}
+      ],
+      "affected_components": [
+        {"id": "crates/shared_lib", "root": "crates/shared_lib"},
+        {"id": "crates/leaf_a", "root": "crates/leaf_a", "reason": "depends_on:crates/shared_lib"},
+        {"id": "crates/leaf_b", "root": "crates/leaf_b", "reason": "depends_on:crates/shared_lib"}
+      ],
+      "global_change": false
+    },
+    {
+      "id": "mc-commit-04-docs",
+      "changed_files": [
+        {"path": "docs/index.md", "kind": "modified"}
+      ],
+      "affected_components": [],
+      "global_change": false
+    },
+    {
+      "id": "mc-commit-05-toolchain",
+      "changed_files": [
+        {"path": "rust-toolchain.toml", "kind": "modified"}
+      ],
+      "affected_components": [],
+      "global_change": true
+    }
+  ]
+}
