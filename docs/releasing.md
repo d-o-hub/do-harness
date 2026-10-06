@@ -121,8 +121,8 @@ set (verification plus `coverage`) and every build target dogfoods green.
 2. Tag the merge commit and push the tag:
 
    ```bash
-   git tag v0.2.0 <merge-commit>
-   git push origin v0.2.0
+   git tag v0.2.1 <merge-commit>
+   git push origin v0.2.1
    ```
 
 3. The `release` workflow runs:
@@ -159,12 +159,12 @@ set (verification plus `coverage`) and every build target dogfoods green.
 Three checks, each answering a different question:
 
 ```bash
-gh release download v0.2.0 --repo d-o-hub/do-harness
+gh release download v0.2.1 --repo d-o-hub/do-harness
 sha256sum -c checksums.txt                       # is the download intact?
-gh release verify v0.2.0 --repo d-o-hub/do-harness
-gh release verify-asset v0.2.0 \
-  do-harness-v0.2.0-x86_64-unknown-linux-musl.tar.gz --repo d-o-hub/do-harness
-gh attestation verify do-harness-v0.2.0-x86_64-unknown-linux-musl.tar.gz \
+gh release verify v0.2.1 --repo d-o-hub/do-harness
+gh release verify-asset v0.2.1 \
+  do-harness-v0.2.1-x86_64-unknown-linux-musl.tar.gz --repo d-o-hub/do-harness
+gh attestation verify do-harness-v0.2.1-x86_64-unknown-linux-musl.tar.gz \
   --repo d-o-hub/do-harness                      # who built it, from which commit?
 ```
 
@@ -235,10 +235,10 @@ Preview the body without publishing:
 
 ```bash
 gh api --method POST repos/d-o-hub/do-harness/releases/generate-notes \
-  -f tag_name=v0.2.0 -f target_commitish=main \
+  -f tag_name=v0.2.1 -f target_commitish=main \
   -f configuration_file_path=.github/release.yml --jq .body > generated-notes.md
-bash scripts/release-notes.sh compose v0.2.0 generated-notes.md release-notes.md
-bash scripts/release-notes.sh check v0.2.0 release-notes.md
+bash scripts/release-notes.sh compose v0.2.1 generated-notes.md release-notes.md
+bash scripts/release-notes.sh check v0.2.1 release-notes.md
 bash scripts/release-notes.sh --self-test
 ```
 
@@ -409,12 +409,12 @@ Validate the assembly locally without a token:
 dist=$(mktemp -d)
 for target in x86_64-unknown-linux-musl aarch64-unknown-linux-musl \
     x86_64-apple-darwin aarch64-apple-darwin; do
-  name="do-harness-v0.2.0-${target}"
+  name="do-harness-v0.2.1-${target}"
   mkdir -p "$dist/pkg/$name"
   cp target/release/do-harness "$dist/pkg/$name/do-harness"
   tar -czf "$dist/${name}.tar.gz" -C "$dist/pkg" "$name"
 done
-name="do-harness-v0.2.0-x86_64-pc-windows-msvc"
+name="do-harness-v0.2.1-x86_64-pc-windows-msvc"
 mkdir -p "$dist/pkg/$name"
 cp target/release/do-harness "$dist/pkg/$name/do-harness.exe"
 (cd "$dist/pkg" && zip -qr "$dist/${name}.zip" "$name")
@@ -432,10 +432,10 @@ missing/unsupported-platform diagnostics.
 |---------|---------|---------|
 | npx (zero install) | `npx do-harness init` | no (package unavailable) |
 | npm dev dependency | `npm install -D do-harness && npx do-harness verify` | no |
-| Prebuilt installer | `curl -fsSL .../scripts/install.sh \| sh -s -- --version v0.2.0` | yes (Git Bash) |
+| Prebuilt installer | `curl -fsSL .../scripts/install.sh \| sh -s -- --version v0.2.1` | yes (Git Bash) |
 | Release zip | unzip `do-harness-v<version>-x86_64-pc-windows-msvc.zip` | yes |
 | cargo-binstall | `cargo binstall do-harness` | yes |
-| crates.io source build | `cargo install do-harness --version 0.2.0` | yes |
+| crates.io source build | `cargo install do-harness --version 0.2.1` | yes |
 | Vendored source | `cargo install --path vendor/do-harness/crates/do-harness` | yes |
 
 Windows has no npm channel: the `do-harness-win32-x64` platform package is
