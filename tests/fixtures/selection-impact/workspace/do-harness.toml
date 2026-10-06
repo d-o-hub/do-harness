@@ -1,0 +1,38 @@
+# Test fixture workspace for affected-selection impact experiment
+[signal-sets]
+verification = ["check", "test-shared", "test-leaf-a", "test-leaf-b", "check-codegen", "test-codegen", "clippy"]
+
+[[sensors]]
+name = "check"
+argv = ["cargo", "check", "--workspace"]
+when-changed = ["**/*.rs", "Cargo.toml", "Cargo.lock", "crates/**/Cargo.toml"]
+
+[[sensors]]
+name = "test-shared"
+argv = ["cargo", "test", "-p", "shared_lib"]
+when-changed = ["crates/shared_lib/**"]
+
+[[sensors]]
+name = "test-leaf-a"
+argv = ["cargo", "test", "-p", "leaf_a"]
+when-changed = ["crates/leaf_a/**"]
+
+[[sensors]]
+name = "test-leaf-b"
+argv = ["cargo", "test", "-p", "leaf_b"]
+when-changed = ["crates/leaf_b/**"]
+
+[[sensors]]
+name = "check-codegen"
+argv = ["cargo", "check", "-p", "codegen_crate"]
+when-changed = ["crates/codegen_crate/**"]
+
+[[sensors]]
+name = "test-codegen"
+argv = ["cargo", "test", "-p", "codegen_crate"]
+when-changed = ["crates/codegen_crate/**"]
+
+[[sensors]]
+name = "clippy"
+argv = ["cargo", "clippy", "--workspace"]
+when-changed = ["**/*.rs", "Cargo.toml", "Cargo.lock", ".clippy.toml"]
