@@ -241,6 +241,17 @@ fn decide(set: Option<&str>, facts: &CurrentFacts, document: &EvidenceDocument) 
 
     let policy_ok = if same_set { policy_match } else { config_match };
     if covers && workspace_match && policy_ok {
+        if let Some(reason) = &document.invalidated_reason {
+            let mut current = facts.side.clone();
+            current.failed.clone_from(&evidence.failed);
+            return StatusReport {
+                state: EvidenceState::Red,
+                set: set.map(ToOwned::to_owned),
+                reason: reason.clone(),
+                evidence: Some(evidence),
+                current,
+            };
+        }
         if same_set && document.summary.verdict == "fail" {
             let mut current = facts.side.clone();
             current.failed.clone_from(&evidence.failed);

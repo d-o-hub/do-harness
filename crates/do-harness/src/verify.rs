@@ -61,6 +61,17 @@ pub(crate) async fn run(root: &Path, mut opts: VerifyOpts) -> std::result::Resul
         )));
     }
     opts.baselines = Baselines::load(root).await.map_err(CliError::Usage)?;
+    let selection = sensors::resolve_selection(&cfg, root, &opts).map_err(CliError::Usage)?;
+
+    // Compute pre-execution input digests for all selected sensors so mid-run
+    // mutations can be detected for every run, including non---record runs.
+    let mut pre_digests = std::collections::BTreeMap::new();
+    for spec in &selection.specs {
+        if let Some(digest) = sensor_inputs::effective_input_digest(root, spec, config_bytes.as_deref()) {
+            pre_digests.insert(spec.name.clone(), digest);
+        }
+    }
+
     if opts.record {
         let struck = telemetry::struck_sensors(root, &cfg.sensor_names(), &beat_scope.key())
             .await
@@ -77,9 +88,12 @@ pub(crate) async fn run(root: &Path, mut opts: VerifyOpts) -> std::result::Resul
                 opts.blocked.push(name);
             }
         }
-        prepare_reuse(root, &cfg, config_bytes.as_deref(), &beat_scope, &mut opts).await?;
+        prepare_reuse(root, &cfg, config_bytes.as_deref(), &beat_scope, &mut opts, &selection).await?;
+    } else {
+        opts.pre_digests = pre_digests.clone();
     }
-    match sensors::verify(&cfg, root, &opts) {
+
+    match sensors::verify_selection(&cfg, root, &opts, &selection) {
         Ok(report) => {
             let skipped: Vec<String> = opts
                 .blocked
@@ -103,6 +117,29 @@ pub(crate) async fn run(root: &Path, mut opts: VerifyOpts) -> std::result::Resul
             if opts.bless {
                 bless_baselines(root, &report, &opts).await?;
             }
+
+            // Compare pre-execution and post-execution input identities.
+            // If any selected sensor's input identity changed during execution
+            // (e.g. source modified by a sensor or concurrent writer), mark the evidence
+            // as invalidated.
+            let mut invalidated_reason = None;
+            for spec in &selection.specs {
+                if opts.blocked.contains(&spec.name) || opts.quarantined.contains(&spec.name) {
+                    continue;
+                }
+                if let Some(pre) = pre_digests.get(&spec.name) {
+                    if let Some(post) = sensor_inputs::effective_input_digest(root, spec, config_bytes.as_deref()) {
+                        if post != *pre {
+                            invalidated_reason = Some("inputs_changed_during_run".to_string());
+                            break;
+                        }
+                    } else {
+                        invalidated_reason = Some("inputs_changed_during_run".to_string());
+                        break;
+                    }
+                }
+            }
+
             report::print_report(&report, opts.format, opts.quiet);
 
             write_evidence(
@@ -112,8 +149,16 @@ pub(crate) async fn run(root: &Path, mut opts: VerifyOpts) -> std::result::Resul
                 &report,
                 &opts,
                 started_at,
+                &selection,
+                invalidated_reason.as_deref(),
             )
             .await?;
+
+            if let Some(reason) = invalidated_reason {
+                return Err(CliError::Verify(anyhow::anyhow!(
+                    "evidence invalidated during run ({reason})"
+                )));
+            }
 
             if report.ok {
                 Ok(())
@@ -143,14 +188,14 @@ pub(crate) async fn run(root: &Path, mut opts: VerifyOpts) -> std::result::Resul
 /// # Errors
 ///
 /// Returns an error when selection resolution or the state database fails.
-async fn prepare_reuse(
+async fn prepare_reuse<'a>(
     root: &Path,
-    cfg: &config::Config,
+    _cfg: &config::Config,
     config_bytes: Option<&[u8]>,
     scope: &telemetry::BeatScope,
     opts: &mut VerifyOpts,
+    selection: &sensors::ResolvedSelection<'a>,
 ) -> std::result::Result<(), CliError> {
-    let selection = sensors::resolve_selection(cfg, root, opts).map_err(CliError::Usage)?;
     let lookup = !opts.bless && opts.unchanged != sensors::UnchangedMode::Run;
     // Opened on first need: a run whose sensors declare no `inputs` never
     // consults the cache and must not pay for a state-database connection.
@@ -273,13 +318,15 @@ fn to_i64(value: u64) -> i64 {
 /// Signal-set runs own their evidence file so a feedback run can never
 /// clobber verification evidence (or vice versa). Runs without `--set` keep
 /// the legacy behavior: an artifact only for `--evidence` or `--strict`.
-async fn write_evidence(
+async fn write_evidence<'a>(
     root: &Path,
     cfg: &config::Config,
     config_bytes: Option<&[u8]>,
     report: &report::VerifyReport,
     opts: &VerifyOpts,
     started_at: i64,
+    selection: &sensors::ResolvedSelection<'a>,
+    invalidated_reason: Option<&str>,
 ) -> std::result::Result<(), CliError> {
     let evidence_path = opts
         .evidence
@@ -299,9 +346,6 @@ async fn write_evidence(
     let Some(path) = evidence_path else {
         return Ok(());
     };
-    // Selection is resolved again for evidence metadata; the run above made
-    // the same decision internally.
-    let selection = sensors::resolve_selection(cfg, root, opts).map_err(CliError::Usage)?;
     let selected: Vec<String> = selection.specs.iter().map(|s| s.name.clone()).collect();
     let skipped: Vec<EvidenceSkipped> = selection
         .skipped
@@ -340,6 +384,7 @@ async fn write_evidence(
         record: opts.record,
         started_at,
         finished_at,
+        invalidated_reason: invalidated_reason.map(ToOwned::to_owned),
     };
     let mut doc = evidence::EvidenceDocument::from_run(report, &meta);
     // Chain artifacts in the same workspace: reading an existing artifact's

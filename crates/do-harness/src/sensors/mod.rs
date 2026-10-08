@@ -159,8 +159,22 @@ pub struct VerifyOpts {
 /// sensor, when a name in `only` is outside the selected signal set, or when
 /// the requested signal set is unknown or unconfigured.
 pub fn verify(cfg: &Config, root: &Path, opts: &VerifyOpts) -> Result<VerifyReport> {
-    let signal_set = opts.set.clone();
     let selection = resolve_selection(cfg, root, opts)?;
+    verify_selection(cfg, root, opts, &selection)
+}
+
+/// Runs the selected sensors given a pre-resolved selection.
+///
+/// # Errors
+///
+/// Returns an error if parallel execution fails.
+pub fn verify_selection<'a>(
+    cfg: &'a Config,
+    root: &Path,
+    opts: &VerifyOpts,
+    selection: &ResolvedSelection<'a>,
+) -> Result<VerifyReport> {
+    let signal_set = opts.set.clone();
 
     if selection.specs.is_empty() {
         return Ok(VerifyReport {
@@ -174,7 +188,8 @@ pub fn verify(cfg: &Config, root: &Path, opts: &VerifyOpts) -> Result<VerifyRepo
 
     let jobs = parallel::effective_jobs(cfg.jobs, opts.jobs)?;
     let cancel = AtomicBool::new(false);
-    let mut results = parallel::run_parallel(selection.specs, root, opts, jobs, &cancel);
+    let mut results =
+        parallel::run_parallel(selection.specs.iter().copied().collect(), root, opts, jobs, &cancel);
 
     // `--strict` promotes advisory failures to hard failures, except in the
     // fast `feedback` loop where warn severity stays advisory by contract.
@@ -203,6 +218,7 @@ pub fn verify(cfg: &Config, root: &Path, opts: &VerifyOpts) -> Result<VerifyRepo
 
 /// A fully resolved verify selection: the specs to execute plus the
 /// change-aware reasoning behind them (for evidence and `explain` parity).
+#[derive(Debug, Clone)]
 pub struct ResolvedSelection<'a> {
     /// Specs to execute, in run order.
     pub specs: Vec<&'a SensorSpec>,

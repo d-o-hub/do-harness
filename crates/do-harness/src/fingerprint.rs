@@ -228,7 +228,7 @@ pub(crate) fn config_digest(config_bytes: Option<&[u8]>) -> String {
 }
 
 /// Whether a manifest path is harness-owned state (excluded from hashing).
-fn is_harness_state(path: &str) -> bool {
+pub(crate) fn is_harness_state(path: &str) -> bool {
     path == ".do-harness" || path.starts_with(HARNESS_STATE_PREFIX)
 }
 

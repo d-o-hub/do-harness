@@ -88,6 +88,7 @@ pub fn fixture(config: &str) -> (tempfile::TempDir, PathBuf) {
     let dir = tempfile::tempdir().unwrap();
     let root = dir.path().to_path_buf();
     std::fs::write(root.join("do-harness.toml"), config).unwrap();
+    std::fs::write(root.join(".gitignore"), "runs.log\n").unwrap();
     std::fs::write(root.join("input.txt"), "v1\n").unwrap();
     std::fs::write(root.join("other.txt"), "v1\n").unwrap();
     git(&root, &["init", "-q"]);
