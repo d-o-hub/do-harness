@@ -4,14 +4,20 @@
 import argparse
 import json
 import pathlib
-import subprocess
+# This harness deliberately executes the CLI artifact under test.
+import subprocess  # nosec B404
 import tempfile
 
 
 def smoke(binary, cycles=32, expected_version=None):
     binary = pathlib.Path(binary).resolve(strict=True)
-    version = subprocess.check_output(
-        [str(binary), "version", "--format", "json"], text=True, timeout=30
+    if not binary.is_file() or binary.name not in ("do-harness", "do-harness.exe"):
+        raise ValueError("expected a do-harness CLI artifact")
+    command = [str(binary), "version", "--format", "json"]
+    # Explicit local artifact path; argv is fixed and shell execution is disabled.
+    # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit, python.lang.security.audit.dangerous-subprocess-use-tainted-env-args
+    version = subprocess.check_output(command, shell=False,  # nosec B603
+        text=True, timeout=30
     ).strip()
     version = json.loads(version)
     if expected_version and version["version"] != expected_version:
@@ -23,9 +29,13 @@ def smoke(binary, cycles=32, expected_version=None):
             root.mkdir(exist_ok=True)
 
             def cli(*args):
+                if args[0] not in ("init", "task", "init-db"):
+                    raise ValueError("unexpected database smoke command")
+                command = [str(binary), "--root", str(root), *args]
                 try:
-                    return subprocess.check_output(
-                        [str(binary), "--root", str(root), *args],
+                    # Only fixed smoke commands against the explicit local artifact.
+                    # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit, python.lang.security.audit.dangerous-subprocess-use-tainted-env-args
+                    return subprocess.check_output(command, shell=False,  # nosec B603
                         text=True, stderr=subprocess.PIPE, timeout=60,
                     )
                 except subprocess.CalledProcessError as error:

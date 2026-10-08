@@ -9,7 +9,7 @@ import tempfile
 import unittest
 
 from check_source_distribution import (
-    ROOT, POLICY, check_db_manifest, check_fork, check_metadata,
+    ROOT, POLICY, check_db_manifest, check_fork, check_metadata, run,
 )
 
 
@@ -45,6 +45,20 @@ features = ["core"]
 
     def test_approved_registry_graph(self):
         check_metadata(self.metadata, self.policy, "0.3.0")
+
+    def test_windows_line_endings_preserve_source_provenance(self):
+        connection = self.fork / "src/local/connection.rs"
+        source = connection.read_bytes().replace(b"\r\n", b"\n")
+        connection.write_bytes(source.replace(b"\n", b"\r\n"))
+        check_metadata(self.metadata, self.policy, "0.3.0")
+
+    def test_shell_commands_are_rejected_before_execution(self):
+        with self.assertRaisesRegex(ValueError, "only Cargo and rustc"):
+            run(["bash", "-c", "exit 0"], self.root, {})
+
+    def test_nul_arguments_are_rejected_before_execution(self):
+        with self.assertRaisesRegex(ValueError, "NUL"):
+            run(["cargo", "version\0"], self.root, {})
 
     def test_original_registry_dependency_rejected(self):
         (self.db / "Cargo.toml").write_text(self.manifest.replace('package = "do-harness-libsql"\n', ""))
