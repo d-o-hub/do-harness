@@ -1,6 +1,6 @@
 {
   "name": "do-harness",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Zero-install npm wrapper for the do-harness agent execution harness CLI",
   "license": "MIT",
   "homepage": "https://github.com/d-o-hub/do-harness",
@@ -25,10 +25,10 @@
     "node": ">=18"
   },
   "optionalDependencies": {
-    "do-harness-linux-x64": "0.2.1",
-    "do-harness-linux-arm64": "0.2.1",
-    "do-harness-darwin-x64": "0.2.1",
-    "do-harness-darwin-arm64": "0.2.1",
-    "do-harness-win32-x64": "0.2.1"
+    "do-harness-linux-x64": "0.3.0",
+    "do-harness-linux-arm64": "0.3.0",
+    "do-harness-darwin-x64": "0.3.0",
+    "do-harness-darwin-arm64": "0.3.0",
+    "do-harness-win32-x64": "0.3.0"
   }
 }
