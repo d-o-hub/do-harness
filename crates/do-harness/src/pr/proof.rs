@@ -1,32 +1,31 @@
-//! Proof skipping: which residual units a trusted policy may mark proven.
+//! Proof skipping: which residual units a trusted policy may mark exempt or proven.
 //!
 //! Rules come only from `.github/pr-gate.toml` at the merge base. A unit is
-//! proven when its path matches a `[proof] mechanical` glob and no
-//! `behavioral` glob, or when the change is structural (rename-only or
-//! mode-only). Behavioral matches always stay residual; a mechanical claim
-//! contradicted by a behavioral rule is revoked and recorded as
-//! `false_proven`. Absent, malformed, or partially invalid policy proves
-//! nothing.
+//! exempt when its paths match a `[proof] mechanical` glob and no
+//! `behavioral` or protected glob. Behavioral matches always stay residual; a
+//! mechanical claim contradicted by a behavioral or protected rule is revoked
+//! and recorded as `false_proven`. Absent, malformed, or partially invalid
+//! policy proves/exempts nothing.
 
 use globset::{Glob, GlobSet, GlobSetBuilder};
 use serde::{Deserialize, Serialize};
 
-use super::diff::{HEADER_MODE_CHANGE, HEADER_RENAME_ONLY, Unit};
+use super::diff::Unit;
 
 /// Gate policy path, read from the merge-base revision only.
 pub const POLICY_PATH: &str = ".github/pr-gate.toml";
 
-/// Paths that are privileged and can never be proven, whatever the rules say.
+/// Paths that are privileged and can never be proven or exempted, whatever the rules say.
 const PROTECTED_PATHS: &[&str] = &[POLICY_PATH];
 
 /// Policy-declared proof rules from the `[proof]` table.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ProofRules {
-    /// Globs whose changed units are mechanical and may be skipped.
+    /// Globs whose changed units are mechanical and may be exempted.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub mechanical: Vec<String>,
-    /// Globs that are never proven; they override `mechanical`.
+    /// Globs that are never exempted; they override `mechanical`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub behavioral: Vec<String>,
 }
@@ -43,13 +42,16 @@ pub struct GatePolicy {
 /// Outcome of evaluating one unit against the proof rules.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Verdict {
-    /// No trusted proof applies; the unit stays residual.
+    /// No trusted proof or exemption applies; the unit stays residual.
     Residual,
-    /// The unit is proven and belongs in the audit list.
+    /// Policy exempts the unit from review.
+    Exempt,
+    /// Deterministic evidence proved behavior preservation.
+    #[allow(dead_code)]
     Proven,
     /// A mechanical claim was revoked; the unit stays residual with a reason.
     Revoked {
-        /// Why the proof claim is untrusted.
+        /// Why the proof/exemption claim is untrusted.
         reason: String,
     },
 }
@@ -93,22 +95,31 @@ impl Matcher {
         if !self.active {
             return Verdict::Residual;
         }
-        let mechanical = matches(self.mechanical.as_ref(), &unit.path);
-        if matches(self.behavioral.as_ref(), &unit.path)
-            || PROTECTED_PATHS.contains(&unit.path.as_str())
-        {
-            if mechanical {
+        let mut paths = vec![unit.path.as_str()];
+        if let Some(old) = unit.old_path.as_deref() {
+            if old != unit.path.as_str() {
+                paths.push(old);
+            }
+        }
+        let is_protected = paths.iter().any(|p| PROTECTED_PATHS.contains(p));
+        let is_behavioral = matches_any(self.behavioral.as_ref(), &paths);
+        let mechanical_match_all = matches_all(self.mechanical.as_ref(), &paths);
+        let mechanical_match_any = matches_any(self.mechanical.as_ref(), &paths);
+
+        if is_protected || is_behavioral {
+            if mechanical_match_any {
                 return Verdict::Revoked {
                     reason: format!(
-                        "{} matches both mechanical and behavioral proof rules",
+                        "{} matches both mechanical and behavioral or protected proof rules",
                         unit.path
                     ),
                 };
             }
             return Verdict::Residual;
         }
-        if mechanical || is_structural(unit) {
-            Verdict::Proven
+
+        if mechanical_match_all {
+            Verdict::Exempt
         } else {
             Verdict::Residual
         }
@@ -122,15 +133,6 @@ impl Matcher {
             warnings: Vec::new(),
         }
     }
-}
-
-/// Whether the unit is a content-free structural change.
-fn is_structural(unit: &Unit) -> bool {
-    unit.lines.is_empty()
-        && matches!(
-            unit.header.as_deref(),
-            Some(HEADER_RENAME_ONLY | HEADER_MODE_CHANGE)
-        )
 }
 
 /// Compiles one glob list; an invalid pattern disables all proofs.
@@ -161,7 +163,14 @@ fn build(patterns: &[String], label: &str, warnings: &mut Vec<String>) -> Option
     }
 }
 
-/// Whether `path` matches the compiled set.
-fn matches(set: Option<&GlobSet>, path: &str) -> bool {
-    set.is_some_and(|set| set.is_match(path))
+/// Whether any path matches the compiled set.
+fn matches_any(set: Option<&GlobSet>, paths: &[&str]) -> bool {
+    let Some(set) = set else { return false; };
+    paths.iter().any(|p| set.is_match(p))
+}
+
+/// Whether all paths match the compiled set.
+fn matches_all(set: Option<&GlobSet>, paths: &[&str]) -> bool {
+    let Some(set) = set else { return false; };
+    !paths.is_empty() && paths.iter().all(|p| set.is_match(p))
 }

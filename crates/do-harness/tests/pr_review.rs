@@ -78,6 +78,7 @@ fn range_review_lists_residual_units_and_serves_cache() {
     assert_eq!(report["mode"], serde_json::json!("range"));
     assert_eq!(report["cached"], serde_json::json!(false));
     assert_eq!(report["policy"]["present"], serde_json::json!(false));
+    assert_eq!(report["exempt"].as_array().unwrap().len(), 0);
     assert_eq!(report["skipped"].as_array().unwrap().len(), 0);
     assert_eq!(report["false_proven"].as_array().unwrap().len(), 0);
     assert_ne!(report["merge_base"].as_str().unwrap().len(), 0);
@@ -176,7 +177,7 @@ fn malformed_base_policy_warns_but_keeps_reviewing() {
 }
 
 #[test]
-fn policy_skips_mechanical_units_and_audits_them() {
+fn policy_exempts_mechanical_units_and_audits_them() {
     let dir = tempfile::tempdir().unwrap();
     init_repo(dir.path());
     commit_file(dir.path(), "src/lib.rs", "fn a() {}\n", "src base");
@@ -201,7 +202,8 @@ fn policy_skips_mechanical_units_and_audits_them() {
             .map(|unit| unit["path"].as_str().unwrap().to_owned())
             .collect()
     };
-    assert_eq!(paths("skipped"), vec!["Cargo.lock"]);
+    assert_eq!(paths("exempt"), vec!["Cargo.lock"]);
+    assert_eq!(paths("skipped"), Vec::<String>::new());
     assert_eq!(paths("residual"), vec!["src/lib.rs"]);
     assert_eq!(report["false_proven"].as_array().unwrap().len(), 0);
     assert_eq!(report["warnings"].as_array().unwrap().len(), 0);
@@ -264,22 +266,147 @@ fn invalid_glob_proves_nothing() {
 }
 
 #[test]
-fn structural_rename_is_proven_with_policy() {
+fn structural_rename_and_mode_change_remain_residual_with_empty_policy() {
     let dir = tempfile::tempdir().unwrap();
     init_repo(dir.path());
     commit_file(dir.path(), "old.txt", "content\n", "base");
+    commit_file(dir.path(), "script.sh", "#!/bin/sh\necho hi\n", "add script");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(
+            dir.path().join("script.sh"),
+            std::fs::Permissions::from_mode(0o755),
+        )
+        .unwrap();
+        git(dir.path(), &["add", "script.sh"]);
+        git(dir.path(), &["commit", "-q", "--amend", "--no-edit"]);
+    }
     commit_file(dir.path(), ".github/pr-gate.toml", "[proof]\n", "policy");
+
     git(dir.path(), &["switch", "-q", "-c", "feature"]);
     std::fs::rename(dir.path().join("old.txt"), dir.path().join("new.txt")).unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(
+            dir.path().join("script.sh"),
+            std::fs::Permissions::from_mode(0o644),
+        )
+        .unwrap();
+        git(dir.path(), &["add", "script.sh"]);
+    }
     git(dir.path(), &["add", "-A"]);
-    git(dir.path(), &["commit", "-q", "-m", "rename"]);
+    git(dir.path(), &["commit", "-q", "-m", "structural changes"]);
 
     let report = json(&review(dir.path(), &["--format", "json"]));
-    assert_eq!(report["residual"].as_array().unwrap().len(), 0);
-    let skipped = report["skipped"].as_array().unwrap();
-    assert_eq!(skipped.len(), 1);
-    assert_eq!(skipped[0]["path"], serde_json::json!("new.txt"));
-    assert_eq!(skipped[0]["header"], serde_json::json!("rename-only"));
+    assert_eq!(report["exempt"].as_array().unwrap().len(), 0);
+    assert_eq!(report["skipped"].as_array().unwrap().len(), 0);
+    let residual = report["residual"].as_array().unwrap();
+    assert!(
+        residual.iter().any(|u| u["path"] == serde_json::json!("new.txt") && u["old_path"] == serde_json::json!("old.txt")),
+        "rename-only unit must remain residual: {residual:?}"
+    );
+    #[cfg(unix)]
+    assert!(
+        residual.iter().any(|u| u["path"] == serde_json::json!("script.sh") && u["header"] == serde_json::json!("mode change")),
+        "mode-change unit must remain residual: {residual:?}"
+    );
+}
+
+#[test]
+fn relocation_module_rename_and_mode_change_fixtures_remain_visible() {
+    let dir = tempfile::tempdir().unwrap();
+    init_repo(dir.path());
+    commit_file(dir.path(), ".github/workflows/ci.yml", "name: CI\n", "workflow");
+    commit_file(dir.path(), "src/mod_a.rs", "pub fn a() {}\n", "mod_a");
+    commit_file(
+        dir.path(),
+        ".github/pr-gate.toml",
+        "[proof]\nmechanical = [\"docs/**\"]\n",
+        "policy",
+    );
+
+    git(dir.path(), &["switch", "-q", "-c", "feature"]);
+    std::fs::rename(
+        dir.path().join(".github/workflows/ci.yml"),
+        dir.path().join("ci.yml"),
+    )
+    .unwrap();
+    std::fs::rename(dir.path().join("src/mod_a.rs"), dir.path().join("src/mod_b.rs")).unwrap();
+    git(dir.path(), &["add", "-A"]);
+    git(dir.path(), &["commit", "-q", "-m", "relocate and rename"]);
+
+    let report = json(&review(dir.path(), &["--format", "json"]));
+    let residual = report["residual"].as_array().unwrap();
+    assert!(
+        residual.iter().any(|u| u["path"] == serde_json::json!("ci.yml") && u["old_path"] == serde_json::json!(".github/workflows/ci.yml")),
+        "workflow relocation must remain visible in residual: {residual:?}"
+    );
+    assert!(
+        residual.iter().any(|u| u["path"] == serde_json::json!("src/mod_b.rs") && u["old_path"] == serde_json::json!("src/mod_a.rs")),
+        "module rename must remain visible in residual: {residual:?}"
+    );
+}
+
+#[test]
+fn both_rename_endpoints_participate_in_matching() {
+    let dir = tempfile::tempdir().unwrap();
+    init_repo(dir.path());
+    commit_file(
+        dir.path(),
+        "crates/core/lib.rs",
+        "pub fn core() {}\n",
+        "crates base",
+    );
+    commit_file(dir.path(), "docs/old.md", "# Docs\n", "docs base");
+    commit_file(
+        dir.path(),
+        ".github/pr-gate.toml",
+        "[proof]\nmechanical = [\"docs/**\"]\nbehavioral = [\"crates/**\"]\n",
+        "policy",
+    );
+
+    git(dir.path(), &["switch", "-q", "-c", "feature"]);
+    // Move out of behavioral area into mechanical area
+    std::fs::rename(
+        dir.path().join("crates/core/lib.rs"),
+        dir.path().join("docs/lib.rs"),
+    )
+    .unwrap();
+    // Move within mechanical area
+    std::fs::rename(
+        dir.path().join("docs/old.md"),
+        dir.path().join("docs/new.md"),
+    )
+    .unwrap();
+    // Move protected policy file into mechanical area
+    std::fs::rename(
+        dir.path().join(".github/pr-gate.toml"),
+        dir.path().join("docs/gate.toml"),
+    )
+    .unwrap();
+    git(dir.path(), &["add", "-A"]);
+    git(dir.path(), &["commit", "-q", "-m", "moves"]);
+
+    let report = json(&review(dir.path(), &["--format", "json"]));
+    let exempt_paths: Vec<String> = report["exempt"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|u| u["path"].as_str().unwrap().to_owned())
+        .collect();
+    let residual_paths: Vec<String> = report["residual"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|u| u["path"].as_str().unwrap().to_owned())
+        .collect();
+
+    assert_eq!(exempt_paths, vec!["docs/new.md"]);
+    assert!(residual_paths.contains(&"docs/lib.rs".to_owned()));
+    assert!(residual_paths.contains(&"docs/gate.toml".to_owned()));
+    assert_ne!(report["false_proven"].as_array().unwrap().len(), 0);
 }
 
 #[test]
