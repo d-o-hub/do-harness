@@ -12,7 +12,8 @@ import hashlib
 import json
 import os
 import pathlib
-import subprocess
+# Cargo/compiler execution is required to verify the distributed artifacts.
+import subprocess  # nosec B404
 import tarfile
 import tempfile
 import tomllib
@@ -33,8 +34,13 @@ def require(condition, message):
 
 
 def run(args, cwd, env, capture=False):
-    print("+ " + " ".join(map(str, args)), flush=True)
-    return subprocess.run(list(map(str, args)), cwd=cwd, env=env, check=True,
+    argv = list(map(str, args))
+    require(argv and argv[0] in ("cargo", "rustc"), "only Cargo and rustc may be executed")
+    require(all("\0" not in arg for arg in argv), "NUL in command argument")
+    print("+ " + " ".join(argv), flush=True)
+    # Fixed tool allowlist; repository-built argv, never shell command text.
+    # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit, python.lang.security.audit.dangerous-subprocess-use-tainted-env-args
+    return subprocess.run(argv, cwd=cwd, env=env, check=True, shell=False,  # nosec B603
                           text=True, stdout=subprocess.PIPE if capture else None).stdout
 
 
@@ -45,7 +51,10 @@ def check_fork(path, policy):
     require(package["version"] == policy["version"], package)
     require(package["license"] == "MIT" and (path / "LICENSE").is_file(), "MIT license missing")
     require(package["metadata"]["vendor-fork"]["upstream-ref"] == "libsql-0.9.30", "upstream provenance changed")
-    digest = hashlib.sha256((path / "src/local/connection.rs").read_bytes()).hexdigest()
+    # Git may check out CRLF on Windows; hash the canonical LF source in both
+    # checkouts and Cargo archives without relaxing validation of its contents.
+    source = (path / "src/local/connection.rs").read_bytes().replace(b"\r\n", b"\n")
+    digest = hashlib.sha256(source).hexdigest()
     require(digest == policy["connection_sha256"], "libSQL fix source digest changed")
     require(not any(key in manifest for key in ("patch", "replace", "workspace")), "manifest was not normalized")
     return digest
@@ -99,7 +108,9 @@ def check_metadata(metadata, policy, expected_version):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--mode", choices=("packaged", "registry"), default="packaged")
-    parser.add_argument("--target")
+    parser.add_argument("--target", choices=("x86_64-unknown-linux-musl", "aarch64-unknown-linux-musl",
+                        "x86_64-apple-darwin", "aarch64-apple-darwin", "x86_64-pc-windows-msvc",
+                        "x86_64-unknown-linux-gnu"))
     parser.add_argument("--check-policy", action="store_true")
     parser.add_argument("--prebuilt", type=pathlib.Path)
     args = parser.parse_args()
