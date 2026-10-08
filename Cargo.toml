@@ -1,16 +1,20 @@
 [workspace]
 resolver = "3"
 members = ["crates/db", "crates/types", "crates/do-harness", "crates/guardian-proxy"]
+# Third-party code retains its own lint/test baseline and release version.
+exclude = ["vendor/libsql"]
 
 [workspace.package]
-version = "0.2.1"
+version = "0.3.0"
 edition = "2024"
 rust-version = "1.85"
 license = "MIT"
 repository = "https://github.com/d-o-hub/do-harness"
 
 [workspace.dependencies]
-libsql = { version = "0.9", default-features = false }
+# The version survives Cargo package normalization; consumers receive the same
+# teardown fix as checkout builds without a workspace-local patch.
+libsql = { package = "do-harness-libsql", version = "0.9.30", path = "vendor/libsql", default-features = false }
 tokio = { version = "1", features = ["rt", "macros", "fs", "process", "sync", "time"] }
 anyhow = "1"
 serde = "1"
@@ -58,19 +62,6 @@ debug = "line-tables-only"
 
 [profile.dev.package."*"]
 debug = false
-
-# Vendor libsql 0.9.30 with a one-function fix for upstream
-# tursodatabase/libsql#2251: `Connection::disconnect` calls
-# `sqlite3_close_v2` twice on teardown (`LibsqlConnection::drop`, then the
-# inner `Connection`'s `Drop`), and the second close reads a freed handle.
-# glibc keeps the freed page mapped so the double free passes silently;
-# static musl release binaries crash (SIGSEGV in `sqlite3Close`) when musl
-# returns the page to the OS. The vendored crate nulls `raw` after closing so
-# the repeat call is a no-op. Upstream `main` and 0.10.0-pre.4 still carry the
-# unfixed code (checked 2026-10-03); drop this patch section when a release
-# with the fix lands and re-run `cargo deny check` + the full sensor suite.
-[patch.crates-io]
-libsql = { path = "vendor/libsql" }
 
 [profile.dev.build-override]
 opt-level = 3

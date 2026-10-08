@@ -533,7 +533,7 @@ dependencies = [
 
 [[package]]
 name = "do-harness"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -554,11 +554,11 @@ dependencies = [
 
 [[package]]
 name = "do-harness-db"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "anyhow",
+ "do-harness-libsql",
  "do-harness-types",
- "libsql",
  "serde",
  "serde_json",
  "tempfile",
@@ -567,8 +567,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "do-harness-libsql"
+version = "0.9.30"
+dependencies = [
+ "async-trait",
+ "bitflags",
+ "bytes",
+ "futures",
+ "libsql-sys",
+ "parking_lot",
+ "thiserror 1.0.69",
+ "tracing",
+]
+
+[[package]]
 name = "do-harness-types"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "hex",
  "serde",
@@ -813,7 +827,7 @@ dependencies = [
 
 [[package]]
 name = "guardian-proxy"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "agent-governance",
  "anyhow",
@@ -1174,20 +1188,6 @@ checksum = "d7c4b02199fee7c5d21a5ae7d8cfa79a6ef5bb2fc834d6e9058e89c825efdc55"
 dependencies = [
  "cfg-if",
  "windows-link",
-]
-
-[[package]]
-name = "libsql"
-version = "0.9.30"
-dependencies = [
- "async-trait",
- "bitflags",
- "bytes",
- "futures",
- "libsql-sys",
- "parking_lot",
- "thiserror 1.0.69",
- "tracing",
 ]
 
 [[package]]
