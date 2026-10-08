@@ -84,7 +84,12 @@ fn behavioral_rule_keeps_structural_units_residual() {
 fn structural_units_without_matching_glob_remain_residual() {
     let matcher = Matcher::compile(Some(&rules(&[], &[])));
     assert_eq!(
-        matcher.evaluate(&rename_unit("old.rs", "new.rs", Some(HEADER_RENAME_ONLY), &[])),
+        matcher.evaluate(&rename_unit(
+            "old.rs",
+            "new.rs",
+            Some(HEADER_RENAME_ONLY),
+            &[]
+        )),
         Verdict::Residual
     );
     assert_eq!(
@@ -98,12 +103,18 @@ fn both_rename_endpoints_participate_in_matching() {
     let matcher = Matcher::compile(Some(&rules(&["docs/**"], &["crates/**"])));
     // Move out of behavioral area into mechanical area is revoked
     let move_out = rename_unit("crates/core/lib.rs", "docs/lib.rs", None, &["+x"]);
-    assert!(matches!(matcher.evaluate(&move_out), Verdict::Revoked { .. }));
+    assert!(matches!(
+        matcher.evaluate(&move_out),
+        Verdict::Revoked { .. }
+    ));
 
     // Move out of protected area into mechanical area is revoked
     let matcher_all = Matcher::compile(Some(&rules(&["docs/**"], &[])));
     let move_protected = rename_unit(".github/pr-gate.toml", "docs/gate.toml", None, &["+x"]);
-    assert!(matches!(matcher_all.evaluate(&move_protected), Verdict::Revoked { .. }));
+    assert!(matches!(
+        matcher_all.evaluate(&move_protected),
+        Verdict::Revoked { .. }
+    ));
 
     // Move within mechanical area is exempt
     let move_mechanical = rename_unit("docs/old.md", "docs/new.md", None, &["+x"]);

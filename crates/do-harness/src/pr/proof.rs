@@ -165,12 +165,16 @@ fn build(patterns: &[String], label: &str, warnings: &mut Vec<String>) -> Option
 
 /// Whether any path matches the compiled set.
 fn matches_any(set: Option<&GlobSet>, paths: &[&str]) -> bool {
-    let Some(set) = set else { return false; };
+    let Some(set) = set else {
+        return false;
+    };
     paths.iter().any(|p| set.is_match(p))
 }
 
 /// Whether all paths match the compiled set.
 fn matches_all(set: Option<&GlobSet>, paths: &[&str]) -> bool {
-    let Some(set) = set else { return false; };
+    let Some(set) = set else {
+        return false;
+    };
     !paths.is_empty() && paths.iter().all(|p| set.is_match(p))
 }

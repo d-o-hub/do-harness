@@ -315,22 +315,30 @@ fn line_path(token: &str) -> Option<String> {
 /// Parses `diff --git a/from b/to` into `(old_path, new_path)`.
 fn diff_git_paths(rest: &str) -> (Option<String>, Option<String>) {
     if rest.starts_with('"') {
-        let Some((from_raw, used)) = unquote(rest) else { return (None, None); };
+        let Some((from_raw, used)) = unquote(rest) else {
+            return (None, None);
+        };
         let after = rest[used..].trim_start();
-        let Some((to_raw, _)) = unquote(after) else { return (None, None); };
+        let Some((to_raw, _)) = unquote(after) else {
+            return (None, None);
+        };
         let from = from_raw.strip_prefix("a/").unwrap_or(&from_raw).to_owned();
         let to = to_raw.strip_prefix("b/").unwrap_or(&to_raw).to_owned();
-        let old_path = if from != to && !from.is_empty() { Some(from) } else { None };
-        let new_path = if !to.is_empty() { Some(to) } else { None };
+        let old_path = (from != to && !from.is_empty()).then_some(from);
+        let new_path = (!to.is_empty()).then_some(to);
         return (old_path, new_path);
     }
-    let Some(index) = rest.find(" b/") else { return (None, None); };
+    let Some(index) = rest.find(" b/") else {
+        return (None, None);
+    };
     let from_slice = rest[..index].strip_prefix("a/").unwrap_or(&rest[..index]);
-    let to_slice = rest[index + 1..].strip_prefix("b/").unwrap_or(&rest[index + 1..]);
+    let to_slice = rest[index + 1..]
+        .strip_prefix("b/")
+        .unwrap_or(&rest[index + 1..]);
     let from = from_slice.to_owned();
     let to = to_slice.to_owned();
-    let old_path = if from != to && !from.is_empty() { Some(from) } else { None };
-    let new_path = if !to.is_empty() { Some(to) } else { None };
+    let old_path = (from != to && !from.is_empty()).then_some(from);
+    let new_path = (!to.is_empty()).then_some(to);
     (old_path, new_path)
 }
 
