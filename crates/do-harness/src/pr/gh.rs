@@ -260,6 +260,13 @@ struct GqlThreads {
     nodes: Vec<ReviewThread>,
 }
 
+#[derive(Deserialize)]
+struct PermissionResponse {
+    permission: Option<String>,
+    #[serde(rename = "role_name")]
+    role_name: Option<String>,
+}
+
 /// Reads PR view metadata including merge state.
 ///
 /// # Errors
@@ -460,12 +467,6 @@ pub fn user_permission(root: &Path, login: &str) -> Result<String> {
             "gh api collaborator permission failed: {}",
             String::from_utf8_lossy(&output.stderr).trim()
         );
-    }
-    #[derive(Deserialize)]
-    struct PermissionResponse {
-        permission: Option<String>,
-        #[serde(rename = "role_name")]
-        role_name: Option<String>,
     }
     let res: PermissionResponse = serde_json::from_slice(&output.stdout)
         .context("unexpected collaborator permission JSON")?;
