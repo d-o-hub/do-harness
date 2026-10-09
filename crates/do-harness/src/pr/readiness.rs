@@ -13,12 +13,19 @@ use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
 use super::gh;
+use super::waivers::{
+    CodecovStatus, WaiverAuditRecord, is_authorized_role, parse_candidate_waiver,
+};
 use crate::CliError;
 use crate::report::Format;
 
 /// Logins that post Codecov's own report comments: the app (`codecov[bot]`),
 /// the legacy bot user (`codecov`), and the comment-bot account.
 const CODECOV_AUTHORS: [&str; 3] = ["codecov", "codecov[bot]", "codecov-commenter"];
+
+pub(crate) fn is_codecov_author(login: &str) -> bool {
+    CODECOV_AUTHORS.contains(&login)
+}
 
 /// Whether `login` is a bot account: `GitHub` Apps (`[bot]` suffix) and the
 /// well-known dependency bots.
@@ -101,11 +108,23 @@ pub struct ActionableComment {
 /// Digest of Codecov report status on the PR.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CodecovSummary {
+    pub status: CodecovStatus,
     pub is_actionable: bool,
+    pub waived: bool,
     pub patch_coverage: Option<f64>,
     pub missing_lines: Option<u64>,
     pub excerpt: String,
     pub url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub waiver_reason: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub waiver_author: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub waiver_finding_ref: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub waiver_head_sha: Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub audit_waivers: Vec<WaiverAuditRecord>,
 }
 
 /// Evaluates merge readiness for PR `number`.
@@ -142,7 +161,8 @@ pub fn evaluate(root: &Path, number: u64) -> Result<ReadinessReport> {
     let checks = evaluate_checks(root, &view.head_ref_oid, &mut blockers)?;
 
     // 3. Review Threads & Issue Comments
-    let (conversations, codecov) = evaluate_conversations(root, number, &mut blockers)?;
+    let (conversations, codecov) =
+        evaluate_conversations(root, number, &view.head_ref_oid, &mut blockers)?;
 
     let ready = blockers.is_empty();
     Ok(ReadinessReport {
@@ -244,6 +264,7 @@ fn evaluate_checks(
 fn evaluate_conversations(
     root: &Path,
     number: u64,
+    head_ref_oid: &str,
     blockers: &mut Vec<String>,
 ) -> Result<(ConversationSummary, Option<CodecovSummary>)> {
     let threads = gh::review_threads(root, number).context("could not read review threads")?;
@@ -284,29 +305,102 @@ fn evaluate_conversations(
     let mut actionable_comments = Vec::new();
     let mut codecov = None;
 
-    let mut seen_codecov_actionable = false;
-    for (idx, comment) in comments.iter().enumerate() {
-        let author = comment.user.as_ref().map_or("", |u| u.login.as_str());
-        // Only Codecov's own logins post a report: a human comment that merely
-        // mentions "Codecov" must not overwrite the real summary.
-        let is_codecov = CODECOV_AUTHORS.contains(&author);
+    let latest_codecov = comments.iter().rev().find(|c| {
+        let author = c.user.as_ref().map_or("", |u| u.login.as_str());
+        CODECOV_AUTHORS.contains(&author)
+    });
 
-        if is_codecov {
-            let has_gap = comment.body.contains("missing coverage")
-                || comment.body.contains("Patch coverage is 0")
-                || comment.body.contains("Decreases by");
-            // A human reply waives the gap; another bot's notice does not.
-            let has_subsequent_answer = comments[idx + 1..].iter().any(|c| {
-                let a = c.user.as_ref().map_or("", |u| u.login.as_str());
-                !CODECOV_AUTHORS.contains(&a) && !is_bot_login(a)
+    if let Some(comment) = latest_codecov {
+        let author = comment.user.as_ref().map_or("codecov", |u| u.login.as_str());
+        let patch_cov = parse_patch_coverage(&comment.body);
+        let missing_lines = parse_missing_lines(&comment.body);
+        let excerpt = first_line(&comment.body, 80);
+
+        let has_gap = comment.body.contains("missing coverage")
+            || comment.body.contains("Patch coverage is 0")
+            || comment.body.contains("Decreases by")
+            || missing_lines.is_some_and(|m| m > 0);
+
+        if !has_gap {
+            codecov = Some(CodecovSummary {
+                status: CodecovStatus::NoConcern,
+                is_actionable: false,
+                waived: false,
+                patch_coverage: patch_cov,
+                missing_lines,
+                excerpt,
+                url: comment.html_url.clone(),
+                waiver_reason: None,
+                waiver_author: None,
+                waiver_finding_ref: None,
+                waiver_head_sha: None,
+                audit_waivers: Vec::new(),
             });
-            let is_actionable = has_gap && !has_subsequent_answer;
-            let patch_cov = parse_patch_coverage(&comment.body);
-            let missing_lines = parse_missing_lines(&comment.body);
-            let excerpt = first_line(&comment.body, 80);
+        } else {
+            let mut audit_waivers = Vec::new();
+            let mut valid_waiver = None;
 
-            if is_actionable && !seen_codecov_actionable {
-                seen_codecov_actionable = true;
+            for c in &comments {
+                if let Some(candidate) = parse_candidate_waiver(c) {
+                    let head_sha = candidate.head_sha.clone().unwrap_or_default();
+                    let is_stale = head_sha.is_empty()
+                        || (!head_ref_oid.is_empty()
+                            && !head_ref_oid
+                                .to_ascii_lowercase()
+                                .starts_with(&head_sha.to_ascii_lowercase())
+                            && !head_sha
+                                .to_ascii_lowercase()
+                                .starts_with(&head_ref_oid.to_ascii_lowercase()));
+
+                    let perm = gh::user_permission(root, &candidate.author).unwrap_or_default();
+                    let authorized = is_authorized_role(&perm);
+
+                    let finding_ref = candidate.finding_ref.clone().unwrap_or_default();
+                    let finding_lower = finding_ref.to_ascii_lowercase();
+                    let finding_matches = finding_lower.contains("codecov")
+                        || finding_lower.contains("coverage")
+                        || finding_lower.contains("patch")
+                        || finding_lower.contains("missing")
+                        || finding_lower.contains("macro-field")
+                        || finding_lower.contains("guarded-arm")
+                        || finding_lower.contains("feature-gated");
+
+                    audit_waivers.push(WaiverAuditRecord {
+                        author: candidate.author.clone(),
+                        head_sha: head_sha.clone(),
+                        finding_ref: finding_ref.clone(),
+                        reason: candidate.reason.clone(),
+                        authorized,
+                        is_stale,
+                    });
+
+                    if finding_matches
+                        && !is_stale
+                        && authorized
+                        && !candidate.reason.trim().is_empty()
+                        && valid_waiver.is_none()
+                    {
+                        valid_waiver = Some((candidate, head_sha, finding_ref));
+                    }
+                }
+            }
+
+            if let Some((waiver, matched_sha, matched_finding)) = valid_waiver {
+                codecov = Some(CodecovSummary {
+                    status: CodecovStatus::Waived,
+                    is_actionable: false,
+                    waived: true,
+                    patch_coverage: patch_cov,
+                    missing_lines,
+                    excerpt,
+                    url: comment.html_url.clone(),
+                    waiver_reason: Some(waiver.reason),
+                    waiver_author: Some(waiver.author),
+                    waiver_finding_ref: Some(matched_finding),
+                    waiver_head_sha: Some(matched_sha),
+                    audit_waivers,
+                });
+            } else {
                 let cov_text = patch_cov.map_or_else(
                     || "uncovered lines".to_owned(),
                     |p| format!("patch coverage {p:.2}%"),
@@ -320,14 +414,22 @@ fn evaluate_conversations(
                     excerpt: excerpt.clone(),
                     url: comment.html_url.clone(),
                 });
+
+                codecov = Some(CodecovSummary {
+                    status: CodecovStatus::Actionable,
+                    is_actionable: true,
+                    waived: false,
+                    patch_coverage: patch_cov,
+                    missing_lines,
+                    excerpt,
+                    url: comment.html_url.clone(),
+                    waiver_reason: None,
+                    waiver_author: None,
+                    waiver_finding_ref: None,
+                    waiver_head_sha: None,
+                    audit_waivers,
+                });
             }
-            codecov = Some(CodecovSummary {
-                is_actionable,
-                patch_coverage: patch_cov,
-                missing_lines,
-                excerpt,
-                url: comment.html_url.clone(),
-            });
         }
     }
 
@@ -445,6 +547,23 @@ fn print_text(report: &ReadinessReport) {
     }
     for c in &report.conversations.actionable_comments {
         println!("    ACTIONABLE: {}: \"{}\"", c.author, c.excerpt);
+    }
+
+    if let Some(c) = &report.codecov {
+        println!(
+            "  codecov status: {:?} (actionable: {}, waived: {})",
+            c.status, c.is_actionable, c.waived
+        );
+        if c.waived {
+            if let (Some(author), Some(sha), Some(finding), Some(reason)) = (
+                &c.waiver_author,
+                &c.waiver_head_sha,
+                &c.waiver_finding_ref,
+                &c.waiver_reason,
+            ) {
+                println!("    WAIVED: {finding} for {sha} by {author}: \"{reason}\"");
+            }
+        }
     }
 
     if !report.blockers.is_empty() {
