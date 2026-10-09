@@ -29,7 +29,7 @@ fi
 # Real closure check: cargo tree resolves the full normal-dependency graph.
 # A tree failure is a hard error under required-tools mode, a SKIP otherwise.
 if closure="$(cd "$ROOT" && cargo tree -p do-harness-types --edges normal --prefix none 2>/dev/null)"; then
-    if echo "$closure" | grep -qE '^(do-harness-db|do-harness|guardian-proxy|libsql)( |$)'; then
+    if echo "$closure" | grep -qE '^(do-harness-db|do-harness|guardian-proxy|libsql|do-harness-libsql)( |$)'; then
         echo "FAIL: do-harness-types closure must not contain storage or adapters."
         FAIL=1
     fi

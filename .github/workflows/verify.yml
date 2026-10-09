@@ -16,6 +16,56 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  source-distribution:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+            binary: do-harness
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            binary: do-harness.exe
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Resolve pinned toolchain
+        id: toolchain
+        shell: bash
+        run: |
+          channel="$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)"
+          echo "channel=$channel" >> "$GITHUB_OUTPUT"
+      - uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de
+        with:
+          toolchain: ${{ steps.toolchain.outputs.channel }}
+          targets: ${{ matrix.target }}
+      - name: Install musl toolchain
+        if: runner.os == 'Linux'
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq musl-tools
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: "3.12"
+      - name: Build checkout binary
+        run: cargo build --release --locked -p do-harness --target ${{ matrix.target }}
+      - name: Validate isolated packages and database teardown
+        shell: bash
+        run: |
+          python scripts/test_source_distribution.py 2>&1 | tee distribution-validation.log
+          python scripts/check_source_distribution.py --target "${{ matrix.target }}" \
+            --prebuilt "target/${{ matrix.target }}/release/${{ matrix.binary }}" \
+            2>&1 | tee -a distribution-validation.log
+      - name: Upload distribution validation evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: source-distribution-${{ matrix.target }}
+          path: distribution-validation.log
+          if-no-files-found: error
+
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 30

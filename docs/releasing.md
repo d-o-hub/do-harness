@@ -17,7 +17,7 @@ set (verification plus `coverage`) and every build target dogfoods green.
   asset, and only then publishes, which is the sequence the immutability guidance
   asks for.
 - **crates.io publishes through Trusted Publishing (OIDC); there is no publish
-  secret.** For each published crate — `do-harness-types`, `do-harness-db`,
+  secret.** For each published crate — `do-harness-libsql`, `do-harness-types`, `do-harness-db`,
   `do-harness` — open <https://crates.io> → the crate → **Settings → Trusted
   Publishing** and add a GitHub publisher with repository `d-o-hub/do-harness`
   and workflow filename `release.yml`. Leave *environment* empty: the `publish`
@@ -27,6 +27,14 @@ set (verification plus `coverage`) and every build target dogfoods green.
   `cargo publish` through `CARGO_REGISTRY_TOKEN` for that step only. A crate
   with no trusted publisher fails the job loudly at the exchange; revoke any
   API token created for the previous secret-based path.
+- **Before the first fork release**, recheck the `do-harness-libsql` name and
+  establish crates.io ownership/publication for that new crate. Configure its
+  trusted publisher for the same repository and `release.yml`. If the registry
+  requires an initial authenticated publish before trust can be configured,
+  publish the functional fork once with
+  `cargo publish --locked --manifest-path vendor/libsql/Cargo.toml --no-default-features --features core`,
+  then configure trust; the release job skips an existing exact fork version.
+  Do this before tagging, so the OIDC-only job can publish every dependency.
 - npm Trusted Publisher setup is per existing package. If a package has not
   been published yet, perform a one-time authenticated bootstrap publish first;
   npm exposes its **Settings → Trusted Publisher** page only afterward.
@@ -121,8 +129,8 @@ set (verification plus `coverage`) and every build target dogfoods green.
 2. Tag the merge commit and push the tag:
 
    ```bash
-   git tag v0.2.1 <merge-commit>
-   git push origin v0.2.1
+   git tag v0.3.0 <merge-commit>
+   git push origin v0.3.0
    ```
 
 3. The `release` workflow runs:
@@ -136,8 +144,12 @@ set (verification plus `coverage`) and every build target dogfoods green.
    - `build` — Linux static-musl (x86_64/aarch64) and macOS (x86_64/arm64)
      tarballs plus a Windows x86_64 zip, each dogfooded with `init && verify`
      and each attested for build provenance in the job that produced it.
-    - `publish` — publishes the three crates to crates.io in dependency order,
+    - `publish` — publishes the fork, then the three harness crates to crates.io in dependency order,
       authenticating with a short-lived token exchanged from its OIDC identity.
+    - `registry-validation` — installs the exact published CLI outside the
+      checkout with a fresh Cargo home on musl and Windows, verifies the fixed
+      dependency's provenance and exercises database teardown. It gates the
+      binary and npm publications; it cannot undo immutable crates.io versions.
     - `npm-publish` — publishes the available platform packages, then the
       `do-harness` meta package. It skips `UNAVAILABLE_PKGS` (currently
       `do-harness-win32-x64`, which npm refuses) and **still publishes the meta
@@ -270,8 +282,13 @@ goes in afterwards with `gh release edit <tag> --notes-file <file>`.
 The publish job runs on a tag push, and on `workflow_dispatch` with
 `publish=true` — the bootstrap and re-run path for a version whose tag already
 exists. It is idempotent: a version already present on crates.io is skipped, so
-a partially failed run can be re-run safely. Publish order is `do-harness-types` → `do-harness-db` → `do-harness`;
+a partially failed run can be re-run safely. Publish order is `do-harness-libsql` → `do-harness-types` → `do-harness-db` → `do-harness`;
 each step retries while the registry index catches up.
+
+The fork has its own version (`vendor/libsql/Cargo.toml`, currently 0.9.30),
+independent of `[workspace.package].version`. Its versioned path dependency
+is normalized to a registry dependency in `do-harness-db`; no `[patch]` is
+needed by consumers. Preserve upstream licensing and provenance on updates.
 
 Before introducing or publishing a new publishable crate, run the pre-publish name check described in [.agents/skills/crates-io-name-check/SKILL.md](../.agents/skills/crates-io-name-check/SKILL.md). Paste the terminal output (`curl` API status and `cargo search` results) into the release PR or pre-publish record to confirm availability and naming appropriateness before the first publish.
 
@@ -322,7 +339,8 @@ Release preflight runs focused contract checks before publication:
    covered by the separate contract test below.
 2. **Package contents:** `scripts/check-package-contract.sh` checks required
    package files, rejects local state and build output, and confirms
-   `guardian-proxy` remains unpublished.
+   `guardian-proxy` remains unpublished. The libSQL policy also rejects reverting
+   to upstream registry `libsql` or relying on another workspace override.
 3. **CLI and evidence:** `crates/do-harness/tests/release_contract.rs` checks
    command and option availability, exit-code classes, JSON stdout, evidence v3/v4,
    previous-release configuration fixtures, and unknown-field rejection.
@@ -343,6 +361,53 @@ Install the pinned API checker, then run the same preflight checks locally:
 A deliberate pre-1.0 contract break follows the normal reviewed version-change
 process: update the corresponding fixture in the same PR and document the break
 and migration guidance in the release notes. No waiver mechanism is added.
+
+### Source-distribution validation
+
+Versions through 0.2.1 used a workspace-local libSQL patch that is removed by
+Cargo packaging. Their registry source installations do not include the
+teardown fix. Until 0.3.0 is published and passes registry validation, direct
+affected users to tested prebuilt artifacts. `--locked` selects packaged
+versions; it is not a replacement for publishing fixed dependency code.
+
+Before publication, validate actual normalized archives against an isolated
+directory registry (Cargo source replacement, with no manifest patches).
+These scripts require Python 3.12 and the pinned Rust toolchain; Linux musl
+checks also require the Rust musl target and `musl-gcc`:
+
+```bash
+python scripts/test_source_distribution.py
+python scripts/check_source_distribution.py --target x86_64-unknown-linux-musl \
+  --prebuilt target/x86_64-unknown-linux-musl/release/do-harness
+```
+
+After publication, validate the actual registry install:
+
+```bash
+python scripts/check_source_distribution.py --mode registry \
+  --target x86_64-unknown-linux-musl
+# On Windows, use --target x86_64-pc-windows-msvc.
+```
+
+Both modes use a fresh Cargo home and a working directory outside the checkout.
+They inspect normalized manifests, reject unpatched or non-registry libSQL
+implementations, and compare the connection-source SHA-256 with the committed
+policy. They record compiler/LLVM, target, artifact and dependency versions,
+registry identity and source digest. The shared smoke test runs 32 cycles of
+real temporary databases through separate write/read CLI processes, verifying
+persistence on reopen and successful teardown. The optional `--prebuilt` runs
+the same smoke test against the checkout binary. A successful smoke test alone
+does not prove the fix: allocation history can mask the original bug.
+
+The release matrix validates packaged source and prebuilt binaries on every
+target. Post-publish musl and Windows registry checks must pass before the
+GitHub Release or npm packages are published. PR CI also exercises the
+packaged path on those two platforms. Logs are retained as workflow artifacts.
+
+For 0.3.0, Rust library consumers must upgrade do-harness crates together and
+use `do_harness_db::Connection` or alias `do-harness-libsql` as `libsql`.
+The public types come from a different crate identity; upstream `libsql` types
+cannot be mixed with them. CLI behavior and database formats are unchanged.
 
 ## npm publishing
 
@@ -435,7 +500,7 @@ missing/unsupported-platform diagnostics.
 | Prebuilt installer | `curl -fsSL .../scripts/install.sh \| sh -s -- --version v0.2.1` | yes (Git Bash) |
 | Release zip | unzip `do-harness-v<version>-x86_64-pc-windows-msvc.zip` | yes |
 | cargo-binstall | `cargo binstall do-harness` | yes |
-| crates.io source build | `cargo install do-harness --version 0.2.1` | yes |
+| crates.io source build (after 0.3.0 validation) | `cargo install do-harness --version 0.3.0 --locked` | yes |
 | Vendored source | `cargo install --path vendor/do-harness/crates/do-harness` | yes |
 
 Windows has no npm channel: the `do-harness-win32-x64` platform package is

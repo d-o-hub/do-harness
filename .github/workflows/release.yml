@@ -193,6 +193,10 @@ jobs:
         uses: taiki-e/install-action@ba47c86ac325773530516bb756137ac718732518
         with:
           tool: cargo-deny,cargo-audit
+      # actions/setup-python@v6; tomllib and tarfile's data filter need Python 3.12.
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: "3.12"
       - name: Build release binary
         run: cargo build --release --locked -p do-harness --target ${{ matrix.target }}
       - name: Smoke-test the binary
@@ -205,6 +209,21 @@ jobs:
           tmp="$(mktemp -d)"
           ./target/${{ matrix.target }}/release/${{ matrix.binary }} --root "$tmp" init
           ./target/${{ matrix.target }}/release/${{ matrix.binary }} --root "$tmp" verify --format json --strict
+      - name: Validate packaged source distribution and prebuilt database teardown
+        shell: bash
+        run: |
+          python scripts/test_source_distribution.py 2>&1 | tee distribution-validation.log
+          python scripts/check_source_distribution.py --mode packaged \
+            --target "${{ matrix.target }}" \
+            --prebuilt "target/${{ matrix.target }}/release/${{ matrix.binary }}" \
+            2>&1 | tee -a distribution-validation.log
+      - name: Upload distribution validation evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: distribution-${{ matrix.target }}
+          path: distribution-validation.log
+          if-no-files-found: error
       - name: Package the release artifact
         shell: bash
         run: |
@@ -243,7 +262,7 @@ jobs:
     # waits for both publication paths: `v0.1.2` created this Release while
     # `npm-publish` was red, leaving a complete Release next to a version that
     # was never on npm.
-    needs: [build, publish, npm-publish]
+    needs: [build, publish, registry-validation, npm-publish]
     # Dispatch is a dry run; only a tag push publishes.
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
@@ -363,12 +382,16 @@ jobs:
               -o /dev/null "https://crates.io/api/v1/crates/$1/$2"
           }
           publish() {
-            local crate="$1" attempt=1
-            if published "$crate" "$version"; then
-              echo "$crate $version is already on crates.io; skipping"
+            local crate="$1" crate_version="$2" manifest="$3" attempt=1
+            local features=()
+            if [ "$crate" = "do-harness-libsql" ]; then
+              features=(--no-default-features --features core)
+            fi
+            if published "$crate" "$crate_version"; then
+              echo "$crate $crate_version is already on crates.io; skipping"
               return 0
             fi
-            until cargo publish --locked -p "$crate"; do
+            until cargo publish --locked --manifest-path "$manifest" "${features[@]}"; do
               if [ "$attempt" -ge 8 ]; then
                 echo "FAIL: could not publish $crate after $attempt attempts" >&2
                 return 1
@@ -378,15 +401,65 @@ jobs:
               sleep 15
             done
           }
-          publish do-harness-types
-          publish do-harness-db
-          publish do-harness
+          fork_version="$(sed -n 's/^version *= *"\(.*\)"/\1/p' vendor/libsql/Cargo.toml)"
+          test -n "$fork_version"
+          publish do-harness-libsql "$fork_version" vendor/libsql/Cargo.toml
+          publish do-harness-types "$version" crates/types/Cargo.toml
+          publish do-harness-db "$version" crates/db/Cargo.toml
+          publish do-harness "$version" crates/do-harness/Cargo.toml
+
+  registry-validation:
+    # Published versions are immutable. This gate checks the actual registry
+    # implementation before any binary or npm release can be advertised.
+    needs: publish
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Resolve pinned toolchain
+        id: toolchain
+        shell: bash
+        run: |
+          channel="$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)"
+          echo "channel=$channel" >> "$GITHUB_OUTPUT"
+      - uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de
+        with:
+          toolchain: ${{ steps.toolchain.outputs.channel }}
+          targets: ${{ matrix.target }}
+      - name: Install musl toolchain
+        if: runner.os == 'Linux'
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq musl-tools
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: "3.12"
+      - name: Validate registry installation
+        shell: bash
+        run: |
+          python scripts/check_source_distribution.py --mode registry \
+            --target "${{ matrix.target }}" 2>&1 | tee registry-validation.log
+      - name: Upload registry validation evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: registry-${{ matrix.target }}
+          path: registry-validation.log
+          if-no-files-found: error
 
   npm-publish:
     # The npm wrapper ships the same prebuilt binaries as the GitHub release,
     # so it is gated on the same preconditions. Platform packages publish
     # first, then the meta package whose optionalDependencies pin them.
-    needs: [preflight, build]
+    needs: [preflight, build, registry-validation]
     if: github.event_name == 'push' || inputs.publish
     runs-on: ubuntu-latest
     timeout-minutes: 20

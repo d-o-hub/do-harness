@@ -69,13 +69,18 @@ rust-pack helpers are POSIX shell scripts — run hooks and dogfood under Git
 Bash on Windows. Managed git hooks resolve `do-harness.exe` via the `.exe`
 fallback.
 
-Rust toolchains can install from crates.io instead, either building from
-source or fetching the release artifact:
+Rust toolchains can fetch the prebuilt release artifact:
 
 ```bash
-cargo install do-harness --version 0.2.1
 cargo binstall do-harness          # prebuilt, no compile
 ```
+
+Registry source installs through 0.2.1 lose the local libSQL teardown patch.
+Prefer the tested prebuilt artifacts until 0.3.0 is published and its registry
+validation passes. From 0.3.0 onward, use
+`cargo install do-harness --version 0.3.0 --locked`; the normalized dependency
+names the maintained `do-harness-libsql` fork. `--locked` makes version selection
+reproducible, but cannot add a missing source fix to an older release.
 
 ### Air-gapped and vendored installs
 
