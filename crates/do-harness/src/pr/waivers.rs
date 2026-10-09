@@ -23,8 +23,8 @@ use super::{waiver_classify, waiver_scan};
 
 #[allow(unused_imports)]
 pub use super::waiver_comment::{
-    CodecovStatus, CodecovSummary, WaiverAuditRecord, is_authorized_role,
-    parse_candidate_waiver, render_markdown,
+    CodecovStatus, CodecovSummary, WaiverAuditRecord, is_authorized_role, parse_candidate_waiver,
+    render_markdown,
 };
 
 /// Why an uncovered changed line needs no new test.
