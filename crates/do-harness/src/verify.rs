@@ -28,6 +28,7 @@ fn warn_unscoped_record(
 }
 
 /// Runs the `verify` subcommand: sensors, optional beat recording, report.
+#[allow(clippy::too_many_lines)]
 pub(crate) async fn run(root: &Path, mut opts: VerifyOpts) -> std::result::Result<(), CliError> {
     let started_at = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -67,7 +68,9 @@ pub(crate) async fn run(root: &Path, mut opts: VerifyOpts) -> std::result::Resul
     // mutations can be detected for every run, including non---record runs.
     let mut pre_digests = std::collections::BTreeMap::new();
     for spec in &selection.specs {
-        if let Some(digest) = sensor_inputs::effective_input_digest(root, spec, config_bytes.as_deref()) {
+        if let Some(digest) =
+            sensor_inputs::effective_input_digest(root, spec, config_bytes.as_deref())
+        {
             pre_digests.insert(spec.name.clone(), digest);
         }
     }
@@ -88,7 +91,15 @@ pub(crate) async fn run(root: &Path, mut opts: VerifyOpts) -> std::result::Resul
                 opts.blocked.push(name);
             }
         }
-        prepare_reuse(root, &cfg, config_bytes.as_deref(), &beat_scope, &mut opts, &selection).await?;
+        prepare_reuse(
+            root,
+            &cfg,
+            config_bytes.as_deref(),
+            &beat_scope,
+            &mut opts,
+            &selection,
+        )
+        .await?;
     } else {
         opts.pre_digests = pre_digests.clone();
     }
@@ -128,7 +139,9 @@ pub(crate) async fn run(root: &Path, mut opts: VerifyOpts) -> std::result::Resul
                     continue;
                 }
                 if let Some(pre) = pre_digests.get(&spec.name) {
-                    if let Some(post) = sensor_inputs::effective_input_digest(root, spec, config_bytes.as_deref()) {
+                    if let Some(post) =
+                        sensor_inputs::effective_input_digest(root, spec, config_bytes.as_deref())
+                    {
                         if post != *pre {
                             invalidated_reason = Some("inputs_changed_during_run".to_string());
                             break;
@@ -188,13 +201,13 @@ pub(crate) async fn run(root: &Path, mut opts: VerifyOpts) -> std::result::Resul
 /// # Errors
 ///
 /// Returns an error when selection resolution or the state database fails.
-async fn prepare_reuse<'a>(
+async fn prepare_reuse(
     root: &Path,
     _cfg: &config::Config,
     config_bytes: Option<&[u8]>,
     scope: &telemetry::BeatScope,
     opts: &mut VerifyOpts,
-    selection: &sensors::ResolvedSelection<'a>,
+    selection: &sensors::ResolvedSelection<'_>,
 ) -> std::result::Result<(), CliError> {
     let lookup = !opts.bless && opts.unchanged != sensors::UnchangedMode::Run;
     // Opened on first need: a run whose sensors declare no `inputs` never
@@ -318,14 +331,15 @@ fn to_i64(value: u64) -> i64 {
 /// Signal-set runs own their evidence file so a feedback run can never
 /// clobber verification evidence (or vice versa). Runs without `--set` keep
 /// the legacy behavior: an artifact only for `--evidence` or `--strict`.
-async fn write_evidence<'a>(
+#[allow(clippy::too_many_arguments)]
+async fn write_evidence(
     root: &Path,
     cfg: &config::Config,
     config_bytes: Option<&[u8]>,
     report: &report::VerifyReport,
     opts: &VerifyOpts,
     started_at: i64,
-    selection: &sensors::ResolvedSelection<'a>,
+    selection: &sensors::ResolvedSelection<'_>,
     invalidated_reason: Option<&str>,
 ) -> std::result::Result<(), CliError> {
     let evidence_path = opts

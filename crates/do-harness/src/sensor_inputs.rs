@@ -55,11 +55,19 @@ pub(crate) fn workspace_source_digest(
             continue;
         }
         let is_untracked = untracked.contains(path);
-        if is_untracked && artifact_set.as_ref().is_some_and(|set| set.is_match(path.as_str())) {
+        if is_untracked
+            && (path == "Cargo.lock"
+                || artifact_set
+                    .as_ref()
+                    .is_some_and(|set| set.is_match(path.as_str())))
+        {
             continue;
         }
         entries.push(entry(root, path, "source")?);
-        if coverage_set.as_ref().is_some_and(|set| set.is_match(path.as_str())) {
+        if coverage_set
+            .as_ref()
+            .is_some_and(|set| set.is_match(path.as_str()))
+        {
             entries.push(entry(root, path, "coverage")?);
         }
     }
@@ -91,10 +99,10 @@ pub(crate) fn effective_input_digest(
     spec: &SensorSpec,
     config_bytes: Option<&[u8]>,
 ) -> Option<String> {
-    if !spec.inputs.is_empty() {
-        digest(root, spec, config_bytes)
-    } else {
+    if spec.inputs.is_empty() {
         workspace_source_digest(root, spec, config_bytes)
+    } else {
+        digest(root, spec, config_bytes)
     }
 }
 
@@ -199,12 +207,7 @@ fn repository_paths(root: &Path) -> Option<Vec<String>> {
 /// enumerate them or a path is not UTF-8.
 fn untracked_paths(root: &Path) -> Option<std::collections::HashSet<String>> {
     let output = crate::changes::git_command(root)
-        .args([
-            "ls-files",
-            "--others",
-            "--exclude-standard",
-            "-z",
-        ])
+        .args(["ls-files", "--others", "--exclude-standard", "-z"])
         .output()
         .ok()?;
     if !output.status.success() {

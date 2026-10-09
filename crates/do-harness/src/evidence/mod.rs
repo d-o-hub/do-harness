@@ -82,7 +82,7 @@ pub struct EvidenceDocument {
     pub config_fingerprint: String,
     /// Whether the run used `--changed` selection.
     pub changed: bool,
-    /// Explicit reason if evidence was invalidated during run (e.g. "inputs_changed_during_run").
+    /// Explicit reason if evidence was invalidated during run (e.g. "`inputs_changed_during_run`").
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub invalidated_reason: Option<String>,
     pub sensors: Vec<EvidenceSensor>,
@@ -164,6 +164,7 @@ impl EvidenceDocument {
     }
 
     /// Creates an evidence document from a completed verify run.
+    #[allow(clippy::too_many_lines)]
     pub fn from_run(report: &VerifyReport, meta: &RunMeta<'_>) -> Self {
         let git_sha = resolve_git_sha(meta.root);
         let sensor_pack = meta
@@ -252,11 +253,12 @@ impl EvidenceDocument {
         // Any skip (reused pass, cancelled, or unreported selection) or invalidation
         // makes the evidence non-pass: `status` must never report green on a run
         // that did not freshly observe every selected sensor without mid-run mutation.
-        let summary_verdict = if meta.invalidated_reason.is_none() && fail_count == 0 && skip_count == 0 {
-            "pass"
-        } else {
-            "fail"
-        };
+        let summary_verdict =
+            if meta.invalidated_reason.is_none() && fail_count == 0 && skip_count == 0 {
+                "pass"
+            } else {
+                "fail"
+            };
 
         EvidenceDocument {
             schema_version: EVIDENCE_SCHEMA_VERSION,

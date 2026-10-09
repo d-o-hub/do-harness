@@ -252,12 +252,9 @@ line/branch proof from `cargo-llvm-cov nextest`.
   them gets the branch percentage printed beside the line one.
 - **Ratchet contract.** The verdict stays numeric for `verify --record --bless`:
   `FINDINGS: <deficit>` is the line-percentage deficit against `TARGET_PCT=70`,
-  and `FINDINGS: 0` above target. A branch percentage never changes that number.
-- **Exit contract.** Below the target — or when the report carries no line counts
-  (`WARN … FINDINGS: 1`) — the script exits non-zero instead of passing silently.
-  The sensor ships with `severity = "warn"`, so a local run stays advisory while
-  `verify --strict` (the release preflight) promotes the failure and the 70%
-  threshold gates the tag.
+  and `FINDINGS: 0` above target. A branch percentage never changes that number,
+  and a report with no line counts keeps the `WARN … FINDINGS: 1` contract
+  instead of passing silently.
 - **Tool contract.** A missing `cargo-llvm-cov`/`cargo-nextest` exits 0 with a
   `SKIP:` line locally and fails closed when `CI=true` or
   `DO_HARNESS_REQUIRE_TOOLS=1`.

@@ -153,7 +153,7 @@ argv = ["sh", "-c", "echo mutated > lib.rs"]
 }
 
 /// Test 3: Barrier-coordinated external writer changes source during a sensor run.
-/// Evidence is invalidated, verify --strict fails, and status reports red with reason "inputs_changed_during_run".
+/// Evidence is invalidated, verify --strict fails, and status reports red with reason "`inputs_changed_during_run`".
 #[test]
 fn barrier_coordinated_external_writer_invalidates_evidence() {
     let dir = tempfile::tempdir().unwrap();
@@ -209,9 +209,10 @@ inputs = ["lib.rs"]
     // Wait for the sensor to reach the barrier with a 10s safety timeout
     let start = std::time::Instant::now();
     while !barrier_start.exists() {
-        if start.elapsed() > std::time::Duration::from_secs(10) {
-            panic!("timed out waiting for barrier_start to be created by sensor");
-        }
+        assert!(
+            start.elapsed() <= std::time::Duration::from_secs(10),
+            "timed out waiting for barrier_start to be created by sensor"
+        );
         std::thread::sleep(std::time::Duration::from_millis(10));
     }
 
