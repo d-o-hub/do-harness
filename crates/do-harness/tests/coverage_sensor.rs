@@ -6,7 +6,9 @@
 //! - the llvm-cov path derives the line and branch percentages from the lcov
 //!   report, prints the branch percentage when the report carries one, and
 //!   always reports `FINDINGS: <line deficit>` (0 above target) for the blessed
-//!   ratchet.
+//!   ratchet. Below the target — or without line counts — it exits non-zero so
+//!   `--strict` promotes the warn severity to a hard failure (the release
+//!   gate), while local runs stay advisory.
 //! - a missing toolchain keeps the SKIP/FAIL contract (`CI=true` /
 //!   `DO_HARNESS_REQUIRE_TOOLS=1`).
 //! - the sensor measures the workspace that contains it, independent of cwd.
@@ -30,6 +32,15 @@ const LCOV_WITH_BRANCHES: &str = r#"std::fs::write("lcov.info", "SF:src/lib.rs\n
 /// must report the deficit without inventing a branch number.
 const LCOV_WITHOUT_BRANCHES: &str =
     r#"std::fs::write("lcov.info", "SF:src/lib.rs\nLF:100\nLH:65\nend_of_record\n").unwrap();"#;
+
+/// Fake `cargo-llvm-cov` whose report carries no line counts: the sensor must
+/// report the unmeasurable report as a finding and exit non-zero.
+const LCOV_WITHOUT_LINE_COUNTS: &str =
+    r#"std::fs::write("lcov.info", "SF:src/lib.rs\nBRF:20\nBRH:13\nend_of_record\n").unwrap();"#;
+
+/// Fake `cargo-llvm-cov` whose report is exactly at the target (70.00%).
+const LCOV_AT_TARGET: &str =
+    r#"std::fs::write("lcov.info", "SF:src/lib.rs\nLF:100\nLH:70\nend_of_record\n").unwrap();"#;
 
 /// Removes ambient git state so a spawned command cannot inherit this test
 /// run's repository.
@@ -173,7 +184,10 @@ fn llvm_cov_path_reports_the_deficit_without_branch_data() {
         .expect("run check-coverage.sh llvm-cov");
 
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(output.status.success(), "sensor failed:\n{stdout}");
+    assert!(
+        !output.status.success(),
+        "a sub-threshold report must exit non-zero so --strict gates the release:\n{stdout}"
+    );
     assert!(
         stdout.contains("WARN: Line coverage is 65.00% (target 70%, deficit 5%)."),
         "expected line deficit without branch data, got:\n{stdout}"
@@ -185,6 +199,64 @@ fn llvm_cov_path_reports_the_deficit_without_branch_data() {
     assert!(
         !stdout.contains("Branch coverage"),
         "a report without branch records must not print a branch percentage:\n{stdout}"
+    );
+}
+
+#[test]
+fn llvm_cov_path_fails_when_the_report_has_no_line_counts() {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let root = temp_dir.path();
+    let bin_dir = scaffold(root, LCOV_WITHOUT_LINE_COUNTS);
+
+    let output = shell::bash()
+        .arg(script_path())
+        .arg("llvm-cov")
+        .arg(root)
+        .env("PATH", path_with(&bin_dir))
+        .output()
+        .expect("run check-coverage.sh llvm-cov");
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        !output.status.success(),
+        "an unmeasurable report must exit non-zero instead of passing silently:\n{stdout}"
+    );
+    assert!(
+        stdout.contains("WARN: Could not derive line coverage from lcov.info."),
+        "expected the unmeasurable-report warning, got:\n{stdout}"
+    );
+    assert!(
+        stdout.contains("FINDINGS: 1"),
+        "expected FINDINGS: 1 for the ratchet, got:\n{stdout}"
+    );
+}
+
+#[test]
+fn llvm_cov_path_passes_at_exactly_the_target() {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let root = temp_dir.path();
+    let bin_dir = scaffold(root, LCOV_AT_TARGET);
+
+    let output = shell::bash()
+        .arg(script_path())
+        .arg("llvm-cov")
+        .arg(root)
+        .env("PATH", path_with(&bin_dir))
+        .output()
+        .expect("run check-coverage.sh llvm-cov");
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        output.status.success(),
+        "the target is inclusive: 70.00% must pass. Output:\n{stdout}"
+    );
+    assert!(
+        stdout.contains("check-coverage OK: Line coverage is 70.00% (>= 70%)."),
+        "expected the at-target OK line, got:\n{stdout}"
+    );
+    assert!(
+        stdout.contains("FINDINGS: 0"),
+        "expected FINDINGS: 0, got:\n{stdout}"
     );
 }
 
@@ -266,5 +338,16 @@ fn the_sensor_measures_the_workspace_that_contains_it() {
     assert!(
         !elsewhere.join("lcov.info").exists(),
         "the sensor must not measure the caller's working directory"
+    );
+}
+
+/// The shipped `init` template is this script; a fix that lands in only one of
+/// them leaves scaffolded repositories on the old contract.
+#[test]
+fn the_shipped_template_matches_the_repository_script() {
+    assert_eq!(
+        include_str!("../../../scripts/check-coverage.sh"),
+        include_str!("../templates/scripts/check-coverage.sh"),
+        "the shipped template must not drift from scripts/"
     );
 }
