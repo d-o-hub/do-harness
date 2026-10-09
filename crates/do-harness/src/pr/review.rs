@@ -15,7 +15,7 @@ use super::proof::{self, GatePolicy, ProofRules};
 use crate::changes::git_command;
 
 /// Stable review report schema version.
-pub const SCHEMA_VERSION: u32 = 3;
+pub const SCHEMA_VERSION: u32 = 4;
 
 /// Where the gate policy was read from and whether it parsed.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -90,8 +90,10 @@ pub struct ReviewReport {
     pub cached: bool,
     /// Gate policy probe result.
     pub policy: Policy,
-    /// Changed units evidence could not prove.
+    /// Changed units evidence could not prove or exempt.
     pub residual: Vec<Unit>,
+    /// Policy-exempt units listed for audit.
+    pub exempt: Vec<Unit>,
     /// Proven units listed for audit.
     pub skipped: Vec<Unit>,
     /// Revoked mechanical claims; the affected units stay residual.
@@ -218,11 +220,13 @@ fn assemble(inputs: Inputs<'_>, recompute: bool) -> ReviewReport {
     warnings.extend(parsed.warnings);
     warnings.extend_from_slice(matcher.warnings());
     let mut residual = Vec::new();
+    let mut exempt = Vec::new();
     let mut skipped = Vec::new();
     let mut false_proven = Vec::new();
     for unit in parsed.units {
         match matcher.evaluate(&unit) {
             proof::Verdict::Residual => residual.push(unit),
+            proof::Verdict::Exempt => exempt.push(unit),
             proof::Verdict::Proven => skipped.push(unit),
             proof::Verdict::Revoked { reason } => {
                 false_proven.push(FalseProven {
@@ -246,6 +250,7 @@ fn assemble(inputs: Inputs<'_>, recompute: bool) -> ReviewReport {
         cached: false,
         policy: inputs.policy,
         residual,
+        exempt,
         skipped,
         false_proven,
         measurement,
