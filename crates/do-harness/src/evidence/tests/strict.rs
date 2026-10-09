@@ -21,6 +21,7 @@ fn strict_clean_checks() {
         policy_fingerprint: "sha256:p".into(),
         config_fingerprint: "sha256:c".into(),
         changed: false,
+        invalidated_reason: None,
         sensors: vec![EvidenceSensor {
             name: "check".into(),
             argv: vec!["cargo".into(), "check".into()],
@@ -122,6 +123,7 @@ fn soft_failure_is_recorded_as_warn_not_pass() {
         record: true,
         started_at: 0,
         finished_at: 1,
+        invalidated_reason: None,
     };
     let doc = EvidenceDocument::from_run(&report, &meta);
     assert_eq!(doc.sensors[0].verdict, "warn");
@@ -188,6 +190,7 @@ fn warned_sensor_is_recorded_as_warn_and_fails_summary() {
         record: true,
         started_at: 0,
         finished_at: 1,
+        invalidated_reason: None,
     };
     let doc = EvidenceDocument::from_run(&report, &meta);
     assert_eq!(doc.sensors[0].verdict, "warn");

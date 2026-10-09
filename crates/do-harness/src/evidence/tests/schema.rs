@@ -21,6 +21,7 @@ fn serialization_matches_schema() {
         policy_fingerprint: "sha256:p".into(),
         config_fingerprint: "sha256:c".into(),
         changed: false,
+        invalidated_reason: None,
         sensors: vec![EvidenceSensor {
             name: "check".into(),
             argv: vec!["cargo".into(), "check".into()],

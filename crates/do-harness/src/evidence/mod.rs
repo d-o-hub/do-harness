@@ -82,6 +82,9 @@ pub struct EvidenceDocument {
     pub config_fingerprint: String,
     /// Whether the run used `--changed` selection.
     pub changed: bool,
+    /// Explicit reason if evidence was invalidated during run (e.g. "`inputs_changed_during_run`").
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub invalidated_reason: Option<String>,
     pub sensors: Vec<EvidenceSensor>,
     /// Sensors skipped by change-aware selection, with reasons.
     pub skipped: Vec<EvidenceSkipped>,
@@ -103,7 +106,8 @@ impl EvidenceDocument {
     /// durations, or an unsealed document without a chain hash.
     #[must_use]
     pub fn is_strict_clean(&self) -> bool {
-        self.summary.verdict == "pass"
+        self.invalidated_reason.is_none()
+            && self.summary.verdict == "pass"
             && self.summary.skip == 0
             && !self.chain_hash.is_empty()
             && self
@@ -136,6 +140,7 @@ impl EvidenceDocument {
             "policy_fingerprint": self.policy_fingerprint,
             "config_fingerprint": self.config_fingerprint,
             "changed": self.changed,
+            "invalidated_reason": self.invalidated_reason,
             "sensors": self.sensors,
             "skipped": self.skipped,
             "coverage": self.coverage,
@@ -159,6 +164,7 @@ impl EvidenceDocument {
     }
 
     /// Creates an evidence document from a completed verify run.
+    #[allow(clippy::too_many_lines)]
     pub fn from_run(report: &VerifyReport, meta: &RunMeta<'_>) -> Self {
         let git_sha = resolve_git_sha(meta.root);
         let sensor_pack = meta
@@ -244,14 +250,15 @@ impl EvidenceDocument {
             }
         }
 
-        // Any skip (reused pass, cancelled, or unreported selection) makes
-        // the evidence non-pass: `status` must never report green on a run
-        // that did not freshly observe every selected sensor.
-        let summary_verdict = if fail_count == 0 && skip_count == 0 {
-            "pass"
-        } else {
-            "fail"
-        };
+        // Any skip (reused pass, cancelled, or unreported selection) or invalidation
+        // makes the evidence non-pass: `status` must never report green on a run
+        // that did not freshly observe every selected sensor without mid-run mutation.
+        let summary_verdict =
+            if meta.invalidated_reason.is_none() && fail_count == 0 && skip_count == 0 {
+                "pass"
+            } else {
+                "fail"
+            };
 
         EvidenceDocument {
             schema_version: EVIDENCE_SCHEMA_VERSION,
@@ -268,6 +275,7 @@ impl EvidenceDocument {
             policy_fingerprint: meta.fingerprints.policy.clone(),
             config_fingerprint: meta.fingerprints.config.clone(),
             changed: meta.changed,
+            invalidated_reason: meta.invalidated_reason.clone(),
             sensors,
             skipped: meta.skipped.clone(),
             coverage,
@@ -311,6 +319,8 @@ pub struct RunMeta<'a> {
     pub started_at: i64,
     /// Unix timestamp when the run finished.
     pub finished_at: i64,
+    /// Explicit reason if evidence was invalidated during run.
+    pub invalidated_reason: Option<String>,
 }
 
 /// Evidence record for a sensor whose verdict was reused from a recorded
