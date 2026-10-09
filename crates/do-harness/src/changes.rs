@@ -278,7 +278,7 @@ fn untracked_files(root: &Path) -> Vec<ChangedFile> {
 }
 
 /// Normalizes a git-reported path: `/` separators on every OS, no `./`.
-fn normalize(path: &str) -> String {
+pub(crate) fn normalize(path: &str) -> String {
     let path = path.replace('\\', "/");
     path.strip_prefix("./").unwrap_or(&path).to_owned()
 }

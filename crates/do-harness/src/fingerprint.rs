@@ -229,7 +229,8 @@ pub(crate) fn config_digest(config_bytes: Option<&[u8]>) -> String {
 
 /// Whether a manifest path is harness-owned state (excluded from hashing).
 pub(crate) fn is_harness_state(path: &str) -> bool {
-    path == ".do-harness" || path.starts_with(HARNESS_STATE_PREFIX)
+    let normalized = crate::changes::normalize(path);
+    normalized == ".do-harness" || normalized.starts_with(HARNESS_STATE_PREFIX)
 }
 
 /// `sha256:`-prefixed hex of raw bytes.

@@ -188,8 +188,7 @@ pub fn verify_selection<'a>(
 
     let jobs = parallel::effective_jobs(cfg.jobs, opts.jobs)?;
     let cancel = AtomicBool::new(false);
-    let mut results =
-        parallel::run_parallel(selection.specs.clone(), root, opts, jobs, &cancel);
+    let mut results = parallel::run_parallel(selection.specs.clone(), root, opts, jobs, &cancel);
 
     // `--strict` promotes advisory failures to hard failures, except in the
     // fast `feedback` loop where warn severity stays advisory by contract.

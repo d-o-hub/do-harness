@@ -194,11 +194,11 @@ fn repository_paths(root: &Path) -> Option<Vec<String>> {
         if raw.is_empty() {
             continue;
         }
-        let path = std::str::from_utf8(raw).ok()?.to_owned();
-        if Path::new(&path).is_absolute() {
+        let raw_str = std::str::from_utf8(raw).ok()?;
+        if Path::new(raw_str).is_absolute() {
             return None;
         }
-        paths.push(path);
+        paths.push(crate::changes::normalize(raw_str));
     }
     Some(paths)
 }
@@ -218,9 +218,9 @@ fn untracked_paths(root: &Path) -> Option<std::collections::HashSet<String>> {
         if raw.is_empty() {
             continue;
         }
-        let path = std::str::from_utf8(raw).ok()?.to_owned();
-        if !Path::new(&path).is_absolute() {
-            set.insert(path);
+        let raw_str = std::str::from_utf8(raw).ok()?;
+        if !Path::new(raw_str).is_absolute() {
+            set.insert(crate::changes::normalize(raw_str));
         }
     }
     Some(set)
