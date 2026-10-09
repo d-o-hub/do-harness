@@ -105,7 +105,6 @@ pub struct ActionableComment {
     pub url: Option<String>,
 }
 
-
 /// Evaluates merge readiness for PR `number`.
 ///
 /// # Errors
