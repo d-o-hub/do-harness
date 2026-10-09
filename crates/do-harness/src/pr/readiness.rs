@@ -13,9 +13,9 @@ use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
 use super::gh;
-use super::waivers::{
-    CodecovStatus, WaiverAuditRecord, is_authorized_role, parse_candidate_waiver,
-};
+use super::waiver_comment::first_line;
+#[allow(unused_imports)]
+pub use super::waiver_comment::{CodecovStatus, CodecovSummary, WaiverAuditRecord};
 use crate::CliError;
 use crate::report::Format;
 
@@ -105,27 +105,6 @@ pub struct ActionableComment {
     pub url: Option<String>,
 }
 
-/// Digest of Codecov report status on the PR.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CodecovSummary {
-    pub status: CodecovStatus,
-    pub is_actionable: bool,
-    pub waived: bool,
-    pub patch_coverage: Option<f64>,
-    pub missing_lines: Option<u64>,
-    pub excerpt: String,
-    pub url: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub waiver_reason: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub waiver_author: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub waiver_finding_ref: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub waiver_head_sha: Option<String>,
-    #[serde(skip_serializing_if = "Vec::is_empty", default)]
-    pub audit_waivers: Vec<WaiverAuditRecord>,
-}
 
 /// Evaluates merge readiness for PR `number`.
 ///
@@ -303,177 +282,19 @@ fn evaluate_conversations(
 
     let comments = gh::issue_comments(root, number).context("could not read issue comments")?;
     let mut actionable_comments = Vec::new();
-    let mut codecov = None;
-
-    let latest_codecov = comments.iter().rev().find(|c| {
-        let author = c.user.as_ref().map_or("", |u| u.login.as_str());
-        CODECOV_AUTHORS.contains(&author)
-    });
-
-    if let Some(comment) = latest_codecov {
-        let author = comment.user.as_ref().map_or("codecov", |u| u.login.as_str());
-        let patch_cov = parse_patch_coverage(&comment.body);
-        let missing_lines = parse_missing_lines(&comment.body);
-        let excerpt = first_line(&comment.body, 80);
-
-        let has_gap = comment.body.contains("missing coverage")
-            || comment.body.contains("Patch coverage is 0")
-            || comment.body.contains("Decreases by")
-            || missing_lines.is_some_and(|m| m > 0);
-
-        if !has_gap {
-            codecov = Some(CodecovSummary {
-                status: CodecovStatus::NoConcern,
-                is_actionable: false,
-                waived: false,
-                patch_coverage: patch_cov,
-                missing_lines,
-                excerpt,
-                url: comment.html_url.clone(),
-                waiver_reason: None,
-                waiver_author: None,
-                waiver_finding_ref: None,
-                waiver_head_sha: None,
-                audit_waivers: Vec::new(),
-            });
-        } else {
-            let mut audit_waivers = Vec::new();
-            let mut valid_waiver = None;
-
-            for c in &comments {
-                if let Some(candidate) = parse_candidate_waiver(c) {
-                    let head_sha = candidate.head_sha.clone().unwrap_or_default();
-                    let is_stale = head_sha.is_empty()
-                        || (!head_ref_oid.is_empty()
-                            && !head_ref_oid
-                                .to_ascii_lowercase()
-                                .starts_with(&head_sha.to_ascii_lowercase())
-                            && !head_sha
-                                .to_ascii_lowercase()
-                                .starts_with(&head_ref_oid.to_ascii_lowercase()));
-
-                    let perm = gh::user_permission(root, &candidate.author).unwrap_or_default();
-                    let authorized = is_authorized_role(&perm);
-
-                    let finding_ref = candidate.finding_ref.clone().unwrap_or_default();
-                    let finding_lower = finding_ref.to_ascii_lowercase();
-                    let finding_matches = finding_lower.contains("codecov")
-                        || finding_lower.contains("coverage")
-                        || finding_lower.contains("patch")
-                        || finding_lower.contains("missing")
-                        || finding_lower.contains("macro-field")
-                        || finding_lower.contains("guarded-arm")
-                        || finding_lower.contains("feature-gated");
-
-                    audit_waivers.push(WaiverAuditRecord {
-                        author: candidate.author.clone(),
-                        head_sha: head_sha.clone(),
-                        finding_ref: finding_ref.clone(),
-                        reason: candidate.reason.clone(),
-                        authorized,
-                        is_stale,
-                    });
-
-                    if finding_matches
-                        && !is_stale
-                        && authorized
-                        && !candidate.reason.trim().is_empty()
-                        && valid_waiver.is_none()
-                    {
-                        valid_waiver = Some((candidate, head_sha, finding_ref));
-                    }
-                }
-            }
-
-            if let Some((waiver, matched_sha, matched_finding)) = valid_waiver {
-                codecov = Some(CodecovSummary {
-                    status: CodecovStatus::Waived,
-                    is_actionable: false,
-                    waived: true,
-                    patch_coverage: patch_cov,
-                    missing_lines,
-                    excerpt,
-                    url: comment.html_url.clone(),
-                    waiver_reason: Some(waiver.reason),
-                    waiver_author: Some(waiver.author),
-                    waiver_finding_ref: Some(matched_finding),
-                    waiver_head_sha: Some(matched_sha),
-                    audit_waivers,
-                });
-            } else {
-                let cov_text = patch_cov.map_or_else(
-                    || "uncovered lines".to_owned(),
-                    |p| format!("patch coverage {p:.2}%"),
-                );
-                blockers.push(format!(
-                    "unanswered Codecov comment reporting missing coverage ({cov_text})"
-                ));
-                actionable_comments.push(ActionableComment {
-                    id: comment.id,
-                    author: author.to_owned(),
-                    excerpt: excerpt.clone(),
-                    url: comment.html_url.clone(),
-                });
-
-                codecov = Some(CodecovSummary {
-                    status: CodecovStatus::Actionable,
-                    is_actionable: true,
-                    waived: false,
-                    patch_coverage: patch_cov,
-                    missing_lines,
-                    excerpt,
-                    url: comment.html_url.clone(),
-                    waiver_reason: None,
-                    waiver_author: None,
-                    waiver_finding_ref: None,
-                    waiver_head_sha: None,
-                    audit_waivers,
-                });
-            }
-        }
-    }
+    let codecov = super::waiver_comment::evaluate_codecov(
+        root,
+        &comments,
+        head_ref_oid,
+        blockers,
+        &mut actionable_comments,
+    );
 
     let conversations = ConversationSummary {
         unresolved_threads,
         actionable_comments,
     };
     Ok((conversations, codecov))
-}
-
-fn first_line(text: &str, max: usize) -> String {
-    let line = text
-        .lines()
-        .find(|l| !l.trim().is_empty())
-        .unwrap_or("")
-        .trim();
-    // Truncate by characters: a byte slice at `max` panics whenever it falls
-    // inside a multi-byte character, and comment bodies are arbitrary text.
-    if line.chars().count() > max {
-        let mut excerpt: String = line.chars().take(max).collect();
-        excerpt.push_str("...");
-        excerpt
-    } else {
-        line.to_owned()
-    }
-}
-
-fn parse_patch_coverage(body: &str) -> Option<f64> {
-    // `to_ascii_lowercase` preserves byte offsets, so the index stays valid in
-    // `body`; `to_lowercase` can change length (`İ` -> 2 bytes -> 3).
-    let lower = body.to_ascii_lowercase();
-    let idx = lower.find("patch coverage")?;
-    let rest = &body[idx..];
-    let pct_idx = rest.find('%')?;
-    let words = &rest[..pct_idx];
-    words.split_whitespace().last()?.parse::<f64>().ok()
-}
-
-fn parse_missing_lines(body: &str) -> Option<u64> {
-    let lower = body.to_ascii_lowercase();
-    let idx = lower.find("lines in your changes missing coverage")?;
-    let prefix = &body[..idx];
-    let count_word = prefix.split_whitespace().last()?;
-    count_word.parse::<u64>().ok()
 }
 
 /// Runs the ready command and prints the report in `format`.
