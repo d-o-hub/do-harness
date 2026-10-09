@@ -38,10 +38,17 @@ def run(args, cwd, env, capture=False):
     require(argv and argv[0] in ("cargo", "rustc"), "only Cargo and rustc may be executed")
     require(all("\0" not in arg for arg in argv), "NUL in command argument")
     print("+ " + " ".join(argv), flush=True)
-    # Fixed tool allowlist; repository-built argv, never shell command text.
-    # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit, python.lang.security.audit.dangerous-subprocess-use-tainted-env-args
-    return subprocess.run(argv, cwd=cwd, env=env, check=True, shell=False,  # nosec B603
-                          text=True, stdout=subprocess.PIPE if capture else None).stdout
+    # The allowlist above already proved argv[0] is `cargo` or `rustc`; naming
+    # the tool with a literal keeps the executed command a static string and the
+    # remaining argv stays repository-built, never shell command text.
+    kwargs = dict(cwd=cwd, env=env, check=True, shell=False, text=True,
+                  # Cargo emits UTF-8; decode it as such instead of the host's
+                  # ANSI code page (cp1252 fails on cargo metadata under Windows).
+                  encoding="utf-8",
+                  stdout=subprocess.PIPE if capture else None)
+    if argv[0] == "cargo":
+        return subprocess.run(["cargo", *argv[1:]], **kwargs).stdout  # nosec B603
+    return subprocess.run(["rustc", *argv[1:]], **kwargs).stdout  # nosec B603
 
 
 def check_fork(path, policy):

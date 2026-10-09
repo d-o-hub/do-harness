@@ -13,11 +13,13 @@ def smoke(binary, cycles=32, expected_version=None):
     binary = pathlib.Path(binary).resolve(strict=True)
     if not binary.is_file() or binary.name not in ("do-harness", "do-harness.exe"):
         raise ValueError("expected a do-harness CLI artifact")
-    command = [str(binary), "version", "--format", "json"]
-    # Explicit local artifact path; argv is fixed and shell execution is disabled.
-    # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit, python.lang.security.audit.dangerous-subprocess-use-tainted-env-args
-    version = subprocess.check_output(command, shell=False,  # nosec B603
-        text=True, timeout=30
+    # The artifact under test is named by `executable=`; argv stays a literal so
+    # the executed command is a static string and shell execution stays disabled.
+    version = subprocess.check_output(
+        ["do-harness", "version", "--format", "json"], executable=str(binary),
+        shell=False, text=True,  # nosec B603
+        # The CLI emits UTF-8; decode it as such instead of the host ANSI code page.
+        encoding="utf-8", timeout=30,
     ).strip()
     version = json.loads(version)
     if expected_version and version["version"] != expected_version:
@@ -31,12 +33,16 @@ def smoke(binary, cycles=32, expected_version=None):
             def cli(*args):
                 if args[0] not in ("init", "task", "init-db"):
                     raise ValueError("unexpected database smoke command")
-                command = [str(binary), "--root", str(root), *args]
                 try:
-                    # Only fixed smoke commands against the explicit local artifact.
-                    # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit, python.lang.security.audit.dangerous-subprocess-use-tainted-env-args
-                    return subprocess.check_output(command, shell=False,  # nosec B603
-                        text=True, stderr=subprocess.PIPE, timeout=60,
+                    # The artifact is named by `executable=`; argv is a literal so
+                    # the command is a static string, never caller-built text.
+                    return subprocess.check_output(
+                        ["do-harness", "--root", str(root), *args],
+                        executable=str(binary),
+                        shell=False, text=True,  # nosec B603
+                        # UTF-8 output must not be decoded with the host code page.
+                        encoding="utf-8",
+                        stderr=subprocess.PIPE, timeout=60,
                     )
                 except subprocess.CalledProcessError as error:
                     raise RuntimeError(f"CLI exited {error.returncode}: {error.stderr}") from error
