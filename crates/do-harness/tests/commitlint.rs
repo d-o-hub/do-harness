@@ -171,6 +171,39 @@ fn commitlint_empty_history_validates_arguments_and_messages() {
     }
 }
 
+/// The conventional-commits breaking-change marker (`!`) is a valid subject,
+/// and accepting it must not loosen the lowercase rule.
+///
+/// Regression: the pattern omitted `!?`, so a legitimately breaking
+/// `fix(distribution)!:` subject failed the gate even though the commit carried
+/// a `BREAKING CHANGE:` footer. The marker is the machine-readable half of that
+/// signal; rejecting it would force the history to hide the change's impact.
+#[test]
+fn commitlint_accepts_breaking_change_markers() {
+    let (_dir, root) = fixture();
+    git(&root, &["init", "-q"], None);
+
+    let cases: &[(&str, bool)] = &[
+        ("fix(distribution)!: ship the libsql teardown fix\n", true),
+        ("feat!: drop the legacy flag\n", true),
+        ("feat(api)!: rename the response field\n", true),
+        ("fix(distribution): validate windows provenance\n", true),
+        ("fix(distribution)!!: doubled marker\n", false),
+        ("fix(distribution)!: Capitalized subject\n", false),
+        ("fix(distribution): Capitalized subject\n", false),
+        ("Fix(distribution)!: capitalized type\n", false),
+    ];
+    for (index, (subject, expected)) in cases.iter().enumerate() {
+        let path = root.join(format!("message-{index}"));
+        std::fs::write(&path, subject).unwrap();
+        let (ok, stdout, stderr) = lint(&root, &["--message", path.to_str().unwrap()]);
+        assert_eq!(
+            ok, *expected,
+            "subject {subject:?}: stdout={stdout} stderr={stderr}"
+        );
+    }
+}
+
 /// A merge tip is judged on the branch's commits, not the base it merged.
 ///
 /// Regression: the window ran `git log --no-merges -n 1`, which skips a merge
