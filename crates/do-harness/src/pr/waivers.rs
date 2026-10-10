@@ -21,7 +21,11 @@ use super::diff;
 use super::lcov;
 use super::{waiver_classify, waiver_scan};
 
-pub use super::waiver_comment::render_markdown;
+#[allow(unused_imports)]
+pub use super::waiver_comment::{
+    CodecovStatus, CodecovSummary, WaiverAuditRecord, is_authorized_role, parse_candidate_waiver,
+    render_markdown,
+};
 
 /// Why an uncovered changed line needs no new test.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize)]
