@@ -28,7 +28,8 @@ database files do not change.
   exclude checkout patches and ambient Cargo configuration. Every normalized
   dependency is a registry dependency; the CLI is installed from its archive.
 - The same script's `--mode registry` installs the exact published CLI with
-  `--locked`, inspects the resolved graph and checks the fixed source digest.
+  `--locked`, inspects the resolved graph and checks the fixed source digest
+  after canonicalizing Windows CRLF line endings to LF.
   An additional unpatched `libsql`, a path/git override, a changed source
   digest or a wrong version/source fails even if the process smoke succeeds.
 - Both installed and prebuilt CLIs run `smoke_db_distribution.py`: 32 cycles

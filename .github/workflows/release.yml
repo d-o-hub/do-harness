@@ -212,11 +212,11 @@ jobs:
       - name: Validate packaged source distribution and prebuilt database teardown
         shell: bash
         run: |
-          python scripts/test_source_distribution.py
+          python scripts/test_source_distribution.py 2>&1 | tee distribution-validation.log
           python scripts/check_source_distribution.py --mode packaged \
             --target "${{ matrix.target }}" \
             --prebuilt "target/${{ matrix.target }}/release/${{ matrix.binary }}" \
-            | tee distribution-validation.log
+            2>&1 | tee -a distribution-validation.log
       - name: Upload distribution validation evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
@@ -446,7 +446,7 @@ jobs:
         shell: bash
         run: |
           python scripts/check_source_distribution.py --mode registry \
-            --target "${{ matrix.target }}" | tee registry-validation.log
+            --target "${{ matrix.target }}" 2>&1 | tee registry-validation.log
       - name: Upload registry validation evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
