@@ -32,15 +32,6 @@ pub struct Unit {
     pub id: String,
     /// Repository-relative path after the change.
     pub path: String,
-    /// Repository-relative path before the change (when renamed or path changed).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub old_path: Option<String>,
-    /// File mode before the change (e.g. "100644").
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub old_mode: Option<String>,
-    /// File mode after the change (e.g. "100755").
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub new_mode: Option<String>,
     /// File-level change kind.
     pub change: Change,
     /// First line in the base file (0 when unknown).
@@ -68,9 +59,6 @@ pub struct Parsed {
 struct FileState {
     started: bool,
     path: Option<String>,
-    old_path: Option<String>,
-    old_mode: Option<String>,
-    new_mode: Option<String>,
     change: Option<Change>,
     old_null: bool,
     new_null: bool,
@@ -100,9 +88,7 @@ pub fn parse(diff: &str) -> Parsed {
         if let Some(rest) = line.strip_prefix("diff --git ") {
             finish_file(&mut file, &mut pending, &mut out);
             file.started = true;
-            let (old_p, new_p) = diff_git_paths(rest);
-            file.old_path = old_p;
-            file.path = new_p;
+            file.path = diff_git_path(rest);
             continue;
         }
         if line.starts_with("@@") {
@@ -169,9 +155,6 @@ fn finish_hunk(file: &mut FileState, pending: &mut Option<Pending>, out: &mut Pa
     out.units.push(Unit {
         id,
         path,
-        old_path: file.old_path.clone(),
-        old_mode: file.old_mode.clone(),
-        new_mode: file.new_mode.clone(),
         change,
         old_start: hunk.old_start,
         new_start: hunk.new_start,
@@ -211,9 +194,6 @@ fn finish_file(file: &mut FileState, pending: &mut Option<Pending>, out: &mut Pa
     out.units.push(Unit {
         id: unique_id(out, &path, 0),
         path,
-        old_path: state.old_path,
-        old_mode: state.old_mode,
-        new_mode: state.new_mode,
         change,
         old_start: 0,
         new_start: 0,
@@ -255,46 +235,24 @@ fn apply_meta(line: &str, file: &mut FileState) {
         return;
     }
     if let Some(rest) = line.strip_prefix("rename to ") {
-        file.path = line_path(rest).or_else(|| Some(rest.to_owned()));
+        file.path = Some(rest.to_owned());
         file.change = Some(Change::Renamed);
         return;
     }
-    if let Some(rest) = line.strip_prefix("rename from ") {
-        file.old_path = line_path(rest).or_else(|| Some(rest.to_owned()));
+    if line.starts_with("rename from ") {
         file.change = Some(Change::Renamed);
         return;
     }
-    if let Some(rest) = line.strip_prefix("old mode ") {
-        file.old_mode = Some(rest.to_owned());
-        file.mode_changed = true;
-        return;
-    }
-    if let Some(rest) = line.strip_prefix("new mode ") {
-        file.new_mode = Some(rest.to_owned());
-        file.mode_changed = true;
-        return;
-    }
-    if let Some(rest) = line.strip_prefix("new file mode ") {
-        file.new_mode = Some(rest.to_owned());
+    if line.starts_with("new file mode ") {
         file.added_marker = true;
         return;
     }
-    if let Some(rest) = line.strip_prefix("deleted file mode ") {
-        file.old_mode = Some(rest.to_owned());
+    if line.starts_with("deleted file mode ") {
         file.deleted_marker = true;
         return;
     }
-    if let Some(rest) = line.strip_prefix("index ") {
-        if let Some(mode) = rest.split_whitespace().nth(1) {
-            if mode.len() == 6 && mode.chars().all(|c| c.is_ascii_digit()) {
-                if file.old_mode.is_none() {
-                    file.old_mode = Some(mode.to_owned());
-                }
-                if file.new_mode.is_none() {
-                    file.new_mode = Some(mode.to_owned());
-                }
-            }
-        }
+    if line.starts_with("old mode ") || line.starts_with("new mode ") {
+        file.mode_changed = true;
         return;
     }
     if line.starts_with("Binary files ") || line == "GIT binary patch" {
@@ -312,34 +270,28 @@ fn line_path(token: &str) -> Option<String> {
     (!path.is_empty()).then(|| path.to_owned())
 }
 
-/// Parses `diff --git a/from b/to` into `(old_path, new_path)`.
-fn diff_git_paths(rest: &str) -> (Option<String>, Option<String>) {
+/// Parses `diff --git a/from b/to` into `to`.
+fn diff_git_path(rest: &str) -> Option<String> {
     if rest.starts_with('"') {
-        let Some((from_raw, used)) = unquote(rest) else {
-            return (None, None);
-        };
+        let (from_raw, used) = unquote(rest)?;
         let after = rest[used..].trim_start();
-        let Some((to_raw, _)) = unquote(after) else {
-            return (None, None);
-        };
-        let from = from_raw.strip_prefix("a/").unwrap_or(&from_raw).to_owned();
-        let to = to_raw.strip_prefix("b/").unwrap_or(&to_raw).to_owned();
-        let old_path = (from != to && !from.is_empty()).then_some(from);
-        let new_path = (!to.is_empty()).then_some(to);
-        return (old_path, new_path);
+        let (to_raw, _) = unquote(after)?;
+        let to = to_raw.strip_prefix("b/").unwrap_or(&to_raw);
+        if to.is_empty() {
+            let from = from_raw.strip_prefix("a/").unwrap_or(&from_raw);
+            return (!from.is_empty()).then(|| from.to_owned());
+        }
+        return Some(to.to_owned());
     }
-    let Some(index) = rest.find(" b/") else {
-        return (None, None);
-    };
-    let from_slice = rest[..index].strip_prefix("a/").unwrap_or(&rest[..index]);
-    let to_slice = rest[index + 1..]
+    let index = rest.find(" b/")?;
+    let from = rest[..index].strip_prefix("a/").unwrap_or(&rest[..index]);
+    let to = rest[index + 1..]
         .strip_prefix("b/")
         .unwrap_or(&rest[index + 1..]);
-    let from = from_slice.to_owned();
-    let to = to_slice.to_owned();
-    let old_path = (from != to && !from.is_empty()).then_some(from);
-    let new_path = (!to.is_empty()).then_some(to);
-    (old_path, new_path)
+    if to.is_empty() {
+        return (!from.is_empty()).then(|| from.to_owned());
+    }
+    Some(to.to_owned())
 }
 
 /// Decodes a possibly quoted token, returning `(value, bytes consumed)`.

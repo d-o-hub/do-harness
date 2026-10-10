@@ -86,7 +86,6 @@ fn rename_with_content_is_one_renamed_unit() {
     );
     assert_eq!(parsed.units.len(), 1);
     assert_eq!(parsed.units[0].path, "new.rs");
-    assert_eq!(parsed.units[0].old_path.as_deref(), Some("old.rs"));
     assert_eq!(parsed.units[0].change, Change::Renamed);
 }
 
@@ -100,7 +99,6 @@ fn rename_only_emits_synthetic_unit() {
     );
     assert_eq!(parsed.units.len(), 1);
     assert_eq!(parsed.units[0].path, "new.rs");
-    assert_eq!(parsed.units[0].old_path.as_deref(), Some("old.rs"));
     assert_eq!(parsed.units[0].change, Change::Renamed);
     assert_eq!(parsed.units[0].header.as_deref(), Some("rename-only"));
     assert_eq!(parsed.units[0].lines.len(), 0);
@@ -133,8 +131,6 @@ fn mode_change_emits_synthetic_unit() {
     );
     assert_eq!(parsed.units.len(), 1);
     assert_eq!(parsed.units[0].header.as_deref(), Some("mode change"));
-    assert_eq!(parsed.units[0].old_mode.as_deref(), Some("100644"));
-    assert_eq!(parsed.units[0].new_mode.as_deref(), Some("100755"));
     assert_eq!(parsed.units[0].change, Change::Modified);
 }
 
