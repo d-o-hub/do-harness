@@ -11,6 +11,13 @@ on:
 permissions:
   contents: read
 
+# Keep the aggregate compiler RSS bounded on the workspace's libSQL and
+# feature-matrix builds. Local developers retain Cargo's CPU-count default and
+# can opt into the same setting with CARGO_BUILD_JOBS=2.
+env:
+  CARGO_BUILD_JOBS: "2"
+  CARGO_INCREMENTAL: "0"
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
