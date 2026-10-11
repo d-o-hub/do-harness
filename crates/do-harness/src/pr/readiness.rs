@@ -34,9 +34,9 @@ fn default_true() -> bool {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ReadinessReport {
     pub pr: u64,
-    #[serde(rename = "headRefOid", alias = "head_sha", alias = "head_ref_oid", default)]
+    #[serde(rename = "headRefOid", default)]
     pub head_ref_oid: String,
-    #[serde(rename = "collectionComplete", alias = "collection_complete", default = "default_true")]
+    #[serde(rename = "collectionComplete", default = "default_true")]
     pub collection_complete: bool,
     pub ready: bool,
     pub merge_state: MergeState,
@@ -97,7 +97,7 @@ pub struct UnresolvedThread {
     pub line: Option<u64>,
     pub author: String,
     pub excerpt: String,
-    #[serde(rename = "isOutdated", alias = "is_outdated", default)]
+    #[serde(rename = "isOutdated", default)]
     pub is_outdated: bool,
 }
 
@@ -134,15 +134,13 @@ pub fn evaluate(root: &Path, number: u64) -> Result<ReadinessReport> {
         let mut blockers = Vec::new();
 
         // 1. Merge State
-        let is_clean = view.merge_state_status == "CLEAN";
-        let is_mergeable = view.mergeable == "MERGEABLE";
-        if !is_clean {
+        if view.merge_state_status != "CLEAN" {
             blockers.push(format!(
                 "merge state is '{}' (expected 'CLEAN')",
                 view.merge_state_status
             ));
         }
-        if !is_mergeable {
+        if view.mergeable != "MERGEABLE" {
             blockers.push(format!(
                 "mergeability is '{}' (expected 'MERGEABLE')",
                 view.mergeable
@@ -167,12 +165,11 @@ pub fn evaluate(root: &Path, number: u64) -> Result<ReadinessReport> {
         if recheck_view.head_ref_oid != initial_head {
             if attempt + 1 < MAX_HEAD_RETRIES {
                 continue;
-            } else {
-                anyhow::bail!(
-                    "head SHA moved during inspection from {initial_head} to {}; snapshot is stale/mixed",
-                    recheck_view.head_ref_oid
-                );
             }
+            anyhow::bail!(
+                "head SHA moved during inspection from {initial_head} to {}; snapshot is stale/mixed",
+                recheck_view.head_ref_oid
+            );
         }
 
         let ready = blockers.is_empty();
@@ -303,7 +300,11 @@ fn evaluate_conversations(
                 (Some(p), None) => p.clone(),
                 _ => "diff".to_owned(),
             };
-            let status_note = if thread.is_outdated { " (outdated)" } else { "" };
+            let status_note = if thread.is_outdated {
+                " (outdated)"
+            } else {
+                ""
+            };
             blockers.push(format!(
                 "unresolved review thread{status_note} on {location} by {author}: {excerpt}"
             ));
@@ -481,7 +482,10 @@ fn print_text(report: &ReadinessReport) {
     for t in &report.conversations.unresolved_threads {
         let loc = t.path.as_deref().unwrap_or("diff");
         let outdated = if t.is_outdated { " (outdated)" } else { "" };
-        println!("    UNRESOLVED{outdated}: {loc} by {}: \"{}\"", t.author, t.excerpt);
+        println!(
+            "    UNRESOLVED{outdated}: {loc} by {}: \"{}\"",
+            t.author, t.excerpt
+        );
     }
     for c in &report.conversations.actionable_comments {
         println!("    ACTIONABLE: {}: \"{}\"", c.author, c.excerpt);

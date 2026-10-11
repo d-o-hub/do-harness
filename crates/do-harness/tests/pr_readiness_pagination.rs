@@ -21,12 +21,14 @@ fn paginated_threads_101st_unresolved_blocks_readiness() {
     ).unwrap();
 
     let p1_nodes: Vec<Value> = (1..=100)
-        .map(|i| serde_json::json!({
-            "id": format!("thread_{i}"),
-            "isResolved": true,
-            "isOutdated": false,
-            "comments": { "nodes": [{ "author": { "login": "rev" }, "body": "ok" }] }
-        }))
+        .map(|i| {
+            serde_json::json!({
+                "id": format!("thread_{i}"),
+                "isResolved": true,
+                "isOutdated": false,
+                "comments": { "nodes": [{ "author": { "login": "rev" }, "body": "ok" }] }
+            })
+        })
         .collect();
 
     let g1 = serde_json::json!({
@@ -35,7 +37,11 @@ fn paginated_threads_101st_unresolved_blocks_readiness() {
             "nodes": p1_nodes
         } } } }
     });
-    std::fs::write(root.join("graphql.json"), serde_json::to_string(&g1).unwrap()).unwrap();
+    std::fs::write(
+        root.join("graphql.json"),
+        serde_json::to_string(&g1).unwrap(),
+    )
+    .unwrap();
 
     let g2 = serde_json::json!({
         "data": { "repository": { "pullRequest": { "reviewThreads": {
@@ -50,13 +56,24 @@ fn paginated_threads_101st_unresolved_blocks_readiness() {
             }]
         } } } }
     });
-    std::fs::write(root.join("graphql_cursor_p2.json"), serde_json::to_string(&g2).unwrap()).unwrap();
+    std::fs::write(
+        root.join("graphql_cursor_p2.json"),
+        serde_json::to_string(&g2).unwrap(),
+    )
+    .unwrap();
 
     let (code, stdout, stderr) = run_pr(root, &bin, &["pr", "ready", "2001", "--format", "json"]);
-    assert_eq!(code, Some(1), "unresolved 101st thread must block readiness:\n{stderr}");
+    assert_eq!(
+        code,
+        Some(1),
+        "unresolved 101st thread must block readiness:\n{stderr}"
+    );
     let report: Value = serde_json::from_str(&stdout).unwrap();
     assert_eq!(report["ready"], false);
-    assert_eq!(report["conversations"]["unresolved_threads"][0]["id"], "thread_101");
+    assert_eq!(
+        report["conversations"]["unresolved_threads"][0]["id"],
+        "thread_101"
+    );
 }
 
 #[cfg(unix)]
@@ -72,12 +89,14 @@ fn paginated_threads_all_resolved_passes_readiness() {
     ).unwrap();
 
     let p1_nodes: Vec<Value> = (1..=100)
-        .map(|i| serde_json::json!({
-            "id": format!("thread_{i}"),
-            "isResolved": true,
-            "isOutdated": false,
-            "comments": { "nodes": [{ "author": { "login": "rev" }, "body": "ok" }] }
-        }))
+        .map(|i| {
+            serde_json::json!({
+                "id": format!("thread_{i}"),
+                "isResolved": true,
+                "isOutdated": false,
+                "comments": { "nodes": [{ "author": { "login": "rev" }, "body": "ok" }] }
+            })
+        })
         .collect();
 
     let g1 = serde_json::json!({
@@ -86,15 +105,21 @@ fn paginated_threads_all_resolved_passes_readiness() {
             "nodes": p1_nodes
         } } } }
     });
-    std::fs::write(root.join("graphql.json"), serde_json::to_string(&g1).unwrap()).unwrap();
+    std::fs::write(
+        root.join("graphql.json"),
+        serde_json::to_string(&g1).unwrap(),
+    )
+    .unwrap();
 
     let p2_nodes: Vec<Value> = (101..=110)
-        .map(|i| serde_json::json!({
-            "id": format!("thread_{i}"),
-            "isResolved": true,
-            "isOutdated": false,
-            "comments": { "nodes": [{ "author": { "login": "rev" }, "body": "ok" }] }
-        }))
+        .map(|i| {
+            serde_json::json!({
+                "id": format!("thread_{i}"),
+                "isResolved": true,
+                "isOutdated": false,
+                "comments": { "nodes": [{ "author": { "login": "rev" }, "body": "ok" }] }
+            })
+        })
         .collect();
 
     let g2 = serde_json::json!({
@@ -103,10 +128,18 @@ fn paginated_threads_all_resolved_passes_readiness() {
             "nodes": p2_nodes
         } } } }
     });
-    std::fs::write(root.join("graphql_c2.json"), serde_json::to_string(&g2).unwrap()).unwrap();
+    std::fs::write(
+        root.join("graphql_c2.json"),
+        serde_json::to_string(&g2).unwrap(),
+    )
+    .unwrap();
 
     let (code, stdout, stderr) = run_pr(root, &bin, &["pr", "ready", "2002", "--format", "json"]);
-    assert_eq!(code, Some(0), "all resolved across pages must pass:\n{stderr}");
+    assert_eq!(
+        code,
+        Some(0),
+        "all resolved across pages must pass:\n{stderr}"
+    );
     let report: Value = serde_json::from_str(&stdout).unwrap();
     assert_eq!(report["ready"], true);
 }
@@ -129,7 +162,11 @@ fn page_two_graphql_failure_fails_closed() {
             "nodes": [{ "id": "t1", "isResolved": true, "comments": { "nodes": [] } }]
         } } } }
     });
-    std::fs::write(root.join("graphql.json"), serde_json::to_string(&g1).unwrap()).unwrap();
+    std::fs::write(
+        root.join("graphql.json"),
+        serde_json::to_string(&g1).unwrap(),
+    )
+    .unwrap();
     std::fs::write(root.join("fail_graphql_page2"), "true").unwrap();
 
     let (code, stdout, stderr) = run_pr(root, &bin, &["pr", "ready", "2003", "--format", "json"]);
@@ -156,7 +193,11 @@ fn has_next_page_without_usable_cursor_errors() {
             "nodes": [{ "id": "t1", "isResolved": true, "comments": { "nodes": [] } }]
         } } } }
     });
-    std::fs::write(root.join("graphql.json"), serde_json::to_string(&g1).unwrap()).unwrap();
+    std::fs::write(
+        root.join("graphql.json"),
+        serde_json::to_string(&g1).unwrap(),
+    )
+    .unwrap();
 
     let (code, stdout, stderr) = run_pr(root, &bin, &["pr", "ready", "2004", "--format", "json"]);
     assert_ne!(code, Some(0), "missing cursor with hasNextPage must fail");
@@ -187,5 +228,8 @@ fn head_moving_during_collection_yields_no_ready_result() {
     let (code, stdout, stderr) = run_pr(root, &bin, &["pr", "ready", "2006", "--format", "json"]);
     assert_ne!(code, Some(0), "unstable head SHA must fail closed");
     assert!(!stdout.contains(r#""ready": true"#));
-    assert!(stderr.contains("head SHA moved during inspection"), "stderr: {stderr}");
+    assert!(
+        stderr.contains("head SHA moved during inspection"),
+        "stderr: {stderr}"
+    );
 }

@@ -391,6 +391,7 @@ pub fn issue_comments(root: &Path, number: u64) -> Result<Vec<Comment>> {
 ///
 /// Returns an error when `gh api` fails.
 pub fn review_threads(root: &Path, number: u64) -> Result<Vec<ReviewThread>> {
+    const MAX_PAGES: usize = 100;
     let query = r#"query($number: Int!, $after: String) {
         repository(owner: "{owner}", name: "{repo}") {
             pullRequest(number: $number) {
@@ -409,7 +410,6 @@ pub fn review_threads(root: &Path, number: u64) -> Result<Vec<ReviewThread>> {
     let mut seen_ids = std::collections::HashSet::new();
     let mut cursor: Option<String> = None;
     let mut page_count = 0;
-    const MAX_PAGES: usize = 100;
 
     loop {
         page_count += 1;

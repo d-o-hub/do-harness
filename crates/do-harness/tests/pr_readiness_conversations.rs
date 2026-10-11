@@ -250,13 +250,23 @@ fn outdated_unresolved_and_resolved_threads() {
             ]
         } } } }
     });
-    std::fs::write(root.join("graphql.json"), serde_json::to_string(&g1).unwrap()).unwrap();
+    std::fs::write(
+        root.join("graphql.json"),
+        serde_json::to_string(&g1).unwrap(),
+    )
+    .unwrap();
 
     let (code, stdout, stderr) = run_pr(root, &bin, &["pr", "ready", "2005", "--format", "json"]);
-    assert_eq!(code, Some(1), "unresolved outdated thread must block:\n{stderr}");
+    assert_eq!(
+        code,
+        Some(1),
+        "unresolved outdated thread must block:\n{stderr}"
+    );
     let report: Value = serde_json::from_str(&stdout).unwrap();
     assert_eq!(report["ready"], false);
-    let threads = report["conversations"]["unresolved_threads"].as_array().unwrap();
+    let threads = report["conversations"]["unresolved_threads"]
+        .as_array()
+        .unwrap();
     assert_eq!(threads.len(), 1);
     assert_eq!(threads[0]["id"], "t_outdated_open");
     assert_eq!(threads[0]["isOutdated"], true);
@@ -275,10 +285,18 @@ fn outdated_unresolved_and_resolved_threads() {
             }]
         } } } }
     });
-    std::fs::write(root.join("graphql.json"), serde_json::to_string(&g2).unwrap()).unwrap();
+    std::fs::write(
+        root.join("graphql.json"),
+        serde_json::to_string(&g2).unwrap(),
+    )
+    .unwrap();
 
     let (code, stdout, stderr) = run_pr(root, &bin, &["pr", "ready", "2005", "--format", "json"]);
-    assert_eq!(code, Some(0), "resolved outdated thread does not block:\n{stderr}");
+    assert_eq!(
+        code,
+        Some(0),
+        "resolved outdated thread does not block:\n{stderr}"
+    );
     let report: Value = serde_json::from_str(&stdout).unwrap();
     assert_eq!(report["ready"], true);
 }
