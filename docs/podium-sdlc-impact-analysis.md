@@ -61,7 +61,7 @@ Podium built an AI review system combining security, architecture, and de-slopif
 ## Pillar 3: WALL-E: Autonomous Cloud Agent for Bug Fixing and Triage
 
 ### Verdict
-**No Impact / Out of Scope (Product/Roadmap & Internal Process)**
+**No Impact / Out of Scope (Product/Roadmap)** | **No Impact (Internal Process)**
 
 ### Evidence
 - **CLI Architecture Scope**: `README.md`, `crates/do-harness/src/main.rs`.
