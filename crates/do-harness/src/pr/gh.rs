@@ -270,6 +270,13 @@ struct GqlPageInfo {
     end_cursor: Option<String>,
 }
 
+#[derive(Deserialize)]
+struct PermissionResponse {
+    permission: Option<String>,
+    #[serde(rename = "role_name")]
+    role_name: Option<String>,
+}
+
 /// Reads PR view metadata including merge state.
 ///
 /// # Errors
@@ -486,4 +493,31 @@ pub fn review_threads(root: &Path, number: u64) -> Result<Vec<ReviewThread>> {
     }
 
     Ok(all_threads)
+}
+
+/// Reads repository permission for a user via `gh api`.
+///
+/// # Errors
+///
+/// Returns an error when `gh api` fails or author permission cannot be determined.
+pub fn user_permission(root: &Path, login: &str) -> Result<String> {
+    if login.trim().is_empty() {
+        bail!("empty login");
+    }
+    let endpoint = format!("repos/{{owner}}/{{repo}}/collaborators/{login}/permission");
+    let output = Command::new("gh")
+        .current_dir(root)
+        .args(["api", &endpoint])
+        .output()
+        .context("failed to run gh api collaborator permission")?;
+    if !output.status.success() {
+        bail!(
+            "gh api collaborator permission failed: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        );
+    }
+    let res: PermissionResponse = serde_json::from_slice(&output.stdout)
+        .context("unexpected collaborator permission JSON")?;
+    let perm = res.role_name.or(res.permission).unwrap_or_default();
+    Ok(perm)
 }

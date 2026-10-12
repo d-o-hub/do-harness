@@ -150,6 +150,38 @@ async fn init_appends_gitignore_entries() {
     assert!(text.contains("# existing"));
 }
 
+/// The Rust pack's own build output must be ignored: its sensors run Cargo
+/// (`target/`) and `cargo llvm-cov` (`lcov.info`), and untracked nonignored
+/// files are sensor input identity, so an unignored build invalidates the
+/// scaffolded verify run it was created by.
+#[tokio::test(flavor = "current_thread")]
+async fn init_rust_gitignore_covers_build_output() {
+    let dir = tempfile::tempdir().unwrap();
+
+    init_workspace(dir.path(), &opts(Some(Language::Rust)))
+        .await
+        .unwrap();
+
+    let text = fs::read_to_string(dir.path().join(".gitignore")).unwrap();
+    assert!(text.lines().any(|line| line == "/target"), "{text}");
+    assert!(text.lines().any(|line| line == "/lcov.info"), "{text}");
+}
+
+/// Language-neutral packs keep a language-neutral ignore file: build entries
+/// are Rust-only.
+#[tokio::test(flavor = "current_thread")]
+async fn init_generic_gitignore_stays_language_neutral() {
+    let dir = tempfile::tempdir().unwrap();
+
+    init_workspace(dir.path(), &opts(Some(Language::Generic)))
+        .await
+        .unwrap();
+
+    let text = fs::read_to_string(dir.path().join(".gitignore")).unwrap();
+    assert!(!text.contains("/target"), "{text}");
+    assert!(!text.contains("/lcov.info"), "{text}");
+}
+
 #[tokio::test(flavor = "current_thread")]
 async fn init_rust_writes_crate_when_manifest_absent() {
     let dir = tempfile::tempdir().unwrap();

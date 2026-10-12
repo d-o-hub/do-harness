@@ -198,6 +198,12 @@
     "category": "skills"
   },
   {
+    "invariant": "harness <-> pr-triage guidance overlap (~0.48 cosine, measured 2026-10-12; the pair already read ~0.47 before that day's distillation) is accepted: harness owns the sensor and verification contract plus its distilled traces; pr-triage owns the sweep that cites those verdicts. Shared run/path/check/sensor vocabulary is the handoff, not duplicated procedure",
+    "rationale": "The sweep cannot state a blocker, an evidence state, or a gate without the harness's verification vocabulary, so the terms are load-bearing in both guides. This is a re-measurement, not a license for further drift: rerun do-harness overlap --format json before additional corpus changes",
+    "sensor": "do-harness overlap (advisory, threshold 0.45)",
+    "category": "skills"
+  },
+  {
     "invariant": "Warn-severity sensor failures are advisory in non-strict runs and never promote inside the feedback set; evidence still records them as warn, never pass",
     "rationale": "Noisy checks can be adopted before they are clean without weakening the verification contract: strict promotion and non-pass evidence keep the completion gate honest while the fast loop stays usable",
     "sensor": "do-harness verify --strict",

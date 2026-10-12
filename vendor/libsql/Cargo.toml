@@ -7,11 +7,11 @@
 #
 # If you are reading this file be aware that the original Cargo.toml
 # will likely look very different (and much more reasonable).
-# See Cargo.toml.orig for the original contents.
+# See Cargo.toml.upstream for the original upstream contents.
 
 [package]
 edition = "2021"
-name = "libsql"
+name = "do-harness-libsql"
 version = "0.9.30"
 authors = ["the libSQL authors"]
 build = false
@@ -20,16 +20,16 @@ autobins = false
 autoexamples = false
 autotests = false
 autobenches = false
-description = "The libSQL database library"
+description = "libSQL 0.9.30 fork carrying the do-harness connection teardown fix"
 readme = "README.md"
 license = "MIT"
-repository = "https://github.com/tursodatabase/libsql"
+repository = "https://github.com/d-o-hub/do-harness"
 
 [package.metadata.cargo-udeps.ignore]
 normal = ["hyper-rustls"]
 
-# Vendored fork of crates.io libsql 0.9.30 carrying one fix (see
-# `[patch.crates-io]` in the workspace root): upstream #2251 double-close on
+# Publishable fork of crates.io libsql 0.9.30 carrying one fix:
+# upstream #2251 double-close on
 # teardown. Third-party code keeps its own lint baseline; the workspace lint
 # table is intentionally NOT inherited here (`[lints] workspace = true` would
 # apply the repo's 2024-edition lints to upstream code).
