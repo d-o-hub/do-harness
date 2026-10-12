@@ -11,6 +11,13 @@
 unsound = "all"
 unmaintained = "transitive"
 yanked = "deny"
+# RUSTSEC-2024-0449: `unsafe-libyaml` 0.2.11 is unmaintained (upstream
+# dtolnay/unsafe-libyaml is archived), reachable only transitively via
+# `serde_yaml` 0.9. The advisory records maintenance status, not a reported
+# vulnerability. Rationale in scripts/check-audit.sh; the migration that
+# retires this entry is tracked in plans/serde-yaml-migration.md and
+# plans/invariants.json.
+ignore = ["RUSTSEC-2024-0449"]
 
 [bans]
 multiple-versions = "deny"
