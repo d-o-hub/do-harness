@@ -693,12 +693,13 @@ error is never reported as `no-effect`.
 
 ### `pr review`
 Emit the semantic residual for a pull request or revision range: the changed
-hunks (units) that evidence could not prove, with minimal context, plus the
-audit list of skipped units and any untrusted `false_proven` claims. Works in
-any git repository without harness initialization.
+hunks (units) that evidence could not prove or exempt, with minimal context,
+plus the audit list of policy-exempt units (`exempt`), proven units (`skipped`),
+and any untrusted `false_proven` claims. Works in any git repository without
+harness initialization.
 
-Proof skipping is driven by `.github/pr-gate.toml`, read **at the merge-base
-revision only** (never the PR head):
+Proof and exemption rules are driven by `.github/pr-gate.toml`, read **at the
+merge-base revision only** (never the PR head):
 
 ```toml
 [proof]
@@ -706,12 +707,14 @@ mechanical = ["**/Cargo.lock", "docs/generated/**"]
 behavioral = ["crates/**", "src/**"]
 ```
 
-A unit is moved to `skipped` when its path matches a `mechanical` glob and no
-`behavioral` glob, or when the change is structural (rename-only or mode-only).
-Behavioral matches always stay residual; a mechanical claim contradicted by a
-behavioral rule (or by the protected policy path itself) is revoked, kept
-residual, and recorded in `false_proven`. Absent, malformed, or partially
-invalid policy — including invalid globs — proves nothing and adds a warning.
+A unit is moved to `exempt` when all its changed paths (including both rename
+endpoints) match a `mechanical` glob and no `behavioral` or protected glob.
+Structural changes (rename-only or mode-only) remain `residual` unless covered
+by a policy exemption or proved by a validator. Behavioral matches always stay
+residual; a mechanical claim contradicted by a behavioral rule or protected
+path is revoked, kept residual, and recorded in `false_proven`. Absent,
+malformed, or partially invalid policy — including invalid globs — proves
+nothing and adds a warning.
 
 - `<PR>`: Pull request number; base and head are resolved through `gh`,
   falling back to `gh pr diff` when the clone cannot resolve them. As in
@@ -752,6 +755,16 @@ Inspect a pull request's end-to-end merge readiness:
 Exit `0` when the PR is ready to merge, `1` when any blocker exists (non-`CLEAN`
 merge state, cancelled or failed check, unresolved thread, unanswered Codecov
 gap), and `2` when `gh` fails.
+
+A Codecov gap is cleared only by an explicit waiver, never by a bare reply: the
+waiver comment must come from a collaborator whose repository permission is
+`write`, `maintain`, or `admin`, must name a finding it waives (for example
+`waiver: codecov patch coverage`), and must match the current PR head SHA — a
+waiver naming another head, or none, is stale and the gap stays actionable. When
+the permission lookup fails, the waiver is rejected rather than trusted. Every
+evaluated candidate is recorded in `codecov.audit_waivers` with its
+authorization and staleness verdict, so a rejected waiver is visible instead of
+silently ignored.
 
 ### `pr waivers`
 Classify the patch-coverage residue of a change: every changed line the measured

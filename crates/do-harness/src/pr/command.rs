@@ -214,8 +214,9 @@ fn print_review(report: &ReviewReport) {
     }
     println!("merge-base {} head {}", report.merge_base, report.head);
     println!(
-        "residual: {} unit(s), skipped: {} unit(s)",
+        "residual: {} unit(s), exempt: {} unit(s), skipped: {} unit(s)",
         report.residual.len(),
+        report.exempt.len(),
         report.skipped.len()
     );
     println!(
@@ -225,6 +226,15 @@ fn print_review(report: &ReviewReport) {
         report.measurement.ratio,
         reduction_label(report.measurement.verdict)
     );
+    for unit in &report.exempt {
+        let anchor = unit.header.as_deref().unwrap_or("-");
+        println!(
+            "  exempt {} [{}] {}",
+            unit.id,
+            change_label(unit.change),
+            anchor
+        );
+    }
     for unit in &report.skipped {
         let anchor = unit.header.as_deref().unwrap_or("-");
         println!(
