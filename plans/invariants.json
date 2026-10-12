@@ -174,6 +174,12 @@
     "category": "supply-chain"
   },
   {
+    "invariant": "RUSTSEC-2024-0449 (unsafe-libyaml 0.2.11 unmaintained, upstream archived) is accepted only until the serde_yaml migration in plans/serde-yaml-migration.md lands",
+    "rationale": "unsafe-libyaml is reachable only transitively via serde_yaml 0.9, used for skill frontmatter parsing and the optional pre-GA AGT policy parameters; the advisory records maintenance status, not a reported vulnerability. The advisory database added the finding on 2026-10-12, which flips cargo-deny's `unmaintained = transitive` scope and cargo audit for main and every open PR at once, so the ignore is documented in deny.toml plus scripts/check-audit.sh instead of being silently suppressed, and both entries plus this decision are deleted by the migration PR",
+    "sensor": "scripts/check-audit.sh (--ignore RUSTSEC-2024-0449)",
+    "category": "supply-chain"
+  },
+  {
     "invariant": "Agent runtimes integrate through the scaffolded skills + AGENTS.md and the CLI JSON contracts; no do-harness MCP wrapper ships while guardian-proxy remains the only MCP surface",
     "rationale": "Skills are the feedforward layer and the CLI validates fixed argv and emits parseable JSON; MCP only exposes tools and cannot enforce the completion gate, which needs runtime lifecycle hooks (DSH bundle pattern), while host-side sensor execution would change the trust model",
     "sensor": "do-harness eval",

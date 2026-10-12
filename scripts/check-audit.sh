@@ -48,8 +48,20 @@ fi
 # Advisory-DB pin decision: intentionally unpinned. RustSec advisories are the
 # point of the scan, and a pinned snapshot would hide post-pin disclosures;
 # reproducibility comes from Cargo.lock (deps) and `cargo audit --deny warnings`.
+# Ignore RUSTSEC-2024-0449 (unsafe-libyaml 0.2.11 unmaintained: upstream
+# dtolnay/unsafe-libyaml is archived; advisory:
+# https://rustsec.org/advisories/RUSTSEC-2024-0449).
+# Scope justification: unsafe-libyaml is reachable ONLY transitively via
+# serde_yaml 0.9, which parses skill frontmatter and the optional pre-GA AGT
+# policy parameters; the advisory records maintenance status, not a reported
+# vulnerability. Machine-readable decision: plans/invariants.json
+# (supply-chain). The migration that retires this ignore — replacing
+# serde_yaml with a maintained YAML crate — is tracked in
+# plans/serde-yaml-migration.md.
 run_audit() {
-    cargo audit --deny warnings --ignore RUSTSEC-2026-0097 "$@"
+    cargo audit --deny warnings \
+        --ignore RUSTSEC-2026-0097 \
+        --ignore RUSTSEC-2024-0449 "$@"
 }
 
 if ! run_audit "$@"; then
