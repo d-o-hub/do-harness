@@ -21,6 +21,7 @@ fn seal_and_verify_chain() {
         policy_fingerprint: "sha256:p".into(),
         config_fingerprint: "sha256:c".into(),
         changed: false,
+        invalidated_reason: None,
         sensors: vec![],
         skipped: Vec::new(),
         coverage: std::collections::BTreeMap::new(),
