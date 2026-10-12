@@ -20,6 +20,92 @@ use sha2::{Digest, Sha256};
 
 use crate::config::SensorSpec;
 
+/// Computes a conservative input identity for a sensor that has no declared
+/// `inputs`.
+///
+/// This covers all repository source paths (from index and untracked files)
+/// excluding harness-owned state (`.do-harness/`), gitignored files, and
+/// untracked declared output artifacts (`artifacts` globs). If any untracked
+/// declared artifact glob matches an untracked file, that untracked output is
+/// excluded so generated output creation during run doesn't invalidate. Tracked
+/// output files remain included so git-managed source files are never hidden.
+#[must_use]
+pub(crate) fn workspace_source_digest(
+    root: &Path,
+    spec: &SensorSpec,
+    config_bytes: Option<&[u8]>,
+) -> Option<String> {
+    let paths = repository_paths(root)?;
+    let artifact_set = if spec.artifacts.is_empty() {
+        None
+    } else {
+        compile(&spec.artifacts)
+    };
+    let coverage_set = if spec.coverage_inputs.is_empty() {
+        None
+    } else {
+        compile(&spec.coverage_inputs)
+    };
+
+    let untracked = untracked_paths(root).unwrap_or_default();
+
+    let mut entries: Vec<Entry> = Vec::new();
+    for path in &paths {
+        if crate::fingerprint::is_harness_state(path) {
+            continue;
+        }
+        let is_untracked = untracked.contains(path);
+        if is_untracked
+            && (path == "Cargo.lock"
+                || artifact_set
+                    .as_ref()
+                    .is_some_and(|set| set.is_match(path.as_str())))
+        {
+            continue;
+        }
+        entries.push(entry(root, path, "source")?);
+        if coverage_set
+            .as_ref()
+            .is_some_and(|set| set.is_match(path.as_str()))
+        {
+            entries.push(entry(root, path, "coverage")?);
+        }
+    }
+
+    entries.sort();
+    entries.dedup();
+    let files: Vec<serde_json::Value> = entries
+        .iter()
+        .map(|(kind, path, sha256, mode)| {
+            serde_json::json!({ "kind": kind, "path": path, "sha256": sha256, "mode": mode })
+        })
+        .collect();
+    let payload = serde_json::json!({
+        "sensor": serde_json::to_value(spec).ok()?,
+        "config": crate::fingerprint::config_digest(config_bytes),
+        "harness_version": env!("CARGO_PKG_VERSION"),
+        "baselines": crate::baselines::digest(root),
+        "head": head_sha(root),
+        "files": files,
+    });
+    Some(crate::fingerprint::hash_canonical(&payload))
+}
+
+/// Returns input identity for `spec`: declared input digest if declared, or
+/// conservative workspace source digest if undeclared.
+#[must_use]
+pub(crate) fn effective_input_digest(
+    root: &Path,
+    spec: &SensorSpec,
+    config_bytes: Option<&[u8]>,
+) -> Option<String> {
+    if spec.inputs.is_empty() {
+        workspace_source_digest(root, spec, config_bytes)
+    } else {
+        digest(root, spec, config_bytes)
+    }
+}
+
 /// Computes the identity of `spec`'s declared inputs, or `None` when the
 /// sensor must run.
 ///
@@ -108,13 +194,36 @@ fn repository_paths(root: &Path) -> Option<Vec<String>> {
         if raw.is_empty() {
             continue;
         }
-        let path = std::str::from_utf8(raw).ok()?.to_owned();
-        if Path::new(&path).is_absolute() {
+        let raw_str = std::str::from_utf8(raw).ok()?;
+        if Path::new(raw_str).is_absolute() {
             return None;
         }
-        paths.push(path);
+        paths.push(crate::changes::normalize(raw_str));
     }
     Some(paths)
+}
+
+/// Repository-relative nonignored untracked paths, or `None` when git cannot
+/// enumerate them or a path is not UTF-8.
+fn untracked_paths(root: &Path) -> Option<std::collections::HashSet<String>> {
+    let output = crate::changes::git_command(root)
+        .args(["ls-files", "--others", "--exclude-standard", "-z"])
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let mut set = std::collections::HashSet::new();
+    for raw in output.stdout.split(|byte| *byte == 0) {
+        if raw.is_empty() {
+            continue;
+        }
+        let raw_str = std::str::from_utf8(raw).ok()?;
+        if !Path::new(raw_str).is_absolute() {
+            set.insert(crate::changes::normalize(raw_str));
+        }
+    }
+    Some(set)
 }
 
 /// Compiles declared globs with the same `literal_separator` policy as

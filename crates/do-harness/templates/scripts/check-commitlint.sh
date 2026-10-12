@@ -3,8 +3,9 @@
 #
 # Sensor: scripts/check-commitlint.sh
 # Fails if any inspected commit messages do not match:
-#   type(optional scope): lowercase subject
-# where type is one of feat/fix/docs/chore/refactor/test/build/ci/perf/revert.
+#   type(optional scope)!: lowercase subject
+# where type is one of feat/fix/docs/chore/refactor/test/build/ci/perf/revert
+# and the conventional-commits `!` breaking-change marker is optional.
 #
 # Modes:
 #   (no args)             lint the last COUNT commit subjects (sensor default).
@@ -38,11 +39,11 @@ lint_subject() {
     if [[ "$subject" =~ ^Merge[[:space:]] ]]; then
         return 0
     fi
-    if ! [[ "$subject" =~ ^(feat|fix|docs|chore|refactor|test|build|ci|perf|revert)(\([a-z0-9._/-]+\))?:\ ?.+$ ]]; then
+    if ! [[ "$subject" =~ ^(feat|fix|docs|chore|refactor|test|build|ci|perf|revert)(\([a-z0-9._/-]+\))?!?:\ ?.+$ ]]; then
         echo "FAIL: non-conventional commit subject: $subject"
         return 1
     fi
-    # Drop the "type(scope): " prefix, then require the subject to be lowercase.
+    # Drop the "type(scope)!: " prefix, then require the subject to be lowercase.
     local body="${subject#*: }"
     if [[ "$body" != "${body,,}" ]]; then
         echo "FAIL: commit subject is not lowercase: $subject"

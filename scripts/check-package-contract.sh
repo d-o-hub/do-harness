@@ -30,7 +30,11 @@ check_crate_package() {
 
     echo "Checking package contents for $crate..."
     local list
-    if ! list="$(cd "$ROOT" && cargo package --locked --allow-dirty --list -p "$crate" 2>/dev/null)"; then
+    local selection=(-p "$crate")
+    if [[ "$crate" == "do-harness-libsql" ]]; then
+        selection=(--manifest-path "$ROOT/vendor/libsql/Cargo.toml")
+    fi
+    if ! list="$(cd "$ROOT" && cargo package --locked --allow-dirty --list "${selection[@]}" 2>/dev/null)"; then
         echo "FAIL: cargo package --locked --allow-dirty --list -p $crate failed"
         FAIL=1
         return
@@ -53,6 +57,9 @@ check_crate_package() {
     fi
 }
 
+check_crate_package do-harness-libsql LICENSE README.md Cargo.toml.upstream src/local/connection.rs
+python3 "$ROOT/scripts/check_source_distribution.py" --check-policy || FAIL=1
+python3 "$ROOT/scripts/test_source_distribution.py" || FAIL=1
 check_crate_package do-harness-types LICENSE
 check_crate_package do-harness-db LICENSE
 check_crate_package do-harness LICENSE README.md assets/compliance.md assets/methods.json assets/nextest.toml templates/AGENTS.md

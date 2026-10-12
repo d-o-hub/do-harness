@@ -37,19 +37,23 @@ corruption and truncated downloads, not a compromised origin. See
 [docs/provenance-trust-model.md](https://github.com/d-o-hub/do-harness/blob/main/docs/provenance-trust-model.md) for the complete
 provenance trust boundary and verification model.
 
-Rust users can also install from crates.io (source build) or fetch the
-prebuilt release through `cargo-binstall`:
+Rust users can fetch the prebuilt release through `cargo-binstall`:
 
 ```bash
-cargo install do-harness --version 0.2.1
-# or, using the published release assets:
 cargo binstall do-harness
 ```
+
+Registry source installs through 0.2.1 do not include the checkout's libSQL
+teardown fix; `--locked` does not restore that missing code. Use the tested
+prebuilt artifacts above until 0.3.0 is published and its registry validation
+passes. Starting with 0.3.0, source installs use the maintained
+`do-harness-libsql` fork: `cargo install do-harness --version 0.3.0 --locked`.
+See [source-distribution validation](docs/releasing.md#source-distribution-validation).
 
 Building from source requires Rust 1.85+:
 
 ```bash
-cargo build --release -p do-harness
+cargo build --release --locked -p do-harness
 ```
 
 The binary lands at `target/release/do-harness`.
@@ -57,7 +61,7 @@ The binary lands at `target/release/do-harness`.
 To install a source checkout on `PATH` (for use in other repositories):
 
 ```bash
-cargo install --path crates/do-harness
+cargo install --path crates/do-harness --locked
 ```
 
 ## Use in another repo
