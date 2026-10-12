@@ -52,6 +52,18 @@ if [ "$1" = "api" ]; then
             fi
             exit 0
             ;;
+        *collaborators*|*permission*)
+            if [ -f "$MOCK_DIR/permission_fail" ]; then
+                echo "HTTP 403: rate limit exceeded" >&2
+                exit 1
+            fi
+            if [ -f "$MOCK_DIR/permission.json" ]; then
+                cat "$MOCK_DIR/permission.json"
+            else
+                printf '%s' '{{"permission":"write","role_name":"write"}}'
+            fi
+            exit 0
+            ;;
         *status*)
             if [ -f "$MOCK_DIR/status.json" ]; then
                 cat "$MOCK_DIR/status.json"

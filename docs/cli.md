@@ -756,6 +756,16 @@ Exit `0` when the PR is ready to merge, `1` when any blocker exists (non-`CLEAN`
 merge state, cancelled or failed check, unresolved thread, unanswered Codecov
 gap), and `2` when `gh` fails.
 
+A Codecov gap is cleared only by an explicit waiver, never by a bare reply: the
+waiver comment must come from a collaborator whose repository permission is
+`write`, `maintain`, or `admin`, must name a finding it waives (for example
+`waiver: codecov patch coverage`), and must match the current PR head SHA — a
+waiver naming another head, or none, is stale and the gap stays actionable. When
+the permission lookup fails, the waiver is rejected rather than trusted. Every
+evaluated candidate is recorded in `codecov.audit_waivers` with its
+authorization and staleness verdict, so a rejected waiver is visible instead of
+silently ignored.
+
 ### `pr waivers`
 Classify the patch-coverage residue of a change: every changed line the measured
 lcov report marks as executed zero times gets a waiver class or a "needs a test"

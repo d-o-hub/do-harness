@@ -13,12 +13,19 @@ use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
 use super::gh;
+use super::waiver_comment::first_line;
+#[allow(unused_imports)]
+pub use super::waiver_comment::{CodecovStatus, CodecovSummary, WaiverAuditRecord};
 use crate::CliError;
 use crate::report::Format;
 
 /// Logins that post Codecov's own report comments: the app (`codecov[bot]`),
 /// the legacy bot user (`codecov`), and the comment-bot account.
 const CODECOV_AUTHORS: [&str; 3] = ["codecov", "codecov[bot]", "codecov-commenter"];
+
+pub(crate) fn is_codecov_author(login: &str) -> bool {
+    CODECOV_AUTHORS.contains(&login)
+}
 
 /// Whether `login` is a bot account: `GitHub` Apps (`[bot]` suffix) and the
 /// well-known dependency bots.
@@ -98,16 +105,6 @@ pub struct ActionableComment {
     pub url: Option<String>,
 }
 
-/// Digest of Codecov report status on the PR.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CodecovSummary {
-    pub is_actionable: bool,
-    pub patch_coverage: Option<f64>,
-    pub missing_lines: Option<u64>,
-    pub excerpt: String,
-    pub url: Option<String>,
-}
-
 /// Evaluates merge readiness for PR `number`.
 ///
 /// # Errors
@@ -142,7 +139,8 @@ pub fn evaluate(root: &Path, number: u64) -> Result<ReadinessReport> {
     let checks = evaluate_checks(root, &view.head_ref_oid, &mut blockers)?;
 
     // 3. Review Threads & Issue Comments
-    let (conversations, codecov) = evaluate_conversations(root, number, &mut blockers)?;
+    let (conversations, codecov) =
+        evaluate_conversations(root, number, &view.head_ref_oid, &mut blockers)?;
 
     let ready = blockers.is_empty();
     Ok(ReadinessReport {
@@ -244,6 +242,7 @@ fn evaluate_checks(
 fn evaluate_conversations(
     root: &Path,
     number: u64,
+    head_ref_oid: &str,
     blockers: &mut Vec<String>,
 ) -> Result<(ConversationSummary, Option<CodecovSummary>)> {
     let threads = gh::review_threads(root, number).context("could not read review threads")?;
@@ -282,96 +281,19 @@ fn evaluate_conversations(
 
     let comments = gh::issue_comments(root, number).context("could not read issue comments")?;
     let mut actionable_comments = Vec::new();
-    let mut codecov = None;
-
-    let mut seen_codecov_actionable = false;
-    for (idx, comment) in comments.iter().enumerate() {
-        let author = comment.user.as_ref().map_or("", |u| u.login.as_str());
-        // Only Codecov's own logins post a report: a human comment that merely
-        // mentions "Codecov" must not overwrite the real summary.
-        let is_codecov = CODECOV_AUTHORS.contains(&author);
-
-        if is_codecov {
-            let has_gap = comment.body.contains("missing coverage")
-                || comment.body.contains("Patch coverage is 0")
-                || comment.body.contains("Decreases by");
-            // A human reply waives the gap; another bot's notice does not.
-            let has_subsequent_answer = comments[idx + 1..].iter().any(|c| {
-                let a = c.user.as_ref().map_or("", |u| u.login.as_str());
-                !CODECOV_AUTHORS.contains(&a) && !is_bot_login(a)
-            });
-            let is_actionable = has_gap && !has_subsequent_answer;
-            let patch_cov = parse_patch_coverage(&comment.body);
-            let missing_lines = parse_missing_lines(&comment.body);
-            let excerpt = first_line(&comment.body, 80);
-
-            if is_actionable && !seen_codecov_actionable {
-                seen_codecov_actionable = true;
-                let cov_text = patch_cov.map_or_else(
-                    || "uncovered lines".to_owned(),
-                    |p| format!("patch coverage {p:.2}%"),
-                );
-                blockers.push(format!(
-                    "unanswered Codecov comment reporting missing coverage ({cov_text})"
-                ));
-                actionable_comments.push(ActionableComment {
-                    id: comment.id,
-                    author: author.to_owned(),
-                    excerpt: excerpt.clone(),
-                    url: comment.html_url.clone(),
-                });
-            }
-            codecov = Some(CodecovSummary {
-                is_actionable,
-                patch_coverage: patch_cov,
-                missing_lines,
-                excerpt,
-                url: comment.html_url.clone(),
-            });
-        }
-    }
+    let codecov = super::waiver_comment::evaluate_codecov(
+        root,
+        &comments,
+        head_ref_oid,
+        blockers,
+        &mut actionable_comments,
+    );
 
     let conversations = ConversationSummary {
         unresolved_threads,
         actionable_comments,
     };
     Ok((conversations, codecov))
-}
-
-fn first_line(text: &str, max: usize) -> String {
-    let line = text
-        .lines()
-        .find(|l| !l.trim().is_empty())
-        .unwrap_or("")
-        .trim();
-    // Truncate by characters: a byte slice at `max` panics whenever it falls
-    // inside a multi-byte character, and comment bodies are arbitrary text.
-    if line.chars().count() > max {
-        let mut excerpt: String = line.chars().take(max).collect();
-        excerpt.push_str("...");
-        excerpt
-    } else {
-        line.to_owned()
-    }
-}
-
-fn parse_patch_coverage(body: &str) -> Option<f64> {
-    // `to_ascii_lowercase` preserves byte offsets, so the index stays valid in
-    // `body`; `to_lowercase` can change length (`İ` -> 2 bytes -> 3).
-    let lower = body.to_ascii_lowercase();
-    let idx = lower.find("patch coverage")?;
-    let rest = &body[idx..];
-    let pct_idx = rest.find('%')?;
-    let words = &rest[..pct_idx];
-    words.split_whitespace().last()?.parse::<f64>().ok()
-}
-
-fn parse_missing_lines(body: &str) -> Option<u64> {
-    let lower = body.to_ascii_lowercase();
-    let idx = lower.find("lines in your changes missing coverage")?;
-    let prefix = &body[..idx];
-    let count_word = prefix.split_whitespace().last()?;
-    count_word.parse::<u64>().ok()
 }
 
 /// Runs the ready command and prints the report in `format`.
@@ -445,6 +367,23 @@ fn print_text(report: &ReadinessReport) {
     }
     for c in &report.conversations.actionable_comments {
         println!("    ACTIONABLE: {}: \"{}\"", c.author, c.excerpt);
+    }
+
+    if let Some(c) = &report.codecov {
+        println!(
+            "  codecov status: {:?} (actionable: {}, waived: {})",
+            c.status, c.is_actionable, c.waived
+        );
+        if c.waived {
+            if let (Some(author), Some(sha), Some(finding), Some(reason)) = (
+                &c.waiver_author,
+                &c.waiver_head_sha,
+                &c.waiver_finding_ref,
+                &c.waiver_reason,
+            ) {
+                println!("    WAIVED: {finding} for {sha} by {author}: \"{reason}\"");
+            }
+        }
     }
 
     if !report.blockers.is_empty() {
