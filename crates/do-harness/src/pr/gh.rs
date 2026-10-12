@@ -6,6 +6,10 @@ use std::process::Command;
 use anyhow::{Context, Result, bail};
 use serde::Deserialize;
 
+#[path = "review_threads.rs"]
+mod review_threads;
+pub use review_threads::review_threads;
+
 /// Minimal PR metadata needed to locate the effective change.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -190,74 +194,10 @@ pub struct CommentAuthor {
     pub login: String,
 }
 
-/// A review thread returned by `GraphQL` query.
-#[derive(Debug, Clone, Deserialize)]
-#[allow(dead_code)]
-pub struct ReviewThread {
-    pub id: String,
-    #[serde(rename = "isResolved", default)]
-    pub is_resolved: bool,
-    #[serde(rename = "isOutdated", default)]
-    pub is_outdated: bool,
-    pub path: Option<String>,
-    pub line: Option<u64>,
-    #[serde(default)]
-    pub comments: ReviewThreadComments,
-}
-
-/// Wrapper for comments in a review thread.
-#[derive(Debug, Clone, Default, Deserialize)]
-pub struct ReviewThreadComments {
-    #[serde(default)]
-    pub nodes: Vec<ReviewThreadComment>,
-}
-
-/// A single comment in a review thread.
-#[derive(Debug, Clone, Deserialize)]
-pub struct ReviewThreadComment {
-    pub author: Option<CommentAuthor>,
-    #[serde(default)]
-    pub body: String,
-}
 #[derive(Deserialize)]
 struct CommitStatusesResponse {
     #[serde(default)]
     statuses: Vec<CommitStatus>,
-}
-
-#[derive(Deserialize)]
-struct GqlResponse {
-    data: Option<GqlData>,
-    #[serde(default)]
-    errors: Vec<GqlError>,
-}
-
-#[derive(Deserialize)]
-struct GqlError {
-    message: String,
-}
-
-#[derive(Deserialize)]
-struct GqlData {
-    repository: Option<GqlRepo>,
-}
-
-#[derive(Deserialize)]
-struct GqlRepo {
-    #[serde(rename = "pullRequest")]
-    pull_request: Option<GqlPr>,
-}
-
-#[derive(Deserialize)]
-struct GqlPr {
-    #[serde(rename = "reviewThreads")]
-    review_threads: Option<GqlThreads>,
-}
-
-#[derive(Deserialize)]
-struct GqlThreads {
-    #[serde(default)]
-    nodes: Vec<ReviewThread>,
 }
 
 #[derive(Deserialize)]
@@ -380,71 +320,6 @@ pub fn issue_comments(root: &Path, number: u64) -> Result<Vec<Comment>> {
         comments.extend(page.context("unexpected issue comments JSON")?);
     }
     Ok(comments)
-}
-
-/// Reads review threads for a PR via `GraphQL`.
-///
-/// # Errors
-///
-/// Returns an error when `gh api` fails.
-pub fn review_threads(root: &Path, number: u64) -> Result<Vec<ReviewThread>> {
-    let query = r#"query($number: Int!) {
-        repository(owner: "{owner}", name: "{repo}") {
-            pullRequest(number: $number) {
-                reviewThreads(first: 100) {
-                    nodes {
-                        id
-                        isResolved
-                        isOutdated
-                        path
-                        line
-                        comments(first: 1) {
-                            nodes {
-                                author { login }
-                                body
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }"#;
-    // `-F` (not `-f`) so `gh` substitutes the `{owner}`/`{repo}` placeholders;
-    // a raw `-f` field sends them verbatim and every query fails with
-    // "Could not resolve to a Repository with the name '{owner}/{repo}'".
-    let output = Command::new("gh")
-        .current_dir(root)
-        .args([
-            "api",
-            "graphql",
-            "-F",
-            &format!("number={number}"),
-            "-F",
-            &format!("query={query}"),
-        ])
-        .output()
-        .context("failed to run gh api graphql reviewThreads")?;
-    if !output.status.success() {
-        bail!(
-            "gh api graphql reviewThreads failed: {}",
-            String::from_utf8_lossy(&output.stderr).trim()
-        );
-    }
-    let res: GqlResponse =
-        serde_json::from_slice(&output.stdout).context("unexpected reviewThreads JSON")?;
-    if let Some(error) = res.errors.first() {
-        bail!(
-            "gh api graphql reviewThreads returned an error: {}",
-            error.message
-        );
-    }
-    let threads = res
-        .data
-        .and_then(|d| d.repository)
-        .and_then(|r| r.pull_request)
-        .and_then(|p| p.review_threads)
-        .ok_or_else(|| anyhow::anyhow!("gh api graphql reviewThreads returned no data"))?;
-    Ok(threads.nodes)
 }
 
 /// Reads repository permission for a user via `gh api`.

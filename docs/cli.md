@@ -745,8 +745,9 @@ Inspect a pull request's end-to-end merge readiness:
 1. Merge state (`mergeStateStatus`, `mergeable`, auto-merge).
 2. CI check runs and commit statuses, categorizing `cancelled` separately from
    `failure` and synthesizing exact `gh run rerun <id> --job <job_id>` commands.
-3. Review conversations and issue comments, detecting unresolved threads and
-   unanswered actionable comments (including Codecov patch coverage gaps).
+3. Review conversations and issue comments, detecting unresolved threads —
+   including outdated ones, which stay blockers until a human resolves them —
+   and unanswered actionable comments (including Codecov patch coverage gaps).
 
 - `<PR>`: Pull request number.
 - `--format <Format>`: Output format (`text` or `json`). Can also be invoked
@@ -755,6 +756,11 @@ Inspect a pull request's end-to-end merge readiness:
 Exit `0` when the PR is ready to merge, `1` when any blocker exists (non-`CLEAN`
 merge state, cancelled or failed check, unresolved thread, unanswered Codecov
 gap), and `2` when `gh` fails.
+
+The report pins the head SHA it evaluated (`headRefOid`) and rechecks it before
+returning: if the head moves during collection the command retries, and fails
+rather than returning a mixed snapshot (`collectionComplete` records that the
+conversation walk completed).
 
 A Codecov gap is cleared only by an explicit waiver, never by a bare reply: the
 waiver comment must come from a collaborator whose repository permission is

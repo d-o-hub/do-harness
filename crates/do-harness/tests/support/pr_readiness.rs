@@ -26,6 +26,15 @@ pub fn fake_gh_router(mock_dir: &Path) -> PathBuf {
 MOCK_DIR="{}"
 # gh pr view ...
 if [ "$1" = "pr" ] && [ "$2" = "view" ]; then
+    if [ -f "$MOCK_DIR/view_seq.txt" ]; then
+        count=$(cat "$MOCK_DIR/view_seq.txt")
+        count=$((count + 1))
+        echo "$count" > "$MOCK_DIR/view_seq.txt"
+        if [ -f "$MOCK_DIR/view_$count.json" ]; then
+            cat "$MOCK_DIR/view_$count.json"
+            exit 0
+        fi
+    fi
     cat "$MOCK_DIR/view.json"
     exit 0
 fi
@@ -84,13 +93,22 @@ if [ "$1" = "api" ]; then
             # `gh` substitutes {{owner}}/{{repo}} only for `-F` fields; a raw `-f`
             # query ships the placeholders verbatim and resolves nothing, so
             # emulate that failure and let the flag regress loudly.
+            after_val=""
             for arg in "$@"; do
                 if [ "$arg" = "-f" ]; then
                     printf '%s' '{{"data":{{"repository":null}},"errors":[{{"message":"Could not resolve to a Repository with the name {{owner}}/{{repo}}."}}]}}'
                     exit 0
                 fi
+                case "$arg" in
+                    after=*) after_val="${{arg#after=}}" ;;
+                esac
             done
-            if [ -f "$MOCK_DIR/graphql.json" ]; then
+            if [ -n "$after_val" ] && [ -f "$MOCK_DIR/graphql_$after_val.json" ]; then
+                cat "$MOCK_DIR/graphql_$after_val.json"
+            elif [ -n "$after_val" ] && [ -f "$MOCK_DIR/fail_graphql_page2" ]; then
+                echo "HTTP 500: GraphQL page 2 failure" >&2
+                exit 1
+            elif [ -f "$MOCK_DIR/graphql.json" ]; then
                 cat "$MOCK_DIR/graphql.json"
             else
                 printf '%s' '{{"data":{{"repository":{{"pullRequest":{{"reviewThreads":{{"nodes":[]}}}}}}}}}}'

@@ -115,6 +115,93 @@ fn codecov_numbers_survive_case_folding_length_changes() {
 
 #[cfg(unix)]
 #[test]
+fn outdated_unresolved_and_resolved_threads() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    let bin = fake_gh_router(root);
+
+    std::fs::write(
+        root.join("view.json"),
+        r#"{"number": 2005, "baseRefName": "main", "headRefOid": "headoutdated", "mergeStateStatus": "CLEAN", "mergeable": "MERGEABLE"}"#,
+    ).unwrap();
+
+    // Test 1: Unresolved outdated thread blocks
+    let g1 = serde_json::json!({
+        "data": { "repository": { "pullRequest": { "reviewThreads": {
+            "pageInfo": { "hasNextPage": false, "endCursor": null },
+            "nodes": [
+                {
+                    "id": "t_outdated_open",
+                    "isResolved": false,
+                    "isOutdated": true,
+                    "path": "src/old.rs",
+                    "line": 12,
+                    "comments": { "nodes": [{ "author": { "login": "rev" }, "body": "unresolved outdated concern" }] }
+                },
+                {
+                    "id": "t_outdated_resolved",
+                    "isResolved": true,
+                    "isOutdated": true,
+                    "path": "src/old.rs",
+                    "line": 20,
+                    "comments": { "nodes": [{ "author": { "login": "rev" }, "body": "resolved outdated concern" }] }
+                }
+            ]
+        } } } }
+    });
+    std::fs::write(
+        root.join("graphql.json"),
+        serde_json::to_string(&g1).unwrap(),
+    )
+    .unwrap();
+
+    let (code, stdout, stderr) = run_pr(root, &bin, &["pr", "ready", "2005", "--format", "json"]);
+    assert_eq!(
+        code,
+        Some(1),
+        "unresolved outdated thread must block:\n{stderr}"
+    );
+    let report: Value = serde_json::from_str(&stdout).unwrap();
+    assert_eq!(report["ready"], false);
+    let threads = report["conversations"]["unresolved_threads"]
+        .as_array()
+        .unwrap();
+    assert_eq!(threads.len(), 1);
+    assert_eq!(threads[0]["id"], "t_outdated_open");
+    assert_eq!(threads[0]["isOutdated"], true);
+
+    // Test 2: Resolved outdated thread alone does not block
+    let g2 = serde_json::json!({
+        "data": { "repository": { "pullRequest": { "reviewThreads": {
+            "pageInfo": { "hasNextPage": false, "endCursor": null },
+            "nodes": [{
+                "id": "t_outdated_resolved",
+                "isResolved": true,
+                "isOutdated": true,
+                "path": "src/old.rs",
+                "line": 20,
+                "comments": { "nodes": [{ "author": { "login": "rev" }, "body": "resolved outdated concern" }] }
+            }]
+        } } } }
+    });
+    std::fs::write(
+        root.join("graphql.json"),
+        serde_json::to_string(&g2).unwrap(),
+    )
+    .unwrap();
+
+    let (code, stdout, stderr) = run_pr(root, &bin, &["pr", "ready", "2005", "--format", "json"]);
+    assert_eq!(
+        code,
+        Some(0),
+        "resolved outdated thread does not block:\n{stderr}"
+    );
+    let report: Value = serde_json::from_str(&stdout).unwrap();
+    assert_eq!(report["ready"], true);
+}
+
+#[cfg(unix)]
+#[test]
 fn only_codecov_logins_report_and_bots_do_not_answer() {
     let dir = tempfile::tempdir().unwrap();
     let root = dir.path();

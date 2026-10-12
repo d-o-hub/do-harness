@@ -33,10 +33,18 @@ pub(crate) fn is_bot_login(login: &str) -> bool {
     login.ends_with("[bot]") || login == "dependabot" || login == "renovate"
 }
 
+fn default_true() -> bool {
+    true
+}
+
 /// Merge readiness evaluation report.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ReadinessReport {
     pub pr: u64,
+    #[serde(rename = "headRefOid", default)]
+    pub head_ref_oid: String,
+    #[serde(rename = "collectionComplete", default = "default_true")]
+    pub collection_complete: bool,
     pub ready: bool,
     pub merge_state: MergeState,
     pub checks: CheckSummary,
@@ -84,6 +92,8 @@ pub struct CancelledCheck {
 pub struct ConversationSummary {
     pub unresolved_threads: Vec<UnresolvedThread>,
     pub actionable_comments: Vec<ActionableComment>,
+    #[serde(default = "default_true")]
+    pub complete: bool,
 }
 
 /// An unresolved review thread.
@@ -94,6 +104,8 @@ pub struct UnresolvedThread {
     pub line: Option<u64>,
     pub author: String,
     pub excerpt: String,
+    #[serde(rename = "isOutdated", default)]
+    pub is_outdated: bool,
 }
 
 /// An actionable top-level comment (e.g. Codecov gap).
@@ -111,47 +123,68 @@ pub struct ActionableComment {
 ///
 /// Returns an error when querying `GitHub` fails.
 pub fn evaluate(root: &Path, number: u64) -> Result<ReadinessReport> {
-    let view = gh::readiness_view(root, number)?;
-    let mut blockers = Vec::new();
+    const MAX_HEAD_RETRIES: usize = 3;
 
-    // 1. Merge State
-    let is_clean = view.merge_state_status == "CLEAN";
-    let is_mergeable = view.mergeable == "MERGEABLE";
-    if !is_clean {
-        blockers.push(format!(
-            "merge state is '{}' (expected 'CLEAN')",
-            view.merge_state_status
-        ));
+    for attempt in 0..MAX_HEAD_RETRIES {
+        let view = gh::readiness_view(root, number)?;
+        let initial_head = view.head_ref_oid.clone();
+        let mut blockers = Vec::new();
+
+        // 1. Merge State
+        if view.merge_state_status != "CLEAN" {
+            blockers.push(format!(
+                "merge state is '{}' (expected 'CLEAN')",
+                view.merge_state_status
+            ));
+        }
+        if view.mergeable != "MERGEABLE" {
+            blockers.push(format!(
+                "mergeability is '{}' (expected 'MERGEABLE')",
+                view.mergeable
+            ));
+        }
+        let merge_state = MergeState {
+            status: view.merge_state_status,
+            mergeable: view.mergeable,
+            auto_merge: view.auto_merge_request.is_some(),
+        };
+
+        // 2. Checks & Statuses
+        let checks = evaluate_checks(root, &initial_head, &mut blockers)?;
+
+        // 3. Review Threads & Issue Comments
+        let (conversations, codecov) =
+            evaluate_conversations(root, number, &initial_head, &mut blockers)?;
+
+        // 4. Recheck head SHA after collection
+        let recheck_view = gh::readiness_view(root, number)
+            .context("failed to recheck head SHA after metadata collection")?;
+
+        if recheck_view.head_ref_oid != initial_head {
+            if attempt + 1 < MAX_HEAD_RETRIES {
+                continue;
+            }
+            anyhow::bail!(
+                "head SHA moved during inspection from {initial_head} to {}; snapshot is stale/mixed",
+                recheck_view.head_ref_oid
+            );
+        }
+
+        let ready = blockers.is_empty();
+        return Ok(ReadinessReport {
+            pr: number,
+            head_ref_oid: initial_head,
+            collection_complete: conversations.complete,
+            ready,
+            merge_state,
+            checks,
+            conversations,
+            codecov,
+            blockers,
+        });
     }
-    if !is_mergeable {
-        blockers.push(format!(
-            "mergeability is '{}' (expected 'MERGEABLE')",
-            view.mergeable
-        ));
-    }
-    let merge_state = MergeState {
-        status: view.merge_state_status,
-        mergeable: view.mergeable,
-        auto_merge: view.auto_merge_request.is_some(),
-    };
 
-    // 2. Checks & Statuses
-    let checks = evaluate_checks(root, &view.head_ref_oid, &mut blockers)?;
-
-    // 3. Review Threads & Issue Comments
-    let (conversations, codecov) =
-        evaluate_conversations(root, number, &view.head_ref_oid, &mut blockers)?;
-
-    let ready = blockers.is_empty();
-    Ok(ReadinessReport {
-        pr: number,
-        ready,
-        merge_state,
-        checks,
-        conversations,
-        codecov,
-        blockers,
-    })
+    anyhow::bail!("failed to obtain a stable head SHA snapshot after {MAX_HEAD_RETRIES} attempts")
 }
 
 fn evaluate_checks(
@@ -248,7 +281,7 @@ fn evaluate_conversations(
     let threads = gh::review_threads(root, number).context("could not read review threads")?;
     let mut unresolved_threads = Vec::new();
     for thread in threads {
-        if !thread.is_resolved && !thread.is_outdated {
+        if !thread.is_resolved {
             let author = thread
                 .comments
                 .nodes
@@ -266,8 +299,13 @@ fn evaluate_conversations(
                 (Some(p), None) => p.clone(),
                 _ => "diff".to_owned(),
             };
+            let status_note = if thread.is_outdated {
+                " (outdated)"
+            } else {
+                ""
+            };
             blockers.push(format!(
-                "unresolved review thread on {location} by {author}: {excerpt}"
+                "unresolved review thread{status_note} on {location} by {author}: {excerpt}"
             ));
             unresolved_threads.push(UnresolvedThread {
                 id: thread.id,
@@ -275,6 +313,7 @@ fn evaluate_conversations(
                 line: thread.line,
                 author: author.to_owned(),
                 excerpt,
+                is_outdated: thread.is_outdated,
             });
         }
     }
@@ -292,6 +331,7 @@ fn evaluate_conversations(
     let conversations = ConversationSummary {
         unresolved_threads,
         actionable_comments,
+        complete: true,
     };
     Ok((conversations, codecov))
 }
@@ -363,7 +403,11 @@ fn print_text(report: &ReadinessReport) {
     );
     for t in &report.conversations.unresolved_threads {
         let loc = t.path.as_deref().unwrap_or("diff");
-        println!("    UNRESOLVED: {loc} by {}: \"{}\"", t.author, t.excerpt);
+        let outdated = if t.is_outdated { " (outdated)" } else { "" };
+        println!(
+            "    UNRESOLVED{outdated}: {loc} by {}: \"{}\"",
+            t.author, t.excerpt
+        );
     }
     for c in &report.conversations.actionable_comments {
         println!("    ACTIONABLE: {}: \"{}\"", c.author, c.excerpt);
