@@ -167,3 +167,94 @@ async fn export_without_dry_run_does_write() {
     let written = fs::read_to_string(dir.path().join("plans/tasks.json")).unwrap();
     assert!(written.contains("\"real\""), "export must write the board");
 }
+
+/// Regression: `task done --dry-run` reported success before any gate ran, so
+/// it previewed a transition the real call refuses instead of surfacing it.
+#[tokio::test(flavor = "current_thread")]
+async fn dry_run_done_surfaces_the_same_refusal() {
+    let dir = tempfile::tempdir().unwrap();
+    write_catalog(dir.path());
+    let (id, _) = add_task(dir.path(), "methodless", None, None, None)
+        .await
+        .unwrap();
+
+    let dry = crate::commands::task_cmd(
+        dir.path(),
+        crate::cli::TaskAction::Done { id, dry_run: false },
+        true,
+    )
+    .await
+    .unwrap_err()
+    .to_string();
+    let real = done_task(dir.path(), id).await.unwrap_err().to_string();
+    assert_eq!(dry, real, "a dry run must preview the real refusal");
+    assert!(dry.contains("has no method"), "unexpected: {dry}");
+}
+
+/// Regression: a dry-run advance past a sensor-gated subtask printed success
+/// even though the real transition refuses without a passing beat.
+#[tokio::test(flavor = "current_thread")]
+async fn dry_run_advance_surfaces_the_unsatisfied_gate() {
+    let dir = tempfile::tempdir().unwrap();
+    write_catalog(dir.path());
+    let (id, _) = add_task(
+        dir.path(),
+        "gated",
+        Some("vertical-event-slice"),
+        None,
+        None,
+    )
+    .await
+    .unwrap();
+
+    let dry = crate::commands::task_cmd(
+        dir.path(),
+        crate::cli::TaskAction::Advance { id, dry_run: false },
+        true,
+    )
+    .await
+    .unwrap_err()
+    .to_string();
+    let real = advance_task(dir.path(), id).await.unwrap_err().to_string();
+    assert_eq!(dry, real, "a dry run must preview the real refusal");
+    assert!(
+        dry.contains("requires sensor 'test' to pass"),
+        "unexpected: {dry}"
+    );
+}
+
+/// A dry run that does pass its gate still writes nothing: the subtask pointer
+/// and the append-only event log stay untouched.
+#[tokio::test(flavor = "current_thread")]
+async fn dry_run_advance_past_a_free_subtask_writes_nothing() {
+    let dir = tempfile::tempdir().unwrap();
+    write_catalog(dir.path());
+    let (id, _) = add_task(dir.path(), "free", Some("mini"), None, None)
+        .await
+        .unwrap();
+    let before = {
+        let conn = do_harness_db::connect_and_migrate(dir.path())
+            .await
+            .unwrap();
+        do_harness_db::list_all_events(&conn).await.unwrap().len()
+    };
+
+    crate::commands::task_cmd(
+        dir.path(),
+        crate::cli::TaskAction::Advance { id, dry_run: false },
+        true,
+    )
+    .await
+    .unwrap();
+
+    let conn = do_harness_db::connect_and_migrate(dir.path())
+        .await
+        .unwrap();
+    let task = do_harness_db::get_task(&conn, id).await.unwrap().unwrap();
+    assert_eq!(task.subtask_index, 0, "dry run must not move the pointer");
+    assert_eq!(
+        do_harness_db::list_all_events(&conn).await.unwrap().len(),
+        before,
+        "dry run must not append a workflow event"
+    );
+}
