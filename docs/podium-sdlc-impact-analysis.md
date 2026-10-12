@@ -19,7 +19,7 @@ This report evaluates whether the insights from Podium's article, *"Rewiring the
 - **Template Synchronization**: `.agents/skills/` and `crates/do-harness/templates/skills/` enforced by `scripts/check-skills-sync.sh`.
 
 ### Analysis & Gaps
-Podium describes an internal "skills marketplace" distributing standardized agent skills and git hooks across teams via an internal CLI. `do-harness` already implements local skill scaffolding, discovery (`skills suggest`), drift detection (`skills drift`), and trace distillation (`distill`). However, `do-harness` currently only manages local or repo-bundled skills.
+Podium describes an internal "skills marketplace" distributing standardized agent skills and git hooks across teams via an internal CLI. `do-harness` already implements local skill scaffolding, discovery (`skills suggest`), drift detection (`skills drift`), and trace distillation (`distill`). However, `skills drift` is deliberately check-only — it pins manifest-managed skills against an upstream commit and content digest but never fetches or writes — so installing and updating a shared skill still happens by hand or outside the harness.
 
 ### Follow-Up Opportunities (Ranked)
 1. **Remote Skill Distribution & Registry (`do-harness skills install <url|repo>`)**
@@ -42,7 +42,7 @@ Podium describes an internal "skills marketplace" distributing standardized agen
 ### Evidence
 - **PR Review & Readiness Engine**: `do-harness pr review` (`crates/do-harness/src/pr/review.rs`), `do-harness pr ready` (`crates/do-harness/src/pr/readiness.rs`), and `do-harness pr waivers` (`crates/do-harness/src/pr/waivers.rs`).
 - **Anti-Slop Guidelines**: `.agents/skills/skill-creator/references/anti_ai_slop.md`.
-- **Triage & Routing**: `integrations/pr-triage/kev/` and `crates/do-harness/tests/pr_routing.rs`.
+- **Triage & Routing**: `.agents/skills/pr-triage/` and `crates/do-harness/tests/pr_routing.rs`.
 - **Optional Governance Sidecar**: `crates/guardian-proxy/src/proxy.rs` (gated via `agt-governance`).
 
 ### Analysis & Gaps
@@ -69,9 +69,9 @@ Podium built an AI review system combining security, architecture, and de-slopif
 - **Runtime Scope Boundary**: `README.md` explicitly notes: *"do-harness itself stays a dev-loop harness (no traffic proxy)"*.
 
 ### Analysis & Gaps
-Podium's WALL-E is an autonomous background worker running on cloud infrastructure that monitors issue trackers (Jira/Zendesk), reproduces bugs, provisions preview environments, and creates PRs.
+Podium's WALL-E is an autonomous cloud agent, built on the Claude SDK, that claims eligible customer-reported bug tickets, triages and implements fixes, tests and validates changes, creates previews, and generates pull requests, escalating to a human when context or judgment is missing.
 
-`do-harness` is explicitly designed as a *local/CI execution and verification harness*, not an autonomous cloud agent orchestrator or issue-tracker polling service. While `do-harness` tracks task states locally (`task add`/`advance`/`done`), hosting cloud workers or issue integrators belongs to external agent platforms (e.g. DeepSeek Harness, Cordis, or custom worker clouds) that *use* `do-harness` as their execution substrate (`integrations/deepseek-harness/`). Re-architecting `do-harness` to become an issue-ingesting cloud daemon would contradict its design principles (`docs/compliance.md`).
+`do-harness` is explicitly designed as a *local/CI execution and verification harness*, not an autonomous cloud agent orchestrator or issue-tracker polling service. While `do-harness` tracks task states locally (`task add`/`advance`/`done`), hosting cloud workers or issue integrators belongs to external agent platforms (e.g. DeepSeek Harness or custom worker clouds) that *use* `do-harness` as their execution substrate (`integrations/deepseek-harness/`). Re-architecting `do-harness` to become an issue-ingesting cloud daemon would contradict its design principles (`docs/compliance.md`).
 
 ---
 
@@ -81,17 +81,17 @@ Podium's WALL-E is an autonomous background worker running on cloud infrastructu
 **Direct Impact (Product/Roadmap)** | **Partial Impact (Internal Process)**
 
 ### Evidence
-- **CI Failure Diagnosis**: `do-harness ci-explain` (`crates/do-harness/src/ci_explain/`, `crates/do-harness/src/commands/ci_explain.rs`).
+- **CI Failure Diagnosis**: `do-harness ci-explain` (`crates/do-harness/src/ci_explain/`).
 - **Error Signatures & Striking**: `crates/do-harness/src/errors.rs` and `crates/types/src/error_signature.rs`.
 - **PR Rerun Recommendations**: `crates/do-harness/src/pr/readiness.rs` (emits `gh run rerun <id> --failed`).
 - **Agent Integration Seams**: `integrations/deepseek-harness/lib/harness.mjs` and `integrations/deepseek-harness/lib/gate.mjs`.
 
 ### Analysis & Gaps
-Podium's WALL-E monitors CI runs, interprets failures, applies fixes, and retries jobs toward a green merge state. `do-harness` already features `ci-explain` to diagnose GitHub Actions runs and map failed jobs to exact local sensor repro commands. However, `ci-explain` output is currently optimized for human console reading rather than structured ingestion by autonomous coding agents.
+Podium's WALL-E monitors CI runs, interprets failures, applies fixes, and retries jobs toward a green merge state. `do-harness` already features `ci-explain` to diagnose GitHub Actions runs and map failed jobs to exact local sensor repro commands; its JSON already carries per-job `classification`, `failed_step`, `local_sensor`, `local_repro_command`, and `rerun_command`. What it does not carry is change-scoped context — which changed files the failing step implicates, or any suggested-fix hint.
 
 ### Follow-Up Opportunities (Ranked)
-1. **Agent-Structured Remediation Payload in `ci-explain --format json`**
-   - *Description*: Enhance `ci-explain` JSON output to include explicit agent remediation fields (`target_files`, `failing_sensor`, `repro_command`, `suggested_fix_context`) so coding agents can programmatically consume CI failures and execute targeted fixes.
+1. **Change-Scoped Remediation Fields in `ci-explain --format json`**
+   - *Description*: Add `target_files` (the changed files the failing step implicates) and a `suggested_fix_context` hint alongside the existing `local_sensor`/`local_repro_command` fields, so coding agents can execute targeted fixes without a second query pass.
    - *Effort*: Medium (~2–3 days)
 2. **Automated CI Failure-to-Trace Conversion (`trace add --from-ci`)**
    - *Description*: Allow `do-harness trace add` to ingest `ci-explain` failure payloads directly, enabling agents to record CI fix iterations and distill them into reusable skills (`do-harness distill`).
