@@ -112,27 +112,13 @@ pub(crate) async fn run(root: &Path, mut opts: VerifyOpts) -> std::result::Resul
                 .chain(&opts.quarantined)
                 .cloned()
                 .collect();
-            if opts.record {
-                telemetry::record_verify(
-                    root,
-                    &report,
-                    &skipped,
-                    &beat_scope,
-                    &cfg,
-                    config_bytes.as_deref(),
-                    &opts.pre_digests,
-                )
-                .await
-                .map_err(CliError::Usage)?;
-            }
-            if opts.bless {
-                bless_baselines(root, &report, &opts).await?;
-            }
-
-            // Compare pre-execution and post-execution input identities.
-            // If any selected sensor's input identity changed during execution
-            // (e.g. source modified by a sensor or concurrent writer), mark the evidence
-            // as invalidated.
+            // Compare pre-execution and post-execution input identities
+            // immediately after the sensors: a change here (source modified by
+            // a sensor or concurrent writer) invalidates the evidence. The
+            // comparison runs before this run's own bookkeeping — beat
+            // recording and a baseline bless — because those are deliberate
+            // harness writes, not input drift, and the blessed baseline file
+            // is itself part of the digest being compared.
             let mut invalidated_reason = None;
             for spec in &selection.specs {
                 if opts.blocked.contains(&spec.name) || opts.quarantined.contains(&spec.name) {
@@ -151,6 +137,23 @@ pub(crate) async fn run(root: &Path, mut opts: VerifyOpts) -> std::result::Resul
                         break;
                     }
                 }
+            }
+
+            if opts.record {
+                telemetry::record_verify(
+                    root,
+                    &report,
+                    &skipped,
+                    &beat_scope,
+                    &cfg,
+                    config_bytes.as_deref(),
+                    &opts.pre_digests,
+                )
+                .await
+                .map_err(CliError::Usage)?;
+            }
+            if opts.bless {
+                bless_baselines(root, &report, &opts).await?;
             }
 
             report::print_report(&report, opts.format, opts.quiet);

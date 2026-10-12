@@ -420,3 +420,72 @@ inputs = ["input.txt"]
         "changed input identity must force a fresh run rather than reuse beat: {stderr}"
     );
 }
+
+/// A run's own bookkeeping must not invalidate it: `--record --bless` writes
+/// the blessed baseline file, which is part of the input digest, and the run
+/// still has to end green.
+///
+/// Regression: the comparison ran after `bless_baselines`, so every bless that
+/// initialized or lowered a baseline reported `inputs_changed_during_run` and
+/// exited non-zero even though all sensors passed.
+#[test]
+fn blessing_a_baseline_does_not_invalidate_the_run() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path().to_path_buf();
+    let config = r#"
+[signal-sets]
+verification = ["noisy"]
+
+[[sensors]]
+name = "noisy"
+argv = ["bash", "noisy.sh"]
+severity = "warn"
+"#;
+    std::fs::write(root.join("do-harness.toml"), config).unwrap();
+    std::fs::write(root.join("noisy.sh"), "echo 'FINDINGS: 3'\nexit 1\n").unwrap();
+    git(&root, &["init", "-q"]);
+    git(&root, &["add", "-A"]);
+    git(&root, &["commit", "-qm", "test: base"]);
+
+    let blessed = |root: &Path| -> u64 {
+        let bytes = std::fs::read(root.join("plans/baselines.json")).unwrap();
+        serde_json::from_slice::<Value>(&bytes).unwrap()["sensors"]["noisy"]
+            .as_u64()
+            .unwrap()
+    };
+
+    // Initializing bless: the baseline file is created during the run.
+    let mut cmd = harness(&root);
+    cmd.arg("verify")
+        .arg("--record")
+        .arg("--bless")
+        .arg("--approver")
+        .arg("tester")
+        .arg("--format")
+        .arg("json");
+    let (code, stdout, stderr) = run(&mut cmd);
+    assert_eq!(
+        code,
+        Some(0),
+        "an initializing bless must stay green: stdout:\n{stdout}\nstderr:\n{stderr}"
+    );
+    assert_eq!(blessed(&root), 3, "bless must initialize the baseline");
+
+    // Lowering bless: the baseline file is rewritten during the run.
+    std::fs::write(root.join("noisy.sh"), "echo 'FINDINGS: 1'\nexit 1\n").unwrap();
+    let mut cmd = harness(&root);
+    cmd.arg("verify")
+        .arg("--record")
+        .arg("--bless")
+        .arg("--approver")
+        .arg("tester")
+        .arg("--format")
+        .arg("json");
+    let (code, stdout, stderr) = run(&mut cmd);
+    assert_eq!(
+        code,
+        Some(0),
+        "a lowering bless must stay green: stdout:\n{stdout}\nstderr:\n{stderr}"
+    );
+    assert_eq!(blessed(&root), 1, "bless must lower the baseline");
+}
