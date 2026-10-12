@@ -292,8 +292,12 @@ pub async fn show_task(root: &Path, id: i64, format: Format) -> Result<()> {
 mod mutations;
 
 // The lifecycle commands live in `mutations`; re-exported so `do-harness task`
-// call sites and the test modules keep addressing them as `task::<name>`.
-pub use mutations::{add_task, advance_task, done_task, fail_task, remove_task};
+// call sites and the test modules keep addressing them as `task::<name>`. The
+// `preview_*` twins run the same gates for `--dry-run` without mutating.
+pub use mutations::{
+    add_task, advance_task, done_task, fail_task, preview_advance, preview_done, preview_fail,
+    preview_remove, remove_task,
+};
 
 #[cfg(test)]
 mod export_tests;

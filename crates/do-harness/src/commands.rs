@@ -159,6 +159,7 @@ pub async fn task_cmd(root: &Path, action: TaskAction, dry_run: bool) -> Result<
         }
         TaskAction::Advance { id, .. } => {
             if dry_run {
+                task::preview_advance(root, id).await?;
                 println!("Dry run: would advance task {id}");
                 return Ok(());
             }
@@ -168,6 +169,7 @@ pub async fn task_cmd(root: &Path, action: TaskAction, dry_run: bool) -> Result<
         }
         TaskAction::Done { id, .. } => {
             if dry_run {
+                task::preview_done(root, id).await?;
                 println!("Dry run: would mark task {id} done");
                 return Ok(());
             }
@@ -177,6 +179,7 @@ pub async fn task_cmd(root: &Path, action: TaskAction, dry_run: bool) -> Result<
         }
         TaskAction::Fail { id } => {
             if dry_run {
+                task::preview_fail(root, id).await?;
                 println!("Dry run: would mark task {id} failed");
                 return Ok(());
             }
@@ -186,6 +189,7 @@ pub async fn task_cmd(root: &Path, action: TaskAction, dry_run: bool) -> Result<
         }
         TaskAction::Remove { id } => {
             if dry_run {
+                task::preview_remove(root, id).await?;
                 println!("Dry run: would remove task {id}");
                 return Ok(());
             }
