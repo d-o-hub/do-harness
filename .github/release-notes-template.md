@@ -2,7 +2,8 @@
 run the checks, the evidence artifact records what was verified on which
 workspace fingerprint, and the release gate refuses to publish unverified work.
 
-`{{VERSION}}` ships the prebuilt binaries, the three crates.io packages, and —
+`{{VERSION}}` ships the prebuilt binaries, the harness crates and maintained
+libSQL fork on crates.io, and —
 on Linux and macOS — the npm wrapper. Every command below is pinned to `{{TAG}}`.
 
 ## Breaking changes
@@ -21,7 +22,7 @@ curl -fsSL https://raw.githubusercontent.com/d-o-hub/do-harness/main/scripts/ins
   | sh -s -- --version {{TAG}}
 
 # from crates.io (builds from source)
-cargo install do-harness --version {{VERSION}}
+cargo install do-harness --version {{VERSION}} --locked
 
 # run without installing (Linux and macOS)
 npx do-harness --help

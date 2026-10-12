@@ -65,6 +65,7 @@ fn artifacts_and_coverage_are_recorded() {
         record: true,
         started_at: 0,
         finished_at: 1,
+        invalidated_reason: None,
     };
     let doc = EvidenceDocument::from_run(&report, &meta);
     assert_eq!(doc.schema_version, 4);
@@ -138,6 +139,7 @@ fn missing_declared_artifact_records_warn() {
         record: true,
         started_at: 0,
         finished_at: 1,
+        invalidated_reason: None,
     };
     let doc = EvidenceDocument::from_run(&report, &meta);
     assert_eq!(doc.sensors[0].verdict, "warn");

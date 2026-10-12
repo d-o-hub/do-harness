@@ -552,6 +552,51 @@ dependencies = [
 ]
 
 [[package]]
+name = "do-harness-libsql"
+version = "0.9.30"
+dependencies = [
+ "anyhow",
+ "async-stream",
+ "async-trait",
+ "base64 0.21.7",
+ "bincode",
+ "bitflags 2.6.0",
+ "bytes",
+ "chrono",
+ "crc32fast",
+ "criterion",
+ "fallible-iterator 0.3.0",
+ "futures",
+ "http 0.2.12",
+ "hyper",
+ "hyper-rustls",
+ "libsql-hrana",
+ "libsql-sqlite3-parser",
+ "libsql-sys",
+ "libsql_replication",
+ "parking_lot",
+ "pprof",
+ "rand",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "tokio-stream",
+ "tokio-test",
+ "tokio-util",
+ "tonic",
+ "tonic-web",
+ "tower",
+ "tower-http",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+ "worker",
+ "zerocopy",
+]
+
+[[package]]
 name = "either"
 version = "1.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1102,51 +1147,6 @@ checksum = "e310b3a6b5907f99202fcdb4960ff45b93735d7c7d96b760fcff8db2dc0e103d"
 dependencies = [
  "cfg-if",
  "windows-targets 0.52.6",
-]
-
-[[package]]
-name = "libsql"
-version = "0.9.30"
-dependencies = [
- "anyhow",
- "async-stream",
- "async-trait",
- "base64 0.21.7",
- "bincode",
- "bitflags 2.6.0",
- "bytes",
- "chrono",
- "crc32fast",
- "criterion",
- "fallible-iterator 0.3.0",
- "futures",
- "http 0.2.12",
- "hyper",
- "hyper-rustls",
- "libsql-hrana",
- "libsql-sqlite3-parser",
- "libsql-sys",
- "libsql_replication",
- "parking_lot",
- "pprof",
- "rand",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror",
- "tokio",
- "tokio-stream",
- "tokio-test",
- "tokio-util",
- "tonic",
- "tonic-web",
- "tower",
- "tower-http",
- "tracing",
- "tracing-subscriber",
- "uuid",
- "worker",
- "zerocopy",
 ]
 
 [[package]]
