@@ -40,6 +40,39 @@ Run the `crates-io-name-check` skill before adopting one, verify licence and
 MSRV against `deny.toml`/`rust-toolchain.toml`, and prefer the fork with the
 smallest API delta from `serde_yaml` 0.9 so the migration stays reviewable.
 
+## Spike outcome (2026-10-13, `crates-io-name-check` + registry metadata)
+
+Checked each candidate's dependencies, licence, and `rust_version` via the
+crates.io API before touching the tree:
+
+- `serde_norway` 0.9.42 — **chosen**. MIT OR Apache-2.0, `rust_version` 1.71.1,
+  links `unsafe-libyaml-norway` 0.2.15 (MIT, rust 1.71.1, a distinct crate the
+  advisory DB does not flag) instead of the archived `unsafe-libyaml`.
+  API-identical fork of serde_yaml 0.9, so the frontmatter call site migrates
+  with a one-line change.
+- `serde_yaml_ng` 0.10.0 — **rejected**. Still depends on `unsafe-libyaml`
+  `^0.2.11` directly, so it cannot retire the advisory.
+- `serde_yml` 0.0.13 — **rejected**. A deprecated shim forwarding to `noyalib`,
+  whose normal dependencies include `tokio`, `rayon`, `jsonschema`,
+  `validator`, and `figment`: far too heavy for frontmatter parsing.
+- `serde-saphyr` 1.3.0 — **rejected for now**. Pure Rust and recently released
+  (2026-09-16), but `rust_version` 1.89 exceeds the workspace MSRV 1.85 and
+  its default features pull `figment`/`garde`/`validator`/`miette`.
+- `agentmesh` 4.0.0 (the live AGT SDK line) still depends on `serde_yaml`
+  0.9.34 as a normal dependency, so migrating the SDK would not clear the
+  advisory either.
+
+`crates/do-harness` (skill frontmatter, unconditional) now uses `serde_norway`;
+`serde_yaml` stays as a `guardian-proxy`-optional dependency because the
+retired `agent-governance` 3.2.2 SDK names `serde_yaml::Value` in its
+`execute_with_governance` signature (`policy.rs:189`), which no fork's nominal
+type can satisfy. `cargo tree -i unsafe-libyaml` on default features shows no
+path; `cargo audit` (lockfile-wide) still reports RUSTSEC-2024-0449 via the
+SDK's own transitive edge, so the ignore entries stay until the SDK drops
+`serde_yaml` or the `agt-governance` feature is removed by the
+`chore-agt-promotion` decision — full removal was never achievable by migrating
+the two call sites alone.
+
 ## Executable gates
 
 - `cargo deny check advisories` and `cargo audit --deny warnings` pass **with

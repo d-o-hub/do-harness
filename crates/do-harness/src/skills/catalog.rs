@@ -159,7 +159,7 @@ fn read_skill(
         });
     }
 
-    let parsed: Frontmatter = match serde_yaml::from_str(&block) {
+    let parsed: Frontmatter = match serde_norway::from_str(&block) {
         Ok(parsed) => parsed,
         Err(err) => {
             warnings.push(format!("{rel}: malformed frontmatter: {err}"));
