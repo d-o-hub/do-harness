@@ -322,8 +322,15 @@ fn do_harness_loc_discovers_generic_workspace_sources() {
     std::fs::write(&app_file, big_module(50)).unwrap();
 
     let (code, stdout, stderr) = run(harness(root).arg("loc"));
-    assert_eq!(code, Some(0), "do-harness loc must succeed on generic workspace:\n{stdout}\n{stderr}");
-    assert!(stdout.contains("packages/contracts/src/evidence-framing.ts"), "{stdout}");
+    assert_eq!(
+        code,
+        Some(0),
+        "do-harness loc must succeed on generic workspace:\n{stdout}\n{stderr}"
+    );
+    assert!(
+        stdout.contains("packages/contracts/src/evidence-framing.ts"),
+        "{stdout}"
+    );
     assert!(stdout.contains("apps/web/src/index.tsx"), "{stdout}");
 }
 
@@ -346,14 +353,22 @@ fn do_harness_loc_accepts_root_and_ext_flags() {
         .arg("packages")
         .arg("--ext")
         .arg("ts"));
-    assert_eq!(code, Some(0), "do-harness loc --dir packages --ext ts must succeed:\n{stdout}\n{stderr}");
-    assert!(stdout.contains("packages/contracts/src/evidence-framing.ts"), "{stdout}");
+    assert_eq!(
+        code,
+        Some(0),
+        "do-harness loc --dir packages --ext ts must succeed:\n{stdout}\n{stderr}"
+    );
+    assert!(
+        stdout.contains("packages/contracts/src/evidence-framing.ts"),
+        "{stdout}"
+    );
     assert!(!stdout.contains("apps/web/src/index.tsx"), "{stdout}");
 
-    let (code, stdout, stderr) = run(harness(root)
-        .arg("loc")
-        .arg("--dir")
-        .arg("missing"));
-    assert_eq!(code, Some(2), "missing dir must fail with usage error:\n{stdout}\n{stderr}");
+    let (code, stdout, stderr) = run(harness(root).arg("loc").arg("--dir").arg("missing"));
+    assert_eq!(
+        code,
+        Some(2),
+        "missing dir must fail with usage error:\n{stdout}\n{stderr}"
+    );
     assert!(stderr.contains("--root missing does not exist"), "{stderr}");
 }
