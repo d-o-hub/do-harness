@@ -741,6 +741,8 @@ set edit:completion:arg-completer[do-harness] = {|@words|
         &'do-harness;errors;help;help'= {
         }
         &'do-harness;loc'= {
+            cand --dir 'Scan directory, relative to workspace root (repeatable or comma-separated)'
+            cand --ext 'Scan extension (repeatable or comma-separated, e.g. rs, ts, tsx)'
             cand --format 'Output format'
             cand --root 'Workspace root override (default: walk up from cwd)'
             cand --config 'Explicit path to do-harness.toml'

@@ -520,6 +520,8 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand errors; and __fish
 complete -c do-harness -n "__fish_do_harness_using_subcommand errors; and __fish_seen_subcommand_from help" -f -a "list" -d 'List fail-fast error signatures (prefixed with `sensor:`)'
 complete -c do-harness -n "__fish_do_harness_using_subcommand errors; and __fish_seen_subcommand_from help" -f -a "clear" -d 'Clear fail-fast error signatures (e.g. `sensor:<name>`)'
 complete -c do-harness -n "__fish_do_harness_using_subcommand errors; and __fish_seen_subcommand_from help" -f -a "help" -d 'Print this message or the help of the given subcommand(s)'
+complete -c do-harness -n "__fish_do_harness_using_subcommand loc" -l dir -d 'Scan directory, relative to workspace root (repeatable or comma-separated)' -r
+complete -c do-harness -n "__fish_do_harness_using_subcommand loc" -l ext -d 'Scan extension (repeatable or comma-separated, e.g. rs, ts, tsx)' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand loc" -l format -d 'Output format' -r -f -a "text\t'Human-readable text output'
 json\t'Machine-readable JSON output'"
 complete -c do-harness -n "__fish_do_harness_using_subcommand loc" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"

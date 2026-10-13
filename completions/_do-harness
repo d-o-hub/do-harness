@@ -960,6 +960,8 @@ esac
 ;;
 (loc)
 _arguments "${_arguments_options[@]}" : \
+'*--dir=[Scan directory, relative to workspace root (repeatable or comma-separated)]:DIR:_default' \
+'*--ext=[Scan extension (repeatable or comma-separated, e.g. rs, ts, tsx)]:EXT:_default' \
 '--format=[Output format]:FORMAT:((text\:"Human-readable text output"
 json\:"Machine-readable JSON output"))' \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
@@ -973,7 +975,7 @@ json\:"Machine-readable JSON output"))' \
 '--help[Print help (see more with '\''--help'\'')]' \
 '-V[Print version]' \
 '--version[Print version]' \
-'*::paths -- Files or directories to measure (default\: every `.rs` under src/ and crates/):_files' \
+'*::paths -- Files or directories to measure (default\: scan workspace roots):_files' \
 && ret=0
 ;;
 (split)

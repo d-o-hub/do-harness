@@ -134,31 +134,23 @@ pub fn measure(root: &Path, file: &Path) -> Result<FileLocInfo> {
     Ok(measure_text(display_path(root, file), &text))
 }
 
-/// Recursively collects `.rs` files under `dir`, skipping `target/`.
-pub fn collect_rust_files(dir: &Path, out: &mut Vec<PathBuf>) {
-    let Ok(entries) = std::fs::read_dir(dir) else {
-        return;
-    };
-    for entry in entries.flatten() {
-        let path = entry.path();
-        let Ok(kind) = entry.file_type() else {
-            continue;
-        };
-        if kind.is_dir() {
-            if entry.file_name() == "target" {
-                continue;
-            }
-            collect_rust_files(&path, out);
-        } else if kind.is_file() && path.extension().is_some_and(|ext| ext == "rs") {
-            out.push(path);
-        }
-    }
-}
+/// Directory names pruned during source discovery (matching `check-loc.sh`).
+pub const PRUNE_NAMES: &[&str] = &[
+    "node_modules",
+    "target",
+    "dist",
+    "build",
+    "coverage",
+    "vendor",
+    ".next",
+    "out",
+    ".git",
+];
 
-/// Directories the LOC invariant covers, relative to the workspace root.
+/// Directories the default Rust LOC invariant covers, relative to the workspace root.
 pub const SCOPE_DIRS: [&str; 2] = ["crates", "src"];
 
-/// True when `file` lies inside a directory [`scan`] measures.
+/// True when `file` lies inside a directory [`scan`] default measures.
 ///
 /// Callers that mutate or index Rust sources use this so they accept exactly
 /// the files the sensors can fail on: the workspace layout (`crates/`) and the
@@ -170,33 +162,234 @@ pub fn in_scope(root: &Path, file: &Path) -> bool {
         .any(|dir| file.starts_with(root.join(dir)))
 }
 
-/// Measures every `.rs` file under `<root>/crates` and `<root>/src`.
-///
-/// The scope is the union of what the workspace sensor and the scaffolded
-/// sensor cover: this repository keeps all Rust under `crates/`, while the
-/// `rust` pack `init` scaffolds is a single crate rooted at `src/`. Scanning
-/// both keeps `loc` and whichever `check-loc.sh` is installed in agreement, so
-/// `loc` can never report a file safe that the sensor would fail.
+/// Normalizes comma-separated roots, stripping leading `./` and trailing `/`.
+#[must_use]
+pub fn parse_roots(raw: &[String]) -> Vec<String> {
+    let mut out = Vec::new();
+    for item in raw {
+        for part in item.split(',') {
+            let trimmed = part.trim();
+            if !trimmed.is_empty() {
+                let norm = trimmed.strip_prefix("./").unwrap_or(trimmed);
+                let norm = norm.trim_end_matches('/');
+                if !norm.is_empty() && !out.iter().any(|r| r == norm) {
+                    out.push(norm.to_owned());
+                }
+            }
+        }
+    }
+    out
+}
+
+/// Normalizes comma-separated extensions, stripping leading `.`.
+#[must_use]
+pub fn parse_exts(raw: &[String]) -> Vec<String> {
+    let mut out = Vec::new();
+    for item in raw {
+        for part in item.split(',') {
+            let trimmed = part.trim();
+            if !trimmed.is_empty() {
+                let norm = trimmed.strip_prefix('.').unwrap_or(trimmed);
+                if !norm.is_empty() && !out.iter().any(|e| e == norm) {
+                    out.push(norm.to_owned());
+                }
+            }
+        }
+    }
+    out
+}
+
+/// Extracts `--root` and `--ext` values from `argv` (e.g. `check-loc.sh --root web,src --ext ts,tsx`).
+#[must_use]
+pub fn parse_sensor_argv(argv: &[String]) -> (Vec<String>, Vec<String>) {
+    let mut roots = Vec::new();
+    let mut exts = Vec::new();
+    let mut iter = argv.iter().peekable();
+    while let Some(arg) = iter.next() {
+        if arg == "--root" {
+            if let Some(val) = iter.next() {
+                roots.push(val.clone());
+            }
+        } else if let Some(val) = arg.strip_prefix("--root=") {
+            roots.push(val.to_owned());
+        } else if arg == "--ext" {
+            if let Some(val) = iter.next() {
+                exts.push(val.clone());
+            }
+        } else if let Some(val) = arg.strip_prefix("--ext=") {
+            exts.push(val.to_owned());
+        }
+    }
+    (parse_roots(&roots), parse_exts(&exts))
+}
+
+/// Resolved discovery scope for `loc`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LocScope {
+    pub roots: Vec<String>,
+    pub exts: Vec<String>,
+    pub roots_explicit: bool,
+}
+
+impl LocScope {
+    /// Resolves roots and extensions given CLI overrides, config path, and repository root.
+    #[must_use]
+    pub fn resolve(
+        root: &Path,
+        config_path: Option<&Path>,
+        cli_roots: &[String],
+        cli_exts: &[String],
+    ) -> Self {
+        let parsed_cli_roots = parse_roots(cli_roots);
+        let parsed_cli_exts = parse_exts(cli_exts);
+
+        let (config_language, sensor_roots, sensor_exts) = load_config_info(root, config_path);
+
+        let roots_explicit = !parsed_cli_roots.is_empty() || !sensor_roots.is_empty();
+
+        let roots = if !parsed_cli_roots.is_empty() {
+            parsed_cli_roots
+        } else if !sensor_roots.is_empty() {
+            sensor_roots
+        } else if matches!(
+            config_language.as_deref(),
+            Some("generic" | "node" | "web")
+        ) {
+            vec![
+                "packages".to_owned(),
+                "apps".to_owned(),
+                "src".to_owned(),
+                "crates".to_owned(),
+            ]
+        } else {
+            vec!["src".to_owned(), "crates".to_owned()]
+        };
+
+        let exts = if !parsed_cli_exts.is_empty() {
+            parsed_cli_exts
+        } else if !sensor_exts.is_empty() {
+            sensor_exts
+        } else if matches!(
+            config_language.as_deref(),
+            Some("generic" | "node" | "web")
+        ) {
+            vec![
+                "ts".to_owned(),
+                "tsx".to_owned(),
+                "js".to_owned(),
+                "jsx".to_owned(),
+                "rs".to_owned(),
+            ]
+        } else {
+            vec!["rs".to_owned()]
+        };
+
+        Self {
+            roots,
+            exts,
+            roots_explicit,
+        }
+    }
+}
+
+/// Helper reading language and `loc` sensor argv from `do-harness.toml`.
+fn load_config_info(root: &Path, explicit: Option<&Path>) -> (Option<String>, Vec<String>, Vec<String>) {
+    let path = match explicit {
+        Some(path) => path.to_path_buf(),
+        None => root.join("do-harness.toml"),
+    };
+    let Ok(text) = std::fs::read_to_string(&path) else {
+        return (None, Vec::new(), Vec::new());
+    };
+    let Ok(cfg) = toml::from_str::<crate::config::Config>(&text) else {
+        return (None, Vec::new(), Vec::new());
+    };
+
+    let mut sensor_roots = Vec::new();
+    let mut sensor_exts = Vec::new();
+    for sensor in cfg.effective_sensors() {
+        if sensor.name == "loc" {
+            let (r, e) = parse_sensor_argv(&sensor.argv);
+            sensor_roots.extend(r);
+            sensor_exts.extend(e);
+        }
+    }
+
+    (cfg.language, sensor_roots, sensor_exts)
+}
+
+/// Recursively collects source files under `dir` matching `exts`, skipping `PRUNE_NAMES`.
+pub fn collect_source_files(dir: &Path, exts: &[String], out: &mut Vec<PathBuf>) {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let Ok(kind) = entry.file_type() else {
+            continue;
+        };
+        if kind.is_dir() {
+            if let Some(name) = entry.file_name().to_str() {
+                if PRUNE_NAMES.contains(&name) {
+                    continue;
+                }
+            }
+            collect_source_files(&path, exts, out);
+        } else if kind.is_file() {
+            if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
+                if exts.iter().any(|target| target.eq_ignore_ascii_case(ext)) {
+                    out.push(path);
+                }
+            }
+        }
+    }
+}
+
+/// Recursively collects `.rs` files under `dir`, skipping `target/`.
+#[allow(dead_code)]
+pub fn collect_rust_files(dir: &Path, out: &mut Vec<PathBuf>) {
+    collect_source_files(dir, &["rs".to_string()], out);
+}
+
+/// Measures source files matching `scope` under `<root>`.
 ///
 /// # Errors
 ///
-/// Returns an error when neither directory exists, or a file is unreadable.
-pub fn scan(root: &Path) -> Result<Vec<FileLocInfo>> {
-    let mut files = Vec::new();
-    for dir in SCOPE_DIRS {
-        let base = root.join(dir);
-        if base.is_dir() {
-            collect_rust_files(&base, &mut files);
+/// Returns an error when explicit roots do not exist, when no source files are found,
+/// or when a file cannot be read.
+pub fn scan(root: &Path, scope: &LocScope) -> Result<Vec<FileLocInfo>> {
+    if scope.roots_explicit {
+        for dir in &scope.roots {
+            let base = root.join(dir);
+            if !base.is_dir() {
+                bail!("--root {dir} does not exist under {}", root.display());
+            }
         }
     }
+
+    let mut files = Vec::new();
+    for dir in &scope.roots {
+        let base = root.join(dir);
+        if base.is_dir() {
+            collect_source_files(&base, &scope.exts, &mut files);
+        }
+    }
+
     if files.is_empty() {
+        let roots_str = scope
+            .roots
+            .iter()
+            .map(|r| format!("{}/{r}", root.display()))
+            .collect::<Vec<_>>()
+            .join(" or ");
         bail!(
-            "no Rust sources under {}/crates or {}/src",
-            root.display(),
-            root.display()
+            "no source files matching extension(s) ({}) under {}; pass explicit file/directory paths or use --root / --ext",
+            scope.exts.join(", "),
+            roots_str
         );
     }
     files.sort();
+    files.dedup();
     files.iter().map(|file| measure(root, file)).collect()
 }
 
@@ -205,15 +398,23 @@ pub fn scan(root: &Path) -> Result<Vec<FileLocInfo>> {
 /// # Errors
 ///
 /// Returns an error for a path that does not exist, or a directory holding no
-/// `.rs` file: a query that silently measures nothing is worse than a failure.
-pub fn collect_paths(root: &Path, paths: &[PathBuf]) -> Result<Vec<FileLocInfo>> {
+/// matching source files.
+pub fn collect_paths(
+    root: &Path,
+    paths: &[PathBuf],
+    exts: &[String],
+) -> Result<Vec<FileLocInfo>> {
     let mut files = Vec::new();
     for path in paths {
         if path.is_dir() {
             let mut found = Vec::new();
-            collect_rust_files(path, &mut found);
+            collect_source_files(path, exts, &mut found);
             if found.is_empty() {
-                bail!("no .rs files under {}", path.display());
+                bail!(
+                    "no files matching extension(s) ({}) under {}",
+                    exts.join(", "),
+                    path.display()
+                );
             }
             files.extend(found);
         } else if path.is_file() {
@@ -238,11 +439,20 @@ pub fn collect_paths(root: &Path, paths: &[PathBuf]) -> Result<Vec<FileLocInfo>>
 ///
 /// Returns an error when the scope cannot be read (see [`scan`] and
 /// [`collect_paths`]).
-pub fn run(root: &Path, format: Format, warn_only: bool, paths: &[PathBuf]) -> Result<()> {
+pub fn run(
+    root: &Path,
+    config_path: Option<&Path>,
+    format: Format,
+    warn_only: bool,
+    cli_roots: &[String],
+    cli_exts: &[String],
+    paths: &[PathBuf],
+) -> Result<()> {
+    let scope = LocScope::resolve(root, config_path, cli_roots, cli_exts);
     let mut infos = if paths.is_empty() {
-        scan(root)?
+        scan(root, &scope)?
     } else {
-        collect_paths(root, paths)?
+        collect_paths(root, paths, &scope.exts)?
     };
     let scanned = infos.len();
     if warn_only {
@@ -345,7 +555,8 @@ mod tests {
         std::fs::write(root.join("src/outside.rs"), "fn c() {}\n").unwrap();
         std::fs::write(root.join("crates/app/README.md"), "noise\n").unwrap();
 
-        let infos = scan(root).unwrap();
+        let scope = LocScope::resolve(root, None, &[], &[]);
+        let infos = scan(root, &scope).unwrap();
         let paths: Vec<&str> = infos.iter().map(|info| info.path.as_str()).collect();
         assert_eq!(paths, vec!["crates/app/src/lib.rs", "src/outside.rs"]);
     }
@@ -359,16 +570,18 @@ mod tests {
         std::fs::create_dir_all(root.join("src")).unwrap();
         std::fs::write(root.join("src/main.rs"), "fn main() {}\n").unwrap();
 
-        let infos = scan(root).unwrap();
+        let scope = LocScope::resolve(root, None, &[], &[]);
+        let infos = scan(root, &scope).unwrap();
         assert_eq!(infos.len(), 1);
         assert_eq!(infos[0].path, "src/main.rs");
     }
 
     #[test]
-    fn scan_fails_when_no_rust_sources_exist() {
+    fn scan_fails_when_no_sources_exist() {
         let dir = tempfile::tempdir().unwrap();
-        let err = scan(dir.path()).unwrap_err().to_string();
-        assert!(err.contains("no Rust sources"), "{err}");
+        let scope = LocScope::resolve(dir.path(), None, &[], &[]);
+        let err = scan(dir.path(), &scope).unwrap_err().to_string();
+        assert!(err.contains("no source files matching"), "{err}");
     }
 
     #[test]
@@ -380,19 +593,97 @@ mod tests {
         std::fs::write(root.join("crates/app/other.rs"), "fn a() {}\n").unwrap();
         std::fs::write(root.join("crates/app/notes.txt"), "noise\n").unwrap();
 
-        let infos = collect_paths(root, &[root.join("crates/app")]).unwrap();
+        let scope = LocScope::resolve(root, None, &[], &[]);
+        let infos = collect_paths(root, &[root.join("crates/app")], &scope.exts).unwrap();
         assert_eq!(
             infos.iter().map(|i| i.path.as_str()).collect::<Vec<_>>(),
             vec!["crates/app/lib.rs", "crates/app/other.rs"],
-            "directories expand to .rs files only"
+            "directories expand to matching files only"
         );
         assert_eq!(infos[0].test_lines, Some(4));
 
         assert!(
-            collect_paths(root, &[root.join("crates/missing")])
+            collect_paths(root, &[root.join("crates/missing")], &scope.exts)
                 .unwrap_err()
                 .to_string()
                 .contains("no such file or directory")
         );
+    }
+
+    #[test]
+    fn scan_generic_workspace_discovers_packages_and_apps() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        std::fs::create_dir_all(root.join("packages/contracts/src")).unwrap();
+        std::fs::create_dir_all(root.join("apps/web/src")).unwrap();
+        std::fs::create_dir_all(root.join("packages/contracts/node_modules")).unwrap();
+        std::fs::write(root.join("do-harness.toml"), "language = \"generic\"\n").unwrap();
+        std::fs::write(
+            root.join("packages/contracts/src/evidence-framing.ts"),
+            "export const x = 1;\n",
+        )
+        .unwrap();
+        std::fs::write(
+            root.join("apps/web/src/index.tsx"),
+            "export const App = () => null;\n",
+        )
+        .unwrap();
+        std::fs::write(
+            root.join("packages/contracts/node_modules/noise.ts"),
+            "export const noise = 2;\n",
+        )
+        .unwrap();
+
+        let scope = LocScope::resolve(root, None, &[], &[]);
+        assert_eq!(scope.roots, vec!["packages", "apps", "src", "crates"]);
+        assert_eq!(scope.exts, vec!["ts", "tsx", "js", "jsx", "rs"]);
+
+        let infos = scan(root, &scope).unwrap();
+        let paths: Vec<&str> = infos.iter().map(|info| info.path.as_str()).collect();
+        assert_eq!(
+            paths,
+            vec![
+                "apps/web/src/index.tsx",
+                "packages/contracts/src/evidence-framing.ts"
+            ]
+        );
+    }
+
+    #[test]
+    fn cli_root_and_ext_overrides_win() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        std::fs::create_dir_all(root.join("web/src")).unwrap();
+        std::fs::write(root.join("web/src/app.ts"), "const a = 1;\n").unwrap();
+        std::fs::write(root.join("web/src/ignored.rs"), "fn f() {}\n").unwrap();
+
+        let scope = LocScope::resolve(
+            root,
+            None,
+            &["./web/src/".to_string()],
+            &[".ts".to_string()],
+        );
+        assert_eq!(scope.roots, vec!["web/src"]);
+        assert_eq!(scope.exts, vec!["ts"]);
+        assert!(scope.roots_explicit);
+
+        let infos = scan(root, &scope).unwrap();
+        assert_eq!(infos.len(), 1);
+        assert_eq!(infos[0].path, "web/src/app.ts");
+    }
+
+    #[test]
+    fn parses_sensor_argv_roots_and_exts() {
+        let argv = vec![
+            "bash".to_owned(),
+            "scripts/check-loc.sh".to_owned(),
+            "--root".to_owned(),
+            "web,src,crates".to_owned(),
+            "--ext".to_owned(),
+            "rs,ts,tsx".to_owned(),
+        ];
+        let (roots, exts) = parse_sensor_argv(&argv);
+        assert_eq!(roots, vec!["web", "src", "crates"]);
+        assert_eq!(exts, vec!["rs", "ts", "tsx"]);
     }
 }
