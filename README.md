@@ -189,11 +189,12 @@ export PATH="$HOME/.local/bin:$PATH"
 | `status` | Report evidence freshness (`green\|red\|stale\|missing`) for `--set SET` without running sensors |
 | `init-db` | Apply migrations to `.do-harness/agent_state.db` |
 | `seed` | Upsert `plans/invariants.json` into the DB |
-| `task list [--format text\|json]` / `task export` | Read task state from the local database; export writes `plans/tasks.json` |
+| `task list [--format text\|json]` / `task show <ID>` / `task export` / `task import [--check]` | Read task state from the local database; export writes `plans/tasks.json`, import validates the snapshot against the database |
 | `task add <title> [--method NAME] [--parent ID] [--precondition TEXT]` | Add a pending task to the workflow runtime |
 | `task advance <ID>` | Advance the subtask pointer |
 | `task done <ID>` | Mark a task done once all sensor-gated subtasks have passed |
 | `task fail <ID>` | Mark a task failed |
+| `task remove <ID>` | Remove an orphan task row with no workflow events (refused when history exists; use `task fail` instead) |
 | `errors list [--task ID] [--format text\|json]` / `errors clear [--sensor NAME] [--task ID]` | Inspect and clear fail-fast error signatures |
 | `trace add --session S [--task ID] [--command C] [--error-diff D] [--resolution-steps R]` / `trace list --session S [--format text\|json]` | Record and read execution traces per session |
 | `distill --skill NAME --pattern P [--description D] [--from-trace ID] [--to-fixture]` | Distill a resolved trace into a skill (refuses without resolution steps); `--to-fixture` raises the skill's pass-rate bar |
@@ -201,7 +202,7 @@ export PATH="$HOME/.local/bin:$PATH"
 | `eval [--skill NAME] [--bless] [--agent-cmd CMD]` | Validate skills via skill-creator's quick_validate.py and persist skill_evals; `--bless` re-baselines graders and raises the pass-rate bar after a fully green run; `--agent-cmd` runs an external agent per case for true Skill Lift |
 | `metrics [--format text\|json]` | Report sensor stats, strike counts, and eval pass-rate history |
 | `metrics pr --repo OWNER/NAME [--since 30d\|YYYY-MM-DD] [--limit N] [--recompute]` | Measure the PR loop: time-to-green, pushes per green, waiver comments by class, actionable vs informational comments, cancelled runs, re-runs (read-only; `gh`-backed with a local snapshot cache) |
-| `dora [--days N] [--format text\|json] [--record] [--source git\|gh] [--now UNIX]` | Derive DORA metrics (deployment frequency, lead time, change failure rate, time to restore) from git history plus the pinned `plans/dora.json` policy; every number carries its derivation manifest |
+| `dora [--days N] [--format text\|json] [--record] [--source git\|gh] [--now UNIX]` | Derive DORA metrics (deployment frequency, lead time, change failure rate, deployment rework rate, time to restore) from git history plus the pinned `plans/dora.json` policy; every number carries its derivation manifest |
 | `compliance [--format text\|json]` | Print compliance mapping to OWASP Agentic Top 10, NIST AI RMF, and EU AI Act |
 | `init [--language rust\|generic\|web\|node] [--force]` | Scaffold a harness workspace in the current directory |
 | `hook install [--force]` / `hook uninstall` / `hook status` / `hook diff` | Manage git hooks (`.git/hooks/pre-commit`, `commit-msg`, `pre-push`) |
@@ -222,7 +223,7 @@ export PATH="$HOME/.local/bin:$PATH"
 | `completions <bash\|zsh\|fish\|powershell\|elvish>` | Generate shell completions |
 | `man <DIR>` | Generate man pages into a directory |
 
-Global flags: `--root <path>`, `--config <path>`.
+Global flags: `--root <path>`, `--config <path>`, `-q/--quiet`, `--output <FILE>`, `--dry-run` (faithful preview for every mutating `task` action).
 
 ## Exit codes
 
