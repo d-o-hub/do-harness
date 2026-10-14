@@ -132,6 +132,17 @@ The prior three runs (2026-09-12/15/16) reached the same verdict through a
 retired crate name, so they agreed with the truth by coincidence rather than by
 measurement. The verdict is unchanged; the instrument now actually measures it.
 
+### GA watch run — 2026-10-14
+
+`bash scripts/check-agt-ga.sh` (network re-check, exit 0):
+
+- `source: crate=https://crates.io/api/v1/crates/agentmesh`
+- `source: legacy=https://crates.io/api/v1/crates/agent-governance`
+- crate: `name=agentmesh version=4.0.0 description=Public Preview — Rust SDK for the Agent Governance Toolkit (policy, trust, audit, identity)`
+- legacy: `name=agent-governance version=3.2.2` (retired name, evidence only)
+- release: `tag=v4.1.0 prerelease=false`
+- `VERDICT=NOT_GA` — criterion (a) remains unsatisfied; no promotion review is opened.
+
 ### GA watch run — 2026-09-12
 
 Manual `bash scripts/check-agt-ga.sh`:
@@ -178,7 +189,7 @@ records that the 2026-09-15 decision was independently reproduced.
 
 ## Next action
 
-The `chore-agt-promotion` review is complete as a **hold**, re-confirmed on 2026-09-16 and instrument-corrected on 2026-09-19. The MCP/tool-call mediation criterion (b) is satisfied behind `mcp-surface`, but AGT criterion (a) remains unsatisfied: `bash scripts/check-agt-ga.sh` reports `VERDICT=NOT_GA` for the **live** `agentmesh` crate, which still describes itself as Public Preview (upstream `CHANGELOG.md`: "All releases are currently **public preview releases**"). Keep `agt-governance` off by default and rerun this review when the GA watch reports `VERDICT=GA`; do not remove the feature flag or alter production Rust until both criteria hold.
+The `chore-agt-promotion` review is complete as a **hold**, re-confirmed on 2026-09-16, instrument-corrected on 2026-09-19, and re-checked on 2026-10-14 (`VERDICT=NOT_GA`, live `agentmesh` 4.0.0 still Public Preview). The MCP/tool-call mediation criterion (b) is satisfied behind `mcp-surface`, but AGT criterion (a) remains unsatisfied: `bash scripts/check-agt-ga.sh` reports `VERDICT=NOT_GA` for the **live** `agentmesh` crate, which still describes itself as Public Preview (upstream `CHANGELOG.md`: "All releases are currently **public preview releases**"). Keep `agt-governance` off by default and rerun this review when the GA watch reports `VERDICT=GA`; do not remove the feature flag or alter production Rust until both criteria hold.
 
 When the watch does report `GA`, the promotion work is larger than removing a flag: the pinned dependency is the **retired** `agent-governance` 3.2.2 and the live crate is `agentmesh` 4.x, whose API moved `serde_yaml::Value` to `agentmesh::policy_data::Value` (upstream `YAML-MIGRATION.md`). Promoting therefore means migrating the adapter to `agentmesh` and re-running `cargo deny check` + `cargo audit`, which is also what retires the `RUSTSEC-2026-0097` ignore in `scripts/check-audit.sh`.
 

@@ -46,6 +46,17 @@ signals a first-class, runtime-neutral completion contract.
 - Central contract: `green -> edit -> stale -> verify -> green`, proven with
   the real binary (Rust `status.rs` and JS `e2e.test.mjs`).
 
+## Follow-up
+
+- DORA fifth metric (2026-10-14, #309): `deployment rework rate` derived per
+  deploy range with `max_rework_rate` policy (migration `0022`,
+  `plans/dora.json` plus `plans/baselines.json` 2→3 by reviewed file edit
+  since bless only lowers).
+  Landed outside the original 8 slices; the `dora` sensor stays warn/report-only.
+- Skill-eval health as of 2026-10-14: `do-harness eval --strict-fixtures` 13/13
+  skills green, all pass_rate 1.00; `overlap` WARN pairs unchanged and recorded
+  in `plans/invariants.json`; `learn --draft` reports no sensor at ≥3 fires.
+
 ## Non-goals
 
 - No DeepSeek-specific logic in the Rust core.

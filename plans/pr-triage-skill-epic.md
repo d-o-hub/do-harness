@@ -339,6 +339,16 @@ Reopening needs a router whose input is **strictly smaller** than the payload it
 replaces while keeping enough context to stay safe. Phase 7 showed those are the
 same bytes. A different model does not change that.
 
+## Post-epic distillations (2026-09-20 → 2026-10-14)
+
+Phases 1–8 are closed; the skill keeps absorbing sweep lessons without new
+phases: PR #298 (paginate review threads, retain unresolved outdated concerns),
+PR #299 (merge-revert and input-identity lessons), PR #301 (dry-run faithful preview),
+PR #302 (preview-fidelity and stale-binary lessons), PR #303/#304 (grounded skill
+citations). Evals as of 2026-10-14: `do-harness eval --skill pr-triage`
+114/114, pass_rate 1.00, bar 0.95. Next: keep distilling per sweep; open a new
+phase only for a capability change (new forge, new command).
+
 ## Task tracking note
 
 `plans/methods.json` only catalogs Rust-sensor methods (`vertical-event-slice`,

@@ -23,9 +23,19 @@ while the migration lands:
 
 ## Next action
 
-Replace `serde_yaml` 0.9 with a maintained YAML crate in
-`[workspace.dependencies]`, migrate the two call sites, then delete both ignore
-entries and the invariants decision in the same PR.
+Partially done by #308 (2026-10-13): `crates/do-harness` skill frontmatter
+parsing now uses `serde_norway` 0.9.42 (one-line call-site change; `cargo tree
+-i unsafe-libyaml` on default features shows no path). Remaining: `serde_yaml`
+stays as a `guardian-proxy`-optional dependency because the retired
+`agent-governance` 3.2.2 SDK names `serde_yaml::Value` in its
+`execute_with_governance` signature, so the `deny.toml` + `scripts/check-audit.sh`
+`RUSTSEC-2024-0449` ignores stay until the SDK drops `serde_yaml` or the
+`chore-agt-promotion` decision removes the feature. Delete both ignore entries
+and the invariants decision in the same PR that clears the last edge.
+
+Original plan (kept for the record): replace `serde_yaml` 0.9 with a maintained
+YAML crate in `[workspace.dependencies]`, migrate the two call sites, then delete
+both ignore entries and the invariants decision in the same PR.
 
 Candidates checked against crates.io on 2026-10-12 (name, max stable version,
 last publish):
