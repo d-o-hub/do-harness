@@ -68,6 +68,12 @@ signals a first-class, runtime-neutral completion contract.
   `node` (60MB victim) mid-push while the heavier no-`--set` hook ran as the
   hog; host fix chosen: swap 4G→12G plus earlyoom; agent-side: wrap heavy runs
   in `systemd-run --user` memory caps.
+- Root cause (2026-10-14): the coverage OOM is one test —
+  `concurrency::concurrent_verify_record_and_advance_keep_chain_intact` passes
+  in ~3s normally but balloons past 11GB anon under llvm-cov (timing-sensitive
+  retry storm under instrumentation slowdown), killing every pre-push hook.
+  lcov.info stale since 10-09. Fix pending approval: bound the test when
+  `LLVM_PROFILE_FILE` is set, or exclude it from the coverage run.
 
 ## Non-goals
 
