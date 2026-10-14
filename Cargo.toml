@@ -30,6 +30,16 @@ sha2 = "0.10"
 toml = "0.9"
 tempfile = "3"
 serde_yaml = "0.9"
+# API-compatible fork of serde_yaml 0.9 (same from_str/Value API). The fork
+# links unsafe-libyaml-norway (a distinct crate, no RUSTSEC-2024-0449) instead
+# of the archived unsafe-libyaml, so the unconditional frontmatter path in
+# crates/do-harness stays on a maintained YAML stack. serde_yaml itself stays
+# (optional, guardian-proxy only) because the retired agent-governance 3.2.2
+# SDK names serde_yaml::Value in its execute_with_governance signature — and
+# the live agentmesh 4.x line still depends on serde_yaml 0.9 too — so the
+# SDK-typed call site cannot migrate until the SDK does. See
+# plans/serde-yaml-migration.md.
+serde_norway = "0.9"
 axum = { version = "0.7" }
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 tower = { version = "0.5" }

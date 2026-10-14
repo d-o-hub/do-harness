@@ -279,6 +279,18 @@ Managed hooks carry a marker identifying them as do-harness-owned; re-running `h
 
 Alternative for users of the pre-commit framework: this repo ships `.pre-commit-config.yaml` with a `local` hook (`language: system`) whose entry is `./target/release/do-harness verify --fail-fast --only fmt --only loc`.
 
+## Skills
+
+Skills (`.agents/skills/`) are the harness's feedforward guides — markdown
+plus executable evals that agents load before coding, complementing the
+feedback sensors that check the result. See
+[docs/skills.md](https://github.com/d-o-hub/do-harness/blob/main/docs/skills.md)
+for the catalog, the progressive-disclosure loading contract (`skills
+suggest` → inspect metadata → select → read one body), the authoring loop
+(`skill-creator`: scaffold → evals → `eval --strict-fixtures` → `--bless`),
+and the one-way sync rule (templates mirror `.agents/skills/`; edit the
+canonical copy).
+
 ## CI
 
 GitHub Actions: see `.github/workflows/verify.yml` — lints shell sensors, builds `do-harness`, checks the adjacent `guardian-proxy` crate with the optional features off and on (`cargo check -p guardian-proxy` / `--features agt-governance` / `--features mcp-surface`) and tests it (`cargo test -p guardian-proxy` plus both feature builds), runs `verify --set verification --format json --strict` and `status --set verification`, dogfoods `init && verify` on fresh rust/generic workspaces, and runs `do-harness eval`.

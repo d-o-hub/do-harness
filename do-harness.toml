@@ -6,8 +6,8 @@ pre-push = []
 
 [signal-sets]
 feedback = ["fmt", "check", "clippy"]
-verification = ["fmt", "check", "clippy", "deps", "audit", "test", "doctest", "loc", "skills", "shell", "markdownlint", "yamllint", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "commitlint"]
-release = ["fmt", "check", "clippy", "deps", "audit", "test", "doctest", "coverage", "loc", "skills", "shell", "markdownlint", "yamllint", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "commitlint"]
+verification = ["fmt", "check", "clippy", "deps", "audit", "test", "doctest", "loc", "skills", "skills-docs", "shell", "markdownlint", "yamllint", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "commitlint"]
+release = ["fmt", "check", "clippy", "deps", "audit", "test", "doctest", "coverage", "loc", "skills", "skills-docs", "shell", "markdownlint", "yamllint", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "commitlint"]
 # DORA gets its own set so its evidence is addressable (`status --set metrics`)
 # without joining the gating sets. A no-`--set` status check compares against
 # every configured sensor, so a dora-only run's artifact would report
@@ -56,6 +56,16 @@ when-changed = ["**/*.rs"]
 name = "skills"
 argv = ["bash", "scripts/check-skills-sync.sh"]
 when-changed = [".agents/skills/**", "crates/do-harness/templates/skills/**", "scripts/check-skills-sync.sh"]
+
+[[sensors]]
+# Drift gate between the skill catalog and its docs: docs/skills.md must name
+# exactly the skills under .agents/skills/ (frontmatter names only, never
+# skill bodies), every repo-relative path the docs name must exist, and the
+# README Skills section must point at the guide. Run with --fix locally after
+# adding/renaming/removing a skill; CI runs the plain check.
+name = "skills-docs"
+argv = ["bash", "scripts/check-skills-docs.sh"]
+when-changed = [".agents/skills/**", "docs/skills.md", "README.md", "scripts/check-skills-docs.sh"]
 
 [[sensors]]
 name = "deps"
