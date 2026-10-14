@@ -203,7 +203,7 @@ export PATH="$HOME/.local/bin:$PATH"
 | `metrics [--format text\|json]` | Report sensor stats, strike counts, and eval pass-rate history |
 | `metrics pr --repo OWNER/NAME [--since 30d\|YYYY-MM-DD] [--limit N] [--recompute]` | Measure the PR loop: time-to-green, pushes per green, waiver comments by class, actionable vs informational comments, cancelled runs, re-runs (read-only; `gh`-backed with a local snapshot cache) |
 | `dora [--days N] [--format text\|json] [--record] [--source git\|gh] [--now UNIX]` | Derive DORA metrics (deployment frequency, lead time, change failure rate, deployment rework rate, time to restore) from git history plus the pinned `plans/dora.json` policy; every number carries its derivation manifest |
-| `compliance [--format text\|json]` | Print compliance mapping to OWASP Agentic Top 10, NIST AI RMF, and EU AI Act |
+| `compliance [--framework owasp\|nist\|eu\|soc] [--format text\|json]` | Print compliance mapping to OWASP Agentic Top 10, NIST AI RMF, EU AI Act, and SOC 2 |
 | `init [--language rust\|generic\|web\|node] [--force]` | Scaffold a harness workspace in the current directory |
 | `hook install [--force]` / `hook uninstall` / `hook status` / `hook diff` | Manage git hooks (`.git/hooks/pre-commit`, `commit-msg`, `pre-push`) |
 | `doctor` | Run diagnostic checks on binary resolution, git hook health, and state-database migration skew (fails when the database outruns the binary) |
@@ -323,7 +323,7 @@ verify:
 
 `do-harness` enforces deterministic, computational controls over the agent development loop (build-time verification sensors, workflow gates, tamper-evident logs, and machine-readable evidence artifacts). It is designed to satisfy dev-loop assurance requirements in regulated environments without over-claiming runtime policy or proxy capabilities.
 
-See [docs/compliance.md](https://github.com/d-o-hub/do-harness/blob/main/docs/compliance.md) for full mappings against the **OWASP Agentic Top 10 (2026)**, **NIST AI RMF 1.0**, and the **EU AI Act**.
+See [docs/compliance.md](https://github.com/d-o-hub/do-harness/blob/main/docs/compliance.md) for full mappings against the **OWASP Agentic Top 10 (2026)**, **NIST AI RMF 1.0**, the **EU AI Act**, and **SOC 2**.
 
 ## Configuration
 
