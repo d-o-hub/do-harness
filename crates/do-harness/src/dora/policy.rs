@@ -60,6 +60,8 @@ pub struct DoraPolicy {
     pub max_lead_p90_days: i64,
     /// Ceiling for the change failure rate, as a fraction in `0.0..=1.0`.
     pub max_change_failure_rate: f64,
+    /// Ceiling for the deployment rework rate, as a fraction in `0.0..=1.0`.
+    pub max_rework_rate: f64,
     /// Ceiling for the median time to restore, in hours.
     pub max_mttr_hours: i64,
     /// Maximum incidents left unrestored before the window is a breach.
@@ -111,6 +113,12 @@ impl DoraPolicy {
                 self.max_change_failure_rate
             );
         }
+        if !(0.0..=1.0).contains(&self.max_rework_rate) {
+            bail!(
+                "max_rework_rate must be a fraction in 0.0..=1.0, got {}",
+                self.max_rework_rate
+            );
+        }
         // Every remaining threshold is a floor or a ceiling that is only
         // meaningful as a positive quantity. A negative value is not merely
         // odd, it inverts the rule: `mttr_unrestored > max_unrestored` with
@@ -148,6 +156,14 @@ impl DoraPolicy {
     #[allow(clippy::cast_possible_truncation)]
     pub fn max_change_failure_rate_bp(&self) -> i64 {
         (self.max_change_failure_rate * 10_000.0).round() as i64
+    }
+
+    /// Rework rate ceiling in basis points, rounded once (same comparison
+    /// discipline as the change failure rate ceiling).
+    #[must_use]
+    #[allow(clippy::cast_possible_truncation)]
+    pub fn max_rework_rate_bp(&self) -> i64 {
+        (self.max_rework_rate * 10_000.0).round() as i64
     }
 }
 
@@ -224,7 +240,7 @@ const SECONDS_PER_HOUR: i64 = 3_600;
 
 /// Evaluates every threshold rule against a snapshot.
 ///
-/// The four rules are deliberately non-overlapping: zero incidents report
+/// The five rules are deliberately non-overlapping: zero incidents report
 /// nothing, an only-unrestored window reports `unrestored_deploys` alone, and
 /// a window with at least one recovery reports `mttr`. Without the
 /// `mttr_restored > 0` precondition an unrestored incident would be reported
@@ -273,6 +289,20 @@ pub fn breaches(snapshot: &DoraSnapshot, policy: &DoraPolicy) -> Vec<Breach> {
             observed: format!("{}/{}", snapshot.deploys_failed, snapshot.deploy_count),
             direction: Direction::Ceiling,
             limit: format!("{:.3}", policy.max_change_failure_rate),
+        });
+    }
+
+    // Rework is measured over the deploy's own lead range, so it is
+    // independent of failure attribution: a deploy can fail without rework
+    // and rework without failing.
+    if snapshot.deploy_count > 0
+        && snapshot.deploys_rework * 10_000 > policy.max_rework_rate_bp() * snapshot.deploy_count
+    {
+        found.push(Breach {
+            name: "rework_rate".to_string(),
+            observed: format!("{}/{}", snapshot.deploys_rework, snapshot.deploy_count),
+            direction: Direction::Ceiling,
+            limit: format!("{:.3}", policy.max_rework_rate),
         });
     }
 

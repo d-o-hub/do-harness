@@ -1,4 +1,4 @@
-//! Deterministic git derivation of the four DORA metrics.
+//! Deterministic git derivation of the five DORA metrics.
 //!
 //! Every call goes through [`crate::changes::git_command`], which clears the
 //! hook-inherited `GIT_DIR` family so a hook-invoked run cannot silently

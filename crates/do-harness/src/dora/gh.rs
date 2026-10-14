@@ -1,6 +1,6 @@
 //! Opt-in `GitHub` enrichment for `do-harness dora --source gh`.
 //!
-//! This module is additive only. The four hermetic metrics are always
+//! This module is additive only. The five hermetic metrics are always
 //! git-derived; the network-sourced numbers land in a separate `github`
 //! object so the two can never be silently conflated. It exists because git
 //! cannot supply two things: whether a deploy tag actually shipped (a release

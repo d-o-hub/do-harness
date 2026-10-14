@@ -35,6 +35,7 @@ fn deployed_fixture_derives_exact_metrics_and_breaches() {
     assert_eq!(snapshot["lead_p50_seconds"], serde_json::json!(0));
     assert_eq!(snapshot["lead_p90_seconds"], serde_json::json!(100));
     assert_eq!(snapshot["deploys_failed"], serde_json::json!(1));
+    assert_eq!(snapshot["deploys_rework"], serde_json::json!(0));
     assert_eq!(snapshot["mttr_restored"], serde_json::json!(0));
     assert_eq!(snapshot["mttr_unrestored"], serde_json::json!(1));
     assert_eq!(snapshot["mttr_seconds"], Value::Null);
@@ -49,7 +50,9 @@ fn deployed_fixture_derives_exact_metrics_and_breaches() {
     assert_eq!(ranges.len(), 2);
     assert_eq!(ranges[0]["tag"], serde_json::json!("v0.1.0"));
     assert_eq!(ranges[0]["range"], serde_json::json!("v0.1.0"));
+    assert_eq!(ranges[0]["rework"], serde_json::json!(false));
     assert_eq!(ranges[1]["range"], serde_json::json!("v0.1.0..v0.1.1"));
+    assert_eq!(ranges[1]["rework"], serde_json::json!(false));
     assert_eq!(
         ranges[1]["failure_range"],
         serde_json::json!("v0.1.1..HEAD")
@@ -128,6 +131,7 @@ fn tagless_history_reports_missing_measurements_as_unmeasured() {
     assert_eq!(code, Some(1));
     assert!(stdout.contains("  lead time          p50 -  p90 -  (n=0)\n"));
     assert!(stdout.contains("  change failure rate -\n"));
+    assert!(stdout.contains("  rework rate        -\n"));
     assert!(stdout.contains("  time to restore    -  (0 restored, 0 unrestored)\n"));
 }
 
@@ -190,8 +194,13 @@ fn a_tag_on_the_revert_commit_restores_the_incident() {
     assert_eq!(incidents.len(), 1);
     assert_eq!(incidents[0]["restored_by"], serde_json::json!("v0.1.2"));
     assert_eq!(incidents[0]["restore_ts"], serde_json::json!(T0 + 300));
-    // Restored, so the restore-failure rule must not fire.
-    assert_eq!(breach_names(&snapshot), vec!["change_failure_rate"]);
+    // Restored, so the restore-failure rule must not fire. The revert ships
+    // inside v0.1.2's own range, so the rework rule does: rework and failure
+    // attribution are independent by construction.
+    assert_eq!(
+        breach_names(&snapshot),
+        vec!["change_failure_rate", "rework_rate"]
+    );
 }
 
 /// Deploys are ordered by deploy time, not by when the tag object was written.
@@ -358,6 +367,11 @@ fn multiple_reverts_are_separate_incidents() {
         serde_json::json!(1),
         "the deploy is counted once even with two reverts"
     );
+    assert_eq!(
+        snapshot["deploys_rework"],
+        serde_json::json!(0),
+        "reverts after the deploy are failure, not rework"
+    );
     assert_eq!(snapshot["mttr_unrestored"], serde_json::json!(2));
     assert_eq!(
         snapshot["derivation"]["incidents"]
@@ -391,4 +405,32 @@ fn floor_rules_report_the_less_than_comparator() {
     );
     // Ceilings keep `>`.
     assert!(stderr.contains("breach: lead_p90 - > "), "stderr: {stderr}");
+}
+
+/// A revert shipped inside a deploy's own range is rework, not failure.
+///
+/// Failure attribution scans the range *after* the deploy (`T..next`); the
+/// rework rule scans the deploy's own range (`prev..T`) with the same
+/// predicate. Here the predecessor predates the window, so no in-window
+/// failure range contains the revert: the deploy counts as rework while
+/// failure attribution stays silent, proving the two rules are independent.
+#[test]
+fn a_revert_inside_the_deploy_range_is_rework_not_failure() {
+    let (_dir, root) = fixture_repo();
+    commit_at(&root, T0 - 3_000_000, "chore: seed");
+    git(&root, &["tag", "v0.1.0"]);
+    commit_at(&root, T0 + 100, "revert(fixture): drop the bad idea");
+    commit_at(&root, T0 + 200, "feat: a");
+    git(&root, &["tag", "v0.1.1"]);
+
+    let (_stdout, stderr, snapshot) = dora_json(&root, T0 + 86_400, 1);
+    assert_eq!(snapshot["deploy_count"], serde_json::json!(1));
+    assert_eq!(snapshot["deploys_failed"], serde_json::json!(0));
+    assert_eq!(snapshot["deploys_rework"], serde_json::json!(1));
+    assert_eq!(breach_names(&snapshot), vec!["rework_rate"]);
+    let ranges = snapshot["derivation"]["ranges"].as_array().unwrap();
+    assert_eq!(ranges.len(), 1);
+    assert_eq!(ranges[0]["tag"], serde_json::json!("v0.1.1"));
+    assert_eq!(ranges[0]["rework"], serde_json::json!(true));
+    assert!(stderr.contains("FINDINGS: 1"), "stderr: {stderr}");
 }

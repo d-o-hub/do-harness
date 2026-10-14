@@ -16,6 +16,7 @@ fn policy() -> DoraPolicy {
           "min_deploys": 1,
           "max_lead_p90_days": 30,
           "max_change_failure_rate": 0.15,
+          "max_rework_rate": 0.15,
           "max_mttr_hours": 24,
           "max_unrestored": 0
         }"#,
@@ -29,6 +30,7 @@ fn snapshot() -> DoraSnapshot {
           "window_days": 30, "window_start": 0, "window_end": 0,
           "source": "git", "source_rev": "deadbeef",
           "deploy_count": 2, "deploys_failed": 1, "deploy_tags": [],
+          "deploys_rework": 0,
           "lead_samples": 165, "lead_p50_seconds": 865179,
           "lead_p90_seconds": 2335088, "mttr_seconds": null,
           "mttr_restored": 0, "mttr_unrestored": 1, "breaches": [],
@@ -48,6 +50,7 @@ fn snapshot() -> DoraSnapshot {
 #[test]
 fn rate_ceiling_rounds_to_basis_points() {
     assert_eq!(policy().max_change_failure_rate_bp(), 1500);
+    assert_eq!(policy().max_rework_rate_bp(), 1500);
 }
 
 #[test]
@@ -76,6 +79,46 @@ fn unrestored_incidents_report_once_and_not_as_mttr() {
         .map(|b| b.name)
         .collect();
     assert_eq!(names, vec!["change_failure_rate", "unrestored_deploys"]);
+}
+
+#[test]
+fn rework_rate_breach_is_exact_integer_cross_multiplication() {
+    // 1/7 is below a 0.15 ceiling; 1/6 is above it, independent of failure
+    // attribution (this snapshot fails nothing).
+    let mut snap = snapshot();
+    snap.deploy_count = 7;
+    snap.deploys_failed = 0;
+    snap.deploys_rework = 1;
+    snap.lead_p90_seconds = Some(0);
+    snap.mttr_unrestored = 0;
+    assert_eq!(breaches(&snap, &policy()).len(), 0);
+    snap.deploy_count = 6;
+    assert_eq!(
+        breaches(&snap, &policy())
+            .iter()
+            .map(|b| b.name.as_str())
+            .collect::<Vec<_>>(),
+        vec!["rework_rate"]
+    );
+}
+
+#[test]
+fn rework_without_failure_reports_only_rework() {
+    // A rework deploy that nothing after it failed: failure attribution
+    // stays silent while the rework rule fires.
+    let mut snap = snapshot();
+    snap.deploy_count = 2;
+    snap.deploys_failed = 0;
+    snap.deploys_rework = 1;
+    snap.lead_p90_seconds = Some(0);
+    snap.mttr_unrestored = 0;
+    assert_eq!(
+        breaches(&snap, &policy())
+            .iter()
+            .map(|b| b.name.as_str())
+            .collect::<Vec<_>>(),
+        vec!["rework_rate"]
+    );
 }
 
 #[test]
