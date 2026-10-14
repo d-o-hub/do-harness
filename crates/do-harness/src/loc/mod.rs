@@ -19,6 +19,11 @@ use serde::Serialize;
 
 use crate::report::Format;
 
+mod scope;
+
+#[allow(unused_imports)]
+pub use scope::{LocScope, PRUNE_NAMES, parse_exts, parse_roots, parse_sensor_argv};
+
 /// Hard per-file ceiling, matching `MAX` in `scripts/check-loc.sh`.
 pub const MAX_LINES: usize = 500;
 
@@ -134,31 +139,10 @@ pub fn measure(root: &Path, file: &Path) -> Result<FileLocInfo> {
     Ok(measure_text(display_path(root, file), &text))
 }
 
-/// Recursively collects `.rs` files under `dir`, skipping `target/`.
-pub fn collect_rust_files(dir: &Path, out: &mut Vec<PathBuf>) {
-    let Ok(entries) = std::fs::read_dir(dir) else {
-        return;
-    };
-    for entry in entries.flatten() {
-        let path = entry.path();
-        let Ok(kind) = entry.file_type() else {
-            continue;
-        };
-        if kind.is_dir() {
-            if entry.file_name() == "target" {
-                continue;
-            }
-            collect_rust_files(&path, out);
-        } else if kind.is_file() && path.extension().is_some_and(|ext| ext == "rs") {
-            out.push(path);
-        }
-    }
-}
-
-/// Directories the LOC invariant covers, relative to the workspace root.
+/// Directories the default Rust LOC invariant covers, relative to the workspace root.
 pub const SCOPE_DIRS: [&str; 2] = ["crates", "src"];
 
-/// True when `file` lies inside a directory [`scan`] measures.
+/// True when `file` lies inside a directory [`scan`] default measures.
 ///
 /// Callers that mutate or index Rust sources use this so they accept exactly
 /// the files the sensors can fail on: the workspace layout (`crates/`) and the
@@ -170,33 +154,78 @@ pub fn in_scope(root: &Path, file: &Path) -> bool {
         .any(|dir| file.starts_with(root.join(dir)))
 }
 
-/// Measures every `.rs` file under `<root>/crates` and `<root>/src`.
-///
-/// The scope is the union of what the workspace sensor and the scaffolded
-/// sensor cover: this repository keeps all Rust under `crates/`, while the
-/// `rust` pack `init` scaffolds is a single crate rooted at `src/`. Scanning
-/// both keeps `loc` and whichever `check-loc.sh` is installed in agreement, so
-/// `loc` can never report a file safe that the sensor would fail.
+/// Recursively collects source files under `dir` matching `exts`, skipping `PRUNE_NAMES`.
+pub fn collect_source_files(dir: &Path, exts: &[String], out: &mut Vec<PathBuf>) {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let Ok(kind) = entry.file_type() else {
+            continue;
+        };
+        if kind.is_dir() {
+            if let Some(name) = entry.file_name().to_str() {
+                if PRUNE_NAMES.contains(&name) {
+                    continue;
+                }
+            }
+            collect_source_files(&path, exts, out);
+        } else if kind.is_file() {
+            if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
+                if exts.iter().any(|target| target.eq_ignore_ascii_case(ext)) {
+                    out.push(path);
+                }
+            }
+        }
+    }
+}
+
+/// Recursively collects `.rs` files under `dir`, skipping `target/`.
+#[allow(dead_code)]
+pub fn collect_rust_files(dir: &Path, out: &mut Vec<PathBuf>) {
+    collect_source_files(dir, &["rs".to_string()], out);
+}
+
+/// Measures source files matching `scope` under `<root>`.
 ///
 /// # Errors
 ///
-/// Returns an error when neither directory exists, or a file is unreadable.
-pub fn scan(root: &Path) -> Result<Vec<FileLocInfo>> {
-    let mut files = Vec::new();
-    for dir in SCOPE_DIRS {
-        let base = root.join(dir);
-        if base.is_dir() {
-            collect_rust_files(&base, &mut files);
+/// Returns an error when explicit roots do not exist, when no source files are found,
+/// or when a file cannot be read.
+pub fn scan(root: &Path, scope: &LocScope) -> Result<Vec<FileLocInfo>> {
+    if scope.roots_explicit {
+        for dir in &scope.roots {
+            let base = root.join(dir);
+            if !base.is_dir() {
+                bail!("--root {dir} does not exist under {}", root.display());
+            }
         }
     }
+
+    let mut files = Vec::new();
+    for dir in &scope.roots {
+        let base = root.join(dir);
+        if base.is_dir() {
+            collect_source_files(&base, &scope.exts, &mut files);
+        }
+    }
+
     if files.is_empty() {
+        let roots_str = scope
+            .roots
+            .iter()
+            .map(|r| format!("{}/{r}", root.display()))
+            .collect::<Vec<_>>()
+            .join(" or ");
         bail!(
-            "no Rust sources under {}/crates or {}/src",
-            root.display(),
-            root.display()
+            "no source files matching extension(s) ({}) under {}; pass explicit file/directory paths or use --root / --ext",
+            scope.exts.join(", "),
+            roots_str
         );
     }
     files.sort();
+    files.dedup();
     files.iter().map(|file| measure(root, file)).collect()
 }
 
@@ -205,15 +234,19 @@ pub fn scan(root: &Path) -> Result<Vec<FileLocInfo>> {
 /// # Errors
 ///
 /// Returns an error for a path that does not exist, or a directory holding no
-/// `.rs` file: a query that silently measures nothing is worse than a failure.
-pub fn collect_paths(root: &Path, paths: &[PathBuf]) -> Result<Vec<FileLocInfo>> {
+/// matching source files.
+pub fn collect_paths(root: &Path, paths: &[PathBuf], exts: &[String]) -> Result<Vec<FileLocInfo>> {
     let mut files = Vec::new();
     for path in paths {
         if path.is_dir() {
             let mut found = Vec::new();
-            collect_rust_files(path, &mut found);
+            collect_source_files(path, exts, &mut found);
             if found.is_empty() {
-                bail!("no .rs files under {}", path.display());
+                bail!(
+                    "no files matching extension(s) ({}) under {}",
+                    exts.join(", "),
+                    path.display()
+                );
             }
             files.extend(found);
         } else if path.is_file() {
@@ -238,11 +271,20 @@ pub fn collect_paths(root: &Path, paths: &[PathBuf]) -> Result<Vec<FileLocInfo>>
 ///
 /// Returns an error when the scope cannot be read (see [`scan`] and
 /// [`collect_paths`]).
-pub fn run(root: &Path, format: Format, warn_only: bool, paths: &[PathBuf]) -> Result<()> {
+pub fn run(
+    root: &Path,
+    config_path: Option<&Path>,
+    format: Format,
+    warn_only: bool,
+    cli_roots: &[String],
+    cli_exts: &[String],
+    paths: &[PathBuf],
+) -> Result<()> {
+    let scope = LocScope::resolve(root, config_path, cli_roots, cli_exts);
     let mut infos = if paths.is_empty() {
-        scan(root)?
+        scan(root, &scope)?
     } else {
-        collect_paths(root, paths)?
+        collect_paths(root, paths, &scope.exts)?
     };
     let scanned = infos.len();
     if warn_only {
@@ -275,124 +317,5 @@ pub fn run(root: &Path, format: Format, warn_only: bool, paths: &[PathBuf]) -> R
 }
 
 #[cfg(test)]
-mod tests {
-    #![allow(clippy::unwrap_used, clippy::expect_used)]
-
-    use std::fmt::Write;
-
-    use super::*;
-
-    /// A file body of `preamble` lines followed by an inline test module.
-    fn with_test_module(preamble: usize, tests: usize) -> String {
-        let mut text = String::new();
-        for i in 0..preamble {
-            writeln!(text, "fn f{i}() {{}}").unwrap();
-        }
-        text.push_str("#[cfg(test)]\nmod tests {\n");
-        for i in 0..tests {
-            writeln!(text, "    fn t{i}() {{}}").unwrap();
-        }
-        text.push_str("}\n");
-        text
-    }
-
-    #[test]
-    fn split_counts_marker_line_as_test() {
-        let text = with_test_module(10, 3);
-        let info = measure_text("x.rs".to_owned(), &text);
-        assert_eq!(
-            info.lines, 16,
-            "10 code + cfg(test) + mod + 3 tests + brace"
-        );
-        assert_eq!(info.code_lines, Some(10));
-        assert_eq!(info.test_lines, Some(6));
-        assert_eq!(
-            info.code_lines.unwrap() + info.test_lines.unwrap(),
-            info.lines
-        );
-        assert_eq!(test_marker_line(&text), Some(11));
-    }
-
-    #[test]
-    fn file_without_test_module_has_no_split() {
-        let info = measure_text("x.rs".to_owned(), "fn a() {}\nfn b() {}\n");
-        assert_eq!(info.code_lines, None);
-        assert_eq!(info.test_lines, None);
-        assert_eq!(test_marker_line("fn a() {}\nfn b() {}\n"), None);
-    }
-
-    /// The ceiling itself is still OK; the threshold is inclusive.
-    #[test]
-    fn status_bands_are_inclusive_at_thresholds() {
-        assert_eq!(LocStatus::of(WARN_THRESHOLD - 1), LocStatus::Ok);
-        assert_eq!(LocStatus::of(WARN_THRESHOLD), LocStatus::Warn);
-        assert_eq!(LocStatus::of(MAX_LINES), LocStatus::Warn);
-        assert_eq!(LocStatus::of(MAX_LINES + 1), LocStatus::Fail);
-    }
-
-    /// `loc` must cover everything either shipped `check-loc.sh` scans, so a
-    /// scaffolded single-crate repo (`src/`) and this workspace (`crates/`) are
-    /// both reported, with `target/` and non-Rust files excluded.
-    #[test]
-    fn scan_covers_crates_and_src_but_skips_target() {
-        let dir = tempfile::tempdir().unwrap();
-        let root = dir.path();
-        std::fs::create_dir_all(root.join("crates/app/src")).unwrap();
-        std::fs::create_dir_all(root.join("crates/app/target/debug")).unwrap();
-        std::fs::create_dir_all(root.join("src")).unwrap();
-        std::fs::write(root.join("crates/app/src/lib.rs"), "fn a() {}\n").unwrap();
-        std::fs::write(root.join("crates/app/target/debug/gen.rs"), "fn b() {}\n").unwrap();
-        std::fs::write(root.join("src/outside.rs"), "fn c() {}\n").unwrap();
-        std::fs::write(root.join("crates/app/README.md"), "noise\n").unwrap();
-
-        let infos = scan(root).unwrap();
-        let paths: Vec<&str> = infos.iter().map(|info| info.path.as_str()).collect();
-        assert_eq!(paths, vec!["crates/app/src/lib.rs", "src/outside.rs"]);
-    }
-
-    /// A scaffolded single-crate repo has no `crates/` at all: `loc` must still
-    /// measure it rather than failing.
-    #[test]
-    fn scan_works_without_a_crates_directory() {
-        let dir = tempfile::tempdir().unwrap();
-        let root = dir.path();
-        std::fs::create_dir_all(root.join("src")).unwrap();
-        std::fs::write(root.join("src/main.rs"), "fn main() {}\n").unwrap();
-
-        let infos = scan(root).unwrap();
-        assert_eq!(infos.len(), 1);
-        assert_eq!(infos[0].path, "src/main.rs");
-    }
-
-    #[test]
-    fn scan_fails_when_no_rust_sources_exist() {
-        let dir = tempfile::tempdir().unwrap();
-        let err = scan(dir.path()).unwrap_err().to_string();
-        assert!(err.contains("no Rust sources"), "{err}");
-    }
-
-    #[test]
-    fn explicit_paths_are_measured_and_missing_paths_fail() {
-        let dir = tempfile::tempdir().unwrap();
-        let root = dir.path();
-        std::fs::create_dir_all(root.join("crates/app")).unwrap();
-        std::fs::write(root.join("crates/app/lib.rs"), with_test_module(2, 1)).unwrap();
-        std::fs::write(root.join("crates/app/other.rs"), "fn a() {}\n").unwrap();
-        std::fs::write(root.join("crates/app/notes.txt"), "noise\n").unwrap();
-
-        let infos = collect_paths(root, &[root.join("crates/app")]).unwrap();
-        assert_eq!(
-            infos.iter().map(|i| i.path.as_str()).collect::<Vec<_>>(),
-            vec!["crates/app/lib.rs", "crates/app/other.rs"],
-            "directories expand to .rs files only"
-        );
-        assert_eq!(infos[0].test_lines, Some(4));
-
-        assert!(
-            collect_paths(root, &[root.join("crates/missing")])
-                .unwrap_err()
-                .to_string()
-                .contains("no such file or directory")
-        );
-    }
-}
+#[path = "tests.rs"]
+mod tests;

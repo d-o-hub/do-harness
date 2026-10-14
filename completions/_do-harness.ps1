@@ -813,6 +813,8 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             break
         }
         'do-harness;loc' {
+            [CompletionResult]::new('--dir', '--dir', [CompletionResultType]::ParameterName, 'Scan directory, relative to workspace root (repeatable or comma-separated)')
+            [CompletionResult]::new('--ext', '--ext', [CompletionResultType]::ParameterName, 'Scan extension (repeatable or comma-separated, e.g. rs, ts, tsx)')
             [CompletionResult]::new('--format', '--format', [CompletionResultType]::ParameterName, 'Output format')
             [CompletionResult]::new('--root', '--root', [CompletionResultType]::ParameterName, 'Workspace root override (default: walk up from cwd)')
             [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Explicit path to do-harness.toml')

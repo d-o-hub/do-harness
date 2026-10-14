@@ -277,10 +277,21 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
             format,
         } => status::run(&root, config_path.as_deref(), set, evidence, format).await,
         Command::Loc {
+            dir: dir_args,
+            ext: ext_args,
             format,
             warn,
             paths,
-        } => loc::run(&root, format, warn, &paths).map_err(CliError::Usage),
+        } => loc::run(
+            &root,
+            config_path.as_deref(),
+            format,
+            warn,
+            &dir_args,
+            &ext_args,
+            &paths,
+        )
+        .map_err(CliError::Usage),
         Command::Split {
             file,
             dry_run,

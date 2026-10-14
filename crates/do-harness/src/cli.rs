@@ -247,13 +247,19 @@ pub enum Command {
     },
     /// Report line-of-code state for the 500-LOC invariant.
     Loc {
+        /// Scan directory, relative to workspace root (repeatable or comma-separated).
+        #[arg(long = "dir", value_name = "DIR", action = ArgAction::Append)]
+        dir: Vec<String>,
+        /// Scan extension (repeatable or comma-separated, e.g. rs, ts, tsx).
+        #[arg(long = "ext", value_name = "EXT", action = ArgAction::Append)]
+        ext: Vec<String>,
         /// Output format.
         #[arg(long, value_enum, default_value_t = Format::Text)]
         format: Format,
         /// Show only files at or above the 450-line decomposition threshold.
         #[arg(long)]
         warn: bool,
-        /// Files or directories to measure (default: every `.rs` under src/ and crates/).
+        /// Files or directories to measure (default: scan workspace roots).
         #[arg(value_hint = ValueHint::AnyPath, value_name = "PATH")]
         paths: Vec<PathBuf>,
     },

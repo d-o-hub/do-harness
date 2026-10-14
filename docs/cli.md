@@ -577,14 +577,16 @@ Report line-of-code state against the 500-line invariant: one line per file with
 threshold, `FAIL` above the ceiling), and the code/test split when an inline
 `#[cfg(test)]` module is present.
 
-- `[PATH]...`: Files or directories to measure (default: every `.rs` under
-  `src/` and `crates/`).
+- `[PATH]...`: Files or directories to measure (default: scan workspace roots).
+- `--dir <DIR>`: Scan this directory, relative to the workspace root (repeatable or comma-separated).
+- `--ext <EXT>`: Scan this extension (repeatable or comma-separated, e.g. rs, ts, tsx).
 - `--warn`: Show only files at or above the decomposition threshold.
 - `--format <Format>`: Output format (`text` or `json`).
 
-This command is Rust-shaped: the default scope, the `SPAN:` spans, and the
-`CODE:`/`TEST:` split all come from `*.rs`. The `loc` *sensor*
-(`scripts/check-loc.sh`) is the part that carries the ceiling to other trees, so
+By default, source discovery follows the workspace `language` declared in `do-harness.toml`
+(`generic`/`node`/`web` scan conventional `packages/`, `apps/`, `src/`, `crates/` roots for `ts`, `tsx`, `js`, `jsx`, `rs` files; `rust` scans `src/` and `crates/` for `rs`). Configured `--root` and `--ext` options in the `loc` sensor's `argv` or passed on the CLI override these defaults.
+The `CODE:`/`TEST:` split and item density hints are emitted for Rust files (`*.rs`).
+The `loc` *sensor* (`scripts/check-loc.sh`) is the part that carries the ceiling to other trees, so
 a repository with a front-end scopes it from `do-harness.toml` instead of
 forking the script:
 
