@@ -1,0 +1,12 @@
+---
+# Codacy Static Code Analysis scope.
+#
+# The T-SQL engine flags SQLite migration files (e.g. "Expected SET
+# QUOTED_IDENTIFIER ON"), which is a false positive: migrations under
+# crates/db/migrations/ are libSQL DDL reviewed as code and covered by the
+# schema_usage computational test plus the migrate path, not by a
+# SQL Server linter. Excluding the tree keeps every future migration from
+# tripping the same rule. Java glob syntax per
+# https://docs.codacy.com/repositories-configure/codacy-configuration-file
+exclude_paths:
+  - "crates/db/migrations/**"
