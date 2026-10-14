@@ -56,6 +56,9 @@ signals a first-class, runtime-neutral completion contract.
 - Skill-eval health as of 2026-10-14: `do-harness eval --strict-fixtures` 13/13
   skills green, all pass_rate 1.00; `overlap` WARN pairs unchanged and recorded
   in `plans/invariants.json`; `learn --draft` reports no sensor at ≥3 fires.
+- Evidence invalidation (2026-10-12, #294): verification rejects green when
+  inputs change mid-run, so the `green -> edit -> stale -> verify -> green`
+  contract holds even under concurrent edits.
 
 ## Non-goals
 

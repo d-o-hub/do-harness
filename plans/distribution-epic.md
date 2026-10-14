@@ -300,6 +300,8 @@ was already at `0.1.1`, so the run correctly skipped each publish
 
 Until 0.3.0 passes registry validation, registry installs of prior versions resolve unpatched upstream libSQL: use tested prebuilt artifacts or build this checkout with its versioned fork dependency. Detail: `plans/libsql-distribution.md`.
 
+Teardown fix (2026-10-12, #293): registry installs ship the libSQL teardown fix; packaged-install smoke (`smoke_db_distribution.py`, 32 cycles) covers the allocation-dependent teardown.
+
 ## Non-goals
 
 - No npm/npx wrapper; the installer and crates.io are the acquisition paths. (Superseded by the npm-wrapper follow-up.)
