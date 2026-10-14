@@ -306,3 +306,69 @@ fn aliased_roots_do_not_double_count_findings() {
         "one tree, one count:\n{stdout}"
     );
 }
+
+/// Built-in `do-harness loc` command automatically discovers generic workspace sources.
+#[test]
+fn do_harness_loc_discovers_generic_workspace_sources() {
+    let dir = tempdir().unwrap();
+    let root = dir.path();
+    git(root, &["init", "-q"]);
+    std::fs::write(root.join("do-harness.toml"), "language = \"generic\"\n").unwrap();
+    let pkg_file = root.join("packages/contracts/src/evidence-framing.ts");
+    let app_file = root.join("apps/web/src/index.tsx");
+    std::fs::create_dir_all(pkg_file.parent().unwrap()).unwrap();
+    std::fs::create_dir_all(app_file.parent().unwrap()).unwrap();
+    std::fs::write(&pkg_file, big_module(100)).unwrap();
+    std::fs::write(&app_file, big_module(50)).unwrap();
+
+    let (code, stdout, stderr) = run(harness(root).arg("loc"));
+    assert_eq!(
+        code,
+        Some(0),
+        "do-harness loc must succeed on generic workspace:\n{stdout}\n{stderr}"
+    );
+    assert!(
+        stdout.contains("packages/contracts/src/evidence-framing.ts"),
+        "{stdout}"
+    );
+    assert!(stdout.contains("apps/web/src/index.tsx"), "{stdout}");
+}
+
+/// Built-in `do-harness loc` command honors `--dir` and `--ext` CLI flags.
+#[test]
+fn do_harness_loc_accepts_root_and_ext_flags() {
+    let dir = tempdir().unwrap();
+    let root = dir.path();
+    git(root, &["init", "-q"]);
+    let pkg_file = root.join("packages/contracts/src/evidence-framing.ts");
+    let app_file = root.join("apps/web/src/index.tsx");
+    std::fs::create_dir_all(pkg_file.parent().unwrap()).unwrap();
+    std::fs::create_dir_all(app_file.parent().unwrap()).unwrap();
+    std::fs::write(&pkg_file, big_module(100)).unwrap();
+    std::fs::write(&app_file, big_module(50)).unwrap();
+
+    let (code, stdout, stderr) = run(harness(root)
+        .arg("loc")
+        .arg("--dir")
+        .arg("packages")
+        .arg("--ext")
+        .arg("ts"));
+    assert_eq!(
+        code,
+        Some(0),
+        "do-harness loc --dir packages --ext ts must succeed:\n{stdout}\n{stderr}"
+    );
+    assert!(
+        stdout.contains("packages/contracts/src/evidence-framing.ts"),
+        "{stdout}"
+    );
+    assert!(!stdout.contains("apps/web/src/index.tsx"), "{stdout}");
+
+    let (code, stdout, stderr) = run(harness(root).arg("loc").arg("--dir").arg("missing"));
+    assert_eq!(
+        code,
+        Some(2),
+        "missing dir must fail with usage error:\n{stdout}\n{stderr}"
+    );
+    assert!(stderr.contains("--root missing does not exist"), "{stderr}");
+}
