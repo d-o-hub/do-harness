@@ -9,6 +9,7 @@
   "min_deploys": 1,
   "max_lead_p90_days": 30,
   "max_change_failure_rate": 0.15,
+  "max_rework_rate": 0.15,
   "max_mttr_hours": 24,
   "max_unrestored": 0
 }

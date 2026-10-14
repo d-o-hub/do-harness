@@ -25,6 +25,8 @@ pub struct NewDoraSnapshot<'a> {
     pub deploy_count: i64,
     /// Deploys whose failure range contained at least one revert.
     pub deploys_failed: i64,
+    /// Deploys whose own lead range contained at least one revert (rework).
+    pub deploys_rework: i64,
     /// Lead-time samples behind the percentiles.
     pub lead_samples: i64,
     /// Median lead time in seconds, `None` with no samples.
@@ -66,6 +68,8 @@ pub struct DoraSnapshotRow {
     pub deploy_count: i64,
     /// Failed deploys.
     pub deploys_failed: i64,
+    /// Rework deploys.
+    pub deploys_rework: i64,
     /// Lead-time samples.
     pub lead_samples: i64,
     /// Median lead time in seconds.
@@ -98,10 +102,10 @@ pub async fn insert_dora_snapshot(
     let mut rows = conn
         .query(
             "INSERT INTO dora_snapshots (recorded_at, source, window_days, window_start, \
-             window_end, source_rev, deploy_count, deploys_failed, lead_samples, \
+             window_end, source_rev, deploy_count, deploys_failed, deploys_rework, lead_samples, \
              lead_p50_seconds, lead_p90_seconds, mttr_seconds, mttr_restored, \
              mttr_unrestored, breach_count, policy_fingerprint, derivation) \
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17) \
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18) \
              RETURNING id",
             params!(
                 unix_now(),
@@ -112,6 +116,7 @@ pub async fn insert_dora_snapshot(
                 snapshot.source_rev,
                 snapshot.deploy_count,
                 snapshot.deploys_failed,
+                snapshot.deploys_rework,
                 snapshot.lead_samples,
                 snapshot.lead_p50_seconds,
                 snapshot.lead_p90_seconds,
@@ -140,7 +145,7 @@ pub async fn list_dora_snapshots(conn: &Connection, limit: i64) -> Result<Vec<Do
     let mut rows = conn
         .query(
             "SELECT id, recorded_at, source, window_days, window_start, window_end, source_rev, \
-             deploy_count, deploys_failed, lead_samples, lead_p50_seconds, lead_p90_seconds, \
+             deploy_count, deploys_failed, deploys_rework, lead_samples, lead_p50_seconds, lead_p90_seconds, \
              mttr_seconds, mttr_restored, mttr_unrestored, breach_count, policy_fingerprint, \
              derivation FROM dora_snapshots ORDER BY id DESC LIMIT ?1",
             params!(limit),
@@ -158,15 +163,16 @@ pub async fn list_dora_snapshots(conn: &Connection, limit: i64) -> Result<Vec<Do
             source_rev: row.get(6)?,
             deploy_count: row.get(7)?,
             deploys_failed: row.get(8)?,
-            lead_samples: row.get(9)?,
-            lead_p50_seconds: row.get(10)?,
-            lead_p90_seconds: row.get(11)?,
-            mttr_seconds: row.get(12)?,
-            mttr_restored: row.get(13)?,
-            mttr_unrestored: row.get(14)?,
-            breach_count: row.get(15)?,
-            policy_fingerprint: row.get(16)?,
-            derivation: row.get(17)?,
+            deploys_rework: row.get(9)?,
+            lead_samples: row.get(10)?,
+            lead_p50_seconds: row.get(11)?,
+            lead_p90_seconds: row.get(12)?,
+            mttr_seconds: row.get(13)?,
+            mttr_restored: row.get(14)?,
+            mttr_unrestored: row.get(15)?,
+            breach_count: row.get(16)?,
+            policy_fingerprint: row.get(17)?,
+            derivation: row.get(18)?,
         });
     }
     Ok(snapshots)
@@ -187,6 +193,7 @@ mod tests {
             source_rev: "deadbeef",
             deploy_count: 2,
             deploys_failed: 1,
+            deploys_rework: 1,
             lead_samples: 165,
             lead_p50_seconds: Some(865_179),
             lead_p90_seconds: Some(2_335_088),
@@ -218,6 +225,7 @@ mod tests {
         assert_eq!(row.source_rev, "deadbeef");
         assert_eq!(row.deploy_count, 2);
         assert_eq!(row.deploys_failed, 1);
+        assert_eq!(row.deploys_rework, 1);
         assert_eq!(row.lead_p50_seconds, Some(865_179));
         assert_eq!(row.lead_p90_seconds, Some(2_335_088));
         assert_eq!(row.mttr_seconds, None);

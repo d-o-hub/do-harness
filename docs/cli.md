@@ -643,8 +643,9 @@ Verify event hash chain integrity in `.do-harness/agent_state.db`.
 - `--format <Format>`: Output format (`text` or `json`).
 
 ### `dora`
-Derive the four DORA deployment metrics — deployment frequency, lead time for
-changes, change failure rate, and time to restore service — from git history.
+Derive the five DORA deployment metrics — deployment frequency, lead time for
+changes, change failure rate, deployment rework rate, and time to restore
+service — from git history.
 Every number is **derived from persisted history and the pinned policy in
 `plans/dora.json`**, never judged: the same input yields byte-identical output,
 and each snapshot carries its own derivation manifest (resolved window, ref

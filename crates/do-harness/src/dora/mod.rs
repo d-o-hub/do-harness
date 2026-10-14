@@ -1,7 +1,8 @@
 //! Deterministic DORA deployment metrics derived from git history.
 //!
-//! The four DORA metrics — deployment frequency, lead time for changes,
-//! change failure rate, and time to restore service — are **derived**, never
+//! The five DORA metrics — deployment frequency, lead time for changes,
+//! change failure rate, deployment rework rate, and time to restore
+//! service — are **derived**, never
 //! judged: every number comes from persisted git history plus the pinned
 //! policy in `plans/dora.json`, so the same input yields byte-identical
 //! output. Each snapshot carries its own derivation manifest (the resolved
@@ -70,6 +71,9 @@ pub struct RangeRecord {
     pub previous: Option<String>,
     /// Git revision range that supplied this deploy's lead-time samples.
     pub range: String,
+    /// Whether the deploy's own lead range contains at least one revert:
+    /// the release itself reworks previously shipped work.
+    pub rework: bool,
     /// Git revision range that attributed failures to this deploy
     /// (`T..next`, or `T..HEAD` for the newest deploy).
     pub failure_range: String,
@@ -130,6 +134,10 @@ pub struct DoraSnapshot {
     pub deploy_count: i64,
     /// Deploys whose own failure range contains at least one revert.
     pub deploys_failed: i64,
+    /// Deploys whose own lead range contains at least one revert (rework),
+    /// kept as an exact `deploys_rework/deploy_count` pair like the change
+    /// failure rate.
+    pub deploys_rework: i64,
     /// Tags of the measured deploys, in deploy order.
     pub deploy_tags: Vec<String>,
     /// Lead-time samples behind the percentiles.
@@ -237,6 +245,7 @@ pub fn collect(root: &Path, policy: &DoraPolicy, now: i64, source: Source) -> Re
         source_rev,
         deploy_count: i64::try_from(scan.ranges.len()).context("deploy count overflow")?,
         deploys_failed: scan.deploys_failed,
+        deploys_rework: scan.deploys_rework,
         deploy_tags: scan
             .ranges
             .iter()
@@ -280,6 +289,7 @@ struct DeployScan {
     samples: Vec<i64>,
     clock_skew_commits: i64,
     deploys_failed: i64,
+    deploys_rework: i64,
 }
 
 /// Walks the in-window deploys once, collecting ranges, samples, and
@@ -301,6 +311,7 @@ fn scan_deploys(
         samples: Vec::new(),
         clock_skew_commits: 0,
         deploys_failed: 0,
+        deploys_rework: 0,
     };
 
     for (index, tag) in tags.iter().enumerate() {
@@ -329,6 +340,14 @@ fn scan_deploys(
         if !revert_rows.is_empty() {
             scan.deploys_failed += 1;
         }
+        // Rework scans the deploy's OWN range with the same predicate: a
+        // release whose content reverts prior work, whether or not anything
+        // after it failed.
+        let own_reverts = git::reverts(root, &range, &policy.revert_pattern)?;
+        let rework = !own_reverts.is_empty();
+        if rework {
+            scan.deploys_rework += 1;
+        }
         for (revert_sha, revert_ts) in revert_rows {
             scan.incidents
                 .push(incident_from(tags.get(index + 1), revert_sha, revert_ts));
@@ -338,6 +357,7 @@ fn scan_deploys(
             tag: tag.name.clone(),
             previous,
             range: range.clone(),
+            rework,
             failure_range,
             commits: lead.commits,
             deploy_ts: tag.deploy_ts,

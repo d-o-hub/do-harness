@@ -90,6 +90,7 @@ async fn record_snapshot(root: &Path, snapshot: &dora::DoraSnapshot) -> Result<(
         source_rev: &snapshot.source_rev,
         deploy_count: snapshot.deploy_count,
         deploys_failed: snapshot.deploys_failed,
+        deploys_rework: snapshot.deploys_rework,
         lead_samples: snapshot.lead_samples,
         lead_p50_seconds: snapshot.lead_p50_seconds,
         lead_p90_seconds: snapshot.lead_p90_seconds,
@@ -182,6 +183,12 @@ fn render_text(snapshot: &dora::DoraSnapshot) -> String {
     );
     let _ = writeln!(
         out,
+        "  {:<18} {}",
+        "rework rate",
+        rate_label(snapshot.deploys_rework, snapshot.deploy_count)
+    );
+    let _ = writeln!(
+        out,
         "  {:<18} {}  ({} restored, {} unrestored)",
         "time to restore",
         snapshot
@@ -230,6 +237,7 @@ mod tests {
               "window_days": 30, "window_start": 1787053312, "window_end": 1789645312,
               "source": "git", "source_rev": "d8b4dbd76e15ddd70c2a1ebb016e493ebb6e0881",
               "deploy_count": 2, "deploys_failed": 1,
+              "deploys_rework": 1,
               "deploy_tags": ["v0.1.0", "v0.1.1"],
               "lead_samples": 165, "lead_p50_seconds": 865179,
               "lead_p90_seconds": 2335088, "mttr_seconds": null,
@@ -258,6 +266,7 @@ mod tests {
         assert!(text.contains("  deploys            2  (failed 1)  v0.1.0, v0.1.1\n"));
         assert!(text.contains("  lead time          p50 10.01d  p90 27.03d  (n=165)\n"));
         assert!(text.contains("  change failure rate 1/2 = 0.500\n"));
+        assert!(text.contains("  rework rate        1/2 = 0.500\n"));
         assert!(text.contains("  time to restore    -  (0 restored, 1 unrestored)\n"));
         assert!(text.contains("  policy             sha256:9f3c\n"));
         assert!(text.contains("  breaches           change_failure_rate 1/2 > 0.150\n"));
@@ -273,11 +282,13 @@ mod tests {
         snap.lead_p50_seconds = None;
         snap.lead_p90_seconds = None;
         snap.deploys_failed = 0;
+        snap.deploys_rework = 0;
         snap.mttr_unrestored = 0;
         snap.breaches.clear();
         let text = render_text(&snap);
         assert!(text.contains("  lead time          p50 -  p90 -  (n=0)\n"));
         assert!(text.contains("  change failure rate -\n"));
+        assert!(text.contains("  rework rate        -\n"));
         assert!(text.contains("  time to restore    -  (0 restored, 0 unrestored)\n"));
         assert!(text.contains("  breaches           none\n"));
     }

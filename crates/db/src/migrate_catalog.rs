@@ -117,4 +117,9 @@ pub const MIGRATIONS: &[Migration] = &[
         name: "error_signature_scope",
         sql: include_str!("../migrations/0021_error_signature_scope.sql"),
     },
+    Migration {
+        version: 22,
+        name: "dora_rework",
+        sql: include_str!("../migrations/0022_dora_rework.sql"),
+    },
 ];
