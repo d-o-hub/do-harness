@@ -59,6 +59,12 @@ signals a first-class, runtime-neutral completion contract.
 - Evidence invalidation (2026-10-12, #294): verification rejects green when
   inputs change mid-run, so the `green -> edit -> stale -> verify -> green`
   contract holds even under concurrent edits.
+- Task fix (2026-10-14, #306/#310): methodless tasks can reach done through
+  empty sensor gates; PR triaged and squash-reworded locally, merge pending
+  CI re-gate. Tasks 1–3 (landed #292/#293/#294) stay pending until it merges.
+- Ops (2026-10-14): an uncapped full local verify invoked the host OOM killer
+  (`opencode` shot twice); local verify/push now requires `CARGO_BUILD_JOBS=2`
+  plus `CARGO_INCREMENTAL=0`, see `AGENTS.md` hooks.
 
 ## Non-goals
 

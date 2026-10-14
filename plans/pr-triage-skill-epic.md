@@ -346,7 +346,7 @@ phases: PR #292 (structural changes stay residual, policy exemptions distinct
 from proof), PR #298 (paginate review threads, retain unresolved outdated concerns),
 PR #299 (merge-revert and input-identity lessons), PR #301 (dry-run faithful preview),
 PR #302 (preview-fidelity and stale-binary lessons), PR #303/#304 (grounded skill
-citations). Evals as of 2026-10-14: `do-harness eval --skill pr-triage`
+citations), PR #310 (prose subjects fail range lint; squash-reword own/bot branches). Evals as of 2026-10-14: `do-harness eval --skill pr-triage`
 114/114, pass_rate 1.00, bar 0.95. Next: keep distilling per sweep; open a new
 phase only for a capability change (new forge, new command).
 
