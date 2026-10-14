@@ -24,19 +24,19 @@ to prevent the fire. See `docs/cli.md` for the command reference
 
 | Skill | Purpose |
 |-------|---------|
-| `harness` | Feedforward guides + feedback sensors, self-correction and steering loops |
-| `skill-creator` | Scaffold, validate, and evaluate new skills |
-| `skill-distiller` | Compress verified traces and fixes into reusable skills |
-| `htn-planner` | Decompose objectives into task networks with precondition guards |
-| `spike-runner` | Isolated de-risking spikes for uncertain APIs or integrations |
+| `crates-io-name-check` | Verify crates.io name availability before publishing |
 | `event-modeler` | Type-safe event-sourced slices (commands, events, projections) |
 | `fail-closed-proxy` | Fail-closed tool-call mediation with audit and metrics |
-| `pr-triage` | End-to-end GitHub PR triage, review, and merge |
-| `crates-io-name-check` | Verify crates.io name availability before publishing |
-| `npm-github-publish` | Publish npm packages via GitHub OIDC Trusted Publishers |
-| `tokio-performance` | Workload-aware async rules and review flags |
+| `harness` | Feedforward guides + feedback sensors, self-correction and steering loops |
+| `htn-planner` | Decompose objectives into task networks with precondition guards |
 | `move-only-decomposition` | Split files at the line ceiling without behavior change |
 | `nested-build-isolation` | Keep nested cargo/coverage builds from interfering |
+| `npm-github-publish` | Publish npm packages via GitHub OIDC Trusted Publishers |
+| `pr-triage` | End-to-end GitHub PR triage, review, and merge |
+| `skill-creator` | Scaffold, validate, and evaluate new skills |
+| `skill-distiller` | Compress verified traces and fixes into reusable skills |
+| `spike-runner` | Isolated de-risking spikes for uncertain APIs or integrations |
+| `tokio-performance` | Workload-aware async rules and review flags |
 
 ## Progressive disclosure
 
@@ -59,6 +59,18 @@ frontmatter (`name`, `description`) → add graded `evals/evals.json` cases
 
 `do-harness overlap` warns when two skills drift past the accepted similarity
 baselines in `plans/invariants.json`. `skills drift` checks manifest-managed
-shared skills (`.agents/skills-manifest.toml`) against their pinned commit
-and content digest. Both are advisories; the `skills` sensor (sync) is the
+shared skills against their pinned commit and content digest (see
+`docs/cli.md`). Both are advisories; the `skills` sensor (sync) is the
 gate.
+
+## Auto-update (no stale docs)
+
+`scripts/check-skills-docs.sh` keeps this page and the `README.md` Skills
+section honest without loading a single skill body: it compares frontmatter
+`name:` lines against the catalog table above, verifies every repo-relative
+path named here exists, and checks the README pointer. After adding,
+renaming, or removing a skill, run it with `--fix` (it rewrites only the
+table rows; new rows arrive with an empty purpose cell for you to fill —
+names are mechanical, purposes are judgment), then run it plain to confirm.
+The `skills-docs` sensor runs the plain check in CI, so drift fails the
+build instead of rotting silently.
