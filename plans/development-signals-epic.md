@@ -64,7 +64,10 @@ signals a first-class, runtime-neutral completion contract.
   CI re-gate. Tasks 1–3 (landed #292/#293/#294) stay pending until it merges.
 - Ops (2026-10-14): an uncapped full local verify invoked the host OOM killer
   (`opencode` shot twice); local verify/push now requires `CARGO_BUILD_JOBS=2`
-  plus `CARGO_INCREMENTAL=0`, see `AGENTS.md` hooks.
+  plus `CARGO_INCREMENTAL=0`, see `AGENTS.md` hooks. The 13:40 round killed
+  `node` (60MB victim) mid-push while the heavier no-`--set` hook ran as the
+  hog; host fix chosen: swap 4G→12G plus earlyoom; agent-side: wrap heavy runs
+  in `systemd-run --user` memory caps.
 
 ## Non-goals
 
