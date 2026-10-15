@@ -26,6 +26,10 @@ Before claiming completion:
 Do not disable, bypass, remove, or weaken a required signal merely to obtain a
 passing result. Fix the underlying cause and re-run the sensor.
 
+A sensor that runs zero checks is vacuous, not evidence: if `verify` reports
+green but a sensor executed nothing (e.g. `0 tests run`), add a real check
+before claiming completion.
+
 ## Completion
 
 A change is complete only when current verification evidence is green:

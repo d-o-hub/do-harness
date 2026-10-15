@@ -1,5 +1,10 @@
 [profile.default]
 retries = 0
+# Bounded test threads: full-suite instrumented runs (llvm-cov) pile up
+# spawning integration tests past small-box memory (measured 2026-10-14:
+# 8-wide instrumented runaway past 11GB anon on a 14GB host); 2 keeps the
+# default suite green locally with a small CI slowdown.
+test-threads = 2
 # No `no-tests` key here: nextest reports it as an unknown configuration key, and
 # every `nextest run` in the harness and the scaffold passes --no-tests=pass.
 

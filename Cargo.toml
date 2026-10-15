@@ -66,15 +66,13 @@ agent-governance = "=3.2.2"
 rmcp = { version = "=3.5.0", features = ["server", "transport-streamable-http-server", "macros"] }
 
 # Dev-profile tuning lives here (Cargo only honors [profile.*] in manifests,
-# never in .cargo/config.toml).
+# never in .cargo/config.toml). Build-override stays at Cargo defaults
+# (opt-level 0): optimizing build scripts raises peak RSS for no runtime gain.
 [profile.dev]
 debug = "line-tables-only"
 
 [profile.dev.package."*"]
 debug = false
-
-[profile.dev.build-override]
-opt-level = 3
 
 # Fast-CI profile alias where full release optimization is overkill.
 [profile.ci]

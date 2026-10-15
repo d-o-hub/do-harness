@@ -152,4 +152,5 @@ command.
 - Never trust LLM self-assessment over a computational sensor's exit code.
 - Fix the sensor that fired; do not refactor unrelated code in the same pass.
 - An empty sensor suite passes vacuously; that is not evidence.
+- A gate that runs zero checks is a failed gate, not a pass: `cargo test --doc` reporting `0 passed` proves nothing — add a doc-test on a public API before claiming the sensor green.
 - Never read every `SKILL.md` to decide which skill applies; rank metadata first.

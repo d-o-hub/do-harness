@@ -32,6 +32,15 @@ pub fn canonical_value(value: &serde_json::Value) -> Result<String, serde_json::
 ///
 /// When `prev` is [`None`] the chain starts from the literal `GENESIS`
 /// sentinel.
+///
+/// ```
+/// # use do_harness_types::chain_hash;
+/// let payload = r#"{"a":1}"#;
+/// let genesis = chain_hash(None, payload);
+/// assert_eq!(genesis, chain_hash(Some("GENESIS"), payload));
+/// assert_eq!(genesis.len(), 64);
+/// assert_ne!(genesis, chain_hash(Some(genesis.as_str()), payload));
+/// ```
 #[must_use]
 pub fn chain_hash(prev: Option<&str>, payload_json: &str) -> String {
     let mut hasher = Sha256::new();

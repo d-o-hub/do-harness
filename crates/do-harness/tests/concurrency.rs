@@ -37,6 +37,12 @@ fn spawn(dir: &Path, args: &[&str]) -> Child {
 
 #[test]
 fn concurrent_verify_record_and_advance_keep_chain_intact() {
+    // Under coverage instrumentation every spawned harness runs an order of
+    // magnitude slower, so full writer waves pile up without bound (measured
+    // 2026-10-14: past 11GB anon, OOM-killing the coverage run). Shrink the
+    // waves when LLVM_PROFILE_FILE is set; the retry path is still exercised.
+    let under_coverage = std::env::var_os("LLVM_PROFILE_FILE").is_some();
+    let (first_wave, second_wave) = if under_coverage { (1, 2) } else { (2, 3) };
     let dir = tempfile::tempdir().expect("tempdir");
     let root = dir.path();
     run(root, &["init"]);
@@ -51,38 +57,30 @@ fn concurrent_verify_record_and_advance_keep_chain_intact() {
         ],
     );
 
-    // Two concurrent verify --record writers plus a task advance.
-    let mut children = vec![
-        spawn(
-            root,
-            &["verify", "--record", "--task", "1", "--only", "loc"],
-        ),
-        spawn(
-            root,
-            &["verify", "--record", "--task", "1", "--only", "loc"],
-        ),
-        spawn(root, &["task", "advance", "1"]),
-    ];
+    // Concurrent verify --record writers plus a task advance.
+    let mut children: Vec<Child> = (0..first_wave)
+        .map(|_| {
+            spawn(
+                root,
+                &["verify", "--record", "--task", "1", "--only", "loc"],
+            )
+        })
+        .collect();
+    children.push(spawn(root, &["task", "advance", "1"]));
     for child in &mut children {
         let status = child.wait().expect("wait");
         assert!(status.success(), "concurrent writer failed: {status}");
     }
 
     // A second wave exercises the retry path on an already-chained log.
-    let mut second = vec![
-        spawn(
-            root,
-            &["verify", "--record", "--task", "1", "--only", "loc"],
-        ),
-        spawn(
-            root,
-            &["verify", "--record", "--task", "1", "--only", "loc"],
-        ),
-        spawn(
-            root,
-            &["verify", "--record", "--task", "1", "--only", "loc"],
-        ),
-    ];
+    let mut second: Vec<Child> = (0..second_wave)
+        .map(|_| {
+            spawn(
+                root,
+                &["verify", "--record", "--task", "1", "--only", "loc"],
+            )
+        })
+        .collect();
     for child in &mut second {
         let status = child.wait().expect("wait");
         assert!(status.success(), "second-wave writer failed: {status}");
