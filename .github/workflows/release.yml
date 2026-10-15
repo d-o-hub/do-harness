@@ -387,7 +387,7 @@ jobs:
           }
           publish() {
             local crate="$1" crate_version="$2" manifest="$3" attempt=1
-            local features=()
+            local features=() out
             if [ "$crate" = "do-harness-libsql" ]; then
               features=(--no-default-features --features core)
             fi
@@ -395,9 +395,27 @@ jobs:
               echo "$crate $crate_version is already on crates.io; skipping"
               return 0
             fi
-            until cargo publish --locked --manifest-path "$manifest" "${features[@]}"; do
+            out="$(mktemp)"
+            while true; do
+              if cargo publish --locked --manifest-path "$manifest" "${features[@]}" >"$out" 2>&1; then
+                cat "$out"
+                rm -f "$out"
+                return 0
+              fi
+              cat "$out"
+              if grep -q "already exists on crates.io" "$out"; then
+                echo "$crate $crate_version is already on crates.io; skipping"
+                rm -f "$out"
+                return 0
+              fi
+              if grep -q "Trusted Publishing tokens do not support creating new crates" "$out"; then
+                echo "FAIL: $crate is new on crates.io; publish it once with an API token, then configure its trusted publisher (see docs/releasing.md)" >&2
+                rm -f "$out"
+                return 1
+              fi
               if [ "$attempt" -ge 8 ]; then
                 echo "FAIL: could not publish $crate after $attempt attempts" >&2
+                rm -f "$out"
                 return 1
               fi
               attempt=$((attempt + 1))
@@ -405,7 +423,7 @@ jobs:
               sleep 15
             done
           }
-          fork_version="$(sed -n 's/^version *= *"\(.*\)"/\1/p' vendor/libsql/Cargo.toml)"
+          fork_version="$(sed -n '/^\[package\]/,/^\[/ s/^version *= *"\(.*\)"/\1/p' vendor/libsql/Cargo.toml)"
           test -n "$fork_version"
           publish do-harness-libsql "$fork_version" vendor/libsql/Cargo.toml
           publish do-harness-types "$version" crates/types/Cargo.toml
