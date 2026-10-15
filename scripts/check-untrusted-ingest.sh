@@ -35,16 +35,24 @@ fail() {
     FAIL_COUNT=$((FAIL_COUNT + 1))
 }
 
-if [[ ! -d "$SCRIPTS_DIR" ]]; then
-    echo "SKIP: $SCRIPTS_DIR is absent (repo-only skill not present in this checkout)."
+# The skill is repo-only: when it is entirely absent (a published crate or a
+# template context), there is nothing to check and the sensor skips. When the
+# skill IS present its wrappers must be too — otherwise renaming `scripts/`
+# would silently suppress both the sink lint and the contract check below.
+if [[ ! -d "$SKILL_DIR" ]]; then
+    echo "SKIP: $SKILL_DIR is absent (repo-only skill not present in this checkout)."
     exit 0
 fi
 
-mapfile -t scripts < <(find "$SCRIPTS_DIR" -maxdepth 1 -type f \
-    \( -name '*.sh' -o -name '*.mjs' -o -name '*.js' \) -print | sort)
-
-if [[ "${#scripts[@]}" -eq 0 ]]; then
-    fail "no ingest scripts under $SCRIPTS_DIR (expected the pr-triage wrappers)."
+scripts=()
+if [[ ! -d "$SCRIPTS_DIR" ]]; then
+    fail "$SCRIPTS_DIR is missing (the pr-triage wrappers must exist when the skill is present)."
+else
+    mapfile -t scripts < <(find "$SCRIPTS_DIR" -maxdepth 1 -type f \
+        \( -name '*.sh' -o -name '*.mjs' -o -name '*.js' \) -print | sort)
+    if [[ "${#scripts[@]}" -eq 0 ]]; then
+        fail "no ingest scripts under $SCRIPTS_DIR (expected the pr-triage wrappers)."
+    fi
 fi
 
 for script in "${scripts[@]:-}"; do

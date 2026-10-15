@@ -7,6 +7,7 @@
 # Enforcement policy (fail-open locally, fail-closed on demand):
 #   - markdownlint-cli2/markdownlint missing AND (CI=true OR DO_HARNESS_REQUIRE_TOOLS=1) -> FAIL.
 #   - markdownlint-cli2/markdownlint missing otherwise -> SKIP.
+#   - zero markdown files discovered -> FAIL (no vacuous gate).
 
 set -euo pipefail
 
@@ -39,8 +40,8 @@ mapfile -t files < <(
 )
 
 if [[ "${#files[@]}" -eq 0 ]]; then
-    echo "check-markdownlint OK: no markdown files found to lint."
-    exit 0
+    echo "FAIL: no markdown files found to lint; a gate that checks nothing is not a pass." >&2
+    exit 1
 fi
 
 "${RUNNER[@]}" "${files[@]}"

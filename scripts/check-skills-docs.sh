@@ -38,8 +38,20 @@ failures=0
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
+# The skill tree is a required artifact: with no skills the drift check would
+# compare two empty sets. nullglob means a missing tree yields an empty array
+# (not a literal glob handed to grep), so the guard below is reachable and the
+# failure is a clear message rather than a raw grep error.
+shopt -s nullglob
+skill_files=(.agents/skills/*/SKILL.md)
+shopt -u nullglob
+if [[ "${#skill_files[@]}" -eq 0 ]]; then
+    echo "check-skills-docs FAIL: no skills found under .agents/skills (empty catalog)." >&2
+    exit 1
+fi
+
 # Canonical names: frontmatter only, one grep per SKILL.md, sorted.
-for md in .agents/skills/*/SKILL.md; do
+for md in "${skill_files[@]}"; do
     grep -m1 '^name:' "$md" | sed 's/^name: *//'
 done | sort -u > "$tmp/names.txt"
 

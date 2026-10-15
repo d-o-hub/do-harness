@@ -2,4 +2,5 @@
 # Workspace-level lints live in Cargo.toml ([workspace.lints]).
 # This file tunes clippy metadata and allowed identifiers.
 
-doc-valid-idents = ["libSQL", "HTN", "ATDD", "TDD", "SQL", "CLI", "JSON"]
+doc-valid-idents = ["libSQL", "HTN", "ATDD", "TDD", "SQL", "CLI", "JSON", "IPv4", "IPv6"]
+msrv = "1.85"
