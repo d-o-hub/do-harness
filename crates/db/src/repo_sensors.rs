@@ -130,3 +130,52 @@ pub async fn list_sensor_blesses(conn: &Connection) -> Result<Vec<SensorBless>> 
     }
     Ok(blesses)
 }
+
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used)]
+
+    use super::*;
+
+    async fn open() -> (tempfile::TempDir, Connection) {
+        let dir = tempfile::tempdir().unwrap();
+        let conn = crate::migrate::connect_and_migrate(dir.path())
+            .await
+            .unwrap();
+        (dir, conn)
+    }
+
+    /// The findings ceiling only ratchets up: a smaller later observation must
+    /// not lower it, while the timestamp still moves.
+    #[tokio::test(flavor = "current_thread")]
+    async fn findings_upsert_keeps_the_running_maximum() {
+        let (_dir, conn) = open().await;
+        upsert_sensor_findings(&conn, "loc", 3, 1).await.unwrap();
+        upsert_sensor_findings(&conn, "loc", 1, 2).await.unwrap();
+        upsert_sensor_findings(&conn, "loc", 5, 3).await.unwrap();
+
+        let all = list_sensor_findings(&conn).await.unwrap();
+        assert_eq!(all.len(), 1);
+        assert_eq!(all[0].max_findings, 5);
+        assert_eq!(all[0].updated_at, 3);
+    }
+
+    /// Bless history is append-only and records the previous ceiling; reads
+    /// come back newest first.
+    #[tokio::test(flavor = "current_thread")]
+    async fn bless_history_records_previous_max_newest_first() {
+        let (_dir, conn) = open().await;
+        insert_sensor_bless(&conn, "loc", 3, None, "alice", 10)
+            .await
+            .unwrap();
+        insert_sensor_bless(&conn, "loc", 1, Some(3), "alice", 20)
+            .await
+            .unwrap();
+
+        let blesses = list_sensor_blesses(&conn).await.unwrap();
+        assert_eq!(blesses.len(), 2);
+        assert_eq!(blesses[0].max_findings, 1);
+        assert_eq!(blesses[0].previous_max, Some(3));
+        assert_eq!(blesses[1].previous_max, None);
+    }
+}
