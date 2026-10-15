@@ -226,7 +226,7 @@ async fn connect_and_migrate_once(root: &Path) -> Result<Connection> {
         .applied_max
         .is_some_and(|applied| applied < skew.known_max)
     {
-        backup_state_file(&path)?;
+        backup_state_file(&conn, &path).await?;
     }
     migrate_with_retry(&conn).await?;
     Ok(conn)
@@ -265,7 +265,23 @@ async fn migrate_with_retry(conn: &Connection) -> Result<()> {
 }
 
 /// Copies the state database beside itself as `<file>.bak`.
-fn backup_state_file(path: &Path) -> Result<()> {
+///
+/// The connection runs in WAL mode (see [`connect`]), so committed pages can
+/// still live in the `-wal` sidecar at the moment of the copy; a plain file
+/// copy would then omit them, or capture a torn state mid-write. Checkpoint
+/// first so the snapshot is complete — this backup is the recovery path for
+/// the destructive migrations (`0006` deletes rows, `0011` rebuilds tables).
+/// The checkpoint is best-effort: a concurrent reader can keep it from
+/// completing, and a slightly stale snapshot still beats refusing to migrate.
+async fn backup_state_file(conn: &Connection, path: &Path) -> Result<()> {
+    // A checkpoint returns rows, and `execute` rejects row-returning SQL, so
+    // route it through `query` with drained rows (see the `connect` note).
+    if let Ok(mut rows) = conn
+        .query("PRAGMA wal_checkpoint(TRUNCATE)", Params::None)
+        .await
+    {
+        while rows.next().await.ok().flatten().is_some() {}
+    }
     let backup = path.with_extension("db.bak");
     std::fs::copy(path, &backup).map_err(|source| DbError::Backup {
         path: backup,

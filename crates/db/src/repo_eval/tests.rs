@@ -14,6 +14,56 @@ async fn open(dir: &tempfile::TempDir) -> Connection {
         .unwrap()
 }
 
+/// The three eval tables are written in one transaction, so the latest-per-skill
+/// row, the history row, and the dimension rows always describe the same run.
+#[tokio::test(flavor = "current_thread")]
+async fn record_eval_run_writes_all_three_tables() {
+    let dir = connect();
+    let conn = open(&dir).await;
+
+    let run_id = record_eval_run(
+        &conn,
+        &crate::repo_skill_eval::NewSkillEval {
+            skill_name: "harness",
+            prompt: Some("p"),
+            expected_outcome: Some("o"),
+            pass_rate: Some(1.0),
+        },
+        &NewSkillEvalRun {
+            skill_name: "harness",
+            mode: EvalMode::Deterministic,
+            graded: 4,
+            passed: 4,
+            pass_rate: Some(1.0),
+            without_pass_rate: Some(0.5),
+            skill_words: Some(120),
+            walk_secs: Some(2.0),
+        },
+        &[NewSkillEvalDimRate {
+            dim: "correctness",
+            graded: 2,
+            passed: 2,
+            without_passed: Some(1),
+        }],
+    )
+    .await
+    .unwrap();
+
+    let latest = crate::repo_skill_eval::list_skill_evals(&conn, "harness")
+        .await
+        .unwrap();
+    assert_eq!(latest.len(), 1);
+    assert_eq!(latest[0].pass_rate, Some(1.0));
+
+    let runs = list_skill_eval_runs(&conn, "harness").await.unwrap();
+    assert_eq!(runs.len(), 1);
+    assert_eq!(runs[0].id, run_id);
+
+    let dims = dim_rates_for_run(&conn, run_id).await.unwrap();
+    assert_eq!(dims.len(), 1);
+    assert_eq!(dims[0].dim, "correctness");
+}
+
 #[tokio::test(flavor = "current_thread")]
 async fn eval_runs_append_and_list_in_order() {
     let dir = connect();

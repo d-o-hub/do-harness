@@ -64,6 +64,12 @@ pub enum DbError {
     /// [`do_harness_types::TaskState`] (only `done`/`failed` map to events).
     #[error("terminal-status writer requires 'done' or 'failed', got '{0}'")]
     InvalidTerminalState(String),
+    /// A lifecycle writer targeted a task whose current state is already
+    /// terminal (`done`/`failed`). Allowing it would append an out-of-order
+    /// event (`TaskAdvanced`/`TaskCompleted` after completion) and break the
+    /// "the event stream covers every persisted transition" invariant.
+    #[error("invalid task transition: {0}")]
+    InvalidTaskTransition(String),
     /// A foreign-key or unique constraint was violated.
     #[error("constraint violated: {0}")]
     Constraint(String),

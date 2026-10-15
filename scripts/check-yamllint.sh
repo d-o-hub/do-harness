@@ -7,6 +7,7 @@
 # Enforcement policy (fail-open locally, fail-closed on demand):
 #   - yamllint missing AND (CI=true OR DO_HARNESS_REQUIRE_TOOLS=1) -> FAIL.
 #   - yamllint missing otherwise -> SKIP.
+#   - zero yaml files discovered -> FAIL (no vacuous gate).
 
 set -euo pipefail
 
@@ -33,8 +34,8 @@ mapfile -t files < <(
 )
 
 if [[ "${#files[@]}" -eq 0 ]]; then
-    echo "check-yamllint OK: no yaml files found to lint."
-    exit 0
+    echo "FAIL: no yaml files found to lint; a gate that checks nothing is not a pass." >&2
+    exit 1
 fi
 
 # Pass configuration file if present

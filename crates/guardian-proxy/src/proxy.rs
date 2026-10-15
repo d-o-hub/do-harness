@@ -182,7 +182,7 @@ pub fn validate_upstream(config: &ProxyConfig) -> Result<()> {
             config.upstream
         ))
     })?;
-    let host_lower = host.to_ascii_lowercase();
+    let host_lower = normalize_host_literal(&host.to_ascii_lowercase());
     if is_link_local(&host_lower) {
         return Err(crate::error::GuardianError::Config(format!(
             "upstream host '{host}' is link-local/metadata and always denied"
@@ -219,6 +219,74 @@ fn upstream_host(upstream: &str) -> Option<&str> {
     Some(host_port.split(':').next().unwrap_or(host_port))
 }
 
+/// Rewrites a host literal to the address that will actually be dialled so the
+/// range checks cannot be bypassed by alternate spellings: an IPv4-mapped IPv6
+/// host (`::ffff:169.254.169.254`) becomes its embedded dotted IPv4 form, the
+/// unspecified address (`::`) becomes `0.0.0.0`, and a WHATWG-style IPv4
+/// literal (`0x7f000001`, `2130706433`, `017700000001`) becomes a dotted quad.
+/// Non-literals pass through unchanged, so hostnames keep the textual checks.
+fn normalize_host_literal(host: &str) -> String {
+    if let Ok(v6) = host.parse::<std::net::Ipv6Addr>() {
+        if let Some(v4) = v6.to_ipv4_mapped() {
+            return v4.to_string();
+        }
+        if v6.is_unspecified() {
+            return "0.0.0.0".to_string();
+        }
+        return host.to_string();
+    }
+    match parse_ipv4_literal(host) {
+        Some(octets) => std::net::Ipv4Addr::from(octets).to_string(),
+        None => host.to_string(),
+    }
+}
+
+/// Parses a WHATWG-style IPv4 literal — decimal, octal (`0NNN`), or hex
+/// (`0xNN`) with one to four dot-separated parts — into its four octets.
+///
+/// The URL stack folds these alternate spellings to a dotted quad at connect
+/// time, so the range checks must see the same value; otherwise
+/// `http://0x7f000001/` would reach loopback while the guard saw a hostname.
+/// Returns `None` when the input is not an IPv4 literal.
+fn parse_ipv4_literal(host: &str) -> Option<[u8; 4]> {
+    if host.is_empty() {
+        return None;
+    }
+    let mut numbers: Vec<u64> = Vec::new();
+    for part in host.split('.') {
+        let (radix, digits) =
+            if part.len() > 2 && (part.starts_with("0x") || part.starts_with("0X")) {
+                (16u32, &part[2..])
+            } else if part.len() > 1 && part.starts_with('0') {
+                (8u32, &part[1..])
+            } else {
+                (10u32, part)
+            };
+        if digits.is_empty() {
+            return None;
+        }
+        numbers.push(u64::from_str_radix(digits, radix).ok()?);
+    }
+    if numbers.len() > 4 {
+        return None;
+    }
+    let last = numbers.pop()?;
+    // Every leading part is one octet; the final part fills the remainder.
+    if numbers.iter().any(|&n| n > 255) || last >= 1u64 << (8 * (4 - numbers.len())) {
+        return None;
+    }
+    let mut ipv4 = last;
+    for (i, &n) in numbers.iter().enumerate() {
+        ipv4 += n << (8 * (3 - i));
+    }
+    Some([
+        ((ipv4 >> 24) & 0xff) as u8,
+        ((ipv4 >> 16) & 0xff) as u8,
+        ((ipv4 >> 8) & 0xff) as u8,
+        (ipv4 & 0xff) as u8,
+    ])
+}
+
 /// Cloud metadata / link-local ranges that are never valid upstreams.
 fn is_link_local(host: &str) -> bool {
     // IPv4 link-local (169.254.0.0/16) and the cloud metadata aliases.
@@ -250,140 +318,5 @@ fn is_private_or_loopback(host: &str) -> bool {
 }
 
 #[cfg(test)]
-mod tests {
-    #![allow(clippy::unwrap_used, clippy::expect_used)]
-
-    use super::*;
-    use serde_json::json;
-
-    fn test_config() -> ProxyConfig {
-        ProxyConfig {
-            bind: "127.0.0.1:0".to_string(),
-            upstream: "http://127.0.0.1:9000".to_string(),
-            agent_id: "test-agent".to_string(),
-            audit_log: None,
-            upstream_allowlist: vec![],
-            allow_private_upstreams: true,
-            metrics_token: None,
-            ingress_token: None,
-            allowed_origins: vec![],
-        }
-    }
-
-    #[test]
-    fn test_config_deny_unknown_fields() {
-        let bad = r#"{"bind":"a","upstream":"b","agent_id":"c","extra":1}"#;
-        let err = serde_json::from_str::<ProxyConfig>(bad).unwrap_err();
-        assert!(err.to_string().contains("unknown field"));
-    }
-
-    #[test]
-    fn test_ssrf_denies_metadata_upstream_always() {
-        let mut cfg = test_config();
-        cfg.upstream = "http://169.254.169.254/latest/meta-data".into();
-        cfg.allow_private_upstreams = true;
-        let err = validate_upstream(&cfg).unwrap_err().to_string();
-        assert!(err.contains("link-local"), "{err}");
-    }
-
-    #[test]
-    fn test_ssrf_denies_ipv6_link_local_upstream_always() {
-        let mut cfg = test_config();
-        cfg.upstream = "http://[fe80::1]:8080".into();
-        cfg.allow_private_upstreams = false;
-        let err = match ProxyMediator::new(cfg) {
-            Ok(_) => panic!("link-local upstream must be rejected"),
-            Err(err) => err.to_string(),
-        };
-        assert!(err.contains("link-local"), "{err}");
-    }
-
-    #[test]
-    fn test_ssrf_requires_opt_in_for_loopback() {
-        let mut cfg = test_config();
-        cfg.allow_private_upstreams = false;
-        let err = validate_upstream(&cfg).unwrap_err().to_string();
-        assert!(err.contains("private/loopback"), "{err}");
-
-        cfg.allow_private_upstreams = true;
-        assert!(validate_upstream(&cfg).is_ok());
-        // And the mediator itself enforces the same policy.
-        cfg.allow_private_upstreams = false;
-        assert!(ProxyMediator::new(cfg).is_err());
-    }
-
-    #[test]
-    fn test_ssrf_allowlist_is_exact_host_match() {
-        let mut cfg = test_config();
-        cfg.upstream = "http://api.example.com:9000".into();
-        cfg.upstream_allowlist = vec!["other.example.com".into()];
-        assert!(validate_upstream(&cfg).is_err());
-
-        cfg.upstream_allowlist = vec!["API.example.com".into()];
-        assert!(validate_upstream(&cfg).is_ok());
-    }
-
-    #[test]
-    fn test_empty_credential_is_rejected_at_construction() {
-        let mut cfg = test_config();
-        cfg.ingress_token = Some(String::new());
-        let err = match ProxyMediator::new(cfg) {
-            Ok(_) => panic!("empty ingress_token must be rejected"),
-            Err(err) => err.to_string(),
-        };
-        assert!(err.contains("ingress_token must not be empty"), "{err}");
-
-        let mut cfg = test_config();
-        cfg.metrics_token = Some(String::new());
-        let err = match ProxyMediator::new(cfg) {
-            Ok(_) => panic!("empty metrics_token must be rejected"),
-            Err(err) => err.to_string(),
-        };
-        assert!(err.contains("metrics_token must not be empty"), "{err}");
-
-        let mut cfg = test_config();
-        cfg.ingress_token = Some("s3cret".into());
-        cfg.metrics_token = Some("mtok".into());
-        assert!(ProxyMediator::new(cfg).is_ok());
-    }
-
-    #[test]
-    fn test_decide_allows_valid() {
-        let mediator = ProxyMediator::new(test_config()).expect("create mediator");
-        let call = McpLikeToolCall::new("data.read", Some(json!({"path":"/tmp/x"})));
-        let decision = mediator.decide(&call).expect("decide");
-        assert_eq!(decision, ForwardDecision::Allow);
-    }
-
-    #[test]
-    fn test_decide_deny_invalid_params() {
-        let mediator = ProxyMediator::new(test_config()).expect("create mediator");
-        let call = McpLikeToolCall::new("data.read", Some(json!("not a map")));
-        let decision = mediator.decide(&call).expect("decide");
-        assert!(matches!(decision, ForwardDecision::Deny { .. }));
-    }
-
-    #[test]
-    fn test_decide_allows_no_params() {
-        let mediator = ProxyMediator::new(test_config()).expect("create mediator");
-        let call = McpLikeToolCall::new("data.read", None);
-        let decision = mediator.decide(&call).expect("decide");
-        assert_eq!(decision, ForwardDecision::Allow);
-    }
-
-    #[test]
-    fn test_bind_upstream_accessors() {
-        let mediator = ProxyMediator::new(test_config()).expect("create mediator");
-        assert_eq!(mediator.bind(), "127.0.0.1:0");
-        assert_eq!(mediator.upstream(), "http://127.0.0.1:9000");
-    }
-
-    #[cfg(feature = "agt-governance")]
-    #[test]
-    fn test_decide_with_feature_allows() {
-        let mediator = ProxyMediator::new(test_config()).expect("create mediator");
-        let call = McpLikeToolCall::new("data.read", None);
-        let decision = mediator.decide(&call).expect("decide");
-        assert_eq!(decision, ForwardDecision::Allow);
-    }
-}
+#[path = "proxy_tests.rs"]
+mod tests;

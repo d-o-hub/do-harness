@@ -233,3 +233,16 @@ happens without a default-enabled successor. Revisit triggers: (a) a consumer
 needs MCP by default, (b) AGT reaches GA and promotion review runs, (c) a
 release boundary after which the flat route can be removed together with
 default-on.
+
+### Post-review note (2026-10-15)
+
+- The pinned `rmcp = "=3.5.0"` has a newer patch release, `3.5.1`
+  (2026-10-05, official `modelcontextprotocol/rust-sdk`). The exact pin makes
+  the bump deliberate: `cargo update -p rmcp --precise 3.5.1`, then re-run
+  `cargo deny check`, `cargo audit`, the `check-mcp` sensor, and the `powerset`
+  sensor before landing it.
+- The MSRV row above is re-confirmed (every rmcp 3.x requires Rust 1.88 vs the
+  workspace 1.85; holds only while the feature is off). One adjacent gap worth
+  closing: `.clippy.toml` declares no `msrv = "1.85"`, so clippy can suggest
+  post-1.85 idioms that pass on the pinned 1.99 channel and fail the MSRV job.
+  See `plans/analysis-followups.md` (F3).

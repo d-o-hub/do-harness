@@ -94,11 +94,15 @@ pub async fn list_tasks(conn: &Connection) -> Result<Vec<TaskRecord>> {
 /// Updates a task's lifecycle state.
 ///
 /// The update reports the row back via `RETURNING`, so a missing task id is
-/// reported directly instead of silently updating zero rows.
+/// reported directly instead of silently updating zero rows. The `WHERE` also
+/// excludes tasks already in a terminal state, so a second completion (or a
+/// completion of a `failed` task) fails closed instead of appending a
+/// duplicate terminal event.
 ///
 /// # Errors
 ///
-/// Returns an error when the update statement fails or the task does not exist.
+/// Returns an error when the update statement fails, the task does not exist,
+/// or the task is already terminal.
 pub(crate) async fn update_task_status(
     conn: &Connection,
     id: i64,
@@ -106,13 +110,14 @@ pub(crate) async fn update_task_status(
 ) -> Result<()> {
     let mut rows = conn
         .query(
-            "UPDATE tasks SET status = ?1, updated_at = ?2 WHERE id = ?3 RETURNING id",
+            "UPDATE tasks SET status = ?1, updated_at = ?2 WHERE id = ?3 \
+             AND status NOT IN ('done', 'failed') RETURNING id",
             params!(status.as_str(), unix_now(), id),
         )
         .await?;
-    rows.next()
-        .await?
-        .ok_or_else(|| DbError::NotFound(format!("task {id} not found")))?;
+    if rows.next().await?.is_none() {
+        return Err(missing_row_error(conn, id, "update the status of").await);
+    }
     Ok(())
 }
 
@@ -120,25 +125,39 @@ pub(crate) async fn update_task_status(
 ///
 /// Returns the new subtask index. The update returns the new index via
 /// `RETURNING`, so a missing task id is reported directly instead of failing
-/// on a follow-up query.
+/// on a follow-up query. Terminal tasks are excluded: advancing a `done` or
+/// `failed` task would append a `TaskAdvanced` after its terminal event.
 ///
 /// # Errors
 ///
-/// Returns an error when the update fails or the task does not exist.
+/// Returns an error when the update fails, the task does not exist, or the
+/// task is already terminal.
 pub(crate) async fn advance_subtask(conn: &Connection, id: i64) -> Result<i64> {
     let mut rows = conn
         .query(
             "UPDATE tasks SET subtask_index = subtask_index + 1, status = ?1, \
-             updated_at = ?2 WHERE id = ?3 \
+             updated_at = ?2 WHERE id = ?3 AND status NOT IN ('done', 'failed') \
              RETURNING subtask_index",
             params!(TaskState::InProgress.as_str(), unix_now(), id),
         )
         .await?;
-    let row = rows
-        .next()
-        .await?
-        .ok_or_else(|| DbError::NotFound(format!("task {id} not found")))?;
-    Ok(row.get(0)?)
+    match rows.next().await? {
+        Some(row) => Ok(row.get(0)?),
+        None => Err(missing_row_error(conn, id, "advance").await),
+    }
+}
+
+/// Classifies a guarded `UPDATE ... RETURNING` that matched no row: a missing
+/// task is [`DbError::NotFound`], an existing terminal task is
+/// [`DbError::InvalidTaskTransition`].
+async fn missing_row_error(conn: &Connection, id: i64, action: &str) -> DbError {
+    match get_task(conn, id).await {
+        Ok(Some(task)) => DbError::InvalidTaskTransition(format!(
+            "cannot {action} task {id}: it is already '{}' (terminal)",
+            task.status.as_str()
+        )),
+        _ => DbError::NotFound(format!("task {id} not found")),
+    }
 }
 
 /// Maps a `tasks` row to a [`TaskRecord`].
@@ -329,6 +348,51 @@ mod tests {
         let task = get_task(&conn, id).await.unwrap().unwrap();
         assert_eq!(task.subtask_index, 1);
         assert_eq!(task.status, TaskState::InProgress);
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn advance_subtask_rejects_terminal_task() {
+        let dir = tempfile::tempdir().unwrap();
+        let conn = crate::migrate::connect_and_migrate(dir.path())
+            .await
+            .unwrap();
+        let id = insert_task(&conn, &new_task("slice")).await.unwrap();
+        update_task_status(&conn, id, TaskState::Done)
+            .await
+            .unwrap();
+
+        let err = advance_subtask(&conn, id).await.unwrap_err();
+        assert!(
+            matches!(err, crate::error::DbError::InvalidTaskTransition(_)),
+            "{err:?}"
+        );
+        let task = get_task(&conn, id).await.unwrap().unwrap();
+        assert_eq!(task.status, TaskState::Done);
+        assert_eq!(task.subtask_index, 0, "terminal row must be untouched");
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn update_task_status_rejects_second_terminal_transition() {
+        let dir = tempfile::tempdir().unwrap();
+        let conn = crate::migrate::connect_and_migrate(dir.path())
+            .await
+            .unwrap();
+        let id = insert_task(&conn, &new_task("slice")).await.unwrap();
+        update_task_status(&conn, id, TaskState::Done)
+            .await
+            .unwrap();
+
+        let err = update_task_status(&conn, id, TaskState::Failed)
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(err, crate::error::DbError::InvalidTaskTransition(_)),
+            "{err:?}"
+        );
+        assert_eq!(
+            get_task(&conn, id).await.unwrap().unwrap().status,
+            TaskState::Done
+        );
     }
 
     #[tokio::test(flavor = "current_thread")]

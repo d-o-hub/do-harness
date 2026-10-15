@@ -4,9 +4,10 @@
 #
 # Sensor: scripts/check-shell.sh
 # Coverage:
-#   - scripts/*.sh and crates/do-harness/templates/scripts/*.sh
+#   - scripts/**/*.sh and crates/do-harness/templates/scripts/**/*.sh
 #   - .agents/skills/**/*.sh (skill walkthroughs and helpers)
 #   - crates/do-harness/templates/skills/**/*.sh (shipped skill fixtures)
+#   - tests/**/*.sh (integration helpers and fixtures)
 # Enforcement policy (fail-open locally, fail-closed on demand):
 #   - shellcheck missing AND (CI=true OR DO_HARNESS_REQUIRE_TOOLS=1) -> FAIL.
 #   - shellcheck missing otherwise -> SKIP (keeps offline
@@ -29,11 +30,14 @@ fi
 mapfile -t files < <(
     {
         find "$ROOT/scripts" "$ROOT/crates/do-harness/templates/scripts" \
-            -maxdepth 1 -name '*.sh' -print
+            -name '*.sh' -print
         find "$ROOT/.agents/skills" "$ROOT/crates/do-harness/templates/skills" \
             -name '*.sh' -print
-        if [[ -d "$ROOT/tests/fixtures" ]]; then
-            find "$ROOT/tests/fixtures" -name '*.sh' -print
+        # Integration helpers and fixtures are executed in CI (the benchmark
+        # runs tests/selection_impact_test.sh), so they are linted too — the
+        # old `-maxdepth 1` silently skipped both.
+        if [[ -d "$ROOT/tests" ]]; then
+            find "$ROOT/tests" -name '*.sh' -print
         fi
     } | sort
 )
