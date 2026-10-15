@@ -27,15 +27,17 @@ pub const FAIL_FAST_STRIKES: i64 = 3;
 /// Returns an error when the state database cannot be initialized or queried.
 pub async fn struck_sensors(root: &Path, names: &[String], scope: &str) -> Result<Vec<String>> {
     let conn = do_harness_db::connect_and_migrate(root).await?;
-    let mut struck = Vec::new();
-    for name in names {
-        let sig =
-            do_harness_db::get_error_signature(&conn, &format!("sensor:{name}"), scope).await?;
-        if sig.is_some_and(|s| s.attempt_count >= FAIL_FAST_STRIKES) {
-            struck.push(name.clone());
-        }
-    }
-    Ok(struck)
+    let struck =
+        do_harness_db::struck_signatures(&conn, scope, "sensor:", FAIL_FAST_STRIKES).await?;
+    let struck: std::collections::HashSet<&str> = struck
+        .iter()
+        .filter_map(|signature| signature.strip_prefix("sensor:"))
+        .collect();
+    Ok(names
+        .iter()
+        .filter(|name| struck.contains(name.as_str()))
+        .cloned()
+        .collect())
 }
 /// Workstream scope for persisted beats.
 #[derive(Debug, Clone, PartialEq, Eq)]

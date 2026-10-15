@@ -419,5 +419,35 @@ pub async fn get_error_signature(
     }
 }
 
+/// Returns the error signatures at `scope` whose `attempt_count` meets
+/// `threshold` and whose key starts with `prefix`.
+///
+/// One query replaces a per-sensor lookup loop, so the fail-fast pre-check
+/// stays a single round trip as the configured sensor count grows.
+///
+/// # Errors
+///
+/// Returns an error when the query fails.
+pub async fn struck_signatures(
+    conn: &Connection,
+    scope: &str,
+    prefix: &str,
+    threshold: i64,
+) -> Result<Vec<String>> {
+    let mut rows = conn
+        .query(
+            "SELECT signature FROM error_signatures \
+             WHERE scope = ?1 AND attempt_count >= ?2 AND signature LIKE ?3 \
+             ORDER BY signature",
+            params!(scope, threshold, format!("{prefix}%")),
+        )
+        .await?;
+    let mut signatures = Vec::new();
+    while let Some(row) = rows.next().await? {
+        signatures.push(row.get(0)?);
+    }
+    Ok(signatures)
+}
+
 #[cfg(test)]
 mod tests;
