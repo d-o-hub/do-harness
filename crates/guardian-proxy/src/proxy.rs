@@ -221,22 +221,70 @@ fn upstream_host(upstream: &str) -> Option<&str> {
 
 /// Rewrites a host literal to the address that will actually be dialled so the
 /// range checks cannot be bypassed by alternate spellings: an IPv4-mapped IPv6
-/// host (`::ffff:169.254.169.254`) becomes its embedded dotted IPv4 form, and
-/// the unspecified address (`::`) becomes `0.0.0.0`. Non-literals pass through
-/// unchanged, so hostnames and unparseable forms keep the textual heuristics.
+/// host (`::ffff:169.254.169.254`) becomes its embedded dotted IPv4 form, the
+/// unspecified address (`::`) becomes `0.0.0.0`, and a WHATWG-style IPv4
+/// literal (`0x7f000001`, `2130706433`, `017700000001`) becomes a dotted quad.
+/// Non-literals pass through unchanged, so hostnames keep the textual checks.
 fn normalize_host_literal(host: &str) -> String {
-    match host.parse::<std::net::Ipv6Addr>() {
-        Ok(v6) => {
-            if let Some(v4) = v6.to_ipv4_mapped() {
-                return v4.to_string();
-            }
-            if v6.is_unspecified() {
-                return "0.0.0.0".to_string();
-            }
-            host.to_string()
+    if let Ok(v6) = host.parse::<std::net::Ipv6Addr>() {
+        if let Some(v4) = v6.to_ipv4_mapped() {
+            return v4.to_string();
         }
-        Err(_) => host.to_string(),
+        if v6.is_unspecified() {
+            return "0.0.0.0".to_string();
+        }
+        return host.to_string();
     }
+    match parse_ipv4_literal(host) {
+        Some(octets) => std::net::Ipv4Addr::from(octets).to_string(),
+        None => host.to_string(),
+    }
+}
+
+/// Parses a WHATWG-style IPv4 literal — decimal, octal (`0NNN`), or hex
+/// (`0xNN`) with one to four dot-separated parts — into its four octets.
+///
+/// The URL stack folds these alternate spellings to a dotted quad at connect
+/// time, so the range checks must see the same value; otherwise
+/// `http://0x7f000001/` would reach loopback while the guard saw a hostname.
+/// Returns `None` when the input is not an IPv4 literal.
+fn parse_ipv4_literal(host: &str) -> Option<[u8; 4]> {
+    if host.is_empty() {
+        return None;
+    }
+    let mut numbers: Vec<u64> = Vec::new();
+    for part in host.split('.') {
+        let (radix, digits) =
+            if part.len() > 2 && (part.starts_with("0x") || part.starts_with("0X")) {
+                (16u32, &part[2..])
+            } else if part.len() > 1 && part.starts_with('0') {
+                (8u32, &part[1..])
+            } else {
+                (10u32, part)
+            };
+        if digits.is_empty() {
+            return None;
+        }
+        numbers.push(u64::from_str_radix(digits, radix).ok()?);
+    }
+    if numbers.len() > 4 {
+        return None;
+    }
+    let last = numbers.pop()?;
+    // Every leading part is one octet; the final part fills the remainder.
+    if numbers.iter().any(|&n| n > 255) || last >= 1u64 << (8 * (4 - numbers.len())) {
+        return None;
+    }
+    let mut ipv4 = last;
+    for (i, &n) in numbers.iter().enumerate() {
+        ipv4 += n << (8 * (3 - i));
+    }
+    Some([
+        ((ipv4 >> 24) & 0xff) as u8,
+        ((ipv4 >> 16) & 0xff) as u8,
+        ((ipv4 >> 8) & 0xff) as u8,
+        (ipv4 & 0xff) as u8,
+    ])
 }
 
 /// Cloud metadata / link-local ranges that are never valid upstreams.
@@ -345,6 +393,42 @@ mod tests {
         cfg.allow_private_upstreams = false;
         let err = validate_upstream(&cfg).unwrap_err().to_string();
         assert!(err.contains("private/loopback"), "{err}");
+    }
+
+    #[test]
+    fn parses_alternate_ipv4_literals() {
+        assert_eq!(parse_ipv4_literal("127.0.0.1"), Some([127, 0, 0, 1]));
+        assert_eq!(parse_ipv4_literal("0x7f000001"), Some([127, 0, 0, 1]));
+        assert_eq!(parse_ipv4_literal("2130706433"), Some([127, 0, 0, 1]));
+        assert_eq!(parse_ipv4_literal("017700000001"), Some([127, 0, 0, 1]));
+        assert_eq!(parse_ipv4_literal("0xa9fea9fe"), Some([169, 254, 169, 254]));
+        assert_eq!(parse_ipv4_literal("10"), Some([0, 0, 0, 10]));
+        assert_eq!(parse_ipv4_literal("127.1"), Some([127, 0, 0, 1]));
+        assert_eq!(parse_ipv4_literal("localhost"), None);
+        assert_eq!(parse_ipv4_literal("example.com"), None);
+        assert_eq!(parse_ipv4_literal("1.2.3.4.5"), None);
+        assert_eq!(parse_ipv4_literal("256.0.0.1"), None);
+    }
+
+    #[test]
+    fn test_ssrf_normalizes_alternate_ipv4_spellings() {
+        for upstream in [
+            "http://0x7f000001:9000",
+            "http://2130706433:9000",
+            "http://017700000001:9000",
+        ] {
+            let mut cfg = test_config();
+            cfg.upstream = upstream.into();
+            cfg.allow_private_upstreams = false;
+            let err = validate_upstream(&cfg).unwrap_err().to_string();
+            assert!(err.contains("private/loopback"), "{upstream}: {err}");
+        }
+        // Link-local metadata in hex is always denied, even with the opt-in.
+        let mut cfg = test_config();
+        cfg.upstream = "http://0xa9fea9fe/".into();
+        cfg.allow_private_upstreams = true;
+        let err = validate_upstream(&cfg).unwrap_err().to_string();
+        assert!(err.contains("link-local"), "{err}");
     }
 
     #[test]
