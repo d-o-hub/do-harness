@@ -160,6 +160,31 @@ pub async fn latest_eval_run(conn: &Connection, skill_name: &str) -> Result<Opti
     }
 }
 
+/// Persists one eval run's three tables atomically: the latest-per-skill row,
+/// the append-only history row, and its per-dimension rates.
+///
+/// The three writes previously ran as independent statements from the caller,
+/// so a crash between them could leave the `skill_evals` read model claiming a
+/// run absent from the history (or missing its dimensions), and the bar ratchet
+/// plus `metrics` would then compute from divergent data.
+///
+/// # Errors
+///
+/// Returns an error when any insert fails; all three roll back together.
+pub async fn record_eval_run(
+    conn: &Connection,
+    latest: &crate::repo_skill_eval::NewSkillEval<'_>,
+    run: &NewSkillEvalRun<'_>,
+    dims: &[NewSkillEvalDimRate<'_>],
+) -> Result<i64> {
+    let tx = crate::tx::begin_immediate(conn).await?;
+    crate::repo_skill_eval::insert_skill_eval(&tx, latest).await?;
+    let run_id = insert_skill_eval_run(&tx, run).await?;
+    insert_dim_rates(&tx, run_id, dims).await?;
+    tx.commit().await?;
+    Ok(run_id)
+}
+
 /// Appends per-dimension breakdown rows for one eval run.
 ///
 /// # Errors

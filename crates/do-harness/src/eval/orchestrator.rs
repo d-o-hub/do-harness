@@ -254,30 +254,6 @@ pub async fn run_eval(root: &Path, opts: EvalOpts<'_>) -> Result<()> {
         }
 
         if let Some(pass_rate) = report.pass_rate {
-            do_harness_db::insert_skill_eval(
-                &conn,
-                &do_harness_db::NewSkillEval {
-                    skill_name: &name,
-                    prompt: report.prompt.as_deref(),
-                    expected_outcome: report.expected_outcome.as_deref(),
-                    pass_rate: Some(pass_rate),
-                },
-            )
-            .await?;
-            let run_id = do_harness_db::insert_skill_eval_run(
-                &conn,
-                &do_harness_db::NewSkillEvalRun {
-                    skill_name: &name,
-                    mode,
-                    graded: i64::from(report.graded),
-                    passed: i64::from(report.passed),
-                    pass_rate: Some(pass_rate),
-                    without_pass_rate: report.without_pass_rate,
-                    skill_words: Some(report.skill_words),
-                    walk_secs: Some(report.walk_secs),
-                },
-            )
-            .await?;
             let dim_rates: Vec<do_harness_db::NewSkillEvalDimRate<'_>> = report
                 .dims
                 .iter()
@@ -288,7 +264,27 @@ pub async fn run_eval(root: &Path, opts: EvalOpts<'_>) -> Result<()> {
                     without_passed: d.without_passed.map(i64::from),
                 })
                 .collect();
-            do_harness_db::insert_dim_rates(&conn, run_id, &dim_rates).await?;
+            do_harness_db::record_eval_run(
+                &conn,
+                &do_harness_db::NewSkillEval {
+                    skill_name: &name,
+                    prompt: report.prompt.as_deref(),
+                    expected_outcome: report.expected_outcome.as_deref(),
+                    pass_rate: Some(pass_rate),
+                },
+                &do_harness_db::NewSkillEvalRun {
+                    skill_name: &name,
+                    mode,
+                    graded: i64::from(report.graded),
+                    passed: i64::from(report.passed),
+                    pass_rate: Some(pass_rate),
+                    without_pass_rate: report.without_pass_rate,
+                    skill_words: Some(report.skill_words),
+                    walk_secs: Some(report.walk_secs),
+                },
+                &dim_rates,
+            )
+            .await?;
         }
 
         if bless {
