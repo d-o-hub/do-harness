@@ -12,6 +12,10 @@
 # (`references/*.md`, `scripts/*.py|*.sh`) that the template skill directory
 # does not ship. Prose example paths that the canonical skill does not bundle
 # are ignored; a dropped canonical resource fails.
+#
+# Finally it fails when a reference file that two canonical skills both ship
+# (`anti_ai_slop.md`) drifts between them: the copies are byte-identical today,
+# and nothing else would notice a divergent edit.
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -60,6 +64,14 @@ while IFS= read -r -d '' md; do
     fi
   done <<< "$refs"
 done < <(find "$templates" -name 'SKILL.md' -type f -print0)
+
+# Reference files that two canonical skills both ship must not drift.
+slop_a="$canonical/skill-creator/references/anti_ai_slop.md"
+slop_b="$canonical/skill-distiller/references/anti_ai_slop.md"
+if [[ -f "$slop_a" && -f "$slop_b" ]] && ! cmp -s "$slop_a" "$slop_b"; then
+  echo "check-skills-sync: drift: skill-creator/references/anti_ai_slop.md != skill-distiller/references/anti_ai_slop.md" >&2
+  failures=1
+fi
 
 if [[ "$failures" -ne 0 ]]; then
   echo "check-skills-sync FAIL: sync templates from .agents/skills" >&2
