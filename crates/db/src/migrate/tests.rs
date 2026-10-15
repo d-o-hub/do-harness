@@ -171,15 +171,31 @@ async fn pragma_int(conn: &Connection, sql: &str) -> i64 {
     rows.next().await.unwrap().unwrap().get::<i64>(0).unwrap()
 }
 
-/// Pending migrations snapshot the database to `agent_state.db.bak` first.
-#[test]
-fn backup_state_file_copies_database() {
+/// Pending migrations snapshot the database to `agent_state.db.bak` first, and
+/// the snapshot must carry committed state that still lives in the WAL sidecar
+/// — the checkpoint inside `backup_state_file` is what makes it complete.
+#[tokio::test(flavor = "current_thread")]
+async fn backup_state_file_is_wal_consistent() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("agent_state.db");
-    std::fs::write(&path, b"pre-migration").unwrap();
+    let conn = connect(&path).await.unwrap();
+    conn.execute("CREATE TABLE t (x INTEGER)", Params::None)
+        .await
+        .unwrap();
+    conn.execute("INSERT INTO t (x) VALUES (7)", Params::None)
+        .await
+        .unwrap();
 
-    backup_state_file(&path).unwrap();
+    backup_state_file(&conn, &path).await.unwrap();
 
     let backup = path.with_extension("db.bak");
-    assert_eq!(std::fs::read(&backup).unwrap(), b"pre-migration");
+    assert!(backup.exists(), "backup file missing");
+    // The snapshot is readable and contains the committed row.
+    let restored = connect(&backup).await.unwrap();
+    let mut rows = restored
+        .query("SELECT x FROM t", Params::None)
+        .await
+        .unwrap();
+    let row = rows.next().await.unwrap().expect("row");
+    assert_eq!(row.get::<i64>(0).unwrap(), 7);
 }

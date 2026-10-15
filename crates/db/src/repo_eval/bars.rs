@@ -145,7 +145,7 @@ pub async fn bless_grader_baseline(
     reason: Option<&str>,
 ) -> Result<()> {
     let now = unix_now();
-    let tx = conn.transaction().await?;
+    let tx = crate::tx::begin_immediate(conn).await?;
     tx.execute(
         "INSERT INTO grader_baselines (skill_name, walkthrough_sha, specs_sha, blessed_at) \
          VALUES (?1, ?2, ?3, ?4) \
