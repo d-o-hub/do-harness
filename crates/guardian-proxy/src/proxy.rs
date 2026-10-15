@@ -182,7 +182,7 @@ pub fn validate_upstream(config: &ProxyConfig) -> Result<()> {
             config.upstream
         ))
     })?;
-    let host_lower = host.to_ascii_lowercase();
+    let host_lower = normalize_host_literal(&host.to_ascii_lowercase());
     if is_link_local(&host_lower) {
         return Err(crate::error::GuardianError::Config(format!(
             "upstream host '{host}' is link-local/metadata and always denied"
@@ -217,6 +217,26 @@ fn upstream_host(upstream: &str) -> Option<&str> {
         return rest.split(']').next();
     }
     Some(host_port.split(':').next().unwrap_or(host_port))
+}
+
+/// Rewrites a host literal to the address that will actually be dialled so the
+/// range checks cannot be bypassed by alternate spellings: an IPv4-mapped IPv6
+/// host (`::ffff:169.254.169.254`) becomes its embedded dotted IPv4 form, and
+/// the unspecified address (`::`) becomes `0.0.0.0`. Non-literals pass through
+/// unchanged, so hostnames and unparseable forms keep the textual heuristics.
+fn normalize_host_literal(host: &str) -> String {
+    match host.parse::<std::net::Ipv6Addr>() {
+        Ok(v6) => {
+            if let Some(v4) = v6.to_ipv4_mapped() {
+                return v4.to_string();
+            }
+            if v6.is_unspecified() {
+                return "0.0.0.0".to_string();
+            }
+            host.to_string()
+        }
+        Err(_) => host.to_string(),
+    }
 }
 
 /// Cloud metadata / link-local ranges that are never valid upstreams.
@@ -296,6 +316,35 @@ mod tests {
             Err(err) => err.to_string(),
         };
         assert!(err.contains("link-local"), "{err}");
+    }
+
+    #[test]
+    fn test_ssrf_denies_ipv4_mapped_ipv6_metadata() {
+        // `::ffff:169.254.169.254` is the link-local metadata address in
+        // IPv4-mapped form; it must be denied even with the private opt-in.
+        let mut cfg = test_config();
+        cfg.upstream = "http://[::ffff:169.254.169.254]/latest/meta-data".into();
+        cfg.allow_private_upstreams = true;
+        let err = validate_upstream(&cfg).unwrap_err().to_string();
+        assert!(err.contains("link-local"), "{err}");
+    }
+
+    #[test]
+    fn test_ssrf_requires_opt_in_for_ipv4_mapped_loopback() {
+        let mut cfg = test_config();
+        cfg.upstream = "http://[::ffff:127.0.0.1]:9000".into();
+        cfg.allow_private_upstreams = false;
+        let err = validate_upstream(&cfg).unwrap_err().to_string();
+        assert!(err.contains("private/loopback"), "{err}");
+    }
+
+    #[test]
+    fn test_ssrf_requires_opt_in_for_unspecified_ipv6() {
+        let mut cfg = test_config();
+        cfg.upstream = "http://[::]:9000".into();
+        cfg.allow_private_upstreams = false;
+        let err = validate_upstream(&cfg).unwrap_err().to_string();
+        assert!(err.contains("private/loopback"), "{err}");
     }
 
     #[test]

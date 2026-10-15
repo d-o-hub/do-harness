@@ -145,6 +145,11 @@ fn bearer(headers: &HeaderMap) -> Option<&str> {
 fn upstream_client() -> crate::error::Result<reqwest::Client> {
     reqwest::Client::builder()
         .timeout(REQUEST_TIMEOUT)
+        // Fail-closed SSRF: the configured upstream is validated syntactically,
+        // but reqwest follows up to 10 redirects by default, so an allowed host
+        // answering `302 -> http://169.254.169.254/` would be followed to a
+        // target the guard never saw. Refuse to follow redirects at all.
+        .redirect(reqwest::redirect::Policy::none())
         .build()
         .map_err(|err| {
             crate::error::GuardianError::Config(format!("upstream client build failed: {err}"))
