@@ -1,6 +1,6 @@
 # Compliance mapping
 
-> **Assessment date:** 2026-09-11 · **Harness version:** 0.1.0 · **Scope:** dev-loop only
+> **Assessment date:** 2026-09-11 · **Assessed harness version:** 0.1.0 · **Scope:** dev-loop only
 >
 > Pinned framework editions: **OWASP Top 10 for Agentic Applications (2026, ASI01–ASI10)**;
 > **OWASP Top 10 for LLM Applications (2025, LLM01–LLM10)**;

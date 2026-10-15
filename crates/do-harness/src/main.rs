@@ -62,6 +62,7 @@ mod status;
 mod task;
 mod telemetry;
 mod trace;
+mod util;
 mod verify;
 mod version;
 

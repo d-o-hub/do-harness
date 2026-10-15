@@ -188,13 +188,7 @@ pub fn resolve_now(explicit: Option<i64>) -> i64 {
 /// documented name cannot drift apart.
 #[must_use]
 pub fn percentile(sorted: &[i64], pct: u32) -> Option<i64> {
-    if sorted.is_empty() {
-        return None;
-    }
-    let n = u64::try_from(sorted.len()).ok()?;
-    let rank = (u64::from(pct) * n).div_ceil(100).max(1);
-    let index = usize::try_from(rank - 1).ok()?;
-    sorted.get(index).copied()
+    crate::util::percentile(sorted, pct)
 }
 
 /// Derives a snapshot from git history.

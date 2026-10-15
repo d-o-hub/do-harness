@@ -272,7 +272,7 @@ source of truth.
 
 `do-harness hook install` writes three managed hooks into `.git/hooks/`:
 
-- **pre-commit**: runs `verify --fail-fast --only fmt --only loc`
+- **pre-commit**: runs `verify --fail-fast --record --only fmt --only loc`
 - **commit-msg**: runs `scripts/check-commitlint.sh --message` against the prepared message (fail-closed: blocks the commit when the repo or script is missing)
 - **pre-push**: runs the full `verify` suite
 
@@ -294,7 +294,7 @@ canonical copy).
 
 ## CI
 
-GitHub Actions: see `.github/workflows/verify.yml` — lints shell sensors, builds `do-harness`, checks the adjacent `guardian-proxy` crate with the optional features off and on (`cargo check -p guardian-proxy` / `--features agt-governance` / `--features mcp-surface`) and tests it (`cargo test -p guardian-proxy` plus both feature builds), runs `verify --set verification --format json --strict` and `status --set verification`, dogfoods `init && verify` on fresh rust/generic workspaces, and runs `do-harness eval`.
+GitHub Actions: see `.github/workflows/verify.yml` — lints shell sensors, builds `do-harness`, checks the adjacent `guardian-proxy` crate with default features and tests it with the optional features off and on (`cargo check -p guardian-proxy`; `cargo test -p guardian-proxy` plus both feature builds), runs `verify --set verification --format json --strict` and `status --set verification` plus `verify --set scheduled`, dogfoods `init && verify` on fresh rust/generic workspaces, and runs `do-harness eval --strict-fixtures`.
 
 > **Runtime proxy note:** `do-harness` itself stays a dev-loop harness (no traffic proxy). The adjacent `crates/guardian-proxy` is an *optional* fail-closed sidecar (off by default; governance via `agt-governance`, MCP Streamable HTTP ingress via `mcp-surface`) and the only tool-call mediation surface, via its `ProxyMediator` gate — see `crates/guardian-proxy/README.md` when present.
 
