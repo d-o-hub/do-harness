@@ -8,6 +8,7 @@ use std::fs;
 use super::tests::write_catalog;
 use super::*;
 use crate::report::Format;
+use do_harness_types::TaskState;
 
 /// Regression: `task remove` used to run a bare `DELETE FROM tasks`, which
 /// failed with `FOREIGN KEY constraint failed` for any task that had an event,
@@ -174,7 +175,7 @@ async fn export_without_dry_run_does_write() {
 async fn dry_run_done_surfaces_the_same_refusal() {
     let dir = tempfile::tempdir().unwrap();
     write_catalog(dir.path());
-    let (id, _) = add_task(dir.path(), "methodless", None, None, None)
+    let (id, _) = add_task(dir.path(), "gated", Some("mini"), None, None)
         .await
         .unwrap();
 
@@ -188,7 +189,35 @@ async fn dry_run_done_surfaces_the_same_refusal() {
     .to_string();
     let real = done_task(dir.path(), id).await.unwrap_err().to_string();
     assert_eq!(dry, real, "a dry run must preview the real refusal");
-    assert!(dry.contains("has no method"), "unexpected: {dry}");
+    assert!(dry.contains("subtasks remain"), "unexpected: {dry}");
+}
+
+/// `--dry-run` on a method-less `task done` previews success without writing.
+#[tokio::test(flavor = "current_thread")]
+async fn dry_run_done_methodless_task_writes_nothing() {
+    let dir = tempfile::tempdir().unwrap();
+    write_catalog(dir.path());
+    let (id, _) = add_task(dir.path(), "methodless", None, None, None)
+        .await
+        .unwrap();
+
+    crate::commands::task_cmd(
+        dir.path(),
+        crate::cli::TaskAction::Done { id, dry_run: true },
+        true,
+    )
+    .await
+    .unwrap();
+
+    let conn = do_harness_db::connect_and_migrate(dir.path())
+        .await
+        .unwrap();
+    let task = do_harness_db::get_task(&conn, id).await.unwrap().unwrap();
+    assert_eq!(
+        task.status,
+        TaskState::Pending,
+        "dry run must not change status"
+    );
 }
 
 /// Regression: a dry-run advance past a sensor-gated subtask printed success
