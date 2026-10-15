@@ -35,6 +35,8 @@ dev checkout.
 | A7 | `upstream_client()` sets `reqwest::redirect::Policy::none()` — an allowed upstream can no longer answer `302` to a metadata address | `cargo test -p guardian-proxy` → 40 passed; clippy clean |
 | A8 | `normalize_host_literal` maps IPv4-mapped IPv6 (`::ffff:169.254.169.254`) to its embedded IPv4, `::` to `0.0.0.0`, and WHATWG-style IPv4 literals (`0x7f000001`, `2130706433`, `017700000001`) to a dotted quad before the range checks; 5 new tests | `cargo test -p guardian-proxy --lib` → 42 passed |
 | S4 | `struck_signatures` does the fail-fast pre-check in one indexed query instead of one `get_error_signature` per sensor; `struck_sensors` rewired to it | `cargo test -p do-harness-db` → 66 passed; `cargo test --bin do-harness -- telemetry errors` → 20 passed |
+| A4 | `record_eval_run` writes the latest-per-skill row, the history row and the dimension rows in one transaction; the orchestrator uses it instead of three independent writes | `cargo test -p do-harness-db` → 67 passed |
+| C4 | `classify_verdict` + `cancelled_result` are shared by the parallel and sequential execution paths, so the verdict ladder cannot drift | `cargo test --bin do-harness -- sensors` → 34 passed |
 | P2/P3 | Toolchain/lint/nextest configs and each sensor's own script added to the `when-changed` inputs whose verdicts they change | `do-harness list`/`explain --set verification --changed` run against the rebuilt binary; TOML parses (25 sensors) |
 | R8 | `pr-triage` SKILL.md step 10 and description mark semantic routing optional/experimental with the measured no-go | markdownlint clean; `untrusted-ingest`/`skills-docs` sensors pass |
 | F5 | `.clippy.toml` gained `msrv = "1.85"` (and `IPv4`/`IPv6` as valid doc idents) | workspace clippy clean; the setting surfaced a real `doc_markdown` finding during the pass |
@@ -49,8 +51,8 @@ explicit guard) instead of a raw grep error.
 
 **Residual:** none for A8 (alternate IPv4 spellings are now normalized).
 
-**Not started:** R1 (release rescue), A10 (pre-push set), A4, A6, S1–S3,
-S5–S19, T1–T18, F1–F4, P1, P4, P7–P16, B1, B3–B5, C1–C5, D1–D2, R2–R7, R9.
+**Not started:** R1 (release rescue), A10 (pre-push set), A6, S1–S3, S5–S19,
+T1–T18, F1–F4, P1, P4, P7–P16, B1, B3–B5, C1–C3, C5, D1–D2, R2–R7, R9.
 
 ## Progress: release-state truth decay (verified first-party)
 
@@ -212,9 +214,9 @@ closed final (`NO_GO`); DORA ratchet tolerates 3 breaches.
 6. Roadmap/doc sync (**R2/R4/R5/R6**) once the release lands; LOC splits
    (**B1–B3**) opportunistic; **F1/F2/P2/P3** as policy/supply-chain chores.
 
-*Landed in the first implementation pass (2026-10-15):* A1, A2, A3, A5, A7, A8,
-F5, P2, P3, P5, P6 (partial), R8, S4, B2 (forced by A1). *Next:* R1
-(operator-gated), A10 (maintainer decision), A4, A6.
+*Landed (2026-10-15):* A1, A2, A3, A4, A5, A7, A8, C4, F5, P2, P3, P5, P6
+(partial), R8, S4, B2 (forced by A1). *Next:* R1 (operator-gated), A10
+(maintainer decision), A6, C1–C3, C5.
 
 ## Verification notes
 
