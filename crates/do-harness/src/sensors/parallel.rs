@@ -44,6 +44,55 @@ fn into_order(mut indexed: Vec<(usize, SensorResult)>) -> Vec<SensorResult> {
     indexed.into_iter().map(|(_, result)| result).collect()
 }
 
+/// The verdict a sensor receives before execution, in priority order: a reused
+/// beat (which spawns nothing) wins over a blocked/quarantined verdict, which
+/// wins over a fresh run. Both execution paths resolve through
+/// [`classify_verdict`] so the ordering cannot drift between them.
+#[derive(Clone, Copy)]
+enum Verdict {
+    Reused(i64),
+    Blocked,
+    Quarantined,
+    Run,
+}
+
+/// Classifies one sensor's verdict for the current run. The reuse, blocked and
+/// quarantined sets are disjoint, so this is a pure priority statement rather
+/// than a set-intersection decision.
+fn classify_verdict(spec: &SensorSpec, opts: &VerifyOpts) -> Verdict {
+    if let Some(beat_id) = opts.reused.get(&spec.name) {
+        Verdict::Reused(*beat_id)
+    } else if opts.blocked.contains(&spec.name) {
+        Verdict::Blocked
+    } else if opts.quarantined.contains(&spec.name) {
+        Verdict::Quarantined
+    } else {
+        Verdict::Run
+    }
+}
+
+/// The not-run result a sensor gets when fail-fast cancelled it before start.
+fn cancelled_result(spec: &SensorSpec) -> SensorResult {
+    SensorResult {
+        fix: None,
+        name: spec.name.clone(),
+        ok: false,
+        exit_code: None,
+        duration_ms: 0,
+        severity: spec.effective_severity(),
+        allow_failure: spec.effective_severity() == crate::config::SensorSeverity::Warn,
+        warned: false,
+        findings: None,
+        baseline: None,
+        execution: crate::report::Execution::NotRun,
+        reused_beat_id: None,
+        output: format!(
+            "sensor '{}' cancelled before start: fail-fast stopped this run",
+            spec.name
+        ),
+    }
+}
+
 /// Runs one chunk of specs on scoped worker threads.
 ///
 /// Each worker checks the shared cancel flag before spawning: with
@@ -62,40 +111,22 @@ fn run_chunk(
                 let handle = scope.spawn(|| {
                     // A reused verdict spawns nothing, so fail-fast
                     // cancellation must not rewrite it as `cancelled before
-                    // start`; the sequential path checks reuse with no cancel
-                    // guard either, and both must agree.
-                    let result = if let Some(beat_id) = opts.reused.get(&item.spec.name) {
-                        super::sensor_reused(item.spec, *beat_id)
-                    } else if opts.fail_fast && cancel.load(Ordering::SeqCst) {
-                        SensorResult {
-                            fix: None,
-                            name: item.spec.name.clone(),
-                            ok: false,
-                            exit_code: None,
-                            duration_ms: 0,
-                            severity: item.spec.effective_severity(),
-                            allow_failure: item.spec.effective_severity()
-                                == crate::config::SensorSeverity::Warn,
-                            warned: false,
-                            findings: None,
-                            baseline: None,
-                            execution: crate::report::Execution::NotRun,
-                            reused_beat_id: None,
-                            output: format!(
-                                "sensor '{}' cancelled before start: fail-fast stopped this run",
-                                item.spec.name
-                            ),
+                    // start`; the shared ladder states that priority once for
+                    // both the parallel and sequential paths.
+                    let result = match classify_verdict(item.spec, opts) {
+                        Verdict::Reused(beat_id) => super::sensor_reused(item.spec, beat_id),
+                        _ if opts.fail_fast && cancel.load(Ordering::SeqCst) => {
+                            cancelled_result(item.spec)
                         }
-                    } else if opts.blocked.contains(&item.spec.name) {
-                        sensor_blocked(item.spec)
-                    } else if opts.quarantined.contains(&item.spec.name) {
-                        super::sensor_quarantined(item.spec)
-                    } else {
-                        let result = run_sensor(item.spec, root, cancel, &opts.baselines);
-                        if opts.fail_fast && !result.ok && !result.allow_failure {
-                            cancel.store(true, Ordering::SeqCst);
+                        Verdict::Blocked => sensor_blocked(item.spec),
+                        Verdict::Quarantined => super::sensor_quarantined(item.spec),
+                        Verdict::Run => {
+                            let result = run_sensor(item.spec, root, cancel, &opts.baselines);
+                            if opts.fail_fast && !result.ok && !result.allow_failure {
+                                cancel.store(true, Ordering::SeqCst);
+                            }
+                            result
                         }
-                        result
                     };
                     (item.index, result)
                 });
@@ -132,14 +163,11 @@ fn run_sequential(
 ) -> Vec<SensorResult> {
     let mut results = Vec::with_capacity(specs.len());
     for spec in specs {
-        let result = if opts.blocked.contains(&spec.name) {
-            sensor_blocked(spec)
-        } else if opts.quarantined.contains(&spec.name) {
-            super::sensor_quarantined(spec)
-        } else if let Some(beat_id) = opts.reused.get(&spec.name) {
-            super::sensor_reused(spec, *beat_id)
-        } else {
-            run_sensor(spec, root, cancel, &opts.baselines)
+        let result = match classify_verdict(spec, opts) {
+            Verdict::Reused(beat_id) => super::sensor_reused(spec, beat_id),
+            Verdict::Blocked => sensor_blocked(spec),
+            Verdict::Quarantined => super::sensor_quarantined(spec),
+            Verdict::Run => run_sensor(spec, root, cancel, &opts.baselines),
         };
         let hard_failed = !result.ok && !result.allow_failure;
         results.push(result);
