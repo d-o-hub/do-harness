@@ -60,8 +60,9 @@ signals a first-class, runtime-neutral completion contract.
   inputs change mid-run, so the `green -> edit -> stale -> verify -> green`
   contract holds even under concurrent edits.
 - Task fix (2026-10-14, #306/#310): methodless tasks can reach done through
-  empty sensor gates; PR triaged and squash-reworded locally, merge pending
-  CI re-gate. Tasks 1–3 (landed #292/#293/#294) stay pending until it merges.
+  empty sensor gates; PR triaged and squash-reworded locally, merged 2026-10-15
+  (`9dbf2eb`, 12/12 checks). Tasks 1–3 (landed #292/#293/#294) marked done;
+  board 5/5 done.
 - Ops (2026-10-14): an uncapped full local verify invoked the host OOM killer
   (`opencode` shot twice); local verify/push now requires `CARGO_BUILD_JOBS=2`
   plus `CARGO_INCREMENTAL=0`, see `AGENTS.md` hooks. The 13:40 round killed
@@ -72,8 +73,10 @@ signals a first-class, runtime-neutral completion contract.
   `concurrency::concurrent_verify_record_and_advance_keep_chain_intact` passes
   in ~3s normally but balloons past 11GB anon under llvm-cov (timing-sensitive
   retry storm under instrumentation slowdown), killing every pre-push hook.
-  lcov.info stale since 10-09. Fix pending approval: bound the test when
-  `LLVM_PROFILE_FILE` is set, or exclude it from the coverage run.
+  Fixed 2026-10-15 in `f7a6cff` (wave sizes shrink when `LLVM_PROFILE_FILE` is
+  set, nextest threads bounded, dev `opt-level 3` dropped); verified the same
+  day: 1 passed in ~46s under `cargo llvm-cov nextest` inside an 8G
+  `systemd-run` cap, lcov.info fresh.
 
 ## Non-goals
 
