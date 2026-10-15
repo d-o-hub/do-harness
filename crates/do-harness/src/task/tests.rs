@@ -278,20 +278,22 @@ async fn advance_rejects_when_done_or_failed() {
     );
 }
 
-/// A task with no method cannot be marked done.
+/// A task with no method can be marked done.
 #[tokio::test(flavor = "current_thread")]
-async fn done_rejects_task_without_method() {
+async fn done_allows_task_without_method() {
     let dir = tempfile::tempdir().unwrap();
     write_catalog(dir.path());
     let (id, _event) = add_task(dir.path(), "orphan", None, None, None)
         .await
         .unwrap();
 
-    let err = done_task(dir.path(), id).await.unwrap_err();
-    assert_eq!(
-        err.to_string(),
-        format!("task {id} has no method; cannot mark done")
-    );
+    done_task(dir.path(), id).await.unwrap();
+
+    let conn = do_harness_db::connect_and_migrate(dir.path())
+        .await
+        .unwrap();
+    let task = do_harness_db::get_task(&conn, id).await.unwrap().unwrap();
+    assert_eq!(task.status, TaskState::Done);
 }
 
 /// A task with no method cannot advance at all (it is stuck pending).

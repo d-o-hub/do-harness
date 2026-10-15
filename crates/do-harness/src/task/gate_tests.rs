@@ -92,12 +92,8 @@ async fn done_rejects_empty_method_string() {
 
 /// Failing a methodless task is legitimate (a stuck task may be failed), but
 /// after failing it must still be impossible to advance or mark done.
-///
-/// Note the asymmetry: `advance_task` rejects `done`/`failed` before the method
-/// check, while `done_task` checks the method first — so the two block with
-/// different messages for the same task.
 #[tokio::test(flavor = "current_thread")]
-async fn fail_allows_methodless_then_blocks_advance_and_done() {
+async fn fail_allows_methodless_then_blocks_advance() {
     let dir = tempfile::tempdir().unwrap();
     write_catalog(dir.path());
     let (id, _event) = add_task(dir.path(), "orphan", None, None, None)
@@ -115,7 +111,7 @@ async fn fail_allows_methodless_then_blocks_advance_and_done() {
     let done_err = done_task(dir.path(), id).await.unwrap_err();
     assert_eq!(
         done_err.to_string(),
-        format!("task {id} has no method; cannot mark done"),
+        format!("task {id} is failed; cannot mark done"),
         "unexpected error: {done_err}"
     );
 }

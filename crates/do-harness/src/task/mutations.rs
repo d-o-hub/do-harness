@@ -195,8 +195,14 @@ async fn done_gate(root: &Path, id: i64) -> Result<DoneGate> {
     let task = do_harness_db::get_task(&conn, id)
         .await?
         .with_context(|| format!("task {id} not found"))?;
+    if matches!(task.status, TaskState::Done | TaskState::Failed) {
+        anyhow::bail!("task {id} is {}; cannot mark done", task.status.as_str());
+    }
     let Some(method_name) = task.method else {
-        anyhow::bail!("task {id} has no method; cannot mark done");
+        return Ok(DoneGate {
+            conn,
+            required_sensors: Vec::new(),
+        });
     };
     let methods = crate::methods::load_methods(root).await?;
     let method = crate::methods::find_method(&methods, &method_name)
