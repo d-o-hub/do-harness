@@ -41,6 +41,9 @@ dev checkout.
 | R5/R6 | `docs/compliance.md` names the *assessed* version; README hook command shows `--record`, the CI paragraph matches `verify.yml`, and the `docs/cli.md` skills-suggest example shows the real catalog size | markdownlint clean |
 | R9 | `check-skills-sync.sh` fails when the two `anti_ai_slop.md` copies diverge | guard fires in a hermetic scratch tree |
 | C1 | one `util::percentile` (with a covering test) shared by the DORA collector and the PR-loop metrics | `cargo test --bins` → 553 passed |
+| S5/T18 | in-crate tests for `repo_sensors` (the `MAX` ratchet monotonicity and the `previous_max` bless flow) | `cargo test -p do-harness-db` → 69 passed |
+| S8 | `parse_invariants_json` returns a typed `ParseInvariantsError` (its `Display` keeps the expected-schema guidance verbatim) | `cargo test -p do-harness-types` → 19 passed |
+| S19 | the `tx.rs` ordering test now describes what it actually asserts | `cargo test -p do-harness-db` → 69 passed |
 | P2/P3 | Toolchain/lint/nextest configs and each sensor's own script added to the `when-changed` inputs whose verdicts they change | `do-harness list`/`explain --set verification --changed` run against the rebuilt binary; TOML parses (25 sensors) |
 | R8 | `pr-triage` SKILL.md step 10 and description mark semantic routing optional/experimental with the measured no-go | markdownlint clean; `untrusted-ingest`/`skills-docs` sensors pass |
 | F5 | `.clippy.toml` gained `msrv = "1.85"` (and `IPv4`/`IPv6` as valid doc idents) | workspace clippy clean; the setting surfaced a real `doc_markdown` finding during the pass |
@@ -55,8 +58,9 @@ explicit guard) instead of a raw grep error.
 
 **Residual:** none for A8 (alternate IPv4 spellings are now normalized).
 
-**Not started:** R1 (release rescue), A10 (pre-push set), A6, S1–S3, S5–S19,
-T1–T18, F1–F4, P1, P4, P7–P16, B1, B3–B5, C2, C3, C5, D1–D2, R2, R3, R7.
+**Not started:** R1 (release rescue), A10 (pre-push set), A6, S1–S3, S6, S7,
+S9–S18, T1–T18, F1–F4, P1, P4, P7–P16, B1, B3–B5, C2, C3, C5, D1–D2, R2, R3,
+R7.
 
 ## Progress: release-state truth decay (verified first-party)
 
@@ -219,8 +223,9 @@ closed final (`NO_GO`); DORA ratchet tolerates 3 breaches.
    (**B1–B3**) opportunistic; **F1/F2/P2/P3** as policy/supply-chain chores.
 
 *Landed (2026-10-15):* A1, A2, A3, A4, A5, A7, A8, C1, C4, F5, P2, P3, P5,
-P6 (partial), R4, R5, R6, R8, R9, S4, B2 (forced by A1). *Next:* R1
-(operator-gated), A10 (maintainer decision), A6, C2, C3, C5, R2, R3, R7.
+P6 (partial), R4, R5, R6, R8, R9, S4, S5, S8, S19, T18, B2 (forced by A1).
+*Next:* R1 (operator-gated), A10 (maintainer decision), A6, C2, C3, C5, R2, R3,
+R7.
 
 ## Verification notes
 
