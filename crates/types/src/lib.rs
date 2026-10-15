@@ -23,7 +23,7 @@ pub mod workflow;
 
 pub use beat::Beat;
 pub use chain::{canonical_payload, canonical_value, chain_hash};
-pub use decision::{DecisionHeader, parse_invariants_json};
+pub use decision::{DecisionHeader, ParseInvariantsError, parse_invariants_json};
 pub use error_signature::ErrorSignature;
 pub use eval_dim::EvalDim;
 pub use eval_run::{EvalMode, GraderBaseline, SkillEvalBless, SkillEvalDimRate, SkillEvalRun};

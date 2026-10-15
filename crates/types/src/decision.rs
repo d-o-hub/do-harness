@@ -52,25 +52,39 @@ struct InvariantsWrapper {
     invariants: Vec<DecisionHeader>,
 }
 
+/// Error returned when `plans/invariants.json` matches neither accepted shape.
+///
+/// Carries the expected-schema guidance in its `Display`, so callers that
+/// interpolate it (`{e}`) keep the previous message verbatim.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ParseInvariantsError;
+
+impl std::fmt::Display for ParseInvariantsError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(
+            "invalid invariants.json: expected a JSON array of DecisionHeader objects \
+             ({invariant, rationale, sensor, category}) or an object with a top-level \
+             \"invariants\" array; see plans/invariants.json",
+        )
+    }
+}
+
+impl std::error::Error for ParseInvariantsError {}
+
 /// Parses `plans/invariants.json` in either accepted shape.
 ///
 /// # Errors
 ///
-/// Returns an error describing the expected schema when the input matches
-/// neither a `DecisionHeader` array nor an `{"invariants": [...]}` object.
-pub fn parse_invariants_json(json: &str) -> Result<Vec<DecisionHeader>, String> {
+/// Returns [`ParseInvariantsError`] when the input matches neither a
+/// `DecisionHeader` array nor an `{"invariants": [...]}` object.
+pub fn parse_invariants_json(json: &str) -> Result<Vec<DecisionHeader>, ParseInvariantsError> {
     if let Ok(headers) = serde_json::from_str::<Vec<DecisionHeader>>(json) {
         return Ok(headers);
     }
     if let Ok(wrapper) = serde_json::from_str::<InvariantsWrapper>(json) {
         return Ok(wrapper.invariants);
     }
-    Err(
-        "invalid invariants.json: expected a JSON array of DecisionHeader objects \
-         ({invariant, rationale, sensor, category}) or an object with a top-level \
-         \"invariants\" array; see plans/invariants.json"
-            .to_owned(),
-    )
+    Err(ParseInvariantsError)
 }
 
 #[cfg(test)]
@@ -113,7 +127,7 @@ mod tests {
     #[test]
     fn error_mentions_expected_schema() {
         let err = parse_invariants_json("{}").expect_err("must fail");
-        assert!(err.contains("DecisionHeader"), "{err}");
-        assert!(err.contains("invariants"), "{err}");
+        assert!(err.to_string().contains("DecisionHeader"), "{err}");
+        assert!(err.to_string().contains("invariants"), "{err}");
     }
 }
