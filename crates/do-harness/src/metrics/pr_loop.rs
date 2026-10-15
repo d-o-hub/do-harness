@@ -259,11 +259,7 @@ fn ratio(part: usize, total: usize) -> f64 {
 
 /// Nearest-rank percentile over an ascending slice.
 fn percentile(sorted: &[u64], percent: usize) -> Option<u64> {
-    if sorted.is_empty() {
-        return None;
-    }
-    let rank = (percent * sorted.len()).div_ceil(100).max(1);
-    sorted.get(rank - 1).copied()
+    crate::util::percentile(sorted, u32::try_from(percent).ok()?)
 }
 
 /// Commit timestamp, preferring the committer stamp.
