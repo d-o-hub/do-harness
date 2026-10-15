@@ -62,6 +62,30 @@ Until 0.3.0 has passed actual registry validation, registry source installations
 of prior versions still resolve unpatched upstream libSQL. Use tested prebuilt
 release artifacts, or build this checkout with its versioned fork dependency.
 
+## Publication record (2026-10-15)
+
+`do-harness-libsql` 0.9.30 was published manually to crates.io on 2026-10-15
+(crates.io API: `published_by: d-o-hub`, `trustpub_data: null`) because Trusted
+Publishing for the new name was not yet configured. The `v0.3.0` tag exists on
+`6804b41`; its publish job failed (`do-harness-libsql 0.9.30 already exists`, the
+idempotency check fixed later in #312/`787c19f`) and
+`registry-validation`/`npm-publish`/`release` were skipped. Recovery: configure
+Trusted Publishing for `do-harness-libsql`, re-cut the tag on `787c19f`, then
+complete the registry-validation step above.
+
+## Upstream issue watch
+
+The vendored line is libSQL 0.9.30. Upstream released 0.10.0 on 2026-10-13 and
+carries open soundness/durability issues that affect this base version: #2285
+(`Row::get_value` truncates embedded NUL text and panics on malformed UTF-8,
+reported against 0.9.30), #2271 (bundled SQLite predates the 3.51.3 WAL-reset
+fix — silent loss of committed writes under concurrent checkpointing), #2254
+(corruption on power loss), and #2272 (`Connection::authorizer` keeps a raw
+pointer to the connection, heap use-after-free). The harness uses libSQL as the
+persistence engine for all task/beat/trace state, so a 0.10.0 rebase decision is
+due; add an upstream-issue watch mirroring `scripts/check-agt-ga.sh` and record
+the affected issues here as they land.
+
 ## References
 
 - <https://doc.rust-lang.org/cargo/commands/cargo-package.html>

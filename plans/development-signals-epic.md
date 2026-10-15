@@ -77,6 +77,18 @@ signals a first-class, runtime-neutral completion contract.
   set, nextest threads bounded, dev `opt-level 3` dropped); verified the same
   day: 1 passed in ~46s under `cargo llvm-cov nextest` inside an 8G
   `systemd-run` cap, lcov.info fresh.
+- Pre-push hook sensor selection (2026-10-15): an empty `pre-push` list
+  (`do-harness.toml`) means the **full** suite runs on every push — including
+  `coverage` (the OOM amplifier above), `powerset`, `machete`, and the network
+  `audit` — contradicting the "kept out of fast-loop hooks" comments on those
+  sensors. Recommended: enumerate the push-gate sensors explicitly, or support a
+  `@set` reference in the hook schema. See `plans/analysis-followups.md` (A10).
+- Coverage as a PR signal (2026-10-15): the `coverage` sensor runs only in the
+  `release` set, so regressions land silently on `main`; and
+  `scripts/check-coverage.sh` measures with no test-code exclusion, so the 70%
+  figure includes ~20k lines of self-covering test code. Recommended: a
+  `--ignore-filename-regex` for tests plus a PR/scheduled coverage run and a
+  minimum-test-count guard. See `plans/analysis-followups.md` (T1/T2/T7).
 
 ## Non-goals
 
