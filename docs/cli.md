@@ -834,7 +834,7 @@ JSON output carries metadata only:
 {
   "schema_version": 1,
   "query_terms": 8,
-  "catalog_size": 27,
+  "catalog_size": 13,
   "candidates": [
     {
       "name": "pr-triage",
