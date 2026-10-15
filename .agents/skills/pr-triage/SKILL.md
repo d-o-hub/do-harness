@@ -1,6 +1,6 @@
 ---
 name: pr-triage
-description: Triage GitHub pull requests with gh and git. Use after opening a PR, or when asked to review, roast, clean up, update, resolve comments on, or merge open PRs. Reviews and roasts changes, closes PRs with no effective diff, applies roast fixes, answers and resolves review conversations, updates branches to the latest base, verifies every check including bots, and merges directly with --match-head-commit. Optionally uses do-harness to cut review tokens to the unresolved residual and semantic-route to adapt review depth.
+description: Triage GitHub pull requests with gh and git. Use after opening a PR, or when asked to review, roast, clean up, update, resolve comments on, or merge open PRs. Reviews and roasts changes, closes PRs with no effective diff, applies roast fixes, answers and resolves review conversations, updates branches to the latest base, verifies every check including bots, and merges directly with --match-head-commit. Optionally uses do-harness to cut review tokens to the unresolved residual; semantic routing to adapt review depth is optional and experimental (a measured no-go on cost).
 license: MIT
 metadata:
   short-description: Triage open GitHub PRs end to end
@@ -100,9 +100,13 @@ Run these steps in order. Stop the sweep on any escalation and report it.
 10. **Semantic routing, review, and roast.** If the probed `do-harness` binary
     is available (honoring `DO_HARNESS_BIN`; see
     [references/do-harness-optional.md](references/do-harness-optional.md)), run
-    `pr review`. Before reviewing, run `scripts/semantic-route.sh PR` to select
-    the review depth (`cheap`, `focused`, `deep`; defaults to `deep` on any router
-    failure, timeout, invalid judgment, or unconfigured environment).
+    `pr review`. Semantic routing (`scripts/semantic-route.sh`) is
+    **optional and experimental**: it is a measured no-go on cost (+46% versus
+    the deterministic gate — see
+    [references/semantic-routing.md](references/semantic-routing.md)), so only
+    configure a router if one is already present. Run it to select the review
+    depth (`cheap`, `focused`, `deep`; defaults to `deep` on any router failure,
+    timeout, invalid judgment, or unconfigured environment).
     Review residual units when `measurement.verdict` is `reduced`; otherwise roast
     `gh pr diff PR`. Follow [references/review-contract.md](references/review-contract.md)
     for the selected depth: concrete defects only, with failure mode, evidence, severity,
