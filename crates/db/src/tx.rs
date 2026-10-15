@@ -36,9 +36,9 @@ mod tests {
 
     use super::*;
 
-    /// Two `BEGIN IMMEDIATE` writers must serialize rather than deadlock: the
-    /// second starts only after the first commits and then succeeds. A deferred
-    /// transaction would risk `SQLITE_BUSY` on the lock upgrade instead.
+    /// Two `BEGIN IMMEDIATE` transactions issued in sequence on one connection
+    /// commit without `SQLITE_BUSY` (an ordering smoke test; the cross-connection
+    /// contention path is exercised by the concurrent `verify --record` test).
     #[tokio::test(flavor = "current_thread")]
     async fn immediate_writers_serialize_without_busy() {
         let dir = tempfile::tempdir().unwrap();
@@ -55,8 +55,8 @@ mod tests {
             .await
             .unwrap();
 
-        // A second immediate writer on the same connection cannot start until
-        // the first commits; committing then retrying must succeed.
+        // Commit the first, then open a second; the ordering must succeed
+        // rather than surface a deferred-upgrade `SQLITE_BUSY`.
         first.commit().await.unwrap();
         let second = begin_immediate(&conn).await.unwrap();
         second
