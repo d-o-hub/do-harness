@@ -46,8 +46,8 @@ pub async fn insert_skill_eval(conn: &Connection, eval: &NewSkillEval<'_>) -> Re
             ),
         )
         .await?;
-    let row = rows.next().await?.ok_or(DbError::NotFound(format!(
-        "skill eval for '{}'",
+    let row = rows.next().await?.ok_or(DbError::Invariant(format!(
+        "skill eval for '{}' vanished after upsert",
         eval.skill_name
     )))?;
     Ok(row.get(0)?)

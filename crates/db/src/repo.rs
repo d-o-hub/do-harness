@@ -50,7 +50,7 @@ pub(crate) async fn insert_task(conn: &Connection, task: &NewTask<'_>) -> Result
     let row = rows
         .next()
         .await?
-        .ok_or_else(|| DbError::NotFound("task id vanished after insert".to_string()))?;
+        .ok_or_else(|| DbError::Invariant("task id vanished after insert".to_string()))?;
     Ok(row.get(0)?)
 }
 
@@ -149,14 +149,16 @@ pub(crate) async fn advance_subtask(conn: &Connection, id: i64) -> Result<i64> {
 
 /// Classifies a guarded `UPDATE ... RETURNING` that matched no row: a missing
 /// task is [`DbError::NotFound`], an existing terminal task is
-/// [`DbError::InvalidTaskTransition`].
+/// [`DbError::InvalidTaskTransition`]. A failing lookup is propagated as-is so
+/// a database failure is never reported as "task not found".
 async fn missing_row_error(conn: &Connection, id: i64, action: &str) -> DbError {
     match get_task(conn, id).await {
         Ok(Some(task)) => DbError::InvalidTaskTransition(format!(
             "cannot {action} task {id}: it is already '{}' (terminal)",
             task.status.as_str()
         )),
-        _ => DbError::NotFound(format!("task {id} not found")),
+        Ok(None) => DbError::NotFound(format!("task {id} not found")),
+        Err(err) => err,
     }
 }
 

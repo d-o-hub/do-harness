@@ -65,7 +65,7 @@ pub(crate) async fn insert_beat(conn: &Connection, beat: &NewBeat<'_>) -> Result
     let row = rows
         .next()
         .await?
-        .ok_or_else(|| DbError::NotFound("beat id vanished after insert".to_string()))?;
+        .ok_or_else(|| DbError::Invariant("beat id vanished after insert".to_string()))?;
     Ok(row.get(0)?)
 }
 
@@ -267,7 +267,7 @@ async fn bump_error_signature_on(
     let row = rows
         .next()
         .await?
-        .ok_or_else(|| DbError::NotFound("error signature vanished after bump".to_string()))?;
+        .ok_or_else(|| DbError::Invariant("error signature vanished after bump".to_string()))?;
     Ok(row.get(0)?)
 }
 

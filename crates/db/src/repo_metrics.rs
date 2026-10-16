@@ -64,7 +64,7 @@ pub async fn has_ok_beat(conn: &Connection) -> Result<bool> {
     let row = rows
         .next()
         .await?
-        .ok_or_else(|| DbError::NotFound("EXISTS probe returned no row".to_string()))?;
+        .ok_or_else(|| DbError::Invariant("EXISTS probe returned no row".to_string()))?;
     let exists: i64 = row.get(0)?;
     Ok(exists != 0)
 }
