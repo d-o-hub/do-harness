@@ -50,6 +50,9 @@ jobs:
         with:
           toolchain: ${{ steps.toolchain.outputs.channel }}
           targets: ${{ matrix.target }}
+      # Swatinem/rust-cache@v2: without it this job recompiled the workspace for
+      # its target from scratch on every run (P9).
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
       - name: Install musl toolchain
         if: runner.os == 'Linux'
         run: sudo apt-get update -qq && sudo apt-get install -y -qq musl-tools
@@ -125,6 +128,13 @@ jobs:
           node --check integrations/npm/bin/do-harness.js
           node --check integrations/npm/lib/platform.js
           node --test integrations/npm/test/*.test.mjs
+      # actions/cache@v4: the Chromium download is ~150 MB and was the step's
+      # slowest avoidable cost, re-fetched on every run. `playwright install`
+      # reuses the browser when it is already present.
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-1.50.1
       - name: Browser-test web UI pack
         run: |
           mkdir -p target/web-ui-browser-deps
@@ -147,10 +157,11 @@ jobs:
           cp target/release/do-harness "$dist/pkg/$name/do-harness.exe"
           (cd "$dist/pkg" && zip -qr "$dist/${name}.zip" "$name")
           bash scripts/publish-npm.sh --dist "$dist" --dry-run
-      - name: Check adjacent guardian-proxy crate
-        run: cargo check -p guardian-proxy
-      - name: Test adjacent guardian-proxy crate
-        run: cargo test -p guardian-proxy && cargo test -p guardian-proxy --features agt-governance && cargo test -p guardian-proxy --features mcp-surface
+      # The adjacent crate is covered by the sensors below: `check` compiles it
+      # with default features, the `test` sensor's workspace run runs its
+      # default-feature suite, and `check-agt`/`check-mcp` build the two feature
+      # matrices. Running `cargo check`/`cargo test` here as well charged every
+      # pull request for the same three invocations twice (P1).
       - name: Run sensors
         env:
           # check-audit.sh / check-deps.sh / check-shell.sh / check-markdownlint.sh / check-yamllint.sh
@@ -162,11 +173,11 @@ jobs:
         run: ./target/release/do-harness verify --set verification --format json --strict
       - name: Assert verification evidence is green
         run: ./target/release/do-harness status --set verification --format json
-      - name: Run scheduled sensors
-        env:
-          CI: "true"
-          DO_HARNESS_REQUIRE_TOOLS: "1"
-        run: ./target/release/do-harness verify --set scheduled --format json --strict
+      # The `scheduled` set (the feature-powerset builds) runs nightly from
+      # `.github/workflows/scheduled.yml`, where its evidence is asserted the
+      # same way this set's is. Paying a four-build matrix per push and per pull
+      # request was the wrong cadence for work that no diff can invalidate
+      # (P4).
       - name: Record Cargo.lock hash
         run: |
           mkdir -p .do-harness

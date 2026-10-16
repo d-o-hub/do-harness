@@ -5,8 +5,15 @@ pre-commit = ["fmt", "loc"]
 pre-push = []
 
 [signal-sets]
-feedback = ["fmt", "check", "clippy"]
-verification = ["fmt", "check", "clippy", "deps", "audit", "test", "doctest", "loc", "skills", "skills-docs", "shell", "markdownlint", "yamllint", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "commitlint"]
+# `feedback` is the fast loop, so it names the sensors the generated pre-commit
+# hook runs (`fmt` and `loc`): a set that omitted one of them would be a
+# different check than the commit it stands for.
+feedback = ["fmt", "check", "clippy", "loc"]
+# `machete` is cheap (one scan over the manifests) and a pull request can add an
+# unused dependency, so it belongs to the PR-time set; `powerset` builds four
+# feature combinations and is scheduled instead (`.github/workflows/scheduled.yml`),
+# which is why it is the only member of `scheduled`.
+verification = ["fmt", "check", "clippy", "deps", "machete", "audit", "test", "doctest", "loc", "skills", "skills-docs", "shell", "markdownlint", "yamllint", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "commitlint"]
 release = ["fmt", "check", "clippy", "deps", "audit", "test", "doctest", "coverage", "loc", "skills", "skills-docs", "shell", "markdownlint", "yamllint", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "commitlint"]
 # DORA gets its own set so its evidence is addressable (`status --set metrics`)
 # without joining the gating sets. A no-`--set` status check compares against
@@ -14,7 +21,7 @@ release = ["fmt", "check", "clippy", "deps", "audit", "test", "doctest", "covera
 # `insufficient_coverage` rather than green; scoping the evidence to a set is
 # what makes the freshness comparison meaningful.
 metrics = ["dora"]
-scheduled = ["powerset", "machete"]
+scheduled = ["powerset"]
 
 [[sensors]]
 name = "fmt"
@@ -130,6 +137,10 @@ argv = ["bash", "scripts/check-audit.sh"]
 when-changed = ["Cargo.toml", "Cargo.lock", "scripts/check-audit.sh"]
 
 [[sensors]]
+# No `when-changed`: a commit message is not tied to any tracked path, so
+# `commitlint` is always applicable. The pre-commit hook runs it on every
+# commit, and the sensor stays cheap enough for that (it reads the message on
+# stdin and matches conventional-commit prefixes).
 name = "commitlint"
 argv = ["bash", "scripts/check-commitlint.sh"]
 

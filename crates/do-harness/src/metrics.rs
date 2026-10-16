@@ -11,6 +11,10 @@ use crate::CliError;
 use crate::cli::MetricsAction;
 use crate::report::Format;
 
+#[cfg(test)]
+#[path = "metrics/skill_trends_tests.rs"]
+mod skill_trends_tests;
+
 /// Per-skill evaluation trend.
 #[derive(Debug, Clone, Serialize)]
 pub struct SkillTrend {

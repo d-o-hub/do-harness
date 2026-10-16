@@ -68,3 +68,6 @@ pub async fn has_ok_beat(conn: &Connection) -> Result<bool> {
     let exists: i64 = row.get(0)?;
     Ok(exists != 0)
 }
+
+#[cfg(test)]
+mod tests;
