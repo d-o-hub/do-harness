@@ -281,7 +281,10 @@ fn generate_rust_config(sensors: &[crate::config::SensorSpec]) -> Result<String>
     }
     let names: Vec<&str> = sensors.iter().map(|spec| spec.name.as_str()).collect();
     let mut signal_sets: BTreeMap<String, Vec<String>> = BTreeMap::new();
-    let feedback = ["fmt", "check", "clippy"]
+    // `loc` is in the fast loop because the generated pre-commit hook runs it:
+    // a set that omitted it would be a different check than the commit it
+    // stands for.
+    let feedback = ["fmt", "check", "clippy", "loc"]
         .iter()
         .filter(|name| names.contains(name))
         .map(ToString::to_string)

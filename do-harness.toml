@@ -5,7 +5,10 @@ pre-commit = ["fmt", "loc"]
 pre-push = []
 
 [signal-sets]
-feedback = ["fmt", "check", "clippy"]
+# `feedback` is the fast loop, so it names the sensors the generated pre-commit
+# hook runs (`fmt` and `loc`): a set that omitted one of them would be a
+# different check than the commit it stands for.
+feedback = ["fmt", "check", "clippy", "loc"]
 verification = ["fmt", "check", "clippy", "deps", "audit", "test", "doctest", "loc", "skills", "skills-docs", "shell", "markdownlint", "yamllint", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "commitlint"]
 release = ["fmt", "check", "clippy", "deps", "audit", "test", "doctest", "coverage", "loc", "skills", "skills-docs", "shell", "markdownlint", "yamllint", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "commitlint"]
 # DORA gets its own set so its evidence is addressable (`status --set metrics`)
@@ -130,6 +133,10 @@ argv = ["bash", "scripts/check-audit.sh"]
 when-changed = ["Cargo.toml", "Cargo.lock", "scripts/check-audit.sh"]
 
 [[sensors]]
+# No `when-changed`: a commit message is not tied to any tracked path, so
+# `commitlint` is always applicable. The pre-commit hook runs it on every
+# commit, and the sensor stays cheap enough for that (it reads the message on
+# stdin and matches conventional-commit prefixes).
 name = "commitlint"
 argv = ["bash", "scripts/check-commitlint.sh"]
 

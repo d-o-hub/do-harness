@@ -329,3 +329,43 @@ async fn init_no_seed_skips_seeding() {
     assert_eq!(report.seeded, 0);
     assert!(!dir.path().join(".do-harness/agent_state.db").exists());
 }
+
+/// The generated `feedback` set must name every sensor the generated
+/// `pre-commit` hook runs.
+///
+/// The set is the fast loop and the hook is that same loop invoked at commit
+/// time, so a set that omitted one of them would be a weaker check than the
+/// commit it stands for — which is how `loc` came to be in the hook but not in
+/// the set. The rust pack's `feedback` may hold more (`check`, `clippy`) than
+/// the hook runs; it must not hold less.
+#[tokio::test(flavor = "current_thread")]
+async fn generated_feedback_set_covers_the_pre_commit_hook() {
+    let dir = tempfile::tempdir().unwrap();
+    init_workspace(dir.path(), &opts(Some(Language::Rust)))
+        .await
+        .unwrap();
+    let path = dir.path().join("do-harness.toml");
+    let cfg = crate::config::load(dir.path(), Some(&path)).await.unwrap();
+    assert_fast_loop_covers_the_hook(&cfg.hooks.pre_commit, &cfg.signal_sets["feedback"]);
+}
+
+/// The repository's own policy holds the same rule as the generated one, so the
+/// two cannot drift apart: this repository's hook and set are what its
+/// contributors actually run.
+#[tokio::test(flavor = "current_thread")]
+async fn repository_feedback_set_covers_its_pre_commit_hook() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let path = root.join("do-harness.toml");
+    let cfg = crate::config::load(&root, Some(&path)).await.unwrap();
+    assert_fast_loop_covers_the_hook(&cfg.hooks.pre_commit, &cfg.signal_sets["feedback"]);
+}
+
+fn assert_fast_loop_covers_the_hook(pre_commit: &[String], feedback: &[String]) {
+    assert!(!pre_commit.is_empty(), "the hook runs something");
+    for sensor in pre_commit {
+        assert!(
+            feedback.contains(sensor),
+            "the fast loop must include {sensor}, which the pre-commit hook runs: {feedback:?}"
+        );
+    }
+}
