@@ -90,11 +90,11 @@ pub async fn list_skill_eval_runs(
     conn: &Connection,
     skill_name: &str,
 ) -> Result<Vec<SkillEvalRun>> {
-    list_skill_eval_runs_page(conn, skill_name, -1, 0).await
+    list_skill_eval_runs_page(conn, skill_name, None, 0).await
 }
 
-/// Lists a skill's evaluation runs with `LIMIT`/`OFFSET` paging (`limit = -1`
-/// disables the limit).
+/// Lists a skill's evaluation runs with `LIMIT`/`OFFSET` paging (`limit: None`
+/// returns every row).
 ///
 /// # Errors
 ///
@@ -102,15 +102,15 @@ pub async fn list_skill_eval_runs(
 pub async fn list_skill_eval_runs_page(
     conn: &Connection,
     skill_name: &str,
-    limit: i64,
-    offset: i64,
+    limit: Option<u32>,
+    offset: u32,
 ) -> Result<Vec<SkillEvalRun>> {
     let mut rows = conn
         .query(
             "SELECT id, skill_name, mode, graded, passed, pass_rate, without_pass_rate, \
               skill_words, walk_secs, ran_at \
              FROM skill_eval_runs WHERE skill_name = ?1 ORDER BY id LIMIT ?2 OFFSET ?3",
-            params!(skill_name, limit, offset),
+            params!(skill_name, crate::bind_limit(limit), i64::from(offset)),
         )
         .await?;
     let mut runs = Vec::new();

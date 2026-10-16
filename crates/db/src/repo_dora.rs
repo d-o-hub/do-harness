@@ -136,19 +136,22 @@ pub async fn insert_dora_snapshot(
     Ok(row.get(0)?)
 }
 
-/// Lists snapshots newest first (`limit = -1` returns every row).
+/// Lists snapshots newest first (`limit: None` returns every row).
 ///
 /// # Errors
 ///
 /// Returns an error when the query fails.
-pub async fn list_dora_snapshots(conn: &Connection, limit: i64) -> Result<Vec<DoraSnapshotRow>> {
+pub async fn list_dora_snapshots(
+    conn: &Connection,
+    limit: Option<u32>,
+) -> Result<Vec<DoraSnapshotRow>> {
     let mut rows = conn
         .query(
             "SELECT id, recorded_at, source, window_days, window_start, window_end, source_rev, \
              deploy_count, deploys_failed, deploys_rework, lead_samples, lead_p50_seconds, lead_p90_seconds, \
              mttr_seconds, mttr_restored, mttr_unrestored, breach_count, policy_fingerprint, \
              derivation FROM dora_snapshots ORDER BY id DESC LIMIT ?1",
-            params!(limit),
+            params!(crate::bind_limit(limit)),
         )
         .await?;
     let mut snapshots = Vec::new();
@@ -217,7 +220,7 @@ mod tests {
             .await
             .unwrap();
 
-        let rows = list_dora_snapshots(&conn, -1).await.unwrap();
+        let rows = list_dora_snapshots(&conn, None).await.unwrap();
         assert_eq!(rows.len(), 1);
         let row = &rows[0];
         assert_eq!(row.id, id);
@@ -251,11 +254,11 @@ mod tests {
         let first = insert_dora_snapshot(&conn, &snapshot("{}")).await.unwrap();
         let second = insert_dora_snapshot(&conn, &snapshot("{}")).await.unwrap();
 
-        let rows = list_dora_snapshots(&conn, -1).await.unwrap();
+        let rows = list_dora_snapshots(&conn, None).await.unwrap();
         assert_eq!(
             rows.iter().map(|row| row.id).collect::<Vec<_>>(),
             vec![second, first]
         );
-        assert_eq!(list_dora_snapshots(&conn, 1).await.unwrap().len(), 1);
+        assert_eq!(list_dora_snapshots(&conn, Some(1)).await.unwrap().len(), 1);
     }
 }

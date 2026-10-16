@@ -57,9 +57,9 @@ pub use repo_eval::{
     skill_eval_summary,
 };
 pub use repo_exec::{
-    NewBeat, SensorOutcome, bump_error_signature, get_error_signature, latest_sensor_beat,
-    list_beats, list_beats_by_scope, list_beats_page, prune_beats, record_sensor_outcome,
-    record_verify_batch, struck_signatures, vacuum,
+    LatestSensorBeat, NewBeat, SensorOutcome, bump_error_signature, get_error_signature,
+    latest_sensor_beat, list_beats, list_beats_by_scope, list_beats_page, prune_beats,
+    record_sensor_outcome, record_verify_batch, struck_signatures, vacuum,
 };
 pub use repo_heuristic::{NewHeuristic, insert_heuristic, list_heuristics};
 pub use repo_metrics::{SensorStat, has_ok_beat, sensor_stats};
@@ -78,3 +78,28 @@ pub use repo_workflow::{
     list_events_ascending, update_task_status_with_event,
 };
 pub use root::{db_path, find_harness_root};
+
+/// Converts a page limit into the value bound to a `LIMIT` parameter.
+///
+/// `None` means "every row", which `SQLite` spells as a negative `LIMIT`: "If
+/// the LIMIT expression evaluates to a negative value, then there is no upper
+/// bound on the number of rows returned"
+/// (<https://www.sqlite.org/lang_select.html>).
+#[must_use]
+pub fn bind_limit(limit: Option<u32>) -> i64 {
+    limit.map_or(-1, i64::from)
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used)]
+
+    /// The unbounded case binds the negative limit `SQLite` documents, and a
+    /// set limit binds its exact value.
+    #[test]
+    fn bind_limit_maps_none_to_the_unbounded_limit() {
+        assert_eq!(super::bind_limit(None), -1);
+        assert_eq!(super::bind_limit(Some(0)), 0);
+        assert_eq!(super::bind_limit(Some(7)), 7);
+    }
+}
