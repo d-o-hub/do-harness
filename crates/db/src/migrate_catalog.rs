@@ -10,6 +10,19 @@ pub struct Migration {
     pub sql: &'static str,
 }
 
+impl Migration {
+    /// SHA-256 hex digest of this migration's embedded SQL.
+    ///
+    /// Recorded in `schema_migrations.checksum` at apply time so a migration
+    /// file edited after release is detected on startup instead of silently
+    /// diverging existing versus fresh databases.
+    #[must_use]
+    pub fn checksum(&self) -> String {
+        use sha2::Digest as _;
+        hex::encode(sha2::Sha256::digest(self.sql.as_bytes()))
+    }
+}
+
 /// Embedded migration catalog, ordered by ascending version.
 pub const MIGRATIONS: &[Migration] = &[
     Migration {

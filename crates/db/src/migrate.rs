@@ -163,24 +163,30 @@ pub async fn count_migrations(conn: &Connection) -> Result<i64> {
 
 /// Applies all pending embedded migrations to `conn` in ascending version order.
 ///
-/// Tracked via a `schema_migrations(version, name, applied_at)` table so each
-/// migration runs exactly once.
+/// Tracked via a `schema_migrations(version, name, applied_at, checksum)`
+/// table so each migration runs exactly once. The SHA-256 hex of each
+/// migration's SQL is recorded at apply time and re-verified on every startup:
+/// a migration file edited after release fails closed instead of silently
+/// diverging existing versus fresh databases.
 ///
 /// # Errors
 ///
 /// Returns an error if the tracking table cannot be created, the database was
-/// written by a newer binary (fail-fast instead of silently diverging), or
+/// written by a newer binary (fail-fast instead of silently diverging), a
+/// previously applied migration no longer matches the embedded catalog, or
 /// any pending migration fails to apply.
 pub async fn migrate(conn: &Connection) -> Result<()> {
     conn.execute(
         "CREATE TABLE IF NOT EXISTS schema_migrations (\
          version INTEGER PRIMARY KEY,\
          name TEXT NOT NULL,\
-         applied_at INTEGER NOT NULL\
+         applied_at INTEGER NOT NULL,\
+         checksum TEXT\
          )",
         Params::None,
     )
     .await?;
+    ensure_checksum_column(conn).await?;
 
     let applied = applied_versions(conn).await?;
     let newest_catalog = known_max_version();
@@ -190,9 +196,18 @@ pub async fn migrate(conn: &Connection) -> Result<()> {
             known_max: newest_catalog,
         });
     }
+    let stored = applied_checksums(conn).await?;
     for migration in MIGRATIONS {
-        if !applied.contains(&migration.version) {
-            apply_migration(conn, migration).await?;
+        match stored
+            .iter()
+            .find(|(version, _)| *version == migration.version)
+        {
+            Some((_, existing)) => {
+                verify_migration_checksum(conn, migration, existing.clone()).await?;
+            }
+            None => {
+                apply_migration(conn, migration).await?;
+            }
         }
     }
     Ok(())
@@ -257,6 +272,15 @@ async fn migrate_with_retry(conn: &Connection) -> Result<()> {
                 tokio::task::yield_now().await;
             }
             Err(err) => {
+                // A checksum or downgrade failure means the database content
+                // genuinely disagrees with this binary: a concurrent migrator
+                // finishing the version list must not swallow it into success.
+                if matches!(
+                    err,
+                    DbError::MigrationDiverged { .. } | DbError::FutureDatabase { .. }
+                ) {
+                    return Err(err);
+                }
                 let skew = inspect_migrations(conn).await?;
                 if skew.applied_max == Some(skew.known_max) {
                     return Ok(());
@@ -306,8 +330,88 @@ async fn applied_versions(conn: &Connection) -> Result<Vec<i64>> {
     Ok(versions)
 }
 
+/// `schema_migrations` column holding the SHA-256 hex of the applied SQL.
+const CHECKSUM_COLUMN: &str = "checksum";
+
+/// Adds the checksum column to databases created before it existed.
+///
+/// Pre-checksum rows keep a `NULL` checksum, which the verifier adopts (see
+/// [`verify_migration_checksum`]); only a recorded non-`NULL` value that
+/// disagrees with the catalog fails.
+async fn ensure_checksum_column(conn: &Connection) -> Result<()> {
+    let mut rows = conn
+        .query("PRAGMA table_info(schema_migrations)", Params::None)
+        .await?;
+    let mut has_checksum = false;
+    while let Some(row) = rows.next().await? {
+        let name: String = row.get(1)?;
+        if name == CHECKSUM_COLUMN {
+            has_checksum = true;
+        }
+    }
+    drop(rows);
+    if !has_checksum {
+        conn.execute(
+            "ALTER TABLE schema_migrations ADD COLUMN checksum TEXT",
+            Params::None,
+        )
+        .await?;
+    }
+    Ok(())
+}
+
+/// Returns each applied `(version, recorded checksum)` pair.
+///
+/// Callers must run [`ensure_checksum_column`] first so the `checksum` column
+/// exists on databases created before checksums were recorded.
+async fn applied_checksums(conn: &Connection) -> Result<Vec<(i64, Option<String>)>> {
+    let mut rows = conn
+        .query(
+            "SELECT version, checksum FROM schema_migrations",
+            Params::None,
+        )
+        .await?;
+    let mut applied = Vec::new();
+    while let Some(row) = rows.next().await? {
+        applied.push((row.get::<i64>(0)?, row.get::<Option<String>>(1)?));
+    }
+    Ok(applied)
+}
+
+/// Verifies one already-applied migration against the embedded catalog.
+///
+/// A `NULL` recorded checksum predates checksum tracking, so the current
+/// catalog value is adopted in place; a recorded value that disagrees means
+/// the migration file was edited after this database applied it, and startup
+/// fails closed.
+async fn verify_migration_checksum(
+    conn: &Connection,
+    migration: &Migration,
+    stored: Option<String>,
+) -> Result<()> {
+    let expected = migration.checksum();
+    match stored {
+        None => {
+            conn.execute(
+                "UPDATE schema_migrations SET checksum = ?1 WHERE version = ?2",
+                libsql::params!(expected, migration.version),
+            )
+            .await?;
+            Ok(())
+        }
+        Some(found) if found == expected => Ok(()),
+        Some(found) => Err(DbError::MigrationDiverged {
+            version: migration.version,
+            name: migration.name.to_owned(),
+            expected,
+            found,
+        }),
+    }
+}
+
 /// Applies a single migration within a transaction.
 async fn apply_migration(conn: &Connection, migration: &Migration) -> Result<()> {
+    let checksum = migration.checksum();
     let tx = crate::tx::begin_immediate(conn).await?;
     tx.execute_batch(migration.sql).await?;
     if migration.version == 10 {
@@ -316,8 +420,8 @@ async fn apply_migration(conn: &Connection, migration: &Migration) -> Result<()>
         backfill_workflow_event_chain(&tx).await?;
     }
     tx.execute(
-        "INSERT INTO schema_migrations (version, name, applied_at) VALUES (?1, ?2, ?3)",
-        libsql::params!(migration.version, migration.name, unix_now()),
+        "INSERT INTO schema_migrations (version, name, applied_at, checksum) VALUES (?1, ?2, ?3, ?4)",
+        libsql::params!(migration.version, migration.name, unix_now(), checksum),
     )
     .await?;
     tx.commit().await?;
