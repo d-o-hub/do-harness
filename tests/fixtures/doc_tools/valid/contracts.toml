@@ -1,0 +1,22 @@
+version = 1
+
+[[rules]]
+path = "README.md"
+classification = "maintained"
+reason = "Root README"
+
+[[rules]]
+glob = "docs/*.md"
+classification = "maintained"
+reason = "Docs"
+
+[[rules]]
+glob = "docs/nested/readme.md"
+classification = "maintained"
+reason = "Nested readme discovery"
+
+[[rules]]
+path = "symlink_alias.md"
+classification = "canonical_alias"
+canonical_target = "README.md"
+reason = "Alias symlink"

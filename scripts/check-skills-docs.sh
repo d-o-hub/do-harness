@@ -23,6 +23,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
+require_tools() { [[ "${CI:-}" == "true" || "${DO_HARNESS_REQUIRE_TOOLS:-}" == "1" ]]; }
+
 FIX=0
 if [[ "${1:-}" == "--fix" ]]; then
     FIX=1
@@ -157,4 +159,29 @@ if [[ "$failures" -ne 0 ]]; then
     echo "check-skills-docs FAIL: see the items above; the catalog table itself can be rebuilt with --fix (then fill empty purposes by hand)" >&2
     exit 1
 fi
-echo "check-skills-docs OK: $SKILLS_DOC matches $(wc -l < "$tmp/names.txt" | tr -d ' ') skill(s), all documented paths exist"
+
+# Run offline document inventory and link/anchor verification
+if command -v python3 >/dev/null 2>&1; then
+    if python3 -c "import markdown_it, tomllib" >/dev/null 2>&1 || python3 -c "import markdown_it, tomli" >/dev/null 2>&1; then
+        python3 "$ROOT/scripts/docs.py" links --check || failures=1
+    else
+        if require_tools; then
+            echo "check-skills-docs FAIL: markdown-it-py is required when CI=true or DO_HARNESS_REQUIRE_TOOLS=1." >&2
+            exit 1
+        fi
+        echo "check-skills-docs SKIP: markdown-it-py not installed; skipping offline document link check." >&2
+    fi
+else
+    if require_tools; then
+        echo "check-skills-docs FAIL: python3 is required when CI=true or DO_HARNESS_REQUIRE_TOOLS=1." >&2
+        exit 1
+    fi
+    echo "check-skills-docs SKIP: python3 not installed; skipping offline document link check." >&2
+fi
+
+if [[ "$failures" -ne 0 ]]; then
+    echo "check-skills-docs FAIL: document link/anchor check failed." >&2
+    exit 1
+fi
+
+echo "check-skills-docs OK: $SKILLS_DOC matches $(wc -l < "$tmp/names.txt" | tr -d ' ') skill(s), all documented paths and links exist"
