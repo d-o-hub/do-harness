@@ -67,6 +67,9 @@ dev checkout.
 | T14 | the managed `pre-push` hook is executed, not just read: an e2e test installs the hooks, commits, pushes to a bare local remote (a green workspace pushes), then breaks the crate and pushes again (the `check` sensor fails, the push is refused, and the hook output names `check`). `hooks/tests.rs` asserts the installed script by string match, and this is the only place it runs under a real `git push`; the refused push is the can-fail proof, since a hook that stopped gating would let it through | `cargo test -p do-harness --test hook_e2e` → 3 passed |
 | P11 | the `feedback` set now names every sensor the generated `pre-commit` hook runs (`loc` was in the hook and missing from the set, in both the repository policy and the generated default), and the `commitlint` sensor's lack of `when-changed` is documented in place — a commit message is not tied to a tracked path, so it is always applicable. A guard loads both configs and asserts the pairing | `cargo test -p do-harness --bins init::tests` → 42 passed (was 41); can-fail proof: dropping `loc` from the repository policy fails the guard with "the fast loop must include loc, which the pre-commit hook runs" |
 | T3 | `dora --source gh` is driven end to end against a fake `gh` on `PATH`: the release-run fold (a success anywhere in a head's runs wins regardless of run order), windowed counters against **unwindowed** reconciliation (a success before `window_start` still counts as shipped, while a head that only ever failed is named in `deploy_head_mismatches`), nearest-rank PR lead-time percentiles, `null` rather than `0` for no samples, and a failing `gh` surfacing as an error instead of a green empty snapshot. The inline tests covered timestamp parsing only, and this is the path that talks to the network in production. The file is `cfg(unix)` because the fake `gh` is a bash script | `cargo test -p do-harness --test dora_gh` → 3 passed |
+| P1 | the `verify` job no longer runs the guardian-proxy crate twice: the raw `cargo check -p guardian-proxy` and the three-invocation `cargo test` step are gone, because the sensors already cover them — `check` compiles the crate with default features, the `test` sensor's workspace run runs its default-feature suite, and `check-agt`/`check-mcp` build both feature matrices. The duplicate step was also the one that always ran, since only the sensors carry `when-changed` | `bash scripts/check-yamllint.sh` → 13 files; `explain --set verification` still selects both feature sensors |
+| P4 | the `scheduled` set moved to its own nightly workflow (`.github/workflows/scheduled.yml`, `cron: "23 4 * * *"` plus `workflow_dispatch`): `powerset`'s four feature builds were charged to every push and pull request from inside `verify.yml`, and the set's evidence was neither asserted nor uploaded. The new job runs `verify --set scheduled --strict` with `CI=true`/`DO_HARNESS_REQUIRE_TOOLS=1` and then asserts `status --set scheduled`. `machete` stays at pull-request time — it is a single scan and a diff can add an unused dependency — so `scheduled` is now `["powerset"]` and `machete` joined `verification` | `explain --set scheduled` selects powerset only; `explain --set verification` selects 22 sensors, machete among them |
+| P9 | the `source-distribution` job got `Swatinem/rust-cache` (it recompiled the workspace for its target on every run), and the verify job's Playwright Chromium download is cached (`actions/cache@v4` over `~/.cache/ms-playwright`, keyed by runner OS and the pinned 1.50.1) instead of re-fetching about 150 MB per run | `bash scripts/check-yamllint.sh` → 13 files, 0 issues; both caches reuse the SHAs this workflow already pins |
 | P2/P3 | Toolchain/lint/nextest configs and each sensor's own script added to the `when-changed` inputs whose verdicts they change | `do-harness list`/`explain --set verification --changed` run against the rebuilt binary; TOML parses (25 sensors) |
 | R8 | `pr-triage` SKILL.md step 10 and description mark semantic routing optional/experimental with the measured no-go | markdownlint clean; `untrusted-ingest`/`skills-docs` sensors pass |
 | F5 | `.clippy.toml` gained `msrv = "1.85"` (and `IPv4`/`IPv6` as valid doc idents) | workspace clippy clean; the setting surfaced a real `doc_markdown` finding during the pass |
@@ -82,8 +85,8 @@ explicit guard) instead of a raw grep error.
 **Residual:** none for A8 (alternate IPv4 spellings are now normalized).
 
 **Not started:** R1 (release rescue), A10 (pre-push set), A6, S1–S3, S6, S7,
-S17, T1–T2, T6, T11, T13, F1–F4, P1, P4, P7–P10, P12–P16, B1, B3–B5, C2, C3,
-D1–D2, R2, R3, R7.
+S17, T1–T2, T6, T11, T13, F1–F4, P7–P8, P10, P12–P16, B1, B3–B5, C2, C3, D1–D2,
+R2, R3, R7.
 
 ## Progress: release-state truth decay (verified first-party)
 
@@ -245,8 +248,8 @@ closed final (`NO_GO`); DORA ratchet tolerates 3 breaches.
 6. Roadmap/doc sync (**R2/R4/R5/R6**) once the release lands; LOC splits
    (**B1–B3**) opportunistic; **F1/F2/P2/P3** as policy/supply-chain chores.
 
-*Landed (2026-10-15):* A1, A2, A3, A4, A5, A7, A8, C1, C4, C5, F5, P2, P3, P5,
-P6 (partial), P11, R4, R5, R6, R8, R9, S4, S5, S8, S9, S10, S11, S12, S13, S14,
+*Landed (2026-10-15):* A1, A2, A3, A4, A5, A7, A8, C1, C4, C5, F5, P1, P2, P3,
+P4, P5, P6 (partial), P9, P11, R4, R5, R6, R8, R9, S4, S5, S8, S9, S10, S11, S12,
 S15, S16, S18, S19, T3, T4, T5, T7, T8, T9, T10, T12, T14, T15, T16, T17, T18,
 B2 (forced by A1).
 *Next:* R1 (operator-gated), A10 (maintainer decision), A6, C2, C3, R2, R3,
