@@ -36,8 +36,7 @@ fn inside_git_repo(dir: &Path) -> bool {
         .arg(dir)
         .args(["rev-parse", "--show-toplevel"])
         .output()
-        .map(|output| output.status.success())
-        .unwrap_or(false)
+        .is_ok_and(|output| output.status.success())
 }
 
 fn harness(root: &Path) -> Command {

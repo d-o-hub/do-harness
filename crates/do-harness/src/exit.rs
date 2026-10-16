@@ -38,6 +38,14 @@ impl std::error::Error for UsageError {
     }
 }
 
+/// Whether a chain entry is the usage marker.
+///
+/// A named predicate rather than an inline closure: `clippy` asks for the
+/// method path form, and this reads better than the turbofish it suggests.
+fn is_usage_marker(cause: &(dyn std::error::Error + 'static)) -> bool {
+    cause.is::<UsageError>()
+}
+
 /// Classifies an error into the CLI's exit-code contract.
 ///
 /// The marker is located anywhere in the chain and the error is passed through
@@ -45,7 +53,7 @@ impl std::error::Error for UsageError {
 /// the classification nor the rendered message.
 #[must_use]
 pub fn classify(err: Error) -> CliError {
-    if err.chain().any(|cause| cause.is::<UsageError>()) {
+    if err.chain().any(is_usage_marker) {
         CliError::Usage(err)
     } else {
         CliError::Verify(err)
