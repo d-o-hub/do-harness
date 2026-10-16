@@ -171,6 +171,112 @@ async fn pragma_int(conn: &Connection, sql: &str) -> i64 {
     rows.next().await.unwrap().unwrap().get::<i64>(0).unwrap()
 }
 
+/// Every applied migration records the SHA-256 of its SQL, matching the
+/// embedded catalog, so a later edit of a migration file is detectable.
+#[tokio::test(flavor = "current_thread")]
+async fn migrate_records_migration_checksums() {
+    let dir = tempfile::tempdir().unwrap();
+    let conn = connect(dir.path().join("state.db")).await.unwrap();
+    migrate(&conn).await.unwrap();
+
+    let mut rows = conn
+        .query(
+            "SELECT version, checksum FROM schema_migrations ORDER BY version",
+            Params::None,
+        )
+        .await
+        .unwrap();
+    let mut seen = 0;
+    while let Some(row) = rows.next().await.unwrap() {
+        let version: i64 = row.get(0).unwrap();
+        let checksum: Option<String> = row.get(1).unwrap();
+        let migration = MIGRATIONS
+            .iter()
+            .find(|m| m.version == version)
+            .expect("applied version from catalog");
+        assert_eq!(checksum.as_deref(), Some(migration.checksum()).as_deref());
+        seen += 1;
+    }
+    assert_eq!(seen, MIGRATIONS.len());
+}
+
+/// A recorded checksum that no longer matches the binary's migration SQL
+/// fails closed: the migration file was edited after this database applied
+/// it, so existing and fresh databases would silently diverge.
+#[tokio::test(flavor = "current_thread")]
+async fn migrate_fails_on_diverged_migration_checksum() {
+    let dir = tempfile::tempdir().unwrap();
+    let conn = connect(dir.path().join("state.db")).await.unwrap();
+    migrate(&conn).await.unwrap();
+
+    let tampered = MIGRATIONS.first().expect("catalog is non-empty");
+    conn.execute(
+        "UPDATE schema_migrations SET checksum = 'deadbeef' WHERE version = ?1",
+        libsql::params!(tampered.version),
+    )
+    .await
+    .unwrap();
+
+    let err = migrate(&conn).await.unwrap_err();
+    assert!(
+        err.to_string().contains("diverged"),
+        "error must name the divergence: {err}"
+    );
+    match err {
+        DbError::MigrationDiverged {
+            version,
+            name,
+            expected,
+            found,
+        } => {
+            assert_eq!(version, tampered.version);
+            assert_eq!(name, tampered.name);
+            assert_eq!(expected, tampered.checksum());
+            assert_eq!(found, "deadbeef");
+        }
+        other => panic!("expected MigrationDiverged, got {other:?}"),
+    }
+}
+
+/// Rows written before checksum tracking carry `NULL` and are adopted, not
+/// rejected: only a recorded value that disagrees with the catalog fails.
+#[tokio::test(flavor = "current_thread")]
+async fn migrate_adopts_legacy_rows_without_checksums() {
+    let dir = tempfile::tempdir().unwrap();
+    let conn = connect(dir.path().join("state.db")).await.unwrap();
+
+    conn.execute(
+        "CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at INTEGER NOT NULL)",
+        Params::None,
+    )
+    .await
+    .unwrap();
+    let first = MIGRATIONS.first().expect("catalog is non-empty");
+    let setup = conn.transaction().await.unwrap();
+    setup.execute_batch(first.sql).await.unwrap();
+    setup
+        .execute(
+            "INSERT INTO schema_migrations (version, name, applied_at) VALUES (?1, ?2, 0)",
+            libsql::params!(first.version, first.name),
+        )
+        .await
+        .unwrap();
+    setup.commit().await.unwrap();
+
+    migrate(&conn).await.unwrap();
+
+    let mut rows = conn
+        .query(
+            "SELECT checksum FROM schema_migrations WHERE version = ?1",
+            libsql::params!(first.version),
+        )
+        .await
+        .unwrap();
+    let row = rows.next().await.unwrap().expect("adopted row");
+    let checksum: Option<String> = row.get(0).unwrap();
+    assert_eq!(checksum.as_deref(), Some(first.checksum()).as_deref());
+}
+
 /// Pending migrations snapshot the database to `agent_state.db.bak` first, and
 /// the snapshot must carry committed state that still lives in the WAL sidecar
 /// — the checkpoint inside `backup_state_file` is what makes it complete.

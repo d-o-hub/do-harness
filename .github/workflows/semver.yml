@@ -1,0 +1,72 @@
+name: semver
+
+# API-compatibility visibility on main (analysis follow-up F2).
+#
+# `cargo-semver-checks` already ran in the tag-time release preflight, so a pull
+# request that broke a published crate's public API merged green and surfaced
+# only when the next tag was cut. This job runs the same comparison —
+# `scripts/check-rust-api-compatibility.sh` against the crates.io baselines for
+# `do-harness-types` (`crates/types/Cargo.toml`), `do-harness-db`
+# (`crates/db/Cargo.toml`), and `do-harness` (`crates/do-harness/Cargo.toml`) —
+# on every push to `main` and on demand, so the break is visible where it lands.
+#
+# It is deliberately NOT a `do-harness` sensor: `check-release` resolves the
+# published baseline from the registry, so the job needs network access, and a
+# sensor must stay hermetic and offline. It is therefore absent from every
+# `[signal-sets]` entry in `do-harness.toml` and is not wired into `verify`.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_BUILD_JOBS: "2"
+  CARGO_INCREMENTAL: "0"
+
+concurrency:
+  group: semver-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  semver:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      # actions/checkout@v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          # No push/fetch credentials persisted: this workflow never pushes.
+          persist-credentials: false
+      - name: Resolve pinned toolchain
+        id: toolchain
+        run: |
+          channel="$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)"
+          echo "channel=$channel" >> "$GITHUB_OUTPUT"
+      # dtolnay/rust-toolchain@master (SHA within master history per action docs)
+      - uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de
+        with:
+          toolchain: ${{ steps.toolchain.outputs.channel }}
+      # Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
+        with:
+          key: semver
+      # taiki-e/install-action@v2. `cargo-semver-checks` version feeds policy
+      # (it decides whether a release is semver-compatible), so it is pinned
+      # exactly rather than tracking latest, matching the release preflight.
+      - uses: taiki-e/install-action@ba47c86ac325773530516bb756137ac718732518
+        with:
+          tool: cargo-semver-checks@0.50.0
+      - name: Check published-crate API compatibility
+        # `check-rust-api-compatibility.sh` needs python3 only to strip the ANSI
+        # color codes cargo-semver-checks emits in CI; the runner image has it.
+        run: bash scripts/check-rust-api-compatibility.sh
+      - name: Upload API compatibility report on failure
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: semver-checks-report
+          path: target/semver-checks-reports/*
+          if-no-files-found: ignore

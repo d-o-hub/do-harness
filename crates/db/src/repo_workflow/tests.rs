@@ -2,6 +2,7 @@
 
 use super::*;
 use crate::migrate::connect_and_migrate;
+use do_harness_types::{BeatStatus, BeatType};
 
 fn new_task(title: &str) -> NewTask<'_> {
     NewTask {
@@ -180,8 +181,8 @@ async fn advance_rechecks_sensor_gate_inside_transaction() {
         &NewBeat {
             task_id: Some(id),
             scope: None,
-            beat_type: "sensor",
-            status: "ok",
+            beat_type: BeatType::Sensor,
+            status: BeatStatus::Ok,
             sensor_exit_code: Some(0),
             sensor_name: Some("check"),
             started_at: 1,

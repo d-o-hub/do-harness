@@ -39,57 +39,34 @@ pub async fn struck_sensors(root: &Path, names: &[String], scope: &str) -> Resul
         .cloned()
         .collect())
 }
-/// Workstream scope for persisted beats.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum BeatScope {
-    /// Explicit task ID (`task:<id>`).
-    Task(i64),
-    /// Branch name (`branch:<name>`).
-    Branch(String),
-    /// Unscoped / global beats.
-    Global,
-}
+/// Workstream scope for persisted beats (shared vocabulary from
+/// `do-harness-types`, so beats and strikes cannot drift on the key).
+pub use do_harness_types::BeatScope;
 
-impl BeatScope {
-    /// Formatted scope string persisted in the `beats` table (e.g. `task:1`, `branch:main`, `global`).
-    #[must_use]
-    pub fn key(&self) -> String {
-        match self {
-            Self::Task(id) => format!("task:{id}"),
-            Self::Branch(name) => format!("branch:{name}"),
-            Self::Global => "global".to_owned(),
-        }
+/// Resolves the effective beat scope from CLI flags and git state.
+///
+/// `task` is the raw `--task` value: `global` and a missing value fall back to
+/// the current branch (or `global` outside a repository), a numeric value
+/// scopes to that task id, and anything else is treated as an explicit branch
+/// name.
+#[must_use]
+pub fn resolve_scope(root: &Path, task: Option<&str>, global: bool) -> BeatScope {
+    if global {
+        return BeatScope::Global;
     }
-
-    /// Task ID when scoped to a task.
-    #[must_use]
-    pub fn task_id(&self) -> Option<i64> {
-        match self {
-            Self::Task(id) => Some(*id),
-            Self::Branch(_) | Self::Global => None,
+    if let Some(t) = task {
+        if t == "global" {
+            return BeatScope::Global;
         }
+        if let Ok(id) = t.parse::<i64>() {
+            return BeatScope::Task(id);
+        }
+        return BeatScope::Branch(t.to_owned());
     }
-
-    /// Resolves the effective beat scope.
-    #[must_use]
-    pub fn resolve(root: &Path, task: Option<&str>, global: bool) -> Self {
-        if global {
-            return Self::Global;
-        }
-        if let Some(t) = task {
-            if t == "global" {
-                return Self::Global;
-            }
-            if let Ok(id) = t.parse::<i64>() {
-                return Self::Task(id);
-            }
-            return Self::Branch(t.to_owned());
-        }
-        if let Some(branch) = crate::changes::current_branch(root) {
-            Self::Branch(branch)
-        } else {
-            Self::Global
-        }
+    if let Some(branch) = crate::changes::current_branch(root) {
+        BeatScope::Branch(branch)
+    } else {
+        BeatScope::Global
     }
 }
 
@@ -124,7 +101,6 @@ pub async fn record_verify(
         .map(|spec| (spec.name.as_str(), spec))
         .collect();
     let now = do_harness_db::unix_now();
-    let scope_key = scope.key();
     let task_id = scope.task_id();
     let messages: Vec<String> = report
         .sensors
@@ -155,15 +131,9 @@ pub async fn record_verify(
         .map(|((sensor, message), digest)| do_harness_db::SensorOutcome {
             beat: do_harness_db::NewBeat {
                 task_id,
-                scope: Some(&scope_key),
-                beat_type: "sensor",
-                status: if sensor.ok {
-                    "ok"
-                } else if sensor.allow_failure {
-                    "warn"
-                } else {
-                    "failed"
-                },
+                scope: Some(scope.clone()),
+                beat_type: do_harness_types::BeatType::Sensor,
+                status: do_harness_types::BeatStatus::for_outcome(sensor.ok, sensor.allow_failure),
                 sensor_exit_code: sensor.exit_code,
                 sensor_name: Some(&sensor.name),
                 started_at: now,

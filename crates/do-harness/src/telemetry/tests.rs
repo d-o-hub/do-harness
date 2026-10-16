@@ -2,6 +2,7 @@
 
 use super::*;
 use crate::report::SensorResult;
+use do_harness_types::{BeatScope, BeatStatus, BeatType};
 
 #[tokio::test(flavor = "current_thread")]
 async fn record_verify_persists_beats_and_signatures() {
@@ -45,8 +46,8 @@ async fn record_verify_persists_beats_and_signatures() {
         .unwrap();
     let beats = do_harness_db::list_beats(&conn, None).await.unwrap();
     assert_eq!(beats.len(), 1);
-    assert_eq!(beats[0].beat_type, "sensor");
-    assert_eq!(beats[0].status, "failed");
+    assert_eq!(beats[0].beat_type, BeatType::Sensor);
+    assert_eq!(beats[0].status, BeatStatus::Failed);
     assert_eq!(beats[0].sensor_exit_code, Some(1));
     let sig = do_harness_db::get_error_signature(&conn, "sensor:fail", "global")
         .await
@@ -98,7 +99,7 @@ async fn record_verify_skips_signatures_when_all_pass() {
         .unwrap();
     let beats = do_harness_db::list_beats(&conn, None).await.unwrap();
     assert_eq!(beats.len(), 1);
-    assert_eq!(beats[0].status, "ok");
+    assert_eq!(beats[0].status, BeatStatus::Ok);
     assert!(
         do_harness_db::get_error_signature(&conn, "sensor:fmt", "global")
             .await
@@ -378,7 +379,10 @@ async fn record_verify_scopes_to_branch() {
         .unwrap();
     let beats = do_harness_db::list_beats(&conn, None).await.unwrap();
     assert_eq!(beats.len(), 1);
-    assert_eq!(beats[0].scope, "branch:feat/feature-a");
+    assert_eq!(
+        beats[0].scope,
+        BeatScope::Branch("feat/feature-a".to_owned())
+    );
     assert_eq!(beats[0].task_id, None);
 
     let scoped = do_harness_db::list_beats_by_scope(&conn, "branch:feat/feature-a")
@@ -393,29 +397,23 @@ fn beat_scope_resolution_precedence() {
 
     // Explicit global flag wins:
     assert_eq!(
-        BeatScope::resolve(dir.path(), Some("42"), true),
+        resolve_scope(dir.path(), Some("42"), true),
         BeatScope::Global
     );
-    assert_eq!(
-        BeatScope::resolve(dir.path(), None, true),
-        BeatScope::Global
-    );
+    assert_eq!(resolve_scope(dir.path(), None, true), BeatScope::Global);
 
     // Explicit task ID:
     assert_eq!(
-        BeatScope::resolve(dir.path(), Some("42"), false),
+        resolve_scope(dir.path(), Some("42"), false),
         BeatScope::Task(42)
     );
 
     // Explicit task = "global":
     assert_eq!(
-        BeatScope::resolve(dir.path(), Some("global"), false),
+        resolve_scope(dir.path(), Some("global"), false),
         BeatScope::Global
     );
 
     // Outside git repo with no task/global defaults to Global:
-    assert_eq!(
-        BeatScope::resolve(dir.path(), None, false),
-        BeatScope::Global
-    );
+    assert_eq!(resolve_scope(dir.path(), None, false), BeatScope::Global);
 }

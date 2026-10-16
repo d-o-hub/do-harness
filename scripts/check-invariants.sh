@@ -19,9 +19,25 @@
 # It deliberately does not re-derive whether a decision is still *true* — that
 # is the owning epic's reviewed evidence, not something a hermetic script can
 # read.
+#
+# Enforcement policy (fail-open on a missing tool, fail-closed when required),
+# mirroring scripts/check-magic-numbers.sh:
+#   - python3 missing AND (CI=true OR DO_HARNESS_REQUIRE_TOOLS=1) -> FAIL.
+#   - python3 missing otherwise -> SKIP with the marker the runner surfaces.
 set -euo pipefail
 
+require_tools() { [[ "${CI:-}" == "true" || "${DO_HARNESS_REQUIRE_TOOLS:-}" == "1" ]]; }
+
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+if ! command -v python3 >/dev/null 2>&1; then
+    if require_tools; then
+        echo "FAIL: python3 is required when CI=true or DO_HARNESS_REQUIRE_TOOLS=1."
+        exit 1
+    fi
+    echo "SKIP: python3 not installed; skipping the invariants check (install python3)."
+    exit 0
+fi
 
 python3 - "$ROOT" <<'PY'
 import json

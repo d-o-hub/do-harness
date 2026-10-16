@@ -179,8 +179,8 @@ fn latest_sensor_beat_ok(beats: &[Beat], sensor: &str) -> bool {
     beats
         .iter()
         .rev()
-        .find(|beat| beat.beat_type == "sensor" && beat.sensor_name.as_deref() == Some(sensor))
-        .is_some_and(|beat| beat.status == "ok")
+        .find(|beat| beat.is_sensor_beat_for(sensor))
+        .is_some_and(Beat::is_ok)
 }
 
 /// Validated state for a `done` transition.

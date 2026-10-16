@@ -19,6 +19,8 @@ anyhow.workspace = true
 thiserror.workspace = true
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
+sha2.workspace = true
+hex.workspace = true
 do-harness-types = { path = "../types", version = "0.3.0" }
 
 [dev-dependencies]

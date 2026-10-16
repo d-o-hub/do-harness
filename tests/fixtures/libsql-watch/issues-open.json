@@ -1,0 +1,22 @@
+[
+ {
+  "number": 2254,
+  "state": "open",
+  "title": "Corruption on power loss"
+ },
+ {
+  "number": 2271,
+  "state": "open",
+  "title": "Bundled SQLite predates the 3.51.3 WAL-reset fix"
+ },
+ {
+  "number": 2272,
+  "state": "open",
+  "title": "Connection::authorizer keeps a raw pointer to the connection"
+ },
+ {
+  "number": 2285,
+  "state": "open",
+  "title": "Row::get_value truncates embedded NUL text and panics on malformed UTF-8"
+ }
+]

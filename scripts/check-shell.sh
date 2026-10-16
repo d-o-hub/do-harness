@@ -23,7 +23,7 @@ if ! command -v shellcheck >/dev/null 2>&1; then
         echo "FAIL: shellcheck is required when CI=true or DO_HARNESS_REQUIRE_TOOLS=1."
         exit 1
     fi
-    echo "SKIP: shellcheck not installed; skipping shell lint."
+    echo "SKIP: shellcheck not installed; skipping shell lint (install shellcheck: https://www.shellcheck.net)."
     exit 0
 fi
 
@@ -43,7 +43,7 @@ mapfile -t files < <(
 )
 
 if [[ "${#files[@]}" -eq 0 ]]; then
-    echo "FAIL: no shell scripts found to lint." >&2
+    echo "FAIL: no shell scripts found to lint. Restore the scripts/ tree or pass a complete checkout." >&2
     exit 1
 fi
 

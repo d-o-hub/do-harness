@@ -21,7 +21,7 @@ if ! command -v yamllint >/dev/null 2>&1; then
         echo "FAIL: yamllint is required when CI=true or DO_HARNESS_REQUIRE_TOOLS=1."
         exit 1
     fi
-    echo "SKIP: yamllint not installed; skipping yaml lint."
+    echo "SKIP: yamllint not installed; skipping yaml lint (pipx install yamllint)."
     exit 0
 fi
 
@@ -37,7 +37,7 @@ mapfile -t files < <(
 )
 
 if [[ "${#files[@]}" -eq 0 ]]; then
-    echo "FAIL: no yaml files found to lint; a gate that checks nothing is not a pass." >&2
+    echo "FAIL: no yaml files found to lint; a gate that checks nothing is not a pass. Restore the tracked YAML files or fix the discovery root." >&2
     exit 1
 fi
 

@@ -36,7 +36,7 @@ pub(crate) async fn run(root: &Path, mut opts: VerifyOpts) -> std::result::Resul
     let (cfg, config_bytes) = config::load_raw(root, opts.config.as_deref())
         .await
         .map_err(CliError::Usage)?;
-    let beat_scope = telemetry::BeatScope::resolve(root, opts.raw_task.as_deref(), opts.global);
+    let beat_scope = telemetry::resolve_scope(root, opts.raw_task.as_deref(), opts.global);
     if opts.task.is_none() {
         opts.task = beat_scope.task_id();
     }
@@ -234,7 +234,7 @@ async fn prepare_reuse(
                 .await
                 .map_err(|e| CliError::Usage(e.into()))?;
             if let Some(latest) = latest {
-                let eligible = latest.status == "ok"
+                let eligible = latest.status.is_ok()
                     && latest.exit_code == Some(0)
                     && latest.input_digest.as_deref() == Some(digest.as_str());
                 if eligible {
