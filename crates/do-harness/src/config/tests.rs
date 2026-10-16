@@ -240,6 +240,26 @@ async fn rust_language_without_sensors_uses_builtin_pack() {
     assert!(cfg.sensor_names().contains(&"clippy".to_owned()));
 }
 
+/// The built-in pack must not carry `--no-tests=pass`: a workspace whose suite
+/// shrank to zero has to fail its `test` sensor instead of reporting green
+/// (AGENTS.md section 4, "No Vacuous Gates").
+///
+/// `tests/vacuous_gates.rs` proves the behaviour end to end where cargo-nextest
+/// is installed; this pin holds on every host.
+#[test]
+fn builtin_rust_pack_test_sensor_fails_on_zero_tests() {
+    let pack = rust_pack();
+    let test = pack
+        .iter()
+        .find(|sensor| sensor.name == "test")
+        .expect("the built-in pack ships a test sensor");
+    assert_eq!(
+        test.argv,
+        vec!["cargo", "nextest", "run", "--workspace"],
+        "nextest must fail the run when it executes zero tests"
+    );
+}
+
 /// Parses `[signal-sets]` and `when-changed` sensor patterns.
 #[tokio::test(flavor = "current_thread")]
 async fn parses_signal_sets_and_when_changed() {

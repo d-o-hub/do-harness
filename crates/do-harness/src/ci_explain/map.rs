@@ -64,7 +64,7 @@ const TOOL_RULES: &[ToolRule] = &[
             "failed to run test",
         ],
         sensor: "test",
-        fallback: "cargo nextest run --workspace --no-tests=pass",
+        fallback: "cargo nextest run --workspace",
     },
     ToolRule {
         keywords: &["doctest", "doc test"],

@@ -211,9 +211,11 @@ pub fn rust_pack() -> Vec<SensorSpec> {
             ],
             RUST_INPUTS,
         ),
+        // No `--no-tests=pass`: a generated workspace whose suite shrank to
+        // zero must fail its `test` sensor rather than pass vacuously.
         spec(
             "test",
-            &["cargo", "nextest", "run", "--workspace", "--no-tests=pass"],
+            &["cargo", "nextest", "run", "--workspace"],
             RUST_INPUTS,
         ),
         spec(

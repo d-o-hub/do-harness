@@ -5,8 +5,10 @@ retries = 0
 # 8-wide instrumented runaway past 11GB anon on a 14GB host); 2 keeps the
 # default suite green locally with a small CI slowdown.
 test-threads = 2
-# No `no-tests` key here: nextest reports it as an unknown configuration key, and
-# every `nextest run` in the harness and the scaffold passes --no-tests=pass.
+# No `no-tests` key here: nextest reports it as an unknown configuration key,
+# and this repository's harness deliberately does NOT pass `--no-tests=pass`, so
+# a run that executes zero tests fails the `test` sensor instead of reporting
+# green (`tests/vacuous_gates.rs` pins that).
 
 [profile.ci]
 retries = 1
