@@ -7,6 +7,9 @@ on:
     # verified exactly once: by `push` on main, by `pull_request` on branches.
     branches: [main]
   pull_request:
+  # Manual re-run: a transient runner failure or a quota exhaustion should not
+  # require an empty commit to produce fresh evidence.
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -108,7 +111,7 @@ jobs:
       # taiki-e/install-action@v2
       - uses: taiki-e/install-action@ba47c86ac325773530516bb756137ac718732518
         with:
-          tool: cargo-deny,cargo-audit,cargo-nextest,cargo-llvm-cov,shellcheck,cargo-hack,cargo-machete
+          tool: cargo-deny,cargo-audit,cargo-nextest,shellcheck,cargo-hack,cargo-machete
       - name: Install markdownlint and yamllint
         run: |
           python3 -m pip install --disable-pip-version-check yamllint

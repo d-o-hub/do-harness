@@ -3,9 +3,15 @@ repos:
     hooks:
       - id: do-harness-verify
         name: do-harness (fmt, loc)
-        # Build the binary first so a fresh clone passes without a manual
-        # release build, mirroring the managed git hook.
-        entry: cargo build --release -p do-harness && ./target/release/do-harness verify --fail-fast --only fmt --only loc
+        # The same gate the managed git hook runs, for contributors who use the
+        # pre-commit framework. It resolves the binary the way the repository
+        # documents instead of hardcoding `./target/release/do-harness`, which
+        # silently ran a stale or missing binary whenever CARGO_TARGET_DIR was
+        # redirected.
+        entry: >-
+          bash -c 'cargo build --release -p do-harness &&
+          "${DO_HARNESS_BIN:-${CARGO_TARGET_DIR:-target}/release/do-harness}"
+          verify --fail-fast --only fmt --only loc'
         language: system
         pass_filenames: false
         always_run: true

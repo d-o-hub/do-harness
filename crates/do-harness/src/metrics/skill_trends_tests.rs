@@ -25,6 +25,14 @@ async fn open() -> (tempfile::TempDir, Connection) {
     (dir, conn)
 }
 
+/// The fixture's rate, cast the way the report casts it: through `u32`, which
+/// the pedantic `cast_precision_loss` lint accepts because the widening cannot
+/// lose precision for these values.
+fn rate(passed: i64, graded: i64) -> f64 {
+    f64::from(u32::try_from(passed).expect("fixture fits u32"))
+        / f64::from(u32::try_from(graded).expect("fixture fits u32"))
+}
+
 /// Records one run of `skill`, with the latest-skill row that accompanies it.
 async fn record(
     conn: &Connection,
@@ -263,4 +271,88 @@ async fn ungraded_runs_and_dimensions_report_none() {
         dim.without_rate, None,
         "no denominator means no without-rate either"
     );
+}
+
+/// Every rate the report derives is finite or absent.
+///
+/// S17 names the bare `f64` pass-rate fields: a `NaN` would poison the ratchet's
+/// ordering comparisons, since every comparison with `NaN` is false, so "best
+/// ever" and "lift floor" would turn into coin flips. The derivation guards its
+/// divisions (`graded > 0`), so `NaN` cannot enter through the arithmetic; this
+/// pins that property from the outside, at both extremes and at the empty
+/// denominator.
+#[tokio::test(flavor = "current_thread")]
+async fn derived_rates_are_finite_or_absent() {
+    let (_dir, conn) = open().await;
+    for (skill, graded, passed) in [
+        ("all-pass", 3, 3),
+        ("none-pass", 3, 0),
+        ("nothing-graded", 0, 0),
+    ] {
+        record(
+            &conn,
+            skill,
+            NewSkillEvalRun {
+                skill_name: skill,
+                mode: EvalMode::Deterministic,
+                graded,
+                passed,
+                pass_rate: (graded > 0).then(|| rate(passed, graded)),
+                without_pass_rate: None,
+                skill_words: None,
+                walk_secs: None,
+            },
+            &[NewSkillEvalDimRate {
+                dim: "correctness",
+                graded,
+                passed,
+                without_passed: Some(passed),
+            }],
+            if graded > 0 {
+                rate(passed, graded)
+            } else {
+                0.0
+            },
+        )
+        .await;
+    }
+
+    let trends = collect_skill_trends(&conn, None, None).await.unwrap();
+    assert_eq!(trends.len(), 3, "one trend row per seeded skill");
+    for trend in trends {
+        assert!(
+            trend.latest_pass_rate.is_none_or(f64::is_finite),
+            "{}: latest pass rate",
+            trend.name
+        );
+        assert!(
+            trend.best_pass_rate.is_none_or(f64::is_finite),
+            "{}: best pass rate",
+            trend.name
+        );
+        assert!(
+            trend.lift.is_none_or(f64::is_finite),
+            "{}: lift",
+            trend.name
+        );
+        assert!(
+            trend.bar_floor.is_none_or(f64::is_finite),
+            "{}: bar floor",
+            trend.name
+        );
+        for dim in &trend.dims {
+            assert!(
+                dim.rate.is_none_or(f64::is_finite),
+                "{}: {} rate",
+                trend.name,
+                dim.dim
+            );
+            assert!(
+                dim.without_rate.is_none_or(f64::is_finite),
+                "{}: {} without-rate",
+                trend.name,
+                dim.dim
+            );
+        }
+    }
 }
