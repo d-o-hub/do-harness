@@ -460,6 +460,10 @@ pub async fn get_error_signature(
 /// One query replaces a per-sensor lookup loop, so the fail-fast pre-check
 /// stays a single round trip as the configured sensor count grows.
 ///
+/// `prefix` is matched literally: `_` and `%` are LIKE wildcards, and a sensor
+/// key such as `sensor:cargo_check` would otherwise also strike
+/// `sensor:cargoCheckX`, quarantining a sensor that never failed.
+///
 /// # Errors
 ///
 /// Returns an error when the query fails.
@@ -469,12 +473,16 @@ pub async fn struck_signatures(
     prefix: &str,
     threshold: i64,
 ) -> Result<Vec<String>> {
+    let escaped = prefix
+        .replace('\\', "\\\\")
+        .replace('%', "\\%")
+        .replace('_', "\\_");
     let mut rows = conn
         .query(
             "SELECT signature FROM error_signatures \
-             WHERE scope = ?1 AND attempt_count >= ?2 AND signature LIKE ?3 \
+             WHERE scope = ?1 AND attempt_count >= ?2 AND signature LIKE ?3 ESCAPE '\\' \
              ORDER BY signature",
-            params!(scope, threshold, format!("{prefix}%")),
+            params!(scope, threshold, format!("{escaped}%")),
         )
         .await?;
     let mut signatures = Vec::new();
