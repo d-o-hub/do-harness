@@ -77,10 +77,28 @@ fn confirm_migrations(health: &crate::dbcheck::DbHealth) -> Result<bool> {
 /// least `keep_per_task` most-recent beats per task; the database is then
 /// `VACUUM`-compacted. Without the flag only `VACUUM` runs.
 ///
+/// `--dry-run` neither prunes nor compacts, and does not even open the state
+/// database: `connect_and_migrate` creates and migrates it, so a dry run that
+/// reached it would mutate the very state it claims only to preview.
+///
 /// # Errors
 ///
 /// Returns an error when the database cannot be opened or pruned.
-pub async fn maintenance(root: &Path, prune_beats: Option<i64>, keep_per_task: i64) -> Result<()> {
+pub async fn maintenance(
+    root: &Path,
+    prune_beats: Option<i64>,
+    keep_per_task: i64,
+    dry_run: bool,
+) -> Result<()> {
+    if dry_run {
+        match prune_beats {
+            Some(days) => println!(
+                "Dry run: would prune beats older than {days} day(s) (kept >= {keep_per_task} per task/workstream), then VACUUM; nothing deleted"
+            ),
+            None => println!("Dry run: would VACUUM; nothing changed"),
+        }
+        return Ok(());
+    }
     let conn = do_harness_db::connect_and_migrate(root).await?;
     if let Some(days) = prune_beats {
         let cutoff = do_harness_db::unix_now().saturating_sub(days.max(0).saturating_mul(86_400));

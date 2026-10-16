@@ -103,6 +103,10 @@ fn prune_beats_keeps_the_newest_and_a_dry_run_changes_nothing() {
     // A dry run reports what it would delete and deletes nothing.
     let (code, stdout, stderr) = run(harness(&root).args(prune_args()).arg("--dry-run"));
     assert_eq!(code, Some(0), "dry run failed:\n{stdout}\n{stderr}");
+    assert!(
+        stdout.contains("Dry run"),
+        "the report must name itself a dry run, not read as a deletion:\n{stdout}"
+    );
     assert_eq!(
         recorded_runs(&root),
         RECORDED_BEATS,
@@ -122,5 +126,21 @@ fn prune_beats_keeps_the_newest_and_a_dry_run_changes_nothing() {
         recorded_runs(&root),
         KEEP_PER_TASK,
         "the minimum keep count survives, the rest is pruned:\n{stdout}"
+    );
+}
+
+/// A dry run must not even open the state database.
+///
+/// `connect_and_migrate` creates and migrates the file, so a dry run that
+/// reached it would mutate the state it claims only to preview — on a fresh
+/// clone it would leave a migrated `agent_state.db` behind.
+#[test]
+fn prune_beats_dry_run_leaves_no_state_database() {
+    let (_dir, root) = workspace();
+    let (code, stdout, stderr) = run(harness(&root).args(prune_args()).arg("--dry-run"));
+    assert_eq!(code, Some(0), "dry run failed:\n{stdout}\n{stderr}");
+    assert!(
+        !root.join(".do-harness").join("agent_state.db").exists(),
+        "a dry run must not create the state database:\n{stdout}\n{stderr}"
     );
 }
