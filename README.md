@@ -278,7 +278,14 @@ source of truth.
 
 Managed hooks carry a marker identifying them as do-harness-owned; re-running `hook install` overwrites them, and `--force` overwrites any pre-existing hook at the same path. `hook uninstall` removes only managed hooks. `hook status` reports which hooks are present and whether they are managed.
 
-Alternative for users of the pre-commit framework: this repo ships `.pre-commit-config.yaml` with a `local` hook (`language: system`) whose entry is `./target/release/do-harness verify --fail-fast --only fmt --only loc`.
+Alternative for users of the pre-commit framework: this repo ships
+`.pre-commit-config.yaml` with a `local` hook (`language: system`) that builds
+the CLI and runs the same `verify --fail-fast --only fmt --only loc` gate. It
+resolves the binary through `DO_HARNESS_BIN` and otherwise through
+`CARGO_TARGET_DIR`'s release directory, so a redirected target directory cannot
+make it execute a stale binary. The check itself is already gated in CI by the
+`feedback` set, and the managed hook's execution is covered end to end, so this
+integration adds a second entry point rather than a second gate.
 
 ## Skills
 
