@@ -261,7 +261,7 @@ async fn migrate_with_retry(conn: &Connection) -> Result<()> {
             }
         }
     }
-    Err(last.unwrap_or_else(|| DbError::NotFound("migration retry state lost".to_owned())))
+    Err(last.unwrap_or_else(|| DbError::Invariant("migration retry state lost".to_owned())))
 }
 
 /// Copies the state database beside itself as `<file>.bak`.

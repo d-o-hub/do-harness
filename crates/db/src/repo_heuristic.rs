@@ -41,7 +41,7 @@ pub async fn insert_heuristic(conn: &Connection, heuristic: &NewHeuristic<'_>) -
     let row = rows
         .next()
         .await?
-        .ok_or_else(|| DbError::NotFound("heuristic id vanished after insert".to_string()))?;
+        .ok_or_else(|| DbError::Invariant("heuristic id vanished after insert".to_string()))?;
     Ok(row.get(0)?)
 }
 

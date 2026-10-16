@@ -97,7 +97,9 @@ async fn terminal_writer_reports_missing_task_as_not_found() {
 }
 
 /// The event-log foreign key refuses orphan events: reached by hitting
-/// `append_event_on` directly for a task id whose row no longer exists.
+/// `append_event_on` directly for a task id whose row no longer exists. Pins
+/// the classification as well: only a lost `UNIQUE(seq)` race is retryable, so
+/// a foreign-key failure must not be mistaken for one.
 #[tokio::test(flavor = "current_thread")]
 async fn orphan_event_append_violates_foreign_key() {
     let dir = tempfile::tempdir().unwrap();
@@ -116,7 +118,8 @@ async fn orphan_event_append_violates_foreign_key() {
     )
     .await
     .unwrap_err();
-    assert!(matches!(err, DbError::Constraint(_)));
+    assert!(matches!(err, DbError::Constraint { code: 787, .. }));
+    assert!(!err.is_unique_violation());
 }
 
 #[test]

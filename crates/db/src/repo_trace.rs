@@ -44,7 +44,7 @@ pub async fn insert_trace(conn: &Connection, trace: &NewTrace<'_>) -> Result<i64
     let row = rows
         .next()
         .await?
-        .ok_or_else(|| DbError::NotFound("trace id vanished after insert".to_string()))?;
+        .ok_or_else(|| DbError::Invariant("trace id vanished after insert".to_string()))?;
     Ok(row.get(0)?)
 }
 

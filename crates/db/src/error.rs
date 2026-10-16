@@ -15,6 +15,15 @@ const SQLITE_BUSY: std::ffi::c_int = 5;
 /// `SQLite` primary result code for a table/database lock contention (`database table is locked`).
 const SQLITE_LOCKED: std::ffi::c_int = 6;
 
+/// `SQLite` extended result code: a `UNIQUE` constraint failed.
+const SQLITE_CONSTRAINT_UNIQUE: std::ffi::c_int = 2067;
+
+/// `SQLite` extended result code: a `PRIMARY KEY` constraint failed.
+const SQLITE_CONSTRAINT_PRIMARYKEY: std::ffi::c_int = 1555;
+
+/// `SQLite` extended result code: a `rowid` was not unique.
+const SQLITE_CONSTRAINT_ROWID: std::ffi::c_int = 2579;
+
 /// Errors produced by the do-harness persistence layer.
 ///
 /// All `libsql` failures (execute, query, row access, transactions) funnel
@@ -70,12 +79,33 @@ pub enum DbError {
     /// "the event stream covers every persisted transition" invariant.
     #[error("invalid task transition: {0}")]
     InvalidTaskTransition(String),
-    /// A foreign-key or unique constraint was violated.
-    #[error("constraint violated: {0}")]
-    Constraint(String),
+    /// A SQL constraint was violated.
+    ///
+    /// The extended `SQLite` result code is kept alongside the engine's
+    /// message so callers can tell the kinds apart
+    /// (`SQLITE_CONSTRAINT_UNIQUE` = 2067 versus `SQLITE_CONSTRAINT_FOREIGNKEY`
+    /// = 787); see <https://www.sqlite.org/rescode.html>.
+    #[error("constraint violated: {message}")]
+    Constraint {
+        /// Extended `SQLite` result code, e.g. `SQLITE_CONSTRAINT_UNIQUE`.
+        code: std::ffi::c_int,
+        /// Constraint text reported by the engine.
+        message: String,
+    },
     /// A record expected to exist was missing.
     #[error("not found: {0}")]
     NotFound(String),
+    /// An assumption the code makes about the database was violated: a
+    /// read-back after a write returned no row, or a probe that must always
+    /// answer did not.
+    ///
+    /// Distinct from [`DbError::NotFound`], which means the caller asked for a
+    /// record that legitimately does not exist.
+    #[error("database invariant violated: {0}")]
+    Invariant(String),
+    /// A stored skill-eval mode was not one of the persisted wire names.
+    #[error("invalid stored eval mode '{0}': expected deterministic|agent")]
+    InvalidEvalMode(String),
     /// A workflow gate's required sensor has no passing beat at write time
     /// (re-checked inside the command transaction to close the read-then-write
     /// race with concurrent `verify --record`).
@@ -109,7 +139,10 @@ impl From<libsql::Error> for DbError {
     fn from(err: libsql::Error) -> Self {
         if let libsql::Error::SqliteFailure(code, message) = &err {
             if (code & 0xFF) == SQLITE_CONSTRAINT {
-                return DbError::Constraint(message.clone());
+                return DbError::Constraint {
+                    code: *code,
+                    message: message.clone(),
+                };
             }
         }
         DbError::Sql(err)
@@ -129,6 +162,35 @@ impl DbError {
                 let primary = code & 0xFF;
                 primary == SQLITE_BUSY || primary == SQLITE_LOCKED
             }
+            _ => false,
+        }
+    }
+
+    /// Builds a uniqueness violation with the canonical extended code.
+    ///
+    /// Used by callers that synthesise a race outcome rather than receiving one
+    /// from the engine.
+    #[must_use]
+    pub fn unique_violation(message: impl Into<String>) -> Self {
+        DbError::Constraint {
+            code: SQLITE_CONSTRAINT_UNIQUE,
+            message: message.into(),
+        }
+    }
+
+    /// Whether this failure is a uniqueness violation, and therefore the only
+    /// constraint failure a concurrent writer can retry its way out of.
+    ///
+    /// libSQL reports the extended result code (`sqlite3_extended_errcode`), so
+    /// a lost insert race is distinguishable from a foreign-key or `CHECK`
+    /// failure by the code alone.
+    #[must_use]
+    pub fn is_unique_violation(&self) -> bool {
+        match self {
+            DbError::Constraint { code, .. } => matches!(
+                *code,
+                SQLITE_CONSTRAINT_UNIQUE | SQLITE_CONSTRAINT_PRIMARYKEY | SQLITE_CONSTRAINT_ROWID
+            ),
             _ => false,
         }
     }
@@ -181,7 +243,7 @@ mod tests {
             SQLITE_CONSTRAINT,
             "UNIQUE constraint failed".to_owned(),
         ));
-        assert!(matches!(constraint, DbError::Constraint(_)));
+        assert!(matches!(constraint, DbError::Constraint { .. }));
 
         // An extended constraint code (19 | 0x100 << 8) still maps to
         // `Constraint` after masking to the primary code.
@@ -189,13 +251,66 @@ mod tests {
             SQLITE_CONSTRAINT | (1 << 8),
             "constraint failed".to_owned(),
         ));
-        assert!(matches!(extended, DbError::Constraint(_)));
+        assert!(matches!(extended, DbError::Constraint { .. }));
 
         let other = DbError::from(libsql::Error::SqliteFailure(
             1,
             "generic failure".to_owned(),
         ));
         assert!(matches!(other, DbError::Sql(_)));
+    }
+
+    /// The extended code is preserved, so a retryable `UNIQUE(seq)` race is
+    /// distinguishable from a foreign-key or `CHECK` failure. Codes per
+    /// <https://www.sqlite.org/rescode.html>.
+    #[test]
+    fn constraint_kinds_are_distinguished_by_extended_code() {
+        const FOREIGN_KEY: std::ffi::c_int = 787;
+        const CHECK: std::ffi::c_int = 275;
+
+        let unique = DbError::from(libsql::Error::SqliteFailure(
+            SQLITE_CONSTRAINT_UNIQUE,
+            "UNIQUE constraint failed: workflow_events.seq".to_owned(),
+        ));
+        assert!(matches!(unique, DbError::Constraint { code: 2067, .. }));
+        assert!(unique.is_unique_violation());
+
+        let primary_key = DbError::from(libsql::Error::SqliteFailure(
+            SQLITE_CONSTRAINT_PRIMARYKEY,
+            "PRIMARY KEY constraint failed".to_owned(),
+        ));
+        assert!(primary_key.is_unique_violation());
+
+        let foreign_key = DbError::from(libsql::Error::SqliteFailure(
+            FOREIGN_KEY,
+            "FOREIGN KEY constraint failed".to_owned(),
+        ));
+        assert!(matches!(foreign_key, DbError::Constraint { code: 787, .. }));
+        assert!(!foreign_key.is_unique_violation());
+
+        let check = DbError::from(libsql::Error::SqliteFailure(
+            CHECK,
+            "CHECK constraint failed".to_owned(),
+        ));
+        assert!(!check.is_unique_violation());
+        assert!(!DbError::NotFound("gone".to_owned()).is_unique_violation());
+        assert!(!DbError::Invariant("probe".to_owned()).is_unique_violation());
+    }
+
+    /// A synthesised race uses the canonical extended code, and the new
+    /// variants keep their context in the rendered message.
+    #[test]
+    fn synthesised_errors_render_their_context() {
+        let exhausted = DbError::unique_violation("seq retries exhausted");
+        assert!(exhausted.is_unique_violation());
+        assert!(exhausted.to_string().contains("seq retries exhausted"));
+
+        let invariant = DbError::Invariant("beat id vanished after insert".to_owned());
+        assert!(invariant.to_string().contains("beat id vanished"));
+
+        let mode = DbError::InvalidEvalMode("bogus".to_owned());
+        assert!(mode.to_string().contains("bogus"));
+        assert!(mode.to_string().contains("deterministic|agent"));
     }
 
     /// `SQLITE_BUSY` and `SQLITE_LOCKED` (and extended codes) are classified as transient.
