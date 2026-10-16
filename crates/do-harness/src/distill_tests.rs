@@ -5,6 +5,7 @@
 use std::fs;
 
 use super::*;
+use do_harness_types::{BeatStatus, BeatType};
 
 fn write_skill_md(root: &Path, skill: &str) {
     let dir = root.join(".agents").join("skills").join(skill);
@@ -35,8 +36,8 @@ async fn seed_ok_beat(root: &Path) {
         &do_harness_db::NewBeat {
             task_id: None,
             scope: None,
-            beat_type: "sensor",
-            status: "ok",
+            beat_type: BeatType::Sensor,
+            status: BeatStatus::Ok,
             sensor_exit_code: Some(0),
             sensor_name: Some("check"),
             started_at: 1,

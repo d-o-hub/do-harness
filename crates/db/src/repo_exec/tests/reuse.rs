@@ -7,6 +7,7 @@ use super::super::{
     LatestSensorBeat, NewBeat, SensorOutcome, latest_sensor_beat, record_verify_batch,
 };
 use crate::repo::NewTask;
+use do_harness_types::{BeatScope, BeatStatus, BeatType};
 
 /// A batch outcome's input digest lands on its own beat in the same
 /// transaction, and outcomes without one stay NULL (never reusable).
@@ -21,8 +22,8 @@ async fn record_verify_batch_persists_input_digest_on_the_beat() {
             beat: NewBeat {
                 task_id: None,
                 scope: None,
-                beat_type: "sensor",
-                status: "ok",
+                beat_type: BeatType::Sensor,
+                status: BeatStatus::Ok,
                 sensor_exit_code: Some(0),
                 sensor_name: Some("probe"),
                 started_at: 1,
@@ -36,8 +37,8 @@ async fn record_verify_batch_persists_input_digest_on_the_beat() {
             beat: NewBeat {
                 task_id: None,
                 scope: None,
-                beat_type: "sensor",
-                status: "ok",
+                beat_type: BeatType::Sensor,
+                status: BeatStatus::Ok,
                 sensor_exit_code: Some(0),
                 sensor_name: Some("plain"),
                 started_at: 1,
@@ -54,7 +55,7 @@ async fn record_verify_batch_persists_input_digest_on_the_beat() {
         latest_sensor_beat(&conn, "probe", "global").await.unwrap(),
         Some(LatestSensorBeat {
             id: 1,
-            status: "ok".to_owned(),
+            status: BeatStatus::Ok,
             exit_code: Some(0),
             input_digest: Some("sha256:abc".to_owned()),
         })
@@ -63,7 +64,7 @@ async fn record_verify_batch_persists_input_digest_on_the_beat() {
         latest_sensor_beat(&conn, "plain", "global").await.unwrap(),
         Some(LatestSensorBeat {
             id: 2,
-            status: "ok".to_owned(),
+            status: BeatStatus::Ok,
             exit_code: Some(0),
             input_digest: None,
         })
@@ -77,16 +78,16 @@ async fn record_verify_batch_persists_input_digest_on_the_beat() {
 }
 
 /// A shared sensor beat builder for the `latest_sensor_beat` scope tests.
-fn probe_beat<'a>(
-    scope: Option<&'a str>,
+fn probe_beat(
+    scope: Option<BeatScope>,
     task: Option<i64>,
-    status: &'a str,
+    status: BeatStatus,
     exit: Option<i32>,
-) -> NewBeat<'a> {
+) -> NewBeat<'static> {
     NewBeat {
         task_id: task,
         scope,
-        beat_type: "sensor",
+        beat_type: BeatType::Sensor,
         status,
         sensor_exit_code: exit,
         sensor_name: Some("probe"),
@@ -108,13 +109,13 @@ async fn latest_sensor_beat_shadows_earlier_pass_in_its_scope() {
         &conn,
         &[
             SensorOutcome {
-                beat: probe_beat(None, None, "ok", Some(0)),
+                beat: probe_beat(None, None, BeatStatus::Ok, Some(0)),
                 ok: true,
                 message: None,
                 input_digest: Some("sha256:pass"),
             },
             SensorOutcome {
-                beat: probe_beat(None, None, "failed", Some(1)),
+                beat: probe_beat(None, None, BeatStatus::Failed, Some(1)),
                 ok: false,
                 message: Some("boom"),
                 input_digest: None,
@@ -129,7 +130,7 @@ async fn latest_sensor_beat_shadows_earlier_pass_in_its_scope() {
         .unwrap()
         .expect("failure beat");
     assert_eq!(latest.id, 2);
-    assert_eq!(latest.status, "failed");
+    assert_eq!(latest.status, BeatStatus::Failed);
     assert_eq!(latest.exit_code, Some(1));
     assert_eq!(
         latest.input_digest, None,
@@ -143,7 +144,7 @@ async fn latest_sensor_beat_shadows_earlier_pass_in_its_scope() {
 #[tokio::test(flavor = "current_thread")]
 async fn latest_sensor_beat_isolates_branch_task_and_global_scopes() {
     fn record<'a>(beat: NewBeat<'a>, digest: Option<&'a str>) -> SensorOutcome<'a> {
-        let ok = beat.status == "ok";
+        let ok = beat.status.is_ok();
         SensorOutcome {
             beat,
             ok,
@@ -172,13 +173,21 @@ async fn latest_sensor_beat_isolates_branch_task_and_global_scopes() {
     record_verify_batch(
         &conn,
         &[
-            record(probe_beat(None, None, "ok", Some(0)), Some("sha256:pass")),
             record(
-                probe_beat(Some("branch:feature"), None, "ok", Some(0)),
+                probe_beat(None, None, BeatStatus::Ok, Some(0)),
+                Some("sha256:pass"),
+            ),
+            record(
+                probe_beat(
+                    Some(BeatScope::Branch("feature".to_owned())),
+                    None,
+                    BeatStatus::Ok,
+                    Some(0),
+                ),
                 Some("sha256:branch"),
             ),
             record(
-                probe_beat(None, Some(task_id), "ok", Some(0)),
+                probe_beat(None, Some(task_id), BeatStatus::Ok, Some(0)),
                 Some("sha256:task"),
             ),
         ],
@@ -192,7 +201,7 @@ async fn latest_sensor_beat_isolates_branch_task_and_global_scopes() {
             .unwrap(),
         Some(LatestSensorBeat {
             id: 3,
-            status: "ok".to_owned(),
+            status: BeatStatus::Ok,
             exit_code: Some(0),
             input_digest: Some("sha256:task".to_owned()),
         }),
@@ -218,7 +227,7 @@ async fn latest_sensor_beat_isolates_branch_task_and_global_scopes() {
             .unwrap(),
         Some(LatestSensorBeat {
             id: 2,
-            status: "ok".to_owned(),
+            status: BeatStatus::Ok,
             exit_code: Some(0),
             input_digest: Some("sha256:branch".to_owned()),
         }),
@@ -228,7 +237,7 @@ async fn latest_sensor_beat_isolates_branch_task_and_global_scopes() {
         latest_sensor_beat(&conn, "probe", "global").await.unwrap(),
         Some(LatestSensorBeat {
             id: 1,
-            status: "ok".to_owned(),
+            status: BeatStatus::Ok,
             exit_code: Some(0),
             input_digest: Some("sha256:pass".to_owned()),
         }),

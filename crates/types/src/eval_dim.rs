@@ -6,6 +6,20 @@
 //! alone cannot tell those apart.
 
 use serde::{Deserialize, Serialize};
+use std::str::FromStr;
+use thiserror::Error;
+
+/// Wire names [`EvalDim::from_str`] accepts.
+const EXPECTED_EVAL_DIMS: &str = "correctness|discoverability|effectiveness|efficiency|security";
+
+/// Error returned when a stored or supplied evaluation dimension is not one
+/// of the five scored dimensions.
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[error("unknown eval dimension '{value}': expected one of {EXPECTED_EVAL_DIMS}")]
+pub struct EvalDimParseError {
+    /// The unrecognized value.
+    pub value: String,
+}
 
 /// One of the five scored evaluation dimensions.
 ///
@@ -81,8 +95,8 @@ impl std::fmt::Display for EvalDim {
     }
 }
 
-impl std::str::FromStr for EvalDim {
-    type Err = String;
+impl FromStr for EvalDim {
+    type Err = EvalDimParseError;
 
     fn from_str(raw: &str) -> Result<Self, Self::Err> {
         match raw {
@@ -91,10 +105,9 @@ impl std::str::FromStr for EvalDim {
             "effectiveness" => Ok(EvalDim::Effectiveness),
             "efficiency" => Ok(EvalDim::Efficiency),
             "security" => Ok(EvalDim::Security),
-            _ => Err(format!(
-                "unknown eval dimension '{raw}': expected one of \
-                 correctness|discoverability|effectiveness|efficiency|security"
-            )),
+            _ => Err(EvalDimParseError {
+                value: raw.to_owned(),
+            }),
         }
     }
 }
@@ -116,7 +129,11 @@ mod tests {
             let parsed: EvalDim = serde_json::from_str(&json).expect("parse");
             assert_eq!(parsed, dim);
             assert_eq!(dim.as_str().parse::<EvalDim>().expect("from_str"), dim);
+            assert_eq!(dim.to_string(), dim.as_str());
         }
         assert!(serde_json::from_str::<EvalDim>("\"speed\"").is_err());
+        let err = "speed".parse::<EvalDim>().expect_err("unknown dimension");
+        assert_eq!(err.value, "speed");
+        assert!(err.to_string().contains(EXPECTED_EVAL_DIMS));
     }
 }

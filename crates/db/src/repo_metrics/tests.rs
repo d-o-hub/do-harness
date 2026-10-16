@@ -2,15 +2,16 @@
 
 use super::*;
 use crate::repo_exec::{NewBeat, insert_beat};
+use do_harness_types::{BeatScope, BeatStatus, BeatType};
 
 /// Seeds one beat. Every test below cares about what the aggregate sees rather
 /// than about the row itself.
 async fn beat(
     conn: &Connection,
-    beat_type: &str,
-    status: &str,
+    beat_type: BeatType,
+    status: BeatStatus,
     sensor_name: Option<&str>,
-    scope: Option<&str>,
+    scope: Option<BeatScope>,
     started_at: i64,
 ) {
     insert_beat(
@@ -34,27 +35,51 @@ async fn beat(
 /// beat in `global`, one `test` beat, and a non-sensor beat that carries a
 /// sensor name.
 async fn seed_history(conn: &Connection) {
-    beat(conn, "sensor", "ok", Some("check"), Some("global"), 50).await;
     beat(
         conn,
-        "sensor",
-        "ok",
+        BeatType::Sensor,
+        BeatStatus::Ok,
         Some("check"),
-        Some("branch:main"),
+        Some(BeatScope::Global),
+        50,
+    )
+    .await;
+    beat(
+        conn,
+        BeatType::Sensor,
+        BeatStatus::Ok,
+        Some("check"),
+        Some(BeatScope::Branch("main".to_owned())),
         100,
     )
     .await;
     beat(
         conn,
-        "sensor",
-        "failed",
+        BeatType::Sensor,
+        BeatStatus::Failed,
         Some("check"),
-        Some("branch:main"),
+        Some(BeatScope::Branch("main".to_owned())),
         200,
     )
     .await;
-    beat(conn, "sensor", "ok", Some("test"), Some("branch:main"), 300).await;
-    beat(conn, "task", "failed", Some("check"), Some("global"), 400).await;
+    beat(
+        conn,
+        BeatType::Sensor,
+        BeatStatus::Ok,
+        Some("test"),
+        Some(BeatScope::Branch("main".to_owned())),
+        300,
+    )
+    .await;
+    beat(
+        conn,
+        BeatType::Step,
+        BeatStatus::Failed,
+        Some("check"),
+        Some(BeatScope::Global),
+        400,
+    )
+    .await;
 }
 
 fn stat(name: &str, runs: i64, failures: i64) -> SensorStat {
@@ -93,9 +118,9 @@ async fn sensor_stats_groups_counts_and_ignores_non_sensor_beats() {
         &conn,
         &NewBeat {
             task_id: None,
-            scope: Some("global"),
-            beat_type: "sensor",
-            status: "failed",
+            scope: Some(BeatScope::Global),
+            beat_type: BeatType::Sensor,
+            status: BeatStatus::Failed,
             sensor_exit_code: None,
             sensor_name: None,
             started_at: 600,
@@ -144,10 +169,26 @@ async fn has_ok_beat_reflects_the_status_column() {
     let (_dir, conn) = open().await;
     assert!(!has_ok_beat(&conn).await.unwrap(), "empty table");
 
-    beat(&conn, "sensor", "failed", Some("check"), Some("global"), 1).await;
+    beat(
+        &conn,
+        BeatType::Sensor,
+        BeatStatus::Failed,
+        Some("check"),
+        Some(BeatScope::Global),
+        1,
+    )
+    .await;
     assert!(!has_ok_beat(&conn).await.unwrap(), "failures only");
 
-    beat(&conn, "task", "ok", None, Some("global"), 2).await;
+    beat(
+        &conn,
+        BeatType::Step,
+        BeatStatus::Ok,
+        None,
+        Some(BeatScope::Global),
+        2,
+    )
+    .await;
     assert!(
         has_ok_beat(&conn).await.unwrap(),
         "any beat with status 'ok' counts, not only sensor beats"

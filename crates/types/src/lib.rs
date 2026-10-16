@@ -16,20 +16,24 @@ pub mod eval_run;
 pub mod event;
 pub mod heuristic;
 pub mod htn;
+pub mod scope;
 pub mod skill_eval;
 pub mod task;
 pub mod trace;
 pub mod workflow;
 
-pub use beat::Beat;
+pub use beat::{Beat, BeatStatus, BeatStatusParseError, BeatType, BeatTypeParseError};
 pub use chain::{canonical_payload, canonical_value, chain_hash};
 pub use decision::{DecisionHeader, ParseInvariantsError, parse_invariants_json};
 pub use error_signature::ErrorSignature;
-pub use eval_dim::EvalDim;
-pub use eval_run::{EvalMode, GraderBaseline, SkillEvalBless, SkillEvalDimRate, SkillEvalRun};
+pub use eval_dim::{EvalDim, EvalDimParseError};
+pub use eval_run::{
+    EvalMode, EvalModeParseError, GraderBaseline, SkillEvalBless, SkillEvalDimRate, SkillEvalRun,
+};
 pub use event::{Command, DomainEvent, Projection};
 pub use heuristic::Heuristic;
 pub use htn::{Method, Precondition, Subtask, TaskState, TaskStateParseError};
+pub use scope::{BeatScope, BeatScopeMismatch, BeatScopeParseError, GLOBAL_SCOPE_KEY};
 pub use skill_eval::SkillEval;
 pub use task::TaskRecord;
 pub use trace::Trace;

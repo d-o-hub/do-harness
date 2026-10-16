@@ -42,7 +42,7 @@ pub(super) async fn beat_fires(root: &Path, start_seconds: i64) -> Result<BTreeM
     if !do_harness_db::db_path(root).exists() {
         return Ok(fires);
     }
-    let scope = crate::telemetry::BeatScope::resolve(root, None, false);
+    let scope = crate::telemetry::resolve_scope(root, None, false);
     let conn = do_harness_db::connect_and_migrate(root)
         .await
         .context("open the state database")?;

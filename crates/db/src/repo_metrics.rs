@@ -1,7 +1,8 @@
 //! Read-only aggregation queries for the `do-harness metrics` report.
 
 use crate::error::{DbError, Result};
-use libsql::{Connection, params::Params};
+use do_harness_types::{BeatStatus, BeatType};
+use libsql::Connection;
 use serde::Serialize;
 
 /// Per-sensor beat statistics for the metrics report.
@@ -29,12 +30,17 @@ pub async fn sensor_stats(
     let mut rows = conn
         .query(
             "SELECT sensor_name, COUNT(*), \
-             SUM(CASE WHEN status != 'ok' THEN 1 ELSE 0 END) \
-             FROM beats WHERE beat_type = 'sensor' AND sensor_name IS NOT NULL \
-             AND (?1 IS NULL OR started_at >= ?1) \
-             AND (?2 IS NULL OR scope = ?2) \
+             SUM(CASE WHEN status != ?1 THEN 1 ELSE 0 END) \
+             FROM beats WHERE beat_type = ?2 AND sensor_name IS NOT NULL \
+             AND (?3 IS NULL OR started_at >= ?3) \
+             AND (?4 IS NULL OR scope = ?4) \
              GROUP BY sensor_name ORDER BY sensor_name",
-            libsql::params!(since, scope),
+            libsql::params!(
+                BeatStatus::Ok.as_str(),
+                BeatType::Sensor.as_str(),
+                since,
+                scope
+            ),
         )
         .await?;
     let mut stats = Vec::new();
@@ -57,8 +63,8 @@ pub async fn sensor_stats(
 pub async fn has_ok_beat(conn: &Connection) -> Result<bool> {
     let mut rows = conn
         .query(
-            "SELECT EXISTS(SELECT 1 FROM beats WHERE status = 'ok')",
-            Params::None,
+            "SELECT EXISTS(SELECT 1 FROM beats WHERE status = ?1)",
+            libsql::params!(BeatStatus::Ok.as_str()),
         )
         .await?;
     let row = rows

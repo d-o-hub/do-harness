@@ -171,7 +171,9 @@ fn task_from_row(row: &libsql::Row) -> Result<TaskRecord> {
         title: row.get(2)?,
         method: row.get(3)?,
         subtask_index: row.get(4)?,
-        status: TaskState::try_from(status.as_str())
+        status: status
+            .as_str()
+            .parse::<TaskState>()
             .map_err(|err| DbError::InvalidTaskStatus(format!("{status}: {err}")))?,
         precondition: row.get(6)?,
         created_at: row.get(7)?,

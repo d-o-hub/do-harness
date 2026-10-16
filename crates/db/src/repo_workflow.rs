@@ -176,20 +176,35 @@ async fn update_task_status_with_event_once(
     Ok(event)
 }
 
-/// Returns `Ok` when the task's latest beat for `sensor` is `"ok"`, otherwise
-/// a [`DbError::GateUnsatisfied`]. Runs on a transaction connection so the
-/// check and the dependent write commit or roll back together.
+/// Returns `Ok` when the task's latest beat for `sensor` is [`BeatStatus::Ok`],
+/// otherwise a [`DbError::GateUnsatisfied`]. Runs on a transaction connection
+/// so the check and the dependent write commit or roll back together.
 async fn ensure_sensor_ok_on(conn: &Connection, task_id: i64, sensor: &str) -> Result<()> {
+    use do_harness_types::{BeatStatus, BeatType};
+    use std::str::FromStr;
+
     let mut rows = conn
         .query(
             "SELECT status FROM beats \
-             WHERE task_id = ?1 AND beat_type = 'sensor' AND sensor_name = ?2 \
+             WHERE task_id = ?1 AND beat_type = ?2 AND sensor_name = ?3 \
              ORDER BY id DESC LIMIT 1",
-            params!(task_id, sensor),
+            params!(task_id, BeatType::Sensor.as_str(), sensor),
         )
         .await?;
     match rows.next().await? {
-        Some(row) if row.get::<String>(0)? == "ok" => Ok(()),
+        Some(row) => {
+            let status: String = row.get(0)?;
+            let status = BeatStatus::from_str(&status)
+                .map_err(|err| DbError::InvalidBeatStatus(err.value))?;
+            if status.is_ok() {
+                Ok(())
+            } else {
+                Err(DbError::GateUnsatisfied {
+                    task_id,
+                    sensor: sensor.to_owned(),
+                })
+            }
+        }
         _ => Err(DbError::GateUnsatisfied {
             task_id,
             sensor: sensor.to_owned(),

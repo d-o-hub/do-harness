@@ -1,6 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use super::*;
+use do_harness_types::{BeatStatus, BeatType};
 
 #[test]
 fn identifier_allowlist_accepts_valid_and_rejects_injection() {
@@ -147,8 +148,8 @@ async fn db_assertion_valid_identifiers_grade_against_real_db() {
         &do_harness_db::NewBeat {
             task_id: None,
             scope: None,
-            beat_type: "sensor",
-            status: "ok",
+            beat_type: BeatType::Sensor,
+            status: BeatStatus::Ok,
             sensor_exit_code: Some(0),
             sensor_name: Some("hardening-test"),
             started_at: 0,
