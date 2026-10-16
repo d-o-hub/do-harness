@@ -16,7 +16,7 @@ feedback = ["fmt", "check", "clippy", "loc"]
 # (`.github/workflows/scheduled.yml`). `coverage` sat in `release` only: the
 # floor never ran on a pull request, so a regression could land on main and
 # surface only at tag time.
-verification = ["fmt", "check", "clippy", "deps", "machete", "audit", "magic-numbers", "test", "doctest", "loc", "skills", "skills-docs", "shell", "markdownlint", "yamllint", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "commitlint"]
+verification = ["fmt", "check", "clippy", "deps", "machete", "audit", "test", "doctest", "loc", "skills", "skills-docs", "shell", "markdownlint", "yamllint", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "commitlint"]
 release = ["fmt", "check", "clippy", "deps", "audit", "test", "doctest", "coverage", "loc", "skills", "skills-docs", "shell", "markdownlint", "yamllint", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "commitlint"]
 # DORA gets its own set so its evidence is addressable (`status --set metrics`)
 # without joining the gating sets. A no-`--set` status check compares against
@@ -144,6 +144,10 @@ when-changed = ["Cargo.toml", "Cargo.lock", "scripts/check-audit.sh"]
 # numeric literal that is not a named constant and not one of the conventional
 # values is a finding; the sensor is warn severity with a blessed baseline, so
 # the existing debt is grandfathered and any increase is a hard regression.
+# Deliberately absent from every [signal-sets] entry: any FINDINGS > 0 with a
+# baseline records a warn verdict, and `verify --strict` / `status` stay honest
+# by refusing green on warn, so a grandfathered count can never pass the
+# strict gate (same reason `dora` and `coverage` stay out of `verification`).
 name = "magic-numbers"
 argv = ["bash", "scripts/check-magic-numbers.sh"]
 severity = "warn"
