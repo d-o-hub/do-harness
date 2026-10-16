@@ -53,6 +53,9 @@ dev checkout.
 | S12 | the unchanged-input digest is bound in the `INSERT` (`insert_beat_with_digest`) instead of a post-insert `UPDATE`, so a beat row never exists without the digest of the inputs it was recorded against | `cargo test -p do-harness-db` → 73 passed |
 | S16 | migration `0023` indexes `heuristics(skill_name)`; the query-plan test shares the shipped statement (`LIST_BY_SKILL_SQL`) so the plan under test is the plan that ships, proving the read seeks the index and that `ORDER BY id` needs no second column (rowid trailer) | `cargo test -p do-harness-db` → 74 passed; can-fail proof: dropping the index yields `SCAN heuristics` → 0 passed / 1 failed, and ordering by an unindexed column yields `USE TEMP B-TREE FOR ORDER BY` → 0 passed / 1 failed |
 | S15 | serde contracts pinned for the types that cross a boundary — the hand-edited `plans/methods.json` (nested `Subtask` unknown-field rejection; `spike_candidate` and `preconditions` required), the `EvalDim`/`EvalMode` wire names (`serde` name == `as_str()` == `FromStr`), and the file-level `MethodFile` contract (unknown top-level key errors, missing file falls back to the embedded catalog) | `cargo test -p do-harness-types` → 24 passed; `cargo test -p do-harness --bins` → 558 passed |
+| T4 | the v3/v4 evidence-compatibility test pins the observed outcome instead of accepting "exit 0 or 1": a readable v3/v4 file is `stale` with reason `workspace_changed` (the reader parsed it and only the fingerprint differs), and a v2 file is `missing` with reason `legacy_schema` — each with its exact exit code | `cargo test -p do-harness --test release_contract` → 5 passed; the pinned values come from a faithful repro of the fixture workspace (`--root` + the minimal policy), not from guessing |
+| T7 | `--no-tests=pass` removed from the repository policy *and* from the built-in pack that `init` scaffolds (`config::rust_pack`), so a suite that shrank to zero fails the `test` sensor instead of reporting green. The pack assertion (`builtin_rust_pack_test_sensor_fails_on_zero_tests`) holds on every host; `tests/vacuous_gates.rs` proves the behaviour where cargo-nextest exists (green for the scaffolded suite, red once every test is deleted, with the `test` sensor named in `failed`) | `cargo test -p do-harness --bins config::tests` → 22 passed; generated policies no longer contain `--no-tests` (checked by the integration test) |
+| T9 | partly stale: the `db:` passing path is already covered at the grader level (`eval_assert::db_assertion_valid_identifiers_grade_against_real_db` grades a seeded temp database), so the runner-level gap was the *opposite* contract — grading is hermetic (`Sandbox::for_skill` mirrors only the skill, never `.do-harness/`), which the new test pins by seeding the caller's database and asserting the assertion still grades 0.0 | `cargo test -p do-harness --bins` → 559 passed |
 | P2/P3 | Toolchain/lint/nextest configs and each sensor's own script added to the `when-changed` inputs whose verdicts they change | `do-harness list`/`explain --set verification --changed` run against the rebuilt binary; TOML parses (25 sensors) |
 | R8 | `pr-triage` SKILL.md step 10 and description mark semantic routing optional/experimental with the measured no-go | markdownlint clean; `untrusted-ingest`/`skills-docs` sensors pass |
 | F5 | `.clippy.toml` gained `msrv = "1.85"` (and `IPv4`/`IPv6` as valid doc idents) | workspace clippy clean; the setting surfaced a real `doc_markdown` finding during the pass |
@@ -68,8 +71,8 @@ explicit guard) instead of a raw grep error.
 **Residual:** none for A8 (alternate IPv4 spellings are now normalized).
 
 **Not started:** R1 (release rescue), A10 (pre-push set), A6, S1–S3, S6, S7,
-S17, T1–T18, F1–F4, P1, P4, P7–P16, B1, B3–B5, C2, C3, D1–D2, R2, R3,
-R7.
+S17, T1–T3, T5, T6, T8, T10–T18, F1–F4, P1, P4, P7–P16, B1, B3–B5, C2, C3,
+D1–D2, R2, R3, R7.
 
 ## Progress: release-state truth decay (verified first-party)
 
@@ -141,7 +144,7 @@ closed final (`NO_GO`); DORA ratchet tolerates 3 breaches.
 | T6 | med | 47 `#[cfg(unix)]` tests incl. the entire `pr ready` suite — merge-gating logic has no coverage on a supported Windows platform, and the skip is silent | `support/pr_readiness.rs:126-130`; `verify.yml:393` | M |
 | T7 | med | `test` sensor `--no-tests=pass` with no minimum-count guard (a suite shrunk to zero still passes; doctest has a can-fail proof, `test` has none) | `do-harness.toml:36`; `check-coverage.sh:62-145` | S |
 | T8 | med | `ci_parity.rs` four silent `return;` skip paths — fail-closed contract unverified when a tool is on PATH | `ci_parity.rs:45-46,64-65,165,189` | S |
-| T9 | med | eval `db:` assertion graded only on its failing path (broken query always returns empty) | `eval/eval_tests.rs:198-207` | S |
+| T9 | med | eval `db:` assertion graded only on its failing path (broken query always returns empty) | `eval/eval_tests.rs:198-207` | S — *note (batch 8):* the passing path *is* covered at the grader level; the runner level grades inside the hermetic sandbox, so the contract to pin is that caller state must not satisfy a `db:` assertion |
 | T10 | med | `.codecov.yml` is dead config: no workflow uploads; the 60% patch floor is unenforced | `.codecov.yml` | S |
 | T11 | med | `tests/selection_impact_test.sh` defaults to a possibly-stale release binary and mutates a committed fixture in place | `selection_impact_test.sh:11,203-240` | S |
 | T12 | med | nested-build-isolation Rule 3 (profraw litter check) is manual only | skill vs workflows | S |
@@ -233,7 +236,7 @@ closed final (`NO_GO`); DORA ratchet tolerates 3 breaches.
 
 *Landed (2026-10-15):* A1, A2, A3, A4, A5, A7, A8, C1, C4, C5, F5, P2, P3, P5,
 P6 (partial), R4, R5, R6, R8, R9, S4, S5, S8, S9, S10, S11, S12, S13, S14, S15,
-S16, S18, S19, T18, B2 (forced by A1).
+S16, S18, S19, T4, T7, T9, T18, B2 (forced by A1).
 *Next:* R1 (operator-gated), A10 (maintainer decision), A6, C2, C3, R2, R3,
 R7.
 
