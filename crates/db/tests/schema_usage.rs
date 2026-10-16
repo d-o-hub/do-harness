@@ -234,8 +234,10 @@ async fn beats_reject_sensor_without_sensor_name() {
         "CHECK must reject a sensor beat without sensor_name"
     );
 
+    // A non-sensor beat (`step`, the vocabulary's non-gating kind) stays
+    // name-optional; the CHECK only pins the sensor/name pairing.
     conn.execute(
-        "INSERT INTO beats (beat_type, status, started_at) VALUES ('manual', 'ok', 0)",
+        "INSERT INTO beats (beat_type, status, started_at) VALUES ('step', 'ok', 0)",
         Params::None,
     )
     .await
