@@ -12,6 +12,30 @@ BIN="${DO_HARNESS_BIN:-$ROOT/target/release/do-harness}"
 
 ERRORS=0
 
+# The binary's behaviour is what this suite asserts, so a missing or stale one
+# is a hard stop rather than a warning: `CARGO_TARGET_DIR` silently redirects
+# release builds, and every assertion below would then describe code that is no
+# longer in the tree.
+if [[ ! -x "$BIN" ]]; then
+    echo "FAIL: harness binary not found at $BIN" >&2
+    echo "      build it (cargo build --release -p do-harness) or set DO_HARNESS_BIN." >&2
+    exit 1
+fi
+stale="$(find "$ROOT/crates" "$ROOT/Cargo.toml" "$ROOT/Cargo.lock" -newer "$BIN" -print -quit 2>/dev/null || true)"
+if [[ -n "$stale" ]]; then
+    echo "FAIL: $BIN is older than $stale" >&2
+    echo "      rebuild it or set DO_HARNESS_BIN." >&2
+    exit 1
+fi
+
+# The planted-defect tests mutate a workspace on purpose. They run against a
+# throwaway copy: a killed run (SIGKILL, a cancelled CI step) would otherwise
+# leave the committed fixture mutated, and this suite is what validates the
+# fixture's own arithmetic.
+MUTATION_WORKSPACE="$(mktemp -d)"
+cp -R "$WORKSPACE" "$MUTATION_WORKSPACE/workspace"
+trap 'rm -rf "$MUTATION_WORKSPACE"' EXIT INT TERM
+
 echo "=== Running Selection Impact Hermetic Test Suite ==="
 
 run_test() {
@@ -203,7 +227,7 @@ if [[ "$res_out" == "True" ]]; then pass_test; else fail_test "Candidate fallbac
 run_test "planted defect detected by sensor"
 res_out=$(python3 - << EOF
 import subprocess, os
-workspace = "$WORKSPACE"
+workspace = "$MUTATION_WORKSPACE/workspace"
 abs_file = os.path.join(workspace, "crates/leaf_a/src/lib.rs")
 with open(abs_file, "r") as f:
     orig = f.read()
@@ -223,7 +247,7 @@ if [[ "$res_out" == "True" ]]; then pass_test; else fail_test "Sensor failed to 
 run_test "planted downstream test failure"
 res_out=$(python3 - << EOF
 import subprocess, os
-workspace = "$WORKSPACE"
+workspace = "$MUTATION_WORKSPACE/workspace"
 abs_file = os.path.join(workspace, "crates/shared_lib/src/lib.rs")
 with open(abs_file, "r") as f:
     orig = f.read()
