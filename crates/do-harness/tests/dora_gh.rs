@@ -23,6 +23,19 @@ use serde_json::Value;
 
 mod support;
 
+/// The fixture's clock: the snapshot is taken this many days after `T0`.
+const SNAPSHOT_DAYS_AFTER_T0: i64 = 5;
+/// Seconds in a day, so the timestamps above read as days.
+const SECONDS_PER_DAY: i64 = 86_400;
+/// Runs `gh` reports in the folding fixture.
+const EXPECTED_RUNS: i64 = 3;
+/// PR-open to merge durations the fixture answers with: one short, one long,
+/// which the nearest-rank percentiles must pick out individually.
+const SHORT_LEAD_SECS: i64 = 60;
+const LONG_LEAD_SECS: i64 = 600;
+/// Mode for the fake `gh` this fixture writes.
+const EXECUTABLE_MODE: u32 = 0o755;
+
 use support::dora::{T0, deployed_fixture, harness, run};
 
 /// A fake `gh` that serves `runs`/`prs` JSON.
@@ -47,7 +60,7 @@ fn fake_gh(dir: &Path, runs: &str, prs: &str) -> PathBuf {
     let gh = bin.join("gh");
     std::fs::write(&gh, script).unwrap();
     let mut perms = std::fs::metadata(&gh).unwrap().permissions();
-    std::os::unix::fs::PermissionsExt::set_mode(&mut perms, 0o755);
+    std::os::unix::fs::PermissionsExt::set_mode(&mut perms, EXECUTABLE_MODE);
     std::fs::set_permissions(&gh, perms).unwrap();
     bin
 }
@@ -120,12 +133,13 @@ fn gh_enrichment_folds_runs_and_measures_pr_lead_time() {
     let bin = fake_gh(dir.path(), &runs, prs);
     // Five days after the fixture's base epoch, so the 30-day window covers the
     // fixture history and every row above.
-    let (_code, snapshot) = dora_gh_json(&root, &bin, T0 + 5 * 86_400);
+    let (_code, snapshot) =
+        dora_gh_json(&root, &bin, T0 + SNAPSHOT_DAYS_AFTER_T0 * SECONDS_PER_DAY);
 
     assert_eq!(snapshot["source"], serde_json::json!("gh"));
     let github = &snapshot["github"];
     assert_eq!(github["workflow"], serde_json::json!("release.yml"));
-    assert_eq!(github["runs_total"], serde_json::json!(3));
+    assert_eq!(github["runs_total"], serde_json::json!(EXPECTED_RUNS));
     assert_eq!(github["runs_failed"], serde_json::json!(1));
     assert_eq!(
         github["runs_by_head"][&head0],
@@ -144,8 +158,14 @@ fn gh_enrichment_folds_runs_and_measures_pr_lead_time() {
     // Nearest-rank percentiles over [60, 600]: p50 is the first sample, not an
     // interpolated median, and p90 is the last.
     assert_eq!(github["pr_samples"], serde_json::json!(2));
-    assert_eq!(github["pr_lead_p50_seconds"], serde_json::json!(60));
-    assert_eq!(github["pr_lead_p90_seconds"], serde_json::json!(600));
+    assert_eq!(
+        github["pr_lead_p50_seconds"],
+        serde_json::json!(SHORT_LEAD_SECS)
+    );
+    assert_eq!(
+        github["pr_lead_p90_seconds"],
+        serde_json::json!(LONG_LEAD_SECS)
+    );
 }
 
 #[test]
@@ -163,7 +183,8 @@ fn gh_reconciliation_counts_a_success_outside_the_window_and_names_a_real_mismat
 ]"#
     );
     let bin = fake_gh(dir.path(), &runs, "[]");
-    let (_code, snapshot) = dora_gh_json(&root, &bin, T0 + 5 * 86_400);
+    let (_code, snapshot) =
+        dora_gh_json(&root, &bin, T0 + SNAPSHOT_DAYS_AFTER_T0 * SECONDS_PER_DAY);
 
     let github = &snapshot["github"];
     let mismatches: Vec<&str> = github["deploy_head_mismatches"]
@@ -205,7 +226,7 @@ fn gh_failure_is_an_error_not_an_empty_snapshot() {
     )
     .unwrap();
     let mut perms = std::fs::metadata(&gh).unwrap().permissions();
-    std::os::unix::fs::PermissionsExt::set_mode(&mut perms, 0o755);
+    std::os::unix::fs::PermissionsExt::set_mode(&mut perms, EXECUTABLE_MODE);
     std::fs::set_permissions(&gh, perms).unwrap();
 
     let joined = std::env::join_paths(std::iter::once(bin.clone()).chain(std::env::split_paths(

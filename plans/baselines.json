@@ -1,5 +1,6 @@
 {
   "sensors": {
-    "dora": 3
+    "dora": 3,
+    "magic-numbers": 1724
   }
 }
