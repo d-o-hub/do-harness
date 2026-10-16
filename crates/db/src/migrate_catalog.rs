@@ -122,4 +122,9 @@ pub const MIGRATIONS: &[Migration] = &[
         name: "dora_rework",
         sql: include_str!("../migrations/0022_dora_rework.sql"),
     },
+    Migration {
+        version: 23,
+        name: "heuristics_skill_index",
+        sql: include_str!("../migrations/0023_heuristics_skill_index.sql"),
+    },
 ];

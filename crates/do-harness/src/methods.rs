@@ -60,3 +60,45 @@ pub async fn load_methods(root: &Path) -> Result<Vec<Method>> {
 pub fn find_method<'a>(methods: &'a [Method], name: &str) -> Option<&'a Method> {
     methods.iter().find(|method| method.name == name)
 }
+
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used)]
+
+    use super::*;
+
+    /// A hand-edited catalog with a mistyped top-level key fails loudly instead
+    /// of silently loading zero methods.
+    #[tokio::test(flavor = "current_thread")]
+    async fn load_methods_rejects_unknown_top_level_keys() {
+        let dir = tempfile::tempdir().unwrap();
+        tokio::fs::create_dir_all(dir.path().join("plans"))
+            .await
+            .unwrap();
+        tokio::fs::write(
+            dir.path().join("plans/methods.json"),
+            r#"{"methods": [], "bogus": true}"#,
+        )
+        .await
+        .unwrap();
+
+        let err = load_methods(dir.path()).await.unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("does not match method catalog schema"),
+            "unexpected error: {err}"
+        );
+    }
+
+    /// A workspace without `plans/methods.json` still plans: the embedded
+    /// fallback catalog parses and carries the shipped methods.
+    #[tokio::test(flavor = "current_thread")]
+    async fn load_methods_falls_back_to_the_builtin_catalog() {
+        let dir = tempfile::tempdir().unwrap();
+        let methods = load_methods(dir.path()).await.unwrap();
+        assert!(
+            find_method(&methods, "vertical-event-slice").is_some(),
+            "built-in catalog missed a shipped method"
+        );
+    }
+}

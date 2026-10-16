@@ -121,4 +121,35 @@ mod tests {
         }
         assert!(TaskState::try_from("exploded").is_err());
     }
+
+    /// A mistyped field inside a nested subtask is rejected, not ignored: the
+    /// nested contract is what protects a hand-edited `plans/methods.json`.
+    #[test]
+    fn method_rejects_unknown_fields_in_nested_subtasks() {
+        let json = r#"{"name": "vertical-event-slice",
+            "subtasks": [{"name": "define-event-schema", "sensor": null,
+                "spike_candidate": false, "sencor": "test"}],
+            "preconditions": []}"#;
+        assert!(serde_json::from_str::<Method>(json).is_err());
+    }
+
+    /// Every documented field of a method entry is required, so a hand-edited
+    /// catalog cannot silently drop a subtask's sensor gate or the method's
+    /// preconditions.
+    #[test]
+    fn method_requires_every_documented_field() {
+        let complete = r#"{"name": "m", "subtasks": [{"name": "s", "sensor": null,
+            "spike_candidate": false}], "preconditions": [{"description": "d"}]}"#;
+        let method: Method = serde_json::from_str(complete).expect("complete method parses");
+        assert_eq!(method.subtasks.len(), 1);
+        assert_eq!(method.preconditions.len(), 1);
+
+        let missing_spike_flag = r#"{"name": "m", "subtasks": [{"name": "s", "sensor": null}],
+            "preconditions": []}"#;
+        assert!(serde_json::from_str::<Method>(missing_spike_flag).is_err());
+
+        let missing_preconditions = r#"{"name": "m",
+            "subtasks": [{"name": "s", "sensor": null, "spike_candidate": false}]}"#;
+        assert!(serde_json::from_str::<Method>(missing_preconditions).is_err());
+    }
 }
