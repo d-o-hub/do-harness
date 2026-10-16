@@ -24,9 +24,12 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SKILL_DIR="$ROOT/.agents/skills/pr-triage"
-# The wrappers that call `gh` and parse its output. `evals/walkthrough.sh` is
-# exempt on purpose: it feeds a hostile payload through the router to prove
-# nothing executes, so a sink there would be the test, not the defect.
+# The wrappers that call `gh` and parse its output, at any depth under
+# `scripts/`: a helper moved into `scripts/lib/` is still ingest surface, so
+# scoping the lint to the top level would let a sink hide one directory down.
+# `evals/walkthrough.sh` is exempt on purpose: it feeds a hostile payload
+# through the router to prove nothing executes, so a sink there would be the
+# test, not the defect.
 SCRIPTS_DIR="$SKILL_DIR/scripts"
 FAIL_COUNT=0
 
@@ -48,7 +51,8 @@ scripts=()
 if [[ ! -d "$SCRIPTS_DIR" ]]; then
     fail "$SCRIPTS_DIR is missing (the pr-triage wrappers must exist when the skill is present)."
 else
-    mapfile -t scripts < <(find "$SCRIPTS_DIR" -maxdepth 1 -type f \
+    mapfile -t scripts < <(find "$SCRIPTS_DIR" -type f \
+        -not -path '*/evals/*' \
         \( -name '*.sh' -o -name '*.mjs' -o -name '*.js' \) -print | sort)
     if [[ "${#scripts[@]}" -eq 0 ]]; then
         fail "no ingest scripts under $SCRIPTS_DIR (expected the pr-triage wrappers)."
