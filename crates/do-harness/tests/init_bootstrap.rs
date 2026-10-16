@@ -37,18 +37,24 @@ fn init_json(root: &Path) -> (Option<i32>, Value, String) {
 }
 
 /// Writes a rustfmt-clean minimal crate into `root`.
-fn write_clean_crate(root: &Path) {
+///
+/// `with_test` decides whether the crate ships a unit test. The two adoption
+/// cases are deliberately separate fixtures: the pack's `test` sensor fails
+/// closed when a run executes zero tests, so a test-less crate is not the same
+/// contract as a crate that satisfies every generated signal.
+fn write_clean_crate(root: &Path, with_test: bool) {
     std::fs::write(
         root.join("Cargo.toml"),
         "[package]\nname = \"fixture\"\nversion = \"0.1.0\"\nedition = \"2021\"\n",
     )
     .unwrap();
     std::fs::create_dir_all(root.join("src")).unwrap();
-    std::fs::write(
-        root.join("src/lib.rs"),
-        "pub fn answer() -> u32 {\n    42\n}\n",
-    )
-    .unwrap();
+    let lib = if with_test {
+        "pub fn answer() -> u32 {\n    42\n}\n\n#[cfg(test)]\nmod tests {\n    #[test]\n    fn answer_is_stable() {\n        assert_eq!(super::answer(), 42);\n    }\n}\n"
+    } else {
+        "pub fn answer() -> u32 {\n    42\n}\n"
+    };
+    std::fs::write(root.join("src/lib.rs"), lib).unwrap();
 }
 
 /// An empty directory bootstraps Rust, runs the contract, and reports green.
@@ -80,7 +86,7 @@ fn fresh_bootstrap_proves_generated_contract() {
 #[test]
 fn existing_rust_repo_is_not_rewritten() {
     let dir = tempfile::tempdir().unwrap();
-    write_clean_crate(dir.path());
+    write_clean_crate(dir.path(), true);
     let manifest_before = std::fs::read_to_string(dir.path().join("Cargo.toml")).unwrap();
     let lib_before = std::fs::read_to_string(dir.path().join("src/lib.rs")).unwrap();
 
@@ -107,6 +113,46 @@ fn existing_rust_repo_is_not_rewritten() {
         lib_before
     );
     assert!(dir.path().join("do-harness.toml").is_file());
+}
+
+/// An adopted repository with no tests gets a red baseline that names the empty
+/// `test` gate, instead of a green bootstrap that verified nothing.
+///
+/// The pack runs `cargo nextest run --workspace` without `--no-tests=pass`
+/// (AGENTS.md section 4), so a repository adopted before it has any test is
+/// told to add one — or to drop the sensor from `do-harness.toml`, which the
+/// run still writes. Sources stay untouched either way.
+#[test]
+fn existing_rust_repo_without_tests_reports_the_empty_test_gate() {
+    let dir = tempfile::tempdir().unwrap();
+    write_clean_crate(dir.path(), false);
+    let manifest_before = std::fs::read_to_string(dir.path().join("Cargo.toml")).unwrap();
+    let lib_before = std::fs::read_to_string(dir.path().join("src/lib.rs")).unwrap();
+
+    let (code, report, stderr) = init_json(dir.path());
+    assert_eq!(
+        code,
+        Some(1),
+        "an empty suite must report a red baseline:\n{stderr}\n{report}"
+    );
+    assert_eq!(report["baseline"]["state"], serde_json::json!("red"));
+    let failed = report["baseline"]["failed"].as_array().expect("failed");
+    assert!(
+        failed.iter().any(|name| name == "test"),
+        "the empty suite must be attributed to the test sensor: {failed:?}"
+    );
+    assert_eq!(
+        std::fs::read_to_string(dir.path().join("Cargo.toml")).unwrap(),
+        manifest_before
+    );
+    assert_eq!(
+        std::fs::read_to_string(dir.path().join("src/lib.rs")).unwrap(),
+        lib_before
+    );
+    assert!(
+        dir.path().join("do-harness.toml").is_file(),
+        "adoption must leave the contract in place so the user can act on it"
+    );
 }
 
 /// A failed candidate check is surfaced as a red baseline and non-zero exit.

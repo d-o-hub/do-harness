@@ -59,7 +59,7 @@ fn nextest_fail_line_is_not_read_as_a_sensor_marker() {
     );
     assert_eq!(
         failed["local_repro_command"],
-        "cargo nextest run --workspace --no-tests=pass"
+        "cargo nextest run --workspace"
     );
     let _ = dir;
 }

@@ -209,6 +209,46 @@ async fn failing_db_assertion_drives_pass_rate_to_zero() {
     assert_eq!(rows[0].pass_rate, Some(0.0));
 }
 
+/// The runner grades `db:` assertions inside the hermetic sandbox, which never
+/// mirrors the caller's `.do-harness` database: a row seeded into the caller's
+/// workspace must NOT satisfy the assertion. Grading caller state would make a
+/// fixture depend on whatever is already on the machine; the passing path is
+/// covered where the database is real (the `eval_assert` grader tests grade a
+/// seeded temp database directly).
+#[tokio::test(flavor = "current_thread")]
+async fn db_assertion_grades_the_sandbox_not_the_callers_database() {
+    let dir = fixture_root(
+        VALID_SKILL_MD,
+        Some(&single_case_json(&[
+            "db:heuristics:skill_name=ghost-skill:min=1",
+        ])),
+    );
+    let conn = do_harness_db::connect_and_migrate(dir.path())
+        .await
+        .unwrap();
+    do_harness_db::insert_heuristic(
+        &conn,
+        &do_harness_db::NewHeuristic {
+            skill_name: "ghost-skill",
+            pattern: "residue in the caller's workspace, not the sandbox",
+            description: None,
+            source_trace_id: None,
+        },
+    )
+    .await
+    .unwrap();
+
+    eval_run(dir.path(), Some("test-skill"), false)
+        .await
+        .unwrap();
+    let rows = persisted(dir.path()).await;
+    assert_eq!(
+        rows[0].pass_rate,
+        Some(0.0),
+        "the sandbox must not inherit the caller's database"
+    );
+}
+
 #[tokio::test(flavor = "current_thread")]
 async fn unprefixed_assertions_are_documentation_excluded_from_pass_rate() {
     let dir = fixture_root(

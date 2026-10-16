@@ -32,8 +32,12 @@ argv = ["cargo", "clippy", "--workspace", "--all-targets", "--", "-D", "warnings
 when-changed = ["**/*.rs", "Cargo.toml", "Cargo.lock", "rust-toolchain.toml", ".clippy.toml", ".cargo/config.toml"]
 
 [[sensors]]
+# No `--no-tests=pass`: that flag turns "the suite vanished" into a green gate,
+# which section 4 of AGENTS.md rejects ("Treat `0 tests run` or empty sensor
+# output as RED"). nextest fails the run when it executes zero tests, and the
+# scaffold ships a unit test, so a workspace with a real suite never trips it.
 name = "test"
-argv = ["cargo", "nextest", "run", "--workspace", "--no-tests=pass"]
+argv = ["cargo", "nextest", "run", "--workspace"]
 when-changed = ["**/*.rs", "Cargo.toml", "Cargo.lock", "rust-toolchain.toml", ".config/nextest.toml", ".cargo/config.toml"]
 
 [[sensors]]

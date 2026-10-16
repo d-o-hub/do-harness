@@ -111,6 +111,11 @@ tree, and the local libSQL state. Existing files are never overwritten without `
 application source is never touched. The run ends with
 `Initial verification: GREEN | RED | VACUOUS`; RED exits non-zero.
 
+A repository adopted before it has any test ends `RED` on the `test` sensor:
+the pack does not pass `--no-tests=pass`, so an empty suite is reported by
+name instead of recording a pass that checked nothing. Add a test, or drop the
+sensor from `do-harness.toml` — the run writes that contract first.
+
 `plans/invariants.json` is a JSON array of `DecisionHeader` objects
 (`{invariant, rationale, sensor, category}`), or equivalently an object with
 a top-level `invariants` array (extra keys such as `$comment` are ignored).
