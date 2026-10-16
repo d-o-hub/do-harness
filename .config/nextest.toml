@@ -10,6 +10,11 @@ test-threads = 2
 # a run that executes zero tests fails the `test` sensor instead of reporting
 # green (`tests/vacuous_gates.rs` pins that).
 
-[profile.ci]
-retries = 1
-slow-timeout = { period = "60s", terminate-after = 3 }
+# No named CI profile, and therefore no `[profile.ci]`: no workflow selects one
+# (`NEXTEST_PROFILE`/`--profile` appears nowhere in the repository), an
+# undeclared profile name is a hard nextest error, and an adopted workspace does
+# not ship this file at all — `init` writes it only when it scaffolds a crate —
+# so a globally exported profile would break that workspace's `test` sensor. CI
+# runs with `retries = 0`; the intermittent Windows crash a retry would have
+# absorbed is mitigated by serializing the do-harness-db crate in verify.yml
+# instead.
