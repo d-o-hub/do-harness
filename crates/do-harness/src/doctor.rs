@@ -37,8 +37,13 @@ impl ChainStatus {
 
 /// Runs diagnostic checks covering binary resolution, git hook status, and
 /// state-database migration skew.
+///
+/// A missing git repository is a discovery problem (exit 2): the doctor cannot
+/// run at all, which is the same class as `hook status` reporting it. A check
+/// that runs and fails — including an unreadable state database, which is
+/// itself a doctor finding — stays a verification failure (exit 1).
 pub async fn run(root: &Path, format: Format, strict: bool) -> Result<()> {
-    let git_dir = hooks::find_git_dir(root)?;
+    let git_dir = hooks::find_git_dir(root).map_err(crate::exit::UsageError::wrap)?;
     let status = hooks::status(&git_dir, root);
     run_with_status(root, format, strict, &status).await
 }

@@ -38,6 +38,7 @@ mod eval_sandbox;
 mod eval_walk;
 mod events;
 mod evidence;
+mod exit;
 mod explain;
 mod fingerprint;
 mod fs_perm;
@@ -406,7 +407,7 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
             },
         )
         .await
-        .map_err(CliError::Verify),
+        .map_err(exit::classify),
         Command::Hook { action } => {
             commands::hook(&root, config_path.as_deref(), action, cli.dry_run)
                 .await
@@ -414,7 +415,7 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
         }
         Command::Doctor { format, strict } => doctor::run(&root, format, strict)
             .await
-            .map_err(CliError::Verify),
+            .map_err(exit::classify),
         Command::AuditChain { format } => commands::audit_chain_cmd(&root, format)
             .await
             .map_err(CliError::Verify),
