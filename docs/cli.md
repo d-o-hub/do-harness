@@ -353,6 +353,13 @@ omitted from the generated config. Missing optional tools (`cargo-deny`,
 `cargo-audit`) degrade the script-backed `deps`/`audit` sensors, which fail
 open locally and are enforced in CI.
 
+A repository adopted before it has any test ends with `RED`, not `GREEN`: the
+Rust pack's `test` sensor runs `cargo nextest run --workspace` without
+`--no-tests=pass`, so a run that executes zero tests fails and the baseline
+names `test`. A fresh scaffold ships one unit test, so the bootstrap path is
+green; an adopted repository adds a test or drops the sensor from the
+generated `do-harness.toml`.
+
 Existing files are never rewritten without `--force`, and existing
 application source (including `Cargo.toml`) is never touched. The
 development-methodology skills used to build do-harness itself (HTN planning,
