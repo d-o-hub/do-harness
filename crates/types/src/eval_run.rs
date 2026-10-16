@@ -143,3 +143,24 @@ pub struct SkillEvalBless {
     /// Unix timestamp of the bless.
     pub blessed_at: i64,
 }
+
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used)]
+
+    use super::*;
+
+    /// The database stores [`EvalMode::as_str`] while reports serialize the
+    /// serde name, so both vocabularies must stay the same two words.
+    #[test]
+    fn eval_mode_wire_names_match_the_stored_names() {
+        for mode in [EvalMode::Deterministic, EvalMode::Agent] {
+            let json = serde_json::to_string(&mode).expect("serialize");
+            assert_eq!(json, format!("\"{mode}\""));
+            let parsed: EvalMode = serde_json::from_str(&json).expect("parse");
+            assert_eq!(parsed, mode);
+            assert_eq!(mode.as_str().parse::<EvalMode>().expect("from_str"), mode);
+        }
+        assert!(serde_json::from_str::<EvalMode>("\"manual\"").is_err());
+    }
+}

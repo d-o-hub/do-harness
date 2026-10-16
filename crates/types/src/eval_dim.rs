@@ -82,3 +82,25 @@ impl std::str::FromStr for EvalDim {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used)]
+
+    use super::*;
+
+    /// Fixtures, the database, and reports all quote [`EvalDim::as_str`], so the
+    /// serde name and the `FromStr` name must be the same vocabulary: a serde
+    /// rename alone would desynchronise the three.
+    #[test]
+    fn serde_names_match_the_stored_names() {
+        for dim in EvalDim::all() {
+            let json = serde_json::to_string(&dim).expect("serialize");
+            assert_eq!(json, format!("\"{dim}\""));
+            let parsed: EvalDim = serde_json::from_str(&json).expect("parse");
+            assert_eq!(parsed, dim);
+            assert_eq!(dim.as_str().parse::<EvalDim>().expect("from_str"), dim);
+        }
+        assert!(serde_json::from_str::<EvalDim>("\"speed\"").is_err());
+    }
+}
