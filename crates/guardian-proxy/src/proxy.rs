@@ -222,9 +222,11 @@ fn upstream_host(upstream: &str) -> Option<&str> {
 /// Rewrites a host literal to the address that will actually be dialled so the
 /// range checks cannot be bypassed by alternate spellings: an IPv4-mapped IPv6
 /// host (`::ffff:169.254.169.254`) becomes its embedded dotted IPv4 form, the
-/// unspecified address (`::`) becomes `0.0.0.0`, and a WHATWG-style IPv4
-/// literal (`0x7f000001`, `2130706433`, `017700000001`) becomes a dotted quad.
-/// Non-literals pass through unchanged, so hostnames keep the textual checks.
+/// unspecified address (`::`) becomes `0.0.0.0`, any other IPv6 host becomes its
+/// own canonical text (`0:0:0:0:0:0:0:1` → `::1`), and a WHATWG-style IPv4
+/// literal (`0x7f000001`, `2130706433`, `017700000001`, each with or without one
+/// trailing dot) becomes a dotted quad. Non-literals pass through unchanged, so
+/// hostnames keep the textual checks.
 fn normalize_host_literal(host: &str) -> String {
     if let Ok(v6) = host.parse::<std::net::Ipv6Addr>() {
         if let Some(v4) = v6.to_ipv4_mapped() {
@@ -233,7 +235,10 @@ fn normalize_host_literal(host: &str) -> String {
         if v6.is_unspecified() {
             return "0.0.0.0".to_string();
         }
-        return host.to_string();
+        // Canonical text, not the caller's spelling: the range checks compare
+        // `::1` and `fc00::`/`fe80::` prefixes as strings, so an expanded or
+        // zero-padded IPv6 would slip past a check it satisfies.
+        return v6.to_string();
     }
     match parse_ipv4_literal(host) {
         Some(octets) => std::net::Ipv4Addr::from(octets).to_string(),
@@ -249,6 +254,13 @@ fn normalize_host_literal(host: &str) -> String {
 /// `http://0x7f000001/` would reach loopback while the guard saw a hostname.
 /// Returns `None` when the input is not an IPv4 literal.
 fn parse_ipv4_literal(host: &str) -> Option<[u8; 4]> {
+    if host.is_empty() {
+        return None;
+    }
+    // WHATWG "is an IPv4 address" drops exactly one trailing dot before it
+    // splits on `.`, so `0x7f000001.` dials 127.0.0.1 and must parse as it.
+    // Interior empty parts (`1..2`) are still rejected below.
+    let host = host.strip_suffix('.').unwrap_or(host);
     if host.is_empty() {
         return None;
     }
@@ -293,8 +305,19 @@ fn is_link_local(host: &str) -> bool {
     if host.starts_with("169.254.") || host == "metadata.google.internal" {
         return true;
     }
-    // IPv6 link-local (fe80::/10) and the deprecated site-local prefixes
-    // (fec0:/fed0:). The host is lowercased before this check.
+    // Typed /10 check first: it covers every spelling of a link-local address
+    // (`fe80:0:0:0:0:0:0:1` as much as `fe80::1`) instead of trusting how the
+    // caller wrote it.
+    if host
+        .parse::<std::net::Ipv6Addr>()
+        .is_ok_and(|v6| v6.is_unicast_link_local())
+    {
+        return true;
+    }
+    // IPv6 link-local (fe80::/10), decided on the parsed address so an
+    // uncompressed spelling of the same address is judged as the range it is
+    // in, and the deprecated site-local prefixes (fec0:/fed0:), which have no
+    // `std` predicate. The host is lowercased before this check.
     host.starts_with("fe80:") || host.starts_with("fec0:") || host.starts_with("fed0:")
 }
 
@@ -313,7 +336,12 @@ fn is_private_or_loopback(host: &str) -> bool {
     {
         return (16..=31).contains(&second);
     }
-    // IPv6 unique-local (fc00::/7).
+    // IPv6 unique-local (fc00::/7) and loopback, decided on the parsed address
+    // for the same reason `is_link_local` gives: a prefix match on text only
+    // sees the one spelling the caller happened to write.
+    if let Ok(v6) = host.parse::<std::net::Ipv6Addr>() {
+        return v6.is_loopback() || v6.is_unique_local();
+    }
     host.starts_with("fc") || host.starts_with("fd")
 }
 
