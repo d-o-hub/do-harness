@@ -59,6 +59,9 @@ dev checkout.
 | T8 | the four cargo-tool parity checks (`audit`/`deps`/`powerset`/`machete`) no longer have a skip path: each script runs with a private `bin` as its whole `PATH`, so a host-installed tool cannot change the outcome, and every check asserts the same policy (`SKIP:` + exit 0 locally, `FAIL:` + exit 1 under `CI=true` or `DO_HARNESS_REQUIRE_TOOLS=1`). `check-deps.sh` needs `grep` and `bash` in that bin because it greps a manifest and shells out to `check-package-contract.sh` before reaching its missing-tool branch; the four bash-driven checks are `#[cfg(unix)]` like the lint ones | `cargo test -p do-harness --test ci_parity` → 6 passed; can-fail proof: making the local `check-audit.sh` branch exit 3 fails the check (`local run must SKIP`) and restoring it passes |
 | T10 | `.codecov.yml` removed: no workflow uploads coverage to Codecov and no Codecov check appears on a PR, so its 70% project / 60% patch targets gated nothing while the repository's own `scripts/check-coverage.sh` (70%, `coverage` sensor) is the floor that runs. Codecov-comment handling in `pr/waiver_comment.rs` reads PR comments and is unaffected | `gh pr checks 320` (no codecov check); no workflow or doc names the file |
 | T17 | resolved the opposite way to the finding's implication — the dead `[profile.ci]` is *removed* rather than wired, because wiring it was attempted and rejected on evidence: with `NEXTEST_PROFILE=ci` set, every nested nextest run must resolve a profile, and `init` writes `.config/nextest.toml` **only when it scaffolds a crate**, so an adopted workspace (whose pack still carries a `test` sensor) dies with "error: profile `ci` not found". Reproduced locally against the adoption fixture: plain env green, `NEXTEST_PROFILE=ci` red with `failed: ["test"]`. `.config/nextest.toml` now records the decision: no named profile, CI keeps `retries = 0`, and the intermittent Windows crash a retry would have absorbed stays mitigated by serializing the db crate | `cargo nextest list -p do-harness --test ci_parity` (config parses); `cargo test -p do-harness --test embedded_assets` → 2 passed |
+| T16 | the public wire contracts carry doctests again: `EvalDim` (the one vocabulary fixtures, the database, and reports share), `EvalMode` (`deterministic`/`agent` plus the default), `DecisionHeader` (serde shape and `deny_unknown_fields`), and `parse_invariants_json` (both accepted top-level shapes and the rejected one). The workspace had exactly one doctest (`chain_hash`), and AGENTS.md section 4 names a doc-test on a public API as how a real check stays alive; the examples are also the documentation of those wire names | `cargo test -p do-harness-types --doc` → 5 passed (was 1); `cargo test -p do-harness-types` → 23 passed |
+| T15 | the two benchmark corpora can no longer drift apart: a test reads both manifests and both case directories, requiring the same case names with the same `expected_min_route` floors and the same directories on disk. `pr_routing.rs`'s own doc calls `pr-routing-large` "the same 12 classes at realistic size", and nothing read both side by side, so a case added to one corpus alone kept every assertion green while the harder variant stopped measuring the same problem | `cargo test -p do-harness --test pr_routing` → 8 passed |
+| T12 | nested-build-isolation Rule 3 is a check instead of a post-coverage ritual: a suite test walks the source tree (pruning build output, harness state, and dependency caches; skipping symlinks so a cyclic link cannot loop) and fails on any `*.profraw` beside sources, naming each file. The skill's manual step was `find . -name '*.profraw' \| wc -l` after an instrumented run, and those files are gitignored, so nothing else in the repository noticed a leak | `cargo test -p do-harness --test profraw_litter` → 1 passed; can-fail proof: planting `crates/do-harness/leak.profraw` fails the test with that path, removing it passes |
 | P2/P3 | Toolchain/lint/nextest configs and each sensor's own script added to the `when-changed` inputs whose verdicts they change | `do-harness list`/`explain --set verification --changed` run against the rebuilt binary; TOML parses (25 sensors) |
 | R8 | `pr-triage` SKILL.md step 10 and description mark semantic routing optional/experimental with the measured no-go | markdownlint clean; `untrusted-ingest`/`skills-docs` sensors pass |
 | F5 | `.clippy.toml` gained `msrv = "1.85"` (and `IPv4`/`IPv6` as valid doc idents) | workspace clippy clean; the setting surfaced a real `doc_markdown` finding during the pass |
@@ -74,8 +77,8 @@ explicit guard) instead of a raw grep error.
 **Residual:** none for A8 (alternate IPv4 spellings are now normalized).
 
 **Not started:** R1 (release rescue), A10 (pre-push set), A6, S1–S3, S6, S7,
-S17, T1–T3, T5, T6, T11–T16, T18, F1–F4, P1, P4, P7–P16, B1, B3–B5, C2, C3,
-D1–D2, R2, R3, R7.
+S17, T1–T3, T5, T6, T11, T13, T14, T18, F1–F4, P1, P4, P7–P16, B1, B3–B5,
+C2, C3, D1–D2, R2, R3, R7.
 
 ## Progress: release-state truth decay (verified first-party)
 
@@ -239,7 +242,7 @@ closed final (`NO_GO`); DORA ratchet tolerates 3 breaches.
 
 *Landed (2026-10-15):* A1, A2, A3, A4, A5, A7, A8, C1, C4, C5, F5, P2, P3, P5,
 P6 (partial), R4, R5, R6, R8, R9, S4, S5, S8, S9, S10, S11, S12, S13, S14, S15,
-S16, S18, S19, T4, T7, T8, T9, T10, T17, T18, B2 (forced by A1).
+S16, S18, S19, T4, T7, T8, T9, T10, T12, T15, T16, T17, T18, B2 (forced by A1).
 *Next:* R1 (operator-gated), A10 (maintainer decision), A6, C2, C3, R2, R3,
 R7.
 

@@ -10,6 +10,23 @@ use serde::{Deserialize, Serialize};
 ///
 /// Fields follow the `Invariant` / `Rationale` / `Sensor` contract:
 /// the constraint, why it exists, and how compliance is verified.
+///
+/// ```
+/// # use do_harness_types::DecisionHeader;
+/// let json = r#"{
+///   "invariant": "no unsafe code in workspace roots",
+///   "rationale": "undefined behaviour is a class of bug Rust removes",
+///   "sensor": "grep -r forbid(unsafe_code)",
+///   "category": "safety"
+/// }"#;
+/// let header: DecisionHeader = serde_json::from_str(json).expect("header");
+/// assert_eq!(header.category, "safety");
+/// // `deny_unknown_fields`: a mistyped key is rejected rather than dropped.
+/// assert!(serde_json::from_str::<DecisionHeader>(
+///     r#"{"invariant":"x","rationale":"y","sensor":"z","category":"c","extra":1}"#,
+/// )
+/// .is_err());
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct DecisionHeader {
@@ -77,6 +94,21 @@ impl std::error::Error for ParseInvariantsError {}
 ///
 /// Returns [`ParseInvariantsError`] when the input matches neither a
 /// `DecisionHeader` array nor an `{"invariants": [...]}` object.
+///
+/// ```
+/// # use do_harness_types::parse_invariants_json;
+/// let header = r#"{"invariant":"max 500 LOC","rationale":"reviewable slices",
+///                  "sensor":"scripts/check-loc.sh","category":"architecture"}"#;
+/// let bare = format!("[{header}]");
+/// let wrapped = format!(r#"{{"$comment":"tooling note","invariants":[{header}]}}"#);
+/// let headers = parse_invariants_json(&bare).expect("bare array is accepted");
+/// assert_eq!(
+///     headers,
+///     parse_invariants_json(&wrapped).expect("annotated object is accepted")
+/// );
+/// assert_eq!(headers[0].sensor, "scripts/check-loc.sh");
+/// assert!(parse_invariants_json("{}").is_err());
+/// ```
 pub fn parse_invariants_json(json: &str) -> Result<Vec<DecisionHeader>, ParseInvariantsError> {
     if let Ok(headers) = serde_json::from_str::<Vec<DecisionHeader>>(json) {
         return Ok(headers);

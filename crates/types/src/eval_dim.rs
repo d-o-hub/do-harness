@@ -8,6 +8,22 @@
 use serde::{Deserialize, Serialize};
 
 /// One of the five scored evaluation dimensions.
+///
+/// The wire name ([`EvalDim::as_str`], `Display`, `FromStr`, and the serde
+/// `rename_all = "lowercase"`) is one vocabulary shared by fixtures, the
+/// database, and reports, so a fixture written with a different spelling would
+/// otherwise score as a different dimension.
+///
+/// ```
+/// # use std::str::FromStr;
+/// # use do_harness_types::EvalDim;
+/// let dim = EvalDim::from_str("efficiency").expect("wire name");
+/// assert_eq!(dim, EvalDim::Efficiency);
+/// assert_eq!(dim.as_str(), "efficiency");
+/// assert_eq!(dim.to_string(), "efficiency");
+/// assert_eq!(EvalDim::all().len(), 5);
+/// assert!(EvalDim::from_str("performance").is_err());
+/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 #[serde(deny_unknown_fields)]

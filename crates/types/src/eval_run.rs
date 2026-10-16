@@ -7,6 +7,15 @@ use serde::{Deserialize, Serialize};
 /// Lift means different things per mode: deterministic runs measure artifact
 /// dependence on the walkthrough residue, agent runs measure guidance value
 /// with a real agent in the loop. Persisting the mode keeps the two honest.
+///
+/// ```
+/// # use std::str::FromStr;
+/// # use do_harness_types::EvalMode;
+/// assert_eq!(EvalMode::default(), EvalMode::Deterministic);
+/// assert_eq!(EvalMode::from_str("agent").expect("wire name"), EvalMode::Agent);
+/// assert_eq!(EvalMode::Agent.to_string(), "agent");
+/// assert!(EvalMode::from_str("walkthrough").is_err());
+/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum EvalMode {

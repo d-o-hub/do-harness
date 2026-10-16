@@ -149,6 +149,72 @@ fn benchmark_runs_and_never_downgrades_a_high_impact_class() {
     );
 }
 
+/// Both corpora must carry the same classes with the same route floors.
+///
+/// `pr-routing-large` is documented as "the same 12 classes at realistic
+/// size", so a case added to one corpus and not the other would silently
+/// measure a different problem — or stop measuring the harder variant at all —
+/// while every green assertion still passed. Nothing else reads both manifests
+/// side by side.
+#[test]
+fn corpora_cover_the_same_classes_with_the_same_floors() {
+    let root = repo_root();
+    let small = root.join("tests/fixtures/pr-routing");
+    let large = root.join("tests/fixtures/pr-routing-large");
+
+    let floors = |dir: &Path| -> std::collections::BTreeMap<String, String> {
+        let raw = std::fs::read_to_string(dir.join("manifest.json")).expect("manifest");
+        let parsed: Value = serde_json::from_str(&raw).expect("manifest JSON");
+        parsed["cases"]
+            .as_array()
+            .expect("cases array")
+            .iter()
+            .map(|case| {
+                (
+                    case["case"].as_str().expect("case name").to_owned(),
+                    case["expected_min_route"]
+                        .as_str()
+                        .expect("expected_min_route")
+                        .to_owned(),
+                )
+            })
+            .collect()
+    };
+    let classes = |dir: &Path| -> Vec<String> {
+        let mut names: Vec<String> = std::fs::read_dir(dir)
+            .expect("read corpus")
+            .map(|entry| {
+                entry
+                    .expect("corpus entry")
+                    .file_name()
+                    .to_string_lossy()
+                    .into_owned()
+            })
+            .filter(|name| {
+                // Manifest JSON and the shared provider are corpus metadata,
+                // not case directories.
+                let is_json = std::path::Path::new(name)
+                    .extension()
+                    .is_some_and(|ext| ext.eq_ignore_ascii_case("json"));
+                !is_json && name != "fake-router.sh"
+            })
+            .collect();
+        names.sort();
+        names
+    };
+
+    assert_eq!(
+        floors(&small),
+        floors(&large),
+        "a class must keep its route floor in both corpora"
+    );
+    assert_eq!(
+        classes(&small),
+        classes(&large),
+        "both corpora must carry the same case directories"
+    );
+}
+
 #[test]
 fn deep_classes_are_routed_deep_with_a_misleading_provider() {
     let output = run_benchmark();
