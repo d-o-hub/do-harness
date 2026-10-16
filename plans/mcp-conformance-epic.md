@@ -118,7 +118,8 @@ checklist was never ticked, so it read as open work while every item passed:
 - Evidence: `cargo clippy -p guardian-proxy --all-targets -- -D warnings`
   off/on green; `cargo check -p guardian-proxy --features
   agt-governance,mcp-surface` green; `cargo deny check` clean (no duplicate
-  versions); `do-harness verify` 12/12; trace 25 + harness heuristic 18.
+  versions); `do-harness verify` 12/12; trace 25 + `harness/references/heuristics.md` (the guardian-proxy surface stays
+  gated off by default).
 - Note: rmcp's MSRV 1.88 applies only when the feature is enabled; the CI MSRV
   job (1.85, default features) stayed green on the first post-merge run
   (`verify` run 34758546116, 2026-09-13: `msrv` success).
@@ -146,7 +147,8 @@ checklist was never ticked, so it read as open work while every item passed:
   upstream). Feature-off 29 / feature-on 37.
 - Evidence: clippy `-D warnings` off/on, `agt-governance,mcp-surface` combined
   check, `cargo deny check` clean, `do-harness verify` 12/12; trace 26 +
-  `fail-closed-proxy` heuristic 19. Next slice: `feat-mcp-protocol-security`.
+  `fail-closed-proxy/references/heuristics.md` (decide, metrics, audit — in that
+  order — before forwarding). Next slice: `feat-mcp-protocol-security`.
 
 ## Slice completion — feat-mcp-protocol-security (2026-09-12)
 
@@ -166,7 +168,8 @@ checklist was never ticked, so it read as open work while every item passed:
   (`crates/guardian-proxy/guardian-proxy.example.toml`).
 - Evidence: feature-off 29 / feature-on 43 tests, clippy `-D warnings` off/on,
   `agt-governance,mcp-surface` combined check, `cargo deny check` clean,
-  `do-harness verify` 12/12; trace 27 + `fail-closed-proxy` heuristic 20.
+  `do-harness verify` 12/12; trace 27 + `fail-closed-proxy/references/heuristics.md` (an MCP ingress needs a
+  non-empty `allowed_origins` list).
   Next slice: `test-mcp-conformance-suite`.
 
 ## Slice completion — test-mcp-conformance-suite (2026-09-12)
@@ -186,7 +189,9 @@ checklist was never ticked, so it read as open work while every item passed:
   skill scaffolding moved to `crates/do-harness/src/init/skills.rs`.
 - Evidence: feature-off 29 / feature-on 44 lib + 3 integration tests, clippy
   `-D warnings` off/on, `cargo deny check` clean, `do-harness verify` 12/12;
-  traces 28 + harness heuristic 21 + `fail-closed-proxy` heuristic 22.
+  traces 28 + `harness/references/heuristics.md` (decompose a module at the LOC
+  warning) + `fail-closed-proxy/references/heuristics.md` (return the mapped denial
+  from the mediation method so the deny branch is unit-testable).
   Next slice: `docs-mcp-surface`.
 
 ## Slice completion — docs-mcp-surface (2026-09-12)

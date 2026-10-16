@@ -131,8 +131,30 @@ if [[ "$FIX" -eq 1 ]]; then
     exit 0
 fi
 
+
+# Epic lessons are cited by file, never by number. The mcp epic used to write
+# "harness heuristic 18" - a counter that lived only in the author's session, so
+# the reference resolved to nothing (the file's bullet order never matched it
+# either). A citation must name the file, and that file must exist.
+for epic in "$ROOT"/plans/*-epic.md; do
+    [[ -f "$epic" ]] || continue
+    numbered="$(grep -nE 'heuristic [0-9]+' "$epic" || true)"
+    if [[ -n "$numbered" ]]; then
+        echo "check-skills-docs FAIL: $(basename "$epic") cites a numbered heuristic; cite the file instead:" >&2
+        printf '%s\n' "$numbered" >&2
+        failures=1
+    fi
+    while IFS= read -r citation; do
+        [[ -n "$citation" ]] || continue
+        if [[ ! -f "$ROOT/.agents/skills/$citation" ]]; then
+            echo "check-skills-docs FAIL: $(basename "$epic") cites $citation, which does not exist" >&2
+            failures=1
+        fi
+    done < <(grep -oE '[A-Za-z0-9_-]+/references/heuristics\.md' "$epic" | sort -u)
+done
+
 if [[ "$failures" -ne 0 ]]; then
-    echo "check-skills-docs FAIL: skills docs drifted from .agents/skills (run with --fix, then fill empty purposes by hand)" >&2
+    echo "check-skills-docs FAIL: see the items above; the catalog table itself can be rebuilt with --fix (then fill empty purposes by hand)" >&2
     exit 1
 fi
 echo "check-skills-docs OK: $SKILLS_DOC matches $(wc -l < "$tmp/names.txt" | tr -d ' ') skill(s), all documented paths exist"
