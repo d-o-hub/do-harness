@@ -77,7 +77,7 @@ pub async fn insert_skill_eval_run(conn: &Connection, run: &NewSkillEvalRun<'_>)
     let row = rows
         .next()
         .await?
-        .ok_or_else(|| DbError::NotFound("run id vanished after insert".to_string()))?;
+        .ok_or_else(|| DbError::Invariant("run id vanished after insert".to_string()))?;
     Ok(row.get(0)?)
 }
 
@@ -122,14 +122,18 @@ pub async fn list_skill_eval_runs_page(
 
 /// Maps one `skill_eval_runs` row (`id`, `skill_name`, `mode`, `graded`,
 /// `passed`, `pass_rate`, `without_pass_rate`, `skill_words`, `walk_secs`,
-/// `ran_at`) to a [`SkillEvalRun`]. An unknown mode string degrades to the
-/// default rather than failing the read.
+/// `ran_at`) to a [`SkillEvalRun`]. An unknown mode string is a stored-data
+/// error rather than a silent default: degrading it to `deterministic` would
+/// misreport an agent run as deterministic in the lift ratchet.
 fn run_from_row(row: &libsql::Row) -> Result<SkillEvalRun> {
     let mode_raw: String = row.get(2)?;
+    let mode = mode_raw
+        .parse()
+        .map_err(|_| DbError::InvalidEvalMode(mode_raw.clone()))?;
     Ok(SkillEvalRun {
         id: row.get(0)?,
         skill_name: row.get(1)?,
-        mode: mode_raw.parse().unwrap_or_default(),
+        mode,
         graded: row.get(3)?,
         passed: row.get(4)?,
         pass_rate: row.get(5)?,

@@ -380,10 +380,11 @@ async fn lift_floor_never_lowers() {
     );
 }
 
-/// Eval mode persists per run, and an unknown stored mode degrades to the
-/// default on read instead of failing the query.
+/// Eval mode persists per run, and an unknown stored mode is a stored-data
+/// error rather than a silent default: degrading it would misreport an agent
+/// run as deterministic in the lift ratchet.
 #[tokio::test(flavor = "current_thread")]
-async fn eval_mode_roundtrips_and_degrades_on_read() {
+async fn eval_mode_roundtrips_and_rejects_unknown_stored_mode() {
     let dir = connect();
     let conn = open(&dir).await;
     insert_skill_eval_run(
@@ -412,8 +413,11 @@ async fn eval_mode_roundtrips_and_degrades_on_read() {
     )
     .await
     .unwrap();
-    let degraded = latest_eval_run(&conn, "harness").await.unwrap().unwrap();
-    assert_eq!(degraded.mode, EvalMode::Deterministic);
+    let err = latest_eval_run(&conn, "harness").await.unwrap_err();
+    assert!(
+        matches!(&err, DbError::InvalidEvalMode(raw) if raw == "bogus"),
+        "{err}"
+    );
 }
 
 /// Floors are mode-scoped: an agent floor never governs deterministic runs

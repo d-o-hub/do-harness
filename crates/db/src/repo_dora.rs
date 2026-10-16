@@ -132,7 +132,7 @@ pub async fn insert_dora_snapshot(
     let row = rows
         .next()
         .await?
-        .ok_or_else(|| DbError::NotFound("dora snapshot id vanished after insert".to_string()))?;
+        .ok_or_else(|| DbError::Invariant("dora snapshot id vanished after insert".to_string()))?;
     Ok(row.get(0)?)
 }
 
