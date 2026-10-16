@@ -2,7 +2,6 @@
 inventory.py — Documentation discovery and contract classification matching.
 """
 
-import fnmatch
 import os
 import re
 import subprocess
@@ -85,7 +84,7 @@ class Rule:
         # Convert glob to regex
         parts = norm_pat.split("**")
         regex_parts = []
-        for i, part in enumerate(parts):
+        for part in parts:
             sub_parts = part.split("*")
             escaped_sub = [re.escape(s).replace(r"\?", "[^/]") for s in sub_parts]
             regex_parts.append("[^/]*".join(escaped_sub))
@@ -164,17 +163,17 @@ def _get_git_files(root_dir, mode="local"):
     """
     Returns list of relative paths for markdown files using git.
     """
-    cmd = ["git", "-C", root_dir, "ls-files"]
     if mode == "local":
-        cmd.extend(["--cached", "--others", "--exclude-standard"])
-    cmd.append("*.md")
+        cmd = ["git", "-C", root_dir, "ls-files", "--cached", "--others", "--exclude-standard", "*.md"]
+    else:
+        cmd = ["git", "-C", root_dir, "ls-files", "*.md"]
 
     try:
         res = subprocess.run(cmd, capture_output=True, text=True, check=True)
         files = [line.strip() for line in res.stdout.splitlines() if line.strip()]
         return files
-    except Exception:
-        # Fallback to filesystem walk if git is not available
+    except (subprocess.CalledProcessError, FileNotFoundError, OSError):
+        # Fallback to filesystem walk if git fails or is unavailable
         md_files = []
         for dirpath, _, filenames in os.walk(root_dir):
             for f in filenames:

@@ -15,31 +15,24 @@ import sys
 import urllib.parse
 
 from doc_tools.inventory import (
-    ContractPolicy,
-    PolicyError,
-    UnclassifiedDocumentError,
     discover_documents,
 )
-from doc_tools.markdown import MarkdownDocument, ParsedLink
+from doc_tools.markdown import MarkdownDocument
 
 
 def get_repo_owner_name(root_dir):
     """
     Attempts to extract github owner/repo string from git remote URL.
     """
+    cmd = ["git", "-C", root_dir, "remote", "get-url", "origin"]
     try:
-        res = subprocess.run(
-            ["git", "-C", root_dir, "remote", "get-url", "origin"],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
+        res = subprocess.run(cmd, capture_output=True, text=True, check=True)
         url = res.stdout.strip()
         # https://github.com/owner/repo or git@github.com:owner/repo
         m = re.search(r"github\.com[:/]([^/]+)/([^/.]+)(?:\.git)?$", url, re.IGNORECASE)
         if m:
             return f"{m.group(1)}/{m.group(2)}"
-    except Exception:
+    except (subprocess.CalledProcessError, FileNotFoundError, OSError):
         pass
     return None
 
@@ -250,7 +243,7 @@ def main():
 
     if args.subcommand == "links":
         checker = LinkChecker(root_dir=root_dir, contracts_path=contracts_path, mode=args.mode)
-        success = checker.check_links()
+        checker.check_links()
 
         if checker.warnings:
             for w in checker.warnings:

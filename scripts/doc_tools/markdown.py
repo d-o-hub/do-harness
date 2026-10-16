@@ -4,7 +4,6 @@ Extracts heading slugs, explicit HTML anchors, inline/reference links, and image
 """
 
 import re
-import urllib.parse
 from markdown_it import MarkdownIt
 
 
@@ -67,7 +66,6 @@ class MarkdownDocument:
 
             # Extract headings
             if t.type == "heading_open":
-                line_no = t.map[0] + 1 if t.map else 1
                 if i + 1 < n and tokens[i + 1].type == "inline":
                     inline_tok = tokens[i + 1]
                     heading_text = self._get_inline_plaintext(inline_tok)
