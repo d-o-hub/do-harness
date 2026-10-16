@@ -358,6 +358,48 @@ async fn prune_beats_keeps_newest_per_task() {
     assert_eq!(remaining[1].id, 5);
 }
 
+/// `list_beats_page` binds an explicit window, and `None` means every row:
+/// the negative-`LIMIT` sentinel is wrapped as an `Option` so no caller passes
+/// it by hand.
+#[tokio::test(flavor = "current_thread")]
+async fn list_beats_page_windows_and_treats_none_as_unbounded() {
+    let dir = tempfile::tempdir().unwrap();
+    let conn = crate::migrate::connect_and_migrate(dir.path())
+        .await
+        .unwrap();
+
+    for index in 0..3 {
+        insert_beat(
+            &conn,
+            &NewBeat {
+                task_id: None,
+                scope: None,
+                beat_type: "sensor",
+                status: "ok",
+                sensor_exit_code: Some(0),
+                sensor_name: Some("check"),
+                started_at: i64::from(index),
+                completed_at: Some(i64::from(index)),
+            },
+        )
+        .await
+        .unwrap();
+    }
+
+    assert_eq!(
+        list_beats_page(&conn, None, None, 0).await.unwrap().len(),
+        3
+    );
+    let window = list_beats_page(&conn, None, Some(1), 1).await.unwrap();
+    assert_eq!(window.len(), 1);
+    assert_eq!(window[0].id, 2);
+    assert_eq!(
+        list_beats_page(&conn, None, Some(0), 0).await.unwrap(),
+        Vec::new(),
+        "a zero limit selects no rows"
+    );
+}
+
 #[tokio::test(flavor = "current_thread")]
 async fn beats_scope_isolates_workstreams_and_filters_stats() {
     let dir = tempfile::tempdir().unwrap();

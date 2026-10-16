@@ -3,7 +3,9 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-use super::super::{NewBeat, SensorOutcome, latest_sensor_beat, record_verify_batch};
+use super::super::{
+    LatestSensorBeat, NewBeat, SensorOutcome, latest_sensor_beat, record_verify_batch,
+};
 use crate::repo::NewTask;
 
 /// A batch outcome's input digest lands on its own beat in the same
@@ -50,11 +52,21 @@ async fn record_verify_batch_persists_input_digest_on_the_beat() {
 
     assert_eq!(
         latest_sensor_beat(&conn, "probe", "global").await.unwrap(),
-        Some((1, "ok".to_owned(), Some(0), Some("sha256:abc".to_owned())))
+        Some(LatestSensorBeat {
+            id: 1,
+            status: "ok".to_owned(),
+            exit_code: Some(0),
+            input_digest: Some("sha256:abc".to_owned()),
+        })
     );
     assert_eq!(
         latest_sensor_beat(&conn, "plain", "global").await.unwrap(),
-        Some((2, "ok".to_owned(), Some(0), None))
+        Some(LatestSensorBeat {
+            id: 2,
+            status: "ok".to_owned(),
+            exit_code: Some(0),
+            input_digest: None,
+        })
     );
     assert_eq!(
         latest_sensor_beat(&conn, "missing", "global")
@@ -112,15 +124,15 @@ async fn latest_sensor_beat_shadows_earlier_pass_in_its_scope() {
     .await
     .unwrap();
 
-    let (id, status, exit, digest) = latest_sensor_beat(&conn, "probe", "global")
+    let latest = latest_sensor_beat(&conn, "probe", "global")
         .await
         .unwrap()
         .expect("failure beat");
-    assert_eq!(id, 2);
-    assert_eq!(status, "failed");
-    assert_eq!(exit, Some(1));
+    assert_eq!(latest.id, 2);
+    assert_eq!(latest.status, "failed");
+    assert_eq!(latest.exit_code, Some(1));
     assert_eq!(
-        digest, None,
+        latest.input_digest, None,
         "a failed beat never carries a reusable digest"
     );
 }
@@ -178,7 +190,12 @@ async fn latest_sensor_beat_isolates_branch_task_and_global_scopes() {
         latest_sensor_beat(&conn, "probe", &format!("task:{task_id}"))
             .await
             .unwrap(),
-        Some((3, "ok".to_owned(), Some(0), Some("sha256:task".to_owned()))),
+        Some(LatestSensorBeat {
+            id: 3,
+            status: "ok".to_owned(),
+            exit_code: Some(0),
+            input_digest: Some("sha256:task".to_owned()),
+        }),
         "the scope-less task beat derives `task:<id>`"
     );
     assert_eq!(
@@ -199,17 +216,22 @@ async fn latest_sensor_beat_isolates_branch_task_and_global_scopes() {
         latest_sensor_beat(&conn, "probe", "branch:feature")
             .await
             .unwrap(),
-        Some((
-            2,
-            "ok".to_owned(),
-            Some(0),
-            Some("sha256:branch".to_owned())
-        )),
+        Some(LatestSensorBeat {
+            id: 2,
+            status: "ok".to_owned(),
+            exit_code: Some(0),
+            input_digest: Some("sha256:branch".to_owned()),
+        }),
         "the branch scope keeps its own latest beat"
     );
     assert_eq!(
         latest_sensor_beat(&conn, "probe", "global").await.unwrap(),
-        Some((1, "ok".to_owned(), Some(0), Some("sha256:pass".to_owned()))),
+        Some(LatestSensorBeat {
+            id: 1,
+            status: "ok".to_owned(),
+            exit_code: Some(0),
+            input_digest: Some("sha256:pass".to_owned()),
+        }),
         "the global scope keeps its own latest beat"
     );
 }

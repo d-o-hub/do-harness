@@ -29,10 +29,31 @@ pub struct NewBeat<'a> {
 
 /// Inserts a beat and returns its id.
 ///
+/// The unchanged-input digest is not part of a beat's identity: only the verify
+/// batch that records one uses [`insert_beat_with_digest`], and every other
+/// caller writes the column as `NULL`.
+///
 /// # Errors
 ///
 /// Returns an error when the insert statement fails.
 pub(crate) async fn insert_beat(conn: &Connection, beat: &NewBeat<'_>) -> Result<i64> {
+    insert_beat_with_digest(conn, beat, None).await
+}
+
+/// Inserts a beat with its unchanged-input digest in the same statement.
+///
+/// Binding the digest here, rather than following the insert with an `UPDATE`,
+/// means a beat row never exists without the digest of the inputs it was
+/// recorded against.
+///
+/// # Errors
+///
+/// Returns an error when the insert statement fails.
+pub(crate) async fn insert_beat_with_digest(
+    conn: &Connection,
+    beat: &NewBeat<'_>,
+    input_digest: Option<&str>,
+) -> Result<i64> {
     let task_scope_buf;
     let scope_str = match beat.scope {
         Some(s) => s,
@@ -47,8 +68,8 @@ pub(crate) async fn insert_beat(conn: &Connection, beat: &NewBeat<'_>) -> Result
     let mut rows = conn
         .query(
             "INSERT INTO beats (task_id, scope, beat_type, status, sensor_exit_code, sensor_name, \
-             started_at, completed_at) \
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8) \
+             started_at, completed_at, input_digest) \
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9) \
              RETURNING id",
             params!(
                 beat.task_id,
@@ -58,7 +79,8 @@ pub(crate) async fn insert_beat(conn: &Connection, beat: &NewBeat<'_>) -> Result
                 beat.sensor_exit_code,
                 beat.sensor_name,
                 beat.started_at,
-                beat.completed_at
+                beat.completed_at,
+                input_digest
             ),
         )
         .await?;
@@ -92,10 +114,10 @@ fn scope_task_id(scope: &str) -> Option<i64> {
 ///
 /// Returns an error when the query fails.
 pub async fn list_beats(conn: &Connection, task_id: Option<i64>) -> Result<Vec<Beat>> {
-    list_beats_page(conn, task_id, -1, 0).await
+    list_beats_page(conn, task_id, None, 0).await
 }
 
-/// Lists beats with `LIMIT`/`OFFSET` paging (`limit = -1` disables the limit).
+/// Lists beats with `LIMIT`/`OFFSET` paging (`limit: None` returns every row).
 ///
 /// # Errors
 ///
@@ -103,8 +125,8 @@ pub async fn list_beats(conn: &Connection, task_id: Option<i64>) -> Result<Vec<B
 pub async fn list_beats_page(
     conn: &Connection,
     task_id: Option<i64>,
-    limit: i64,
-    offset: i64,
+    limit: Option<u32>,
+    offset: u32,
 ) -> Result<Vec<Beat>> {
     let mut rows = match task_id {
         Some(id) => {
@@ -112,7 +134,7 @@ pub async fn list_beats_page(
                 "SELECT id, task_id, scope, beat_type, status, sensor_exit_code, sensor_name, \
                  started_at, completed_at FROM beats WHERE task_id = ?1 ORDER BY id \
                  LIMIT ?2 OFFSET ?3",
-                params!(id, limit, offset),
+                params!(id, crate::bind_limit(limit), i64::from(offset)),
             )
             .await?
         }
@@ -120,7 +142,7 @@ pub async fn list_beats_page(
             conn.query(
                 "SELECT id, task_id, scope, beat_type, status, sensor_exit_code, sensor_name, \
                  started_at, completed_at FROM beats ORDER BY id LIMIT ?1 OFFSET ?2",
-                params!(limit, offset),
+                params!(crate::bind_limit(limit), i64::from(offset)),
             )
             .await?
         }
@@ -338,14 +360,7 @@ pub async fn record_verify_batch(conn: &Connection, outcomes: &[SensorOutcome<'_
 async fn record_verify_batch_once(conn: &Connection, outcomes: &[SensorOutcome<'_>]) -> Result<()> {
     let tx = crate::tx::begin_immediate(conn).await?;
     for outcome in outcomes {
-        let beat_id = insert_beat(&tx, &outcome.beat).await?;
-        if let Some(digest) = outcome.input_digest {
-            tx.execute(
-                "UPDATE beats SET input_digest = ?1 WHERE id = ?2",
-                params!(digest, beat_id),
-            )
-            .await?;
-        }
+        insert_beat_with_digest(&tx, &outcome.beat, outcome.input_digest).await?;
         let signature = format!("sensor:{}", outcome.beat.sensor_name.unwrap_or("unknown"));
         let scope = beat_scope(&outcome.beat);
         if outcome.ok {
@@ -358,9 +373,24 @@ async fn record_verify_batch_once(conn: &Connection, outcomes: &[SensorOutcome<'
     Ok(())
 }
 
+/// The newest sensor beat recorded for one `(sensor, scope)` key.
+///
+/// Named fields rather than a positional tuple: `status` and `input_digest` are
+/// both strings, so the two are easy to transpose silently at a call site.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LatestSensorBeat {
+    /// Beat row id, recorded as the reused beat under `--unchanged=skip`.
+    pub id: i64,
+    /// Status of that beat (`ok`, `failed`, ...).
+    pub status: String,
+    /// Exit code the sensor reported, when it reported one.
+    pub exit_code: Option<i32>,
+    /// Digest of the sensor's declared inputs at a clean pass.
+    pub input_digest: Option<String>,
+}
+
 /// Returns the most recent sensor beat for `sensor_name` in `scope`
-/// (`branch:<name>`, `task:<id>`, or `global`): id, status, exit code, and
-/// recorded input digest.
+/// (`branch:<name>`, `task:<id>`, or `global`).
 ///
 /// A later failed or warned beat always shadows an earlier pass, so reuse can
 /// never search past the newest outcome. The lookup is exact-scope: a beat
@@ -373,7 +403,7 @@ pub async fn latest_sensor_beat(
     conn: &Connection,
     sensor_name: &str,
     scope: &str,
-) -> Result<Option<(i64, String, Option<i32>, Option<String>)>> {
+) -> Result<Option<LatestSensorBeat>> {
     let mut rows = conn
         .query(
             "SELECT id, status, sensor_exit_code, input_digest FROM beats \
@@ -383,7 +413,12 @@ pub async fn latest_sensor_beat(
         )
         .await?;
     match rows.next().await? {
-        Some(row) => Ok(Some((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))),
+        Some(row) => Ok(Some(LatestSensorBeat {
+            id: row.get(0)?,
+            status: row.get(1)?,
+            exit_code: row.get(2)?,
+            input_digest: row.get(3)?,
+        })),
         None => Ok(None),
     }
 }

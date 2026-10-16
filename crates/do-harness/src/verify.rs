@@ -233,17 +233,17 @@ async fn prepare_reuse(
             let latest = do_harness_db::latest_sensor_beat(&db, &spec.name, &scope.key())
                 .await
                 .map_err(|e| CliError::Usage(e.into()))?;
-            if let Some((beat_id, status, exit_code, stored)) = latest {
-                let eligible = status == "ok"
-                    && exit_code == Some(0)
-                    && stored.as_deref() == Some(digest.as_str());
+            if let Some(latest) = latest {
+                let eligible = latest.status == "ok"
+                    && latest.exit_code == Some(0)
+                    && latest.input_digest.as_deref() == Some(digest.as_str());
                 if eligible {
                     if opts.unchanged == sensors::UnchangedMode::Skip {
-                        opts.reused.insert(spec.name.clone(), beat_id);
+                        opts.reused.insert(spec.name.clone(), latest.id);
                     } else {
                         eprintln!(
-                            "warning: {}: unchanged inputs; would reuse beat {beat_id} with --unchanged=skip",
-                            spec.name
+                            "warning: {}: unchanged inputs; would reuse beat {} with --unchanged=skip",
+                            spec.name, latest.id
                         );
                     }
                 }
