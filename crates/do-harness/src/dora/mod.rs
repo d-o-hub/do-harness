@@ -167,6 +167,12 @@ pub struct DoraSnapshot {
 /// Seconds in one day.
 const SECONDS_PER_DAY: i64 = 86_400;
 
+/// Median percentile requested for lead time and MTTR.
+const MEDIAN_PERCENTILE: u32 = 50;
+
+/// Ninetieth-percentile percentile requested for lead time.
+const UPPER_PERCENTILE: u32 = 90;
+
 /// Resolves the measurement clock: the explicit `--now` wins, otherwise the
 /// system clock.
 #[must_use]
@@ -246,9 +252,9 @@ pub fn collect(root: &Path, policy: &DoraPolicy, now: i64, source: Source) -> Re
             .map(|record| record.tag.clone())
             .collect(),
         lead_samples: i64::try_from(samples.len()).context("sample count overflow")?,
-        lead_p50_seconds: percentile(&samples, 50),
-        lead_p90_seconds: percentile(&samples, 90),
-        mttr_seconds: percentile(&restored, 50),
+        lead_p50_seconds: percentile(&samples, MEDIAN_PERCENTILE),
+        lead_p90_seconds: percentile(&samples, UPPER_PERCENTILE),
+        mttr_seconds: percentile(&restored, MEDIAN_PERCENTILE),
         mttr_restored: i64::try_from(restored.len()).context("restore count overflow")?,
         mttr_unrestored: i64::try_from(
             scan.incidents
