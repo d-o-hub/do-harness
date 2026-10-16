@@ -9,9 +9,16 @@
 # what is scanned, ignored, and allowed.
 #
 # Findings are reported, not fixed: the sensor runs at warn severity with a
-# blessed baseline (`plans/baselines.json`), so the existing occurrences are
-# grandfathered and any *increase* is a hard regression. That is what makes the
-# rule enforceable on new code without a tree-wide rewrite.
+# blessed findings baseline (`plans/baselines.json`), so the existing occurrences
+# are grandfathered and any *increase* is a hard regression. That is what makes
+# the rule enforceable on new code without a tree-wide rewrite.
+#
+# Exit code is not the verdict, matching `scripts/check-dora.sh`: the checker
+# exits 0 after a successful scan however many findings it counted, because a
+# within-baseline breach must stay advisory. A sensor that exits 1 on every run
+# would accrue strikes under `verify --record`, and a warn-severity sensor is
+# quarantined after 3 strikes — the ratchet would silently stop measuring. Exit 2
+# means no usable count (bad root or bad flag) and is a hard failure.
 #
 # Enforcement policy (fail-open on a missing tool, fail-closed when required):
 #   - python3 missing AND (CI=true OR DO_HARNESS_REQUIRE_TOOLS=1) -> FAIL.

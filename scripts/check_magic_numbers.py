@@ -22,7 +22,11 @@ grandfathered and any *increase* is a hard regression: the rule applies to new
 code from the day it lands, without a tree-wide rewrite.
 
 Usage: ``check_magic_numbers.py [ROOT]``; prints one ``file:line: literal`` per
-finding plus a final ``FINDINGS: <n>`` line, and exits 1 when n > 0.
+finding plus a final ``FINDINGS: <n>`` line. Exit code is *not* the verdict: a
+count that must only go down is gated by the blessed ``FINDINGS:`` ratchet, so a
+successful scan exits 0 however many findings it counted. Exit 2 means no usable
+count (a bad root or a bad flag) and prints no ``FINDINGS:`` line, so a
+discovery failure can never read as a metric verdict.
 """
 
 from __future__ import annotations
@@ -36,6 +40,11 @@ import sys
 PRINT_LIMIT = 25
 
 #: `--limit 0` prints every finding: for a tree-wide survey, not for CI.
+
+#: Exit code for "no usable count". The count itself is never a verdict here:
+#: the blessed ratchet decides, so that a within-baseline breach is advisory
+#: instead of a permanently failing sensor (see scripts/check-dora.sh).
+EXIT_UNAVAILABLE = 2
 
 #: Conventional values: indices, increments, small counts, success codes.
 ALLOWED_VALUES = frozenset({"0", "1", "2", "0.0", "1.0", "2.0"})
@@ -156,14 +165,49 @@ def rust_sources(root: pathlib.Path) -> list[pathlib.Path]:
     return sources
 
 
-def main(argv: list[str]) -> int:
-    limit = PRINT_LIMIT
+def parse_arguments(argv: list[str]) -> tuple[pathlib.Path, int] | None:
+    """Returns `(root, print_limit)`, or None after printing a usage error."""
     arguments = list(argv[1:])
-    if "--limit" in arguments:
-        index = arguments.index("--limit")
-        limit = int(arguments[index + 1])
-        del arguments[index : index + 2]
-    root = pathlib.Path(arguments[0] if arguments else ".").resolve()
+    limit = PRINT_LIMIT
+    positional: list[str] = []
+    index = 0
+    while index < len(arguments):
+        argument = arguments[index]
+        if argument == "--limit" or argument.startswith("--limit="):
+            if argument == "--limit":
+                if index + 1 >= len(arguments):
+                    print("error: --limit requires a value", file=sys.stderr)
+                    return None
+                value = arguments[index + 1]
+                del arguments[index : index + 2]
+            else:
+                value = argument.split("=", 1)[1]
+                del arguments[index]
+            if not value.isdigit():
+                print(f"error: --limit needs a count, got {value!r}", file=sys.stderr)
+                return None
+            limit = int(value)
+            continue
+        if argument.startswith("-"):
+            print(f"error: unknown option {argument}", file=sys.stderr)
+            return None
+        positional.append(argument)
+        index += 1
+    if len(positional) > 1:
+        print("error: expected at most one ROOT", file=sys.stderr)
+        return None
+    root = pathlib.Path(positional[0] if positional else ".").resolve()
+    if not root.is_dir():
+        print(f"error: {root} is not a directory", file=sys.stderr)
+        return None
+    return root, limit
+
+
+def main(argv: list[str]) -> int:
+    parsed = parse_arguments(argv)
+    if parsed is None:
+        return EXIT_UNAVAILABLE
+    root, limit = parsed
     total = 0
     printed = 0
     for path in rust_sources(root):
@@ -178,7 +222,7 @@ def main(argv: list[str]) -> int:
     if limit and total > printed:
         print(f"... {total - printed} more (see plans/baselines.json for the ceiling)")
     print(f"FINDINGS: {total}")
-    return 1 if total else 0
+    return 0
 
 
 if __name__ == "__main__":
