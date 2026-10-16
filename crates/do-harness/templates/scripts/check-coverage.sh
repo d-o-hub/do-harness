@@ -146,18 +146,25 @@ for layer in sorted(counts):
 PY
 }
 
+# The proving modes gate on the coverage toolchain before the inventory: the
+# inventory is informational, so a missing cargo-llvm-cov/nextest must report
+# its own pinned FAIL/SKIP message rather than being shadowed by an inventory
+# tool message (the inventory's own python3 policy applies once the coverage
+# toolchain is present).
+if [[ "$MODE" != "inventory" ]]; then
+    if ! command -v cargo-llvm-cov >/dev/null 2>&1 || ! command -v cargo-nextest >/dev/null 2>&1; then
+        if require_tools; then
+            echo "FAIL: cargo-llvm-cov and cargo-nextest are required when CI=true or DO_HARNESS_REQUIRE_TOOLS=1."
+            exit 1
+        fi
+        echo "SKIP: cargo-llvm-cov or cargo-nextest not installed; skipping coverage check (cargo install cargo-llvm-cov cargo-nextest --locked)."
+        exit 0
+    fi
+fi
+
 print_inventory
 
 if [[ "$MODE" == "inventory" ]]; then
-    exit 0
-fi
-
-if ! command -v cargo-llvm-cov >/dev/null 2>&1 || ! command -v cargo-nextest >/dev/null 2>&1; then
-    if require_tools; then
-        echo "FAIL: cargo-llvm-cov and cargo-nextest are required when CI=true or DO_HARNESS_REQUIRE_TOOLS=1."
-        exit 1
-    fi
-    echo "SKIP: cargo-llvm-cov or cargo-nextest not installed; skipping coverage check (cargo install cargo-llvm-cov cargo-nextest --locked)."
     exit 0
 fi
 
