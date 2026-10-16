@@ -322,13 +322,16 @@ async fn append_event_on(conn: &Connection, task_id: i64, event: &WorkflowEvent)
         {
             Ok(_) => return Ok(()),
             Err(err) => match DbError::from(err) {
-                DbError::Constraint(_) if attempt + 1 < MAX_SEQ_RETRIES => {}
+                // Only a lost `UNIQUE(seq)` race is retryable: recomputing the
+                // seq is the fix. A foreign-key or `CHECK` failure would fail
+                // identically on every attempt, so surface it immediately.
+                err if err.is_unique_violation() && attempt + 1 < MAX_SEQ_RETRIES => {}
                 other => return Err(other),
             },
         }
     }
-    Err(DbError::Constraint(
-        "workflow event seq retries exhausted under concurrent writers".to_owned(),
+    Err(DbError::unique_violation(
+        "workflow event seq retries exhausted under concurrent writers",
     ))
 }
 
