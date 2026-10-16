@@ -33,7 +33,9 @@ fi
 
 mapfile -t files < <(
     if [[ -d "$ROOT/.git" ]]; then
-        git -C "$ROOT" ls-files '*.md'
+        # See check-yamllint.sh: untracked files are linted too, so a new
+        # document fails here rather than after it is staged.
+        git -C "$ROOT" ls-files --cached --others --exclude-standard '*.md'
     else
         find "$ROOT" -name '*.md' -type f
     fi | sort
