@@ -78,6 +78,10 @@ dev checkout.
 | T2 | measured rather than assumed, and the finding does not reproduce for this report: `cargo llvm-cov nextest --workspace` (caps `CARGO_BUILD_JOBS=2`, `test-threads = 2`) reports 142 source files and **none** under `tests/`, `fixtures/`, or `*_tests.rs`, so the harness's test *files* are already outside the number; unfiltered line coverage is 84.76% against the 70% floor. A `--ignore-filename-regex` for those paths was added, measured to move the total by about 1% (nothing a filter can address), and removed again rather than shipped as dead config. The residual the finding is really pointing at is the 91 `src` files carrying an **inline** `#[cfg(test)]` module, which no path filter can exclude; marking those (`LCOV_EXCL_START`/`STOP`) is a maintenance policy rather than a defect, and is recorded as such. The measured run also left no `.profraw` litter, which the T12 gate checks | `cargo llvm-cov report --summary-only` → 142 rows, 0 test-path rows, TOTAL 84.76% lines |
 | R3 | `man/do-harness.1` is generated, guarded, and no longer stale: the CLI's `man` command renders through a new `man` module (which also rewrites `clap_mangen`'s `do-harness-<name>(1)` index — the repository ships one page, so those 30 refs pointed at pages that are never generated, and now read `do-harness <name>`), and `tests/man_sync.rs` regenerates the page and compares it against the committed copy with only the build fingerprint (`<rev>[-dirty] <date>`) normalised away. The semver stays compared, which is the drift nobody noticed (the page announced `0.2.0 (01f6e3e-dirty 2026-10-03)` while the crate was `0.3.0`). `docs/releasing.md`'s runbook now says to regenerate both generated artifacts before tagging, and extracting the renderer took `main.rs` from 468 to 462 lines | `cargo test -p do-harness --test man_sync` → 1 passed; can-fail proof: restoring the stale `0.2.0` fingerprint fails it with "man/do-harness.1 is stale; regenerate with `do-harness man man`" |
 | R2 | the interim annotation the finding prescribes, since the real fix is the stranded release (R1, operator-gated): `docs/releases/v0.3.0.md` now opens with the publication status — the tag exists on `6804b41`, crates.io's newest `do-harness` is still 0.2.1, and the release job stopped before its prebuilt artifacts — points at R1 for the recovery, and says to install the last published version or build from a checkout meanwhile. The README's source-install paragraph already carried the equivalent caveat ("use the tested prebuilt artifacts above until 0.3.0 is published") | `markdownlint-cli2 docs/releases/v0.3.0.md docs/releasing.md` → 0 issues |
+| R7 | the epic→heuristic citations resolve now. `plans/mcp-conformance-epic.md` cited "harness heuristic 18/19/20/21/22", a counter that lived only in the author's session: the harness file's bullet order never matched those numbers and `fail-closed-proxy`'s file holds four entries, so nothing in the tree could reconstruct them. Each citation names the file plus the lesson it stands for, matching the entries' own wording, and the two files exist. The `skills-docs` sensor gained the matching guard: a `plans/*-epic.md` may not cite a numbered heuristic, and every cited `…/references/heuristics.md` must exist on disk. The trace-ID half of the finding is a local-database convention (ids skip because strikes consumed numbers) and stays a process note | `bash scripts/check-skills-docs.sh` → OK, 13 skills; can-fail proofs: a numbered citation fails naming file and line, a dangling citation fails naming the path |
+| P16 | the high-value half of the script-polish bundle: `check-yamllint.sh` and `check-markdownlint.sh` now collect **tracked and untracked** files (`git ls-files --cached --others --exclude-standard`; ignored trees stay excluded). A new workflow or document used to be unlinted until it was staged — exactly when a syntax error is cheapest to catch — and it bit this batch: the new `scheduled.yml` was reported as "12 files linted" while untracked. `check-loc.sh` no longer hides `find` errors (the `2>/dev/null` is gone), so an unreadable tree surfaces instead of silently shrinking the scan. The rest of the bundle (unguarded `$2` under `set -u`, FAIL/SKIP lines without hints, an inconsistent python3-availability policy) stays open | `bash scripts/check-shell.sh` → 68 scripts; both sensors pass clean (13 YAML, 89 markdown) and fail on an untracked bad file: a YAML syntax error → exit 1, `#Title` → `MD018/no-missing-space-atx` → exit 1 |
+
+
 
 
 | P2/P3 | Toolchain/lint/nextest configs and each sensor's own script added to the `when-changed` inputs whose verdicts they change | `do-harness list`/`explain --set verification --changed` run against the rebuilt binary; TOML parses (25 sensors) |
@@ -95,7 +99,8 @@ explicit guard) instead of a raw grep error.
 **Residual:** none for A8 (alternate IPv4 spellings are now normalized).
 
 **Not started:** R1 (release rescue), A10 (pre-push set), A6, S1–S3, S6, S7,
-T6, T13, F1–F4, P7–P8, P10, P12, P15–P16, B1, B3–B5, C2, C3, D1–D2, R7.
+T6, T13, F1–F4, P7–P8, P10, P12, P15, P16 (partial), B1, B3–B5, C2, C3,
+D1–D2.
 
 ## Progress: release-state truth decay (verified first-party)
 
@@ -258,11 +263,26 @@ closed final (`NO_GO`); DORA ratchet tolerates 3 breaches.
    (**B1–B3**) opportunistic; **F1/F2/P2/P3** as policy/supply-chain chores.
 
 *Landed (2026-10-15):* A1, A2, A3, A4, A5, A7, A8, C1, C4, C5, F5, P1, P2, P3,
-P4, P5, P6 (partial), P9, P11, P13, P14, R2, R3, R4, R5, R6, R8, R9, S4, S5, S8, S9,
+P4, P5, P6 (partial), P9, P11, P13, P14, P16 (partial), R2, R3, R4, R5, R6, R7, R8, R9,
 S11, S12, S15, S16, S17, S18, S19, T1, T2, T3, T4, T5, T7, T8, T9, T10, T11, T12, T14,
 T15, T16, T17, T18,
 B2 (forced by A1).
 *Next:* R1 (operator-gated), A10 (maintainer decision), A6, C2, C3, R2, R3,
+R7.
+
+*Harness addition (2026-10-16):* section 5's "named constants over magic numbers"
+is now executable rather than prose. `scripts/check-magic-numbers.sh` (with
+`scripts/check_magic_numbers.py`) reports every numeric literal that is not a
+named constant and not one of `0`/`1`/`2`, ignoring comments, string/char/raw
+literals, and attribute spans; it is registered as the warn-severity
+`magic-numbers` sensor in the `verification` set, with a blessed findings
+baseline (`plans/baselines.json`: 1724) so existing occurrences are grandfathered
+and any *increase* is a hard regression. Proven end to end: adding one literal
+fails with `ratchet regression: findings 1725 exceed blessed baseline 1724`, and
+the session's own new files were named before the first bless (dora_gh, pr_routing,
+maintenance), with the two reporting test files' fixture matrices left to the
+baseline on purpose — that is what the ratchet is for. An invariant in
+`plans/invariants.json` (51 headers) carries the rule with this sensor.
 R7.
 
 ## Verification notes
