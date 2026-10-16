@@ -15,6 +15,7 @@ pub mod readiness;
 pub mod review;
 pub mod waiver_classify;
 pub mod waiver_comment;
+pub mod waiver_render;
 pub mod waiver_scan;
 pub mod waiver_text;
 pub mod waivers;
