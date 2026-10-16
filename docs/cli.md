@@ -386,10 +386,18 @@ Diagnostic health checks covering binary resolution, git hook status, and databa
 
 - `--format <Format>`: Output format (`text` or `json`).
 - `--strict`: Elevate warnings (target/ binary, missing hooks) to failures.
+- Exit codes follow the shared rule: a failure that stops the doctor before any
+  check runs — no git repository to inspect — is a usage/discovery problem
+  (`2`), matching `hook status` for the same failure. A check that runs and
+  fails (`1`) includes an unreadable state database, since diagnosing it is the
+  doctor's job.
 
 ### `eval`
 Skill structure validation and evaluation benchmark runner.
 
+- Exit codes follow the shared rule: a pre-check discovery problem is usage
+  (`2`) — an unknown `--skill` name, or a state database that cannot be opened,
+  so no eval ever ran. A skill whose evals ran and failed is `1`.
 - `--skill <SKILL>`: Restrict evaluation to target skill directory.
 - `--bless`: Re-baseline grader hashes and raise pass-rate floor on green run.
   Every bless appends an immutable `skill_eval_blesses` row recording the
