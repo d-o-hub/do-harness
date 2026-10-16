@@ -25,6 +25,14 @@ async fn open() -> (tempfile::TempDir, Connection) {
     (dir, conn)
 }
 
+/// The fixture's rate, cast the way the report casts it: through `u32`, which
+/// the pedantic `cast_precision_loss` lint accepts because the widening cannot
+/// lose precision for these values.
+fn rate(passed: i64, graded: i64) -> f64 {
+    f64::from(u32::try_from(passed).expect("fixture fits u32"))
+        / f64::from(u32::try_from(graded).expect("fixture fits u32"))
+}
+
 /// Records one run of `skill`, with the latest-skill row that accompanies it.
 async fn record(
     conn: &Connection,
@@ -289,7 +297,7 @@ async fn derived_rates_are_finite_or_absent() {
                 mode: EvalMode::Deterministic,
                 graded,
                 passed,
-                pass_rate: (graded > 0).then(|| passed as f64 / graded as f64),
+                pass_rate: (graded > 0).then(|| rate(passed, graded)),
                 without_pass_rate: None,
                 skill_words: None,
                 walk_secs: None,
@@ -301,7 +309,7 @@ async fn derived_rates_are_finite_or_absent() {
                 without_passed: Some(passed),
             }],
             if graded > 0 {
-                passed as f64 / graded as f64
+                rate(passed, graded)
             } else {
                 0.0
             },
