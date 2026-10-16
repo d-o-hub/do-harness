@@ -83,8 +83,18 @@ fix — silent loss of committed writes under concurrent checkpointing), #2254
 (corruption on power loss), and #2272 (`Connection::authorizer` keeps a raw
 pointer to the connection, heap use-after-free). The harness uses libSQL as the
 persistence engine for all task/beat/trace state, so a 0.10.0 rebase decision is
-due; add an upstream-issue watch mirroring `scripts/check-agt-ga.sh` and record
-the affected issues here as they land.
+due.
+
+The watch is `scripts/check-libsql-watch.sh`: it queries the GitHub issues API
+for tursodatabase/libsql #2254, #2271, #2272, and #2285 and prints each issue's
+state plus a summary of the still-open ones affecting the 0.9.30 base
+(`VERDICT=OPEN|CLEAR|UNKNOWN`, always exit 0 — a fetch or parse failure says so
+rather than reporting a clean line). It mirrors `scripts/check-agt-ga.sh` and,
+like it, is **not** a `do-harness verify` sensor because it needs the network.
+Its hermetic parse contract is pinned by `crates/do-harness/tests/libsql_watch.rs`
+over `tests/fixtures/libsql-watch/*.json`, run with
+`scripts/check-libsql-watch.sh --fixtures <file>`. Record the affected issues here
+as they land.
 
 ## References
 

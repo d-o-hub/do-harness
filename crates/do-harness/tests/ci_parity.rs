@@ -126,6 +126,18 @@ fn yamllint_sensor_fails_closed_only_when_required() {
 
 #[cfg(unix)]
 #[test]
+fn actionlint_sensor_fails_closed_only_when_required() {
+    assert_missing_tool_policy("check-actionlint.sh", &[]);
+}
+
+#[cfg(unix)]
+#[test]
+fn markdown_links_sensor_fails_closed_only_when_required() {
+    assert_missing_tool_policy("check-markdown-links.sh", &[]);
+}
+
+#[cfg(unix)]
+#[test]
 fn powerset_sensor_fails_closed_only_when_required() {
     assert_missing_tool_policy("check-powerset.sh", &[]);
 }

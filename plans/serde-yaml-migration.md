@@ -17,7 +17,7 @@ The advisory database added the finding on 2026-10-12; it fails both
 every open PR at once, the finding is temporarily ignored — never silenced —
 while the migration lands:
 
-- `deny.toml` `[advisories] ignore = ["RUSTSEC-2024-0449"]`
+- `deny.toml` `[advisories] ignore = [{ id = "RUSTSEC-2024-0449", reason = "..." }]` (revisit by 2027-03-25; cargo-deny 0.20.2 has no stable `expiry` field, so the date lives in comments)
 - `scripts/check-audit.sh` `--ignore RUSTSEC-2024-0449`
 - decision header in `plans/invariants.json` (category `supply-chain`)
 

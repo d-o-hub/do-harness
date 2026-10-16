@@ -12,6 +12,10 @@
 # derived from the report. The warn severity keeps local runs advisory while
 # `verify --strict` (the release preflight) promotes the failure to a hard one,
 # so the 70% line threshold actually gates a tag.
+# Enforcement policy (fail-open on a missing tool, fail-closed when required),
+# mirroring scripts/check-magic-numbers.sh: python3, cargo-llvm-cov, or
+# cargo-nextest missing AND (CI=true OR DO_HARNESS_REQUIRE_TOOLS=1) -> FAIL,
+# otherwise SKIP with the marker the runner surfaces.
 #
 # Methodology:
 # - inventory (fast path): unique compiled behavior as unique(file, fn) per layer —
@@ -61,7 +65,11 @@ cd "$TARGET_DIR"
 # deterministically. No test execution and no toolchain beyond python3.
 print_inventory() {
     if ! command -v python3 >/dev/null 2>&1; then
-        echo "SKIP: python3 not installed; behavior inventory unavailable."
+        if require_tools; then
+            echo "FAIL: python3 is required when CI=true or DO_HARNESS_REQUIRE_TOOLS=1."
+            exit 1
+        fi
+        echo "SKIP: python3 not installed; behavior inventory unavailable (install python3)."
         return 0
     fi
     python3 - <<'PY'
@@ -149,7 +157,7 @@ if ! command -v cargo-llvm-cov >/dev/null 2>&1 || ! command -v cargo-nextest >/d
         echo "FAIL: cargo-llvm-cov and cargo-nextest are required when CI=true or DO_HARNESS_REQUIRE_TOOLS=1."
         exit 1
     fi
-    echo "SKIP: cargo-llvm-cov or cargo-nextest not installed; skipping coverage check."
+    echo "SKIP: cargo-llvm-cov or cargo-nextest not installed; skipping coverage check (cargo install cargo-llvm-cov cargo-nextest --locked)."
     exit 0
 fi
 
@@ -157,14 +165,14 @@ TARGET_PCT=70
 
 if ! cov_output="$(cargo llvm-cov nextest --lcov --output-path lcov.info 2>&1)"; then
     echo "$cov_output"
-    echo "FAIL: cargo llvm-cov nextest failed."
+    echo "FAIL: cargo llvm-cov nextest failed (fix the failing test run above, then re-run)."
     exit 1
 fi
 
 echo "$cov_output"
 
 if [[ ! -f lcov.info ]]; then
-    echo "FAIL: cargo llvm-cov reported success but produced no lcov.info."
+    echo "FAIL: cargo llvm-cov reported success but produced no lcov.info (check --output-path and the coverage profile)."
     exit 1
 fi
 

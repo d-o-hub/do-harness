@@ -37,7 +37,7 @@ elif require_tools; then
     echo "FAIL: cargo tree failed under required-tools mode."
     FAIL=1
 else
-    echo "SKIP: cargo tree unavailable; skipping transitive closure check."
+    echo "SKIP: cargo tree unavailable; skipping transitive closure check (ensure cargo is installed)."
 fi
 
 if closure="$(cd "$ROOT" && cargo tree -p guardian-proxy --edges normal --prefix none 2>/dev/null)"; then
@@ -49,7 +49,7 @@ elif require_tools; then
     echo "FAIL: cargo tree failed under required-tools mode."
     FAIL=1
 else
-    echo "SKIP: cargo tree unavailable; skipping guardian-proxy closure check."
+    echo "SKIP: cargo tree unavailable; skipping guardian-proxy closure check (ensure cargo is installed)."
 fi
 
 if command -v cargo-deny >/dev/null 2>&1; then
@@ -58,7 +58,7 @@ elif require_tools; then
     echo "FAIL: cargo-deny is required when CI=true or DO_HARNESS_REQUIRE_TOOLS=1."
     FAIL=1
 else
-    echo "SKIP: cargo-deny not installed; skipping deny check."
+    echo "SKIP: cargo-deny not installed; skipping deny check (cargo install cargo-deny --locked)."
 fi
 
 if [[ -f "$ROOT/scripts/check-package-contract.sh" ]]; then

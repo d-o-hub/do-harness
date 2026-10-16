@@ -16,8 +16,8 @@ feedback = ["fmt", "check", "clippy", "loc"]
 # (`.github/workflows/scheduled.yml`). `coverage` sat in `release` only: the
 # floor never ran on a pull request, so a regression could land on main and
 # surface only at tag time.
-verification = ["fmt", "check", "clippy", "deps", "machete", "audit", "test", "doctest", "loc", "skills", "skills-docs", "shell", "markdownlint", "yamllint", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "commitlint"]
-release = ["fmt", "check", "clippy", "deps", "audit", "test", "doctest", "coverage", "loc", "skills", "skills-docs", "shell", "markdownlint", "yamllint", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "commitlint"]
+verification = ["fmt", "check", "clippy", "deps", "machete", "audit", "test", "doctest", "loc", "skills", "skills-docs", "shell", "markdownlint", "markdown-links", "yamllint", "actionlint", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "commitlint"]
+release = ["fmt", "check", "clippy", "deps", "audit", "test", "doctest", "coverage", "loc", "skills", "skills-docs", "shell", "markdownlint", "markdown-links", "yamllint", "actionlint", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "commitlint"]
 # DORA gets its own set so its evidence is addressable (`status --set metrics`)
 # without joining the gating sets. A no-`--set` status check compares against
 # every configured sensor, so a dora-only run's artifact would report
@@ -104,6 +104,27 @@ argv = ["bash", "scripts/check-yamllint.sh"]
 # check files it never reads. Policy JSON content is guarded by
 # `check-invariants`.
 when-changed = ["**/*.yml", "**/*.yaml", ".yamllint.yml", "scripts/check-yamllint.sh"]
+
+[[sensors]]
+# Schema/lint gate for GitHub Actions workflows. yamllint proves the files are
+# well-formed YAML but cannot see a misspelled key, an undefined
+# `${{ matrix.foo }}`, a bad action input, or a shell syntax error inside a
+# `run:` step; actionlint parses the workflow schema plus the embedded shell.
+# actionlint is not part of a default dev checkout's toolset, so the SKIP/FAIL
+# policy keeps the local gate usable while CI (`verify.yml`) and the release
+# preflight (`release.yml`) install the pinned 1.7.7 binary.
+name = "actionlint"
+argv = ["bash", "scripts/check-actionlint.sh"]
+when-changed = [".github/workflows/**", "scripts/check-actionlint.sh"]
+
+[[sensors]]
+# Relative-link integrity for every markdown file: `markdownlint` checks
+# structure, not whether a documented `../crates/types` or `scripts/*.sh` path
+# still exists, so a rename turns a cited path into a dead link silently. This
+# is a filesystem scan (no network), which is why it can gate a pull request.
+name = "markdown-links"
+argv = ["bash", "scripts/check-markdown-links.sh"]
+when-changed = ["**/*.md", "scripts/check-markdown-links.sh"]
 
 [[sensors]]
 name = "check-agt"
@@ -211,7 +232,7 @@ coverage-inputs = ["plans/dora.json"]
 [[sensors]]
 # Feature-powerset sensor for guardian-proxy feature combinations (--features
 # agt-governance / mcp-surface on/off). Exact-pin policy: dependency pins
-# (agent-governance = "=3.2.2", rmcp = "=3.5.0") remain exact per policy;
+# (agent-governance = "=3.2.2", rmcp = "=3.5.1") remain exact per policy;
 # this sensor verifies all feature combinations build. Kept out of fast-loop hooks.
 name = "powerset"
 argv = ["bash", "scripts/check-powerset.sh"]

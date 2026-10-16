@@ -24,19 +24,26 @@ compute_sha256() {
 }
 
 # Parse CLI arguments if provided
+usage() {
+    echo "usage: check-artifact-provenance.sh [--artifact PATH] [--digest SHA256] [--mode MODE]" >&2
+}
+
 POSITIONAL_ARGS=()
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --artifact)
-            ARTIFACT_PATHS="$2"
+            ARTIFACT_PATHS="${2:-}"
+            [[ -n "$ARTIFACT_PATHS" ]] || { echo "FAIL: --artifact needs a value." >&2; usage; exit 2; }
             shift 2
             ;;
         --digest)
-            EXPECTED_DIGEST="$2"
+            EXPECTED_DIGEST="${2:-}"
+            [[ -n "$EXPECTED_DIGEST" ]] || { echo "FAIL: --digest needs a value." >&2; usage; exit 2; }
             shift 2
             ;;
         --mode)
-            VERIFY_MODE="$2"
+            VERIFY_MODE="${2:-}"
+            [[ -n "$VERIFY_MODE" ]] || { echo "FAIL: --mode needs a value." >&2; usage; exit 2; }
             shift 2
             ;;
         *)
@@ -55,7 +62,7 @@ EXPECTED_DIGEST="${EXPECTED_DIGEST:-}"
 VERIFY_MODE="${VERIFY_MODE:-digest-only}"
 
 if [[ -z "$ARTIFACT_PATHS" ]]; then
-    echo "FAIL: ARTIFACT_PATHS is required."
+    echo "FAIL: ARTIFACT_PATHS is required. Pass --artifact PATH or set ARTIFACT_PATHS."
     echo "COVERAGE: {\"artifact\": \"\", \"digest\": null, \"status\": \"fail\", \"reason\": \"missing ARTIFACT_PATHS input\"}"
     echo "FINDINGS: 1"
     exit 1

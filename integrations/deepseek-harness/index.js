@@ -7,6 +7,8 @@
 // do-harness invocations through ctx.subprocess and validates the JSON it
 // receives.
 
+import { resolve as resolvePath } from 'node:path'
+
 import { probeBinary, resolveBinary, HarnessRunner } from './lib/harness.mjs'
 import { defineDevelopmentSignalsTool } from './lib/tool.mjs'
 import { installCompletionGate } from './lib/gate.mjs'
@@ -19,19 +21,18 @@ export function normalizeConfig(config = {}) {
   if (config === null || typeof config !== 'object' || Array.isArray(config)) {
     throw new Error('do-harness: config must be an object')
   }
+  // The shipped `cordis.patch.yml` default is `workspace: .`, so a relative
+  // value resolves against the harness process working directory instead of
+  // being rejected; an absolute default would have to guess a machine path.
+  // `resolvePath` also normalizes an already-absolute value.
   const settings = {
     binary: optionalString(config.binary, 'binary'),
-    workspace: optionalString(config.workspace, 'workspace') ?? process.cwd(),
+    workspace: resolvePath(optionalString(config.workspace, 'workspace') ?? process.cwd()),
     defaultSignalSet: optionalString(config.defaultSignalSet, 'defaultSignalSet') ?? 'feedback',
     completionSignalSet:
       optionalString(config.completionSignalSet, 'completionSignalSet') ?? 'verification',
     strictCompletion: optionalBoolean(config.strictCompletion, 'strictCompletion') ?? false,
     maxContinuations: optionalPositiveInteger(config.maxContinuations, 'maxContinuations') ?? 3,
-  }
-  if (!settings.workspace.startsWith('/') && !/^[A-Za-z]:[\\/]/.test(settings.workspace)) {
-    throw new Error(
-      `do-harness: workspace must be an absolute path (got ${JSON.stringify(settings.workspace)})`,
-    )
   }
   return settings
 }

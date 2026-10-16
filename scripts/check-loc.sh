@@ -226,7 +226,7 @@ while IFS= read -r file; do
 done < <(scan_files)
 
 if (( FAIL_COUNT > 0 )); then
-    echo "LOC ceiling violated."
+    echo "LOC ceiling violated. Split the file (do-harness split <file>) to get back under $MAX lines."
     echo "FINDINGS: $FAIL_COUNT"
     exit 1
 fi

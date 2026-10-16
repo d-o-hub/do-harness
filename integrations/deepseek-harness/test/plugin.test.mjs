@@ -1,6 +1,8 @@
 // Unit tests for plugin loading, binary probing, and configuration.
 
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import { isAbsolute, resolve } from 'node:path'
 import test from 'node:test'
 
 import { HarnessRunner } from '../lib/harness.mjs'
@@ -17,12 +19,78 @@ test('normalizeConfig applies documented defaults', () => {
   assert.equal(settings.binary, undefined)
 })
 
+test('normalizeConfig anchors a relative workspace to the process cwd', () => {
+  assert.equal(normalizeConfig({ workspace: '.' }).workspace, resolve(process.cwd()))
+  assert.equal(normalizeConfig({ workspace: 'sub/repo' }).workspace, resolve('sub/repo'))
+  assert.equal(normalizeConfig({ workspace: '/repo' }).workspace, '/repo')
+  assert.equal(normalizeConfig({}).workspace, resolve(process.cwd()))
+})
+
 test('normalizeConfig rejects malformed values', () => {
   assert.throws(() => normalizeConfig(null), /config must be an object/)
-  assert.throws(() => normalizeConfig({ workspace: 'relative/path' }), /absolute path/)
   assert.throws(() => normalizeConfig({ strictCompletion: 'yes' }), /must be a boolean/)
   assert.throws(() => normalizeConfig({ maxContinuations: 0 }), /positive integer/)
 })
+
+test('the shipped cordis.patch.yml default config validates', () => {
+  // The shipped default is what every profile that does not restate the row
+  // receives, so it must survive normalizeConfig: an import that fails its own
+  // validator fails the mount at load.
+  const config = loadShippedConfig()
+  assert.deepEqual(config, {
+    binary: 'do-harness',
+    workspace: '.',
+    defaultSignalSet: 'feedback',
+    completionSignalSet: 'verification',
+    strictCompletion: false,
+    maxContinuations: 3,
+  })
+  const settings = normalizeConfig(config)
+  assert.ok(isAbsolute(settings.workspace), `workspace must be absolute: ${settings.workspace}`)
+  assert.equal(settings.workspace, resolve(process.cwd()))
+})
+
+/**
+ * Reads the shipped bundle patch and returns the first insert row's `config`
+ * mapping. The repository has no YAML dependency and the patch is a plain
+ * scalar mapping, so indentation-aware line reading is enough; the assertions
+ * above lock the parsed shape, so a silently mis-parsed field fails loudly.
+ */
+function loadShippedConfig() {
+  const patch = readFileSync(new URL('../cordis.patch.yml', import.meta.url), 'utf8')
+  const config = {}
+  let configIndent = -1
+  for (const raw of patch.split('\n')) {
+    const line = raw.trim()
+    if (line === '' || line.startsWith('#')) {
+      continue
+    }
+    const indent = raw.length - raw.trimStart().length
+    if (line === 'config:') {
+      configIndent = indent
+      continue
+    }
+    if (configIndent === -1) {
+      continue
+    }
+    if (indent <= configIndent) {
+      break
+    }
+    const match = /^([A-Za-z][A-Za-z0-9]*):\s*(.*?)\s*$/.exec(line)
+    assert.ok(match, `unrecognized line in cordis.patch.yml config: ${line}`)
+    config[match[1]] = parseScalar(match[2])
+  }
+  return config
+}
+
+/** Minimal scalar reader for the patch's config values. */
+function parseScalar(raw) {
+  if (raw === 'true') return true
+  if (raw === 'false') return false
+  if (/^-?\d+$/.test(raw)) return Number(raw)
+  if (/^(['"]).*\1$/.test(raw)) return raw.slice(1, -1)
+  return raw
+}
 
 test('apply probes the binary and registers the tool', async () => {
   const ctx = createFakeCtx({

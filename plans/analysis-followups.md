@@ -98,9 +98,10 @@ explicit guard) instead of a raw grep error.
 
 **Residual:** none for A8 (alternate IPv4 spellings are now normalized).
 
-**Not started:** R1 (release rescue), A10 (pre-push set), A6, S1–S3, S6, S7,
-T6, T13, F1–F4, P7–P8, P10, P12, P15, P16 (partial), B1, B3–B5, C2, C3,
-D1–D2.
+**Not started:** R1 (release rescue), A10 (pre-push set), S1, S6, T6, T13, P10,
+P12, B4–B5, C2, C3, D1. **2026-10-16 swarm:** A6, A9, S2, S3, S7, B1, B3, F1,
+F2, F3, F4, P7, P8, P15, P16 (completed), D2 (completed) landed — see the
+progress table below.
 
 ## Progress: release-state truth decay (verified first-party)
 
@@ -267,8 +268,52 @@ P4, P5, P6 (partial), P9, P11, P13, P14, P16 (partial), R2, R3, R4, R5, R6, R7, 
 S11, S12, S15, S16, S17, S18, S19, T1, T2, T3, T4, T5, T7, T8, T9, T10, T11, T12, T14,
 T15, T16, T17, T18,
 B2 (forced by A1).
-*Next:* R1 (operator-gated), A10 (maintainer decision), A6, C2, C3, R2, R3,
-R7.
+*Next:* R1 (operator-gated), A10 (maintainer decision), C2, C3.
+
+## Implementation progress (2026-10-16 swarm)
+
+A second implementation pass, run as a parallel agent swarm with the real
+toolchain (Rust 1.99.0, nextest, clippy, cargo-deny 0.19.0, cargo-audit 0.22.2,
+actionlint 1.7.7, shellcheck, yamllint, markdownlint-cli2). Each row was
+verified by the named command; the full workspace suite is green
+(`cargo nextest run --workspace` → 1054 passed).
+
+| Item | Change | Verification |
+|------|--------|--------------|
+| A6 | `migrate()` records a SHA-256 of each applied migration's SQL and re-verifies every applied migration on startup, failing with `DbError::MigrationDiverged` when a released migration file was edited; a `NULL` checksum on a legacy row is adopted once (pre-change DBs cannot be retro-checked); `migrate_with_retry` no longer swallows a divergence as "fully applied" | `cargo test -p do-harness-db` → 80 lib + 5 integration passed (incl. 3 new `migrate::` cases) |
+| S2 | `BeatStatus` (`ok`/`failed`/`warn`) and `BeatType` (`sensor`/`step`) are closed `thiserror`-backed vocabularies in `crates/types`, with `as_str`/`Display`/`FromStr`/serde all equal to the historical column strings; every gate, metric, and writer compares the enums instead of literals | `cargo test --workspace`; `do-harness-db` 116/116 types+db |
+| S3 | `BeatScope` moved to `crates/types::scope` and the duplicated `do-harness::telemetry::BeatScope` enum deleted (resolution stays a `resolve_scope` helper that reads git state); `resolved_scope` is the single choke point and rejects an explicit scope that disagrees with `task_id` (`DbError::BeatScopeMismatch`), so the `task_id` and `scope` gate lookups cannot diverge | `cargo test -p do-harness --bins --test beat_scope --test unchanged`; `cargo test --workspace` |
+| S7 | the three string-parsing idioms collapse to one: `FromStr` with a typed `thiserror` error per enum (`TaskState` `TryFrom<&str>` removed; `EvalDim`/`EvalMode` `Err = String` → typed), wire spellings unchanged | `cargo test -p do-harness-types` → 31 + 7 doctests; clippy clean |
+| B1 | `commands.rs` 492 → 314 LOC; `hook` + `print_first_difference` extracted to `commands/hook.rs` (193), re-exported like `commands/db.rs` | `bash scripts/check-loc.sh` FINDINGS 0; `cargo check -p do-harness` |
+| B3 | `pr/waiver_comment.rs` 487 → 377 LOC; the markdown rendering half moved to `pr/waiver_render.rs` (117) with the re-export chain preserved | `bash scripts/check-loc.sh`; `cargo test --workspace` |
+| — | `crates/db/src/repo_exec.rs` (512 after S3) split move-only into `repo_exec/beats.rs` + the error-signature half, glob re-exported so every `repo_exec::<item>` path is unchanged; `PROD_SOURCES` in `schema_usage.rs` gained the new file (the dead-column guard) | `cargo test -p do-harness-db` → 116; `bash scripts/check-loc.sh` |
+| F3 | `rmcp` bumped `=3.5.0` → `=3.5.1` deliberately, per the mcp epic's recorded procedure; pin comments in `do-harness.toml`/`check-machete.sh`/`check-powerset.sh` synced | `cargo check`/`nextest -p guardian-proxy --features mcp-surface` 67/67; `cargo deny check` ok; `bash scripts/check-audit.sh` clean; powerset green |
+| F4 | the `RUSTSEC-2024-0449` ignore uses cargo-deny's `{ id, reason }` table form and both ignores carry a dated/event-driven expiry in `deny.toml` + `scripts/check-audit.sh` (cargo-deny 0.19.0 has no stable `expiry` field) | `cargo deny check` accepts the table form; `bash scripts/check-audit.sh` clean |
+| F1 | `scripts/check-libsql-watch.sh` mirrors `check-agt-ga.sh`: queries the four tracked `tursodatabase/libsql` issues with a `User-Agent`, prints per-issue state + a still-open summary, `VERDICT=OPEN\|CLEAR\|UNKNOWN`, always exit 0, `--fixtures` mode for hermetic tests; recorded in `plans/libsql-distribution.md` | `cargo test -p do-harness --test libsql_watch` → 8 passed |
+| F2 | `.github/workflows/semver.yml` runs `cargo-semver-checks` against published baselines on `push` to `main` + `workflow_dispatch` (network-dependent, so deliberately not a hermetic sensor) | `/tmp/opencode/bin/actionlint` exit 0; `bash scripts/check-yamllint.sh` |
+| P7 | `scripts/check-actionlint.sh` sensor (SKIP locally / FAIL under `CI=true`/`DO_HARNESS_REQUIRE_TOOLS=1`, fails closed on zero workflows), installed pin 1.7.7 in `verify.yml`/`release.yml` | actionlint exit 0 on 7 workflows; `cargo test -p do-harness --test ci_parity` → 8 passed |
+| P8 | `scripts/check-markdown-links.sh` — hermetic repository-wide relative-link existence (schemes/anchors/absolute paths skipped, symlinked docs resolved), fails closed on zero files; sensor `markdown-links` registered | `bash scripts/check-markdown-links.sh` → 89 files, 90 links, 0 broken; negative control + zero-file FAIL proven |
+| A9 | the shipped DSH default config validates: `normalizeConfig` anchors a relative `workspace` to `process.cwd()` instead of throwing | `node --test` → 25 passed with the real binary |
+| P16 | completed: unguarded `$2` in `check-artifact-provenance.sh` guarded; `FAIL:`/`SKIP:` remediation hints added across the tool-dependent scripts; python3 availability unified to SKIP-local/FAIL-CI in `check-invariants.sh`/`check-privacy.sh`/`check-coverage.sh`/`check-package-contract.sh` (the shipped `check-coverage.sh` template updated identically) | `bash scripts/check-shell.sh` → 72 scripts; per-script SKIP/FAIL proofs |
+| P15 | the release job self-checks `dist/*` against its own generated `checksums.txt` via the tested digest-only verifier before publication (`check-rust-binary-provenance.sh` documented as not applicable: no cargo-auditable metadata) | `bash scripts/check-yamllint.sh`; script fence verified locally |
+| D2 | e2e coverage for `hook diff` and `overlap` (real binary; drift + missing-hook branches and threshold/JSON/usage paths, with negative controls) | `cargo test -p do-harness --test hook_diff --test overlap` → 5 passed |
+
+**Residual / deferred (with reasons):** R1 (rescue the stranded `v0.3.0`:
+configure Trusted Publishing for `do-harness-libsql`, re-cut the tag on
+`787c19f` — operator-gated, needs crates.io credentials this environment lacks);
+A10 (`pre-push` full-suite list — a maintainer policy decision that changes the
+documented gate, not a code defect); S1 (the `Command` trait is exported and
+tested but has no production caller — collapsing the two writer shapes is a
+design change, not a rename); S6 (typed `Precondition` guards need a new field
+or vocabulary and an evaluator, which would change the hand-edited
+`plans/methods.json` serde contract); C2/C3 (four `gh` runners / 23 `match
+format` sites — consolidation is behavior-adjacent and wants its own verified
+slice); D1/T6/T13/P10/P12/B4/B5 (test dedup, `cfg(unix)` coverage on Windows, the
+nested-cargo slow path, the Windows sensor suite, script-helper extraction, and
+the `main.rs`/`cli.rs` dispatch splits — each is large or platform-gated and
+should land as its own reviewed change).
+
+*Next:* R1 (operator-gated), A10 (maintainer decision), C2, C3, S1, S6.
 
 *Harness addition (2026-10-16):* section 5's "named constants over magic numbers"
 is now executable rather than prose. `scripts/check-magic-numbers.sh` (with
