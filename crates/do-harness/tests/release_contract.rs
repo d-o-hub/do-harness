@@ -252,12 +252,22 @@ fn test_evidence_v3_and_v4_compatibility() {
             "--format",
             "json",
         ]));
-    assert!(
-        code_v3 == Some(0) || code_v3 == Some(1),
+    assert_eq!(
+        code_v3,
+        Some(1),
         "v3 evidence read status code: {code_v3:?}\nstderr: {stderr_v3}"
     );
     let val_v3: Value = serde_json::from_str(&stdout_v3).expect("status json for v3 evidence");
-    assert_ne!(val_v3["state"], serde_json::json!("missing"));
+    assert_eq!(
+        val_v3["state"],
+        serde_json::json!("stale"),
+        "a readable v3 file must be stale, never missing:\n{stdout_v3}"
+    );
+    assert_eq!(
+        val_v3["reason"],
+        serde_json::json!("workspace_changed"),
+        "the v3 reader must parse the file and fail on the fingerprint only:\n{stdout_v3}"
+    );
 
     let (code_v4, stdout_v4, stderr_v4) =
         run_cmd(harness_bin().arg("--root").arg(tmp.path()).args([
@@ -267,12 +277,22 @@ fn test_evidence_v3_and_v4_compatibility() {
             "--format",
             "json",
         ]));
-    assert!(
-        code_v4 == Some(0) || code_v4 == Some(1),
+    assert_eq!(
+        code_v4,
+        Some(1),
         "v4 evidence read status code: {code_v4:?}\nstderr: {stderr_v4}"
     );
     let val_v4: Value = serde_json::from_str(&stdout_v4).expect("status json for v4 evidence");
-    assert_ne!(val_v4["state"], serde_json::json!("missing"));
+    assert_eq!(
+        val_v4["state"],
+        serde_json::json!("stale"),
+        "a readable v4 file must be stale, never missing:\n{stdout_v4}"
+    );
+    assert_eq!(
+        val_v4["reason"],
+        serde_json::json!("workspace_changed"),
+        "the v4 reader must parse the file and fail on the fingerprint only:\n{stdout_v4}"
+    );
 
     let v2_file = tmp.path().join("evidence-v2.json");
     fs::write(
@@ -290,7 +310,7 @@ fn test_evidence_v3_and_v4_compatibility() {
     )
     .unwrap();
 
-    let (_code_v2, stdout_v2, _stderr_v2) =
+    let (code_v2, stdout_v2, _stderr_v2) =
         run_cmd(harness_bin().arg("--root").arg(tmp.path()).args([
             "status",
             "--evidence",
@@ -298,12 +318,21 @@ fn test_evidence_v3_and_v4_compatibility() {
             "--format",
             "json",
         ]));
+    assert_eq!(
+        code_v2,
+        Some(1),
+        "v2 evidence read status code: {code_v2:?}"
+    );
     let val_v2: Value = serde_json::from_str(&stdout_v2).expect("status json for v2 evidence");
-    assert!(
-        val_v2["state"] == serde_json::json!("stale")
-            || (val_v2["state"] == serde_json::json!("missing")
-                && val_v2["reason"] == serde_json::json!("legacy_schema")),
-        "Schema version 2 evidence must be stale or report legacy_schema, got:\n{stdout_v2}"
+    assert_eq!(
+        val_v2["state"],
+        serde_json::json!("missing"),
+        "below MIN_CURRENT_SCHEMA_VERSION must be refused, not read:\n{stdout_v2}"
+    );
+    assert_eq!(
+        val_v2["reason"],
+        serde_json::json!("legacy_schema"),
+        "v2 must be reported as legacy, never as a fingerprint mismatch:\n{stdout_v2}"
     );
 }
 
