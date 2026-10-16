@@ -1,8 +1,10 @@
 //! CI parity: tool-dependent sensors fail open locally and closed when required.
 //!
-//! The scripts resolve tools from `PATH`; the test strips Cargo's bin
-//! directory so `cargo-audit`/`cargo-deny` are absent, then asserts the
-//! documented policy: WARN skip locally, FAIL when `CI=true`.
+//! The scripts resolve tools from `PATH`. Each check runs its script with a
+//! private `bin` as the whole `PATH`, so `cargo-audit`/`cargo-deny`/`cargo-hack`
+//! /`cargo-machete` are missing no matter what the host installed under
+//! `/usr/bin`, and asserts the documented policy: WARN skip locally, FAIL when
+//! `CI=true` or `DO_HARNESS_REQUIRE_TOOLS=1`. Nothing here skips silently.
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
@@ -15,88 +17,51 @@ fn script(name: &str) -> PathBuf {
         .join(name)
 }
 
-fn run(name: &str, required: bool) -> Output {
-    let mut cmd = Command::new("/bin/bash");
-    cmd.arg(script(name));
-    // Deliberately excludes ~/.cargo/bin so the tools are "missing".
-    cmd.env("PATH", "/usr/bin:/bin");
-    if required {
-        cmd.env("CI", "true");
-        cmd.env("DO_HARNESS_REQUIRE_TOOLS", "1");
-    } else {
-        cmd.env_remove("CI");
-        cmd.env_remove("DO_HARNESS_REQUIRE_TOOLS");
-    }
-    cmd.output().expect("spawn script")
+/// Resolves a system utility that a private `bin` needs to copy in.
+#[cfg(unix)]
+fn system_utility(utility: &str) -> std::path::PathBuf {
+    use std::path::Path;
+
+    ["/usr/bin", "/bin"]
+        .into_iter()
+        .map(|dir| Path::new(dir).join(utility))
+        .find(|candidate| candidate.is_file())
+        .unwrap_or_else(|| panic!("neither /usr/bin/{utility} nor /bin/{utility} is present"))
 }
 
-fn tool_hidden(name: &str) -> bool {
-    Command::new("/bin/sh")
-        .arg("-c")
-        .arg(format!("command -v {name}"))
-        .env("PATH", "/usr/bin:/bin")
-        .output()
-        .is_ok_and(|out| !out.status.success())
-}
-
+#[cfg(unix)]
 #[test]
 fn audit_sensor_fails_closed_only_when_required() {
-    if !tool_hidden("cargo-audit") {
-        eprintln!("cargo-audit visible under /usr/bin:/bin; skipping parity check");
-        return;
-    }
-    let local = run("check-audit.sh", false);
-    assert!(
-        local.status.success(),
-        "local run must WARN-skip: {}",
-        String::from_utf8_lossy(&local.stderr)
-    );
-    let ci = run("check-audit.sh", true);
-    assert!(
-        !ci.status.success(),
-        "CI run must fail closed without cargo-audit"
-    );
+    assert_missing_tool_policy("check-audit.sh", &[]);
 }
 
+#[cfg(unix)]
 #[test]
 fn deps_sensor_fails_closed_only_when_required() {
-    if !tool_hidden("cargo-deny") {
-        eprintln!("cargo-deny visible under /usr/bin:/bin; skipping parity check");
-        return;
-    }
-    let local = run("check-deps.sh", false);
-    assert!(
-        local.status.success(),
-        "local run must WARN-skip: {}",
-        String::from_utf8_lossy(&local.stderr)
-    );
-    let ci = run("check-deps.sh", true);
-    assert!(
-        !ci.status.success(),
-        "CI run must fail closed without cargo-deny/cargo tree"
-    );
+    assert_missing_tool_policy("check-deps.sh", &["grep", "bash"]);
 }
 
-/// Asserts a lint sensor fails open (`SKIP`) locally and closed (`FAIL`) under
-/// `CI=true` or `DO_HARNESS_REQUIRE_TOOLS=1`, independent of host tools.
+/// Asserts a tool-dependent sensor fails open (`SKIP`) locally and closed
+/// (`FAIL`) under `CI=true` or `DO_HARNESS_REQUIRE_TOOLS=1`, independent of
+/// host tools.
 ///
-/// The private `bin` holds only a copied `dirname` — the one external program
-/// the scripts need before their missing-tool branch — so host-installed
-/// `markdownlint-cli2`/`markdownlint`/`yamllint`/`npx` cannot change the
-/// outcome and the test never needs to skip.
+/// The private `bin` is the script's whole `PATH`, so a host-installed
+/// `cargo-audit`/`markdownlint-cli2`/… cannot change the outcome and the check
+/// never needs to skip. Besides `dirname`, `utilities` names the system
+/// programs a script reaches before its missing-tool branch: `check-deps.sh`
+/// greps a manifest and shells out to `check-package-contract.sh`, so it needs
+/// `grep` and `bash`; the others need neither.
 #[cfg(unix)]
-fn assert_missing_tool_policy(name: &str) {
+fn assert_missing_tool_policy(name: &str, utilities: &[&str]) {
     use std::fs;
-    use std::path::Path;
 
     let temp = tempfile::tempdir().expect("create temp dir");
     let bin = temp.path().join("bin");
     fs::create_dir(&bin).expect("create private bin");
-    let dirname = ["/usr/bin/dirname", "/bin/dirname"]
-        .into_iter()
-        .find(|candidate| Path::new(candidate).is_file())
-        .unwrap_or_else(|| panic!("neither /usr/bin/dirname nor /bin/dirname is present"));
-    fs::copy(dirname, bin.join("dirname")).expect("copy dirname into private bin");
+    for utility in std::iter::once("dirname").chain(utilities.iter().copied()) {
+        fs::copy(system_utility(utility), bin.join(utility))
+            .unwrap_or_else(|err| panic!("copy {utility} into private bin: {err}"));
+    }
 
     let run_scenario = |ci: bool, require_tools: bool| -> Output {
         let mut cmd = Command::new("/bin/bash");
@@ -150,59 +115,23 @@ fn assert_missing_tool_policy(name: &str) {
 #[cfg(unix)]
 #[test]
 fn markdownlint_sensor_fails_closed_only_when_required() {
-    assert_missing_tool_policy("check-markdownlint.sh");
+    assert_missing_tool_policy("check-markdownlint.sh", &[]);
 }
 
 #[cfg(unix)]
 #[test]
 fn yamllint_sensor_fails_closed_only_when_required() {
-    assert_missing_tool_policy("check-yamllint.sh");
+    assert_missing_tool_policy("check-yamllint.sh", &[]);
 }
 
+#[cfg(unix)]
 #[test]
 fn powerset_sensor_fails_closed_only_when_required() {
-    if !tool_hidden("cargo-hack") {
-        eprintln!("cargo-hack visible under /usr/bin:/bin; skipping parity check");
-        return;
-    }
-    let local = run("check-powerset.sh", false);
-    assert!(
-        local.status.success(),
-        "local run must WARN-skip: {}",
-        String::from_utf8_lossy(&local.stderr)
-    );
-    let output = String::from_utf8_lossy(&local.stdout);
-    assert!(
-        output.contains("SKIP:"),
-        "local run without cargo-hack must output SKIP: marker: {output}"
-    );
-    let ci = run("check-powerset.sh", true);
-    assert!(
-        !ci.status.success(),
-        "CI run must fail closed without cargo-hack"
-    );
+    assert_missing_tool_policy("check-powerset.sh", &[]);
 }
 
+#[cfg(unix)]
 #[test]
 fn machete_sensor_fails_closed_only_when_required() {
-    if !tool_hidden("cargo-machete") {
-        eprintln!("cargo-machete visible under /usr/bin:/bin; skipping parity check");
-        return;
-    }
-    let local = run("check-machete.sh", false);
-    assert!(
-        local.status.success(),
-        "local run must WARN-skip: {}",
-        String::from_utf8_lossy(&local.stderr)
-    );
-    let output = String::from_utf8_lossy(&local.stdout);
-    assert!(
-        output.contains("SKIP:"),
-        "local run without cargo-machete must output SKIP: marker: {output}"
-    );
-    let ci = run("check-machete.sh", true);
-    assert!(
-        !ci.status.success(),
-        "CI run must fail closed without cargo-machete"
-    );
+    assert_missing_tool_policy("check-machete.sh", &[]);
 }
