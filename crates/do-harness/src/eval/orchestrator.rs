@@ -85,14 +85,21 @@ pub async fn run_eval(root: &Path, opts: EvalOpts<'_>) -> Result<()> {
         Some(name) => {
             let dir = skills_root.join(name);
             if !dir.join("SKILL.md").is_file() {
-                bail!("skill '{name}' not found under .agents/skills");
+                return Err(crate::exit::UsageError::msg(format!(
+                    "skill '{name}' not found under .agents/skills"
+                ))
+                .into());
             }
             vec![dir]
         }
         None => discover_skills(&skills_root),
     };
 
-    let conn = do_harness_db::connect_and_migrate(root).await?;
+    // An unreachable state database is a pre-check discovery problem, the same
+    // class other persistence commands report as usage.
+    let conn = do_harness_db::connect_and_migrate(root)
+        .await
+        .map_err(crate::exit::UsageError::wrap)?;
     let mut invalid = Vec::new();
     let mut reports_json = Vec::new();
 
