@@ -198,6 +198,12 @@ pub async fn migrate(conn: &Connection) -> Result<()> {
     Ok(())
 }
 
+/// Attempts allowed against a `SQLITE_BUSY` database before giving up.
+///
+/// Both migrators share this policy: a connect that loses to a concurrent
+/// migrator and a migration that hits a duplicate `CREATE`/`ALTER`.
+const BUSY_RETRY_ATTEMPTS: usize = 5;
+
 /// Connects to the agent-state database under `root` and applies migrations.
 ///
 /// When pending migrations exist, the database file is first copied to
@@ -209,7 +215,7 @@ pub async fn migrate(conn: &Connection) -> Result<()> {
 ///
 /// Returns an error if connecting, backing up, or migrating fails.
 pub async fn connect_and_migrate(root: &Path) -> Result<Connection> {
-    crate::error::retry_on_busy(5, move || {
+    crate::error::retry_on_busy(BUSY_RETRY_ATTEMPTS, move || {
         let root = root.to_path_buf();
         async move { connect_and_migrate_once(&root).await }
     })
@@ -242,13 +248,11 @@ async fn connect_and_migrate_once(root: &Path) -> Result<Connection> {
 ///
 /// Returns the last migration error when the catalog is still not applied.
 async fn migrate_with_retry(conn: &Connection) -> Result<()> {
-    const ATTEMPTS: usize = 5;
-
     let mut last: Option<DbError> = None;
-    for attempt in 0..ATTEMPTS {
+    for attempt in 0..BUSY_RETRY_ATTEMPTS {
         match migrate(conn).await {
             Ok(()) => return Ok(()),
-            Err(err) if err.is_busy() && attempt + 1 < ATTEMPTS => {
+            Err(err) if err.is_busy() && attempt + 1 < BUSY_RETRY_ATTEMPTS => {
                 last = Some(err);
                 tokio::task::yield_now().await;
             }

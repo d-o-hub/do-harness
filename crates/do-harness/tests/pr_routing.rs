@@ -41,6 +41,9 @@ fn repo_root() -> PathBuf {
         .expect("canonical repository root")
 }
 
+/// Corpus size the benchmark and the drift check both expect.
+const CORPUS_CASES: usize = 12;
+
 /// Runs the benchmark against the minimal seeded corpus.
 ///
 /// The hook-inherited git environment is scrubbed: git exports `GIT_DIR` to
@@ -114,7 +117,7 @@ fn benchmark_runs_and_never_downgrades_a_high_impact_class() {
     let rows = rows(&stdout);
     assert_eq!(
         rows.len(),
-        12,
+        CORPUS_CASES,
         "every corpus case must be measured:\n{stdout}"
     );
 
@@ -273,7 +276,11 @@ fn large_corpus_never_downgrades() {
     );
 
     let rows = rows(&stdout);
-    assert_eq!(rows.len(), 12, "every corpus case must be measured");
+    assert_eq!(
+        rows.len(),
+        CORPUS_CASES,
+        "every corpus case must be measured"
+    );
 
     let rank = |route: &str| match route {
         "cheap" => 0,

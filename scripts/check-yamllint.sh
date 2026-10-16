@@ -27,7 +27,10 @@ fi
 
 mapfile -t files < <(
     if [[ -d "$ROOT/.git" ]]; then
-        git -C "$ROOT" ls-files '*.yml' '*.yaml'
+        # `--others --exclude-standard`: a new workflow or config is unlinted
+        # until it is staged, which is exactly when a syntax error is cheapest
+        # to catch. Ignored trees (target/, fixtures) stay excluded.
+        git -C "$ROOT" ls-files --cached --others --exclude-standard '*.yml' '*.yaml'
     else
         find "$ROOT" \( -name '*.yml' -o -name '*.yaml' \) -type f
     fi | sort

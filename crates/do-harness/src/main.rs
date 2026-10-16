@@ -158,7 +158,7 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
         Command::Maintenance {
             prune_beats,
             keep_per_task,
-        } => commands::maintenance(&root, prune_beats, keep_per_task)
+        } => commands::maintenance(&root, prune_beats, keep_per_task, cli.dry_run)
             .await
             .map_err(CliError::Usage),
         Command::Init {

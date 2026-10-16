@@ -65,9 +65,17 @@ while IFS= read -r -d '' md; do
   done <<< "$refs"
 done < <(find "$templates" -name 'SKILL.md' -type f -print0)
 
-# Reference files that two canonical skills both ship must not drift.
+# Reference files that two canonical skills both ship must not drift. A missing
+# copy is a failure, not a skip: comparing only when both files exist lets the
+# guard enforce nothing the moment one is renamed or deleted.
 slop_a="$canonical/skill-creator/references/anti_ai_slop.md"
 slop_b="$canonical/skill-distiller/references/anti_ai_slop.md"
+for slop in "$slop_a" "$slop_b"; do
+  if [[ ! -f "$slop" ]]; then
+    echo "check-skills-sync: $slop is missing (both skills must ship the reference)" >&2
+    failures=1
+  fi
+done
 if [[ -f "$slop_a" && -f "$slop_b" ]] && ! cmp -s "$slop_a" "$slop_b"; then
   echo "check-skills-sync: drift: skill-creator/references/anti_ai_slop.md != skill-distiller/references/anti_ai_slop.md" >&2
   failures=1

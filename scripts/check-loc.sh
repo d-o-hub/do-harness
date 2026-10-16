@@ -203,7 +203,7 @@ scan_files() {
         for root in "${ROOTS[@]}"; do
             [[ -d "$ROOT/$root" ]] || continue
             find "$ROOT/$root" -type d \( "${prune_args[@]}" \) -prune -o \
-                -type f -name "*.$ext" -print 2>/dev/null
+                -type f -name "*.$ext" -print
         done
     done | sort -u
 }

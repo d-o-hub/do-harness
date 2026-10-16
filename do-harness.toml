@@ -89,7 +89,7 @@ when-changed = ["Cargo.toml", "Cargo.lock", "crates/**/Cargo.toml", "deny.toml",
 [[sensors]]
 name = "shell"
 argv = ["bash", "scripts/check-shell.sh"]
-when-changed = ["scripts/**", "crates/do-harness/templates/scripts/**", ".agents/skills/**", "crates/do-harness/templates/skills/**", "tests/fixtures/**"]
+when-changed = ["scripts/**", "crates/do-harness/templates/scripts/**", ".agents/skills/**", "crates/do-harness/templates/skills/**", "tests/**"]
 
 [[sensors]]
 name = "markdownlint"
@@ -138,6 +138,20 @@ when-changed = ["plans/*-epic.md", "plans/invariants.json", "crates/guardian-pro
 name = "audit"
 argv = ["bash", "scripts/check-audit.sh"]
 when-changed = ["Cargo.toml", "Cargo.lock", "scripts/check-audit.sh"]
+
+[[sensors]]
+# Named constants over magic numbers (AGENTS.md section 5), mechanised. A
+# numeric literal that is not a named constant and not one of the conventional
+# values is a finding; the sensor is warn severity with a blessed baseline, so
+# the existing debt is grandfathered and any increase is a hard regression.
+# Deliberately absent from every [signal-sets] entry: any FINDINGS > 0 with a
+# baseline records a warn verdict, and `verify --strict` / `status` stay honest
+# by refusing green on warn, so a grandfathered count can never pass the
+# strict gate (same reason `dora` and `coverage` stay out of `verification`).
+name = "magic-numbers"
+argv = ["bash", "scripts/check-magic-numbers.sh"]
+severity = "warn"
+when-changed = ["**/*.rs", "scripts/check-magic-numbers.sh", "scripts/check_magic_numbers.py"]
 
 [[sensors]]
 # No `when-changed`: a commit message is not tied to any tracked path, so

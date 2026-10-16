@@ -1,5 +1,9 @@
 //! Small shared helpers with no better home.
 
+/// Percentiles are expressed on a 0-100 scale, so the nearest-rank divisor is
+/// the whole scale.
+const PERCENTILE_SCALE: u64 = 100;
+
 /// Nearest-rank percentile over an ascending slice.
 ///
 /// The rank is `ceil(pct * n / 100)` clamped to at least 1 (the nearest-rank
@@ -11,7 +15,7 @@ pub(crate) fn percentile<T: Ord + Copy>(sorted: &[T], pct: u32) -> Option<T> {
         return None;
     }
     let n = u64::try_from(sorted.len()).ok()?;
-    let rank = (u64::from(pct) * n).div_ceil(100).max(1);
+    let rank = (u64::from(pct) * n).div_ceil(PERCENTILE_SCALE).max(1);
     let index = usize::try_from(rank - 1).ok()?.min(sorted.len() - 1);
     sorted.get(index).copied()
 }
