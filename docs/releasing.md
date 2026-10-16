@@ -119,6 +119,13 @@ set (verification plus `coverage`) and every build target dogfoods green.
 
 ## Cutting a release
 
+Regenerate the checked-in CLI artifacts before tagging: `cargo run -q -p
+do-harness --bin do-harness -- completions <shell>` for each shell in
+`completions/` and `do-harness man man` for the man page. `completions_sync.rs`
+and `man_sync.rs` compare the committed copies against the CLI and fail otherwise;
+the man guard normalises only the build fingerprint, so a page still announcing
+an older semver fails there too.
+
 1. Bump `[workspace.package].version` in `Cargo.toml`, run
    `cargo update --workspace` (or `cargo check`) so `Cargo.lock` matches,
    update `integrations/npm/package.json` and the five

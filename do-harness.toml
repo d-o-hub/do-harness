@@ -11,8 +11,11 @@ pre-push = []
 feedback = ["fmt", "check", "clippy", "loc"]
 # `machete` is cheap (one scan over the manifests) and a pull request can add an
 # unused dependency, so it belongs to the PR-time set; `powerset` builds four
-# feature combinations and is scheduled instead (`.github/workflows/scheduled.yml`),
-# which is why it is the only member of `scheduled`.
+# feature combinations and `coverage` is the heaviest sensor in the repository
+# (an instrumented full run), so both are scheduled instead
+# (`.github/workflows/scheduled.yml`). `coverage` sat in `release` only: the
+# floor never ran on a pull request, so a regression could land on main and
+# surface only at tag time.
 verification = ["fmt", "check", "clippy", "deps", "machete", "audit", "test", "doctest", "loc", "skills", "skills-docs", "shell", "markdownlint", "yamllint", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "commitlint"]
 release = ["fmt", "check", "clippy", "deps", "audit", "test", "doctest", "coverage", "loc", "skills", "skills-docs", "shell", "markdownlint", "yamllint", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "commitlint"]
 # DORA gets its own set so its evidence is addressable (`status --set metrics`)
@@ -21,7 +24,7 @@ release = ["fmt", "check", "clippy", "deps", "audit", "test", "doctest", "covera
 # `insufficient_coverage` rather than green; scoping the evidence to a set is
 # what makes the freshness comparison meaningful.
 metrics = ["dora"]
-scheduled = ["powerset"]
+scheduled = ["powerset", "coverage"]
 
 [[sensors]]
 name = "fmt"

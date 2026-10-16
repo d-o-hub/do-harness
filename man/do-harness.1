@@ -1,6 +1,6 @@
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
-.TH do-harness 1  "do-harness 0.2.0 (01f6e3e-dirty 2026-10-03)" 
+.TH do-harness 1  "do-harness 0.3.0 (02877a8-dirty 2026-10-16)" 
 .SH NAME
 do\-harness \- do\-harness agent execution harness CLI
 .SH SYNOPSIS
@@ -31,94 +31,94 @@ Print help
 Print version
 .SH SUBCOMMANDS
 .TP
-do\-harness\-version(1)
+do\-harness version
 Print CLI version information
 .TP
-do\-harness\-verify(1)
+do\-harness verify
 Run computational sensors
 .TP
-do\-harness\-list(1)
+do\-harness list
 List sensor names
 .TP
-do\-harness\-explain(1)
+do\-harness explain
 Explain which sensors the current change selects, without running them
 .TP
-do\-harness\-status(1)
+do\-harness status
 Report verification evidence freshness without running sensors
 .TP
-do\-harness\-pr(1)
+do\-harness pr
 Deterministic PR analysis (read\-only; works in any git repository)
 .TP
-do\-harness\-skills(1)
+do\-harness skills
 Inspect and select skills by progressive disclosure
 .TP
-do\-harness\-init\-db(1)
+do\-harness init-db
 Apply pending database migrations
 .TP
-do\-harness\-seed(1)
+do\-harness seed
 Seed invariants from plans/invariants.json
 .TP
-do\-harness\-init(1)
+do\-harness init
 Scaffold a harness workspace in a target directory
 .TP
-do\-harness\-task(1)
+do\-harness task
 Inspect and export task state
 .TP
-do\-harness\-trace(1)
+do\-harness trace
 Record and list interaction traces
 .TP
-do\-harness\-distill(1)
+do\-harness distill
 Extract a heuristic from a resolved trace into a skill. Review output against the anti\-AI\-slop checklist (.agents/skills/skill\-creator/references/anti_ai_slop.md)
 .TP
-do\-harness\-errors(1)
+do\-harness errors
 Inspect and clear fail\-fast error signatures
 .TP
-do\-harness\-loc(1)
+do\-harness loc
 Report line\-of\-code state for the 500\-LOC invariant
 .TP
-do\-harness\-split(1)
+do\-harness split
 Extract a large top\-level item into a sibling module
 .TP
-do\-harness\-eval(1)
+do\-harness eval
 Validate skill structure and benchmark skill evals
 .TP
-do\-harness\-hook(1)
+do\-harness hook
 Manage git hooks that run `do\-harness verify`
 .TP
-do\-harness\-doctor(1)
+do\-harness doctor
 Run diagnostic checks on binary resolution and git hook health
 .TP
-do\-harness\-metrics(1)
+do\-harness metrics
 Report harness trends: sensor stats, strikes, eval pass\-rate history
 .TP
-do\-harness\-learn(1)
+do\-harness learn
 Draft skill/guide updates from sensors that keep firing (never applies them)
 .TP
-do\-harness\-overlap(1)
+do\-harness overlap
 Rank skill pairs by guidance overlap (Tier\-2 distinctiveness advisory)
 .TP
-do\-harness\-maintenance(1)
+do\-harness maintenance
 Prune old beats and compact the state database
 .TP
-do\-harness\-compliance(1)
+do\-harness compliance
 Print compliance mapping to OWASP Agentic Top 10, NIST AI RMF, and EU AI Act
 .TP
-do\-harness\-audit\-chain(1)
+do\-harness audit-chain
 Recompute workflow event hash chain and report first divergence
 .TP
-do\-harness\-dora(1)
+do\-harness dora
 Derive DORA deployment metrics from git history (deterministic, read\-only)
 .TP
-do\-harness\-ci\-explain(1)
+do\-harness ci-explain
 Explain a CI run\*(Aqs failures and cancellations with local repro commands
 .TP
-do\-harness\-completions(1)
+do\-harness completions
 Generate shell completions
 .TP
-do\-harness\-man(1)
+do\-harness man
 Generate man page documentation
 .TP
-do\-harness\-help(1)
+do\-harness help
 Print this message or the help of the given subcommand(s)
 .SH EXTRA
 Examples:
@@ -132,4 +132,4 @@ Exit Codes:
   1  Verification or check failure
   2  Usage, configuration, or environment error
 .SH VERSION
-v0.2.0 (01f6e3e\-dirty 2026\-10\-03)
+v0.3.0 (02877a8\-dirty 2026\-10\-16)

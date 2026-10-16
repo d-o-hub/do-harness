@@ -47,6 +47,7 @@ mod hooks;
 mod init;
 mod learn;
 mod loc;
+mod man;
 mod methods;
 mod metrics;
 mod overlap;
@@ -124,14 +125,7 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
             return Ok(());
         }
         Command::Man { dir } => {
-            let cmd = Cli::command();
-            let man = clap_mangen::Man::new(cmd);
-            std::fs::create_dir_all(dir).map_err(|e| CliError::Usage(e.into()))?;
-            let mut buffer = Vec::new();
-            man.render(&mut buffer)
-                .map_err(|e| CliError::Usage(e.into()))?;
-            std::fs::write(dir.join("do-harness.1"), buffer)
-                .map_err(|e| CliError::Usage(e.into()))?;
+            man::render_page(dir)?;
             return Ok(());
         }
         _ => {}

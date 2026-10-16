@@ -28,7 +28,10 @@ concurrency:
 jobs:
   scheduled:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # `powerset` builds four feature combinations and `coverage` runs the whole
+    # suite under instrumentation; both are heavy, which is why they are here
+    # rather than on every pull request.
+    timeout-minutes: 45
     steps:
       # actions/checkout@v7.0.1
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -48,7 +51,11 @@ jobs:
       # taiki-e/install-action@v2
       - uses: taiki-e/install-action@ba47c86ac325773530516bb756137ac718732518
         with:
-          tool: cargo-hack
+          # cargo-hack for `powerset`; cargo-llvm-cov and cargo-nextest for
+          # `coverage`, which runs `cargo llvm-cov nextest`. Both fail closed in
+          # this job (`CI=true`, `DO_HARNESS_REQUIRE_TOOLS=1`), so a missing tool
+          # must not read as a skip.
+          tool: cargo-hack,cargo-llvm-cov,cargo-nextest
       - name: Build harness CLI
         run: cargo build --release -p do-harness
       - name: Run scheduled sensors
