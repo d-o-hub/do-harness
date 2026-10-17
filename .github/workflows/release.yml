@@ -99,9 +99,12 @@ jobs:
           tar --extract --gzip --file "$RUNNER_TEMP/$archive" \
             --directory "$RUNNER_TEMP" actionlint
           echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
-      - name: Install markdownlint and yamllint
+      - name: Install markdownlint, yamllint, and docs tooling
+        # `skills-docs` parses maintained markdown, so its markdown-it-py
+        # dependency (scripts/requirements-docs.txt) must be present before the
+        # release set runs; yamllint covers the workflow lint.
         run: |
-          python3 -m pip install --disable-pip-version-check yamllint
+          python3 -m pip install --disable-pip-version-check yamllint -r scripts/requirements-docs.txt
           npm install -g markdownlint-cli2
       - name: Check Rust public API compatibility
         run: bash scripts/check-rust-api-compatibility.sh
