@@ -164,15 +164,18 @@ def _ls_files(root_dir, flags, pathspec=None):
     """
     Runs `git ls-files` in a checkout and returns its non-empty output lines.
     """
-    argv = ["git", "-C", root_dir, "ls-files", *flags]
-    if pathspec is not None:
-        argv.append(pathspec)
     # Fixed argv (git named literally, no shell, output captured): the only
     # variables are a checkout path plus caller-fixed flags and pathspecs, never
     # document- or network-controlled input. The literal executable head keeps
     # the command a static string for static analysis, same shape as
     # scripts/check_source_distribution.py.
-    res = subprocess.run(argv, capture_output=True, text=True, check=True)  # nosec B603 B607
+    optional_pathspec = [] if pathspec is None else [pathspec]
+    res = subprocess.run(  # nosec B603 B607
+        ["git", "-C", root_dir, "ls-files", *flags, *optional_pathspec],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
     return [line.strip() for line in res.stdout.splitlines() if line.strip()]
 
 
