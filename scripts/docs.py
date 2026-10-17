@@ -274,6 +274,13 @@ def main():
     sync_parser.add_argument("--write", action="store_true", help="Rewrite out-of-date blocks in place (refused while CI is set)")
     sync_parser.add_argument("--root", default=".", help="Root directory of repository")
 
+    impact_parser = subparsers.add_parser("impact", help="Perform deterministic docs impact analysis and emit review packets")
+    impact_parser.add_argument("--base", required=True, help="Base revision/branch or merge base commit")
+    impact_parser.add_argument("--head", required=True, help="Head revision/branch or commit")
+    impact_parser.add_argument("--format", choices=["json", "text", "packet"], default="json", help="Output format (default: json)")
+    impact_parser.add_argument("--root", default=".", help="Root directory of repository")
+    impact_parser.add_argument("--contracts", default="docs/contracts.toml", help="Path to contracts policy file")
+
     args = parser.parse_args()
 
     root_dir = os.path.abspath(args.root)
@@ -302,6 +309,33 @@ def main():
             sys.exit(0)
         except Exception as e:
             print(f"Inventory failure: {e}", file=sys.stderr)
+            sys.exit(1)
+
+    if args.subcommand == "impact":
+        from doc_tools.report import build_doc_report_and_packet
+        try:
+            report, packet_text = build_doc_report_and_packet(
+                root_dir=root_dir,
+                base_rev=args.base,
+                head_rev=args.head,
+                contracts_path=args.contracts,
+            )
+            if args.format == "json":
+                import json
+                # Strip policy object before serializing
+                report_out = dict(report)
+                print(json.dumps(report_out, indent=2))
+            elif args.format == "packet":
+                print(packet_text)
+            else:
+                print(f"Base: {report['revisions']['base_rev']} ({report['revisions']['merge_base'][:8]})")
+                print(f"Head: {report['revisions']['head_rev']} ({report['revisions']['head_commit'][:8]})")
+                print(f"Mechanical Status: {'PASS' if not report['mechanical']['findings'] else 'FAIL'}")
+                print(f"Affected Docs: {len(report['impact']['affected_doc_sections'])}")
+                print(f"Packet Size: {report['packet_summary']['packet_bytes']} bytes")
+            sys.exit(0)
+        except Exception as e:
+            print(f"Impact analysis error: {e}", file=sys.stderr)
             sys.exit(1)
 
     if args.subcommand == "links":
