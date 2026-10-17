@@ -16,8 +16,14 @@ yanked = "deny"
 # `serde_yaml` 0.9. The advisory records maintenance status, not a reported
 # vulnerability. Rationale in scripts/check-audit.sh; the migration that
 # retires this entry is tracked in plans/serde-yaml-migration.md and
-# plans/invariants.json.
-ignore = ["RUSTSEC-2024-0449"]
+# plans/invariants.json. Table form (not a bare string) so the ignore carries
+# its reason in the policy itself. (cargo-deny has no stable machine-readable
+# expiry: `advisories.ignore.expiry` is unreleased as of cargo-deny 0.20.2, so
+# the revisit date lives here in prose.) Expiry: revisit by 2027-03-25; delete
+# this entry when plans/serde-yaml-migration.md lands.
+ignore = [
+  { id = "RUSTSEC-2024-0449", reason = "unmaintained, not a vulnerability; reachable only transitively via serde_yaml 0.9, see plans/serde-yaml-migration.md" },
+]
 
 [bans]
 multiple-versions = "deny"

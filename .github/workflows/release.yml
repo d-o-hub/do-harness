@@ -76,11 +76,29 @@ jobs:
           # Every tool the `release` set's sensors invoke: cargo-deny (deps),
           # cargo-audit (audit), cargo-nextest (test), cargo-llvm-cov
           # (coverage). rustfmt and clippy come from the toolchain components
-          # above, shellcheck from the runner image, markdownlint/yamllint from
-          # the step below. Adding a sensor that needs a new tool means adding
+          # above, shellcheck from the runner image, actionlint from the pinned
+          # download below, markdownlint/yamllint from the step below. Adding a
+          # sensor that needs a new tool means adding
           # it here too: the absence of cargo-nextest failed the v0.1.2 tag
           # preflight with "error: no such command: `nextest`" -> weak evidence.
           tool: cargo-deny,cargo-audit,cargo-nextest,cargo-llvm-cov,shellcheck,cargo-semver-checks@0.50.0
+      - name: Install actionlint
+        # The `release` set includes the `actionlint` sensor and this job runs
+        # with `DO_HARNESS_REQUIRE_TOOLS=1`, so a missing tool is a hard failure
+        # rather than a SKIP. `actionlint` is not in `taiki-e/install-action`'s
+        # supported-tool list, so fetch the pinned release tarball and verify its
+        # published SHA-256 (same version/digest pair as verify.yml).
+        run: |
+          version=1.7.7
+          archive="actionlint_${version}_linux_amd64.tar.gz"
+          curl --fail --silent --show-error --location \
+            --output "$RUNNER_TEMP/$archive" \
+            "https://github.com/rhysd/actionlint/releases/download/v${version}/${archive}"
+          echo "023070a287cd8cccd71515fedc843f1985bf96c436b7effaecce67290e7e0757  $RUNNER_TEMP/$archive" \
+            | sha256sum --check
+          tar --extract --gzip --file "$RUNNER_TEMP/$archive" \
+            --directory "$RUNNER_TEMP" actionlint
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
       - name: Install markdownlint and yamllint
         run: |
           python3 -m pip install --disable-pip-version-check yamllint
@@ -294,6 +312,22 @@ jobs:
           cd dist
           sha256sum do-harness-* > checksums.txt
           cat checksums.txt
+      - name: Self-check artifacts against the generated checksums
+        # `checksums.txt` is what a downloader verifies against, so the job that
+        # advertises it should verify it too, before the Release exists. The
+        # `artifact-provenance` sensor is the tested digest-only verifier;
+        # `check-rust-binary-provenance.sh` cannot stand in here because it
+        # requires cargo-auditable metadata, which this plain
+        # `cargo build --release` does not embed, and both scripts check one
+        # expected digest per artifact, which is why each line is fed in turn.
+        run: |
+          set -euo pipefail
+          while read -r digest name; do
+            bash scripts/check-artifact-provenance.sh \
+              --artifact "dist/$name" \
+              --digest "$digest" \
+              --mode digest-only
+          done < dist/checksums.txt
       - name: Compose release notes
         # GitHub's generated changelog (the merged pull requests since the
         # previous tag) is regrouped by conventional-commit type and appended to

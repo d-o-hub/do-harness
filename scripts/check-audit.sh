@@ -28,7 +28,7 @@ if ! cargo audit --version >/dev/null 2>&1; then
         echo "FAIL: cargo-audit is required when CI=true or DO_HARNESS_REQUIRE_TOOLS=1."
         exit 1
     fi
-    echo "SKIP: cargo-audit not installed; skipping RustSec scan."
+    echo "SKIP: cargo-audit not installed; skipping RustSec scan (cargo install cargo-audit --locked)."
     exit 0
 fi
 
@@ -45,6 +45,11 @@ fi
 # Revisit when the SDK moves past 3.2.2
 # (`cargo update -p agent-governance --precise <ver>`) or at GA promotion
 # (plans/agt-governance-epic.md), when the pin — and this ignore — go away.
+# Expiry: event-driven, not dated — this flag dies with the 3.2.x pin at
+# chore-agt-promotion. (cargo-audit's `--ignore` takes a bare advisory ID, so
+# the reason and expiry live here in comments; the deny.toml entry for
+# RUSTSEC-2024-0449 below carries the `{ id, reason }` table form cargo-deny
+# supports.)
 # Advisory-DB pin decision: intentionally unpinned. RustSec advisories are the
 # point of the scan, and a pinned snapshot would hide post-pin disclosures;
 # reproducibility comes from Cargo.lock (deps) and `cargo audit --deny warnings`.
@@ -58,6 +63,10 @@ fi
 # (supply-chain). The migration that retires this ignore — replacing
 # serde_yaml with a maintained YAML crate — is tracked in
 # plans/serde-yaml-migration.md.
+# Expiry: revisit by 2027-03-25 (a machine-readable expiry is unreleased in
+# cargo-deny 0.20.2, so the date lives here and in deny.toml comments). Delete
+# this flag in the same PR that deletes the deny.toml entry, when
+# plans/serde-yaml-migration.md lands.
 run_audit() {
     cargo audit --deny warnings \
         --ignore RUSTSEC-2026-0097 \

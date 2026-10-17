@@ -1,7 +1,9 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
+use libsql::params::Params;
 
 use super::*;
 use crate::repo::NewTask;
+use do_harness_types::{BeatScope, BeatStatus, BeatType};
 
 mod reuse;
 
@@ -28,8 +30,8 @@ async fn insert_beat_roundtrips_and_filters_by_task() {
         &NewBeat {
             task_id: Some(task_id),
             scope: None,
-            beat_type: "sensor",
-            status: "failed",
+            beat_type: BeatType::Sensor,
+            status: BeatStatus::Failed,
             sensor_exit_code: Some(1),
             sensor_name: Some("check"),
             started_at: 1,
@@ -41,9 +43,9 @@ async fn insert_beat_roundtrips_and_filters_by_task() {
 
     let beats = list_beats(&conn, Some(task_id)).await.unwrap();
     assert_eq!(beats.len(), 1);
-    assert_eq!(beats[0].beat_type, "sensor");
-    assert_eq!(beats[0].status, "failed");
-    assert_eq!(beats[0].scope, format!("task:{task_id}"));
+    assert_eq!(beats[0].beat_type, BeatType::Sensor);
+    assert_eq!(beats[0].status, BeatStatus::Failed);
+    assert_eq!(beats[0].scope, BeatScope::Task(task_id));
     assert_eq!(beats[0].sensor_exit_code, Some(1));
     assert_eq!(beats[0].started_at, 1);
     assert_eq!(list_beats(&conn, None).await.unwrap().len(), 1);
@@ -63,8 +65,8 @@ async fn insert_beat_rejects_missing_task_fk() {
         &NewBeat {
             task_id: Some(9999),
             scope: None,
-            beat_type: "sensor",
-            status: "ok",
+            beat_type: BeatType::Sensor,
+            status: BeatStatus::Ok,
             sensor_exit_code: Some(0),
             sensor_name: Some("check"),
             started_at: 1,
@@ -196,20 +198,20 @@ async fn record_sensor_outcome_is_atomic_beat_plus_strike() {
         .await
         .unwrap();
 
-    let beat = |status: &'static str| NewBeat {
+    let beat = |status: BeatStatus| NewBeat {
         task_id: None,
         scope: None,
-        beat_type: "sensor",
+        beat_type: BeatType::Sensor,
         status,
         sensor_exit_code: Some(0),
         sensor_name: Some("atomic"),
         started_at: 1,
         completed_at: Some(2),
     };
-    record_sensor_outcome(&conn, &beat("failed"), false, Some("boom"))
+    record_sensor_outcome(&conn, &beat(BeatStatus::Failed), false, Some("boom"))
         .await
         .unwrap();
-    record_sensor_outcome(&conn, &beat("failed"), false, Some("boom2"))
+    record_sensor_outcome(&conn, &beat(BeatStatus::Failed), false, Some("boom2"))
         .await
         .unwrap();
     assert_eq!(
@@ -220,7 +222,7 @@ async fn record_sensor_outcome_is_atomic_beat_plus_strike() {
             .attempt_count,
         2
     );
-    record_sensor_outcome(&conn, &beat("ok"), true, None)
+    record_sensor_outcome(&conn, &beat(BeatStatus::Ok), true, None)
         .await
         .unwrap();
     assert!(
@@ -280,8 +282,8 @@ async fn record_verify_batch_rolls_back_everything_on_failure() {
             beat: NewBeat {
                 task_id: None,
                 scope: None,
-                beat_type: "sensor",
-                status: "ok",
+                beat_type: BeatType::Sensor,
+                status: BeatStatus::Ok,
                 sensor_exit_code: Some(0),
                 sensor_name: Some("check"),
                 started_at: 1,
@@ -296,8 +298,8 @@ async fn record_verify_batch_rolls_back_everything_on_failure() {
             beat: NewBeat {
                 task_id: Some(9999),
                 scope: None,
-                beat_type: "sensor",
-                status: "failed",
+                beat_type: BeatType::Sensor,
+                status: BeatStatus::Failed,
                 sensor_exit_code: Some(1),
                 sensor_name: Some("test"),
                 started_at: 1,
@@ -338,8 +340,8 @@ async fn prune_beats_keeps_newest_per_task() {
             &NewBeat {
                 task_id: None,
                 scope: None,
-                beat_type: "sensor",
-                status: "ok",
+                beat_type: BeatType::Sensor,
+                status: BeatStatus::Ok,
                 sensor_exit_code: Some(0),
                 sensor_name: Some("check"),
                 started_at: i64::from(index),
@@ -374,8 +376,8 @@ async fn list_beats_page_windows_and_treats_none_as_unbounded() {
             &NewBeat {
                 task_id: None,
                 scope: None,
-                beat_type: "sensor",
-                status: "ok",
+                beat_type: BeatType::Sensor,
+                status: BeatStatus::Ok,
                 sensor_exit_code: Some(0),
                 sensor_name: Some("check"),
                 started_at: i64::from(index),
@@ -412,9 +414,9 @@ async fn beats_scope_isolates_workstreams_and_filters_stats() {
         &conn,
         &NewBeat {
             task_id: None,
-            scope: Some("branch:main"),
-            beat_type: "sensor",
-            status: "ok",
+            scope: Some(BeatScope::Branch("main".to_owned())),
+            beat_type: BeatType::Sensor,
+            status: BeatStatus::Ok,
             sensor_exit_code: Some(0),
             sensor_name: Some("fmt"),
             started_at: 10,
@@ -429,9 +431,9 @@ async fn beats_scope_isolates_workstreams_and_filters_stats() {
         &conn,
         &NewBeat {
             task_id: None,
-            scope: Some("branch:feat"),
-            beat_type: "sensor",
-            status: "failed",
+            scope: Some(BeatScope::Branch("feat".to_owned())),
+            beat_type: BeatType::Sensor,
+            status: BeatStatus::Failed,
             sensor_exit_code: Some(1),
             sensor_name: Some("fmt"),
             started_at: 20,
@@ -445,13 +447,13 @@ async fn beats_scope_isolates_workstreams_and_filters_stats() {
         .await
         .unwrap();
     assert_eq!(main_beats.len(), 1);
-    assert_eq!(main_beats[0].scope, "branch:main");
+    assert_eq!(main_beats[0].scope, BeatScope::Branch("main".to_owned()));
 
     let feat_beats = crate::repo_exec::list_beats_by_scope(&conn, "branch:feat")
         .await
         .unwrap();
     assert_eq!(feat_beats.len(), 1);
-    assert_eq!(feat_beats[0].scope, "branch:feat");
+    assert_eq!(feat_beats[0].scope, BeatScope::Branch("feat".to_owned()));
 
     // Unfiltered sensor stats sums both runs:
     let all_stats = crate::repo_metrics::sensor_stats(&conn, None, None)

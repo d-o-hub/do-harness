@@ -35,7 +35,7 @@ if ! command -v python3 >/dev/null 2>&1; then
         echo "FAIL: python3 is required when CI=true or DO_HARNESS_REQUIRE_TOOLS=1."
         exit 1
     fi
-    echo "SKIP: python3 not installed; skipping the magic-number check."
+    echo "SKIP: python3 not installed; skipping the magic-number check (install python3)."
     exit 0
 fi
 

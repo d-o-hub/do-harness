@@ -3,7 +3,7 @@
 #
 # Sensor: scripts/check-machete.sh
 # Identifies unused dependencies across workspace manifests.
-# Exact-pin policy: pins stay exact (=3.2.2 for agent-governance, =3.5.0 for rmcp);
+# Exact-pin policy: pins stay exact (=3.2.2 for agent-governance, =3.5.1 for rmcp);
 # this sensor verifies no unused dependencies exist.
 #
 # Enforcement policy (fail-open locally with SKIP marker, fail-closed on demand):
@@ -28,6 +28,6 @@ else
         echo "FAIL: cargo-machete is required when CI=true or DO_HARNESS_REQUIRE_TOOLS=1."
         exit 1
     fi
-    echo "SKIP: cargo-machete not installed; skipping unused dependency check."
+    echo "SKIP: cargo-machete not installed; skipping unused dependency check (cargo install cargo-machete --locked)."
     exit 0
 fi

@@ -27,7 +27,7 @@ else
         echo "FAIL: markdownlint-cli2 or markdownlint is required when CI=true or DO_HARNESS_REQUIRE_TOOLS=1."
         exit 1
     fi
-    echo "SKIP: markdownlint-cli2/markdownlint not installed; skipping markdown lint."
+    echo "SKIP: markdownlint-cli2/markdownlint not installed; skipping markdown lint (npm install -g markdownlint-cli2)."
     exit 0
 fi
 
@@ -42,7 +42,7 @@ mapfile -t files < <(
 )
 
 if [[ "${#files[@]}" -eq 0 ]]; then
-    echo "FAIL: no markdown files found to lint; a gate that checks nothing is not a pass." >&2
+    echo "FAIL: no markdown files found to lint; a gate that checks nothing is not a pass. Restore the tracked markdown files or fix the discovery root." >&2
     exit 1
 fi
 

@@ -251,3 +251,17 @@ default-on.
   closing: `.clippy.toml` declares no `msrv = "1.85"`, so clippy can suggest
   post-1.85 idioms that pass on the pinned 1.99 channel and fail the MSRV job.
   See `plans/analysis-followups.md` (F3).
+
+### Bump done — rmcp 3.5.0 → 3.5.1 (2026-10-16)
+
+`Cargo.toml` now pins `rmcp = "=3.5.1"` (with `rmcp-macros` 3.5.1 in the lock)
+and the `powerset` sensor's four feature combinations stay exact. The deliberate
+bump landed with the full gate set from the note above: `cargo update -p rmcp
+--precise 3.5.1`; `cargo check -p guardian-proxy --features mcp-surface` green;
+`cargo nextest run -p guardian-proxy --features mcp-surface` 67/67;
+`cargo deny check` advisories/bans/licenses/sources ok; `bash
+scripts/check-audit.sh` clean (cargo-audit 0.22.2, 290 crates); the machete and
+powerset scripts' pin comments updated. MSRV is unchanged: rmcp 3.x still
+requires 1.88, so the row above holds only while `mcp-surface` is off. The
+`F3` item in `plans/analysis-followups.md` is closed by this bump (the adjacent
+`.clippy.toml msrv` gap was already closed).

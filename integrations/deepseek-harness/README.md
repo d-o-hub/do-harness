@@ -67,6 +67,7 @@ value):
   config:
     binary: /abs/path/to/do-harness   # default: $DO_HARNESS_BIN or `do-harness` on PATH
     workspace: /abs/path/to/repo      # default: the harness process working directory
+                                      # (a relative value resolves against it)
     defaultSignalSet: feedback
     completionSignalSet: verification
     strictCompletion: true

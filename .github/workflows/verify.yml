@@ -112,6 +112,24 @@ jobs:
       - uses: taiki-e/install-action@ba47c86ac325773530516bb756137ac718732518
         with:
           tool: cargo-deny,cargo-audit,cargo-nextest,shellcheck,cargo-hack,cargo-machete
+      - name: Install actionlint
+        # The `actionlint` sensor's script fails closed under CI=true when the
+        # tool is missing, and `actionlint` is not in `taiki-e/install-action`'s
+        # supported-tool list, so fetch the pinned release tarball and verify its
+        # published SHA-256 before putting it on PATH. Bump the version and the
+        # digest together (checksums:
+        # https://github.com/rhysd/actionlint/releases/download/v1.7.7/actionlint_1.7.7_checksums.txt).
+        run: |
+          version=1.7.7
+          archive="actionlint_${version}_linux_amd64.tar.gz"
+          curl --fail --silent --show-error --location \
+            --output "$RUNNER_TEMP/$archive" \
+            "https://github.com/rhysd/actionlint/releases/download/v${version}/${archive}"
+          echo "023070a287cd8cccd71515fedc843f1985bf96c436b7effaecce67290e7e0757  $RUNNER_TEMP/$archive" \
+            | sha256sum --check
+          tar --extract --gzip --file "$RUNNER_TEMP/$archive" \
+            --directory "$RUNNER_TEMP" actionlint
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
       - name: Install markdownlint and yamllint
         run: |
           python3 -m pip install --disable-pip-version-check yamllint
@@ -167,9 +185,11 @@ jobs:
       # pull request for the same three invocations twice (P1).
       - name: Run sensors
         env:
-          # check-audit.sh / check-deps.sh / check-shell.sh / check-markdownlint.sh / check-yamllint.sh
-          # fail closed when CI=true; cargo-audit, cargo-deny, shellcheck, yamllint, and
-          # markdownlint-cli2 are installed above.
+          # check-audit.sh / check-deps.sh / check-shell.sh / check-markdownlint.sh /
+          # check-yamllint.sh / check-actionlint.sh fail closed when CI=true;
+          # cargo-audit, cargo-deny, shellcheck, actionlint, yamllint, and
+          # markdownlint-cli2 are installed above. check-markdown-links.sh needs
+          # only python3, which the runner image provides.
           CI: "true"
           # Belt and braces: missing tools fail even if CI=true is dropped.
           DO_HARNESS_REQUIRE_TOOLS: "1"

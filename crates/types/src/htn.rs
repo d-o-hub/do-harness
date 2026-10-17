@@ -4,12 +4,16 @@
 //! can be persisted and validated as data instead of prose.
 
 use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 use thiserror::Error;
+
+/// Wire names [`TaskState::from_str`] accepts.
+const EXPECTED_TASK_STATES: &str = "pending|in_progress|done|failed";
 
 /// Error returned when a stored or provided task-state string is not one of
 /// the four lifecycle values.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
-#[error("unknown task state '{value}'")]
+#[error("unknown task state '{value}': expected {EXPECTED_TASK_STATES}")]
 pub struct TaskStateParseError {
     /// The unrecognized value.
     pub value: String,
@@ -76,11 +80,17 @@ impl TaskState {
     }
 }
 
-impl TryFrom<&str> for TaskState {
-    type Error = TaskStateParseError;
+impl std::fmt::Display for TaskState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
 
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
-        match value {
+impl FromStr for TaskState {
+    type Err = TaskStateParseError;
+
+    fn from_str(raw: &str) -> Result<Self, Self::Err> {
+        match raw {
             "pending" => Ok(Self::Pending),
             "in_progress" => Ok(Self::InProgress),
             "done" => Ok(Self::Done),
@@ -107,7 +117,9 @@ mod tests {
         assert_eq!(parsed, TaskState::InProgress);
     }
 
-    /// Every database value maps to exactly one state.
+    /// Every database value maps to exactly one state through the single
+    /// `FromStr` idiom, `as_str()`/`Display`/serde agree, and an unknown value
+    /// errors with the typed error carrying the offending string.
     #[test]
     fn task_state_roundtrips_through_db_strings() {
         for state in [
@@ -116,10 +128,21 @@ mod tests {
             TaskState::Done,
             TaskState::Failed,
         ] {
-            let from_db = TaskState::try_from(state.as_str()).expect("known state");
-            assert_eq!(from_db, state);
+            assert_eq!(
+                state.as_str().parse::<TaskState>().expect("known state"),
+                state
+            );
+            assert_eq!(state.to_string(), state.as_str());
+            let json = serde_json::to_string(&state).expect("serialize");
+            assert_eq!(json, format!("\"{}\"", state.as_str()));
+            assert_eq!(
+                serde_json::from_str::<TaskState>(&json).expect("parse"),
+                state
+            );
         }
-        assert!(TaskState::try_from("exploded").is_err());
+        let err = "exploded".parse::<TaskState>().expect_err("unknown state");
+        assert_eq!(err.value, "exploded");
+        assert!(err.to_string().contains(EXPECTED_TASK_STATES));
     }
 
     /// A mistyped field inside a nested subtask is rejected, not ignored: the

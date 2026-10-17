@@ -3,7 +3,7 @@
 use std::fs;
 
 use super::*;
-use do_harness_types::TaskState;
+use do_harness_types::{BeatStatus, BeatType, TaskState};
 
 /// Writes a minimal frozen method catalog for tests that gate on it.
 pub(super) fn write_catalog(root: &Path) {
@@ -35,8 +35,8 @@ pub(super) async fn insert_ok_beat(root: &Path, task_id: i64, sensor: &str) {
         &do_harness_db::NewBeat {
             task_id: Some(task_id),
             scope: None,
-            beat_type: "sensor",
-            status: "ok",
+            beat_type: BeatType::Sensor,
+            status: BeatStatus::Ok,
             sensor_exit_code: Some(0),
             sensor_name: Some(sensor),
             started_at: now,

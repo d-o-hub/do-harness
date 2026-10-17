@@ -1,6 +1,20 @@
 //! Types for skill-eval run history and grader tamper-evidence.
 
 use serde::{Deserialize, Serialize};
+use std::str::FromStr;
+use thiserror::Error;
+
+/// Wire names [`EvalMode::from_str`] accepts.
+const EXPECTED_EVAL_MODES: &str = "deterministic|agent";
+
+/// Error returned when a stored or supplied skill-eval mode is not a known
+/// execution mode.
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[error("unknown eval mode '{value}': expected {EXPECTED_EVAL_MODES}")]
+pub struct EvalModeParseError {
+    /// The unrecognized value.
+    pub value: String,
+}
 
 /// How a skill-eval run was executed.
 ///
@@ -43,16 +57,16 @@ impl std::fmt::Display for EvalMode {
     }
 }
 
-impl std::str::FromStr for EvalMode {
-    type Err = String;
+impl FromStr for EvalMode {
+    type Err = EvalModeParseError;
 
     fn from_str(raw: &str) -> Result<Self, Self::Err> {
         match raw {
             "deterministic" => Ok(EvalMode::Deterministic),
             "agent" => Ok(EvalMode::Agent),
-            _ => Err(format!(
-                "unknown eval mode '{raw}': expected deterministic|agent"
-            )),
+            _ => Err(EvalModeParseError {
+                value: raw.to_owned(),
+            }),
         }
     }
 }
@@ -169,7 +183,11 @@ mod tests {
             let parsed: EvalMode = serde_json::from_str(&json).expect("parse");
             assert_eq!(parsed, mode);
             assert_eq!(mode.as_str().parse::<EvalMode>().expect("from_str"), mode);
+            assert_eq!(mode.to_string(), mode.as_str());
         }
         assert!(serde_json::from_str::<EvalMode>("\"manual\"").is_err());
+        let err = "manual".parse::<EvalMode>().expect_err("unknown mode");
+        assert_eq!(err.value, "manual");
+        assert!(err.to_string().contains(EXPECTED_EVAL_MODES));
     }
 }

@@ -63,7 +63,7 @@ agent-governance = "=3.2.2"
 # feature enables it. Update with `cargo update -p rmcp --precise <ver>` and
 # re-run `cargo deny check` + `cargo audit`; see plans/mcp-conformance-epic.md
 # before bumping.
-rmcp = { version = "=3.5.0", features = ["server", "transport-streamable-http-server", "macros"] }
+rmcp = { version = "=3.5.1", features = ["server", "transport-streamable-http-server", "macros"] }
 
 # Dev-profile tuning lives here (Cargo only honors [profile.*] in manifests,
 # never in .cargo/config.toml). Build-override stays at Cargo defaults

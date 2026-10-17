@@ -106,6 +106,26 @@ pub enum DbError {
     /// A stored skill-eval mode was not one of the persisted wire names.
     #[error("invalid stored eval mode '{0}': expected deterministic|agent")]
     InvalidEvalMode(String),
+    /// A stored beat carried an unrecognized status value.
+    #[error("invalid stored beat status '{0}': expected ok|failed|warn")]
+    InvalidBeatStatus(String),
+    /// A stored beat carried an unrecognized beat-type value.
+    #[error("invalid stored beat type '{0}': expected sensor|step")]
+    InvalidBeatType(String),
+    /// A stored beat carried an unrecognized scope key.
+    #[error("invalid stored beat scope '{0}': expected task:<id>|branch:<name>|global")]
+    InvalidBeatScope(String),
+    /// A beat's `task_id` column disagreed with its scope key, so the
+    /// `task_id` and `scope` lookups would answer differently.
+    #[error(
+        "beat scope '{scope}' disagrees with task id {task_id:?}: a task scope requires the matching id, branch/global scopes require none"
+    )]
+    BeatScopeMismatch {
+        /// The scope key that was supplied.
+        scope: String,
+        /// The `task_id` column that was supplied alongside it.
+        task_id: Option<i64>,
+    },
     /// A workflow gate's required sensor has no passing beat at write time
     /// (re-checked inside the command transaction to close the read-then-write
     /// race with concurrent `verify --record`).
@@ -132,6 +152,27 @@ pub enum DbError {
         applied: i64,
         /// The highest version in this binary's embedded catalog.
         known_max: i64,
+    },
+    /// An applied migration's SQL differs from this binary's embedded catalog.
+    ///
+    /// The database row was recorded with a different checksum than the
+    /// migration file now present in the binary: the file was edited after
+    /// the database applied it, so existing and fresh databases would
+    /// silently diverge. Restore the database from its pre-migration backup,
+    /// or recreate it, after deciding which copy of the migration is
+    /// authoritative; never edit an already-released migration in place.
+    #[error(
+        "migration {version} ({name}) diverged: database checksum {found} does not match this binary's checksum {expected}"
+    )]
+    MigrationDiverged {
+        /// The migration version whose SQL no longer matches.
+        version: i64,
+        /// The migration name from the embedded catalog.
+        name: String,
+        /// SHA-256 hex of the migration SQL in this binary.
+        expected: String,
+        /// SHA-256 hex recorded when the database applied the migration.
+        found: String,
     },
 }
 
@@ -236,6 +277,9 @@ mod tests {
 
     use super::*;
 
+    /// Task id used by the scope-mismatch rendering case.
+    const SAMPLE_TASK_ID: i64 = 3;
+
     /// Constraint failures surface as `Constraint`, everything else as `Sql`.
     #[test]
     fn libsql_errors_map_by_constraint_code() {
@@ -311,6 +355,18 @@ mod tests {
         let mode = DbError::InvalidEvalMode("bogus".to_owned());
         assert!(mode.to_string().contains("bogus"));
         assert!(mode.to_string().contains("deterministic|agent"));
+
+        let status = DbError::InvalidBeatStatus("passed".to_owned());
+        assert!(status.to_string().contains("passed"));
+        let beat_type = DbError::InvalidBeatType("manual".to_owned());
+        assert!(beat_type.to_string().contains("manual"));
+        let scope = DbError::InvalidBeatScope("team:7".to_owned());
+        assert!(scope.to_string().contains("team:7"));
+        let mismatch = DbError::BeatScopeMismatch {
+            scope: "task:2".to_owned(),
+            task_id: Some(SAMPLE_TASK_ID),
+        };
+        assert!(mismatch.to_string().contains("task:2"));
     }
 
     /// `SQLITE_BUSY` and `SQLITE_LOCKED` (and extended codes) are classified as transient.

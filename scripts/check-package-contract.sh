@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 # check-package-contract.sh — verifies package contents and publish constraints for workspace crates.
+#
+# Enforcement policy (fail-open on a missing tool, fail-closed when required),
+# mirroring scripts/check-magic-numbers.sh: cargo or python3 missing AND
+# (CI=true OR DO_HARNESS_REQUIRE_TOOLS=1) -> FAIL, otherwise SKIP.
 
 set -euo pipefail
 
@@ -11,7 +15,17 @@ if ! command -v cargo >/dev/null 2>&1; then
         echo "FAIL: cargo is required when CI=true or DO_HARNESS_REQUIRE_TOOLS=1."
         exit 1
     else
-        echo "SKIP: cargo unavailable; skipping package contract check."
+        echo "SKIP: cargo unavailable; skipping package contract check (install cargo)."
+        exit 0
+    fi
+fi
+
+if ! command -v python3 >/dev/null 2>&1; then
+    if [[ "${CI:-}" == "true" || "${DO_HARNESS_REQUIRE_TOOLS:-}" == "1" ]]; then
+        echo "FAIL: python3 is required when CI=true or DO_HARNESS_REQUIRE_TOOLS=1."
+        exit 1
+    else
+        echo "SKIP: python3 unavailable; skipping package contract check (install python3)."
         exit 0
     fi
 fi
