@@ -16,7 +16,7 @@ import subprocess  # nosec B404
 import sys
 import urllib.parse
 
-from doc_tools import cli_sync
+from doc_tools import cli_sync, examples
 from doc_tools.inventory import (
     discover_documents,
 )
@@ -264,6 +264,11 @@ def main():
     inv_parser.add_argument("--contracts", default="docs/contracts.toml", help="Path to contracts policy file")
     inv_parser.add_argument("--mode", choices=["local", "ci"], default="local", help="Discovery mode")
 
+    examples_parser = subparsers.add_parser("examples", help="Verify documented CLI examples against real execution/fixtures")
+    examples_parser.add_argument("--check", action="store_true", help="Perform example execution and verification")
+    examples_parser.add_argument("--root", default=".", help="Root directory of repository")
+    examples_parser.add_argument("--contracts", default="docs/contracts.toml", help="Path to contracts policy file")
+
     sync_parser = subparsers.add_parser("sync", help="Check or regenerate CLI-derived documentation blocks")
     sync_parser.add_argument("--check", action="store_true", help="Verify committed blocks against the CLI definitions (default)")
     sync_parser.add_argument("--write", action="store_true", help="Rewrite out-of-date blocks in place (refused while CI is set)")
@@ -278,6 +283,10 @@ def main():
             print("sync: --check and --write are mutually exclusive", file=sys.stderr)
             sys.exit(2)
         sys.exit(cli_sync.run_sync(root_dir, write=args.write))
+
+    if args.subcommand == "examples":
+        ok = examples.verify_examples(root_dir=root_dir)
+        sys.exit(0 if ok else 1)
 
     contracts_path = os.path.join(root_dir, args.contracts) if not os.path.isabs(args.contracts) else args.contracts
 

@@ -2,6 +2,7 @@
 
 Zero-install launcher for the [do-harness](../../README.md) CLI:
 
+<!-- example: id=npm_npx_wrapper classification=illustrative reason="npx wrapper command syntax" -->
 ```sh
 npx do-harness init
 npx do-harness verify --set verification --format json --strict
@@ -16,6 +17,7 @@ Supported platforms: Linux x64/arm64 (static musl), macOS x64/arm64. Other
 platforms install from source or download a release; Linux/macOS can use the
 shell installer:
 
+<!-- example: id=npm_install_sh classification=illustrative reason="Single line shell installer invocation" -->
 ```sh
 curl -fsSL https://raw.githubusercontent.com/d-o-hub/do-harness/main/scripts/install.sh | sh
 ```

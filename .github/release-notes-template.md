@@ -16,6 +16,7 @@ release that breaks a workspace contract says so here, not in the changelog. -->
 
 ## Install
 
+<!-- example: id=release_notes_install classification=illustrative reason="Release notes template install snippet" -->
 ```bash
 # pinned, SHA-256 verified binary (Linux x86_64/arm64, macOS x86_64/arm64)
 curl -fsSL https://raw.githubusercontent.com/d-o-hub/do-harness/main/scripts/install.sh \
@@ -34,6 +35,7 @@ Windows. Unzip it, run the installer under Git Bash, or use `cargo install`.
 
 ## Verify the download
 
+<!-- example: id=release_notes_verify classification=illustrative reason="Release notes template verification commands" -->
 ```bash
 gh release download {{TAG}} --repo d-o-hub/do-harness
 sha256sum -c checksums.txt                              # is the download intact?

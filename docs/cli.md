@@ -4,6 +4,7 @@
 
 ## Usage
 
+<!-- example: id=cli_global_usage classification=illustrative reason="CLI global usage syntax" -->
 ```bash
 do-harness [GLOBAL OPTIONS] <SUBCOMMAND>
 ```
@@ -147,6 +148,7 @@ documents, tracker counts, published claims) instead of a gate: it defaults to
 `fix` string is printed as a `FIX:` line when the check fails, so the report
 carries the remediation instead of leaving it in a runbook:
 
+<!-- example: id=cli_tracker_drift_toml classification=parser-check-only reason="Sample project-check configuration snippet" -->
 ```toml
 [[sensors]]
 name = "tracker-drift"
@@ -982,6 +984,7 @@ The `loc` *sensor* (`scripts/check-loc.sh`) is the part that carries the ceiling
 a repository with a front-end scopes it from `do-harness.toml` instead of
 forking the script:
 
+<!-- example: id=cli_loc_toml classification=parser-check-only reason="Sample loc sensor TOML snippet" -->
 ```toml
 [[sensors]]
 name = "loc"
@@ -1167,6 +1170,7 @@ harness initialization.
 Proof and exemption rules are driven by `.github/pr-gate.toml`, read **at the
 merge-base revision only** (never the PR head):
 
+<!-- example: id=cli_pr_gate_toml classification=parser-check-only reason="PR gate policy configuration snippet" -->
 ```toml
 [proof]
 mechanical = ["**/Cargo.lock", "docs/generated/**"]
@@ -1323,6 +1327,7 @@ skills.
 metadata only** — the catalog never reads a skill body, and ranking is offline
 and deterministic.
 
+<!-- example: id=cli_skills_suggest_query classification=illustrative reason="Skills suggest CLI command syntax" -->
 ```bash
 do-harness skills suggest --query "review this pull request" --limit 5
 ```
@@ -1334,6 +1339,7 @@ do-harness skills suggest --query "review this pull request" --limit 5
 
 JSON output carries metadata only:
 
+<!-- example: id=cli_skills_suggest_json classification=parser-check-only reason="Skills suggest JSON output structure" -->
 ```json
 {
   "schema_version": 1,
@@ -1362,6 +1368,7 @@ the first path with a warning naming both.
 **Optional semantic selector.** Set `DO_HARNESS_SKILL_SELECTOR` to an
 executable and it is invoked with bounded candidate metadata on stdin:
 
+<!-- example: id=cli_semantic_selector_input classification=parser-check-only reason="Semantic selector JSON payload" -->
 ```json
 {"schema_version":1,"query":"…","candidates":[{"name":"…","description":"…","score":0.87}]}
 ```
@@ -1405,6 +1412,7 @@ itself. An opt-in manifest at `.agents/skills-manifest.toml` (override with
 `--manifest <FILE>`) names the skills a repository manages from an upstream and
 pins each one:
 
+<!-- example: id=cli_skills_manifest_toml classification=parser-check-only reason="Skills manifest TOML structure" -->
 ```toml
 [[skills]]
 name = "skill-creator"
@@ -1432,6 +1440,7 @@ directory that resolves outside the repository root is an error as well. Obtain
 a pin by running the check once — the report carries the `actual` digest for
 every managed tree.
 
+<!-- example: id=cli_skills_drift_cmd classification=illustrative reason="Skills drift CLI command syntax" -->
 ```bash
 do-harness skills drift                  # text: one line per managed skill
 do-harness skills drift --format json    # schema_version 1 report
@@ -1468,6 +1477,7 @@ Explain a `GitHub` Actions workflow run: why did it fail or cancel, and what do
 I run locally to reproduce it? Read-only; works in any git repository without
 harness initialization (`gh` resolves the repository, honoring `GH_REPO`).
 
+<!-- example: id=cli_ci_explain_cmd classification=illustrative reason="CI explain CLI command syntax" -->
 ```bash
 do-harness ci-explain 35885635041
 do-harness ci-explain https://github.com/d-o-hub/do-harness/actions/runs/36166912302 --format json

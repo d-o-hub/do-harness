@@ -8,6 +8,7 @@ Zero-install with npx on Linux and macOS (Node 18+; resolves the prebuilt
 platform binary). **Windows is not available through npm** — use the release
 zip below:
 
+<!-- example: id=npx_quickstart classification=illustrative reason="npx runner invocation" -->
 ```bash
 npx do-harness init
 npx do-harness verify --set verification --changed --strict
@@ -21,6 +22,7 @@ install path, because npm rejects the `do-harness-win32-x64` package name
 (HTTP 403, "Package name triggered spam detection"); see
 [docs/adoption.md](https://github.com/d-o-hub/do-harness/blob/main/docs/adoption.md#windows) for details.
 
+<!-- example: id=install_script classification=executable fixture=installer_local_artifact -->
 ```bash
 # latest release (resolved from the releases/latest redirect)
 curl -fsSL https://raw.githubusercontent.com/d-o-hub/do-harness/main/scripts/install.sh | sh
@@ -39,6 +41,7 @@ provenance trust boundary and verification model.
 
 Rust users can fetch the prebuilt release through `cargo-binstall`:
 
+<!-- example: id=cargo_binstall classification=illustrative reason="cargo binstall tool" -->
 ```bash
 cargo binstall do-harness
 ```
@@ -52,6 +55,7 @@ See [source-distribution validation](docs/releasing.md#source-distribution-valid
 
 Building from source requires Rust 1.85+:
 
+<!-- example: id=cargo_build_release classification=illustrative reason="Cargo build command" -->
 ```bash
 cargo build --release --locked -p do-harness
 ```
@@ -60,6 +64,7 @@ The binary lands at `target/release/do-harness`.
 
 To install a source checkout on `PATH` (for use in other repositories):
 
+<!-- example: id=cargo_install_crates classification=illustrative reason="Cargo install path command" -->
 ```bash
 cargo install --path crates/do-harness --locked
 ```
@@ -72,6 +77,7 @@ The harness is designed to be adopted by any codebase, Rust or not:
    installer for any stack, or `cargo install --path` for a vendored or
    air-gapped checkout:
 
+   <!-- example: id=use_another_repo_install classification=illustrative reason="Alternative adoption installation flows" -->
    ```bash
    curl -fsSL https://raw.githubusercontent.com/d-o-hub/do-harness/main/scripts/install.sh \
      | sh -s -- --version v0.2.1
@@ -83,6 +89,7 @@ The harness is designed to be adopted by any codebase, Rust or not:
 
    Then from the target repository root run:
 
+   <!-- example: id=init_language_packs classification=executable fixture=generic_adoption -->
    ```bash
    do-harness init                 # Rust sensor pack
    do-harness init --language generic   # no built-in sensors
@@ -127,6 +134,7 @@ The harness is designed to be adopted by any codebase, Rust or not:
 
 3. Wire the git hooks:
 
+   <!-- example: id=readme_hook_install classification=illustrative reason="Hook install command snippet" -->
    ```bash
    do-harness hook install
    ```
@@ -136,6 +144,7 @@ The harness is designed to be adopted by any codebase, Rust or not:
 
 4. Run diagnostics and the suite:
 
+   <!-- example: id=readme_doctor_verify classification=illustrative reason="Diagnostics and verify snippet" -->
    ```bash
    do-harness doctor               # verify binary resolution, git hooks & state-db migration skew
    do-harness verify               # run sensor suite
@@ -145,6 +154,7 @@ The harness is designed to be adopted by any codebase, Rust or not:
 
 For local developer setup scripts or CI workflows in adopting repositories:
 
+<!-- example: id=dev_setup_script classification=illustrative reason="Multi-step developer setup script" -->
 ```bash
 #!/usr/bin/env bash
 set -euo pipefail
@@ -173,6 +183,7 @@ pack's pass is vacuous. CI repeats `init && verify` on every push (see
 
 For CI, install the pinned binary first, then invoke `do-harness verify --format json --evidence .do-harness/evidence.json --strict` (exit 0/1/2) — no build step required.
 
+<!-- example: id=ci_path_export classification=illustrative reason="CI environment path export snippet" -->
 ```bash
 curl -fsSL https://raw.githubusercontent.com/d-o-hub/do-harness/main/scripts/install.sh \
   | sh -s -- --version v0.2.1
@@ -252,6 +263,7 @@ Global flags: `--root <DIR>`, `--config <FILE>`, `-q, --quiet`, `--output <FILE>
 
 `verify --format json` emits a single JSON object:
 
+<!-- example: id=readme_json_report classification=parser-check-only reason="JSON verification output structure" -->
 ```json
 {
   "ok": false,
@@ -333,6 +345,7 @@ for the install walkthrough and configuration.
 
 GitLab CI:
 
+<!-- example: id=readme_gitlab_ci classification=illustrative reason="GitLab CI configuration file snippet" -->
 ```yaml
 verify:
   image: rust:latest

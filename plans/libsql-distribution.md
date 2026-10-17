@@ -45,6 +45,7 @@ database files do not change.
 
 The repository's `crates-io-name-check` skill was applied:
 
+<!-- example: id=plans_libsql_first_publish classification=illustrative reason="Terminal output record from crates.io name check" -->
 ```text
 curl (User-Agent: do-harness-name-check; Accept: application/json)
 https://crates.io/api/v1/crates/do-harness-libsql

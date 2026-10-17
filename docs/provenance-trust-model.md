@@ -8,6 +8,7 @@ This document specifies the trust model for `do-harness` artifact and document p
 
 The provenance verification trust model separates source repository management, build execution, signing, artifact distribution, and consumer-side verification into distinct security boundaries:
 
+<!-- example: id=provenance_trust_diagram classification=illustrative reason="ASCII trust boundary diagram" -->
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
 │ Boundary 1: Source & Dependency Registries                             │
@@ -132,6 +133,7 @@ Consumers and automated deployment harnesses verifying `do-harness` release arti
 
 2. **Attestation & Origin Verification (`github-attestation` / `slsa` mode):**
    * Execute:
+     <!-- example: id=provenance_gh_attestation classification=illustrative reason="gh attestation command syntax" -->
      ```bash
      gh attestation verify do-harness-vX.Y.Z-<target>.tar.gz \
        --owner d-o-hub
@@ -143,6 +145,7 @@ Consumers and automated deployment harnesses verifying `do-harness` release arti
 
 3. **Embedded Metadata Inspection (`cargo-auditable`):**
    * For extracted binary artifacts, run:
+     <!-- example: id=provenance_cargo_audit_bin classification=illustrative reason="cargo audit bin command syntax" -->
      ```bash
      cargo audit bin path/to/do-harness
      ```

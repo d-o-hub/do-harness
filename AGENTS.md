@@ -63,10 +63,12 @@
 ### Phase 5: Implementation & Computational Sensors (Green & Refactor)
 - Implement the minimal handler logic to satisfy the test (`Green`).
 - Run the full verification suite via the unified entrypoint (`do-harness verify` runs every configured sensor — see `[[sensors]]` in `do-harness.toml`):
+  <!-- example: id=agents_verify classification=illustrative reason="Self-correction verify command" -->
   ```bash
   do-harness verify
   ```
 - For targeted re-runs after a specific sensor fires (self-correction protocol), invoke the individual command:
+  <!-- example: id=agents_targeted_reruns classification=illustrative reason="Targeted cargo re-runs" -->
   ```bash
   cargo check
   cargo test
