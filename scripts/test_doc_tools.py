@@ -6,7 +6,7 @@ markdown parsing, and link verification.
 
 import os
 import shutil
-import subprocess
+import subprocess  # nosec B404
 import sys
 import tempfile
 import unittest
