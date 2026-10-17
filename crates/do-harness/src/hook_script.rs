@@ -267,10 +267,16 @@ mod tests {
             assert!(body.contains(key), "scrub must clear {key}");
         }
         // `GIT_CONFIG*` is deliberately inherited: it carries the caller's -c.
-        assert!(
-            !body.contains("GIT_CONFIG"),
-            "config-carrying variables stay inherited"
-        );
+        // Check the unset statements themselves, not the rationale comment.
+        for line in body
+            .lines()
+            .filter(|line| line.trim_start().starts_with("unset"))
+        {
+            assert!(
+                !line.contains("GIT_CONFIG"),
+                "config-carrying variables stay inherited: {line}"
+            );
+        }
     }
 
     #[test]
