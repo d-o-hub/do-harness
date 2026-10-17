@@ -1,0 +1,105 @@
+version = 1
+
+[fixtures.generic_adoption]
+id = "generic_adoption"
+description = "Generic adoption flow: do-harness init --language generic and vacuous verify"
+setup_steps = ["git_init"]
+displayed_command = """
+do-harness init                 # Rust sensor pack
+do-harness init --language generic   # no built-in sensors
+do-harness init --language web       # web UI audit pack (viewport, a11y, console, perf, visual, i18n)
+do-harness init --language node      # Node/JS/TS pack (typecheck, lint, test, build)"""
+commands = [
+    { argv = ["init", "--language", "generic"], expected_exit = 0 },
+    { argv = ["verify"], expected_exit = 0 }
+]
+
+[fixtures.generic_adoption.file_assertions]
+"do-harness.toml" = { exists = true, contains = 'language = "generic"' }
+"AGENTS.md" = { exists = true }
+
+[fixtures.rust_init_detected]
+id = "rust_init_detected"
+description = "Repository-detected init when Cargo.toml exists"
+setup_steps = ["git_init", "cargo_toml_scaffold"]
+displayed_command = "do-harness init"
+commands = [
+    { argv = ["init"], expected_exit = 0 }
+]
+
+[fixtures.rust_init_detected.file_assertions]
+"Cargo.toml" = { exists = true }
+"do-harness.toml" = { exists = true, contains = 'language = "rust"' }
+
+[fixtures.rust_init_scaffolded]
+id = "rust_init_scaffolded"
+description = "Explicit Rust init in empty repository scaffolds minimal crate"
+setup_steps = ["git_init"]
+displayed_command = "do-harness init --language rust"
+commands = [
+    { argv = ["init", "--language", "rust"], expected_exit = 0 }
+]
+
+[fixtures.rust_init_scaffolded.file_assertions]
+"Cargo.toml" = { exists = true }
+"src/lib.rs" = { exists = true }
+"do-harness.toml" = { exists = true, contains = 'language = "rust"' }
+
+[fixtures.configured_sensor_pass_fail]
+id = "configured_sensor_pass_fail"
+description = "Configured passing and failing sensors in do-harness.toml"
+setup_steps = ["git_init", "custom_sensor_config"]
+displayed_command = "do-harness verify --format json"
+commands = [
+    { argv = ["verify", "--format", "json"], expected_exit = 1 }
+]
+
+[fixtures.verify_strict_evidence_freshness]
+id = "verify_strict_evidence_freshness"
+description = "Verify with strict and evidence, followed by status check"
+setup_steps = ["git_init", "generic_init"]
+displayed_command = "do-harness verify --format json --evidence .do-harness/evidence.json --strict\ndo-harness status --format json"
+commands = [
+    { argv = ["verify", "--format", "json", "--evidence", ".do-harness/evidence.json", "--strict"], expected_exit = 0 },
+    { argv = ["status", "--format", "json"], expected_exit = 0 }
+]
+
+[fixtures.task_workflow_db]
+id = "task_workflow_db"
+description = "Task lifecycle backed by real SQLite database"
+setup_steps = ["git_init", "generic_init"]
+displayed_command = "do-harness task add \"Test task\"\ndo-harness task list\ndo-harness task export\ndo-harness task import --check"
+commands = [
+    { argv = ["task", "add", "Test task"], expected_exit = 0 },
+    { argv = ["task", "list"], expected_exit = 0 },
+    { argv = ["task", "export"], expected_exit = 0 },
+    { argv = ["task", "import", "--check"], expected_exit = 0 }
+]
+
+[fixtures.task_workflow_db.file_assertions]
+".do-harness/agent_state.db" = { exists = true }
+"plans/tasks.json" = { exists = true }
+
+[fixtures.usage_error]
+id = "usage_error"
+description = "CLI usage error for invalid flag"
+setup_steps = ["git_init"]
+displayed_command = "do-harness verify --invalid-flag"
+commands = [
+    { argv = ["verify", "--invalid-flag"], expected_exit = 2 }
+]
+
+[fixtures.installer_local_artifact]
+id = "installer_local_artifact"
+description = "Local release-artifact installation fixture without network"
+setup_steps = ["installer_local"]
+displayed_command = """
+# latest release (resolved from the releases/latest redirect)
+curl -fsSL https://raw.githubusercontent.com/d-o-hub/do-harness/main/scripts/install.sh | sh
+
+# pinned, reproducible install
+curl -fsSL https://raw.githubusercontent.com/d-o-hub/do-harness/main/scripts/install.sh \\
+  | sh -s -- --version v0.2.1"""
+commands = []
+type = "installer"
+expected_exit = 0

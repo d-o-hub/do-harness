@@ -13,6 +13,7 @@ The resolver returns **facts only** regarding component scopes and transitively 
 
 An invocation passes a single JSON payload on `stdin`:
 
+<!-- example: id=resolver_input_json classification=parser-check-only reason="Affected-component resolver input JSON schema sample" -->
 ```json
 {
   "schema_version": 1,
@@ -39,6 +40,7 @@ An invocation passes a single JSON payload on `stdin`:
 
 Upon success, the resolver writes a single JSON payload to `stdout`:
 
+<!-- example: id=resolver_output_json classification=parser-check-only reason="Affected-component resolver output JSON schema sample" -->
 ```json
 {
   "schema_version": 1,

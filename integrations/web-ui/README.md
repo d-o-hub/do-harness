@@ -51,6 +51,7 @@ grounded in WCAG 2.2 (1.4.3 contrast, 1.4.10 reflow, 2.4.7 focus visibility,
 
 Headless unit tests cover every pure helper and run without browser dependencies:
 
+<!-- example: id=web_ui_unit_tests classification=illustrative reason="Node unit test execution command" -->
 ```bash
 node --test integrations/web-ui/audit.test.mjs
 ```
@@ -59,6 +60,7 @@ The rendered suite serves the committed fixtures through a local HTTP server,
 then exercises real Playwright layout, paint, overlap, contrast, and visual
 baseline behavior:
 
+<!-- example: id=web_ui_browser_tests classification=illustrative reason="Node browser test execution command" -->
 ```bash
 node --test integrations/web-ui/audit.browser.test.mjs
 ```
@@ -87,6 +89,7 @@ intentional low-contrast chip, and annotation screenshots are valid PNGs.
 `[[sensors]]` entry for an adopting web repo (sensor wraps the repo's own
 script so local evidence and CI cannot drift):
 
+<!-- example: id=web_ui_sensor_toml classification=parser-check-only reason="Web UI sensor TOML configuration snippet" -->
 ```toml
 [[sensors]]
 name = "viewport-ux"

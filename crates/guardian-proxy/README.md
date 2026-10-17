@@ -14,6 +14,7 @@ Optional fail-closed guardian proxy — adjacent to `do-harness` dev harness, no
 
 Run:
 
+<!-- example: id=guardian_proxy_commands classification=illustrative reason="Guardian proxy cargo commands" -->
 ```bash
 cargo check -p guardian-proxy
 cargo check -p guardian-proxy --features agt-governance

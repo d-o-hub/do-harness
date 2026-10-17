@@ -135,6 +135,7 @@ an older semver fails there too.
    (`scripts/check-package-contract.sh`).
 2. Tag the merge commit and push the tag:
 
+   <!-- example: id=releasing_tag_commands classification=illustrative reason="Git tag creation and push commands" -->
    ```bash
    git tag v0.3.0 <merge-commit>
    git push origin v0.3.0
@@ -177,6 +178,7 @@ an older semver fails there too.
 
 Three checks, each answering a different question:
 
+<!-- example: id=releasing_verify_download classification=illustrative reason="Download verification commands" -->
 ```bash
 gh release download v0.2.1 --repo d-o-hub/do-harness
 sha256sum -c checksums.txt                       # is the download intact?
@@ -252,6 +254,7 @@ which is why they are the grouping that exists.
 
 Preview the body without publishing:
 
+<!-- example: id=releasing_generate_notes classification=illustrative reason="Release notes generation script commands" -->
 ```bash
 gh api --method POST repos/d-o-hub/do-harness/releases/generate-notes \
   -f tag_name=v0.2.1 -f target_commitish=main \
@@ -309,6 +312,7 @@ packages (any subdirectory with a `Cargo.toml`) from a package.
 
 Validate packaging locally before tagging:
 
+<!-- example: id=releasing_cargo_publish_dry_run classification=illustrative reason="Cargo publish dry-run command" -->
 ```bash
 cargo publish --dry-run -p do-harness-types
 # db and do-harness depend on the crates above being on crates.io; once
@@ -356,6 +360,7 @@ Release preflight runs focused contract checks before publication:
 
 Install the pinned API checker, then run the same preflight checks locally:
 
+<!-- example: id=releasing_local_repro classification=illustrative reason="Local preflight reproduction commands" -->
 ```bash
  cargo install cargo-semver-checks --version 0.50.0 --locked
  bash scripts/check-rust-api-compatibility.sh
@@ -382,6 +387,7 @@ directory registry (Cargo source replacement, with no manifest patches).
 These scripts require Python 3.12 and the pinned Rust toolchain; Linux musl
 checks also require the Rust musl target and `musl-gcc`:
 
+<!-- example: id=releasing_source_dist_test classification=illustrative reason="Source distribution validation script commands" -->
 ```bash
 python scripts/test_source_distribution.py
 python scripts/check_source_distribution.py --target x86_64-unknown-linux-musl \
@@ -390,6 +396,7 @@ python scripts/check_source_distribution.py --target x86_64-unknown-linux-musl \
 
 After publication, validate the actual registry install:
 
+<!-- example: id=releasing_registry_check classification=illustrative reason="Registry source distribution validation script command" -->
 ```bash
 python scripts/check_source_distribution.py --mode registry \
   --target x86_64-unknown-linux-musl
@@ -477,6 +484,7 @@ still fail.
 
 Validate the assembly locally without a token:
 
+<!-- example: id=releasing_npm_local_assembly classification=illustrative reason="npm package assembly test script" -->
 ```bash
 dist=$(mktemp -d)
 for target in x86_64-unknown-linux-musl aarch64-unknown-linux-musl \

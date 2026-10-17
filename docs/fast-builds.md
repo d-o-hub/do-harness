@@ -4,6 +4,7 @@ Opt-in instructions for accelerating local development builds with shared compil
 
 ## Opt-in Setup (<20 lines)
 
+<!-- example: id=fast_builds_opt_in classification=illustrative reason="Opt-in environment setup instructions" -->
 ```bash
 # 1. Install tools (e.g. Linux x86_64)
 sudo apt-get install sccache mold clang
@@ -26,6 +27,7 @@ good throughput default, but it can create a large aggregate RSS when several
 large dependencies compile together. Use a bounded job count on a constrained
 machine rather than changing the repository-wide default:
 
+<!-- example: id=fast_builds_low_mem classification=illustrative reason="Low memory cargo build commands" -->
 ```bash
 # Lowest peak memory; slowest clean build.
 CARGO_BUILD_JOBS=1 cargo check --workspace --locked

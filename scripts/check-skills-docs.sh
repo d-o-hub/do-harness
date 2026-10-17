@@ -172,7 +172,9 @@ if command -v python3 >/dev/null 2>&1 &&
         python3 -c "import markdown_it, tomli" >/dev/null 2>&1; }; then
     docs_verified=1
     python3 "$ROOT/scripts/test_doc_tools.py" || failures=1
+    python3 "$ROOT/scripts/tests/test_examples.py" || failures=1
     python3 "$ROOT/scripts/docs.py" links --check || failures=1
+    python3 "$ROOT/scripts/docs.py" examples --check || failures=1
 else
     if require_tools; then
         echo "FAIL: python3 and markdown-it-py are required when CI=true or DO_HARNESS_REQUIRE_TOOLS=1 (install: python3 -m pip install -r scripts/requirements-docs.txt)." >&2

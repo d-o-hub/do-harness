@@ -33,6 +33,7 @@ The model never passes raw CLI argv: the tool schema exposes only
 From a checkout of this repository (prebuilt plain JavaScript; a Git install
 needs no TypeScript prepare step):
 
+<!-- example: id=dsh_plugin_add classification=illustrative reason="DSH plugin add command" -->
 ```sh
 dsh plugin --profile demo add ./integrations/deepseek-harness
 dsh --profile demo --dump-config   # verify the do-harness-signals layer
@@ -41,6 +42,7 @@ dsh --profile demo
 
 From a Git host (pin a commit for reproducibility):
 
+<!-- example: id=dsh_plugin_add_git classification=illustrative reason="DSH plugin add git command" -->
 ```sh
 dsh plugin --profile demo add github:your-org/do-harness#<sha>
 ```
@@ -48,6 +50,7 @@ dsh plugin --profile demo add github:your-org/do-harness#<sha>
 Remove it at any time; the repository and the `do-harness` CLI keep working
 exactly as before:
 
+<!-- example: id=dsh_plugin_remove classification=illustrative reason="DSH plugin remove command" -->
 ```sh
 dsh plugin --profile demo remove dsh-do-harness
 ```
@@ -62,6 +65,7 @@ The bundle's `cordis.patch.yml` declares defaults; a profile can override the
 row by restating every key it needs (patches replace the whole `config`
 value):
 
+<!-- example: id=dsh_config_yaml classification=parser-check-only reason="DSH configuration YAML snippet" -->
 ```yaml
 - id: do-harness-signals
   config:
@@ -97,6 +101,7 @@ The unit tests exercise the subprocess seam with scripted outcomes; the e2e
 tests drive the real `do-harness` binary (no mock of the state transitions
 they prove):
 
+<!-- example: id=dsh_tests_cmd classification=illustrative reason="DSH tests execution command" -->
 ```sh
 cargo build -p do-harness
 DO_HARNESS_BIN="$PWD/target/debug/do-harness" \

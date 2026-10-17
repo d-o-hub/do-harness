@@ -8,6 +8,7 @@ generated contract.
 
 Zero-install with npx (Node 18+, no binary on `PATH` required):
 
+<!-- example: id=adoption_npx classification=illustrative reason="npx runner invocation" -->
 ```bash
 npx do-harness init
 npx do-harness verify --set verification --changed --strict
@@ -15,6 +16,7 @@ npx do-harness verify --set verification --changed --strict
 
 Or install a pinned prebuilt binary:
 
+<!-- example: id=adoption_install classification=executable fixture=installer_local_artifact -->
 ```bash
 # Latest release (tag resolved from the releases/latest redirect).
 curl -fsSL https://raw.githubusercontent.com/d-o-hub/do-harness/main/scripts/install.sh | sh
@@ -71,6 +73,7 @@ fallback.
 
 Rust toolchains can fetch the prebuilt release artifact:
 
+<!-- example: id=adoption_binstall classification=illustrative reason="cargo binstall tool" -->
 ```bash
 cargo binstall do-harness          # prebuilt, no compile
 ```
@@ -92,6 +95,7 @@ reproducible, but cannot add a missing source fix to an older release.
 
 ## Initialize the repository
 
+<!-- example: id=adoption_init_flow classification=illustrative reason="Multi-command adoption walkthrough" -->
 ```bash
 cd /path/to/repository
 do-harness init                    # detects the stack; rust pack by default
@@ -129,6 +133,7 @@ before trusting `verify`.
 
 ## Configure sensors for your stack
 
+<!-- example: id=adoption_toml_config classification=parser-check-only reason="Sample do-harness.toml configuration fragment" -->
 ```toml
 # do-harness.toml
 language = "generic"
@@ -160,6 +165,7 @@ Status documents rot silently, so `init` also scaffolds a reference
 list`, prints the drift with its line number, and fails closed when it cannot
 verify a claim. Declare it (soft by default) to enable it:
 
+<!-- example: id=adoption_tracker_drift_toml classification=parser-check-only reason="Sample project-check TOML snippet" -->
 ```toml
 [[sensors]]
 name = "tracker-drift"
@@ -177,6 +183,7 @@ The LOC ceiling is not Rust-only: the rust pack ships `loc` over `*.rs` by
 default, and a front-end tree gets the same invariant by scoping that sensor
 instead of forking the script.
 
+<!-- example: id=adoption_loc_toml classification=parser-check-only reason="Sample loc sensor TOML snippet" -->
 ```toml
 [[sensors]]
 name = "loc"
@@ -221,6 +228,7 @@ audit stages, matrix contract, and visual-baseline semantics.
 
 Agents (and CI) only need three commands:
 
+<!-- example: id=adoption_agent_loop classification=illustrative reason="Agent edit loop CLI commands" -->
 ```bash
 do-harness verify --set feedback --changed          # during edits
 do-harness verify --set verification --changed --strict   # before completion
@@ -238,6 +246,7 @@ evidence.
 
 GitHub Actions:
 
+<!-- example: id=adoption_gha_yaml classification=illustrative reason="GitHub Actions YAML workflow snippet" -->
 ```yaml
 - name: Install do-harness
   run: |
@@ -253,6 +262,7 @@ GitHub Actions:
 
 GitLab CI:
 
+<!-- example: id=adoption_gitlab_yaml classification=illustrative reason="GitLab CI YAML workflow snippet" -->
 ```yaml
 verify:
   script:
@@ -273,6 +283,7 @@ The rust pack scaffolds the release step so it is not re-invented per
 repository: a runbook (`plans/RELEASING.md`) and a read-only preflight
 (`scripts/check-release-preflight.sh`) that never tags, pushes, or publishes.
 
+<!-- example: id=adoption_release_preflight classification=illustrative reason="Release preflight script execution" -->
 ```bash
 bash scripts/check-release-preflight.sh            # pins agree (offline)
 bash scripts/check-release-preflight.sh --release  # + target not already published
@@ -295,6 +306,7 @@ sensor's `argv`) to keep the `VERSION`/`Cargo.toml` check without it.
 `init` puts the offline half in the generated config, so the dev loop never
 needs the network:
 
+<!-- example: id=adoption_release_signal_sets classification=parser-check-only reason="Release signal sets configuration TOML" -->
 ```toml
 [signal-sets]
 # release-preflight also joins `verification`; it is offline, so neither set
