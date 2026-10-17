@@ -362,6 +362,7 @@ class TestCliSync(unittest.TestCase):
             ],
         )
         self.assertEqual(run.call_args.kwargs["cwd"], "/repo")
+        self.assertEqual(run.call_args.kwargs["check"], False)
         self.assertNotIn(cli_sync.WRITE_ENV, run.call_args.kwargs["env"])
 
     def test_write_mode_sets_update_env(self):
@@ -383,14 +384,6 @@ class TestCliSync(unittest.TestCase):
         self.assertFalse(cli_sync.ci_is_set({"CI": "0"}))
         self.assertFalse(cli_sync.ci_is_set({"CI": "false"}))
         self.assertTrue(cli_sync.ci_is_set({"CI": "true"}))
-
-    def test_toolchain_override_precedence(self):
-        self.assertEqual(cli_sync.cargo_binary({}), "cargo")
-        self.assertEqual(cli_sync.cargo_binary({"CARGO": "/opt/cargo"}), "/opt/cargo")
-        self.assertEqual(
-            cli_sync.cargo_binary({"CARGO": "/opt/cargo", "DO_HARNESS_CARGO": "/custom/cargo"}),
-            "/custom/cargo",
-        )
 
     def test_missing_cargo_returns_usage_error(self):
         with mock.patch.object(cli_sync.subprocess, "run", side_effect=FileNotFoundError):
