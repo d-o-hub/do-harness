@@ -9,6 +9,17 @@ do-harness [GLOBAL OPTIONS] <SUBCOMMAND>
 ```
 
 ## Global Options
+<!-- BEGIN GENERATED: cli-globals -->
+`do-harness [OPTIONS] <COMMAND>`
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `--root <DIR>` | no | — | — | Workspace root override (default: walk up from cwd) |
+| `--config <FILE>` | no | — | — | Explicit path to do-harness.toml |
+| `-q, --quiet` | no | — | — | Suppress PASS/WARN verdict lines and the success footer |
+| `--output <FILE>` | no | — | — | Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins) |
+| `--dry-run` | no | — | — | Dry run without side effects |
+<!-- END GENERATED: cli-globals -->
 
 - `--root <DIR>`: Workspace root override (default: walk up from cwd). An
   explicit root selects exactly `<DIR>/do-harness.toml`; a missing file is a
@@ -23,6 +34,13 @@ do-harness [GLOBAL OPTIONS] <SUBCOMMAND>
 ## Subcommands
 
 ### `version`
+<!-- BEGIN GENERATED: cli-contract version -->
+`do-harness version [OPTIONS]`
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `--format <FORMAT>` | no | `text` | `text`, `json` | Output format |
+<!-- END GENERATED: cli-contract version -->
 Print the binary's identity: name, version, commit, commit date, and whether the
 working tree was dirty when it was built.
 
@@ -32,7 +50,30 @@ working tree was dirty when it was built.
 `doctor` compares the same information against the state database to flag a
 binary that predates the schema.
 
-### `verify` (alias: `check`)
+### `verify`
+<!-- BEGIN GENERATED: cli-contract verify -->
+`do-harness verify [OPTIONS]`
+
+Aliases: `check`.
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `--fail-fast` | no | — | — | Halt at the first failing sensor |
+| `--format <FORMAT>` | no | `text` | `text`, `json` | Output format |
+| `--set <SET>` | no | — | — | Run only the sensors in this development signal set |
+| `--changed` | no | — | — | Run only sensors applicable to the working-tree change |
+| `--only <SENSOR>` (repeatable) | no | — | — | Run only the named sensor (repeatable or comma-separated) |
+| `--exclude <SENSOR>` (repeatable) | no | — | — | Exclude named sensors from the run |
+| `--jobs <N>` | no | — | — | Maximum sensors in flight (overrides `jobs` in do-harness.toml) |
+| `--unchanged <MODE>` | no | `warn` | `warn`, `skip`, `run` | Reuse recorded passing beats for sensors whose declared inputs are unchanged: `warn` (default) executes and advises, `skip` reuses without executing (requires --record), `run` always executes |
+| `--record` | no | — | — | Persist beats and error signatures into the state database |
+| `--task <ID>` | no | — | — | Scope records and fail-fast strikes to this task id (or 'global') |
+| `--global` | no | — | — | Record unscoped beats in the global namespace |
+| `--evidence <FILE>` | no | — | — | Write a machine-readable evidence artifact to path |
+| `--strict` | no | — | — | Enforce strong evidence: exit non-zero on skips or missing timing/exit codes |
+| `--bless` | no | — | — | Lower or initialize blessed findings baselines from this run (requires --record; a bless never raises a baseline) |
+| `--approver <NAME>` | no | — | — | Approver identity recorded with `--bless` (defaults to `DO_HARNESS_APPROVER` or the git user email) |
+<!-- END GENERATED: cli-contract verify -->
 Runs computational sensors defined in `do-harness.toml`.
 
 - `--fail-fast`: Stop execution at the first failing sensor.
@@ -267,6 +308,15 @@ line/branch proof from `cargo-llvm-cov nextest`.
   where*, and the llvm-cov run is the coverage proof.
 
 ### `status`
+<!-- BEGIN GENERATED: cli-contract status -->
+`do-harness status [OPTIONS]`
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `--set <SET>` | no | — | — | Check evidence for this development signal set |
+| `--evidence <FILE>` | no | — | — | Read evidence from this file instead of the default artifact |
+| `--format <FORMAT>` | no | `text` | `text`, `json` | Output format |
+<!-- END GENERATED: cli-contract status -->
 Reports verification evidence freshness for a signal set without executing
 any sensor: `green` (current passing evidence covers the set), `red`
 (matching evidence contains required failures), `stale` (evidence exists but
@@ -281,7 +331,17 @@ red/stale/missing, 2 on usage/config errors.
 - `--evidence <FILE>`: Read evidence from this file instead.
 - `--format <Format>`: Output format (`text` or `json`).
 
-### `list` (alias: `ls`)
+### `list`
+<!-- BEGIN GENERATED: cli-contract list -->
+`do-harness list [OPTIONS]`
+
+Aliases: `ls`.
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `--sets` | no | — | — | List development signal-set names instead of sensors |
+| `--format <FORMAT>` | no | `text` | `text`, `json` | Output format |
+<!-- END GENERATED: cli-contract list -->
 Lists configured sensor names, or with `--sets` the selectable development
 signal-set names (declared `[signal-sets]` keys, or `verification`/`release`
 for legacy configs).
@@ -290,6 +350,15 @@ for legacy configs).
 - `--format <Format>`: Output format (`text` or `json`).
 
 ### `explain`
+<!-- BEGIN GENERATED: cli-contract explain -->
+`do-harness explain [OPTIONS]`
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `--set <SET>` | no | — | — | Explain this development signal set (default: all sensors) |
+| `--changed` | no | — | — | Select by working-tree change instead of listing everything |
+| `--format <FORMAT>` | no | `text` | `text`, `json` | Output format |
+<!-- END GENERATED: cli-contract explain -->
 Explains which sensors the current change selects and why, without executing
 any sensor. Reports the changed files plus every selected sensor (with its
 matching pattern or constraint reason) and every skipped sensor.
@@ -299,6 +368,14 @@ matching pattern or constraint reason) and every skipped sensor.
 - `--format <Format>`: Output format (`text` or `json`).
 
 ### `init-db`
+<!-- BEGIN GENERATED: cli-contract init-db -->
+`do-harness init-db [OPTIONS]`
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `--check` | no | — | — | Report pending migrations and exit non-zero when any are pending |
+| `-y, --yes` | no | — | — | Skip the interactive confirmation prompt |
+<!-- END GENERATED: cli-contract init-db -->
 Apply pending migrations to `.do-harness/agent_state.db`, the local state store
 (beats, traces, heuristics, evaluations).
 
@@ -310,6 +387,13 @@ Apply pending migrations to `.do-harness/agent_state.db`, the local state store
 machine-readable half of that check.
 
 ### `seed`
+<!-- BEGIN GENERATED: cli-contract seed -->
+`do-harness seed [OPTIONS]`
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `--prune` | no | — | — | Delete invariants no longer present in plans/invariants.json |
+<!-- END GENERATED: cli-contract seed -->
 Upsert `plans/invariants.json` into the `invariants` table — the machine-readable
 half of the architecture-decision contract (invariant, rationale, sensor).
 
@@ -321,6 +405,18 @@ Run `seed --prune` after editing `plans/invariants.json` so the table cannot
 drift from the file.
 
 ### `init`
+<!-- BEGIN GENERATED: cli-contract init -->
+`do-harness init [OPTIONS]`
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `--language <LANG>` | no | — | `rust`, `generic`, `web`, `node` | Language pack to scaffold (default: detect from the repository) |
+| `--force` | no | — | — | Overwrite existing files |
+| `--format <FORMAT>` | no | `text` | `text`, `json` | Output format |
+| `--no-seed` | no | — | — | Do not seed invariants |
+| `--minimal` | no | — | — | Minimal setup without extra skills |
+| `--no-gitignore` | no | — | — | Skip creating/modifying .gitignore |
+<!-- END GENERATED: cli-contract init -->
 Scaffolds a harness workspace in the target directory and proves the
 generated contract before presenting the repository as ready.
 
@@ -376,19 +472,123 @@ projects.
 - `--no-gitignore`: Skip creating/modifying `.gitignore`.
 
 ### `task`
+<!-- BEGIN GENERATED: cli-contract task -->
+`do-harness task [OPTIONS] <COMMAND>`
+
+Subcommands: `export`, `import`, `list`, `show`, `add`, `advance`, `done`, `fail`, `remove`.
+<!-- END GENERATED: cli-contract task -->
 Task state inspection and workflow management.
-- `task export [--output <FILE>] [--stdout] [--format <Format>]`: Export task snapshot.
-- `task import [--file <FILE>] [--check]`: Validate `plans/tasks.json` against the state database (default file: `plans/tasks.json` under the root); `--check` exits non-zero when the snapshot and database drift.
-- `task list [--status <STATUS>] [--method <METHOD>] [--parent <ID>] [--format <Format>]`: Print tasks and board summary.
-- `task show <ID> [--format <Format>]`: Display task details.
-- `task add <TITLE> [--method <METHOD>] [--parent <ID>] [--precondition <GUARD>]`: Add a new task in pending state. Method must exist in `plans/methods.json`.
-- `task advance <ID>`: Advance task subtask pointer.
-- `task done <ID>`: Mark task completed after all sensor gates pass.
-- `task fail <ID>`: Mark task failed.
-- `task remove <ID>`: Remove an orphan task row that has no workflow events. A task with history is refused, because the event log is append-only and hash-chained; use `task fail` to close it instead.
-- `--dry-run` is a global flag and applies to every mutating action above (`add`, `advance`, `done`, `fail`, `remove`, `export`); each prints what it would do and writes nothing.
+
+`--dry-run` is a global flag and applies to every mutating action below (`add`, `advance`, `done`, `fail`, `remove`, `export`); each prints what it would do and writes nothing.
+
+#### `task export`
+<!-- BEGIN GENERATED: cli-contract task export -->
+`do-harness task export [OPTIONS]`
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `--stdout` | no | — | — | Write directly to stdout instead of file |
+| `--format <FORMAT>` | no | `json` | `text`, `json` | Output format (json/text) |
+<!-- END GENERATED: cli-contract task export -->
+Export the task snapshot to `plans/tasks.json` or to stdout.
+
+#### `task import`
+<!-- BEGIN GENERATED: cli-contract task import -->
+`do-harness task import [OPTIONS]`
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `--file <FILE>` | no | — | — | Snapshot file (defaults to plans/tasks.json under the root) |
+| `--check` | no | — | — | Exit non-zero when the snapshot and database drift |
+<!-- END GENERATED: cli-contract task import -->
+Validate `plans/tasks.json` against the state database (default file: `plans/tasks.json` under the root); `--check` exits non-zero when the snapshot and database drift.
+
+#### `task list`
+<!-- BEGIN GENERATED: cli-contract task list -->
+`do-harness task list [OPTIONS]`
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `--status <STATUS>` | no | — | — | Filter tasks by status (pending, `in_progress`, completed, failed) |
+| `--method <METHOD>` | no | — | — | Filter tasks by method name |
+| `--parent <ID>` | no | — | — | Filter tasks by parent ID |
+| `--format <FORMAT>` | no | `text` | `text`, `json` | Output format |
+<!-- END GENERATED: cli-contract task list -->
+Print tasks and the board summary.
+
+#### `task show`
+<!-- BEGIN GENERATED: cli-contract task show -->
+`do-harness task show [OPTIONS] <ID>`
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `<ID>` | yes | — | — | Task id |
+| `--format <FORMAT>` | no | `text` | `text`, `json` | Output format |
+<!-- END GENERATED: cli-contract task show -->
+Display task details.
+
+#### `task add`
+<!-- BEGIN GENERATED: cli-contract task add -->
+`do-harness task add [OPTIONS] <TITLE>`
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `<TITLE>` | yes | — | — | Human-readable task title |
+| `--method <METHOD>` | no | — | — | Name of HTN method defined in plans/methods.json |
+| `--parent <ID>` | no | — | — | Parent task id |
+| `--precondition <PRECONDITION>` | no | — | — | Recorded precondition guard |
+<!-- END GENERATED: cli-contract task add -->
+Add a new task in `pending` state. The method must exist in `plans/methods.json`.
+
+#### `task advance`
+<!-- BEGIN GENERATED: cli-contract task advance -->
+`do-harness task advance [OPTIONS] <ID>`
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `<ID>` | yes | — | — | Task id |
+<!-- END GENERATED: cli-contract task advance -->
+Advance the task's subtask pointer.
+
+#### `task done`
+<!-- BEGIN GENERATED: cli-contract task done -->
+`do-harness task done [OPTIONS] <ID>`
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `<ID>` | yes | — | — | Task id |
+<!-- END GENERATED: cli-contract task done -->
+Mark the task completed after all sensor gates pass.
+
+#### `task fail`
+<!-- BEGIN GENERATED: cli-contract task fail -->
+`do-harness task fail [OPTIONS] <ID>`
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `<ID>` | yes | — | — | Task id |
+<!-- END GENERATED: cli-contract task fail -->
+Mark the task failed.
+
+#### `task remove`
+<!-- BEGIN GENERATED: cli-contract task remove -->
+`do-harness task remove [OPTIONS] <ID>`
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `<ID>` | yes | — | — | Task id |
+<!-- END GENERATED: cli-contract task remove -->
+Remove an orphan task row that has no workflow events. A task with history is refused, because the event log is append-only and hash-chained; use `task fail` to close it instead.
 
 ### `doctor`
+<!-- BEGIN GENERATED: cli-contract doctor -->
+`do-harness doctor [OPTIONS]`
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `--format <FORMAT>` | no | `text` | `text`, `json` | Output format |
+| `--strict` | no | — | — | Strictly enforce warning checks as failures |
+<!-- END GENERATED: cli-contract doctor -->
 Diagnostic health checks covering binary resolution, git hook status, and database migration skew.
 
 - `--format <Format>`: Output format (`text` or `json`).
@@ -400,6 +600,22 @@ Diagnostic health checks covering binary resolution, git hook status, and databa
   doctor's job.
 
 ### `eval`
+<!-- BEGIN GENERATED: cli-contract eval -->
+`do-harness eval [OPTIONS]`
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `--skill <SKILL>` | no | — | — | Restrict evaluation to this skill directory name |
+| `--bless` | no | — | — | Re-baseline graders and update pass-rate floor on green run |
+| `--list-skills` | no | — | — | List available skills |
+| `--fail-fast` | no | — | — | Halt on first failing evaluation |
+| `--format <FORMAT>` | no | `text` | `text`, `json` | Output format |
+| `--approver <NAME>` | no | — | — | Approver identity recorded with `--bless` (defaults to `DO_HARNESS_APPROVER` or the git user email) |
+| `--no-lift` | no | — | — | Skip the without-skill baseline run (no Skill Lift measured) |
+| `--agent-cmd <COMMAND>` | no | — | — | Run this shell command once per eval case instead of the deterministic walkthrough (real Skill Lift). cwd is the sandbox root; the prompt is in `$DO_HARNESS_PROMPT` and on stdin; stdout is saved to `agent_stdout.txt` for assertions |
+| `--agent-timeout <SECS>` | no | `600` | — | Kill an agent run after this many seconds |
+| `--strict-fixtures` | no | — | — | Fail skills whose fixture has dataset-quality gaps (thin cases, no negative out-of-scope case) |
+<!-- END GENERATED: cli-contract eval -->
 Skill structure validation and evaluation benchmark runner.
 
 - Exit codes follow the shared rule: a pre-check discovery problem is usage
@@ -438,6 +654,14 @@ walkthroughs and `--agent-cmd` commands as untrusted code and wrap the whole
 command in an outer sandbox if needed.
 
 ### `overlap`
+<!-- BEGIN GENERATED: cli-contract overlap -->
+`do-harness overlap [OPTIONS]`
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `--threshold <THRESHOLD>` | no | `0.45` | — | Cosine similarity at or above which a pair prints as WARN |
+| `--format <FORMAT>` | no | `text` | `text`, `json` | Output format |
+<!-- END GENERATED: cli-contract overlap -->
 Rank skill pairs by guidance overlap and warn at or above the cosine threshold —
 a Tier-2 distinctiveness advisory: accepted overlaps are recorded in
 `plans/invariants.json`, and a new pair crossing the threshold signals two guides
@@ -451,6 +675,21 @@ Text output is one line per pair (`skill-creator <-> skill-distiller sim=0.765
 shared=[…]`), sorted by similarity; the command is advisory and exits 0.
 
 ### `distill`
+<!-- BEGIN GENERATED: cli-contract distill -->
+`do-harness distill [OPTIONS]`
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `--skill <SKILL>` | no | — | — | Skill the heuristic belongs to |
+| `--pattern <PATTERN>` | no | — | — | Generalized pattern to record |
+| `--description <DESCRIPTION>` | no | — | — | When the pattern applies |
+| `--from-trace <ID>` | no | — | — | Source trace id; required as evidence of a resolved fix |
+| `--from-strikes` | no | — | — | Generate a starter skill scaffold from recorded sensor strikes (AGENTS.md §6 steering loop) instead of distilling from a trace |
+| `--min-strikes <N>` | no | — | — | Strike count at or above which a signature sculpts a scaffold (default: the fail-fast threshold) |
+| `--task <ID>` | no | — | — | Scope strike lookup to this task id |
+| `--to-fixture` | no | — | — | Raise the skill's pass-rate bar after this recovery (review ticks anti-AI-slop checklist first) |
+| `--format <FORMAT>` | no | `text` | `text`, `json` | Output format |
+<!-- END GENERATED: cli-contract distill -->
 Extracts a heuristic from a resolved trace into a skill.
 
 Review distilled heuristics and code snippets against the advisory Anti-AI-Slop checklist (`.agents/skills/skill-creator/references/anti_ai_slop.md`): purpose-per-struct, real error handling, meaningful domain names, no speculative abstractions, and why-focused docs.
@@ -470,6 +709,16 @@ Review distilled heuristics and code snippets against the advisory Anti-AI-Slop 
 - `--format <Format>`: Output format (`text` or `json`).
 
 ### `learn`
+<!-- BEGIN GENERATED: cli-contract learn -->
+`do-harness learn [OPTIONS] --draft`
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `--draft` | yes | — | — | Draft the steering actions without applying anything (required: `learn` writes nothing) |
+| `--days <DAYS>` | no | `30` | — | Window in days the fires are counted over |
+| `--min-fires <N>` | no | `3` | — | Fires a sensor needs to appear in the draft |
+| `--format <FORMAT>` | no | `text` | `text`, `json` | Output format |
+<!-- END GENERATED: cli-contract learn -->
 Drafts skill/guide updates from sensors that keep firing (the steering loop in
 `AGENTS.md` §6), reading recorded beats for the current scope plus
 `sensor-fire` events under `.agents/events/**`. It never applies anything: the
@@ -491,16 +740,12 @@ draft is a proposal for an operator to act on.
   hyphens, no leading/trailing or consecutive hyphens, at most 64 characters.
 
 ### `errors`
-Inspect and clear fail-fast error signatures. `errors list` displays each
-signature's recorded sensor output. Messages over 2,000 characters include a
-truncation marker, the first detected `FAIL [...]`, `ERROR [...]`, `execfail`,
-or `error:` context (or initial output if none), and a separately labeled
-final 500-character excerpt.
+<!-- BEGIN GENERATED: cli-contract errors -->
+`do-harness errors [OPTIONS] <COMMAND>`
 
-- `errors list [--task <ID>] [--scope <SCOPE>] [--format <Format>]`: List open
-  error signatures.
-- `errors clear [--sensor <SENSOR>] [--task <ID>] [--scope <SCOPE>] [--force] [--dry-run]`:
-  Clear error signatures.
+Subcommands: `list`, `clear`.
+<!-- END GENERATED: cli-contract errors -->
+Inspect and clear fail-fast error signatures.
 
 Strikes are keyed by workstream scope exactly like beats — `branch:<name>` for a
 bare `verify --record`, `task:<id>` for `--task`, `global` for `--global` — so a
@@ -509,22 +754,132 @@ runnable everywhere else. `--scope` accepts `branch:<name>`, `task:<id>`,
 `global`, or `all` (every workstream, the default when no filter is given);
 `--task <ID>` is short for `--scope task:<ID>`.
 
+#### `errors list`
+<!-- BEGIN GENERATED: cli-contract errors list -->
+`do-harness errors list [OPTIONS]`
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `--task <ID>` | no | — | — | Scope to one task id |
+| `--scope <SCOPE>` | no | — | — | Filter by workstream scope (`branch:<name>`, `task:<id>`, `global`, or `all` for every workstream) |
+| `--format <FORMAT>` | no | `text` | `text`, `json` | Output format |
+<!-- END GENERATED: cli-contract errors list -->
+List open error signatures. Each signature's recorded sensor output is displayed; messages over 2,000 characters include a truncation marker, the first detected `FAIL [...]`, `ERROR [...]`, `execfail`, or `error:` context (or initial output if none), and a separately labeled final 500-character excerpt.
+
+#### `errors clear`
+<!-- BEGIN GENERATED: cli-contract errors clear -->
+`do-harness errors clear [OPTIONS]`
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `--sensor <SENSOR>` | no | — | — | Only clear this signature key (e.g. `sensor:<name>`) |
+| `--task <ID>` | no | — | — | Only clear signatures for this task id |
+| `--scope <SCOPE>` | no | — | — | Only clear signatures for this workstream scope (`branch:<name>`, `task:<id>`, `global`, or `all` for every workstream) |
+| `--force` | no | — | — | Allow clearing every workstream without a filter |
+<!-- END GENERATED: cli-contract errors clear -->
+Clear error signatures.
+
 ### `trace`
+<!-- BEGIN GENERATED: cli-contract trace -->
+`do-harness trace [OPTIONS] <COMMAND>`
+
+Subcommands: `add`, `list`, `sessions`.
+<!-- END GENERATED: cli-contract trace -->
 Record and query command execution traces.
 
-- `trace add --session <SESSION> [--task <ID>] [--command <CMD>] [--error-diff <DIFF>] [--resolution-steps <STEPS>]`: Record trace.
-- `trace list --session <SESSION> [--format <Format>]`: Print traces for a session.
-- `trace sessions [--format <Format>]`: List distinct session identifiers.
+#### `trace add`
+<!-- BEGIN GENERATED: cli-contract trace add -->
+`do-harness trace add [OPTIONS] --session <SESSION>`
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `--session <SESSION>` | yes | — | — | Session identifier grouping related traces |
+| `--task <ID>` | no | — | — | Owning task id |
+| `--command <COMMAND>` | no | — | — | The command that was executed |
+| `--error-diff <ERROR_DIFF>` | no | — | — | Error diff or failure output captured |
+| `--resolution-steps <RESOLUTION_STEPS>` | no | — | — | Steps taken to resolve the failure |
+<!-- END GENERATED: cli-contract trace add -->
+Record a command execution trace.
+
+#### `trace list`
+<!-- BEGIN GENERATED: cli-contract trace list -->
+`do-harness trace list [OPTIONS] --session <SESSION>`
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `--session <SESSION>` | yes | — | — | Session identifier |
+| `--format <FORMAT>` | no | `text` | `text`, `json` | Output format |
+<!-- END GENERATED: cli-contract trace list -->
+Print the traces recorded for a session.
+
+#### `trace sessions`
+<!-- BEGIN GENERATED: cli-contract trace sessions -->
+`do-harness trace sessions [OPTIONS]`
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `--format <FORMAT>` | no | `text` | `text`, `json` | Output format |
+<!-- END GENERATED: cli-contract trace sessions -->
+List the distinct session identifiers.
 
 ### `hook`
+<!-- BEGIN GENERATED: cli-contract hook -->
+`do-harness hook [OPTIONS] <COMMAND>`
+
+Subcommands: `install`, `uninstall`, `status`, `diff`.
+<!-- END GENERATED: cli-contract hook -->
 Git hook management (`pre-commit`, `pre-push`, `commit-msg`).
 
-- `hook install [--force]`: Write managed git hooks.
-- `hook uninstall`: Remove managed hooks.
-- `hook status [--format <Format>]`: Report hook installation status.
-- `hook diff`: Show diff between installed hooks and templates.
+#### `hook install`
+<!-- BEGIN GENERATED: cli-contract hook install -->
+`do-harness hook install [OPTIONS]`
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `--force` | no | — | — | Overwrite foreign (unmanaged) hook files |
+<!-- END GENERATED: cli-contract hook install -->
+Write managed git hooks.
+
+#### `hook uninstall`
+<!-- BEGIN GENERATED: cli-contract hook uninstall -->
+`do-harness hook uninstall [OPTIONS]`
+<!-- END GENERATED: cli-contract hook uninstall -->
+Remove managed hooks.
+
+#### `hook status`
+<!-- BEGIN GENERATED: cli-contract hook status -->
+`do-harness hook status [OPTIONS]`
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `--format <FORMAT>` | no | `text` | `text`, `json` | Output format |
+<!-- END GENERATED: cli-contract hook status -->
+Report hook installation status.
+
+#### `hook diff`
+<!-- BEGIN GENERATED: cli-contract hook diff -->
+`do-harness hook diff [OPTIONS]`
+<!-- END GENERATED: cli-contract hook diff -->
+Show the diff between installed hooks and the templates.
 
 ### `metrics`
+<!-- BEGIN GENERATED: cli-contract metrics -->
+`do-harness metrics [OPTIONS] [COMMAND]`
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `--format <FORMAT>` | no | `text` | `text`, `json` | Output format |
+| `--sensor <SENSOR>` | no | — | — | Filter by sensor name |
+| `--skill <SKILL>` | no | — | — | Filter by skill name |
+| `--since <UNIX_SECONDS>` | no | — | — | Filter metrics since a Unix timestamp in seconds |
+| `--scope <SCOPE>` | no | — | — | Filter by workstream scope (e.g. `branch:main`, `task:1`, `global`, or `all`). Defaults to the current git branch |
+| `--task <ID>` | no | — | — | Filter by task id (equivalent to `--scope task:<ID>`) |
+| `--branch <BRANCH>` | no | — | — | Filter by branch name (equivalent to `--scope branch:<NAME>`) |
+| `--all` | no | — | — | Aggregate across all workstreams and scopes |
+
+
+Subcommands: `pr`.
+<!-- END GENERATED: cli-contract metrics -->
 Longitudinal trends: sensor stats, strikes, and skill pass rates. By default,
 sensor statistics *and* strikes are scoped to the current git branch (or to
 `global` when there is none, matching where `verify --record` writes), so
@@ -541,6 +896,17 @@ workstreams.
 - `--all`: Aggregate metrics across all workstreams and scopes.
 
 #### `metrics pr`
+<!-- BEGIN GENERATED: cli-contract metrics pr -->
+`do-harness metrics pr [OPTIONS] --repo <OWNER/NAME>`
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `--repo <OWNER/NAME>` | yes | — | — | Repository as OWNER/NAME (any repository the caller can read) |
+| `--since <WINDOW>` | no | `30d` | — | Window: a duration (`30d`, `12h`, `2w`) or a date (`YYYY-MM-DD`) |
+| `--limit <N>` | no | `30` | — | Maximum pull requests measured, newest first |
+| `--recompute` | no | — | — | Ignore the cached snapshot and refetch |
+| `--format <FORMAT>` | no | `text` | `text`, `json` | Output format |
+<!-- END GENERATED: cli-contract metrics pr -->
 Measure the PR loop itself rather than the sensors: time-to-green, pushes per
 green, waiver comments by class, comment classes, cancelled runs, and re-runs.
 Every number is computed from `gh` reads of the named repository (pull requests,
@@ -587,6 +953,17 @@ rather than reporting an empty window. An unreadable window or repository is a
 usage error (`2`).
 
 ### `loc`
+<!-- BEGIN GENERATED: cli-contract loc -->
+`do-harness loc [OPTIONS] [PATH]...`
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `--dir <DIR>` (repeatable) | no | — | — | Scan directory, relative to workspace root (repeatable or comma-separated) |
+| `--ext <EXT>` (repeatable) | no | — | — | Scan extension (repeatable or comma-separated, e.g. rs, ts, tsx) |
+| `--format <FORMAT>` | no | `text` | `text`, `json` | Output format |
+| `--warn` | no | — | — | Show only files at or above the 450-line decomposition threshold |
+| `[PATH]` (repeatable) | no | — | — | Files or directories to measure (default: scan workspace roots) |
+<!-- END GENERATED: cli-contract loc -->
 Report line-of-code state against the 500-line invariant: one line per file with
 `lines/500`, the band (`OK`, `WARN` at or above the 450-line decomposition
 threshold, `FAIL` above the ceiling), and the code/test split when an inline
@@ -622,6 +999,14 @@ trees — `node_modules`, `target`, `dist`, `build`, `coverage`, `vendor`,
 input; `SPAN:`/`CODE:`/`TEST:` hints are emitted for Rust files only.
 
 ### `split`
+<!-- BEGIN GENERATED: cli-contract split -->
+`do-harness split [OPTIONS] <FILE>`
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `<FILE>` | yes | — | — | Source file to decompose |
+| `--target <NAME>` | no | — | — | Name the sibling module instead of deriving it from the item |
+<!-- END GENERATED: cli-contract split -->
 Extract one large top-level item — or an inline `#[cfg(test)]` module — into a
 sibling module, emitting the declaration and re-exports so the tree still
 compiles. A file already under the ceiling is reported, not modified, and shapes
@@ -632,6 +1017,14 @@ the tool cannot make compile are refused with a reason.
 - `--dry-run`: Print the plan without writing files.
 
 ### `maintenance`
+<!-- BEGIN GENERATED: cli-contract maintenance -->
+`do-harness maintenance [OPTIONS]`
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `--prune-beats <DAYS>` | no | — | — | Delete beats older than this many days (keeps the most recent per task) |
+| `--keep-per-task <N>` | no | `20` | — | Minimum most-recent beats kept per task when pruning |
+<!-- END GENERATED: cli-contract maintenance -->
 Prune unbounded history and compact the local state database.
 
 - `--prune-beats <DAYS>`: Delete beats older than the cutoff, keeping at least
@@ -647,17 +1040,43 @@ retained in full locally (it is small) but CI only uploads the current
 `.do-harness/evidence.json` artifact, not the database.
 
 ### `compliance`
+<!-- BEGIN GENERATED: cli-contract compliance -->
+`do-harness compliance [OPTIONS]`
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `--framework <FRAMEWORK>` | no | — | — | Filter framework (owasp, nist, eu, soc; hyphenated ids accepted) |
+| `--format <FORMAT>` | no | `text` | `text`, `json` | Output format |
+<!-- END GENERATED: cli-contract compliance -->
 Compliance mapping to OWASP Agentic Top 10, NIST AI RMF, EU AI Act, and SOC 2.
 
 - `--framework <FRAMEWORK>`: Filter framework (`owasp`, `nist`, `eu`, `soc`).
 - `--format <Format>`: Output format (`text` or `json`).
 
 ### `audit-chain`
+<!-- BEGIN GENERATED: cli-contract audit-chain -->
+`do-harness audit-chain [OPTIONS]`
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `--format <FORMAT>` | no | `text` | `text`, `json` | Output format |
+<!-- END GENERATED: cli-contract audit-chain -->
 Verify event hash chain integrity in `.do-harness/agent_state.db`.
 
 - `--format <Format>`: Output format (`text` or `json`).
 
 ### `dora`
+<!-- BEGIN GENERATED: cli-contract dora -->
+`do-harness dora [OPTIONS]`
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `--days <DAYS>` | no | — | — | Rolling window in days (overrides the pinned policy for this run) |
+| `--format <FORMAT>` | no | `text` | `text`, `json` | Output format |
+| `--record` | no | — | — | Persist the snapshot into the state database |
+| `--source <SOURCE>` | no | `git` | `git`, `gh` | Where the numbers come from |
+| `--now <UNIX_SECONDS>` | no | — | — | Measurement clock as Unix seconds (default: system clock) |
+<!-- END GENERATED: cli-contract dora -->
 Derive the five DORA deployment metrics — deployment frequency, lead time for
 changes, change failure rate, deployment rework rate, and time to restore
 service — from git history.
@@ -688,7 +1107,25 @@ count travels in the `FINDINGS:` marker for the blessed ratchet), and `2` for a
 usage/config/discovery problem — including a shallow clone whose ranges cannot
 be resolved. A collector that cannot read git history never reads as healthy.
 
+### `pr`
+<!-- BEGIN GENERATED: cli-contract pr -->
+`do-harness pr [OPTIONS] <COMMAND>`
+
+Subcommands: `no-effect`, `review`, `ready`, `waivers`.
+<!-- END GENERATED: cli-contract pr -->
+Deterministic, read-only PR analysis: every subcommand works in any git repository without harness initialization. Pick the subcommand that answers your question.
+
 ### `pr no-effect`
+<!-- BEGIN GENERATED: cli-contract pr no-effect -->
+`do-harness pr no-effect [OPTIONS] [PR]`
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `[PR]` | no | — | — | Pull request number; resolves base and head through `gh` |
+| `--base <REV>` | no | — | — | Base revision (local mode; requires --head) |
+| `--head <REV>` | no | — | — | Head revision (local mode; requires --base) |
+| `--format <FORMAT>` | no | `text` | `text`, `json` | Output format |
+<!-- END GENERATED: cli-contract pr no-effect -->
 Report whether a pull request or revision range introduces any effective change,
 using the merge-base tree delta. Read-only; works in any git repository without
 harness initialization.
@@ -710,6 +1147,17 @@ Exit `0` when the verdict is determined (whether `no-effect` or `has-effect`),
 error is never reported as `no-effect`.
 
 ### `pr review`
+<!-- BEGIN GENERATED: cli-contract pr review -->
+`do-harness pr review [OPTIONS] [PR]`
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `[PR]` | no | — | — | Pull request number; resolves base and head through `gh` |
+| `--base <REV>` | no | — | — | Base revision (local mode; requires --head) |
+| `--head <REV>` | no | — | — | Head revision (local mode; requires --base) |
+| `--recompute` | no | — | — | Ignore the cached report and recompute from scratch |
+| `--format <FORMAT>` | no | `text` | `text`, `json` | Output format |
+<!-- END GENERATED: cli-contract pr review -->
 Emit the semantic residual for a pull request or revision range: the changed
 hunks (units) that evidence could not prove or exempt, with minimal context,
 plus the audit list of policy-exempt units (`exempt`), proven units (`skipped`),
@@ -758,7 +1206,17 @@ cancels out; the JSON envelope counts against the residual. Consumers should
 review the residual only on `reduced` and fall back to the raw diff on `no-go`.
 
 
-### `pr ready` (aliases: `check`, `readiness`, or `pr <n>`)
+### `pr ready`
+<!-- BEGIN GENERATED: cli-contract pr ready -->
+`do-harness pr ready [OPTIONS] <PR>`
+
+Aliases: `readiness`, `check`.
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `<PR>` | yes | — | — | Pull request number |
+| `--format <FORMAT>` | no | `text` | `text`, `json` | Output format |
+<!-- END GENERATED: cli-contract pr ready -->
 Inspect a pull request's end-to-end merge readiness:
 1. Merge state (`mergeStateStatus`, `mergeable`, auto-merge).
 2. CI check runs and commit statuses, categorizing `cancelled` separately from
@@ -791,6 +1249,20 @@ authorization and staleness verdict, so a rejected waiver is visible instead of
 silently ignored.
 
 ### `pr waivers`
+<!-- BEGIN GENERATED: cli-contract pr waivers -->
+`do-harness pr waivers [OPTIONS] --lcov <PATH> [PR]`
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `[PR]` | no | — | — | Pull request number; resolves base and head through `gh` |
+| `--base <REV>` | no | — | — | Base revision (local mode; requires --head) |
+| `--head <REV>` | no | — | — | Head revision (local mode; requires --base) |
+| `--patch <PATH>` | no | — | — | Patch file (unified diff) instead of a revision range |
+| `--lcov <PATH>` | yes | — | — | Measured lcov report to classify |
+| `--since <PATH>` | no | — | — | Previous lcov report: also report the changed lines covered since |
+| `--strip-prefix <PREFIX>` | no | — | — | Prefix stripped from `SF:` paths (a CI checkout path) |
+| `--format <FORMAT>` | no | `text` | `text`, `json` | Output format; `text` prints the paste-ready review comment |
+<!-- END GENERATED: cli-contract pr waivers -->
 Classify the patch-coverage residue of a change: every changed line the measured
 lcov report marks as executed zero times gets a waiver class or a "needs a test"
 verdict. The text output is a comment a reviewer can paste into the pull
@@ -828,8 +1300,25 @@ the verdict lives in the report, where `counts.missing` is the number of changed
 lines a test still has to cover.
 
 ### `skills`
+<!-- BEGIN GENERATED: cli-contract skills -->
+`do-harness skills [OPTIONS] <COMMAND>`
+
+Subcommands: `suggest`, `drift`.
+<!-- END GENERATED: cli-contract skills -->
 Progressive-disclosure skill selection and opt-in drift checks for shared
-skills. `skills suggest` ranks the skills under
+skills.
+
+#### `skills suggest`
+<!-- BEGIN GENERATED: cli-contract skills suggest -->
+`do-harness skills suggest [OPTIONS] --query <TEXT>`
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `--query <TEXT>` | yes | — | — | Task description to match against skill metadata |
+| `--limit <N>` | no | `5` | — | Maximum number of candidates to return |
+| `--format <FORMAT>` | no | `text` | `text`, `json` | Output format |
+<!-- END GENERATED: cli-contract skills suggest -->
+`skills suggest` ranks the skills under
 `.agents/skills/*/SKILL.md` against a task description using **frontmatter
 metadata only** — the catalog never reads a skill body, and ranking is offline
 and deterministic.
@@ -901,7 +1390,16 @@ metadata candidates and one fully loaded skill.
 metadata bytes, loaded-context bytes, unnecessary-load rate, and latency across
 the load-all, deterministic-only, and deterministic+selector arms.
 
-**Drift checks (`skills drift`).** Shared skills are copied between repositories
+#### `skills drift`
+<!-- BEGIN GENERATED: cli-contract skills drift -->
+`do-harness skills drift [OPTIONS]`
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `--manifest <FILE>` | no | — | — | Manifest to read; defaults to `.agents/skills-manifest.toml` |
+| `--format <FORMAT>` | no | `text` | `text`, `json` | Output format |
+<!-- END GENERATED: cli-contract skills drift -->
+Shared skills are copied between repositories
 on purpose, so their drift cannot be detected by comparing a repository against
 itself. An opt-in manifest at `.agents/skills-manifest.toml` (override with
 `--manifest <FILE>`) names the skills a repository manages from an upstream and
@@ -956,6 +1454,16 @@ the real binary's exit codes, output determinism, and unmanaged-skill
 isolation.
 
 ### `ci-explain`
+<!-- BEGIN GENERATED: cli-contract ci-explain -->
+`do-harness ci-explain [OPTIONS] <RUN_ID>`
+
+Aliases: `ci`.
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `<RUN_ID>` | yes | — | — | Workflow run ID or the run's URL |
+| `--format <FORMAT>` | no | `text` | `text`, `json` | Output format |
+<!-- END GENERATED: cli-contract ci-explain -->
 Explain a `GitHub` Actions workflow run: why did it fail or cancel, and what do
 I run locally to reproduce it? Read-only; works in any git repository without
 harness initialization (`gh` resolves the repository, honoring `GH_REPO`).
@@ -993,9 +1501,23 @@ missing/unauthenticated `gh`.
 rerun advice, compile-error mapping, `FAIL`-marker precedence, and URL parsing.
 
 ### `completions`
+<!-- BEGIN GENERATED: cli-contract completions -->
+`do-harness completions [OPTIONS] <SHELL>`
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `<SHELL>` | yes | — | `bash`, `elvish`, `fish`, `powershell`, `zsh` | Target shell (bash, zsh, fish, powershell, elvish) |
+<!-- END GENERATED: cli-contract completions -->
 Generate shell completions for `bash`, `zsh`, `fish`, `powershell`, `elvish`.
 
 ### `man`
+<!-- BEGIN GENERATED: cli-contract man -->
+`do-harness man [OPTIONS] <DIR>`
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `<DIR>` | yes | — | — | Output directory for man pages |
+<!-- END GENERATED: cli-contract man -->
 Generate man page documentation into specified directory.
 
 ## Exit Codes

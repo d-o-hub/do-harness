@@ -5,6 +5,7 @@ docs.py — Documentation inventory and link correctness checker.
 Usage:
   python3 scripts/docs.py links --check [--root ROOT] [--contracts CONTRACTS] [--mode local|ci]
   python3 scripts/docs.py inventory [--root ROOT] [--contracts CONTRACTS] [--mode local|ci]
+  python3 scripts/docs.py sync --check|--write [--root ROOT]
 """
 
 import argparse
@@ -15,6 +16,7 @@ import subprocess  # nosec B404
 import sys
 import urllib.parse
 
+from doc_tools import cli_sync
 from doc_tools.inventory import (
     discover_documents,
 )
@@ -262,9 +264,21 @@ def main():
     inv_parser.add_argument("--contracts", default="docs/contracts.toml", help="Path to contracts policy file")
     inv_parser.add_argument("--mode", choices=["local", "ci"], default="local", help="Discovery mode")
 
+    sync_parser = subparsers.add_parser("sync", help="Check or regenerate CLI-derived documentation blocks")
+    sync_parser.add_argument("--check", action="store_true", help="Verify committed blocks against the CLI definitions (default)")
+    sync_parser.add_argument("--write", action="store_true", help="Rewrite out-of-date blocks in place (refused while CI is set)")
+    sync_parser.add_argument("--root", default=".", help="Root directory of repository")
+
     args = parser.parse_args()
 
     root_dir = os.path.abspath(args.root)
+
+    if args.subcommand == "sync":
+        if args.check and args.write:
+            print("sync: --check and --write are mutually exclusive", file=sys.stderr)
+            sys.exit(2)
+        sys.exit(cli_sync.run_sync(root_dir, write=args.write))
+
     contracts_path = os.path.join(root_dir, args.contracts) if not os.path.isabs(args.contracts) else args.contracts
 
     if args.subcommand == "inventory":

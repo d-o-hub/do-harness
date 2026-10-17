@@ -8,10 +8,12 @@ import os
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 # Add scripts directory to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+from doc_tools import cli_sync
 from doc_tools.github_slugger import GithubSlugger
 from doc_tools.inventory import (
     ContractPolicy,
@@ -21,7 +23,7 @@ from doc_tools.inventory import (
     discover_documents,
 )
 from doc_tools.markdown import MarkdownDocument, slugify_heading
-from docs import LinkChecker, normalize_github_link
+from docs import LinkChecker, main as docs_main, normalize_github_link
 
 README_POLICY = 'version = 1\n[[rules]]\npath="README.md"\nclassification="maintained"\nreason="Root"\n'
 
@@ -338,6 +340,74 @@ class TestLinkChecker(unittest.TestCase):
             checker.repo_owner_name = "d-o-hub/do-harness"
             self.assertTrue(checker.check_links(), checker.errors)
             self.assertEqual(checker.errors, [])
+
+
+class TestCliSync(unittest.TestCase):
+    def test_check_mode_invokes_fixed_cargo_argv(self):
+        completed = mock.Mock(returncode=0)
+        with mock.patch.object(cli_sync.subprocess, "run", return_value=completed) as run:
+            code = cli_sync.run_sync("/repo", write=False, env={})
+        self.assertEqual(code, 0)
+        self.assertEqual(
+            run.call_args.args[0],
+            [
+                "cargo",
+                "test",
+                "-p",
+                "do-harness",
+                "--bin",
+                "do-harness",
+                "--quiet",
+                cli_sync.TEST_FILTER,
+            ],
+        )
+        self.assertEqual(run.call_args.kwargs["cwd"], "/repo")
+        self.assertNotIn(cli_sync.WRITE_ENV, run.call_args.kwargs["env"])
+
+    def test_write_mode_sets_update_env(self):
+        completed = mock.Mock(returncode=0)
+        with mock.patch.object(cli_sync.subprocess, "run", return_value=completed) as run:
+            code = cli_sync.run_sync("/repo", write=True, env={"PATH": "/usr/bin"})
+        self.assertEqual(code, 0)
+        self.assertEqual(run.call_args.kwargs["env"][cli_sync.WRITE_ENV], "1")
+
+    def test_write_mode_is_refused_in_ci(self):
+        with mock.patch.object(cli_sync.subprocess, "run") as run:
+            code = cli_sync.run_sync("/repo", write=True, env={"CI": "true"})
+        self.assertEqual(code, 2)
+        run.assert_not_called()
+
+    def test_ci_detection_matches_common_spellings(self):
+        self.assertFalse(cli_sync.ci_is_set({}))
+        self.assertFalse(cli_sync.ci_is_set({"CI": ""}))
+        self.assertFalse(cli_sync.ci_is_set({"CI": "0"}))
+        self.assertFalse(cli_sync.ci_is_set({"CI": "false"}))
+        self.assertTrue(cli_sync.ci_is_set({"CI": "true"}))
+
+    def test_toolchain_override_precedence(self):
+        self.assertEqual(cli_sync.cargo_binary({}), "cargo")
+        self.assertEqual(cli_sync.cargo_binary({"CARGO": "/opt/cargo"}), "/opt/cargo")
+        self.assertEqual(
+            cli_sync.cargo_binary({"CARGO": "/opt/cargo", "DO_HARNESS_CARGO": "/custom/cargo"}),
+            "/custom/cargo",
+        )
+
+    def test_missing_cargo_returns_usage_error(self):
+        with mock.patch.object(cli_sync.subprocess, "run", side_effect=FileNotFoundError):
+            code = cli_sync.run_sync("/repo", write=False, env={})
+        self.assertEqual(code, 2)
+
+    def test_failing_test_exit_code_is_propagated(self):
+        completed = mock.Mock(returncode=101)
+        with mock.patch.object(cli_sync.subprocess, "run", return_value=completed):
+            code = cli_sync.run_sync("/repo", write=False, env={})
+        self.assertEqual(code, 101)
+
+    def test_check_and_write_flags_are_mutually_exclusive(self):
+        with mock.patch.object(sys, "argv", ["docs.py", "sync", "--check", "--write"]):
+            with self.assertRaises(SystemExit) as caught:
+                docs_main()
+        self.assertEqual(caught.exception.code, 2)
 
 
 if __name__ == "__main__":

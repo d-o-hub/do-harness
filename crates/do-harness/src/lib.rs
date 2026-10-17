@@ -8,8 +8,10 @@
 //! are declared under `src/main.rs` and are deliberately not re-exported here,
 //! so the stable surface is the command line:
 //!
-//! - the CLI reference, `docs/cli.md`, which is gated against `--help` by
-//!   `tests/docs_coverage.rs`;
+//! - the CLI reference, `docs/cli.md`, whose mechanical blocks are generated
+//!   from the Clap definitions and gated by
+//!   `src/docs_generation` (the `do-harness` binary's unit tests) plus
+//!   `python3 scripts/docs.py sync --check`;
 //! - `do-harness --help` and `do-harness <subcommand> --help`;
 //! - the README at <https://github.com/d-o-hub/do-harness#readme>.
 //!
