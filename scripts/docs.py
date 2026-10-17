@@ -10,7 +10,8 @@ Usage:
 import argparse
 import os
 import re
-import subprocess
+# Git is required to resolve same-repository links offline.
+import subprocess  # nosec B404
 import sys
 import urllib.parse
 
@@ -24,9 +25,17 @@ def get_repo_owner_name(root_dir):
     """
     Attempts to extract github owner/repo string from git remote URL.
     """
-    cmd = ["git", "-C", root_dir, "remote", "get-url", "origin"]
     try:
-        res = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        # Fixed argv (git named literally, no shell, output captured): the only
+        # variable is a checkout path, never document- or network-controlled
+        # input. The literal executable head keeps the command a static string
+        # for static analysis, same shape as scripts/check_source_distribution.py.
+        res = subprocess.run(  # nosec B603 B607
+            ["git", "-C", root_dir, "remote", "get-url", "origin"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
         url = res.stdout.strip()
         # https://github.com/owner/repo or git@github.com:owner/repo
         m = re.search(r"github\.com[:/]([^/]+)/([^/.]+)(?:\.git)?$", url, re.IGNORECASE)

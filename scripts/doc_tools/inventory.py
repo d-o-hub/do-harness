@@ -4,7 +4,8 @@ inventory.py — Documentation discovery and contract classification matching.
 
 import os
 import re
-import subprocess
+# Git is required to enumerate tracked markdown files offline.
+import subprocess  # nosec B404
 import sys
 
 # Support Python 3.11+ built-in tomllib, fallback to tomli if needed
@@ -163,13 +164,19 @@ def _get_git_files(root_dir, mode="local"):
     """
     Returns list of relative paths for markdown files using git.
     """
-    if mode == "local":
-        cmd = ["git", "-C", root_dir, "ls-files", "--cached", "--others", "--exclude-standard", "*.md"]
-    else:
-        cmd = ["git", "-C", root_dir, "ls-files", "*.md"]
-
+    flags = ["--cached", "--others", "--exclude-standard"] if mode == "local" else []
     try:
-        res = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        # Fixed argv (git named literally, no shell, output captured): the only
+        # variables are a checkout path and mode-selected ls-files flags, never
+        # document- or network-controlled input. The literal executable head
+        # keeps the command a static string for static analysis, same shape as
+        # scripts/check_source_distribution.py.
+        res = subprocess.run(  # nosec B603 B607
+            ["git", "-C", root_dir, "ls-files", *flags, "*.md"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
         files = [line.strip() for line in res.stdout.splitlines() if line.strip()]
         return files
     except (subprocess.CalledProcessError, FileNotFoundError, OSError):
