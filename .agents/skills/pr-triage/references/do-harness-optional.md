@@ -34,11 +34,24 @@ performs the same probe and reports which binary it found; substitute
 | No effect | `do-harness pr no-effect PR --format json` | `scripts/no-effect.sh PR` |
 | Review input | `do-harness pr review PR --format json` | `gh pr diff PR` |
 | Recompute | `do-harness pr review PR --recompute` | n/a |
+| Docs impact packet | `python3 scripts/docs.py impact --base BASE --head HEAD --format packet` | `gh pr diff PR` |
 
 `pr review` returns the semantic residual: changed units that evidence could not
 prove, with minimal context and an audit list of skipped (proven) units. Review
 only the residual units. If `false_proven` guards or parse errors appear in the
 output, treat those units as unresolved and escalate.
+
+## Bounded Documentation Review Packets
+
+When documentation or source files mapped to documentation sections change in a PR, `python3 scripts/docs.py impact` produces a bounded companion review packet.
+
+Use the packet only when:
+1. The packet generation completed with zero errors and mechanical checks pass (`generated_section_equality`, `examples_ok`, `links_ok`).
+2. The packet is fresh for the current PR `head_commit` and `merge_base`.
+3. The packet size in bytes is strictly smaller than the equivalent raw documentation diff.
+4. No overflow warning or policy/checker tampering warning is present.
+
+If any uncertainty, overflow, tampering warning, or mechanical failure arises, fall back immediately to the original raw documentation diff context. Do not weaken `pr review` proof rules or add `**/*.md` exemptions to `.github/pr-gate.toml`.
 
 Check `measurement.verdict` before using the residual: review the residual only
 when it is `reduced`; on `no-go` the residual is not smaller than the raw diff,

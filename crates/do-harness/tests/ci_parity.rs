@@ -33,6 +33,14 @@ fn repository_root() -> PathBuf {
 /// so a host without one cannot exercise their policy.
 #[cfg(unix)]
 fn path_utility(name: &str) -> PathBuf {
+    if let Ok(output) = Command::new("pyenv").args(["which", name]).output() {
+        if output.status.success() {
+            let path_str = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            if !path_str.is_empty() {
+                return PathBuf::from(path_str);
+            }
+        }
+    }
     std::env::var_os("PATH")
         .and_then(|value| {
             std::env::split_paths(&value)
@@ -249,6 +257,7 @@ fn docs_sync_fails_closed_without_cargo() {
     let temp = tempfile::tempdir().expect("create temp dir");
     let bin = temp.path().join("bin");
     std::fs::create_dir(&bin).expect("create private bin");
+    std::fs::copy(system_utility("bash"), bin.join("bash")).ok();
 
     for (label, ci, require_tools) in [
         ("local", false, false),
