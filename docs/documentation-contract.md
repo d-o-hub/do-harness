@@ -45,6 +45,11 @@ marker: `<!-- example: id=<id> classification=<class> [reason="..."] [fixture=<i
   commands then run the real `do-harness` binary in an isolated temporary
   directory, compared against the declared `expected_exit`; `file_assertions`
   check whatever the commands produced.
+- A fixture may declare `platforms = ["linux", "darwin", "windows"]` for a
+  contract it cannot satisfy on every host — the local installer fixture runs
+  `scripts/test-install.sh`, which supports Linux and macOS only. A host outside
+  the declared list prints the skip and does not run the fixture; an unknown
+  platform name is a manifest error, never a silent exclusion.
 - A `parser-check-only` block must parse as TOML or JSON.
 - `illustrative` and `historical` blocks are inert: they are neither executed
   nor parsed, and only their `reason` is required.
@@ -99,7 +104,10 @@ harness prints with a failing verdict.
   not generated and is not verified.
 - `docs-examples` runs the commands it is told to run. Blocks classified
   `illustrative` or `historical` are never executed, so a command that no
-  longer works can still sit in one of them.
+  longer works can still sit in one of them. A fixture that declares
+  `platforms` is not executed on a host outside that list, and the skip is
+  printed rather than silently accepted — on Windows, the local installer
+  example reports this instead of running.
 - Nothing here renders a website: redirects, external rendering, and external
   URL liveness are out of scope by design, because the checks must stay
   network-free to gate a pull request.

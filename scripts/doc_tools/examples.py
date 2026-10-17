@@ -33,6 +33,18 @@ class ExampleError(Exception):
     pass
 
 
+# Hosts a fixture may name in its `platforms` list — the three CI hosts. A
+# fixture without the key runs on every host.
+FIXTURE_PLATFORMS = ("linux", "darwin", "windows")
+
+
+def host_platform() -> str:
+    """The current host, named the way a fixture's `platforms` list spells it."""
+    if os.name == "nt":
+        return "windows"
+    return "darwin" if sys.platform == "darwin" else "linux"
+
+
 class UnclassifiedExampleError(ExampleError):
     """Raised when an unclassified maintained CLI/config example is discovered."""
     pass
@@ -136,6 +148,17 @@ def load_fixture_manifest(manifest_path: str) -> Dict[str, Any]:
     fixtures = data.get("fixtures", {})
     if not isinstance(fixtures, dict):
         raise ExampleError(f"Malformed [fixtures] section in {manifest_path}")
+
+    for fixture_id, fixture in fixtures.items():
+        platforms = fixture.get("platforms")
+        if platforms is None:
+            continue
+        unknown = [name for name in platforms if name not in FIXTURE_PLATFORMS]
+        if unknown:
+            raise ExampleError(
+                f"Fixture '{fixture_id}' in {manifest_path} declares unknown "
+                f"platform(s) {unknown}; allowed: {list(FIXTURE_PLATFORMS)}"
+            )
 
     return fixtures
 
@@ -437,6 +460,20 @@ def verify_examples(root_dir: str) -> bool:
                 continue
 
             fixture = fixtures[fixture_id]
+
+            # A fixture may declare the hosts it can run on — the local installer
+            # fixture shells out to `scripts/test-install.sh`, which supports
+            # Linux and macOS and reports `SKIP: unsupported host platform`
+            # elsewhere. The skip is announced rather than silent; every other
+            # executable example on this host still runs.
+            fixture_platforms = fixture.get("platforms")
+            if fixture_platforms and host_platform() not in fixture_platforms:
+                print(
+                    f"{block.filepath}:{block.line_no}: {marker.example_id}: fixture "
+                    f"'{fixture_id}' is declared for {', '.join(fixture_platforms)}; "
+                    f"skipped on {host_platform()}"
+                )
+                continue
 
             # Verify binary resolution lazily
             if not binary_path:

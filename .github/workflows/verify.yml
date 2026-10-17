@@ -487,8 +487,11 @@ jobs:
         # `do-harness` binary's unit tests, which include
         # `docs_generation::sync::generated_docs_are_in_sync`, so re-running it
         # through this script would compile the same test target again for no
-        # new signal. Both checks below are offline and `docs-examples` exercises
-        # the release binary built just above.
+        # new signal. Both checks below are offline, and `docs-examples`
+        # exercises the release binary built just above; the local installer
+        # fixture declares `platforms = ["linux", "darwin"]` (its
+        # scripts/test-install.sh supports Linux and macOS only), so here the
+        # check reports that one skip and runs every other example.
         shell: bash
         timeout-minutes: 10
         run: |

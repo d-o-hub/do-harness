@@ -94,6 +94,11 @@ commands = [
 id = "installer_local_artifact"
 description = "Local release-artifact installation fixture without network"
 setup_steps = ["installer_local"]
+# The fixture runs scripts/test-install.sh, whose platform case supports Linux
+# and macOS only; other hosts get `SKIP: unsupported host platform` from the
+# script. Declaring the scope here keeps the check honest on a host where the
+# fixture cannot run: `docs-examples` prints the skip and verifies the rest.
+platforms = ["linux", "darwin"]
 displayed_command = """
 # latest release (resolved from the releases/latest redirect)
 curl -fsSL https://raw.githubusercontent.com/d-o-hub/do-harness/main/scripts/install.sh | sh
