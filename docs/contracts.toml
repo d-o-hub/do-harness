@@ -1,0 +1,86 @@
+version = 1
+
+# Contract rules for documentation inventory and link verification.
+# Every rule must carry a classification and an explicit reason.
+# Allowed classifications: "maintained", "historical", "fixture", "vendored", "canonical_alias".
+
+[[rules]]
+path = "README.md"
+classification = "maintained"
+reason = "Root repository README documentation."
+
+[[rules]]
+path = "AGENTS.md"
+classification = "maintained"
+reason = "Repository-wide agent instructions and guidelines."
+
+[[rules]]
+path = "SECURITY.md"
+classification = "maintained"
+reason = "Security disclosure and contact policy."
+
+[[rules]]
+glob = "docs/*.md"
+classification = "maintained"
+reason = "Maintained top-level documentation under docs/."
+
+[[rules]]
+glob = "docs/releases/*.md"
+classification = "historical"
+reason = "Historical release notes and version changelogs."
+
+[[rules]]
+glob = "integrations/*/README.md"
+classification = "maintained"
+reason = "Maintained integration README entry points."
+
+[[rules]]
+path = "crates/do-harness/README.md"
+classification = "canonical_alias"
+canonical_target = "README.md"
+reason = "Symlink alias to root README.md for published do-harness crate."
+
+[[rules]]
+glob = "crates/*/README.md"
+classification = "maintained"
+reason = "Maintained crate README entry points."
+
+[[rules]]
+glob = "vendor/**"
+classification = "vendored"
+reason = "Upstream vendored library documentation."
+
+[[rules]]
+glob = "tests/fixtures/**"
+classification = "fixture"
+reason = "Test fixture markdown documents."
+
+[[rules]]
+glob = "crates/do-harness/tests/fixtures/**"
+classification = "fixture"
+reason = "Test fixture markdown documents in do-harness crate."
+
+[[rules]]
+glob = "crates/do-harness/templates/**"
+classification = "fixture"
+reason = "Scaffold template markdown documents."
+
+[[rules]]
+glob = ".agents/skills/**"
+classification = "fixture"
+reason = "Skill catalog definitions and reference documents."
+
+[[rules]]
+glob = "plans/*.md"
+classification = "maintained"
+reason = "Maintained architecture and epic design plans."
+
+[[rules]]
+glob = "scripts/selection-impact/*.md"
+classification = "maintained"
+reason = "Maintained benchmark and selection experiment documentation."
+
+[[rules]]
+glob = ".github/*.md"
+classification = "maintained"
+reason = "GitHub workflow templates and guidelines."

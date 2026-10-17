@@ -1,0 +1,4 @@
+# Python dependencies for offline documentation discovery and link checking scripts.
+# Pinned to the release whose CommonMark tokenization the doc-tool tests were
+# validated against (scripts/test_doc_tools.py); widen only after re-running them.
+markdown-it-py==3.0.0

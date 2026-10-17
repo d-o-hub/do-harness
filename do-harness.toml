@@ -79,7 +79,7 @@ when-changed = [".agents/skills/**", "crates/do-harness/templates/skills/**", "s
 # adding/renaming/removing a skill; CI runs the plain check.
 name = "skills-docs"
 argv = ["bash", "scripts/check-skills-docs.sh"]
-when-changed = [".agents/skills/**", "docs/skills.md", "README.md", "scripts/check-skills-docs.sh"]
+when-changed = [".agents/skills/**", "docs/**", "README.md", "AGENTS.md", "SECURITY.md", "**/README.md", "scripts/check-skills-docs.sh", "scripts/docs.py", "scripts/doc_tools/**", "scripts/test_doc_tools.py", "tests/fixtures/doc_tools/**", "scripts/requirements-docs.txt"]
 
 [[sensors]]
 name = "deps"
