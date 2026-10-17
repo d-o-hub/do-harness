@@ -170,9 +170,10 @@ def _get_git_files(root_dir, mode="local"):
         # variables are a checkout path and mode-selected ls-files flags, never
         # document- or network-controlled input. The literal executable head
         # keeps the command a static string for static analysis, same shape as
-        # scripts/check_source_distribution.py.
+        # scripts/check_source_distribution.py. `:(icase)` also matches the
+        # README.MD-style casing the default case-sensitive glob misses.
         res = subprocess.run(  # nosec B603 B607
-            ["git", "-C", root_dir, "ls-files", *flags, "*.md"],
+            ["git", "-C", root_dir, "ls-files", *flags, ":(icase)*.md"],
             capture_output=True,
             text=True,
             check=True,

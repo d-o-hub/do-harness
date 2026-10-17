@@ -160,28 +160,34 @@ if [[ "$failures" -ne 0 ]]; then
     exit 1
 fi
 
-# Run offline document inventory and link/anchor verification
-if command -v python3 >/dev/null 2>&1; then
-    if python3 -c "import markdown_it, tomllib" >/dev/null 2>&1 || python3 -c "import markdown_it, tomli" >/dev/null 2>&1; then
-        python3 "$ROOT/scripts/docs.py" links --check || failures=1
-    else
-        if require_tools; then
-            echo "check-skills-docs FAIL: markdown-it-py is required when CI=true or DO_HARNESS_REQUIRE_TOOLS=1." >&2
-            exit 1
-        fi
-        echo "check-skills-docs SKIP: markdown-it-py not installed; skipping offline document link check." >&2
-    fi
+# Offline document verification: the doc-tool unit tests (slug/anchor/link
+# semantics) and then the maintained-document link/anchor check. Both need
+# python3 + markdown-it-py (scripts/requirements-docs.txt). A missing parser
+# is a FAIL under required tools and a SKIP otherwise, and the `SKIP:` marker
+# must start its line: the sensor runner flags warned runs by trimmed line
+# starts, so a prefixed marker would silently read as a pass.
+docs_verified=0
+if command -v python3 >/dev/null 2>&1 &&
+    { python3 -c "import markdown_it, tomllib" >/dev/null 2>&1 ||
+        python3 -c "import markdown_it, tomli" >/dev/null 2>&1; }; then
+    docs_verified=1
+    python3 "$ROOT/scripts/test_doc_tools.py" || failures=1
+    python3 "$ROOT/scripts/docs.py" links --check || failures=1
 else
     if require_tools; then
-        echo "check-skills-docs FAIL: python3 is required when CI=true or DO_HARNESS_REQUIRE_TOOLS=1." >&2
+        echo "FAIL: python3 and markdown-it-py are required when CI=true or DO_HARNESS_REQUIRE_TOOLS=1 (install: python3 -m pip install -r scripts/requirements-docs.txt)." >&2
         exit 1
     fi
-    echo "check-skills-docs SKIP: python3 not installed; skipping offline document link check." >&2
+    echo "SKIP: python3/markdown-it-py not installed; offline document tests and link/anchor check skipped (install: python3 -m pip install -r scripts/requirements-docs.txt)"
 fi
 
 if [[ "$failures" -ne 0 ]]; then
-    echo "check-skills-docs FAIL: document link/anchor check failed." >&2
+    echo "check-skills-docs FAIL: offline document tests or link/anchor check failed." >&2
     exit 1
 fi
 
-echo "check-skills-docs OK: $SKILLS_DOC matches $(wc -l < "$tmp/names.txt" | tr -d ' ') skill(s), all documented paths and links exist"
+if [[ "$docs_verified" -eq 1 ]]; then
+    echo "check-skills-docs OK: $SKILLS_DOC matches $(wc -l < "$tmp/names.txt" | tr -d ' ') skill(s), all documented paths and links exist"
+else
+    echo "check-skills-docs OK: $SKILLS_DOC matches $(wc -l < "$tmp/names.txt" | tr -d ' ') skill(s), all documented paths exist (offline link check skipped; see the SKIP marker above)"
+fi

@@ -4,7 +4,10 @@ Extracts heading slugs, explicit HTML anchors, inline/reference links, and image
 """
 
 import re
+
 from markdown_it import MarkdownIt
+
+from doc_tools.github_slugger import GithubSlugger, slugify
 
 
 class ParsedLink:
@@ -21,22 +24,23 @@ class ParsedLink:
 
 
 def slugify_heading(heading_text):
-    """
-    GitHub-style heading slug generator.
-    1. Strip HTML tags
-    2. Lowercase
-    3. Strip punctuation except unicode word characters, spaces, and hyphens
-    4. Replace whitespace with hyphens
-    """
-    # Strip HTML tags
-    text = re.sub(r"<[^>]+>", "", heading_text)
-    # Lowercase
-    text = text.lower()
-    # Strip punctuation (keep unicode word characters \w, whitespace \s, and hyphens -)
-    text = re.sub(r"[^\w\s-]", "", text, flags=re.UNICODE)
-    # Replace spaces / whitespace with hyphens
-    text = re.sub(r"\s+", "-", text)
-    return text
+    """GitHub-style heading slug (github-slugger parity; see doc_tools/github_slugger.py)."""
+    return slugify(heading_text)
+
+
+# Anchor extraction scans real HTML tags only. Comments are stripped first, and
+# the attribute lookbehind rejects suffix matches (`data-id="x"`), so prose,
+# inline code, and fenced examples can never contribute anchors.
+_HTML_COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
+_HTML_TAG_RE = re.compile(r"<[a-zA-Z][^>]*>", re.DOTALL)
+_ANCHOR_ATTR_RE = re.compile(r"""(?<![\w-])(?:name|id)\s*=\s*["']([^"']+)["']""", re.IGNORECASE)
+
+
+def _html_anchors(html_text):
+    """Yield explicit anchor names (`<a name>`, any element `id`) from raw HTML."""
+    for tag in _HTML_TAG_RE.finditer(_HTML_COMMENT_RE.sub("", html_text)):
+        for match in _ANCHOR_ATTR_RE.finditer(tag.group(0)):
+            yield match.group(1)
 
 
 class MarkdownDocument:
@@ -46,7 +50,7 @@ class MarkdownDocument:
         self.md_parser = MarkdownIt("commonmark").enable("table")
         self.tokens = self.md_parser.parse(content)
         self.anchors = set()
-        self.slug_counts = {}
+        self.slugger = GithubSlugger()
         self.links = []
         self.diagnostics = []
 
@@ -64,32 +68,23 @@ class MarkdownDocument:
                 i += 1
                 continue
 
-            # Extract headings
+            # Extract headings; duplicate slugs gain github-slugger's suffixes.
             if t.type == "heading_open":
                 if i + 1 < n and tokens[i + 1].type == "inline":
                     inline_tok = tokens[i + 1]
                     heading_text = self._get_inline_plaintext(inline_tok)
-                    raw_slug = slugify_heading(heading_text)
+                    self.anchors.add(self.slugger.slug(heading_text))
 
-                    if raw_slug in self.slug_counts:
-                        self.slug_counts[raw_slug] += 1
-                        unique_slug = f"{raw_slug}-{self.slug_counts[raw_slug]}"
-                    else:
-                        self.slug_counts[raw_slug] = 0
-                        unique_slug = raw_slug
-
-                    self.anchors.add(unique_slug)
-
-            # Extract explicit HTML anchors (<a name="...">, <a id="...">, <element id="...">)
-            if t.type in ("html_block", "inline"):
-                html_text = t.content
-                if t.children:
-                    for c in t.children:
-                        if c.type == "html_inline":
-                            html_text += " " + c.content
-
-                for m in re.finditer(r'''(?:name|id)\s*=\s*["']([^"']+)["']''', html_text, re.IGNORECASE):
-                    self.anchors.add(m.group(1))
+            # Extract explicit HTML anchors (<a name="...">, <a id="...">,
+            # <element id="...">). Only real tags count: the raw inline token
+            # source (`t.content`) would also match `id="x"` inside prose,
+            # inline code, and link targets that are not anchors.
+            if t.type == "html_block":
+                self.anchors.update(_html_anchors(t.content))
+            elif t.type == "inline" and t.children:
+                for c in t.children:
+                    if c.type == "html_inline":
+                        self.anchors.update(_html_anchors(c.content))
 
             # Extract links and images from inline tokens
             if t.type == "inline" and t.children:

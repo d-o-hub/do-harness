@@ -16,7 +16,7 @@ classification = "maintained"
 reason = "Nested readme discovery"
 
 [[rules]]
-path = "symlink_alias.md"
+path = "alias/symlink_alias.md"
 classification = "canonical_alias"
 canonical_target = "README.md"
-reason = "Alias symlink"
+reason = "Alias symlink in a subdirectory (distribution-context coverage)"

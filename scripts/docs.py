@@ -20,6 +20,11 @@ from doc_tools.inventory import (
 )
 from doc_tools.markdown import MarkdownDocument
 
+# Network and non-filesystem targets have no working-tree path to check; the
+# tuple mirrors the skip contract in scripts/check-markdown-links.sh (plus
+# protocol-relative URLs, which start like site paths).
+NETWORK_URL_PREFIXES = ("http://", "https://", "mailto:", "tel:", "ftp://", "data:", "//")
+
 
 def get_repo_owner_name(root_dir):
     """
@@ -66,8 +71,11 @@ def normalize_github_link(url, root_dir, repo_owner_name=None):
             curr_owner, curr_repo = repo_owner_name.split("/")
             if owner.lower() == curr_owner.lower() and repo.lower().replace(".git", "") == curr_repo.lower():
                 return path_part, frag
+            # A known origin pointing at another repository: a same-named local
+            # file is a coincidence, not this link's target.
+            return None, None
 
-        # Fallback check if path exists locally
+        # Origin unknown (e.g. fixture sandboxes): fall back to local existence.
         if os.path.exists(os.path.join(root_dir, path_part)):
             return path_part, frag
 
@@ -154,13 +162,14 @@ class LinkChecker:
                 alias_dir = os.path.dirname(alias_rel)
                 for link in target_doc.links:
                     raw_url = link.raw_url
-                    if raw_url.startswith(("http://", "https://", "mailto:", "ftp:")):
-                        gh_path, _ = normalize_github_link(raw_url, self.root_dir, self.repo_owner_name)
-                        if not gh_path:
-                            continue
-                        raw_url = gh_path
+                    # Absolute and site-absolute URLs resolve to the same
+                    # location from any directory, so only relative links can
+                    # change meaning in the alias's distribution context.
+                    if raw_url.startswith(NETWORK_URL_PREFIXES) or raw_url.startswith("/"):
+                        continue
 
                     url_path, _, _ = raw_url.partition("#")
+                    url_path = url_path.split("?", 1)[0]
                     url_path = urllib.parse.unquote(url_path)
                     if url_path:
                         # Check distribution context: relative path from alias directory
@@ -175,39 +184,61 @@ class LinkChecker:
     def _verify_link(self, doc, link):
         raw_url = link.raw_url
 
-        # Check for same-repo GitHub links
-        if raw_url.startswith(("http://", "https://", "mailto:", "ftp:")):
+        # Same-repo GitHub links become working-tree paths; other network-like
+        # and site-absolute targets are skipped, mirroring
+        # scripts/check-markdown-links.sh. `/blob/<ref>/<path>` is GitHub's
+        # site-absolute form of a repository file link and is still checked.
+        if raw_url.startswith(NETWORK_URL_PREFIXES) or raw_url.startswith("/"):
             gh_path, gh_frag = normalize_github_link(raw_url, self.root_dir, self.repo_owner_name)
             if gh_path:
                 norm_url = gh_path + (f"#{gh_frag}" if gh_frag else "")
             else:
-                # External link: skipped for offline check
                 return
         else:
             norm_url = raw_url
 
         url_path, _, frag = norm_url.partition("#")
+        url_path = url_path.split("?", 1)[0]
         url_path = urllib.parse.unquote(url_path)
+        frag = urllib.parse.unquote(frag)
 
-        # Same-document fragment link (#heading-anchor)
+        # Same-document fragment link (#heading-anchor). `#top` is the one
+        # fragment GitHub always provides regardless of heading content.
         if not url_path:
-            if frag and frag not in doc.anchors:
+            if frag and frag != "top" and frag not in doc.anchors:
                 self.errors.append(f"{doc.filepath}:{link.line_no}: missing anchor '#{frag}' in {doc.filepath}")
             return
 
         # Target file relative to current document's directory
         doc_dir = os.path.dirname(doc.filepath)
         target_rel = os.path.normpath(os.path.join(doc_dir, url_path)).replace("\\", "/")
-        target_full = os.path.join(self.root_dir, target_rel)
 
-        if not os.path.exists(target_full):
+        # Containment: `..` segments (and symlinks) must not leave the checkout.
+        root_real = os.path.realpath(self.root_dir)
+        target_real = os.path.realpath(os.path.join(self.root_dir, target_rel))
+        try:
+            inside_root = os.path.commonpath([root_real, target_real]) == root_real
+        except ValueError:
+            inside_root = False
+
+        if not inside_root:
+            self.errors.append(
+                f"{doc.filepath}:{link.line_no}: link target '{url_path}' escapes the repository root"
+            )
+            return
+
+        # The target must exist inside the checkout. GitHub serves
+        # `/blob/<dir>` via a redirect to `/tree/<dir>`, and the sibling
+        # check-markdown-links.sh sensor uses os.path.exists, so existing
+        # directories are valid link targets too.
+        if not os.path.exists(target_real):
             self.errors.append(
                 f"{doc.filepath}:{link.line_no}: broken link target '{url_path}' (file not found: {target_rel})"
             )
             return
 
         # If target has a fragment and target is a markdown file, check anchor existence
-        if frag:
+        if frag and frag != "top":
             if target_rel.lower().endswith(".md"):
                 target_doc = self.get_document(target_rel)
                 if target_doc and frag not in target_doc.anchors:
