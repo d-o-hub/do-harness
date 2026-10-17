@@ -98,7 +98,8 @@ reproducible, but cannot add a missing source fix to an older release.
 <!-- example: id=adoption_init_flow classification=illustrative reason="Multi-command adoption walkthrough" -->
 ```bash
 cd /path/to/repository
-do-harness init                    # detects the stack; rust pack by default
+do-harness init                    # detects the pack from the repository
+do-harness init --language rust    # Rust sensor pack, explicit
 do-harness init --language generic # no built-in sensors (vacuous pass)
 do-harness init --language web     # web UI audit pack (viewport, a11y, console, perf, visual, i18n)
 do-harness init --language node    # Node/JS/TS pack (typecheck, lint, test, build)

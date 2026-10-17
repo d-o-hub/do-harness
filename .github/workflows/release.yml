@@ -77,7 +77,8 @@ jobs:
           # cargo-audit (audit), cargo-nextest (test), cargo-llvm-cov
           # (coverage). rustfmt and clippy come from the toolchain components
           # above, shellcheck from the runner image, actionlint from the pinned
-          # download below, markdownlint/yamllint from the step below. Adding a
+          # download below, markdownlint/yamllint and the docs tooling's
+          # markdown-it-py from the step below. Adding a
           # sensor that needs a new tool means adding
           # it here too: the absence of cargo-nextest failed the v0.1.2 tag
           # preflight with "error: no such command: `nextest`" -> weak evidence.
@@ -102,7 +103,12 @@ jobs:
       - name: Install markdownlint, yamllint, and docs tooling
         # `skills-docs` parses maintained markdown, so its markdown-it-py
         # dependency (scripts/requirements-docs.txt) must be present before the
-        # release set runs; yamllint covers the workflow lint.
+        # release set runs; the same install backs `docs-sync`, `docs-examples`,
+        # and `docs-links`, which the release set includes as error-severity
+        # contracts. Those checks are offline — `docs-links` resolves link
+        # targets inside this checkout, and none assert registry availability —
+        # so a tag preflight can run them without network. yamllint covers the
+        # workflow lint.
         run: |
           python3 -m pip install --disable-pip-version-check yamllint -r scripts/requirements-docs.txt
           npm install -g markdownlint-cli2
@@ -129,7 +135,25 @@ jobs:
         # where `coverage` lives, so this is the one place the 70% line
         # threshold actually gates an artifact. Coverage is warn-severity and
         # `--strict` turns a sub-threshold run into a failure here.
+        #
+        # This is also the docs contract gate: the `release` set carries
+        # `docs-sync`, `docs-examples`, and `docs-links`, so a stale generated
+        # block, an invalid example, or a broken local link fails the tag here,
+        # before `build` — the job that packages the artifacts — starts.
         run: ./target/release/do-harness verify --set release --format json --strict
+      - name: Assert the release evidence is green and complete
+        # `--strict` above already fails on any non-passing sensor, but a missing,
+        # empty, or stale artifact must not read as a pass either, so the release
+        # set's evidence is asserted the way verify.yml asserts the verification
+        # set's. `status` re-reads the recorded artifact (missing, red, and stale
+        # all fail); the explicit checks then refuse a document that names another
+        # signal set or carries no tagged commit, i.e. evidence that proves
+        # nothing about this tag.
+        run: |
+          ./target/release/do-harness status --set release --format json
+          test -f .do-harness/evidence.release.json
+          test -n "$(jq -r '.git_sha // empty' .do-harness/evidence.release.json)"
+          test "$(jq -r '.signal_set' .do-harness/evidence.release.json)" = "release"
 
   build:
     needs: preflight

@@ -5,6 +5,8 @@ markdown parsing, and link verification.
 """
 
 import os
+import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -20,6 +22,7 @@ from doc_tools.inventory import (
     PolicyContradictionError,
     PolicyError,
     UnclassifiedDocumentError,
+    _get_git_files,
     discover_documents,
 )
 from doc_tools.markdown import MarkdownDocument, slugify_heading
@@ -36,6 +39,25 @@ DOCS_POLICY = (
 def write_file(path, content):
     with open(path, "w", encoding="utf-8") as f:
         f.write(content)
+
+
+# The docs sensors run `python3 scripts/docs.py <check> --check` (do-harness.toml),
+# so the can-fail tests below run that same process: the sensor runner reads the
+# exit code, not the in-process checker verdict.
+DOCS_CLI = os.path.abspath(os.path.join(os.path.dirname(__file__), "docs.py"))
+REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+FIXTURES_DIR = os.path.join(REPO_ROOT, "tests", "fixtures", "doc_tools")
+
+
+def docs_fixture(name):
+    """Absolute path of a fixture repository under tests/fixtures/doc_tools."""
+    return os.path.join(FIXTURES_DIR, name)
+
+
+def run_docs(args, root, env=None, python_flags=()):
+    """Runs `python3 scripts/docs.py <args> --root <root>` the way a docs sensor does."""
+    argv = [sys.executable, *python_flags, DOCS_CLI, *args, "--root", root]
+    return subprocess.run(argv, capture_output=True, text=True, env=env)
 
 
 class TestMarkdownParser(unittest.TestCase):
@@ -180,6 +202,85 @@ class TestInventoryAndPolicy(unittest.TestCase):
                 ContractPolicy(contracts_path)
 
 
+class TestLocalDiscoveryOfUntrackedDocuments(unittest.TestCase):
+    """`local` discovery must see untracked-but-not-ignored documents.
+
+    CI checks a fully committed tree, but the pre-commit half of the contract
+    checks the working tree before a document is staged. On git 2.53
+    `git ls-files --others --exclude-standard ':(icase)*.md'` returns nothing
+    when the checkout root is a nested directory that has no entries in the
+    index — the shape `docs.py --root tests/fixtures/<fixture>` uses — so the
+    untracked half of discovery must not depend on that pathspec.
+    """
+
+    def setUp(self):
+        if shutil.which("git") is None:
+            self.skipTest("without git, local discovery falls back to a filesystem walk")
+        # Isolating the git environment keeps the host's global/system config
+        # (an excludesfile, for instance) out of the temp repository's ignore
+        # decisions, so the fixture alone decides what is discovered.
+        self.git_env = dict(
+            os.environ,
+            GIT_CONFIG_NOSYSTEM="1",
+            GIT_CONFIG_GLOBAL=os.devnull,
+            GIT_CONFIG_SYSTEM=os.devnull,
+        )
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.repo = os.path.join(tmp.name, "repo")
+        os.makedirs(self.repo)
+        self.run_git("init", "-q")
+
+    def run_git(self, *args):
+        return subprocess.run(
+            ["git", "-C", self.repo, *args],
+            check=True,
+            capture_output=True,
+            text=True,
+            env=self.git_env,
+        )
+
+    def stage(self, rel_path, content):
+        """Writes a file under the temp repo and adds it to the index (no commit)."""
+        path = os.path.join(self.repo, rel_path)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        write_file(path, content)
+        self.run_git("add", rel_path)
+
+    def make_nested_fixture(self):
+        """A nested, untracked-only document tree, like a `--root` fixture."""
+        root = os.path.join(self.repo, "fixtures", "nested")
+        docs = os.path.join(root, "docs")
+        os.makedirs(docs)
+        write_file(os.path.join(docs, "pending.md"), "# Pending\n")
+        write_file(os.path.join(docs, ".gitignore"), "ignored.md\n")
+        write_file(os.path.join(docs, "ignored.md"), "# Ignored\n")
+        write_file(os.path.join(root, "contracts.toml"), DOCS_POLICY)
+        return root
+
+    def test_untracked_document_discovered_and_ignored_excluded(self):
+        root = self.make_nested_fixture()
+        with mock.patch.dict(os.environ, self.git_env):
+            files = _get_git_files(root, mode="local")
+            discovered = discover_documents(
+                root, os.path.join(root, "contracts.toml"), mode="local"
+            )
+        self.assertIn("docs/pending.md", files)
+        self.assertNotIn("docs/ignored.md", files)
+        maintained = [r.rel_path for r in discovered["maintained"]]
+        self.assertIn("docs/pending.md", maintained)
+        self.assertNotIn("docs/ignored.md", maintained)
+
+    def test_tracked_documents_still_discovered(self):
+        self.make_nested_fixture()
+        self.stage("README.md", "# Root\n")
+        with mock.patch.dict(os.environ, self.git_env):
+            files = _get_git_files(self.repo, mode="local")
+        self.assertIn("README.md", files)  # tracked half unchanged
+        self.assertIn("fixtures/nested/docs/pending.md", files)
+        self.assertNotIn("fixtures/nested/docs/ignored.md", files)
+
+
 class TestLinkChecker(unittest.TestCase):
     def setUp(self):
         self.fixture_dir = os.path.abspath(
@@ -286,8 +387,9 @@ class TestLinkChecker(unittest.TestCase):
 
     def test_directory_target_is_accepted(self):
         # GitHub serves `/blob/<dir>` by redirecting to `/tree/<dir>` (verified
-        # live), and the sibling check-markdown-links.sh sensor resolves with
-        # os.path.exists, so an existing directory is a valid link target.
+        # live), and existence is the documented target test
+        # (docs/documentation-contract.md), so an existing directory is a valid
+        # link target.
         with tempfile.TemporaryDirectory() as tmp:
             os.makedirs(os.path.join(tmp, "docs"))
             write_file(os.path.join(tmp, "contracts.toml"), README_POLICY)
@@ -401,6 +503,131 @@ class TestCliSync(unittest.TestCase):
             with self.assertRaises(SystemExit) as caught:
                 docs_main()
         self.assertEqual(caught.exception.code, 2)
+
+
+class TestDocsChecksCanFail(unittest.TestCase):
+    """Can-fail proofs: every docs check must reject its committed bad input.
+
+    Each case runs `python3 scripts/docs.py <check> --check --root <fixture>`
+    exactly as the `docs-sync`/`docs-examples`/`docs-links` sensors do, against
+    an isolated copy of a committed fixture repository, and asserts the
+    non-zero exit that makes the sensor RED. A checker that regressed to
+    accepting the bad input would exit 0 instead — the one outcome `verify`
+    reports as a passing (or `SKIP:`-warned) sensor.
+    """
+
+    def copy_fixture(self, name):
+        """Copies tests/fixtures/doc_tools/<name> into a fresh temporary root.
+
+        The copy keeps the run hermetic (offline, no network) and independent
+        of this checkout: `docs.py` walks the filesystem when its root is not a
+        git checkout, so the committed fixture content is exactly what the
+        check sees, staged or not.
+        """
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        return shutil.copytree(docs_fixture(name), os.path.join(tmp.name, name))
+
+    def assert_check_failed(self, result, *needles):
+        output = result.stdout + result.stderr
+        self.assertNotEqual(result.returncode, 0, f"check exited 0: {output}")
+        for needle in needles:
+            self.assertIn(needle, output)
+        # A zero exit carrying a `SKIP:` line still counts as a green sensor (it
+        # is warned, not failed), so the marker must never appear either.
+        self.assertNotIn("SKIP:", output)
+
+    def test_broken_paths_and_anchors_fail_links(self):
+        # No same-document fragment is broken here: markdownlint's MD051 owns
+        # those, so the fixture carries the two failures this checker owns.
+        result = run_docs(["links", "--check"], self.copy_fixture("invalid-links"))
+        self.assert_check_failed(
+            result,
+            "broken link target './docs/absent.md'",
+            "missing anchor '#absent-heading' in docs/guide.md",
+            "Link check FAILED: 2 error(s) found.",
+        )
+
+    def test_invalid_executable_example_fails_examples(self):
+        result = run_docs(["examples", "--check"], self.copy_fixture("invalid-examples"))
+        self.assert_check_failed(
+            result,
+            "Example 'broken_example' references unknown fixture 'absent_fixture' in manifest",
+        )
+
+    def test_empty_discovery_fails_every_check(self):
+        root = self.copy_fixture("empty")  # a policy, and no documents at all
+        for args in (["links", "--check"], ["examples", "--check"]):
+            with self.subTest(check=args[0]):
+                self.assert_check_failed(
+                    run_docs(args, root), "No documentation files were discovered."
+                )
+
+    @unittest.skipUnless(os.name == "posix", "the fixture cargo stand-in is a bash script")
+    def test_malformed_generated_blocks_fail_sync_check(self):
+        root = self.copy_fixture("malformed-generated")
+        # The fixture really carries unterminated marker pairs, so "repairing"
+        # it cannot silently turn this proof into a no-op.
+        for name in ("README.md", "docs/cli.md"):
+            with open(os.path.join(root, name), encoding="utf-8") as handle:
+                text = handle.read()
+            self.assertEqual(
+                text.count("BEGIN GENERATED"), text.count("END GENERATED") + 1, name
+            )
+
+        # `sync` rides on the crate's maintenance test through `cargo`; the
+        # fixture `bin/cargo` stands in for `cargo test` and reports that test's
+        # verdict for the artifacts above (101 on an unterminated pair). A
+        # `PATH` holding only the stand-in keeps this hermetic: the host's
+        # `cargo` never runs.
+        env = dict(os.environ, PATH=os.path.join(root, "bin"))
+        result = run_docs(["sync", "--check"], root, env=env)
+        self.assert_check_failed(
+            result, "generated documentation is out of date", "marker pair has no END"
+        )
+        self.assertEqual(result.returncode, 101, result.stderr)
+
+    def test_missing_dependencies_fail_closed(self):
+        """An absent dependency fails the check; it never skips it green.
+
+        `scripts/docs.py` has no `SKIP:` path, so a check that cannot run exits
+        non-zero under `CI=true` and `DO_HARNESS_REQUIRE_TOOLS=1` — and locally
+        too, where there is likewise nothing to fall back to.
+        """
+        root = self.copy_fixture("invalid-links")
+        with tempfile.TemporaryDirectory() as empty_bin:
+            for label, extra in (
+                ("local", {}),
+                ("CI=true", {"CI": "true"}),
+                ("DO_HARNESS_REQUIRE_TOOLS=1", {"DO_HARNESS_REQUIRE_TOOLS": "1"}),
+            ):
+                with self.subTest(scenario=label, dependency="markdown-it-py"):
+                    # `-S` drops site-packages, which is exactly the parser
+                    # scripts/requirements-docs.txt pins being absent.
+                    result = run_docs(
+                        ["links", "--check"], root, env=dict(os.environ, **extra), python_flags=("-S",)
+                    )
+                    self.assert_check_failed(result, "ModuleNotFoundError", "markdown_it")
+
+                with self.subTest(scenario=label, dependency="cargo"):
+                    # `docs-sync` needs the Rust toolchain to reach the
+                    # maintenance test; an empty `PATH` is a host without it.
+                    result = run_docs(
+                        ["sync", "--check"], root, env=dict(os.environ, PATH=empty_bin, **extra)
+                    )
+                    self.assert_check_failed(result, "cargo not found on PATH")
+                    self.assertEqual(result.returncode, 2, result.stderr)
+
+                with self.subTest(scenario=label, dependency="python3"):
+                    # The interpreter itself absent: the sensor command cannot
+                    # start, so there is no exit code that could report a pass —
+                    # the runner records the failed spawn.
+                    with self.assertRaises(FileNotFoundError):
+                        subprocess.run(
+                            ["python3", DOCS_CLI, "links", "--check", "--root", root],
+                            capture_output=True,
+                            env=dict(os.environ, PATH=empty_bin, **extra),
+                        )
 
 
 if __name__ == "__main__":

@@ -1,0 +1,11 @@
+version = 1
+
+# Minimal valid manifest: the guide's `absent_fixture` is deliberately absent,
+# so the executable example must be rejected instead of silently skipped.
+
+[fixtures.unreferenced_fixture]
+id = "unreferenced_fixture"
+description = "Placeholder fixture that no maintained document in this fixture repository names."
+setup_steps = []
+displayed_command = "do-harness verify"
+commands = []

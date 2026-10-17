@@ -1,0 +1,11 @@
+version = 1
+
+[[rules]]
+path = "README.md"
+classification = "maintained"
+reason = "Can-fail fixture: carries a broken path and a broken anchor."
+
+[[rules]]
+glob = "docs/*.md"
+classification = "maintained"
+reason = "Can-fail fixture: the anchor link target that exists."

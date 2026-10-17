@@ -16,8 +16,12 @@ feedback = ["fmt", "check", "clippy", "loc"]
 # (`.github/workflows/scheduled.yml`). `coverage` sat in `release` only: the
 # floor never ran on a pull request, so a regression could land on main and
 # surface only at tag time.
-verification = ["fmt", "check", "clippy", "deps", "machete", "audit", "test", "doctest", "loc", "skills", "skills-docs", "shell", "markdownlint", "markdown-links", "yamllint", "actionlint", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "commitlint"]
-release = ["fmt", "check", "clippy", "deps", "audit", "test", "doctest", "coverage", "loc", "skills", "skills-docs", "shell", "markdownlint", "markdown-links", "yamllint", "actionlint", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "commitlint"]
+# The `docs-sync`/`docs-examples`/`docs-links` trio enforces the documentation
+# contract (`docs/documentation-contract.md`). Each one reads only git, the
+# working tree, and the local toolchain, and each fails closed on an empty
+# inventory, so the trio belongs to the PR-time set as well as `release`.
+verification = ["fmt", "check", "clippy", "deps", "machete", "audit", "test", "doctest", "loc", "skills", "skills-docs", "shell", "markdownlint", "docs-sync", "docs-examples", "docs-links", "yamllint", "actionlint", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "commitlint"]
+release = ["fmt", "check", "clippy", "deps", "audit", "test", "doctest", "coverage", "loc", "skills", "skills-docs", "shell", "markdownlint", "docs-sync", "docs-examples", "docs-links", "yamllint", "actionlint", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "commitlint"]
 # DORA gets its own set so its evidence is addressable (`status --set metrics`)
 # without joining the gating sets. A no-`--set` status check compares against
 # every configured sensor, so a dora-only run's artifact would report
@@ -118,13 +122,49 @@ argv = ["bash", "scripts/check-actionlint.sh"]
 when-changed = [".github/workflows/**", "scripts/check-actionlint.sh"]
 
 [[sensors]]
-# Relative-link integrity for every markdown file: `markdownlint` checks
+# Generated-block drift gate. The `cli-commands` region of `README.md`, the
+# `cli-globals` and `cli-contract <path>` regions of `docs/cli.md`, and the
+# whole `tests/fixtures/cli-contract.json` are rendered from the Clap
+# definitions (`crates/do-harness/src/docs_generation`), so renaming a
+# command, moving a flag, or editing help text leaves the committed blocks
+# stale. `--check` compares every region byte-for-byte (newline-normalized) and
+# fails naming the file and region; the repair is `--write`, which is refused
+# while `CI` is set and never inserts or deletes a marker pair by itself.
+name = "docs-sync"
+argv = ["python3", "scripts/docs.py", "sync", "--check"]
+fix = "python3 scripts/docs.py sync --write"
+when-changed = ["README.md", "docs/cli.md", "tests/fixtures/cli-contract.json", "**/*.rs", "Cargo.toml", "Cargo.lock", "scripts/docs.py", "scripts/doc_tools/**", "scripts/requirements-docs.txt", "scripts/test_doc_tools.py", "scripts/tests/**", "tests/fixtures/doc_tools/**", "do-harness.toml", ".github/workflows/verify.yml", ".github/workflows/release.yml"]
+
+[[sensors]]
+# Executable documentation gate. Every `<!-- example: id=<id> classification=... -->`
+# block in a maintained document must run against its fixture in
+# `tests/fixtures/docs-examples/manifest.toml` (or parse, for
+# `parser-check-only`), and an unmarked CLI/config fence is itself a failure,
+# so a documented command that no longer runs, a stale `displayed_command`, or
+# a new fence without a marker fires here. `**/*.md` covers every maintained
+# document the checker reads, canonical alias symlinks included
+# (`crates/do-harness/README.md` → `README.md`,
+# `crates/do-harness/assets/compliance.md` → `docs/compliance.md`); the
+# `**/*.rs`/`Cargo.*` inputs are there because the checker runs the real
+# `do-harness` binary it may have to build.
+name = "docs-examples"
+argv = ["python3", "scripts/docs.py", "examples", "--check"]
+fix = "repair the failing documented example named in the check output"
+when-changed = ["**/*.md", "docs/contracts.toml", "tests/fixtures/docs-examples/**", "scripts/test-install.sh", "crates/do-harness/templates/**", "**/*.rs", "Cargo.toml", "Cargo.lock", "scripts/docs.py", "scripts/doc_tools/**", "scripts/requirements-docs.txt", "scripts/test_doc_tools.py", "scripts/tests/**", "tests/fixtures/doc_tools/**", "do-harness.toml", ".github/workflows/verify.yml", ".github/workflows/release.yml"]
+
+[[sensors]]
+# Link and anchor integrity for maintained documents. `markdownlint` checks
 # structure, not whether a documented `../crates/types` or `scripts/*.sh` path
-# still exists, so a rename turns a cited path into a dead link silently. This
-# is a filesystem scan (no network), which is why it can gate a pull request.
-name = "markdown-links"
-argv = ["bash", "scripts/check-markdown-links.sh"]
-when-changed = ["**/*.md", "scripts/check-markdown-links.sh"]
+# still exists, and it never checks `#anchor` targets, so a rename turns a cited
+# path into a dead link and a renamed heading into a dead anchor silently. The
+# checked set is the `docs/contracts.toml` inventory (maintained documents plus
+# canonical alias symlinks — `**/*.md` covers that surface whole); historical,
+# fixture, and vendored documents are deliberately exempt, and the scan is git
+# and filesystem only (no network), which is why it can gate a pull request.
+name = "docs-links"
+argv = ["python3", "scripts/docs.py", "links", "--check"]
+fix = "repair the broken path/anchor named in the check output"
+when-changed = ["**/*.md", "docs/contracts.toml", "scripts/docs.py", "scripts/doc_tools/**", "scripts/requirements-docs.txt", "scripts/test_doc_tools.py", "scripts/tests/**", "tests/fixtures/doc_tools/**", "do-harness.toml", ".github/workflows/verify.yml", ".github/workflows/release.yml"]
 
 [[sensors]]
 name = "check-agt"

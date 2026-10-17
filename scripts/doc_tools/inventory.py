@@ -160,25 +160,46 @@ class DocumentRecord:
         return f"<DocumentRecord {self.rel_path} [{self.classification}]>"
 
 
+def _ls_files(root_dir, flags, pathspec=None):
+    """
+    Runs `git ls-files` in a checkout and returns its non-empty output lines.
+    """
+    argv = ["git", "-C", root_dir, "ls-files", *flags]
+    if pathspec is not None:
+        argv.append(pathspec)
+    # Fixed argv (git named literally, no shell, output captured): the only
+    # variables are a checkout path plus caller-fixed flags and pathspecs, never
+    # document- or network-controlled input. The literal executable head keeps
+    # the command a static string for static analysis, same shape as
+    # scripts/check_source_distribution.py.
+    res = subprocess.run(argv, capture_output=True, text=True, check=True)  # nosec B603 B607
+    return [line.strip() for line in res.stdout.splitlines() if line.strip()]
+
+
 def _get_git_files(root_dir, mode="local"):
     """
     Returns list of relative paths for markdown files using git.
+
+    "local" mode discovers tracked files plus files that are untracked but not
+    ignored, so a maintained document is checked before it is staged; other
+    modes see the tracked tree only. Git's `:(icase)` pathspec also matches the
+    README.MD-style casing the default case-sensitive glob misses, but in
+    `--others` mode it silently returns nothing when the checkout root is a
+    nested directory absent from the index (verified on git 2.53), so the
+    untracked half is enumerated without a pathspec and matched case-
+    insensitively here instead.
     """
-    flags = ["--cached", "--others", "--exclude-standard"] if mode == "local" else []
     try:
-        # Fixed argv (git named literally, no shell, output captured): the only
-        # variables are a checkout path and mode-selected ls-files flags, never
-        # document- or network-controlled input. The literal executable head
-        # keeps the command a static string for static analysis, same shape as
-        # scripts/check_source_distribution.py. `:(icase)` also matches the
-        # README.MD-style casing the default case-sensitive glob misses.
-        res = subprocess.run(  # nosec B603 B607
-            ["git", "-C", root_dir, "ls-files", *flags, ":(icase)*.md"],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-        files = [line.strip() for line in res.stdout.splitlines() if line.strip()]
+        # Tracked half: the case-insensitive pathspec is reliable for the index.
+        files = _ls_files(root_dir, ["--cached"] if mode == "local" else [], ":(icase)*.md")
+        if mode == "local":
+            # `--exclude-standard` keeps .gitignore semantics identical; the
+            # suffix match below reproduces the pathspec's case-insensitivity.
+            files.extend(
+                f
+                for f in _ls_files(root_dir, ["--others", "--exclude-standard"])
+                if f.lower().endswith(".md")
+            )
         return files
     except (subprocess.CalledProcessError, FileNotFoundError, OSError):
         # Fallback to filesystem walk if git fails or is unavailable

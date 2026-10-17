@@ -23,8 +23,8 @@ from doc_tools.inventory import (
 from doc_tools.markdown import MarkdownDocument
 
 # Network and non-filesystem targets have no working-tree path to check; the
-# tuple mirrors the skip contract in scripts/check-markdown-links.sh (plus
-# protocol-relative URLs, which start like site paths).
+# tuple mirrors the skip contract recorded in docs/documentation-contract.md
+# (plus protocol-relative URLs, which start like site paths).
 NETWORK_URL_PREFIXES = ("http://", "https://", "mailto:", "tel:", "ftp://", "data:", "//")
 
 
@@ -187,9 +187,9 @@ class LinkChecker:
         raw_url = link.raw_url
 
         # Same-repo GitHub links become working-tree paths; other network-like
-        # and site-absolute targets are skipped, mirroring
-        # scripts/check-markdown-links.sh. `/blob/<ref>/<path>` is GitHub's
-        # site-absolute form of a repository file link and is still checked.
+        # and site-absolute targets are skipped, as docs/documentation-contract.md
+        # records. `/blob/<ref>/<path>` is GitHub's site-absolute form of a
+        # repository file link and is still checked.
         if raw_url.startswith(NETWORK_URL_PREFIXES) or raw_url.startswith("/"):
             gh_path, gh_frag = normalize_github_link(raw_url, self.root_dir, self.repo_owner_name)
             if gh_path:
@@ -230,8 +230,8 @@ class LinkChecker:
             return
 
         # The target must exist inside the checkout. GitHub serves
-        # `/blob/<dir>` via a redirect to `/tree/<dir>`, and the sibling
-        # check-markdown-links.sh sensor uses os.path.exists, so existing
+        # `/blob/<dir>` via a redirect to `/tree/<dir>`, and existence is the
+        # documented target test (docs/documentation-contract.md), so existing
         # directories are valid link targets too.
         if not os.path.exists(target_real):
             self.errors.append(
