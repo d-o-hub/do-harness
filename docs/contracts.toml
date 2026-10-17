@@ -84,3 +84,48 @@ reason = "Maintained benchmark and selection experiment documentation."
 glob = ".github/*.md"
 classification = "maintained"
 reason = "GitHub workflow templates and guidelines."
+
+# Explicit source-to-section mappings for documentation impact routing.
+# Maps source paths to affected documentation files and heading section anchors/slugs.
+
+[[source_mappings]]
+glob = "crates/do-harness/src/cli*"
+target_docs = ["docs/cli.md", "README.md"]
+target_sections = ["cli-reference", "commands", "usage"]
+reason = "CLI command structure and subcommand definitions."
+
+[[source_mappings]]
+glob = "src/cli*"
+target_docs = ["docs/cli.md", "README.md"]
+target_sections = ["cli-reference", "commands", "usage"]
+reason = "CLI command structure and subcommand definitions."
+
+[[source_mappings]]
+glob = "crates/do-harness/src/init*"
+target_docs = ["docs/adoption.md", "README.md"]
+target_sections = ["quickstart", "adoption", "init"]
+reason = "Project initialization and adoption workflow."
+
+[[source_mappings]]
+glob = "crates/do-harness/templates/**"
+target_docs = ["docs/adoption.md", "README.md"]
+target_sections = ["quickstart", "templates", "adoption"]
+reason = "Scaffold templates for project setup."
+
+[[source_mappings]]
+glob = "do-harness.toml"
+target_docs = ["docs/documentation-contract.md", "README.md"]
+target_sections = ["verification", "ci", "sensors"]
+reason = "Sensor and workflow configuration."
+
+[[source_mappings]]
+glob = ".github/workflows/**"
+target_docs = ["docs/documentation-contract.md", "README.md"]
+target_sections = ["verification", "ci"]
+reason = "CI workflow definitions."
+
+[[source_mappings]]
+glob = "crates/do-harness/src/pr/review.rs"
+target_docs = ["docs/cli.md", "README.md"]
+target_sections = ["json-examples", "pr-review", "reports"]
+reason = "Report serialization and PR review output."
