@@ -130,6 +130,8 @@ mod tests {
 
     use super::*;
     use crate::changes::{ChangeKind, ChangedFile};
+    use crate::config::Config;
+    use std::path::Path;
 
     /// Builds a sensor spec with the given applicability patterns.
     fn spec(name: &str, when_changed: &[&str]) -> SensorSpec {
@@ -260,5 +262,133 @@ mod tests {
         let selection = select(&candidates, &changed(&["src/lib.rs"]));
         assert_eq!(selection.selected.len(), 0);
         assert_eq!(selection.skipped.len(), 1);
+    }
+
+    /// Every sensor from the repository's own `do-harness.toml`, so the docs
+    /// selection proof is driven by the shipped applicability lists rather
+    /// than a copy that could drift from what CI actually runs.
+    fn repo_sensors() -> Vec<SensorSpec> {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let text = std::fs::read_to_string(root.join("do-harness.toml"))
+            .expect("the repository do-harness.toml must be readable");
+        let config: Config = toml::from_str(&text).expect("do-harness.toml must parse");
+        config.sensors
+    }
+
+    /// The docs contract sensors, in shipped configuration order.
+    fn docs_sensors() -> Vec<SensorSpec> {
+        let sensors = repo_sensors();
+        ["docs-sync", "docs-examples", "docs-links"]
+            .iter()
+            .map(|name| {
+                sensors
+                    .iter()
+                    .find(|sensor| sensor.name == *name)
+                    .unwrap_or_else(|| panic!("do-harness.toml must define a `{name}` sensor"))
+                    .clone()
+            })
+            .collect()
+    }
+
+    /// Runs selection over the docs contract sensors for `changed`, returning
+    /// the selected and skipped names so a dropped `when-changed` glob cannot
+    /// pass silently.
+    fn select_docs(changed: &ChangedFiles) -> (Vec<String>, Vec<String>) {
+        let sensors = docs_sensors();
+        let candidates: Vec<&SensorSpec> = sensors.iter().collect();
+        let selection = select(&candidates, changed);
+        (
+            selection.selected_names(),
+            selection.skipped.iter().map(|s| s.name.clone()).collect(),
+        )
+    }
+
+    /// A maintained Markdown edit is owned by both the generated-block
+    /// synchroniser and the link checker, so it must select `docs-sync` and
+    /// `docs-links`; dropping either Markdown glob from the shipped
+    /// applicability lists fails here.
+    #[test]
+    fn docs_only_change_selects_sync_and_links() {
+        let (selected, skipped) = select_docs(&changed(&["README.md"]));
+        assert!(
+            selected.iter().any(|name| name == "docs-sync"),
+            "a maintained Markdown edit must select docs-sync \
+             (selected {selected:?}, skipped {skipped:?})"
+        );
+        assert!(
+            selected.iter().any(|name| name == "docs-links"),
+            "a maintained Markdown edit must select docs-links \
+             (selected {selected:?}, skipped {skipped:?})"
+        );
+    }
+
+    /// A CLI/source metadata edit regenerates the mechanical blocks, so it
+    /// must select `docs-sync` — the docs check that owns them — rather than
+    /// vacuously skipping the contract.
+    #[test]
+    fn source_metadata_change_selects_docs_sync() {
+        let (selected, skipped) = select_docs(&changed(&["crates/do-harness/src/cli.rs"]));
+        assert!(
+            selected.iter().any(|name| name == "docs-sync"),
+            "a CLI source edit must select docs-sync \
+             (selected {selected:?}, skipped {skipped:?})"
+        );
+    }
+
+    /// A renamed maintained document keeps its link obligations, so its new
+    /// path must select `docs-links`.
+    #[test]
+    fn renamed_maintained_doc_selects_docs_links() {
+        let renamed = ChangedFiles {
+            files: vec![ChangedFile {
+                path: "docs/cli-reference.md".to_owned(),
+                kind: ChangeKind::Renamed {
+                    from: "docs/cli.md".to_owned(),
+                },
+            }],
+            discovery_failed: false,
+        };
+
+        let (selected, skipped) = select_docs(&renamed);
+        assert!(
+            selected.iter().any(|name| name == "docs-links"),
+            "a renamed maintained document must select docs-links \
+             (selected {selected:?}, skipped {skipped:?})"
+        );
+    }
+
+    /// A deleted maintained document still owns its inbound links, so the
+    /// deletion must select `docs-links` — deletions are never skipped.
+    #[test]
+    fn deleted_maintained_doc_selects_docs_links() {
+        let deleted = ChangedFiles {
+            files: vec![ChangedFile {
+                path: "docs/adoption.md".to_owned(),
+                kind: ChangeKind::Deleted,
+            }],
+            discovery_failed: false,
+        };
+
+        let (selected, skipped) = select_docs(&deleted);
+        assert!(
+            selected.iter().any(|name| name == "docs-links"),
+            "a deleted maintained document must select docs-links \
+             (selected {selected:?}, skipped {skipped:?})"
+        );
+    }
+
+    /// The three docs contracts replace the legacy shell link checker: exactly
+    /// one sensor owns Markdown links, so `markdown-links` must be gone.
+    #[test]
+    fn legacy_markdown_links_sensor_is_gone() {
+        let legacy: Vec<String> = repo_sensors()
+            .iter()
+            .filter(|sensor| sensor.name == "markdown-links")
+            .map(|sensor| sensor.name.clone())
+            .collect();
+        assert!(
+            legacy.is_empty(),
+            "docs-links supersedes the legacy link checker; remove `markdown-links`: {legacy:?}"
+        );
     }
 }

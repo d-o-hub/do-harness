@@ -1,0 +1,6 @@
+version = 1
+
+[[rules]]
+glob = "docs/*.md"
+classification = "maintained"
+reason = "Can-fail fixture: declares an executable example with an unknown fixture."

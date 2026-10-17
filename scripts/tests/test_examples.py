@@ -3,8 +3,11 @@
 test_examples.py — Unit and integration tests for documentation example verification.
 """
 
+import contextlib
+import io
 import os
 import sys
+import tempfile
 import unittest
 
 # Ensure scripts directory is in sys.path
@@ -107,6 +110,77 @@ class TestFullExamplesVerification(unittest.TestCase):
         root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         ok = examples.verify_examples(root_dir=root_dir)
         self.assertTrue(ok)
+
+
+class TestFixturePlatformScope(unittest.TestCase):
+    """A fixture may declare the hosts it runs on; other hosts skip it loudly.
+
+    Regression: the local installer fixture shells out to a POSIX-only script,
+    so an undeclared scope made `docs-examples` fail on Windows — where an
+    unqualified `bash` is the WSL launcher, not the shell the fixture needs.
+    """
+
+    # A platform the running host is not, so the skip path is exercised on
+    # every host this suite runs on.
+    OTHER_HOST = "windows" if examples.host_platform() != "windows" else "linux"
+
+    def write_repo(self, root, platforms):
+        """A miniature checkout whose one executable example is platform-scoped."""
+        os.makedirs(os.path.join(root, "docs"))
+        os.makedirs(os.path.join(root, "tests", "fixtures", "docs-examples"))
+        with open(os.path.join(root, "docs", "contracts.toml"), "w", encoding="utf-8") as f:
+            f.write(
+                "version = 1\n\n[[rules]]\npath = \"README.md\"\n"
+                "classification = \"maintained\"\nreason = \"Platform-scope fixture.\"\n"
+            )
+        with open(os.path.join(root, "README.md"), "w", encoding="utf-8") as f:
+            f.write(
+                "<!-- example: id=scoped classification=executable fixture=scoped_fixture -->\n"
+                "```bash\ndo-harness verify --invalid-flag\n```\n"
+            )
+        with open(
+            os.path.join(root, "tests", "fixtures", "docs-examples", "manifest.toml"),
+            "w",
+            encoding="utf-8",
+        ) as f:
+            f.write(
+                "version = 1\n\n[fixtures.scoped_fixture]\n"
+                "id = \"scoped_fixture\"\n"
+                "description = \"Platform-scoped fixture.\"\n"
+                "displayed_command = \"do-harness verify --invalid-flag\"\n"
+                f"platforms = [\"{platforms}\"]\n"
+                "commands = [\n    { argv = [\"verify\", \"--invalid-flag\"], expected_exit = 0 }\n]\n"
+            )
+
+    def test_host_platform_is_a_declarable_name(self):
+        self.assertIn(examples.host_platform(), examples.FIXTURE_PLATFORMS)
+
+    def test_fixture_declared_for_another_host_is_skipped_with_a_notice(self):
+        with tempfile.TemporaryDirectory() as root:
+            self.write_repo(root, self.OTHER_HOST)
+            captured = io.StringIO()
+            with contextlib.redirect_stdout(captured), contextlib.redirect_stderr(captured):
+                ok = examples.verify_examples(root_dir=root)
+            self.assertTrue(ok, captured.getvalue())
+            self.assertIn("skipped on", captured.getvalue())
+
+    def test_fixture_declared_for_this_host_still_runs(self):
+        with tempfile.TemporaryDirectory() as root:
+            self.write_repo(root, examples.host_platform())
+            captured = io.StringIO()
+            with contextlib.redirect_stdout(captured), contextlib.redirect_stderr(captured):
+                ok = examples.verify_examples(root_dir=root)
+            # The fixture's command cannot satisfy its declared exit code, so a
+            # green result would mean the key skipped a runnable fixture.
+            self.assertFalse(ok, captured.getvalue())
+            self.assertNotIn("skipped on", captured.getvalue())
+
+    def test_unknown_platform_name_is_a_manifest_error(self):
+        with tempfile.TemporaryDirectory() as root:
+            self.write_repo(root, "plan9")
+            manifest = os.path.join(root, "tests", "fixtures", "docs-examples", "manifest.toml")
+            with self.assertRaises(ExampleError):
+                examples.load_fixture_manifest(manifest)
 
 
 if __name__ == "__main__":

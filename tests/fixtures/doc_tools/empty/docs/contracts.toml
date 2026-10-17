@@ -1,0 +1,14 @@
+version = 1
+
+# A policy and no documents: discovery has nothing to classify, which must fail
+# rather than pass vacuously.
+
+[[rules]]
+path = "README.md"
+classification = "maintained"
+reason = "Can-fail fixture: empty discovery has no README.md to find."
+
+[[rules]]
+glob = "docs/*.md"
+classification = "maintained"
+reason = "Can-fail fixture: empty discovery has no docs to find."

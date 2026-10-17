@@ -5,6 +5,11 @@
 //! /`cargo-machete` are missing no matter what the host installed under
 //! `/usr/bin`, and asserts the documented policy: WARN skip locally, FAIL when
 //! `CI=true` or `DO_HARNESS_REQUIRE_TOOLS=1`. Nothing here skips silently.
+//!
+//! The `docs-*` sensors are the exception to the skip-locally half: their
+//! command is `python3 scripts/docs.py <check> --check`, and `scripts/docs.py`
+//! has no `SKIP:` path, so a missing dependency is RED in every environment.
+//! Their cases below pin that instead of a warned pass.
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
@@ -15,6 +20,43 @@ fn script(name: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../scripts")
         .join(name)
+}
+
+/// The checkout root the sensors run from (the crate sits two levels down).
+#[cfg(unix)]
+fn repository_root() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..")
+}
+
+/// Resolves `name` through `PATH` (then `/usr/bin`, `/bin`), panicking when it
+/// is absent: the docs cases below need an interpreter for `scripts/docs.py`,
+/// so a host without one cannot exercise their policy.
+#[cfg(unix)]
+fn path_utility(name: &str) -> PathBuf {
+    std::env::var_os("PATH")
+        .and_then(|value| {
+            std::env::split_paths(&value)
+                .map(|dir| dir.join(name))
+                .find(|candidate| candidate.is_file())
+        })
+        .unwrap_or_else(|| system_utility(name))
+}
+
+/// Makes `bin` the command's whole `PATH` — so a host-installed tool cannot
+/// change the outcome — and sets exactly the documented CI markers.
+#[cfg(unix)]
+fn sensor_env(cmd: &mut Command, bin: &std::path::Path, ci: bool, require_tools: bool) {
+    cmd.env("PATH", bin);
+    cmd.env_remove("BASH_ENV");
+    cmd.env_remove("ENV");
+    cmd.env_remove("CI");
+    cmd.env_remove("DO_HARNESS_REQUIRE_TOOLS");
+    if ci {
+        cmd.env("CI", "true");
+    }
+    if require_tools {
+        cmd.env("DO_HARNESS_REQUIRE_TOOLS", "1");
+    }
 }
 
 /// Resolves a system utility that a private `bin` needs to copy in.
@@ -66,17 +108,7 @@ fn assert_missing_tool_policy(name: &str, utilities: &[&str]) {
     let run_scenario = |ci: bool, require_tools: bool| -> Output {
         let mut cmd = Command::new("/bin/bash");
         cmd.arg(script(name));
-        cmd.env("PATH", &bin);
-        cmd.env_remove("BASH_ENV");
-        cmd.env_remove("ENV");
-        cmd.env_remove("CI");
-        cmd.env_remove("DO_HARNESS_REQUIRE_TOOLS");
-        if ci {
-            cmd.env("CI", "true");
-        }
-        if require_tools {
-            cmd.env("DO_HARNESS_REQUIRE_TOOLS", "1");
-        }
+        sensor_env(&mut cmd, &bin, ci, require_tools);
         cmd.output().expect("spawn script")
     };
 
@@ -130,10 +162,117 @@ fn actionlint_sensor_fails_closed_only_when_required() {
     assert_missing_tool_policy("check-actionlint.sh", &[]);
 }
 
+/// Runs the docs sensor line (`python3 scripts/docs.py <check> --check`) from
+/// the checkout root with a private `bin` as the whole `PATH`, so `python3` is
+/// missing however the host installed it.
+#[cfg(unix)]
+fn run_docs_without_python(
+    root: &std::path::Path,
+    bin: &std::path::Path,
+    check: &str,
+    ci: bool,
+    require_tools: bool,
+) -> Output {
+    let mut cmd = Command::new("/bin/bash");
+    cmd.arg("-c")
+        .arg(format!("python3 scripts/docs.py {check} --check"));
+    cmd.current_dir(root);
+    sensor_env(&mut cmd, bin, ci, require_tools);
+    cmd.output().expect("spawn docs.py")
+}
+
+/// The docs sensors replaced `check-markdown-links.sh`, and they keep its
+/// fail-closed half without its skip half: `scripts/docs.py` has no `SKIP:`
+/// path, so a missing `python3` cannot become a warned pass. Neither marker is
+/// emitted and the run exits non-zero under `CI=true`,
+/// `DO_HARNESS_REQUIRE_TOOLS=1`, and locally.
 #[cfg(unix)]
 #[test]
-fn markdown_links_sensor_fails_closed_only_when_required() {
-    assert_missing_tool_policy("check-markdown-links.sh", &[]);
+fn docs_sensors_fail_closed_without_python() {
+    let root = repository_root();
+    let temp = tempfile::tempdir().expect("create temp dir");
+    let bin = temp.path().join("bin");
+    std::fs::create_dir(&bin).expect("create private bin");
+
+    for check in ["links", "sync", "examples"] {
+        for (label, ci, require_tools) in [
+            ("local", false, false),
+            ("CI=true", true, false),
+            ("DO_HARNESS_REQUIRE_TOOLS=1", false, true),
+        ] {
+            let output = run_docs_without_python(&root, &bin, check, ci, require_tools);
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            assert!(
+                !output.status.success(),
+                "docs-{check}: {label} run must fail closed without python3: \
+                 stdout={stdout} stderr={stderr}"
+            );
+            assert!(
+                !stdout.contains("SKIP:") && !stderr.contains("SKIP:"),
+                "docs-{check}: {label} run must never emit the SKIP: marker: \
+                 stdout={stdout} stderr={stderr}"
+            );
+            assert!(
+                stderr.contains("python3"),
+                "docs-{check}: {label} run must name the missing interpreter: stderr={stderr}"
+            );
+        }
+    }
+}
+
+/// Runs `docs.py sync --check` with an interpreter that exists but no `cargo`
+/// on `PATH`: the sync check's second dependency is the Rust toolchain.
+#[cfg(unix)]
+fn run_sync_without_cargo(
+    python: &std::path::Path,
+    root: &std::path::Path,
+    bin: &std::path::Path,
+    ci: bool,
+    require_tools: bool,
+) -> Output {
+    let mut cmd = Command::new(python);
+    cmd.arg(script("docs.py")).arg("sync").arg("--check");
+    cmd.current_dir(root);
+    sensor_env(&mut cmd, bin, ci, require_tools);
+    cmd.output().expect("spawn docs.py")
+}
+
+/// `docs-sync` reaches the crate's generated-docs maintenance test through
+/// `cargo`, so the interpreter alone is not enough. With `cargo` absent the
+/// check names the missing tool and exits 2 — a failure, never a green skip.
+#[cfg(unix)]
+#[test]
+fn docs_sync_fails_closed_without_cargo() {
+    let root = repository_root();
+    let python = path_utility("python3");
+    let temp = tempfile::tempdir().expect("create temp dir");
+    let bin = temp.path().join("bin");
+    std::fs::create_dir(&bin).expect("create private bin");
+
+    for (label, ci, require_tools) in [
+        ("local", false, false),
+        ("CI=true", true, false),
+        ("DO_HARNESS_REQUIRE_TOOLS=1", false, true),
+    ] {
+        let output = run_sync_without_cargo(&python, &root, &bin, ci, require_tools);
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert_eq!(
+            output.status.code(),
+            Some(2),
+            "docs-sync: {label} run must fail closed without cargo: stdout={stdout} stderr={stderr}"
+        );
+        assert!(
+            stderr.contains("cargo not found on PATH"),
+            "docs-sync: {label} run must name the missing tool: stderr={stderr}"
+        );
+        assert!(
+            !stdout.contains("SKIP:") && !stderr.contains("SKIP:"),
+            "docs-sync: {label} run must never emit the SKIP: marker: \
+             stdout={stdout} stderr={stderr}"
+        );
+    }
 }
 
 #[cfg(unix)]

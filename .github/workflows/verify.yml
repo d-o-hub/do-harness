@@ -178,12 +178,15 @@ jobs:
           cp target/release/do-harness "$dist/pkg/$name/do-harness.exe"
           (cd "$dist/pkg" && zip -qr "$dist/${name}.zip" "$name")
           bash scripts/publish-npm.sh --dist "$dist" --dry-run
-      - name: Install skill tooling dependencies
-        # The `skills-docs` sensor parses maintained markdown with
+      - name: Install skill and docs tooling dependencies
+        # One install for every parser the Python-side sensors need, run before
+        # the sensors so a missing parser is a hard FAIL under
+        # DO_HARNESS_REQUIRE_TOOLS instead of a SKIP: `skills-docs`, `docs-sync`,
+        # `docs-examples`, and `docs-links` all parse maintained markdown with
         # markdown-it-py (scripts/requirements-docs.txt), and the eval dogfood
-        # below needs PyYAML (quick_validate.py parses YAML frontmatter). Both
-        # installs run before the sensors so a missing parser is a hard FAIL
-        # under DO_HARNESS_REQUIRE_TOOLS instead of a SKIP.
+        # below needs PyYAML (quick_validate.py parses YAML frontmatter). The
+        # `python3` here is the runner image's interpreter, the same one the
+        # docs sensors resolve through their argv.
         run: python3 -m pip install --disable-pip-version-check -r .agents/skills/skill-creator/scripts/requirements.txt -r scripts/requirements-docs.txt
       # The adjacent crate is covered by the sensors below: `check` compiles it
       # with default features, the `test` sensor's workspace run runs its
@@ -196,14 +199,48 @@ jobs:
           # check-yamllint.sh / check-actionlint.sh fail closed when CI=true;
           # cargo-audit, cargo-deny, shellcheck, actionlint, yamllint,
           # markdownlint-cli2, and the docs tooling are installed above.
-          # check-markdown-links.sh needs only python3 (runner image);
-          # check-skills-docs.sh needs markdown-it-py, installed just above.
+          # docs-sync/docs-examples/docs-links run `python3 scripts/docs.py
+          # <subcommand> --check`; docs-examples executes the release binary
+          # built above, and all three need markdown-it-py, installed just
+          # above. check-skills-docs.sh needs markdown-it-py too.
           CI: "true"
           # Belt and braces: missing tools fail even if CI=true is dropped.
           DO_HARNESS_REQUIRE_TOOLS: "1"
         run: ./target/release/do-harness verify --set verification --format json --strict
       - name: Assert verification evidence is green
         run: ./target/release/do-harness status --set verification --format json
+      - name: Capture the generated-docs diff
+        # `docs-sync` renders every generated block from the Clap definitions and
+        # fails on any drift, so the sensor run above has already failed when this
+        # step runs. CI never repairs tracked docs (`python3 scripts/docs.py sync
+        # --write` refuses while CI is set), so the same read-only check is
+        # replayed here and its report — one line per drifted block, naming the
+        # first differing line — is kept as a single file for the reviewer. A
+        # failure in another sensor leaves the docs in sync, so nothing is
+        # uploaded.
+        if: failure()
+        timeout-minutes: 10
+        run: |
+          diff_file="$RUNNER_TEMP/docs-sync.diff"
+          if python3 scripts/docs.py sync --check > "$diff_file" 2>&1; then
+            rm -f "$diff_file"
+            exit 0
+          fi
+          # Bound the uploaded file: the report is one line per drifted block,
+          # but a pathological tree must not ship an unbounded log as an
+          # artifact.
+          tail --bytes=262144 "$diff_file" > "$diff_file.bounded"
+          mv "$diff_file.bounded" "$diff_file"
+          cat "$diff_file"
+          echo "repair locally: python3 scripts/docs.py sync --write"
+      # actions/upload-artifact@v7.0.1
+      - name: Upload the generated-docs diff
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: docs-sync-diff
+          path: ${{ runner.temp }}/docs-sync.diff
+          if-no-files-found: ignore
       # The `scheduled` set (the feature-powerset builds) runs nightly from
       # `.github/workflows/scheduled.yml`, where its evidence is asserted the
       # same way this set's is. Paying a four-build matrix per push and per pull
@@ -441,6 +478,25 @@ jobs:
         run: cargo test -p do-harness-db --release -- --test-threads=1
       - name: Build harness CLI
         run: cargo build --release -p do-harness
+      - name: Check documentation contracts with the resolved interpreter
+        # The verification set's docs sensors spell their argv `python3
+        # scripts/docs.py <subcommand> --check`; windows-latest resolves the
+        # interpreter as `python` (the name the install step above uses), so the
+        # read-only checks run here under that name. `sync` is covered already:
+        # the `cargo nextest run --workspace` step above builds and runs the
+        # `do-harness` binary's unit tests, which include
+        # `docs_generation::sync::generated_docs_are_in_sync`, so re-running it
+        # through this script would compile the same test target again for no
+        # new signal. Both checks below are offline, and `docs-examples`
+        # exercises the release binary built just above; the local installer
+        # fixture declares `platforms = ["linux", "darwin"]` (its
+        # scripts/test-install.sh supports Linux and macOS only), so here the
+        # check reports that one skip and runs every other example.
+        shell: bash
+        timeout-minutes: 10
+        run: |
+          python scripts/docs.py links --check
+          python scripts/docs.py examples --check
       - name: Dogfood init + verify with the release binary
         shell: bash
         env:

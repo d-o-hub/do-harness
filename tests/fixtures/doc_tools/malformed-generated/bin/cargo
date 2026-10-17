@@ -1,0 +1,40 @@
+#!/bin/bash
+# Fixture stand-in for `cargo`, the docs-sync sensor's only dependency.
+#
+# `python3 scripts/docs.py sync --check` reaches the crate's maintenance test
+# (`docs_generation::sync::generated_docs_are_in_sync`) through `cargo test`, so
+# the sensor's verdict is that test's exit code. Compiling the crate here would
+# cost minutes, so this stand-in reproduces the one observable contract the sync
+# CLI depends on: it reports the maintenance test's verdict for the two
+# marker-delimited artifacts of `tests/fixtures/doc_tools/malformed-generated`
+# (exit 101 when a generated region's marker pair is unterminated, exit 0 when
+# every pair balances).
+#
+# Bash builtins only, and the interpreter is named absolutely: the caller runs
+# this with a private `PATH` holding just this file, so no external `grep`,
+# `awk`, or `env` may be assumed.
+set -euo pipefail
+
+count_marker() {
+    local marker="$1" total=0 line file
+    for file in README.md docs/cli.md; do
+        [[ -f "$file" ]] || continue
+        while IFS= read -r line || [[ -n "$line" ]]; do
+            if [[ "$line" == *"$marker"* ]]; then
+                total=$((total + 1))
+            fi
+        done < "$file"
+    done
+    printf '%s' "$total"
+}
+
+begins="$(count_marker 'BEGIN GENERATED')"
+ends="$(count_marker 'END GENERATED')"
+
+if [[ "$begins" != "$ends" ]]; then
+    printf '%s\n' 'generated documentation is out of date (1 issue(s)):' >&2
+    printf '%s\n' '  README.md: region `cli-commands` marker pair has no END — the committed block is malformed' >&2
+    exit 101
+fi
+
+printf '%s\n' 'generated documentation is in sync'

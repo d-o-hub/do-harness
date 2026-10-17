@@ -91,11 +91,17 @@ The harness is designed to be adopted by any codebase, Rust or not:
 
    <!-- example: id=init_language_packs classification=executable fixture=generic_adoption -->
    ```bash
-   do-harness init                 # Rust sensor pack
+   do-harness init                      # detect the pack from the repository
+   do-harness init --language rust      # Rust sensor pack, explicit
    do-harness init --language generic   # no built-in sensors
    do-harness init --language web       # web UI audit pack (viewport, a11y, console, perf, visual, i18n)
    do-harness init --language node      # Node/JS/TS pack (typecheck, lint, test, build)
    ```
+
+   Plain `init` detects the target instead of assuming Rust: an explicit
+   `--language` wins, an existing `do-harness.toml` keeps its declared pack, a
+   `Cargo.toml` selects rust, any other non-empty project selects the generic
+   pack, and an empty directory bootstraps rust.
 
    The web pack's sensors require the `WEB_AUDIT_*` environment plus the
    `playwright`, `@axe-core/playwright`, and `lighthouse` peer dependencies
@@ -328,7 +334,19 @@ canonical copy).
 
 ## CI
 
-GitHub Actions: see `.github/workflows/verify.yml` — lints shell sensors, builds `do-harness`, checks the adjacent `guardian-proxy` crate with default features and tests it with the optional features off and on (`cargo check -p guardian-proxy`; `cargo test -p guardian-proxy` plus both feature builds), runs `verify --set verification --format json --strict` and `status --set verification` plus `verify --set scheduled`, dogfoods `init && verify` on fresh rust/generic workspaces, and runs `do-harness eval --strict-fixtures`.
+GitHub Actions runs three cadences as separate gates. Per pull request,
+`.github/workflows/verify.yml` lints shell sensors, builds `do-harness`,
+dogfoods `init && verify` on fresh rust/generic workspaces, runs `do-harness
+eval --strict-fixtures`, and runs `verify --set verification --format json
+--strict` — the set whose `check`/`test`/`check-agt`/`check-mcp` sensors cover
+the adjacent `guardian-proxy` crate with default features and with its optional
+features off and on — then asserts `status --set verification`. Nightly,
+`.github/workflows/scheduled.yml` runs `verify --set scheduled --format json
+--strict` over the work no diff can invalidate (the `powerset` feature matrix
+and the instrumented `coverage` run) and asserts `status --set scheduled`. Tag
+pushes run `verify --set release --format json --strict` in
+`.github/workflows/release.yml`. Which sensors belong to which set is maintained
+in `do-harness.toml` (`[signal-sets]`), not copied here.
 
 > **Runtime proxy note:** `do-harness` itself stays a dev-loop harness (no traffic proxy). The adjacent `crates/guardian-proxy` is an *optional* fail-closed sidecar (off by default; governance via `agt-governance`, MCP Streamable HTTP ingress via `mcp-surface`) and the only tool-call mediation surface, via its `ProxyMediator` gate — see `crates/guardian-proxy/README.md` when present.
 
