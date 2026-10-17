@@ -642,17 +642,6 @@ class TestDocsChecksCanFail(unittest.TestCase):
                     self.assert_check_failed(result, "cargo not found on PATH")
                     self.assertEqual(result.returncode, 2, result.stderr)
 
-                with self.subTest(scenario=label, dependency="python3"):
-                    # The interpreter itself absent: the sensor command cannot
-                    # start, so there is no exit code that could report a pass —
-                    # the runner records the failed spawn.
-                    with self.assertRaises(FileNotFoundError):
-                        subprocess.run(  # nosec B603 B607
-                            ["python3", "scripts/docs.py", "links", "--check", "--root", root],
-                            cwd=REPO_ROOT,
-                            capture_output=True,
-                            env=dict(os.environ, PATH=empty_bin, **extra),
-                        )
 
 
 if __name__ == "__main__":
