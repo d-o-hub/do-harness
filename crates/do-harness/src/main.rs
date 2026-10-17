@@ -28,6 +28,8 @@ mod config;
 mod dbcheck;
 mod distill;
 mod distill_strikes;
+#[cfg(test)]
+mod docs_generation;
 mod doctor;
 mod dora;
 mod errors;

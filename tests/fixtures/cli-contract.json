@@ -1,0 +1,3339 @@
+{
+  "schema_version": 1,
+  "root": {
+    "path": "",
+    "about": "do-harness agent execution harness CLI",
+    "usage": "do-harness [OPTIONS] <COMMAND>",
+    "aliases": [],
+    "args": [
+      {
+        "id": "root",
+        "kind": "option",
+        "short": null,
+        "long": "root",
+        "value_names": [
+          "DIR"
+        ],
+        "required": false,
+        "repeatable": false,
+        "takes_value": true,
+        "default_values": [],
+        "possible_values": [],
+        "help": "Workspace root override (default: walk up from cwd)",
+        "index": null
+      },
+      {
+        "id": "config",
+        "kind": "option",
+        "short": null,
+        "long": "config",
+        "value_names": [
+          "FILE"
+        ],
+        "required": false,
+        "repeatable": false,
+        "takes_value": true,
+        "default_values": [],
+        "possible_values": [],
+        "help": "Explicit path to do-harness.toml",
+        "index": null
+      },
+      {
+        "id": "quiet",
+        "kind": "option",
+        "short": "q",
+        "long": "quiet",
+        "value_names": [
+          "QUIET"
+        ],
+        "required": false,
+        "repeatable": false,
+        "takes_value": false,
+        "default_values": [],
+        "possible_values": [],
+        "help": "Suppress PASS/WARN verdict lines and the success footer",
+        "index": null
+      },
+      {
+        "id": "output",
+        "kind": "option",
+        "short": null,
+        "long": "output",
+        "value_names": [
+          "FILE"
+        ],
+        "required": false,
+        "repeatable": false,
+        "takes_value": true,
+        "default_values": [],
+        "possible_values": [],
+        "help": "Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)",
+        "index": null
+      },
+      {
+        "id": "dry_run",
+        "kind": "option",
+        "short": null,
+        "long": "dry-run",
+        "value_names": [
+          "DRY_RUN"
+        ],
+        "required": false,
+        "repeatable": false,
+        "takes_value": false,
+        "default_values": [],
+        "possible_values": [],
+        "help": "Dry run without side effects",
+        "index": null
+      }
+    ],
+    "subcommands": [
+      "version",
+      "verify",
+      "list",
+      "explain",
+      "status",
+      "pr",
+      "skills",
+      "init-db",
+      "seed",
+      "init",
+      "task",
+      "trace",
+      "distill",
+      "errors",
+      "loc",
+      "split",
+      "eval",
+      "hook",
+      "doctor",
+      "metrics",
+      "learn",
+      "overlap",
+      "maintenance",
+      "compliance",
+      "audit-chain",
+      "dora",
+      "ci-explain",
+      "completions",
+      "man"
+    ],
+    "invocable": false
+  },
+  "commands": [
+    {
+      "path": "version",
+      "about": "Print CLI version information",
+      "usage": "do-harness version [OPTIONS]",
+      "aliases": [],
+      "args": [
+        {
+          "id": "format",
+          "kind": "option",
+          "short": null,
+          "long": "format",
+          "value_names": [
+            "FORMAT"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [
+            "text"
+          ],
+          "possible_values": [
+            "text",
+            "json"
+          ],
+          "help": "Output format",
+          "index": null
+        }
+      ],
+      "subcommands": [],
+      "invocable": true
+    },
+    {
+      "path": "verify",
+      "about": "Run computational sensors",
+      "usage": "do-harness verify [OPTIONS]",
+      "aliases": [
+        "check"
+      ],
+      "args": [
+        {
+          "id": "fail_fast",
+          "kind": "option",
+          "short": null,
+          "long": "fail-fast",
+          "value_names": [
+            "FAIL_FAST"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": false,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Halt at the first failing sensor",
+          "index": null
+        },
+        {
+          "id": "format",
+          "kind": "option",
+          "short": null,
+          "long": "format",
+          "value_names": [
+            "FORMAT"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [
+            "text"
+          ],
+          "possible_values": [
+            "text",
+            "json"
+          ],
+          "help": "Output format",
+          "index": null
+        },
+        {
+          "id": "set",
+          "kind": "option",
+          "short": null,
+          "long": "set",
+          "value_names": [
+            "SET"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Run only the sensors in this development signal set",
+          "index": null
+        },
+        {
+          "id": "changed",
+          "kind": "option",
+          "short": null,
+          "long": "changed",
+          "value_names": [
+            "CHANGED"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": false,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Run only sensors applicable to the working-tree change",
+          "index": null
+        },
+        {
+          "id": "only",
+          "kind": "option",
+          "short": null,
+          "long": "only",
+          "value_names": [
+            "SENSOR"
+          ],
+          "required": false,
+          "repeatable": true,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Run only the named sensor (repeatable or comma-separated)",
+          "index": null
+        },
+        {
+          "id": "exclude",
+          "kind": "option",
+          "short": null,
+          "long": "exclude",
+          "value_names": [
+            "SENSOR"
+          ],
+          "required": false,
+          "repeatable": true,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Exclude named sensors from the run",
+          "index": null
+        },
+        {
+          "id": "jobs",
+          "kind": "option",
+          "short": null,
+          "long": "jobs",
+          "value_names": [
+            "N"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Maximum sensors in flight (overrides `jobs` in do-harness.toml)",
+          "index": null
+        },
+        {
+          "id": "unchanged",
+          "kind": "option",
+          "short": null,
+          "long": "unchanged",
+          "value_names": [
+            "MODE"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [
+            "warn"
+          ],
+          "possible_values": [
+            "warn",
+            "skip",
+            "run"
+          ],
+          "help": "Reuse recorded passing beats for sensors whose declared inputs are unchanged: `warn` (default) executes and advises, `skip` reuses without executing (requires --record), `run` always executes",
+          "index": null
+        },
+        {
+          "id": "record",
+          "kind": "option",
+          "short": null,
+          "long": "record",
+          "value_names": [
+            "RECORD"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": false,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Persist beats and error signatures into the state database",
+          "index": null
+        },
+        {
+          "id": "task",
+          "kind": "option",
+          "short": null,
+          "long": "task",
+          "value_names": [
+            "ID"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Scope records and fail-fast strikes to this task id (or 'global')",
+          "index": null
+        },
+        {
+          "id": "global",
+          "kind": "option",
+          "short": null,
+          "long": "global",
+          "value_names": [
+            "GLOBAL"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": false,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Record unscoped beats in the global namespace",
+          "index": null
+        },
+        {
+          "id": "evidence",
+          "kind": "option",
+          "short": null,
+          "long": "evidence",
+          "value_names": [
+            "FILE"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Write a machine-readable evidence artifact to path",
+          "index": null
+        },
+        {
+          "id": "strict",
+          "kind": "option",
+          "short": null,
+          "long": "strict",
+          "value_names": [
+            "STRICT"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": false,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Enforce strong evidence: exit non-zero on skips or missing timing/exit codes",
+          "index": null
+        },
+        {
+          "id": "bless",
+          "kind": "option",
+          "short": null,
+          "long": "bless",
+          "value_names": [
+            "BLESS"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": false,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Lower or initialize blessed findings baselines from this run (requires --record; a bless never raises a baseline)",
+          "index": null
+        },
+        {
+          "id": "approver",
+          "kind": "option",
+          "short": null,
+          "long": "approver",
+          "value_names": [
+            "NAME"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Approver identity recorded with `--bless` (defaults to `DO_HARNESS_APPROVER` or the git user email)",
+          "index": null
+        }
+      ],
+      "subcommands": [],
+      "invocable": true
+    },
+    {
+      "path": "list",
+      "about": "List sensor names",
+      "usage": "do-harness list [OPTIONS]",
+      "aliases": [
+        "ls"
+      ],
+      "args": [
+        {
+          "id": "sets",
+          "kind": "option",
+          "short": null,
+          "long": "sets",
+          "value_names": [
+            "SETS"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": false,
+          "default_values": [],
+          "possible_values": [],
+          "help": "List development signal-set names instead of sensors",
+          "index": null
+        },
+        {
+          "id": "format",
+          "kind": "option",
+          "short": null,
+          "long": "format",
+          "value_names": [
+            "FORMAT"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [
+            "text"
+          ],
+          "possible_values": [
+            "text",
+            "json"
+          ],
+          "help": "Output format",
+          "index": null
+        }
+      ],
+      "subcommands": [],
+      "invocable": true
+    },
+    {
+      "path": "explain",
+      "about": "Explain which sensors the current change selects, without running them",
+      "usage": "do-harness explain [OPTIONS]",
+      "aliases": [],
+      "args": [
+        {
+          "id": "set",
+          "kind": "option",
+          "short": null,
+          "long": "set",
+          "value_names": [
+            "SET"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Explain this development signal set (default: all sensors)",
+          "index": null
+        },
+        {
+          "id": "changed",
+          "kind": "option",
+          "short": null,
+          "long": "changed",
+          "value_names": [
+            "CHANGED"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": false,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Select by working-tree change instead of listing everything",
+          "index": null
+        },
+        {
+          "id": "format",
+          "kind": "option",
+          "short": null,
+          "long": "format",
+          "value_names": [
+            "FORMAT"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [
+            "text"
+          ],
+          "possible_values": [
+            "text",
+            "json"
+          ],
+          "help": "Output format",
+          "index": null
+        }
+      ],
+      "subcommands": [],
+      "invocable": true
+    },
+    {
+      "path": "status",
+      "about": "Report verification evidence freshness without running sensors",
+      "usage": "do-harness status [OPTIONS]",
+      "aliases": [],
+      "args": [
+        {
+          "id": "set",
+          "kind": "option",
+          "short": null,
+          "long": "set",
+          "value_names": [
+            "SET"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Check evidence for this development signal set",
+          "index": null
+        },
+        {
+          "id": "evidence",
+          "kind": "option",
+          "short": null,
+          "long": "evidence",
+          "value_names": [
+            "FILE"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Read evidence from this file instead of the default artifact",
+          "index": null
+        },
+        {
+          "id": "format",
+          "kind": "option",
+          "short": null,
+          "long": "format",
+          "value_names": [
+            "FORMAT"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [
+            "text"
+          ],
+          "possible_values": [
+            "text",
+            "json"
+          ],
+          "help": "Output format",
+          "index": null
+        }
+      ],
+      "subcommands": [],
+      "invocable": true
+    },
+    {
+      "path": "pr",
+      "about": "Deterministic PR analysis (read-only; works in any git repository)",
+      "usage": "do-harness pr [OPTIONS] <COMMAND>",
+      "aliases": [],
+      "args": [],
+      "subcommands": [
+        "no-effect",
+        "review",
+        "ready",
+        "waivers"
+      ],
+      "invocable": false
+    },
+    {
+      "path": "pr no-effect",
+      "about": "Report whether a PR or revision range introduces any effective change",
+      "usage": "do-harness pr no-effect [OPTIONS] [PR]",
+      "aliases": [],
+      "args": [
+        {
+          "id": "pr",
+          "kind": "positional",
+          "short": null,
+          "long": null,
+          "value_names": [
+            "PR"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Pull request number; resolves base and head through `gh`",
+          "index": 1
+        },
+        {
+          "id": "base",
+          "kind": "option",
+          "short": null,
+          "long": "base",
+          "value_names": [
+            "REV"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Base revision (local mode; requires --head)",
+          "index": null
+        },
+        {
+          "id": "head",
+          "kind": "option",
+          "short": null,
+          "long": "head",
+          "value_names": [
+            "REV"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Head revision (local mode; requires --base)",
+          "index": null
+        },
+        {
+          "id": "format",
+          "kind": "option",
+          "short": null,
+          "long": "format",
+          "value_names": [
+            "FORMAT"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [
+            "text"
+          ],
+          "possible_values": [
+            "text",
+            "json"
+          ],
+          "help": "Output format",
+          "index": null
+        }
+      ],
+      "subcommands": [],
+      "invocable": true
+    },
+    {
+      "path": "pr review",
+      "about": "Emit the semantic residual: changed units evidence could not prove",
+      "usage": "do-harness pr review [OPTIONS] [PR]",
+      "aliases": [],
+      "args": [
+        {
+          "id": "pr",
+          "kind": "positional",
+          "short": null,
+          "long": null,
+          "value_names": [
+            "PR"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Pull request number; resolves base and head through `gh`",
+          "index": 1
+        },
+        {
+          "id": "base",
+          "kind": "option",
+          "short": null,
+          "long": "base",
+          "value_names": [
+            "REV"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Base revision (local mode; requires --head)",
+          "index": null
+        },
+        {
+          "id": "head",
+          "kind": "option",
+          "short": null,
+          "long": "head",
+          "value_names": [
+            "REV"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Head revision (local mode; requires --base)",
+          "index": null
+        },
+        {
+          "id": "recompute",
+          "kind": "option",
+          "short": null,
+          "long": "recompute",
+          "value_names": [
+            "RECOMPUTE"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": false,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Ignore the cached report and recompute from scratch",
+          "index": null
+        },
+        {
+          "id": "format",
+          "kind": "option",
+          "short": null,
+          "long": "format",
+          "value_names": [
+            "FORMAT"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [
+            "text"
+          ],
+          "possible_values": [
+            "text",
+            "json"
+          ],
+          "help": "Output format",
+          "index": null
+        }
+      ],
+      "subcommands": [],
+      "invocable": true
+    },
+    {
+      "path": "pr ready",
+      "about": "Check whether a pull request is ready to merge: merge state, CI checks, and review conversations",
+      "usage": "do-harness pr ready [OPTIONS] <PR>",
+      "aliases": [
+        "readiness",
+        "check"
+      ],
+      "args": [
+        {
+          "id": "pr",
+          "kind": "positional",
+          "short": null,
+          "long": null,
+          "value_names": [
+            "PR"
+          ],
+          "required": true,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Pull request number",
+          "index": 1
+        },
+        {
+          "id": "format",
+          "kind": "option",
+          "short": null,
+          "long": "format",
+          "value_names": [
+            "FORMAT"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [
+            "text"
+          ],
+          "possible_values": [
+            "text",
+            "json"
+          ],
+          "help": "Output format",
+          "index": null
+        }
+      ],
+      "subcommands": [],
+      "invocable": true
+    },
+    {
+      "path": "pr waivers",
+      "about": "Classify patch-coverage residue: waivable classes and lines needing tests",
+      "usage": "do-harness pr waivers [OPTIONS] --lcov <PATH> [PR]",
+      "aliases": [],
+      "args": [
+        {
+          "id": "pr",
+          "kind": "positional",
+          "short": null,
+          "long": null,
+          "value_names": [
+            "PR"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Pull request number; resolves base and head through `gh`",
+          "index": 1
+        },
+        {
+          "id": "base",
+          "kind": "option",
+          "short": null,
+          "long": "base",
+          "value_names": [
+            "REV"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Base revision (local mode; requires --head)",
+          "index": null
+        },
+        {
+          "id": "head",
+          "kind": "option",
+          "short": null,
+          "long": "head",
+          "value_names": [
+            "REV"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Head revision (local mode; requires --base)",
+          "index": null
+        },
+        {
+          "id": "patch",
+          "kind": "option",
+          "short": null,
+          "long": "patch",
+          "value_names": [
+            "PATH"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Patch file (unified diff) instead of a revision range",
+          "index": null
+        },
+        {
+          "id": "lcov",
+          "kind": "option",
+          "short": null,
+          "long": "lcov",
+          "value_names": [
+            "PATH"
+          ],
+          "required": true,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Measured lcov report to classify",
+          "index": null
+        },
+        {
+          "id": "since",
+          "kind": "option",
+          "short": null,
+          "long": "since",
+          "value_names": [
+            "PATH"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Previous lcov report: also report the changed lines covered since",
+          "index": null
+        },
+        {
+          "id": "strip_prefix",
+          "kind": "option",
+          "short": null,
+          "long": "strip-prefix",
+          "value_names": [
+            "PREFIX"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Prefix stripped from `SF:` paths (a CI checkout path)",
+          "index": null
+        },
+        {
+          "id": "format",
+          "kind": "option",
+          "short": null,
+          "long": "format",
+          "value_names": [
+            "FORMAT"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [
+            "text"
+          ],
+          "possible_values": [
+            "text",
+            "json"
+          ],
+          "help": "Output format; `text` prints the paste-ready review comment",
+          "index": null
+        }
+      ],
+      "subcommands": [],
+      "invocable": true
+    },
+    {
+      "path": "skills",
+      "about": "Inspect and select skills by progressive disclosure",
+      "usage": "do-harness skills [OPTIONS] <COMMAND>",
+      "aliases": [],
+      "args": [],
+      "subcommands": [
+        "suggest",
+        "drift"
+      ],
+      "invocable": false
+    },
+    {
+      "path": "skills suggest",
+      "about": "Rank skills by relevance to a query using metadata only",
+      "usage": "do-harness skills suggest [OPTIONS] --query <TEXT>",
+      "aliases": [],
+      "args": [
+        {
+          "id": "query",
+          "kind": "option",
+          "short": null,
+          "long": "query",
+          "value_names": [
+            "TEXT"
+          ],
+          "required": true,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Task description to match against skill metadata",
+          "index": null
+        },
+        {
+          "id": "limit",
+          "kind": "option",
+          "short": null,
+          "long": "limit",
+          "value_names": [
+            "N"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [
+            "5"
+          ],
+          "possible_values": [],
+          "help": "Maximum number of candidates to return",
+          "index": null
+        },
+        {
+          "id": "format",
+          "kind": "option",
+          "short": null,
+          "long": "format",
+          "value_names": [
+            "FORMAT"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [
+            "text"
+          ],
+          "possible_values": [
+            "text",
+            "json"
+          ],
+          "help": "Output format",
+          "index": null
+        }
+      ],
+      "subcommands": [],
+      "invocable": true
+    },
+    {
+      "path": "skills drift",
+      "about": "Check manifest-managed shared skills against their pinned digests",
+      "usage": "do-harness skills drift [OPTIONS]",
+      "aliases": [],
+      "args": [
+        {
+          "id": "manifest",
+          "kind": "option",
+          "short": null,
+          "long": "manifest",
+          "value_names": [
+            "FILE"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Manifest to read; defaults to `.agents/skills-manifest.toml`",
+          "index": null
+        },
+        {
+          "id": "format",
+          "kind": "option",
+          "short": null,
+          "long": "format",
+          "value_names": [
+            "FORMAT"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [
+            "text"
+          ],
+          "possible_values": [
+            "text",
+            "json"
+          ],
+          "help": "Output format",
+          "index": null
+        }
+      ],
+      "subcommands": [],
+      "invocable": true
+    },
+    {
+      "path": "init-db",
+      "about": "Apply pending database migrations",
+      "usage": "do-harness init-db [OPTIONS]",
+      "aliases": [],
+      "args": [
+        {
+          "id": "check",
+          "kind": "option",
+          "short": null,
+          "long": "check",
+          "value_names": [
+            "CHECK"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": false,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Report pending migrations and exit non-zero when any are pending",
+          "index": null
+        },
+        {
+          "id": "yes",
+          "kind": "option",
+          "short": "y",
+          "long": "yes",
+          "value_names": [
+            "YES"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": false,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Skip the interactive confirmation prompt",
+          "index": null
+        }
+      ],
+      "subcommands": [],
+      "invocable": true
+    },
+    {
+      "path": "seed",
+      "about": "Seed invariants from plans/invariants.json",
+      "usage": "do-harness seed [OPTIONS]",
+      "aliases": [],
+      "args": [
+        {
+          "id": "prune",
+          "kind": "option",
+          "short": null,
+          "long": "prune",
+          "value_names": [
+            "PRUNE"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": false,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Delete invariants no longer present in plans/invariants.json",
+          "index": null
+        }
+      ],
+      "subcommands": [],
+      "invocable": true
+    },
+    {
+      "path": "init",
+      "about": "Scaffold a harness workspace in a target directory",
+      "usage": "do-harness init [OPTIONS]",
+      "aliases": [],
+      "args": [
+        {
+          "id": "language",
+          "kind": "option",
+          "short": null,
+          "long": "language",
+          "value_names": [
+            "LANG"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [
+            "rust",
+            "generic",
+            "web",
+            "node"
+          ],
+          "help": "Language pack to scaffold (default: detect from the repository)",
+          "index": null
+        },
+        {
+          "id": "force",
+          "kind": "option",
+          "short": null,
+          "long": "force",
+          "value_names": [
+            "FORCE"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": false,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Overwrite existing files",
+          "index": null
+        },
+        {
+          "id": "format",
+          "kind": "option",
+          "short": null,
+          "long": "format",
+          "value_names": [
+            "FORMAT"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [
+            "text"
+          ],
+          "possible_values": [
+            "text",
+            "json"
+          ],
+          "help": "Output format",
+          "index": null
+        },
+        {
+          "id": "no_seed",
+          "kind": "option",
+          "short": null,
+          "long": "no-seed",
+          "value_names": [
+            "NO_SEED"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": false,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Do not seed invariants",
+          "index": null
+        },
+        {
+          "id": "minimal",
+          "kind": "option",
+          "short": null,
+          "long": "minimal",
+          "value_names": [
+            "MINIMAL"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": false,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Minimal setup without extra skills",
+          "index": null
+        },
+        {
+          "id": "no_gitignore",
+          "kind": "option",
+          "short": null,
+          "long": "no-gitignore",
+          "value_names": [
+            "NO_GITIGNORE"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": false,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Skip creating/modifying .gitignore",
+          "index": null
+        }
+      ],
+      "subcommands": [],
+      "invocable": true
+    },
+    {
+      "path": "task",
+      "about": "Inspect and export task state",
+      "usage": "do-harness task [OPTIONS] <COMMAND>",
+      "aliases": [],
+      "args": [],
+      "subcommands": [
+        "export",
+        "import",
+        "list",
+        "show",
+        "add",
+        "advance",
+        "done",
+        "fail",
+        "remove"
+      ],
+      "invocable": false
+    },
+    {
+      "path": "task export",
+      "about": "Write the task list to plans/tasks.json or specified output",
+      "usage": "do-harness task export [OPTIONS]",
+      "aliases": [],
+      "args": [
+        {
+          "id": "stdout",
+          "kind": "option",
+          "short": null,
+          "long": "stdout",
+          "value_names": [
+            "STDOUT"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": false,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Write directly to stdout instead of file",
+          "index": null
+        },
+        {
+          "id": "format",
+          "kind": "option",
+          "short": null,
+          "long": "format",
+          "value_names": [
+            "FORMAT"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [
+            "json"
+          ],
+          "possible_values": [
+            "text",
+            "json"
+          ],
+          "help": "Output format (json/text)",
+          "index": null
+        }
+      ],
+      "subcommands": [],
+      "invocable": true
+    },
+    {
+      "path": "task import",
+      "about": "Validate plans/tasks.json against the state database",
+      "usage": "do-harness task import [OPTIONS]",
+      "aliases": [],
+      "args": [
+        {
+          "id": "file",
+          "kind": "option",
+          "short": null,
+          "long": "file",
+          "value_names": [
+            "FILE"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Snapshot file (defaults to plans/tasks.json under the root)",
+          "index": null
+        },
+        {
+          "id": "check",
+          "kind": "option",
+          "short": null,
+          "long": "check",
+          "value_names": [
+            "CHECK"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": false,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Exit non-zero when the snapshot and database drift",
+          "index": null
+        }
+      ],
+      "subcommands": [],
+      "invocable": true
+    },
+    {
+      "path": "task list",
+      "about": "Print tasks from the state database",
+      "usage": "do-harness task list [OPTIONS]",
+      "aliases": [],
+      "args": [
+        {
+          "id": "status",
+          "kind": "option",
+          "short": null,
+          "long": "status",
+          "value_names": [
+            "STATUS"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Filter tasks by status (pending, `in_progress`, completed, failed)",
+          "index": null
+        },
+        {
+          "id": "method",
+          "kind": "option",
+          "short": null,
+          "long": "method",
+          "value_names": [
+            "METHOD"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Filter tasks by method name",
+          "index": null
+        },
+        {
+          "id": "parent",
+          "kind": "option",
+          "short": null,
+          "long": "parent",
+          "value_names": [
+            "ID"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Filter tasks by parent ID",
+          "index": null
+        },
+        {
+          "id": "format",
+          "kind": "option",
+          "short": null,
+          "long": "format",
+          "value_names": [
+            "FORMAT"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [
+            "text"
+          ],
+          "possible_values": [
+            "text",
+            "json"
+          ],
+          "help": "Output format",
+          "index": null
+        }
+      ],
+      "subcommands": [],
+      "invocable": true
+    },
+    {
+      "path": "task show",
+      "about": "Show details for a specific task",
+      "usage": "do-harness task show [OPTIONS] <ID>",
+      "aliases": [],
+      "args": [
+        {
+          "id": "id",
+          "kind": "positional",
+          "short": null,
+          "long": null,
+          "value_names": [
+            "ID"
+          ],
+          "required": true,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Task id",
+          "index": 1
+        },
+        {
+          "id": "format",
+          "kind": "option",
+          "short": null,
+          "long": "format",
+          "value_names": [
+            "FORMAT"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [
+            "text"
+          ],
+          "possible_values": [
+            "text",
+            "json"
+          ],
+          "help": "Output format",
+          "index": null
+        }
+      ],
+      "subcommands": [],
+      "invocable": true
+    },
+    {
+      "path": "task add",
+      "about": "Add a task in `pending` state",
+      "usage": "do-harness task add [OPTIONS] <TITLE>",
+      "aliases": [],
+      "args": [
+        {
+          "id": "title",
+          "kind": "positional",
+          "short": null,
+          "long": null,
+          "value_names": [
+            "TITLE"
+          ],
+          "required": true,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Human-readable task title",
+          "index": 1
+        },
+        {
+          "id": "method",
+          "kind": "option",
+          "short": null,
+          "long": "method",
+          "value_names": [
+            "METHOD"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Name of HTN method defined in plans/methods.json",
+          "index": null
+        },
+        {
+          "id": "parent",
+          "kind": "option",
+          "short": null,
+          "long": "parent",
+          "value_names": [
+            "ID"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Parent task id",
+          "index": null
+        },
+        {
+          "id": "precondition",
+          "kind": "option",
+          "short": null,
+          "long": "precondition",
+          "value_names": [
+            "PRECONDITION"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Recorded precondition guard",
+          "index": null
+        }
+      ],
+      "subcommands": [],
+      "invocable": true
+    },
+    {
+      "path": "task advance",
+      "about": "Advance the task's subtask pointer",
+      "usage": "do-harness task advance [OPTIONS] <ID>",
+      "aliases": [],
+      "args": [
+        {
+          "id": "id",
+          "kind": "positional",
+          "short": null,
+          "long": null,
+          "value_names": [
+            "ID"
+          ],
+          "required": true,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Task id",
+          "index": 1
+        }
+      ],
+      "subcommands": [],
+      "invocable": true
+    },
+    {
+      "path": "task done",
+      "about": "Mark a task done once its sensor-gated subtasks have passed",
+      "usage": "do-harness task done [OPTIONS] <ID>",
+      "aliases": [],
+      "args": [
+        {
+          "id": "id",
+          "kind": "positional",
+          "short": null,
+          "long": null,
+          "value_names": [
+            "ID"
+          ],
+          "required": true,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Task id",
+          "index": 1
+        }
+      ],
+      "subcommands": [],
+      "invocable": true
+    },
+    {
+      "path": "task fail",
+      "about": "Mark a task failed",
+      "usage": "do-harness task fail [OPTIONS] <ID>",
+      "aliases": [],
+      "args": [
+        {
+          "id": "id",
+          "kind": "positional",
+          "short": null,
+          "long": null,
+          "value_names": [
+            "ID"
+          ],
+          "required": true,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Task id",
+          "index": 1
+        }
+      ],
+      "subcommands": [],
+      "invocable": true
+    },
+    {
+      "path": "task remove",
+      "about": "Remove or cancel a task",
+      "usage": "do-harness task remove [OPTIONS] <ID>",
+      "aliases": [],
+      "args": [
+        {
+          "id": "id",
+          "kind": "positional",
+          "short": null,
+          "long": null,
+          "value_names": [
+            "ID"
+          ],
+          "required": true,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Task id",
+          "index": 1
+        }
+      ],
+      "subcommands": [],
+      "invocable": true
+    },
+    {
+      "path": "trace",
+      "about": "Record and list interaction traces",
+      "usage": "do-harness trace [OPTIONS] <COMMAND>",
+      "aliases": [],
+      "args": [],
+      "subcommands": [
+        "add",
+        "list",
+        "sessions"
+      ],
+      "invocable": false
+    },
+    {
+      "path": "trace add",
+      "about": "Record a trace of an executed command and its resolution",
+      "usage": "do-harness trace add [OPTIONS] --session <SESSION>",
+      "aliases": [],
+      "args": [
+        {
+          "id": "session",
+          "kind": "option",
+          "short": null,
+          "long": "session",
+          "value_names": [
+            "SESSION"
+          ],
+          "required": true,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Session identifier grouping related traces",
+          "index": null
+        },
+        {
+          "id": "task",
+          "kind": "option",
+          "short": null,
+          "long": "task",
+          "value_names": [
+            "ID"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Owning task id",
+          "index": null
+        },
+        {
+          "id": "command",
+          "kind": "option",
+          "short": null,
+          "long": "command",
+          "value_names": [
+            "COMMAND"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "The command that was executed",
+          "index": null
+        },
+        {
+          "id": "error_diff",
+          "kind": "option",
+          "short": null,
+          "long": "error-diff",
+          "value_names": [
+            "ERROR_DIFF"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Error diff or failure output captured",
+          "index": null
+        },
+        {
+          "id": "resolution_steps",
+          "kind": "option",
+          "short": null,
+          "long": "resolution-steps",
+          "value_names": [
+            "RESOLUTION_STEPS"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Steps taken to resolve the failure",
+          "index": null
+        }
+      ],
+      "subcommands": [],
+      "invocable": true
+    },
+    {
+      "path": "trace list",
+      "about": "Print traces for a session",
+      "usage": "do-harness trace list [OPTIONS] --session <SESSION>",
+      "aliases": [],
+      "args": [
+        {
+          "id": "session",
+          "kind": "option",
+          "short": null,
+          "long": "session",
+          "value_names": [
+            "SESSION"
+          ],
+          "required": true,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Session identifier",
+          "index": null
+        },
+        {
+          "id": "format",
+          "kind": "option",
+          "short": null,
+          "long": "format",
+          "value_names": [
+            "FORMAT"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [
+            "text"
+          ],
+          "possible_values": [
+            "text",
+            "json"
+          ],
+          "help": "Output format",
+          "index": null
+        }
+      ],
+      "subcommands": [],
+      "invocable": true
+    },
+    {
+      "path": "trace sessions",
+      "about": "List distinct trace session identifiers",
+      "usage": "do-harness trace sessions [OPTIONS]",
+      "aliases": [],
+      "args": [
+        {
+          "id": "format",
+          "kind": "option",
+          "short": null,
+          "long": "format",
+          "value_names": [
+            "FORMAT"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [
+            "text"
+          ],
+          "possible_values": [
+            "text",
+            "json"
+          ],
+          "help": "Output format",
+          "index": null
+        }
+      ],
+      "subcommands": [],
+      "invocable": true
+    },
+    {
+      "path": "distill",
+      "about": "Extract a heuristic from a resolved trace into a skill. Review output against the anti-AI-slop checklist (.agents/skills/skill-creator/references/anti_ai_slop.md)",
+      "usage": "do-harness distill [OPTIONS]",
+      "aliases": [],
+      "args": [
+        {
+          "id": "skill",
+          "kind": "option",
+          "short": null,
+          "long": "skill",
+          "value_names": [
+            "SKILL"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Skill the heuristic belongs to",
+          "index": null
+        },
+        {
+          "id": "pattern",
+          "kind": "option",
+          "short": null,
+          "long": "pattern",
+          "value_names": [
+            "PATTERN"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Generalized pattern to record",
+          "index": null
+        },
+        {
+          "id": "description",
+          "kind": "option",
+          "short": null,
+          "long": "description",
+          "value_names": [
+            "DESCRIPTION"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "When the pattern applies",
+          "index": null
+        },
+        {
+          "id": "from_trace",
+          "kind": "option",
+          "short": null,
+          "long": "from-trace",
+          "value_names": [
+            "ID"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Source trace id; required as evidence of a resolved fix",
+          "index": null
+        },
+        {
+          "id": "from_strikes",
+          "kind": "option",
+          "short": null,
+          "long": "from-strikes",
+          "value_names": [
+            "FROM_STRIKES"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": false,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Generate a starter skill scaffold from recorded sensor strikes (AGENTS.md §6 steering loop) instead of distilling from a trace",
+          "index": null
+        },
+        {
+          "id": "min_strikes",
+          "kind": "option",
+          "short": null,
+          "long": "min-strikes",
+          "value_names": [
+            "N"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Strike count at or above which a signature sculpts a scaffold (default: the fail-fast threshold)",
+          "index": null
+        },
+        {
+          "id": "task",
+          "kind": "option",
+          "short": null,
+          "long": "task",
+          "value_names": [
+            "ID"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Scope strike lookup to this task id",
+          "index": null
+        },
+        {
+          "id": "to_fixture",
+          "kind": "option",
+          "short": null,
+          "long": "to-fixture",
+          "value_names": [
+            "TO_FIXTURE"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": false,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Raise the skill's pass-rate bar after this recovery (review ticks anti-AI-slop checklist first)",
+          "index": null
+        },
+        {
+          "id": "format",
+          "kind": "option",
+          "short": null,
+          "long": "format",
+          "value_names": [
+            "FORMAT"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [
+            "text"
+          ],
+          "possible_values": [
+            "text",
+            "json"
+          ],
+          "help": "Output format",
+          "index": null
+        }
+      ],
+      "subcommands": [],
+      "invocable": true
+    },
+    {
+      "path": "errors",
+      "about": "Inspect and clear fail-fast error signatures",
+      "usage": "do-harness errors [OPTIONS] <COMMAND>",
+      "aliases": [],
+      "args": [],
+      "subcommands": [
+        "list",
+        "clear"
+      ],
+      "invocable": false
+    },
+    {
+      "path": "errors list",
+      "about": "List fail-fast error signatures (prefixed with `sensor:`)",
+      "usage": "do-harness errors list [OPTIONS]",
+      "aliases": [],
+      "args": [
+        {
+          "id": "task",
+          "kind": "option",
+          "short": null,
+          "long": "task",
+          "value_names": [
+            "ID"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Scope to one task id",
+          "index": null
+        },
+        {
+          "id": "scope",
+          "kind": "option",
+          "short": null,
+          "long": "scope",
+          "value_names": [
+            "SCOPE"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Filter by workstream scope (`branch:<name>`, `task:<id>`, `global`, or `all` for every workstream)",
+          "index": null
+        },
+        {
+          "id": "format",
+          "kind": "option",
+          "short": null,
+          "long": "format",
+          "value_names": [
+            "FORMAT"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [
+            "text"
+          ],
+          "possible_values": [
+            "text",
+            "json"
+          ],
+          "help": "Output format",
+          "index": null
+        }
+      ],
+      "subcommands": [],
+      "invocable": true
+    },
+    {
+      "path": "errors clear",
+      "about": "Clear fail-fast error signatures (e.g. `sensor:<name>`)",
+      "usage": "do-harness errors clear [OPTIONS]",
+      "aliases": [],
+      "args": [
+        {
+          "id": "sensor",
+          "kind": "option",
+          "short": null,
+          "long": "sensor",
+          "value_names": [
+            "SENSOR"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Only clear this signature key (e.g. `sensor:<name>`)",
+          "index": null
+        },
+        {
+          "id": "task",
+          "kind": "option",
+          "short": null,
+          "long": "task",
+          "value_names": [
+            "ID"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Only clear signatures for this task id",
+          "index": null
+        },
+        {
+          "id": "scope",
+          "kind": "option",
+          "short": null,
+          "long": "scope",
+          "value_names": [
+            "SCOPE"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Only clear signatures for this workstream scope (`branch:<name>`, `task:<id>`, `global`, or `all` for every workstream)",
+          "index": null
+        },
+        {
+          "id": "force",
+          "kind": "option",
+          "short": null,
+          "long": "force",
+          "value_names": [
+            "FORCE"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": false,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Allow clearing every workstream without a filter",
+          "index": null
+        }
+      ],
+      "subcommands": [],
+      "invocable": true
+    },
+    {
+      "path": "loc",
+      "about": "Report line-of-code state for the 500-LOC invariant",
+      "usage": "do-harness loc [OPTIONS] [PATH]...",
+      "aliases": [],
+      "args": [
+        {
+          "id": "dir",
+          "kind": "option",
+          "short": null,
+          "long": "dir",
+          "value_names": [
+            "DIR"
+          ],
+          "required": false,
+          "repeatable": true,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Scan directory, relative to workspace root (repeatable or comma-separated)",
+          "index": null
+        },
+        {
+          "id": "ext",
+          "kind": "option",
+          "short": null,
+          "long": "ext",
+          "value_names": [
+            "EXT"
+          ],
+          "required": false,
+          "repeatable": true,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Scan extension (repeatable or comma-separated, e.g. rs, ts, tsx)",
+          "index": null
+        },
+        {
+          "id": "format",
+          "kind": "option",
+          "short": null,
+          "long": "format",
+          "value_names": [
+            "FORMAT"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [
+            "text"
+          ],
+          "possible_values": [
+            "text",
+            "json"
+          ],
+          "help": "Output format",
+          "index": null
+        },
+        {
+          "id": "warn",
+          "kind": "option",
+          "short": null,
+          "long": "warn",
+          "value_names": [
+            "WARN"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": false,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Show only files at or above the 450-line decomposition threshold",
+          "index": null
+        },
+        {
+          "id": "paths",
+          "kind": "positional",
+          "short": null,
+          "long": null,
+          "value_names": [
+            "PATH"
+          ],
+          "required": false,
+          "repeatable": true,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Files or directories to measure (default: scan workspace roots)",
+          "index": 1
+        }
+      ],
+      "subcommands": [],
+      "invocable": true
+    },
+    {
+      "path": "split",
+      "about": "Extract a large top-level item into a sibling module",
+      "usage": "do-harness split [OPTIONS] <FILE>",
+      "aliases": [],
+      "args": [
+        {
+          "id": "file",
+          "kind": "positional",
+          "short": null,
+          "long": null,
+          "value_names": [
+            "FILE"
+          ],
+          "required": true,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Source file to decompose",
+          "index": 1
+        },
+        {
+          "id": "target",
+          "kind": "option",
+          "short": null,
+          "long": "target",
+          "value_names": [
+            "NAME"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Name the sibling module instead of deriving it from the item",
+          "index": null
+        }
+      ],
+      "subcommands": [],
+      "invocable": true
+    },
+    {
+      "path": "eval",
+      "about": "Validate skill structure and benchmark skill evals",
+      "usage": "do-harness eval [OPTIONS]",
+      "aliases": [],
+      "args": [
+        {
+          "id": "skill",
+          "kind": "option",
+          "short": null,
+          "long": "skill",
+          "value_names": [
+            "SKILL"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Restrict evaluation to this skill directory name",
+          "index": null
+        },
+        {
+          "id": "bless",
+          "kind": "option",
+          "short": null,
+          "long": "bless",
+          "value_names": [
+            "BLESS"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": false,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Re-baseline graders and update pass-rate floor on green run",
+          "index": null
+        },
+        {
+          "id": "list_skills",
+          "kind": "option",
+          "short": null,
+          "long": "list-skills",
+          "value_names": [
+            "LIST_SKILLS"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": false,
+          "default_values": [],
+          "possible_values": [],
+          "help": "List available skills",
+          "index": null
+        },
+        {
+          "id": "fail_fast",
+          "kind": "option",
+          "short": null,
+          "long": "fail-fast",
+          "value_names": [
+            "FAIL_FAST"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": false,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Halt on first failing evaluation",
+          "index": null
+        },
+        {
+          "id": "format",
+          "kind": "option",
+          "short": null,
+          "long": "format",
+          "value_names": [
+            "FORMAT"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [
+            "text"
+          ],
+          "possible_values": [
+            "text",
+            "json"
+          ],
+          "help": "Output format",
+          "index": null
+        },
+        {
+          "id": "approver",
+          "kind": "option",
+          "short": null,
+          "long": "approver",
+          "value_names": [
+            "NAME"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Approver identity recorded with `--bless` (defaults to `DO_HARNESS_APPROVER` or the git user email)",
+          "index": null
+        },
+        {
+          "id": "no_lift",
+          "kind": "option",
+          "short": null,
+          "long": "no-lift",
+          "value_names": [
+            "NO_LIFT"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": false,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Skip the without-skill baseline run (no Skill Lift measured)",
+          "index": null
+        },
+        {
+          "id": "agent_cmd",
+          "kind": "option",
+          "short": null,
+          "long": "agent-cmd",
+          "value_names": [
+            "COMMAND"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Run this shell command once per eval case instead of the deterministic walkthrough (real Skill Lift). cwd is the sandbox root; the prompt is in `$DO_HARNESS_PROMPT` and on stdin; stdout is saved to `agent_stdout.txt` for assertions",
+          "index": null
+        },
+        {
+          "id": "agent_timeout",
+          "kind": "option",
+          "short": null,
+          "long": "agent-timeout",
+          "value_names": [
+            "SECS"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [
+            "600"
+          ],
+          "possible_values": [],
+          "help": "Kill an agent run after this many seconds",
+          "index": null
+        },
+        {
+          "id": "strict_fixtures",
+          "kind": "option",
+          "short": null,
+          "long": "strict-fixtures",
+          "value_names": [
+            "STRICT_FIXTURES"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": false,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Fail skills whose fixture has dataset-quality gaps (thin cases, no negative out-of-scope case)",
+          "index": null
+        }
+      ],
+      "subcommands": [],
+      "invocable": true
+    },
+    {
+      "path": "hook",
+      "about": "Manage git hooks that run `do-harness verify`",
+      "usage": "do-harness hook [OPTIONS] <COMMAND>",
+      "aliases": [],
+      "args": [],
+      "subcommands": [
+        "install",
+        "uninstall",
+        "status",
+        "diff"
+      ],
+      "invocable": false
+    },
+    {
+      "path": "hook install",
+      "about": "Write pre-commit and pre-push hooks into `.git/hooks/`",
+      "usage": "do-harness hook install [OPTIONS]",
+      "aliases": [],
+      "args": [
+        {
+          "id": "force",
+          "kind": "option",
+          "short": null,
+          "long": "force",
+          "value_names": [
+            "FORCE"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": false,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Overwrite foreign (unmanaged) hook files",
+          "index": null
+        }
+      ],
+      "subcommands": [],
+      "invocable": true
+    },
+    {
+      "path": "hook uninstall",
+      "about": "Remove managed hooks, leaving foreign hook files untouched",
+      "usage": "do-harness hook uninstall [OPTIONS]",
+      "aliases": [],
+      "args": [],
+      "subcommands": [],
+      "invocable": true
+    },
+    {
+      "path": "hook status",
+      "about": "Show whether the managed hooks and release binary are present",
+      "usage": "do-harness hook status [OPTIONS]",
+      "aliases": [],
+      "args": [
+        {
+          "id": "format",
+          "kind": "option",
+          "short": null,
+          "long": "format",
+          "value_names": [
+            "FORMAT"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [
+            "text"
+          ],
+          "possible_values": [
+            "text",
+            "json"
+          ],
+          "help": "Output format",
+          "index": null
+        }
+      ],
+      "subcommands": [],
+      "invocable": true
+    },
+    {
+      "path": "hook diff",
+      "about": "Show diff between installed hooks and current templates",
+      "usage": "do-harness hook diff [OPTIONS]",
+      "aliases": [],
+      "args": [],
+      "subcommands": [],
+      "invocable": true
+    },
+    {
+      "path": "doctor",
+      "about": "Run diagnostic checks on binary resolution and git hook health",
+      "usage": "do-harness doctor [OPTIONS]",
+      "aliases": [],
+      "args": [
+        {
+          "id": "format",
+          "kind": "option",
+          "short": null,
+          "long": "format",
+          "value_names": [
+            "FORMAT"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [
+            "text"
+          ],
+          "possible_values": [
+            "text",
+            "json"
+          ],
+          "help": "Output format",
+          "index": null
+        },
+        {
+          "id": "strict",
+          "kind": "option",
+          "short": null,
+          "long": "strict",
+          "value_names": [
+            "STRICT"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": false,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Strictly enforce warning checks as failures",
+          "index": null
+        }
+      ],
+      "subcommands": [],
+      "invocable": true
+    },
+    {
+      "path": "metrics",
+      "about": "Report harness trends: sensor stats, strikes, eval pass-rate history",
+      "usage": "do-harness metrics [OPTIONS] [COMMAND]",
+      "aliases": [],
+      "args": [
+        {
+          "id": "format",
+          "kind": "option",
+          "short": null,
+          "long": "format",
+          "value_names": [
+            "FORMAT"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [
+            "text"
+          ],
+          "possible_values": [
+            "text",
+            "json"
+          ],
+          "help": "Output format",
+          "index": null
+        },
+        {
+          "id": "sensor",
+          "kind": "option",
+          "short": null,
+          "long": "sensor",
+          "value_names": [
+            "SENSOR"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Filter by sensor name",
+          "index": null
+        },
+        {
+          "id": "skill",
+          "kind": "option",
+          "short": null,
+          "long": "skill",
+          "value_names": [
+            "SKILL"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Filter by skill name",
+          "index": null
+        },
+        {
+          "id": "since",
+          "kind": "option",
+          "short": null,
+          "long": "since",
+          "value_names": [
+            "UNIX_SECONDS"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Filter metrics since a Unix timestamp in seconds",
+          "index": null
+        },
+        {
+          "id": "scope",
+          "kind": "option",
+          "short": null,
+          "long": "scope",
+          "value_names": [
+            "SCOPE"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Filter by workstream scope (e.g. `branch:main`, `task:1`, `global`, or `all`). Defaults to the current git branch",
+          "index": null
+        },
+        {
+          "id": "task",
+          "kind": "option",
+          "short": null,
+          "long": "task",
+          "value_names": [
+            "ID"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Filter by task id (equivalent to `--scope task:<ID>`)",
+          "index": null
+        },
+        {
+          "id": "branch",
+          "kind": "option",
+          "short": null,
+          "long": "branch",
+          "value_names": [
+            "BRANCH"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Filter by branch name (equivalent to `--scope branch:<NAME>`)",
+          "index": null
+        },
+        {
+          "id": "all",
+          "kind": "option",
+          "short": null,
+          "long": "all",
+          "value_names": [
+            "ALL"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": false,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Aggregate across all workstreams and scopes",
+          "index": null
+        }
+      ],
+      "subcommands": [
+        "pr"
+      ],
+      "invocable": true
+    },
+    {
+      "path": "metrics pr",
+      "about": "PR-loop measures: time-to-green, pushes per green, waivers, comments, cancelled runs, reruns",
+      "usage": "do-harness metrics pr [OPTIONS] --repo <OWNER/NAME>",
+      "aliases": [],
+      "args": [
+        {
+          "id": "repo",
+          "kind": "option",
+          "short": null,
+          "long": "repo",
+          "value_names": [
+            "OWNER/NAME"
+          ],
+          "required": true,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Repository as OWNER/NAME (any repository the caller can read)",
+          "index": null
+        },
+        {
+          "id": "since",
+          "kind": "option",
+          "short": null,
+          "long": "since",
+          "value_names": [
+            "WINDOW"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [
+            "30d"
+          ],
+          "possible_values": [],
+          "help": "Window: a duration (`30d`, `12h`, `2w`) or a date (`YYYY-MM-DD`)",
+          "index": null
+        },
+        {
+          "id": "limit",
+          "kind": "option",
+          "short": null,
+          "long": "limit",
+          "value_names": [
+            "N"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [
+            "30"
+          ],
+          "possible_values": [],
+          "help": "Maximum pull requests measured, newest first",
+          "index": null
+        },
+        {
+          "id": "recompute",
+          "kind": "option",
+          "short": null,
+          "long": "recompute",
+          "value_names": [
+            "RECOMPUTE"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": false,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Ignore the cached snapshot and refetch",
+          "index": null
+        },
+        {
+          "id": "format",
+          "kind": "option",
+          "short": null,
+          "long": "format",
+          "value_names": [
+            "FORMAT"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [
+            "text"
+          ],
+          "possible_values": [
+            "text",
+            "json"
+          ],
+          "help": "Output format",
+          "index": null
+        }
+      ],
+      "subcommands": [],
+      "invocable": true
+    },
+    {
+      "path": "learn",
+      "about": "Draft skill/guide updates from sensors that keep firing (never applies them)",
+      "usage": "do-harness learn [OPTIONS] --draft",
+      "aliases": [],
+      "args": [
+        {
+          "id": "draft",
+          "kind": "option",
+          "short": null,
+          "long": "draft",
+          "value_names": [
+            "DRAFT"
+          ],
+          "required": true,
+          "repeatable": false,
+          "takes_value": false,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Draft the steering actions without applying anything (required: `learn` writes nothing)",
+          "index": null
+        },
+        {
+          "id": "days",
+          "kind": "option",
+          "short": null,
+          "long": "days",
+          "value_names": [
+            "DAYS"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [
+            "30"
+          ],
+          "possible_values": [],
+          "help": "Window in days the fires are counted over",
+          "index": null
+        },
+        {
+          "id": "min_fires",
+          "kind": "option",
+          "short": null,
+          "long": "min-fires",
+          "value_names": [
+            "N"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [
+            "3"
+          ],
+          "possible_values": [],
+          "help": "Fires a sensor needs to appear in the draft",
+          "index": null
+        },
+        {
+          "id": "format",
+          "kind": "option",
+          "short": null,
+          "long": "format",
+          "value_names": [
+            "FORMAT"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [
+            "text"
+          ],
+          "possible_values": [
+            "text",
+            "json"
+          ],
+          "help": "Output format",
+          "index": null
+        }
+      ],
+      "subcommands": [],
+      "invocable": true
+    },
+    {
+      "path": "overlap",
+      "about": "Rank skill pairs by guidance overlap (Tier-2 distinctiveness advisory)",
+      "usage": "do-harness overlap [OPTIONS]",
+      "aliases": [],
+      "args": [
+        {
+          "id": "threshold",
+          "kind": "option",
+          "short": null,
+          "long": "threshold",
+          "value_names": [
+            "THRESHOLD"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [
+            "0.45"
+          ],
+          "possible_values": [],
+          "help": "Cosine similarity at or above which a pair prints as WARN",
+          "index": null
+        },
+        {
+          "id": "format",
+          "kind": "option",
+          "short": null,
+          "long": "format",
+          "value_names": [
+            "FORMAT"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [
+            "text"
+          ],
+          "possible_values": [
+            "text",
+            "json"
+          ],
+          "help": "Output format",
+          "index": null
+        }
+      ],
+      "subcommands": [],
+      "invocable": true
+    },
+    {
+      "path": "maintenance",
+      "about": "Prune old beats and compact the state database",
+      "usage": "do-harness maintenance [OPTIONS]",
+      "aliases": [],
+      "args": [
+        {
+          "id": "prune_beats",
+          "kind": "option",
+          "short": null,
+          "long": "prune-beats",
+          "value_names": [
+            "DAYS"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Delete beats older than this many days (keeps the most recent per task)",
+          "index": null
+        },
+        {
+          "id": "keep_per_task",
+          "kind": "option",
+          "short": null,
+          "long": "keep-per-task",
+          "value_names": [
+            "N"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [
+            "20"
+          ],
+          "possible_values": [],
+          "help": "Minimum most-recent beats kept per task when pruning",
+          "index": null
+        }
+      ],
+      "subcommands": [],
+      "invocable": true
+    },
+    {
+      "path": "compliance",
+      "about": "Print compliance mapping to OWASP Agentic Top 10, NIST AI RMF, and EU AI Act",
+      "usage": "do-harness compliance [OPTIONS]",
+      "aliases": [],
+      "args": [
+        {
+          "id": "framework",
+          "kind": "option",
+          "short": null,
+          "long": "framework",
+          "value_names": [
+            "FRAMEWORK"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Filter framework (owasp, nist, eu, soc; hyphenated ids accepted)",
+          "index": null
+        },
+        {
+          "id": "format",
+          "kind": "option",
+          "short": null,
+          "long": "format",
+          "value_names": [
+            "FORMAT"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [
+            "text"
+          ],
+          "possible_values": [
+            "text",
+            "json"
+          ],
+          "help": "Output format",
+          "index": null
+        }
+      ],
+      "subcommands": [],
+      "invocable": true
+    },
+    {
+      "path": "audit-chain",
+      "about": "Recompute workflow event hash chain and report first divergence",
+      "usage": "do-harness audit-chain [OPTIONS]",
+      "aliases": [],
+      "args": [
+        {
+          "id": "format",
+          "kind": "option",
+          "short": null,
+          "long": "format",
+          "value_names": [
+            "FORMAT"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [
+            "text"
+          ],
+          "possible_values": [
+            "text",
+            "json"
+          ],
+          "help": "Output format",
+          "index": null
+        }
+      ],
+      "subcommands": [],
+      "invocable": true
+    },
+    {
+      "path": "dora",
+      "about": "Derive DORA deployment metrics from git history (deterministic, read-only)",
+      "usage": "do-harness dora [OPTIONS]",
+      "aliases": [],
+      "args": [
+        {
+          "id": "days",
+          "kind": "option",
+          "short": null,
+          "long": "days",
+          "value_names": [
+            "DAYS"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Rolling window in days (overrides the pinned policy for this run)",
+          "index": null
+        },
+        {
+          "id": "format",
+          "kind": "option",
+          "short": null,
+          "long": "format",
+          "value_names": [
+            "FORMAT"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [
+            "text"
+          ],
+          "possible_values": [
+            "text",
+            "json"
+          ],
+          "help": "Output format",
+          "index": null
+        },
+        {
+          "id": "record",
+          "kind": "option",
+          "short": null,
+          "long": "record",
+          "value_names": [
+            "RECORD"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": false,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Persist the snapshot into the state database",
+          "index": null
+        },
+        {
+          "id": "source",
+          "kind": "option",
+          "short": null,
+          "long": "source",
+          "value_names": [
+            "SOURCE"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [
+            "git"
+          ],
+          "possible_values": [
+            "git",
+            "gh"
+          ],
+          "help": "Where the numbers come from",
+          "index": null
+        },
+        {
+          "id": "now",
+          "kind": "option",
+          "short": null,
+          "long": "now",
+          "value_names": [
+            "UNIX_SECONDS"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Measurement clock as Unix seconds (default: system clock)",
+          "index": null
+        }
+      ],
+      "subcommands": [],
+      "invocable": true
+    },
+    {
+      "path": "ci-explain",
+      "about": "Explain a CI run's failures and cancellations with local repro commands",
+      "usage": "do-harness ci-explain [OPTIONS] <RUN_ID>",
+      "aliases": [
+        "ci"
+      ],
+      "args": [
+        {
+          "id": "run_id",
+          "kind": "positional",
+          "short": null,
+          "long": null,
+          "value_names": [
+            "RUN_ID"
+          ],
+          "required": true,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Workflow run ID or the run's URL",
+          "index": 1
+        },
+        {
+          "id": "format",
+          "kind": "option",
+          "short": null,
+          "long": "format",
+          "value_names": [
+            "FORMAT"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [
+            "text"
+          ],
+          "possible_values": [
+            "text",
+            "json"
+          ],
+          "help": "Output format",
+          "index": null
+        }
+      ],
+      "subcommands": [],
+      "invocable": true
+    },
+    {
+      "path": "completions",
+      "about": "Generate shell completions",
+      "usage": "do-harness completions [OPTIONS] <SHELL>",
+      "aliases": [],
+      "args": [
+        {
+          "id": "shell",
+          "kind": "positional",
+          "short": null,
+          "long": null,
+          "value_names": [
+            "SHELL"
+          ],
+          "required": true,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [
+            "bash",
+            "elvish",
+            "fish",
+            "powershell",
+            "zsh"
+          ],
+          "help": "Target shell (bash, zsh, fish, powershell, elvish)",
+          "index": 1
+        }
+      ],
+      "subcommands": [],
+      "invocable": true
+    },
+    {
+      "path": "man",
+      "about": "Generate man page documentation",
+      "usage": "do-harness man [OPTIONS] <DIR>",
+      "aliases": [],
+      "args": [
+        {
+          "id": "dir",
+          "kind": "positional",
+          "short": null,
+          "long": null,
+          "value_names": [
+            "DIR"
+          ],
+          "required": true,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Output directory for man pages",
+          "index": 1
+        }
+      ],
+      "subcommands": [],
+      "invocable": true
+    }
+  ]
+}

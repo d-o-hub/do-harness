@@ -181,49 +181,64 @@ export PATH="$HOME/.local/bin:$PATH"
 
 ## Commands
 
+<!-- The table below is generated from the CLI definitions; refresh it with
+`python3 scripts/docs.py sync --write` (it refuses in CI). -->
+<!-- BEGIN GENERATED: cli-commands -->
 | Command | Description |
-|---------|-------------|
-| `verify` | Run all sensors (flags: `--fail-fast`, `--format text\|json`, `--set SET`, `--changed`, `--only NAME` repeatable; `--record` persists beats + error signatures; `--evidence PATH` writes evidence artifact; `--strict` fails on weak evidence; `--bless` lowers/initializes `plans/baselines.json` findings ratchets, with `--approver NAME`) |
-| `list` | Print sensor names (`--format text\|json`, `--sets` for signal-set names) |
-| `explain` | Explain which sensors the current change selects, without running them (`--set SET`, `--changed`) |
-| `status` | Report evidence freshness (`green\|red\|stale\|missing`) for `--set SET` without running sensors |
-| `init-db` | Apply migrations to `.do-harness/agent_state.db` |
-| `seed` | Upsert `plans/invariants.json` into the DB |
-| `task list [--format text\|json]` / `task show <ID>` / `task export` / `task import [--check]` | Read task state from the local database; export writes `plans/tasks.json`, import validates the snapshot against the database |
-| `task add <title> [--method NAME] [--parent ID] [--precondition TEXT]` | Add a pending task to the workflow runtime |
-| `task advance <ID>` | Advance the subtask pointer |
-| `task done <ID>` | Mark a task done once all sensor-gated subtasks have passed |
-| `task fail <ID>` | Mark a task failed |
-| `task remove <ID>` | Remove an orphan task row with no workflow events (refused when history exists; use `task fail` instead) |
-| `errors list [--task ID] [--format text\|json]` / `errors clear [--sensor NAME] [--task ID]` | Inspect and clear fail-fast error signatures |
-| `trace add --session S [--task ID] [--command C] [--error-diff D] [--resolution-steps R]` / `trace list --session S [--format text\|json]` | Record and read execution traces per session |
-| `distill --skill NAME --pattern P [--description D] [--from-trace ID] [--to-fixture]` | Distill a resolved trace into a skill (refuses without resolution steps); `--to-fixture` raises the skill's pass-rate bar |
-| `learn --draft [--days N] [--min-fires N] [--format text\|json]` | Draft skill/guide updates from sensors that keep firing (recorded beats plus `.agents/events/**` `sensor-fire` records); proposes the guide row, the `trace add` + `distill` pair, a skill scaffold command, and a CHANGELOG line — never applies them |
-| `eval [--skill NAME] [--bless] [--agent-cmd CMD]` | Validate skills via skill-creator's quick_validate.py and persist skill_evals; `--bless` re-baselines graders and raises the pass-rate bar after a fully green run; `--agent-cmd` runs an external agent per case for true Skill Lift |
-| `metrics [--format text\|json]` | Report sensor stats, strike counts, and eval pass-rate history |
-| `metrics pr --repo OWNER/NAME [--since 30d\|YYYY-MM-DD] [--limit N] [--recompute]` | Measure the PR loop: time-to-green, pushes per green, waiver comments by class, actionable vs informational comments, cancelled runs, re-runs (read-only; `gh`-backed with a local snapshot cache) |
-| `dora [--days N] [--format text\|json] [--record] [--source git\|gh] [--now UNIX]` | Derive DORA metrics (deployment frequency, lead time, change failure rate, deployment rework rate, time to restore) from git history plus the pinned `plans/dora.json` policy; every number carries its derivation manifest |
-| `compliance [--framework owasp\|nist\|eu\|soc] [--format text\|json]` | Print compliance mapping to OWASP Agentic Top 10, NIST AI RMF, EU AI Act, and SOC 2 |
-| `init [--language rust\|generic\|web\|node] [--force]` | Scaffold a harness workspace in the current directory |
-| `hook install [--force]` / `hook uninstall` / `hook status` / `hook diff` | Manage git hooks (`.git/hooks/pre-commit`, `commit-msg`, `pre-push`) |
-| `doctor` | Run diagnostic checks on binary resolution, git hook health, and state-database migration skew (fails when the database outruns the binary) |
-| `pr no-effect <PR\|--base REV --head REV>` | Report whether a PR or revision range introduces any effective change, from the merge-base tree delta (read-only; works in any git repo) |
-| `pr review <PR\|--base REV --head REV> [--recompute]` | Emit the semantic residual evidence could not prove, with skipped units and revocable `false_proven` claims (read-only) |
-| `pr ready <PR>` | Inspect end-to-end merge readiness: merge state, CI check buckets (cancelled kept distinct from failed, with rerun commands), unresolved review threads, and unanswered coverage gaps (`1` when a blocker exists) |
-| `pr waivers <PR\|--base REV --head REV> --lcov PATH [--since PATH]` | Classify patch-coverage residue: logging-macro field expressions, fallbacks a prior guard proved unreachable, and feature-gated lines as waivable, the rest as needing a test, as a paste-ready comment (read-only) |
-| `ci-explain <RUN_ID\|URL> [--format text\|json]` | Explain a workflow run's jobs: failures map to the local sensor and its exact repro command, cancellations get `gh run rerun` advice (read-only) |
-| `skills suggest --query TEXT [--limit N] [--format text\|json]` | Rank skills by frontmatter metadata for progressive disclosure (offline; metadata only, never a skill body); `DO_HARNESS_SKILL_SELECTOR` optionally reorders the shortlist |
-| `skills drift [--manifest FILE] [--format text\|json]` | Check manifest-managed shared skills against their pinned commit and tree digest (offline, check-only; `2` when the manifest is absent or invalid, or a managed tree cannot be described) |
-| `version [--format text\|json]` | Print the running binary's name, version, commit, commit date, and dirty flag |
-| `loc [PATH]... [--warn] [--format text\|json]` | Report each file's line count against the 500-line ceiling with its code/test split (`--warn` shows only files at or above the 450-line threshold) |
-| `split <FILE> [--target NAME] [--dry-run]` | Extract a large top-level item or inline test module into a sibling module, refusing shapes it cannot make compile |
-| `overlap [--threshold N] [--format text\|json]` | Rank skill pairs by guidance overlap; a pair at or above the threshold (default 0.45) prints as WARN (Tier-2 distinctiveness advisory) |
-| `maintenance [--prune-beats DAYS] [--keep-per-task N]` | Prune old beats and compact the local state database |
-| `audit-chain [--format text\|json]` | Recompute the workflow event hash chain and report the first divergence |
-| `completions <bash\|zsh\|fish\|powershell\|elvish>` | Generate shell completions |
-| `man <DIR>` | Generate man pages into a directory |
+| --- | --- |
+| `version [OPTIONS]` | Print CLI version information — flags: `--format <FORMAT>` |
+| `verify [OPTIONS]` | Run computational sensors (alias: `check`) — flags: `--fail-fast`, `--format <FORMAT>`, `--set <SET>`, `--changed`, `--only <SENSOR>`, `--exclude <SENSOR>`, `--jobs <N>`, `--unchanged <MODE>`, `--record`, `--task <ID>`, `--global`, `--evidence <FILE>`, `--strict`, `--bless`, `--approver <NAME>` |
+| `list [OPTIONS]` | List sensor names (alias: `ls`) — flags: `--sets`, `--format <FORMAT>` |
+| `explain [OPTIONS]` | Explain which sensors the current change selects, without running them — flags: `--set <SET>`, `--changed`, `--format <FORMAT>` |
+| `status [OPTIONS]` | Report verification evidence freshness without running sensors — flags: `--set <SET>`, `--evidence <FILE>`, `--format <FORMAT>` |
+| `pr no-effect [OPTIONS] [PR]` | Report whether a PR or revision range introduces any effective change — flags: `--base <REV>`, `--head <REV>`, `--format <FORMAT>` |
+| `pr review [OPTIONS] [PR]` | Emit the semantic residual: changed units evidence could not prove — flags: `--base <REV>`, `--head <REV>`, `--recompute`, `--format <FORMAT>` |
+| `pr ready [OPTIONS] <PR>` | Check whether a pull request is ready to merge: merge state, CI checks, and review conversations (aliases: `readiness`, `check`) — flags: `--format <FORMAT>` |
+| `pr waivers [OPTIONS] --lcov <PATH> [PR]` | Classify patch-coverage residue: waivable classes and lines needing tests — flags: `--base <REV>`, `--head <REV>`, `--patch <PATH>`, `--lcov <PATH>`, `--since <PATH>`, `--strip-prefix <PREFIX>`, `--format <FORMAT>` |
+| `skills suggest [OPTIONS] --query <TEXT>` | Rank skills by relevance to a query using metadata only — flags: `--query <TEXT>`, `--limit <N>`, `--format <FORMAT>` |
+| `skills drift [OPTIONS]` | Check manifest-managed shared skills against their pinned digests — flags: `--manifest <FILE>`, `--format <FORMAT>` |
+| `init-db [OPTIONS]` | Apply pending database migrations — flags: `--check`, `-y, --yes` |
+| `seed [OPTIONS]` | Seed invariants from plans/invariants.json — flags: `--prune` |
+| `init [OPTIONS]` | Scaffold a harness workspace in a target directory — flags: `--language <LANG>`, `--force`, `--format <FORMAT>`, `--no-seed`, `--minimal`, `--no-gitignore` |
+| `task export [OPTIONS]` | Write the task list to plans/tasks.json or specified output — flags: `--stdout`, `--format <FORMAT>` |
+| `task import [OPTIONS]` | Validate plans/tasks.json against the state database — flags: `--file <FILE>`, `--check` |
+| `task list [OPTIONS]` | Print tasks from the state database — flags: `--status <STATUS>`, `--method <METHOD>`, `--parent <ID>`, `--format <FORMAT>` |
+| `task show [OPTIONS] <ID>` | Show details for a specific task — flags: `--format <FORMAT>` |
+| `task add [OPTIONS] <TITLE>` | Add a task in `pending` state — flags: `--method <METHOD>`, `--parent <ID>`, `--precondition <PRECONDITION>` |
+| `task advance [OPTIONS] <ID>` | Advance the task's subtask pointer |
+| `task done [OPTIONS] <ID>` | Mark a task done once its sensor-gated subtasks have passed |
+| `task fail [OPTIONS] <ID>` | Mark a task failed |
+| `task remove [OPTIONS] <ID>` | Remove or cancel a task |
+| `trace add [OPTIONS] --session <SESSION>` | Record a trace of an executed command and its resolution — flags: `--session <SESSION>`, `--task <ID>`, `--command <COMMAND>`, `--error-diff <ERROR_DIFF>`, `--resolution-steps <RESOLUTION_STEPS>` |
+| `trace list [OPTIONS] --session <SESSION>` | Print traces for a session — flags: `--session <SESSION>`, `--format <FORMAT>` |
+| `trace sessions [OPTIONS]` | List distinct trace session identifiers — flags: `--format <FORMAT>` |
+| `distill [OPTIONS]` | Extract a heuristic from a resolved trace into a skill. Review output against the anti-AI-slop checklist (.agents/skills/skill-creator/references/anti_ai_slop.md) — flags: `--skill <SKILL>`, `--pattern <PATTERN>`, `--description <DESCRIPTION>`, `--from-trace <ID>`, `--from-strikes`, `--min-strikes <N>`, `--task <ID>`, `--to-fixture`, `--format <FORMAT>` |
+| `errors list [OPTIONS]` | List fail-fast error signatures (prefixed with `sensor:`) — flags: `--task <ID>`, `--scope <SCOPE>`, `--format <FORMAT>` |
+| `errors clear [OPTIONS]` | Clear fail-fast error signatures (e.g. `sensor:<name>`) — flags: `--sensor <SENSOR>`, `--task <ID>`, `--scope <SCOPE>`, `--force` |
+| `loc [OPTIONS] [PATH]...` | Report line-of-code state for the 500-LOC invariant — flags: `--dir <DIR>`, `--ext <EXT>`, `--format <FORMAT>`, `--warn` |
+| `split [OPTIONS] <FILE>` | Extract a large top-level item into a sibling module — flags: `--target <NAME>` |
+| `eval [OPTIONS]` | Validate skill structure and benchmark skill evals — flags: `--skill <SKILL>`, `--bless`, `--list-skills`, `--fail-fast`, `--format <FORMAT>`, `--approver <NAME>`, `--no-lift`, `--agent-cmd <COMMAND>`, `--agent-timeout <SECS>`, `--strict-fixtures` |
+| `hook install [OPTIONS]` | Write pre-commit and pre-push hooks into `.git/hooks/` — flags: `--force` |
+| `hook uninstall [OPTIONS]` | Remove managed hooks, leaving foreign hook files untouched |
+| `hook status [OPTIONS]` | Show whether the managed hooks and release binary are present — flags: `--format <FORMAT>` |
+| `hook diff [OPTIONS]` | Show diff between installed hooks and current templates |
+| `doctor [OPTIONS]` | Run diagnostic checks on binary resolution and git hook health — flags: `--format <FORMAT>`, `--strict` |
+| `metrics [OPTIONS] [COMMAND]` | Report harness trends: sensor stats, strikes, eval pass-rate history — flags: `--format <FORMAT>`, `--sensor <SENSOR>`, `--skill <SKILL>`, `--since <UNIX_SECONDS>`, `--scope <SCOPE>`, `--task <ID>`, `--branch <BRANCH>`, `--all` |
+| `metrics pr [OPTIONS] --repo <OWNER/NAME>` | PR-loop measures: time-to-green, pushes per green, waivers, comments, cancelled runs, reruns — flags: `--repo <OWNER/NAME>`, `--since <WINDOW>`, `--limit <N>`, `--recompute`, `--format <FORMAT>` |
+| `learn [OPTIONS] --draft` | Draft skill/guide updates from sensors that keep firing (never applies them) — flags: `--draft`, `--days <DAYS>`, `--min-fires <N>`, `--format <FORMAT>` |
+| `overlap [OPTIONS]` | Rank skill pairs by guidance overlap (Tier-2 distinctiveness advisory) — flags: `--threshold <THRESHOLD>`, `--format <FORMAT>` |
+| `maintenance [OPTIONS]` | Prune old beats and compact the state database — flags: `--prune-beats <DAYS>`, `--keep-per-task <N>` |
+| `compliance [OPTIONS]` | Print compliance mapping to OWASP Agentic Top 10, NIST AI RMF, and EU AI Act — flags: `--framework <FRAMEWORK>`, `--format <FORMAT>` |
+| `audit-chain [OPTIONS]` | Recompute workflow event hash chain and report first divergence — flags: `--format <FORMAT>` |
+| `dora [OPTIONS]` | Derive DORA deployment metrics from git history (deterministic, read-only) — flags: `--days <DAYS>`, `--format <FORMAT>`, `--record`, `--source <SOURCE>`, `--now <UNIX_SECONDS>` |
+| `ci-explain [OPTIONS] <RUN_ID>` | Explain a CI run's failures and cancellations with local repro commands (alias: `ci`) — flags: `--format <FORMAT>` |
+| `completions [OPTIONS] <SHELL>` | Generate shell completions |
+| `man [OPTIONS] <DIR>` | Generate man page documentation |
 
-Global flags: `--root <path>`, `--config <path>`, `-q/--quiet`, `--output <FILE>`, `--dry-run` (faithful preview for every mutating `task` action).
+Global flags: `--root <DIR>`, `--config <FILE>`, `-q, --quiet`, `--output <FILE>`, `--dry-run`.
+<!-- END GENERATED: cli-commands -->
+
+`--dry-run` previews every mutating `task` action and writes nothing.
 
 ## Exit codes
 
