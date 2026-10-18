@@ -2,16 +2,15 @@
 report.py — Documentation report and bounded reviewer packet generation.
 """
 
+import contextlib
 import hashlib
-import json
+import io
 import os
-import sys
 
 from doc_tools.cli_sync import run_sync
-from doc_tools.examples import extract_example_blocks, load_fixture_manifest
+from doc_tools.github_slugger import slugify
 from doc_tools.impact import analyze_impact, get_diff_hunks_for_file
-from doc_tools.inventory import discover_documents
-from doc_tools.markdown import MarkdownDocument
+from doc_tools.links import LinkChecker
 
 
 def compute_sha256(data_bytes):
@@ -26,9 +25,6 @@ def compute_file_sha256(filepath):
     with open(filepath, "rb") as f:
         return compute_sha256(f.read())
 
-
-import io
-import contextlib
 
 def check_generated_section_equality(root_dir):
     """
@@ -47,7 +43,6 @@ def extract_sections_from_doc(content, section_ids):
     If section_ids is empty or contains '*', returns full content or all sections.
     """
     lines = content.splitlines()
-    doc = MarkdownDocument("temp.md", content)
 
     # Map anchors/slugs to line ranges
     # Standard Markdown headings match anchors
@@ -61,7 +56,6 @@ def extract_sections_from_doc(content, section_ids):
     for i, line in enumerate(lines):
         if line.startswith("#"):
             heading_text = line.lstrip("#").strip()
-            from doc_tools.github_slugger import slugify
             slug = slugify(heading_text)
             headings.append({
                 "line_no": i,
@@ -125,7 +119,6 @@ def build_doc_report_and_packet(root_dir, base_rev, head_rev, contracts_path="do
             mechanical_findings.append(f"Examples verification error: {e}")
 
         try:
-            from docs import LinkChecker
             c_path = os.path.join(root_dir, contracts_path) if not os.path.isabs(contracts_path) else contracts_path
             link_checker = LinkChecker(root_dir=root_dir, contracts_path=c_path, mode="local")
             links_ok = link_checker.check_links()

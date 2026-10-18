@@ -25,8 +25,9 @@ from doc_tools.inventory import (
     _get_git_files,
     discover_documents,
 )
+from doc_tools.links import normalize_github_link
 from doc_tools.markdown import MarkdownDocument, slugify_heading
-from docs import LinkChecker, main as docs_main, normalize_github_link
+from docs import LinkChecker, main as docs_main
 
 README_POLICY = 'version = 1\n[[rules]]\npath="README.md"\nclassification="maintained"\nreason="Root"\n'
 
@@ -653,7 +654,7 @@ class TestDocsImpactAndReport(unittest.TestCase):
         os.makedirs(self.repo)
 
         def run_git(*args):
-            subprocess.run(["git", "-C", self.repo, *args], check=True, capture_output=True)
+            subprocess.run(["git", "-C", self.repo, *args], check=True, capture_output=True)  # nosec B603 B607
 
         run_git("init")
         run_git("config", "user.name", "Test User")
@@ -687,17 +688,17 @@ reason = "CLI definitions"
         run_git("add", ".")
         run_git("commit", "-m", "Initial commit")
 
-        res = subprocess.run(["git", "-C", self.repo, "rev-parse", "HEAD"], capture_output=True, text=True, check=True)
+        res = subprocess.run(["git", "-C", self.repo, "rev-parse", "HEAD"], capture_output=True, text=True, check=True)  # nosec B603 B607
         self.base_commit = res.stdout.strip()
 
     def tearDown(self):
         self.tmp.cleanup()
 
     def run_git(self, *args):
-        subprocess.run(["git", "-C", self.repo, *args], check=True, capture_output=True)
+        subprocess.run(["git", "-C", self.repo, *args], check=True, capture_output=True)  # nosec B603 B607
 
     def get_head_commit(self):
-        res = subprocess.run(["git", "-C", self.repo, "rev-parse", "HEAD"], capture_output=True, text=True, check=True)
+        res = subprocess.run(["git", "-C", self.repo, "rev-parse", "HEAD"], capture_output=True, text=True, check=True)  # nosec B603 B607
         return res.stdout.strip()
 
     def test_impact_analysis_mapped_source_change(self):

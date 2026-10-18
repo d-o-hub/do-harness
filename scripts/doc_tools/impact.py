@@ -4,7 +4,6 @@ impact.py — Deterministic Git diff analysis and doc section impact mapping.
 
 import os
 import subprocess  # nosec B404
-import sys
 
 from doc_tools.inventory import ContractPolicy, PolicyError
 
@@ -211,8 +210,9 @@ def analyze_impact(root_dir, base_rev, head_rev, contracts_path="docs/contracts.
                         if sm.reason and sm.reason not in source_reasons[target_doc]:
                             source_reasons[target_doc].append(sm.reason)
 
-            # If an unmapped source file changed (and not a fixture/historical doc or policy file)
-            if not mapped and not (rule and rule.classification in ("historical", "fixture", "vendored")):
+            # If an unmapped source file changed (and not a classified doc file, fixture, historical, or policy file)
+            is_doc = rule and rule.classification in ("maintained", "canonical_alias", "historical", "fixture", "vendored")
+            if not mapped and not is_doc:
                 if ep not in unknown_scope_files:
                     unknown_scope_files.append(ep)
 

@@ -121,7 +121,7 @@ class SourceMapping:
         for part in parts:
             sub_parts = part.split("*")
             escaped_sub = [re.escape(s).replace(r"\?", "[^/]") for s in sub_parts]
-            regex_parts.append("[^/]*".join(escaped_sub))
+            regex_parts.append(".*".join(escaped_sub))
 
         full_regex = ".*".join(regex_parts)
         self.regex = re.compile(f"^{full_regex}$", re.IGNORECASE)
