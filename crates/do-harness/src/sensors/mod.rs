@@ -9,18 +9,29 @@ use clap::ValueEnum;
 use crate::config::{Config, SensorSpec};
 use crate::report::{Format, SensorResult, VerifyReport};
 
+/// Builds the clear command hint for a sensor error signature, optionally scoped.
+fn clear_cmd_hint(sensor_name: &str, scope: Option<&str>) -> String {
+    match scope {
+        Some(s) if !s.is_empty() => {
+            format!("do-harness errors clear --sensor sensor:{sensor_name} --scope {s}")
+        }
+        _ => format!("do-harness errors clear --sensor sensor:{sensor_name}"),
+    }
+}
+
 /// Builds the halted-by-policy result for a sensor the fail-fast guard
 /// refuses to execute (ok=false, no exit code, zero duration).
-pub(crate) fn sensor_blocked(spec: &SensorSpec) -> SensorResult {
+pub(crate) fn sensor_blocked(spec: &SensorSpec, scope: Option<&str>) -> SensorResult {
     use crate::telemetry::FAIL_FAST_STRIKES;
+    let clear_cmd = clear_cmd_hint(&spec.name, scope);
     let mut result = exec::sensor_result(
         spec,
         false,
         None,
         0,
         format!(
-            "halted: sensor '{}' has failed {} consecutive times; resolve the underlying issue before re-running",
-            spec.name, FAIL_FAST_STRIKES
+            "halted: sensor '{}' has failed {} consecutive times; resolve the underlying issue, then run `{}` before re-running",
+            spec.name, FAIL_FAST_STRIKES, clear_cmd
         ),
     );
     result.execution = crate::report::Execution::NotRun;
@@ -30,16 +41,17 @@ pub(crate) fn sensor_blocked(spec: &SensorSpec) -> SensorResult {
 /// Builds the quarantined result for a warn-severity sensor that has warned
 /// [`crate::telemetry::FAIL_FAST_STRIKES`] consecutive times: the sensor is
 /// skipped with an advisory verdict instead of halting the run.
-pub(crate) fn sensor_quarantined(spec: &SensorSpec) -> SensorResult {
+pub(crate) fn sensor_quarantined(spec: &SensorSpec, scope: Option<&str>) -> SensorResult {
     use crate::telemetry::FAIL_FAST_STRIKES;
+    let clear_cmd = clear_cmd_hint(&spec.name, scope);
     let mut result = exec::sensor_result(
         spec,
         false,
         None,
         0,
         format!(
-            "quarantined: sensor '{}' has warned {} consecutive times; resolve the finding or run `do-harness errors clear` to re-enable it",
-            spec.name, FAIL_FAST_STRIKES
+            "quarantined: sensor '{}' has warned {} consecutive times; resolve the finding or run `{}` to re-enable it",
+            spec.name, FAIL_FAST_STRIKES, clear_cmd
         ),
     );
     result.allow_failure = true;
@@ -105,6 +117,8 @@ pub struct VerifyOpts {
     /// Maximum sensors in flight; `None` falls back to `jobs` in
     /// `do-harness.toml`, then to sequential execution.
     pub jobs: Option<usize>,
+    /// Workstream scope key for this run (e.g. `task:<id>`, `branch:<name>`, `global`).
+    pub scope_key: Option<String>,
     /// Sensor names halted by the fail-fast policy (not executed).
     pub blocked: Vec<String>,
     /// Warn-severity sensor names skipped after repeated warnings
