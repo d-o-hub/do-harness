@@ -26,7 +26,37 @@ fn blocked_sensor_is_not_executed() {
     assert_eq!(report.sensors[0].exit_code, None);
     assert_eq!(report.sensors[0].duration_ms, 0);
     assert!(report.sensors[0].output.contains("halted"));
+    assert!(
+        report.sensors[0]
+            .output
+            .contains("do-harness errors clear --sensor sensor:mark")
+    );
     assert!(!dir.path().join("marker").exists());
+}
+
+/// A blocked sensor message includes scope when `scope_key` is set.
+#[test]
+fn blocked_sensor_message_includes_scope() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let cfg = config_with(&[("mark", &["true"])]);
+    let report = verify(
+        &cfg,
+        dir.path(),
+        &VerifyOpts {
+            fail_fast: false,
+            scope_key: Some("task:42".to_string()),
+            blocked: vec!["mark".to_owned()],
+            ..Default::default()
+        },
+    )
+    .expect("verify");
+    assert!(
+        report.sensors[0]
+            .output
+            .contains("do-harness errors clear --sensor sensor:mark --scope task:42"),
+        "unexpected output: {}",
+        report.sensors[0].output
+    );
 }
 
 /// A blocked sensor fails the report while unblocked sensors still run.

@@ -118,8 +118,10 @@ fn run_chunk(
                         _ if opts.fail_fast && cancel.load(Ordering::SeqCst) => {
                             cancelled_result(item.spec)
                         }
-                        Verdict::Blocked => sensor_blocked(item.spec),
-                        Verdict::Quarantined => super::sensor_quarantined(item.spec),
+                        Verdict::Blocked => sensor_blocked(item.spec, opts.scope_key.as_deref()),
+                        Verdict::Quarantined => {
+                            super::sensor_quarantined(item.spec, opts.scope_key.as_deref())
+                        }
                         Verdict::Run => {
                             let result = run_sensor(item.spec, root, cancel, &opts.baselines);
                             if opts.fail_fast && !result.ok && !result.allow_failure {
@@ -165,8 +167,8 @@ fn run_sequential(
     for spec in specs {
         let result = match classify_verdict(spec, opts) {
             Verdict::Reused(beat_id) => super::sensor_reused(spec, beat_id),
-            Verdict::Blocked => sensor_blocked(spec),
-            Verdict::Quarantined => super::sensor_quarantined(spec),
+            Verdict::Blocked => sensor_blocked(spec, opts.scope_key.as_deref()),
+            Verdict::Quarantined => super::sensor_quarantined(spec, opts.scope_key.as_deref()),
             Verdict::Run => run_sensor(spec, root, cancel, &opts.baselines),
         };
         let hard_failed = !result.ok && !result.allow_failure;

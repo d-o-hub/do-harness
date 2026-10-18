@@ -40,6 +40,7 @@ pub(crate) async fn run(root: &Path, mut opts: VerifyOpts) -> std::result::Resul
     if opts.task.is_none() {
         opts.task = beat_scope.task_id();
     }
+    opts.scope_key = Some(beat_scope.key());
     if warn_unscoped_record(
         opts.record,
         &beat_scope,
