@@ -1,236 +1,146 @@
 #!/usr/bin/env python3
-"""
-docs-review-benchmark.py — Benchmark harness for docs review packets.
+"""Measure packet/effective-input bytes and deterministic process/tool calls.
 
-Measures packet reduction against raw full-doc inputs across scenarios:
-  - generated-only
-  - narrative-only
-  - mixed
-  - renamed-deleted
-  - policy-tampering
-  - unmapped-behavior
-
-Reports exact bytes and tool calls; reports tokens only with a named tokenizer/model.
+The six local Git fixtures exercise generated-only, narrative-only, mixed,
+rename/delete, policy-tampering, and unmapped cases. Fallbacks count raw
+full-document input. No network, model, external artifact, or token estimate
+is used.
 """
 
 import json
-import os
-import subprocess  # nosec B404
 import sys
-import tempfile
+from pathlib import Path
+from unittest import mock
 
-from doc_tools.report import build_doc_report_and_packet
+ROOT = Path(__file__).resolve().parents[1]
+SCRIPTS = ROOT / "scripts"
+sys.path.insert(0, str(SCRIPTS))
+sys.path.insert(0, str(SCRIPTS / "tests"))
 
+from doc_tools import git_helpers, impact, report  # noqa: E402
+from test_doc_impact import ImpactRepo, PASSING_CHECKS  # noqa: E402
 
-def run_cmd(args, cwd):
-    """Runs a git command silently in cwd."""
-    subprocess.run(["git", *args], cwd=cwd, capture_output=True, check=True)  # nosec B603 B607
-
-
-def setup_git_repo(tmp_dir):
-    """Initializes a Git repo with basic documentation structure."""
-    run_cmd(["init"], cwd=tmp_dir)
-    run_cmd(["config", "user.name", "Benchmark Bot"], cwd=tmp_dir)
-    run_cmd(["config", "user.email", "bot@example.com"], cwd=tmp_dir)
-
-    os.makedirs(os.path.join(tmp_dir, "docs"), exist_ok=True)
-    os.makedirs(os.path.join(tmp_dir, "src"), exist_ok=True)
-    os.makedirs(os.path.join(tmp_dir, "tests", "fixtures", "docs-examples"), exist_ok=True)
-
-    with open(os.path.join(tmp_dir, "Cargo.toml"), "w", encoding="utf-8") as f:
-        f.write('[workspace]\nmembers = []\n')
-
-    with open(os.path.join(tmp_dir, "tests", "fixtures", "docs-examples", "manifest.toml"), "w", encoding="utf-8") as f:
-        f.write('[fixtures]\n')
-
-    contracts_toml = """version = 1
-
-[[rules]]
-path = "README.md"
-classification = "maintained"
-reason = "Root README"
-
-[[rules]]
-glob = "docs/*.md"
-classification = "maintained"
-reason = "Top level docs"
-
-[[source_mappings]]
-glob = "src/cli*"
-target_docs = ["docs/cli.md", "README.md"]
-target_sections = ["cli-reference", "commands"]
-reason = "CLI definitions"
-"""
-    with open(os.path.join(tmp_dir, "docs", "contracts.toml"), "w", encoding="utf-8") as f:
-        f.write(contracts_toml)
-
-    readme_md = """# Sample Project
-
-## Commands
-This section describes CLI commands.
-
-## Overview
-This section contains general narrative prose that is not affected by CLI code.
-"""
-    with open(os.path.join(tmp_dir, "README.md"), "w", encoding="utf-8") as f:
-        f.write(readme_md)
-
-    cli_md = """# CLI Reference
-
-## cli-reference
-Detailed description of CLI flags and options.
-"""
-    with open(os.path.join(tmp_dir, "docs", "cli.md"), "w", encoding="utf-8") as f:
-        f.write(cli_md)
-
-    src_file = """def main():
-    print("Hello world")
-"""
-    with open(os.path.join(tmp_dir, "src", "cli_main.py"), "w", encoding="utf-8") as f:
-        f.write(src_file)
-
-    run_cmd(["add", "."], cwd=tmp_dir)
-    run_cmd(["commit", "-m", "Initial commit"], cwd=tmp_dir)
-
-    res = subprocess.run(["git", "rev-parse", "HEAD"], cwd=tmp_dir, capture_output=True, text=True, check=True)  # nosec B603 B607
-    base_commit = res.stdout.strip()
-    return base_commit
+def _generated_only(repo):
+    repo._write("crates/do-harness/src/cli.rs", "pub fn command() { println!(\"new\"); }\n")
+    readme = repo._read("README.md").replace("Command caveat.\n", "")
+    repo._write("README.md", readme.replace("old command row", "new command row"))
 
 
-def run_benchmark():
-    scenarios = {}
+def _narrative_only(repo):
+    adoption = repo._read("docs/adoption.md").replace("CI text.", "Updated CI text.")
+    repo._write("docs/adoption.md", adoption)
 
-    # Scenario 1: Generated-only change
-    with tempfile.TemporaryDirectory() as tmp_dir:
-        base_commit = setup_git_repo(tmp_dir)
 
-        # Modify src/cli_main.py (mapped source)
-        with open(os.path.join(tmp_dir, "src", "cli_main.py"), "a", encoding="utf-8") as f:
-            f.write("# Added comment\n")
+def _mixed(repo):
+    repo._write("crates/do-harness/src/cli.rs", "pub fn command() { println!(\"new\"); }\n")
+    readme = repo._read("README.md").replace("old command row", "new command row")
+    repo._write("README.md", readme.replace("Command caveat.", "Updated command caveat."))
 
-        run_cmd(["add", "."], cwd=tmp_dir)
-        run_cmd(["commit", "-m", "Source change"], cwd=tmp_dir)
-        res_head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=tmp_dir, capture_output=True, text=True, check=True)  # nosec B603 B607
-        head_commit = res_head.stdout.strip()
 
-        # In a real environment, generated docs would be re-generated and equal.
-        # Here we run impact analysis.
-        report, packet_text = build_doc_report_and_packet(tmp_dir, base_commit, head_commit, contracts_path="docs/contracts.toml")
+def _rename_delete(repo):
+    repo._git("mv", "docs/old guide.md", "docs/new guide.md")
+    (repo.root / "docs/delete-me.md").unlink()
 
-        raw_diff = subprocess.run(["git", "diff", base_commit, head_commit], cwd=tmp_dir, capture_output=True, text=True, check=True).stdout  # nosec B603 B607
-        scenarios["generated_only"] = {
-            "raw_bytes": len(raw_diff.encode("utf-8")),
-            "packet_bytes": len(packet_text.encode("utf-8")),
-            "tool_calls": 0,
-            "reduced": len(packet_text.encode("utf-8")) <= len(raw_diff.encode("utf-8")),
+
+def _policy_tampering(repo):
+    repo._write("crates/do-harness/src/cli.rs", "pub fn command() { println!(\"new\"); }\n")
+    policy = repo._read("docs/contracts.toml").replace(
+        "CLI definitions drive command reference sections.",
+        "Head policy attempts to hide this source.",
+    )
+    repo._write("docs/contracts.toml", policy)
+
+
+def _unmapped(repo):
+    repo._write("crates/do-harness/src/unmapped.rs", "pub fn changed() {}\n")
+
+
+CASES = (
+    ("generated-only", _generated_only),
+    ("narrative-only", _narrative_only),
+    ("mixed", _mixed),
+    ("renamed-deleted", _rename_delete),
+    ("policy-tampering", _policy_tampering),
+    ("unmapped", _unmapped),
+)
+
+
+def _measure(name, mutate):
+    repo = ImpactRepo()
+    try:
+        mutate(repo)
+        head = repo.finish()
+        original_run = git_helpers.subprocess.run
+        git_processes = 0
+
+        def counted_run(*args, **kwargs):
+            nonlocal git_processes
+            git_processes += 1
+            return original_run(*args, **kwargs)
+
+        with mock.patch.object(git_helpers.subprocess, "run", side_effect=counted_run):
+            analysis = impact.analyze(str(repo.root), repo.base, head)
+            result = report.build_report(str(repo.root), analysis, PASSING_CHECKS)
+        packet = result["reviewer_packet"]
+        packet_bytes = packet["bytes"]
+        raw_bytes = packet["raw_equivalent_bytes"]
+        packet_consumed = not packet["fallback_required"] and packet_bytes < raw_bytes
+        effective_input_bytes = packet_bytes if packet_consumed else raw_bytes
+        return {
+            "case": name,
+            "packet_status": packet["status"],
+            "packet_bytes": packet_bytes,
+            "full_document_input_bytes": raw_bytes,
+            "candidate_reduction_bytes": raw_bytes - packet_bytes,
+            "effective_review_input_bytes": effective_input_bytes,
+            "effective_reduction_bytes": raw_bytes - effective_input_bytes,
+            "packet_consumed": packet_consumed,
+            "measured_git_process_calls": git_processes,
+            "production_local_check_invocations_per_report": len(report._CHECKS),
+            "benchmark_uses_injected_check_results": True,
+            "llm_or_api_calls": 0,
+            "fallback_required": packet["fallback_required"],
         }
+    finally:
+        repo.close()
 
-    # Scenario 2: Narrative-only change
-    with tempfile.TemporaryDirectory() as tmp_dir:
-        base_commit = setup_git_repo(tmp_dir)
 
-        with open(os.path.join(tmp_dir, "README.md"), "a", encoding="utf-8") as f:
-            f.write("\n## Overview\nNew overview section.\n")
-
-        run_cmd(["add", "."], cwd=tmp_dir)
-        run_cmd(["commit", "-m", "Narrative doc update"], cwd=tmp_dir)
-        res_head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=tmp_dir, capture_output=True, text=True, check=True)  # nosec B603 B607
-        head_commit = res_head.stdout.strip()
-
-        report, packet_text = build_doc_report_and_packet(tmp_dir, base_commit, head_commit, contracts_path="docs/contracts.toml")
-        raw_diff = subprocess.run(["git", "diff", base_commit, head_commit], cwd=tmp_dir, capture_output=True, text=True, check=True).stdout  # nosec B603 B607
-        scenarios["narrative_only"] = {
-            "raw_bytes": len(raw_diff.encode("utf-8")),
-            "packet_bytes": len(packet_text.encode("utf-8")),
-            "tool_calls": 0,
-            "reduced": True,
-        }
-
-    # Scenario 3: Mixed change
-    with tempfile.TemporaryDirectory() as tmp_dir:
-        base_commit = setup_git_repo(tmp_dir)
-
-        with open(os.path.join(tmp_dir, "src", "cli_main.py"), "a", encoding="utf-8") as f:
-            f.write("\ndef new_cmd(): pass\n")
-        with open(os.path.join(tmp_dir, "README.md"), "a", encoding="utf-8") as f:
-            f.write("\nNew feature note.\n")
-
-        run_cmd(["add", "."], cwd=tmp_dir)
-        run_cmd(["commit", "-m", "Mixed change"], cwd=tmp_dir)
-        res_head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=tmp_dir, capture_output=True, text=True, check=True)  # nosec B603 B607
-        head_commit = res_head.stdout.strip()
-
-        report, packet_text = build_doc_report_and_packet(tmp_dir, base_commit, head_commit, contracts_path="docs/contracts.toml")
-        raw_diff = subprocess.run(["git", "diff", base_commit, head_commit], cwd=tmp_dir, capture_output=True, text=True, check=True).stdout  # nosec B603 B607
-        scenarios["mixed"] = {
-            "raw_bytes": len(raw_diff.encode("utf-8")),
-            "packet_bytes": len(packet_text.encode("utf-8")),
-            "tool_calls": 0,
-            "reduced": True,
-        }
-
-    # Scenario 4: Renamed / Deleted
-    with tempfile.TemporaryDirectory() as tmp_dir:
-        base_commit = setup_git_repo(tmp_dir)
-
-        run_cmd(["mv", "docs/cli.md", "docs/cli_ref.md"], cwd=tmp_dir)
-        run_cmd(["commit", "-m", "Rename doc"], cwd=tmp_dir)
-        res_head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=tmp_dir, capture_output=True, text=True, check=True)  # nosec B603 B607
-        head_commit = res_head.stdout.strip()
-
-        report, packet_text = build_doc_report_and_packet(tmp_dir, base_commit, head_commit, contracts_path="docs/contracts.toml")
-        raw_diff = subprocess.run(["git", "diff", base_commit, head_commit], cwd=tmp_dir, capture_output=True, text=True, check=True).stdout  # nosec B603 B607
-        scenarios["renamed_deleted"] = {
-            "raw_bytes": len(raw_diff.encode("utf-8")),
-            "packet_bytes": len(packet_text.encode("utf-8")),
-            "tool_calls": 0,
-            "reduced": True,
-        }
-
-    # Scenario 5: Policy Tampering
-    with tempfile.TemporaryDirectory() as tmp_dir:
-        base_commit = setup_git_repo(tmp_dir)
-
-        with open(os.path.join(tmp_dir, "docs", "contracts.toml"), "a", encoding="utf-8") as f:
-            f.write("\n# Tampered line\n")
-
-        run_cmd(["add", "."], cwd=tmp_dir)
-        run_cmd(["commit", "-m", "Policy edit"], cwd=tmp_dir)
-        res_head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=tmp_dir, capture_output=True, text=True, check=True)  # nosec B603 B607
-        head_commit = res_head.stdout.strip()
-
-        report, packet_text = build_doc_report_and_packet(tmp_dir, base_commit, head_commit, contracts_path="docs/contracts.toml")
-        scenarios["policy_tampering"] = {
-            "policy_tampering_flag": report["identities"]["policy_tampering"],
-            "tool_calls": 0,
-            "fallback_required": report["identities"]["policy_tampering"],
-        }
-
-    # Scenario 6: Unmapped behavior
-    with tempfile.TemporaryDirectory() as tmp_dir:
-        base_commit = setup_git_repo(tmp_dir)
-
-        os.makedirs(os.path.join(tmp_dir, "unmapped"), exist_ok=True)
-        with open(os.path.join(tmp_dir, "unmapped", "secret.py"), "w", encoding="utf-8") as f:
-            f.write("# Unmapped code\n")
-
-        run_cmd(["add", "."], cwd=tmp_dir)
-        run_cmd(["commit", "-m", "Unmapped source change"], cwd=tmp_dir)
-        res_head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=tmp_dir, capture_output=True, text=True, check=True)  # nosec B603 B607
-        head_commit = res_head.stdout.strip()
-
-        report, packet_text = build_doc_report_and_packet(tmp_dir, base_commit, head_commit, contracts_path="docs/contracts.toml")
-        scenarios["unmapped_behavior"] = {
-            "unknown_scope_files": report["impact"]["unknown_scope_files"],
-            "tool_calls": 0,
-            "uncertain_scope": len(report["impact"]["unknown_scope_files"]) > 0,
-        }
-
-    print("=== DOCS REVIEW BENCHMARK SUMMARY ===")
-    print("Tool Calls across all mechanical checks: 0 (Zero LLM calls required)")
-    print(json.dumps(scenarios, indent=2))
+def main():
+    cases = [_measure(name, mutate) for name, mutate in CASES]
+    packet_bytes = sum(case["packet_bytes"] for case in cases)
+    raw_bytes = sum(case["full_document_input_bytes"] for case in cases)
+    effective_input_bytes = sum(case["effective_review_input_bytes"] for case in cases)
+    report_data = {
+        "schema_version": 2,
+        "tool_call_definition": (
+            "measured Git subprocesses used by the analyzer; production local checks per report "
+            "are counted but not executed by this fixture benchmark; effective input counts the "
+            "packet only when complete and strictly smaller than equivalent full-document input; "
+            "otherwise it counts the raw full-document input; no LLM/API calls"
+        ),
+        "tokenizer": None,
+        "cases": cases,
+        "summary": {
+            "cases": len(cases),
+            "packet_bytes": packet_bytes,
+            "candidate_reduction_bytes": raw_bytes - packet_bytes,
+            "full_document_input_bytes": raw_bytes,
+            "effective_review_input_bytes": effective_input_bytes,
+            "effective_reduction_bytes": raw_bytes - effective_input_bytes,
+            "effective_reduction_percent": (
+                round((raw_bytes - effective_input_bytes) * 100 / raw_bytes, 2)
+                if raw_bytes
+                else 0.0
+            ),
+            "packets_consumed": sum(case["packet_consumed"] for case in cases),
+            "measured_git_process_calls": sum(case["measured_git_process_calls"] for case in cases),
+            "production_local_check_invocations_per_report": len(report._CHECKS),
+            "llm_or_api_calls": 0,
+        },
+    }
+    print(json.dumps(report_data, ensure_ascii=True, indent=2, sort_keys=True))
     return 0
 
 
 if __name__ == "__main__":
-    sys.exit(run_benchmark())
+    raise SystemExit(main())

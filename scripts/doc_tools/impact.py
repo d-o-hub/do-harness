@@ -1,238 +1,357 @@
-"""
-impact.py — Deterministic Git diff analysis and doc section impact mapping.
+"""Commit-range analysis for documentation impact and review packets.
+
+Public contract: ``analyze(root, base_ref, head_ref)`` returns a deterministic
+mapping or raises ``ImpactError``. The source map and document classifications
+come only from the merge-base policy. Git is invoked with fixed argv and never
+through a shell.
 """
 
+from __future__ import annotations
+
+import fnmatch
+import hashlib
 import os
-import subprocess  # nosec B404
+import re
+from dataclasses import asdict, dataclass
+from typing import Any
 
-from doc_tools.inventory import ContractPolicy, PolicyError
+try:
+    import tomllib
+except ImportError:  # Python 3.10 compatibility matches inventory.py.
+    import tomli as tomllib
 
+from doc_tools.git_helpers import (
+    ImpactError,
+    checker_digest as _checker_digest,
+    checker_tree as _checker_tree,
+    checkout_identity as _checkout_identity,
+    git as _git,
+    parse_name_status as _parse_name_status,
+    read_blob as _read_blob,
+    resolve_commit as _resolve_commit,
+    tree_identity as _tree_identity,
+)
 
-def resolve_commit(root_dir, rev):
-    """Resolves a git revision to full commit hash."""
-    try:
-        res = subprocess.run(  # nosec B603 B607
-            ["git", "-C", root_dir, "rev-parse", "--verify", f"{rev}^{{commit}}"],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-        return res.stdout.strip()
-    except (subprocess.CalledProcessError, FileNotFoundError, OSError) as e:
-        raise ValueError(f"Unresolvable revision '{rev}': {e}")
+from doc_tools.inventory import Rule
+from doc_tools.sections import (
+    Section,
+    changed_line_sets,
+    deepest_sections_for_lines,
+    extract_sections,
+)
 
-
-def get_merge_base(root_dir, base_rev, head_rev):
-    """Calculates merge base commit between base_rev and head_rev."""
-    base_commit = resolve_commit(root_dir, base_rev)
-    head_commit = resolve_commit(root_dir, head_rev)
-    try:
-        res = subprocess.run(  # nosec B603 B607
-            ["git", "-C", root_dir, "merge-base", base_commit, head_commit],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-        return res.stdout.strip()
-    except (subprocess.CalledProcessError, FileNotFoundError, OSError) as e:
-        raise ValueError(f"Failed to find merge base between '{base_rev}' and '{head_rev}': {e}")
-
-
-def load_file_bytes_at_commit(root_dir, commit, rel_path):
-    """Loads file bytes at a specific git commit or returns None if not found."""
-    try:
-        res = subprocess.run(  # nosec B603 B607
-            ["git", "-C", root_dir, "show", f"{commit}:{rel_path}"],
-            capture_output=True,
-            check=True,
-        )
-        return res.stdout
-    except (subprocess.CalledProcessError, FileNotFoundError, OSError):
-        return None
-
-
-def parse_git_diff_name_status(root_dir, base_commit, head_commit):
-    """
-    Runs `git diff -z --name-status base head` and parses NUL-delimited output.
-    Returns list of dicts: {'status': str, 'path': str, 'old_path': str|None}
-    Status codes: A, M, D, R100, C100, etc.
-    """
-    try:
-        res = subprocess.run(  # nosec B603 B607
-            ["git", "-C", root_dir, "diff", "-z", "--name-status", base_commit, head_commit],
-            capture_output=True,
-            check=False,
-        )
-        if res.returncode != 0:
-            raise ValueError(f"git diff failed (exit {res.returncode}): {res.stderr.decode('utf-8', errors='replace')}")
-        raw_bytes = res.stdout
-    except (FileNotFoundError, OSError) as e:
-        raise ValueError(f"Failed to execute git diff: {e}")
-
-    items = raw_bytes.split(b"\x00")
-    changes = []
-    i = 0
-    n = len(items)
-
-    while i < n:
-        item = items[i]
-        if not item:
-            i += 1
-            continue
-
-        status_str = item.decode("utf-8", errors="replace").strip()
-        status_code = status_str[0] if status_str else ""
-
-        if status_code in ("R", "C"):
-            # Renames and copies have status, old_path, new_path
-            if i + 2 < n:
-                old_path = items[i + 1].decode("utf-8", errors="replace")
-                new_path = items[i + 2].decode("utf-8", errors="replace")
-                changes.append({
-                    "status": status_code,
-                    "status_full": status_str,
-                    "path": os.path.normpath(new_path).replace("\\", "/"),
-                    "old_path": os.path.normpath(old_path).replace("\\", "/"),
-                })
-                i += 3
-                continue
-            else:
-                break
-        else:
-            # Added, Modified, Deleted, etc.
-            if i + 1 < n:
-                path = items[i + 1].decode("utf-8", errors="replace")
-                changes.append({
-                    "status": status_code,
-                    "status_full": status_str,
-                    "path": os.path.normpath(path).replace("\\", "/"),
-                    "old_path": None,
-                })
-                i += 2
-                continue
-            else:
-                break
-
-    return changes
-
-
-def get_diff_hunks_for_file(root_dir, base_commit, head_commit, rel_path):
-    """Gets patch diff text for a given file relative path between base and head."""
-    try:
-        res = subprocess.run(  # nosec B603 B607
-            ["git", "-C", root_dir, "diff", base_commit, head_commit, "--", rel_path],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        if res.returncode == 0:
-            return res.stdout
-    except (FileNotFoundError, OSError):
-        pass
-    return ""
-
-
-POLICY_AND_CHECKER_PATHS = {
-    "docs/contracts.toml",
+POLICY_PATH = "docs/contracts.toml"
+CHECKER_PATTERNS = (
+    "Cargo.toml",
+    "Cargo.lock",
+    "crates/do-harness/Cargo.toml",
+    "crates/do-harness/build.rs",
+    ".cargo/**",
+    "rust-toolchain.toml",
     "scripts/docs.py",
-    "scripts/doc_tools/inventory.py",
-    "scripts/doc_tools/markdown.py",
-    "scripts/doc_tools/impact.py",
-    "scripts/doc_tools/report.py",
-    "scripts/doc_tools/examples.py",
-    "scripts/doc_tools/cli_sync.py",
+    "scripts/doc_tools/**",
     "scripts/test_doc_tools.py",
-    "tests/fixtures/docs-examples/manifest.toml",
+    "scripts/tests/**",
+    "scripts/requirements-docs.txt",
+    "crates/do-harness/src/docs_generation/**",
     "tests/fixtures/cli-contract.json",
-}
+    "tests/fixtures/docs-examples/**",
+)
+RELEVANT_SOURCE_PREFIXES = (
+    "crates/do-harness/src/",
+    "crates/do-harness/templates/",
+    ".github/workflows/",
+)
+RELEVANT_SOURCE_FILES = {"do-harness.toml"}
 
 
-def analyze_impact(root_dir, base_rev, head_rev, contracts_path="docs/contracts.toml"):
-    """
-    Performs deterministic docs impact analysis between base_rev and head_rev.
-    Loads ContractPolicy from merge-base commit.
-    Returns impact structure dictionary.
-    """
-    root_dir = os.path.abspath(root_dir)
-    merge_base = get_merge_base(root_dir, base_rev, head_rev)
-    head_commit = resolve_commit(root_dir, head_rev)
+@dataclass(frozen=True)
+class ImpactRule:
+    pattern: str
+    exact: bool
+    sections: tuple[str, ...]
+    reason: str
+    specificity: int
 
-    # 1. Load ContractPolicy from merge base
-    policy_bytes = load_file_bytes_at_commit(root_dir, merge_base, contracts_path)
+    def matches(self, path: str) -> bool:
+        return path == self.pattern if self.exact else fnmatch.fnmatchcase(path, self.pattern)
+
+
+
+
+def _parse_policy(raw: bytes) -> tuple[list[Rule], list[ImpactRule], str]:
+    try:
+        policy = tomllib.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, tomllib.TOMLDecodeError) as error:
+        raise ImpactError(f"merge-base documentation policy is invalid: {error}") from error
+    if policy.get("version") != 1:
+        raise ImpactError("merge-base docs/contracts.toml must declare version = 1")
+    raw_rules = policy.get("rules")
+    if not isinstance(raw_rules, list) or not raw_rules:
+        raise ImpactError("merge-base docs/contracts.toml has no document classification rules")
+    try:
+        document_rules = [Rule(value, index + 1) for index, value in enumerate(raw_rules)]
+    except Exception as error:
+        raise ImpactError(f"merge-base document classification policy is invalid: {error}") from error
+
+    map_data = policy.get("impact_map", [])
+    if not isinstance(map_data, list):
+        raise ImpactError("merge-base impact_map must be an array of tables")
+    impact_rules: list[ImpactRule] = []
+    for index, value in enumerate(map_data, 1):
+        if not isinstance(value, dict):
+            raise ImpactError(f"impact_map entry #{index} is not a table")
+        path, glob = value.get("path"), value.get("glob")
+        if bool(path) == bool(glob):
+            raise ImpactError(f"impact_map entry #{index} must specify exactly one of path or glob")
+        pattern = path or glob
+        sections = value.get("sections")
+        reason = value.get("reason")
+        if not isinstance(pattern, str) or not pattern:
+            raise ImpactError(f"impact_map entry #{index} has an empty path/glob")
+        if not isinstance(sections, list) or any(
+            not isinstance(section, str) or "#" not in section or section.startswith("#")
+            for section in sections
+        ):
+            raise ImpactError(f"impact_map entry #{index} has invalid sections")
+        if not isinstance(reason, str) or not reason.strip():
+            raise ImpactError(f"impact_map entry #{index} needs a non-empty reason")
+        exact = path is not None
+        specificity = (10_000 if exact else 1_000) + len(pattern.replace("*", "").replace("?", ""))
+        impact_rules.append(ImpactRule(pattern, exact, tuple(sections), reason.strip(), specificity))
+    return document_rules, impact_rules, hashlib.sha256(raw).hexdigest()
+
+
+def _classify_document(path: str, rules: list[Rule]) -> str | None:
+    matches = [rule for rule in rules if rule.matches(path)]
+    if not matches:
+        return None
+    best = max(rule.specificity for rule in matches)
+    winners = [rule for rule in matches if rule.specificity == best]
+    identity = {(rule.classification, rule.canonical_target) for rule in winners}
+    if len(identity) > 1:
+        raise ImpactError(f"merge-base document policy contradicts itself for {path}")
+    return winners[0].classification
+
+
+def _selected_map(path: str, rules: list[ImpactRule]) -> ImpactRule | None:
+    matches = [rule for rule in rules if rule.matches(path)]
+    if not matches:
+        return None
+    best = max(rule.specificity for rule in matches)
+    winners = [rule for rule in matches if rule.specificity == best]
+    if len({(rule.sections, rule.reason) for rule in winners}) > 1:
+        raise ImpactError(f"merge-base impact_map has contradictory rules for {path}")
+    return winners[0]
+
+
+
+def _section_for_id(root: str, base: str, head: str, section_id: str) -> tuple[Section | None, bool]:
+    path = section_id.split("#", 1)[0]
+    for revision, is_head in ((head, True), (base, False)):
+        blob = _read_blob(root, revision, path)
+        if blob is None:
+            continue
+        try:
+            sections = extract_sections(path, blob.decode("utf-8"))
+        except (UnicodeDecodeError, ValueError, RuntimeError):
+            return None, False
+        found = next((section for section in sections if section.section_id == section_id), None)
+        if found is not None:
+            return found, is_head
+    return None, False
+
+
+def _is_checker_path(path: str) -> bool:
+    return any(fnmatch.fnmatchcase(path, pattern) for pattern in CHECKER_PATTERNS)
+
+
+def _is_relevant_source(path: str) -> bool:
+    return path in RELEVANT_SOURCE_FILES or path.startswith(RELEVANT_SOURCE_PREFIXES)
+
+
+
+
+def analyze(root: str, base_ref: str, head_ref: str) -> dict[str, Any]:
+    """Analyze a commit range using merge-base policy and NUL-safe Git paths."""
+    root = os.path.abspath(root)
+    base = _resolve_commit(root, base_ref, "base")
+    head = _resolve_commit(root, head_ref, "head")
+    merge_base = _git(root, "merge-base", base, head).decode("ascii", "strict").strip().lower()
+    if not re.fullmatch(r"[0-9a-f]{40,64}", merge_base):
+        raise ImpactError("git merge-base did not return a commit")
+    changes = _parse_name_status(_git(root, "diff", "--name-status", "-z", "--find-renames", merge_base, head))
+    policy_bytes = _read_blob(root, merge_base, POLICY_PATH)
     if policy_bytes is None:
-        raise PolicyError(f"Contracts policy file '{contracts_path}' not found at merge base commit {merge_base[:8]}")
+        raise ImpactError(f"merge-base has no {POLICY_PATH}; refusing to analyze with head policy")
+    document_rules, impact_rules, policy_sha = _parse_policy(policy_bytes)
+    policy_changed = _read_blob(root, head, POLICY_PATH) != policy_bytes
+    paths = sorted({path for change in changes for path in (change.old_path, change.new_path) if path is not None})
 
-    policy = ContractPolicy(contracts_path, content_bytes=policy_bytes)
-
-    # 2. Get file changes
-    changes = parse_git_diff_name_status(root_dir, merge_base, head_commit)
-
-    policy_tampering = False
-    checker_code_changed = False
-    affected_doc_sections = {}  # doc_rel_path -> set of section_ids
-    source_reasons = {}  # doc_rel_path -> list of reasons
-    unknown_scope_files = []
-    changed_doc_files = set()
-    changed_source_files = set()
-
-    for change in changes:
-        path = change["path"]
-        old_path = change["old_path"]
-        endpoints = [path]
-        if old_path:
-            endpoints.append(old_path)
-
-        # Check policy and checker tampering
-        for ep in endpoints:
-            if ep == contracts_path or ep.startswith("docs/contracts.toml"):
-                policy_tampering = True
-            if ep in POLICY_AND_CHECKER_PATHS or ep.startswith("scripts/doc_tools/"):
-                checker_code_changed = True
-
-        # Check if change is a doc file or source file
-        for ep in endpoints:
-            rule = policy.classify(ep)
-            if rule and rule.classification in ("maintained", "canonical_alias"):
-                changed_doc_files.add(ep)
+    unknown: list[dict[str, str]] = []
+    source_reasons: list[dict[str, Any]] = []
+    mapped_sections: dict[str, set[str]] = {}
+    reviewable_paths: set[str] = set()
+    for path in paths:
+        if path.lower().endswith(".md"):
+            classification = _classify_document(path, document_rules)
+            if classification not in ("maintained", "canonical_alias"):
+                unknown.append({"path": path, "reason": "changed Markdown is not maintained by the merge-base documentation policy"})
+            elif any(
+                change.status[0] in ("R", "D") and path in (change.old_path, change.new_path)
+                for change in changes
+            ):
+                unknown.append({"path": path, "reason": "Markdown rename or deletion requires raw review"})
+            continue
+        if _is_checker_path(path) or path == POLICY_PATH:
+            reviewable_paths.add(path)
+        if _is_relevant_source(path):
+            reviewable_paths.add(path)
+            if any(
+                change.status[0] in ("R", "D") and path in (change.old_path, change.new_path)
+                for change in changes
+            ):
+                unknown.append({"path": path, "reason": "relevant source rename or deletion requires raw review"})
+            rule = _selected_map(path, impact_rules)
+            if rule is None:
+                unknown.append({"path": path, "reason": "relevant source path has no merge-base impact_map rule"})
+                source_reasons.append({"path": path, "reason": "unmapped relevant source path", "sections": [], "mapped": False})
             else:
-                changed_source_files.add(ep)
+                mapped = bool(rule.sections)
+                source_reasons.append({"path": path, "reason": rule.reason, "sections": list(rule.sections), "mapped": mapped})
+                for section_id in rule.sections:
+                    mapped_sections.setdefault(section_id, set()).add(path)
+                if not mapped:
+                    unknown.append({"path": path, "reason": rule.reason})
+        elif not _is_checker_path(path) and path != POLICY_PATH:
+            reviewable_paths.add(path)
+            unknown.append({"path": path, "reason": "changed non-Markdown input has no documentation impact classification"})
 
-            # Map source file through source_mappings
-            mapped = False
-            for sm in policy.source_mappings:
-                if sm.matches(ep):
-                    mapped = True
-                    for target_doc in sm.target_docs:
-                        if target_doc not in affected_doc_sections:
-                            affected_doc_sections[target_doc] = set()
-                            source_reasons[target_doc] = []
-                        affected_doc_sections[target_doc].update(sm.target_sections)
-                        if sm.reason and sm.reason not in source_reasons[target_doc]:
-                            source_reasons[target_doc].append(sm.reason)
+    affected: dict[str, Section] = {}
 
-            # If an unmapped source file changed (and not a classified doc file, fixture, historical, or policy file)
-            is_doc = rule and rule.classification in ("maintained", "canonical_alias", "historical", "fixture", "vendored")
-            if not mapped and not is_doc:
-                if ep not in unknown_scope_files:
-                    unknown_scope_files.append(ep)
-
-    # Convert sets to sorted lists for deterministic output
-    formatted_affected = {}
-    for doc_path, sections in sorted(affected_doc_sections.items()):
-        formatted_affected[doc_path] = {
-            "sections": sorted(list(sections)),
-            "reasons": sorted(source_reasons.get(doc_path, [])),
+    def record_section(section: Section, source_path: str | None, prefer: bool) -> None:
+        previous = affected.get(section.section_id)
+        source_paths = set(section.source_paths)
+        if previous is not None:
+            source_paths.update(previous.source_paths)
+        if source_path is not None:
+            source_paths.add(source_path)
+        section.source_paths = sorted(source_paths)
+        if previous is None or prefer:
+            affected[section.section_id] = section
+    for change in changes:
+        old_path, new_path = change.old_path, change.new_path
+        if not any(path and path.lower().endswith(".md") for path in (old_path, new_path)):
+            continue
+        old_blob = _read_blob(root, merge_base, old_path)
+        new_blob = _read_blob(root, head, new_path)
+        try:
+            old_text = old_blob.decode("utf-8") if old_blob is not None else ""
+            new_text = new_blob.decode("utf-8") if new_blob is not None else ""
+            old_sections = extract_sections(old_path, old_text) if old_path and old_blob is not None else []
+            new_sections = extract_sections(new_path, new_text) if new_path and new_blob is not None else []
+        except (UnicodeDecodeError, ValueError, RuntimeError) as error:
+            unknown.append({"path": new_path or old_path or "(unknown)", "reason": f"unsupported Markdown input: {error}"})
+            continue
+        old_changed, new_changed = changed_line_sets(old_text, new_text)
+        if not old_changed and not new_changed and change.status.startswith("R"):
+            old_changed.update(range(1, len(old_text.splitlines()) + 1))
+            new_changed.update(range(1, len(new_text.splitlines()) + 1))
+        old_affected = deepest_sections_for_lines(old_sections, old_changed)
+        old_affected_ids = {section.section_id for section in old_affected}
+        new_affected = {
+            section.section_id: section
+            for section in deepest_sections_for_lines(new_sections, new_changed)
         }
+        for section in old_affected:
+            record_section(section, old_path or section.path, prefer=False)
+        for section in new_sections:
+            if section.section_id in old_affected_ids:
+                new_affected[section.section_id] = section
+        for section in new_affected.values():
+            record_section(section, new_path or section.path, prefer=True)
 
+    for section_id, source_paths in mapped_sections.items():
+        section, from_head = _section_for_id(root, merge_base, head, section_id)
+        if section is None:
+            unknown.append({"path": section_id.split("#", 1)[0], "reason": f"mapped section {section_id} is missing or unsupported"})
+            continue
+        section.source_paths.extend(sorted(source_paths))
+        record_section(section, None, prefer=from_head)
+        if not from_head:
+            unknown.append({"path": section.path, "reason": f"mapped section {section_id} was deleted or renamed in the head revision"})
+
+    diff_paths = sorted(reviewable_paths)
+    diff_raw = b""
+    if diff_paths:
+        diff_raw = _git(
+            root, "diff", "--no-ext-diff", "--no-color", "--find-renames", "--unified=3",
+            merge_base, head, "--", *diff_paths,
+        )
+    checker_base = _checker_tree(root, merge_base, CHECKER_PATTERNS)
+    checker_head = _checker_tree(root, head, CHECKER_PATTERNS)
+    checker_changed_paths = sorted(
+        path for path in set(checker_base) | set(checker_head)
+        if checker_base.get(path) != checker_head.get(path)
+    )
+    checker_base_sha, checker_head_sha = _checker_digest(checker_base), _checker_digest(checker_head)
+    affected_document_paths = sorted(
+        {path for change in changes for path in (change.old_path, change.new_path)
+         if path is not None and path.lower().endswith(".md")}
+        | {section.path for section in affected.values()}
+    )
     return {
-        "merge_base": merge_base,
-        "head_commit": head_commit,
-        "changes": changes,
-        "policy_tampering": policy_tampering,
-        "checker_code_changed": checker_code_changed,
-        "changed_doc_files": sorted(list(changed_doc_files)),
-        "changed_source_files": sorted(list(changed_source_files)),
-        "affected_doc_sections": formatted_affected,
-        "unknown_scope_files": sorted(unknown_scope_files),
-        "policy": policy,
+        "revisions": {"base": base, "head": head, "merge_base": merge_base},
+        "changes": [asdict(change) for change in changes],
+        "changed_paths": paths,
+        "policy": {
+            "path": POLICY_PATH,
+            "source_revision": merge_base,
+            "sha256": policy_sha,
+            "changed_at_head": policy_changed,
+            "impact_map_present_at_base": bool(impact_rules),
+        },
+        "checker": {
+            "paths": list(CHECKER_PATTERNS),
+            "changed_paths": checker_changed_paths,
+            "base_sha256": checker_base_sha,
+            "head_sha256": checker_head_sha,
+            "unchanged": checker_base_sha == checker_head_sha,
+        },
+        "inputs": {
+            "head_tree": _tree_identity(root, head),
+            "diff_sha256": hashlib.sha256(diff_raw).hexdigest(),
+        },
+        "checkout": _checkout_identity(root, head),
+        "source_path_reasons": sorted(source_reasons, key=lambda item: item["path"]),
+        "affected_sections": [affected[key].as_dict() for key in sorted(affected)],
+        "affected_document_paths": affected_document_paths,
+        "unknown_scope": sorted(unknown, key=lambda item: (item["path"], item["reason"])),
+        "reviewable_paths": diff_paths,
+        "source_diff": diff_raw.decode("utf-8", "replace"),
     }
+
+
+def full_document_inputs(root: str, analysis: dict[str, Any]) -> list[dict[str, str]]:
+    """Return complete affected-document text for raw-input byte comparisons."""
+    root = os.path.abspath(root)
+    head = analysis["revisions"]["head"]
+    merge_base = analysis["revisions"]["merge_base"]
+    result = []
+    for path in analysis.get("affected_document_paths", []):
+        revision = head
+        raw = _read_blob(root, head, path)
+        if raw is None:
+            revision = merge_base
+            raw = _read_blob(root, merge_base, path)
+        if raw is None:
+            continue
+        result.append(
+            {
+                "path": path,
+                "revision": revision,
+                "sha256": hashlib.sha256(raw).hexdigest(),
+                "content": raw.decode("utf-8", "replace"),
+            }
+        )
+    return result

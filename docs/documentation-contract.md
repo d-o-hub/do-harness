@@ -81,6 +81,68 @@ both the `verification` and `release` signal sets. `docs-sync` runs
 `python3 scripts/docs.py links --check`; each carries a `fix` hint that the
 harness prints with a failing verdict.
 
+## Impact analysis and review packets
+
+`python3 scripts/docs.py impact --base REV --head REV --format json` emits a
+versioned mechanical report and a separate reviewer packet. `[[impact_map]]`
+entries in `contracts.toml` map relevant source paths to maintained Markdown
+heading IDs and give each mapping a reason. The analyzer resolves the merge-base
+and loads the policy from that revision; a policy edit in the head cannot erase
+the obligations established by the base policy.
+
+The report records resolved revisions and tree identity, policy/checker/input
+digests, changed paths and source reasons, mechanical findings, generated-region
+equality, verified example IDs, affected-section metadata and rationale
+obligations, unknown scope, and local artifact references/digests.
+It makes no LLM or network calls. No external CI artifact is accepted as
+evidence. In particular, `verify.yml`'s `docs-sync-diff` upload is failure-only
+diagnostic text whose payload has no machine-readable binding to a workflow
+check, exact revision, checker identity, or content digest; it cannot authorize
+omission. Only local checks on an exact clean head checkout can do so. Missing,
+changed, or untrusted checkers and incomplete inputs keep generated text visible.
+
+Each mapped source/section pair is a `source_section_obligation`. If the
+section text is unchanged between the merge-base and head, the report marks
+`needs_human_rationale`; this is a review obligation, not a mechanical failure
+or a demand for a meaningless Markdown edit. An optional JSON file can record a
+section-specific rationale:
+
+<!-- example: id=impact-ack-invocation classification=illustrative reason="Revision and file values are supplied by the caller." -->
+```bash
+python3 scripts/docs.py impact --base BASE --head HEAD --format json \
+  --acknowledgments /path/outside/the/checkout/acknowledgments.json
+```
+
+The file has `schema_version: 1` and an `acknowledgments` array. Each entry must
+name `source_path`, `section_id`, and a non-empty `rationale`, plus exact
+`source_revision`/`source_sha256`, `document_revision`/`document_sha256`/
+`document_section_sha256`, and `base_document_revision`/
+`base_document_sha256`/`base_document_section_sha256` values copied from the
+report's obligation identity. The CLI independently resolves those revisions
+and digests from Git objects; stale identities, changed prose, or unmapped
+sections are errors. The report hashes the caller-supplied file and labels the
+rationale as such; it is not proof of semantic correctness and does not replace
+code review.
+
+Generated equality proves byte-for-byte synchronization only, not that prose
+or behavior is semantically correct. `docs-examples` verifies only declared
+fixtures and parser-check-only examples; it does not establish that an example
+is the right guidance. Unmapped source paths, changed policy/checker/generator
+or fixture assertions, missing sections, renames/deletions, and unsupported
+Markdown require raw review. The packet is a companion to the complete code
+review and never removes code units from `do-harness pr review`.
+
+The packet has a 24,000-byte ceiling. It is never truncated: an oversized or
+incomplete packet reports an explicit fallback to the raw documentation diff
+and full code review. PR triage consumes it only for the exact reviewed
+revisions, with trusted checks, and when it is strictly smaller than the
+equivalent full-document input; otherwise triage uses the raw input.
+`scripts/docs-review-benchmark.py` reports candidate packet bytes and effective
+review-input bytes, counting raw input for every fallback case. It measures
+process/tool calls over generated-only, narrative-only, mixed, rename/delete,
+policy-tampering, and unmapped fixtures; it reports tokens only with a named
+tokenizer.
+
 ## What a green check does not prove
 
 - `docs-links` proves target and anchor existence only. It never fetches

@@ -34,24 +34,25 @@ performs the same probe and reports which binary it found; substitute
 | No effect | `do-harness pr no-effect PR --format json` | `scripts/no-effect.sh PR` |
 | Review input | `do-harness pr review PR --format json` | `gh pr diff PR` |
 | Recompute | `do-harness pr review PR --recompute` | n/a |
-| Docs impact packet | `python3 scripts/docs.py impact --base BASE --head HEAD --format packet` | `gh pr diff PR` |
+| Documentation impact | `python3 scripts/docs.py impact --base BASE --head HEAD --format json` | `gh pr diff PR` |
+
+Use the documentation packet only when all freshness and size gates pass:
+`revisions.base` equals the current PR base SHA, `revisions.head` equals the PR
+head SHA, `revisions.merge_base` equals the resolved base/head merge-base,
+`reviewer_packet.status` is `complete`, `reviewer_packet.complete` is true,
+all local mechanical checks are trusted, and `reviewer_packet.bytes` is less
+than `reviewer_packet.raw_equivalent_bytes`. Otherwise review the raw
+documentation diff. The report records the merge-base policy and checker/input
+identities; never substitute head policy or external artifact claims. This
+packet is only documentation context: continue the complete
+`do-harness pr review` / raw code review path, and never remove or skip code
+units based on it.
+
 
 `pr review` returns the semantic residual: changed units that evidence could not
 prove, with minimal context and an audit list of skipped (proven) units. Review
 only the residual units. If `false_proven` guards or parse errors appear in the
 output, treat those units as unresolved and escalate.
-
-## Bounded Documentation Review Packets
-
-When documentation or source files mapped to documentation sections change in a PR, `python3 scripts/docs.py impact` produces a bounded companion review packet.
-
-Use the packet only when:
-1. The packet generation completed with zero errors and mechanical checks pass (`generated_section_equality`, `examples_ok`, `links_ok`).
-2. The packet is fresh for the current PR `head_commit` and `merge_base`.
-3. The packet size in bytes is strictly smaller than the equivalent raw documentation diff.
-4. No overflow warning or policy/checker tampering warning is present.
-
-If any uncertainty, overflow, tampering warning, or mechanical failure arises, fall back immediately to the original raw documentation diff context. Do not weaken `pr review` proof rules or add `**/*.md` exemptions to `.github/pr-gate.toml`.
 
 Check `measurement.verdict` before using the residual: review the residual only
 when it is `reduced`; on `no-go` the residual is not smaller than the raw diff,
