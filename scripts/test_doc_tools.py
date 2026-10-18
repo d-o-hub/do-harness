@@ -25,8 +25,9 @@ from doc_tools.inventory import (
     _get_git_files,
     discover_documents,
 )
+from doc_tools.links import normalize_github_link
 from doc_tools.markdown import MarkdownDocument, slugify_heading
-from docs import LinkChecker, main as docs_main, normalize_github_link
+from docs import LinkChecker, main as docs_main
 
 README_POLICY = 'version = 1\n[[rules]]\npath="README.md"\nclassification="maintained"\nreason="Root"\n'
 
@@ -642,6 +643,88 @@ class TestDocsChecksCanFail(unittest.TestCase):
                     self.assert_check_failed(result, "cargo not found on PATH")
                     self.assertEqual(result.returncode, 2, result.stderr)
 
+
+
+class TestDocsImpactAndReport(unittest.TestCase):
+    def setUp(self):
+        if shutil.which("git") is None:
+            self.skipTest("git is required for docs impact tests")
+        self.tmp = tempfile.TemporaryDirectory()
+        self.repo = os.path.join(self.tmp.name, "repo")
+        os.makedirs(self.repo)
+
+        def run_git(*args):
+            subprocess.run(["git", "-C", self.repo, *args], check=True, capture_output=True)  # nosec B603 B607
+
+        run_git("init")
+        run_git("config", "user.name", "Test User")
+        run_git("config", "user.email", "test@example.com")
+
+        os.makedirs(os.path.join(self.repo, "docs"))
+        os.makedirs(os.path.join(self.repo, "src"))
+
+        contracts_toml = """version = 1
+[[rules]]
+path = "README.md"
+classification = "maintained"
+reason = "Root"
+
+[[rules]]
+glob = "docs/*.md"
+classification = "maintained"
+reason = "Docs"
+
+[[source_mappings]]
+glob = "src/cli*"
+target_docs = ["docs/cli.md", "README.md"]
+target_sections = ["cli-reference", "commands"]
+reason = "CLI definitions"
+"""
+        write_file(os.path.join(self.repo, "docs", "contracts.toml"), contracts_toml)
+        write_file(os.path.join(self.repo, "README.md"), "# Title\n\n## Commands\nCommands here.\n")
+        write_file(os.path.join(self.repo, "docs", "cli.md"), "# CLI\n\n## cli-reference\nCLI ref here.\n")
+        write_file(os.path.join(self.repo, "src", "cli_main.py"), "print('hi')\n")
+
+        run_git("add", ".")
+        run_git("commit", "-m", "Initial commit")
+
+        res = subprocess.run(["git", "-C", self.repo, "rev-parse", "HEAD"], capture_output=True, text=True, check=True)  # nosec B603 B607
+        self.base_commit = res.stdout.strip()
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def run_git(self, *args):
+        subprocess.run(["git", "-C", self.repo, *args], check=True, capture_output=True)  # nosec B603 B607
+
+    def get_head_commit(self):
+        res = subprocess.run(["git", "-C", self.repo, "rev-parse", "HEAD"], capture_output=True, text=True, check=True)  # nosec B603 B607
+        return res.stdout.strip()
+
+    def test_impact_analysis_mapped_source_change(self):
+        from doc_tools.impact import analyze_impact
+        write_file(os.path.join(self.repo, "src", "cli_main.py"), "print('hello world')\n")
+        self.run_git("add", ".")
+        self.run_git("commit", "-m", "Update source")
+        head_commit = self.get_head_commit()
+
+        impact = analyze_impact(self.repo, self.base_commit, head_commit)
+        self.assertEqual(impact["changed_source_files"], ["src/cli_main.py"])
+        self.assertIn("docs/cli.md", impact["affected_doc_sections"])
+        self.assertIn("README.md", impact["affected_doc_sections"])
+        self.assertFalse(impact["policy_tampering"])
+
+    def test_report_and_packet_generation(self):
+        from doc_tools.report import build_doc_report_and_packet
+        write_file(os.path.join(self.repo, "README.md"), "# Title\n\n## Commands\nUpdated commands.\n")
+        self.run_git("add", ".")
+        self.run_git("commit", "-m", "Update docs")
+        head_commit = self.get_head_commit()
+
+        report, packet_text = build_doc_report_and_packet(self.repo, self.base_commit, head_commit)
+        self.assertEqual(report["version"], 1)
+        self.assertEqual(report["impact"]["changed_doc_files"], ["README.md"])
+        self.assertIn("=== DOCS SEMANTIC REVIEW PACKET ===", packet_text)
 
 
 if __name__ == "__main__":
