@@ -132,6 +132,29 @@ fn test_cli_commands_and_required_options() {
     }
 }
 
+/// `errors clear` takes the signature through `--sensor`, so its about must name
+/// that flag: the wording used to be `(e.g. `sensor:<name>`)`, which reads as a
+/// positional and ends in `error: unexpected argument 'sensor:x' found` (#340).
+///
+/// The assertion is scoped to the about line deliberately: `--sensor` also
+/// appears in the options table, so a whole-output `contains` would pass even
+/// with the bug present.
+#[test]
+fn test_errors_clear_about_names_the_sensor_flag() {
+    let (code, stdout, stderr) = run_cmd(harness_bin().args(["errors", "clear", "--help"]));
+    assert_eq!(code, Some(0), "errors clear --help failed:\n{stderr}");
+
+    let help = format!("{stdout}\n{stderr}");
+    let about = help
+        .lines()
+        .find(|line| !line.trim().is_empty())
+        .unwrap_or_default();
+    assert!(
+        about.contains("--sensor"),
+        "the `errors clear` about must name the flag that takes the signature, got:\n{about}"
+    );
+}
+
 /// Verifies exit codes classification:
 /// 0: Success
 /// 1: Verification/check failure
