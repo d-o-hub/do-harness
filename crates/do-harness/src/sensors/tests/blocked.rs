@@ -26,11 +26,15 @@ fn blocked_sensor_is_not_executed() {
     assert_eq!(report.sensors[0].exit_code, None);
     assert_eq!(report.sensors[0].duration_ms, 0);
     assert!(report.sensors[0].output.contains("halted"));
-    assert!(report.sensors[0].output.contains("do-harness errors clear --sensor sensor:mark"));
+    assert!(
+        report.sensors[0]
+            .output
+            .contains("do-harness errors clear --sensor sensor:mark")
+    );
     assert!(!dir.path().join("marker").exists());
 }
 
-/// A blocked sensor message includes scope when scope_key is set.
+/// A blocked sensor message includes scope when `scope_key` is set.
 #[test]
 fn blocked_sensor_message_includes_scope() {
     let dir = tempfile::tempdir().expect("tempdir");

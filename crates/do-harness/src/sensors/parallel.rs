@@ -119,7 +119,9 @@ fn run_chunk(
                             cancelled_result(item.spec)
                         }
                         Verdict::Blocked => sensor_blocked(item.spec, opts.scope_key.as_deref()),
-                        Verdict::Quarantined => super::sensor_quarantined(item.spec, opts.scope_key.as_deref()),
+                        Verdict::Quarantined => {
+                            super::sensor_quarantined(item.spec, opts.scope_key.as_deref())
+                        }
                         Verdict::Run => {
                             let result = run_sensor(item.spec, root, cancel, &opts.baselines);
                             if opts.fail_fast && !result.ok && !result.allow_failure {
