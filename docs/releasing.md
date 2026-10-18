@@ -433,8 +433,9 @@ and migration guidance in the release notes. No waiver mechanism is added.
 
 Versions through 0.2.1 used a workspace-local libSQL patch that is removed by
 Cargo packaging. Their registry source installations do not include the
-teardown fix. Until 0.3.0 is published and passes registry validation, direct
-affected users to tested prebuilt artifacts. `--locked` selects packaged
+teardown fix, so direct affected users on those versions to tested prebuilt
+artifacts. 0.3.0 is the first release whose source installs carry the fix, and
+its registry validation passed on musl and Windows. `--locked` selects packaged
 versions; it is not a replacement for publishing fixed dependency code.
 
 Before publication, validate actual normalized archives against an isolated
@@ -570,7 +571,7 @@ missing/unsupported-platform diagnostics.
 | Prebuilt installer | `curl -fsSL .../scripts/install.sh \| sh -s -- --version v0.2.1` | yes (Git Bash) |
 | Release zip | unzip `do-harness-v<version>-x86_64-pc-windows-msvc.zip` | yes |
 | cargo-binstall | `cargo binstall do-harness` | yes |
-| crates.io source build (after 0.3.0 validation) | `cargo install do-harness --version 0.3.0 --locked` | yes |
+| crates.io source build | `cargo install do-harness --version 0.3.0 --locked` | yes |
 | Vendored source | `cargo install --path vendor/do-harness/crates/do-harness` | yes |
 
 Windows has no npm channel: the `do-harness-win32-x64` platform package is
