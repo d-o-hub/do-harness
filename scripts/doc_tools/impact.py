@@ -21,7 +21,6 @@ except ImportError:  # Python 3.10 compatibility matches inventory.py.
     import tomli as tomllib
 
 from doc_tools.git_helpers import (
-    Change,
     ImpactError,
     checker_digest as _checker_digest,
     checker_tree as _checker_tree,

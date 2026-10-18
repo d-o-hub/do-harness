@@ -4,7 +4,7 @@
 import hashlib
 import json
 import os
-import subprocess
+import subprocess  # nosec B404
 import sys
 import tempfile
 import unittest
@@ -117,7 +117,9 @@ class ImpactRepo:
         self._temp.cleanup()
 
     def _git(self, *args):
-        return subprocess.run(["git", *args], cwd=self.root, check=True, capture_output=True, text=True).stdout.strip()
+        return subprocess.run(  # nosec B603 B607
+            ["git", *args], cwd=self.root, check=True, capture_output=True, text=True
+        ).stdout.strip()
 
     def _write(self, rel_path, text):
         path = self.root / rel_path
@@ -147,7 +149,7 @@ class ImpactRepo:
         document_path = section_id.split("#", 1)[0]
 
         def blob(revision, path):
-            return subprocess.run(
+            return subprocess.run(  # nosec B603 B607
                 ["git", "-C", str(self.root), "cat-file", "blob", f"{revision}:{path}"],
                 capture_output=True,
                 check=True,
@@ -422,9 +424,9 @@ class TestImpactAnalysis(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             ack_path = Path(temp) / "acknowledgments.json"
             ack_path.write_text(json.dumps({"schema_version": 1, "acknowledgments": []}), encoding="utf-8")
-            result = subprocess.run(
+            result = subprocess.run(  # nosec B603 B607
                 [
-                    sys.executable,
+                    "python3",
                     str(REPO_ROOT / "scripts" / "docs.py"),
                     "impact",
                     "--base",
@@ -438,6 +440,7 @@ class TestImpactAnalysis(unittest.TestCase):
                     "--acknowledgments",
                     str(ack_path),
                 ],
+                executable=sys.executable,
                 cwd=REPO_ROOT,
                 capture_output=True,
                 text=True,
