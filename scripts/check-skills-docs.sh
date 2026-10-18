@@ -160,12 +160,12 @@ if [[ "$failures" -ne 0 ]]; then
     exit 1
 fi
 
-# Offline document verification: the doc-tool unit tests (slug/anchor/link
-# semantics) and then the maintained-document link/anchor check. Both need
-# python3 + markdown-it-py (scripts/requirements-docs.txt). A missing parser
-# is a FAIL under required tools and a SKIP otherwise, and the `SKIP:` marker
-# must start its line: the sensor runner flags warned runs by trimmed line
-# starts, so a prefixed marker would silently read as a pass.
+# Offline documentation verification: tests cover inventory, Markdown,
+# impact mapping/packet boundaries, and example contracts; the benchmark
+# prints packet-byte and local process-call measurements.
+# A missing parser is a FAIL under required tools and a SKIP otherwise. The
+# SKIP marker must start its line because the sensor runner matches trimmed
+# line starts.
 docs_verified=0
 if command -v python3 >/dev/null 2>&1 &&
     { python3 -c "import markdown_it, tomllib" >/dev/null 2>&1 ||
@@ -173,6 +173,9 @@ if command -v python3 >/dev/null 2>&1 &&
     docs_verified=1
     python3 "$ROOT/scripts/test_doc_tools.py" || failures=1
     python3 "$ROOT/scripts/tests/test_examples.py" || failures=1
+    python3 "$ROOT/scripts/tests/test_doc_impact.py" || failures=1
+    python3 "$ROOT/scripts/tests/test_docs_review_benchmark.py" || failures=1
+    python3 "$ROOT/scripts/docs-review-benchmark.py" || failures=1
     python3 "$ROOT/scripts/docs.py" links --check || failures=1
     python3 "$ROOT/scripts/docs.py" examples --check || failures=1
 else

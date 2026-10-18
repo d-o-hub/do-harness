@@ -99,54 +99,16 @@ class Rule:
         return bool(self.regex.match(norm_path))
 
 
-class SourceMapping:
-    def __init__(self, raw_dict, index):
-        self.raw = raw_dict
-        self.index = index
-        self.glob = raw_dict.get("glob")
-        self.path = raw_dict.get("path")
-        if not self.glob and not self.path:
-            raise PolicyError(f"Source mapping #{index} must specify 'glob' or 'path'")
-
-        self.target_docs = [
-            os.path.normpath(d).replace("\\", "/") for d in raw_dict.get("target_docs", [])
-        ]
-        self.target_sections = raw_dict.get("target_sections", [])
-        self.reason = raw_dict.get("reason", "").strip()
-
-        pattern = self.path or self.glob
-        norm_pat = os.path.normpath(pattern).replace("\\", "/")
-        parts = norm_pat.split("**")
-        regex_parts = []
-        for part in parts:
-            sub_parts = part.split("*")
-            escaped_sub = [re.escape(s).replace(r"\?", "[^/]") for s in sub_parts]
-            regex_parts.append(".*".join(escaped_sub))
-
-        full_regex = ".*".join(regex_parts)
-        self.regex = re.compile(f"^{full_regex}$", re.IGNORECASE)
-
-    def matches(self, rel_path):
-        norm_path = os.path.normpath(rel_path).replace("\\", "/")
-        return bool(self.regex.match(norm_path))
-
-
 class ContractPolicy:
-    def __init__(self, contracts_path, content_bytes=None):
+    def __init__(self, contracts_path):
         self.contracts_path = contracts_path
-        if content_bytes is not None:
-            try:
-                data = tomllib.loads(content_bytes.decode("utf-8"))
-            except Exception as e:
-                raise PolicyError(f"Failed to parse policy TOML content: {e}")
-        else:
-            if not os.path.exists(contracts_path):
-                raise PolicyError(f"Contracts policy file not found: {contracts_path}")
-            try:
-                with open(contracts_path, "rb") as f:
-                    data = tomllib.load(f)
-            except Exception as e:
-                raise PolicyError(f"Failed to parse policy TOML at {contracts_path}: {e}")
+        if not os.path.exists(contracts_path):
+            raise PolicyError(f"Contracts policy file not found: {contracts_path}")
+        try:
+            with open(contracts_path, "rb") as f:
+                data = tomllib.load(f)
+        except Exception as e:
+            raise PolicyError(f"Failed to parse policy TOML at {contracts_path}: {e}")
 
         version = data.get("version")
         if version != 1:
@@ -157,9 +119,6 @@ class ContractPolicy:
             raise PolicyError(f"No rules defined in contracts policy at {contracts_path}")
 
         self.rules = [Rule(r, i + 1) for i, r in enumerate(rules_data)]
-
-        source_mappings_data = data.get("source_mappings", [])
-        self.source_mappings = [SourceMapping(m, i + 1) for i, m in enumerate(source_mappings_data)]
 
     def classify(self, rel_path):
         norm_path = os.path.normpath(rel_path).replace("\\", "/")

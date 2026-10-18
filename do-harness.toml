@@ -83,7 +83,35 @@ when-changed = [".agents/skills/**", "crates/do-harness/templates/skills/**", "s
 # adding/renaming/removing a skill; CI runs the plain check.
 name = "skills-docs"
 argv = ["bash", "scripts/check-skills-docs.sh"]
-when-changed = [".agents/skills/**", "docs/**", "README.md", "AGENTS.md", "SECURITY.md", "**/README.md", "scripts/check-skills-docs.sh", "scripts/docs.py", "scripts/doc_tools/**", "scripts/test_doc_tools.py", "scripts/tests/**", "tests/fixtures/doc_tools/**", "tests/fixtures/docs-examples/**", "scripts/requirements-docs.txt"]
+when-changed = [
+    ".agents/skills/**",
+    "docs/**",
+    "**/*.md",
+    "README.md",
+    "AGENTS.md",
+    "SECURITY.md",
+    "**/README.md",
+    "crates/do-harness/src/**",
+    "crates/do-harness/templates/**",
+    "crates/**/Cargo.toml",
+    "crates/**/build.rs",
+    "Cargo.toml",
+    "Cargo.lock",
+    ".cargo/**",
+    "rust-toolchain.toml",
+    "do-harness.toml",
+    ".github/workflows/**",
+    "scripts/check-skills-docs.sh",
+    "scripts/docs.py",
+    "scripts/docs-review-benchmark.py",
+    "scripts/doc_tools/**",
+    "scripts/test_doc_tools.py",
+    "scripts/tests/**",
+    "tests/fixtures/cli-contract.json",
+    "tests/fixtures/doc_tools/**",
+    "tests/fixtures/docs-examples/**",
+    "scripts/requirements-docs.txt",
+]
 
 [[sensors]]
 name = "deps"

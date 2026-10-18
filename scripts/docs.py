@@ -6,6 +6,7 @@ Usage:
   python3 scripts/docs.py links --check [--root ROOT] [--contracts CONTRACTS] [--mode local|ci]
   python3 scripts/docs.py inventory [--root ROOT] [--contracts CONTRACTS] [--mode local|ci]
   python3 scripts/docs.py sync --check|--write [--root ROOT]
+  python3 scripts/docs.py impact --base REV --head REV --format json [--root ROOT] [--acknowledgments JSON]
 """
 
 import argparse
@@ -42,12 +43,15 @@ def main():
     sync_parser.add_argument("--write", action="store_true", help="Rewrite out-of-date blocks in place (refused while CI is set)")
     sync_parser.add_argument("--root", default=".", help="Root directory of repository")
 
-    impact_parser = subparsers.add_parser("impact", help="Perform deterministic docs impact analysis and emit review packets")
-    impact_parser.add_argument("--base", required=True, help="Base revision/branch or merge base commit")
-    impact_parser.add_argument("--head", required=True, help="Head revision/branch or commit")
-    impact_parser.add_argument("--format", choices=["json", "text", "packet"], default="json", help="Output format (default: json)")
+    impact_parser = subparsers.add_parser("impact", help="Analyze documentation impact and emit a bounded review packet")
+    impact_parser.add_argument("--base", required=True, help="Base revision used to resolve the merge-base policy")
+    impact_parser.add_argument("--head", required=True, help="Head commit to analyze")
+    impact_parser.add_argument("--format", choices=["json"], default="json", help="Machine-readable report format")
     impact_parser.add_argument("--root", default=".", help="Root directory of repository")
-    impact_parser.add_argument("--contracts", default="docs/contracts.toml", help="Path to contracts policy file")
+    impact_parser.add_argument(
+        "--acknowledgments",
+        help="Optional JSON file of source-section rationales bound to exact commit and content digests",
+    )
 
     args = parser.parse_args()
 
@@ -62,6 +66,24 @@ def main():
     if args.subcommand == "examples":
         ok = examples.verify_examples(root_dir=root_dir)
         sys.exit(0 if ok else 1)
+
+    if args.subcommand == "impact":
+        from doc_tools import impact, report
+
+        try:
+            analysis = impact.analyze(root_dir, args.base, args.head)
+            result = report.build_report(root_dir, analysis, acknowledgments_path=args.acknowledgments)
+            print(report.serialize_report(result), end="")
+            sys.exit(0)
+        except impact.ImpactError as error:
+            print(f"Impact analysis failed: {error}", file=sys.stderr)
+            sys.exit(2)
+        except report.acknowledgments.AcknowledgmentError as error:
+            print(f"Impact acknowledgment failed: {error}", file=sys.stderr)
+            sys.exit(2)
+        except Exception as error:
+            print(f"Impact report failed: {error}", file=sys.stderr)
+            sys.exit(1)
 
     contracts_path = os.path.join(root_dir, args.contracts) if not os.path.isabs(args.contracts) else args.contracts
 
@@ -79,32 +101,6 @@ def main():
             print(f"Inventory failure: {e}", file=sys.stderr)
             sys.exit(1)
 
-    if args.subcommand == "impact":
-        from doc_tools.report import build_doc_report_and_packet
-        try:
-            report, packet_text = build_doc_report_and_packet(
-                root_dir=root_dir,
-                base_rev=args.base,
-                head_rev=args.head,
-                contracts_path=args.contracts,
-            )
-            if args.format == "json":
-                import json
-                # Strip policy object before serializing
-                report_out = dict(report)
-                print(json.dumps(report_out, indent=2))
-            elif args.format == "packet":
-                print(packet_text)
-            else:
-                print(f"Base: {report['revisions']['base_rev']} ({report['revisions']['merge_base'][:8]})")
-                print(f"Head: {report['revisions']['head_rev']} ({report['revisions']['head_commit'][:8]})")
-                print(f"Mechanical Status: {'PASS' if not report['mechanical']['findings'] else 'FAIL'}")
-                print(f"Affected Docs: {len(report['impact']['affected_doc_sections'])}")
-                print(f"Packet Size: {report['packet_summary']['packet_bytes']} bytes")
-            sys.exit(0)
-        except Exception as e:
-            print(f"Impact analysis error: {e}", file=sys.stderr)
-            sys.exit(1)
 
     if args.subcommand == "links":
         checker = LinkChecker(root_dir=root_dir, contracts_path=contracts_path, mode=args.mode)

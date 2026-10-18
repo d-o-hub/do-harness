@@ -85,47 +85,57 @@ glob = ".github/*.md"
 classification = "maintained"
 reason = "GitHub workflow templates and guidelines."
 
-# Explicit source-to-section mappings for documentation impact routing.
-# Maps source paths to affected documentation files and heading section anchors/slugs.
+[[impact_map]]
+path = "crates/do-harness/src/cli.rs"
+sections = ["README.md#commands", "docs/cli.md#subcommands"]
+reason = "Clap command definitions drive the CLI reference and README command table."
 
-[[source_mappings]]
-glob = "crates/do-harness/src/cli*"
-target_docs = ["docs/cli.md", "README.md"]
-target_sections = ["cli-reference", "commands", "usage"]
-reason = "CLI command structure and subcommand definitions."
+[[impact_map]]
+glob = "crates/do-harness/src/cli/**"
+sections = ["README.md#commands", "docs/cli.md#subcommands"]
+reason = "CLI command modules can change documented command behavior."
 
-[[source_mappings]]
-glob = "src/cli*"
-target_docs = ["docs/cli.md", "README.md"]
-target_sections = ["cli-reference", "commands", "usage"]
-reason = "CLI command structure and subcommand definitions."
+[[impact_map]]
+path = "crates/do-harness/src/init.rs"
+sections = ["README.md#use-in-another-repo", "docs/adoption.md#initialize-the-repository", "docs/adoption.md#configure-sensors-for-your-stack"]
+reason = "Initialization behavior defines the adoption quickstart and generated configuration."
 
-[[source_mappings]]
-glob = "crates/do-harness/src/init*"
-target_docs = ["docs/adoption.md", "README.md"]
-target_sections = ["quickstart", "adoption", "init"]
-reason = "Project initialization and adoption workflow."
+[[impact_map]]
+glob = "crates/do-harness/src/init/**"
+sections = ["README.md#use-in-another-repo", "docs/adoption.md#initialize-the-repository", "docs/adoption.md#configure-sensors-for-your-stack"]
+reason = "Initialization modules define the adoption quickstart and generated configuration."
 
-[[source_mappings]]
+[[impact_map]]
 glob = "crates/do-harness/templates/**"
-target_docs = ["docs/adoption.md", "README.md"]
-target_sections = ["quickstart", "templates", "adoption"]
-reason = "Scaffold templates for project setup."
+sections = ["README.md#use-in-another-repo", "docs/adoption.md#initialize-the-repository", "docs/adoption.md#configure-sensors-for-your-stack", "docs/adoption.md#ci-snippets"]
+reason = "Scaffold templates are part of the documented adoption and CI contract."
 
-[[source_mappings]]
-glob = "do-harness.toml"
-target_docs = ["docs/documentation-contract.md", "README.md"]
-target_sections = ["verification", "ci", "sensors"]
-reason = "Sensor and workflow configuration."
+[[impact_map]]
+path = "do-harness.toml"
+sections = ["README.md#ci", "docs/adoption.md#ci-snippets", "AGENTS.md#4-cli-tool-protocol--guardrails"]
+reason = "Sensor and signal-set configuration determines the documented verification gates."
 
-[[source_mappings]]
+[[impact_map]]
 glob = ".github/workflows/**"
-target_docs = ["docs/documentation-contract.md", "README.md"]
-target_sections = ["verification", "ci"]
-reason = "CI workflow definitions."
+sections = ["README.md#ci", "docs/adoption.md#ci-snippets", "AGENTS.md#4-cli-tool-protocol--guardrails"]
+reason = "Workflow wiring is part of the documented CI contract."
 
-[[source_mappings]]
-glob = "crates/do-harness/src/pr/review.rs"
-target_docs = ["docs/cli.md", "README.md"]
-target_sections = ["json-examples", "pr-review", "reports"]
-reason = "Report serialization and PR review output."
+[[impact_map]]
+path = "crates/do-harness/src/report.rs"
+sections = ["README.md#json-output", "docs/cli.md#verify", "docs/adoption.md#the-agent-loop"]
+reason = "Serialized verification reports are represented by the JSON output examples."
+
+[[impact_map]]
+path = "crates/do-harness/src/pr/review.rs"
+sections = ["README.md#json-output", "docs/cli.md#pr-review"]
+reason = "PR review report serialization is represented by the JSON and command reference."
+
+[[impact_map]]
+glob = "crates/do-harness/src/evidence/**"
+sections = ["README.md#json-output", "docs/cli.md#verify", "docs/adoption.md#the-agent-loop"]
+reason = "Evidence serialization affects the documented JSON output and agent loop."
+
+[[impact_map]]
+glob = "crates/do-harness/src/**"
+sections = []
+reason = "Catch-all: unmapped Rust source may affect documented behavior; manual raw review is required."
