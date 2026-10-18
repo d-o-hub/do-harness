@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Can-fail contracts for NUL-safe documentation impact analysis and packets."""
 
+import contextlib
 import hashlib
+import io
 import json
 import os
 import subprocess  # nosec B404
@@ -17,6 +19,7 @@ sys.path.insert(0, str(SCRIPTS))
 
 from doc_tools import impact, report  # noqa: E402
 from doc_tools.sections import extract_sections  # noqa: E402
+from docs import main as docs_main  # noqa: E402
 
 POLICY = '''version = 1
 
@@ -424,30 +427,30 @@ class TestImpactAnalysis(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             ack_path = Path(temp) / "acknowledgments.json"
             ack_path.write_text(json.dumps({"schema_version": 1, "acknowledgments": []}), encoding="utf-8")
-            result = subprocess.run(  # nosec B603 B607
-                [
-                    "python3",
-                    str(REPO_ROOT / "scripts" / "docs.py"),
-                    "impact",
-                    "--base",
-                    self.repo.base,
-                    "--head",
-                    head,
-                    "--format",
-                    "json",
-                    "--root",
-                    str(self.repo.root),
-                    "--acknowledgments",
-                    str(ack_path),
-                ],
-                executable=sys.executable,
-                cwd=REPO_ROOT,
-                capture_output=True,
-                text=True,
-                check=False,
-            )
-        self.assertEqual(result.returncode, 0, result.stderr)
-        report_data = json.loads(result.stdout)
+            # Drive the command entry in-process: the packaged CLI is the same
+            # code path, and a spawned interpreter adds nothing but a Codacy
+            # `subprocess` finding and a second environment to keep clean.
+            argv = [
+                "docs.py",
+                "impact",
+                "--base",
+                self.repo.base,
+                "--head",
+                head,
+                "--format",
+                "json",
+                "--root",
+                str(self.repo.root),
+                "--acknowledgments",
+                str(ack_path),
+            ]
+            output = io.StringIO()
+            with mock.patch.object(sys, "argv", argv):
+                with contextlib.redirect_stdout(output):
+                    with self.assertRaises(SystemExit) as raised:
+                        docs_main()
+        self.assertEqual(raised.exception.code, 0)
+        report_data = json.loads(output.getvalue())
         self.assertEqual(report_data["schema_version"], 1)
         self.assertEqual(report_data["revisions"]["head"], head)
         self.assertFalse(report_data["reviewer_packet"]["complete"])

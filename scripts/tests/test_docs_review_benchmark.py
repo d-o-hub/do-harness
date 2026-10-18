@@ -13,7 +13,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 class TestReviewInputAccounting(unittest.TestCase):
     def test_benchmark_counts_fallback_as_raw_input(self):
         result = subprocess.run(  # nosec B603 B607
-            ["python3", str(REPO_ROOT / "scripts" / "docs-review-benchmark.py")],
+            ["python3", "scripts/docs-review-benchmark.py"],
             executable=sys.executable,
             cwd=REPO_ROOT,
             capture_output=True,
