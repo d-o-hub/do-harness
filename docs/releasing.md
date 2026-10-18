@@ -179,7 +179,8 @@ do-harness --bin do-harness -- completions <shell>` for each shell in
 `completions/` and `do-harness man man` for the man page. `completions_sync.rs`
 and `man_sync.rs` compare the committed copies against the CLI and fail otherwise;
 the man guard normalises only the build fingerprint, so a page still announcing
-an older semver fails there too.
+an older semver fails there too. A version bump needs only the man page: the
+completions change when the CLI surface does, and `prepare` regenerates the page.
 
 1. Apply the version to every managed manifest — `[workspace.package].version` in
    `Cargo.toml`, `Cargo.lock`, `integrations/npm/package.json`, the five
