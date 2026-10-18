@@ -267,11 +267,33 @@ print_json() {
 
 # Rewrites one file through sed, then moves it into place: `sed -i` takes a
 # different argument on GNU and BSD, and `mv` inside the same directory is atomic.
+# `mktemp` creates its file 0600, so the original mode is captured and restored
+# before the move — otherwise every write would quietly leave the manifest
+# owner-only. `stat -c` is GNU, `stat -f` is BSD (macOS).
 substitute() {
-    local expression="$1" file="$2" tmp
+    local expression="$1" file="$2" tmp mode
+    if mode="$(stat -c '%a' "$file" 2>/dev/null)"; then :; else
+        mode="$(stat -f '%Lp' "$file")"
+    fi
     tmp="$(mktemp "${file}.XXXXXX")"
     sed -e "$expression" "$file" >"$tmp"
+    chmod "$mode" "$tmp"
     mv "$tmp" "$file"
+}
+
+# The mode of every manifest `prepare` rewrites, so that a write which changes
+# one is caught by the self-test rather than by the next reader's `ls -l`.
+manifest_modes() {
+    local root="$1" file mode out=""
+    for file in "$root/Cargo.toml" "$root/integrations/npm/package.json" \
+        "$root"/integrations/npm/platforms/*/package.json; do
+        [ -f "$file" ] || continue
+        if mode="$(stat -c '%a' "$file" 2>/dev/null)"; then :; else
+            mode="$(stat -f '%Lp' "$file")"
+        fi
+        out="$out$mode $file"$'\n'
+    done
+    printf '%s' "$out"
 }
 
 prepare_cargo() {
@@ -335,7 +357,7 @@ cmd_prepare() {
 }
 
 self_test() {
-    local repo failures=0
+    local repo failures=0 modes_before modes_after
     WORK="$(mktemp -d)"
     repo="$WORK/repo"
     trap 'rm -rf "$WORK"' EXIT
@@ -476,6 +498,10 @@ EOF
 
     DO_LOCK=false
     DO_MAN=false
+    # The fixture is written under the developer's umask, so pin its mode first:
+    # the assertion below has to fail for a mode change, not for a umask.
+    chmod 644 "$repo/Cargo.toml"
+    modes_before="$(manifest_modes "$repo")"
     cmd_prepare 2.1.1 >/dev/null
     local check file expected
     for check in \
@@ -499,6 +525,14 @@ EOF
         failures=$((failures + 1))
     else
         printf 'ok   prepare left no stale npm version\n'
+    fi
+    modes_after="$(manifest_modes "$repo")"
+    if [ "$modes_before" = "$modes_after" ]; then
+        printf 'ok   prepare preserves the manifest modes\n'
+    else
+        printf 'FAIL prepare changed a manifest mode:\nbefore:\n%s after:\n%s\n' \
+            "$modes_before" "$modes_after" >&2
+        failures=$((failures + 1))
     fi
 
     # Idempotent: a retried job must not fail on its own earlier work.
