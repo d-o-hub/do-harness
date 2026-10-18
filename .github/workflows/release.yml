@@ -5,17 +5,27 @@ name: release
 #     and dogfoods each target, then the release job publishes the tarballs
 #     plus `checksums.txt` as a GitHub Release. The tag must equal the
 #     `[workspace.package].version` in Cargo.toml.
-#   - `workflow_dispatch`: dry run — build and dogfood every target but never
-#     publish binaries. Set `publish` to also publish the workspace version to
-#     crates.io (bootstrap path for a version whose tag predates the publish
-#     job); binary release still requires a tag push.
+#   - tagged `workflow_dispatch`: release that tag end to end —
+#     `gh workflow run release.yml -f tag=vX.Y.Z`. A dispatch runs *this* file
+#     (the default branch's) against the tag's commit, so a pipeline fix applies
+#     to an already-pushed tag without deleting and re-pushing it. Every publish
+#     step is idempotent: crates.io and npm versions already published are
+#     skipped, and an existing GitHub Release has its assets replaced.
+#   - untagged `workflow_dispatch`: dry run — build and dogfood every target but
+#     never release. Set `publish` to also publish the workspace version to
+#     crates.io and npm (bootstrap path for a version whose tag predates the
+#     publish job); binaries and the Release still require a tag.
 on:
   push:
     tags: ["v*"]
   workflow_dispatch:
     inputs:
+      tag:
+        description: "Tag to release (e.g. v0.3.1). Empty = dry run on this ref."
+        type: string
+        default: ""
       publish:
-        description: "Also publish the workspace version to crates.io and npm"
+        description: "Dry run only: also publish the workspace version to crates.io and npm"
         type: boolean
         default: false
 
@@ -25,6 +35,11 @@ permissions:
 env:
   CARGO_BUILD_JOBS: "2"
   CARGO_INCREMENTAL: "0"
+  # The tag this run releases. A tag push carries it in `github.ref_name`; the
+  # recovery dispatch passes it as an input. Jobs that must act on the tag
+  # rather than on the triggering ref read RELEASE_TAG, and `inputs.tag` is the
+  # switch that says "this dispatch names a tag".
+  RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
 
 concurrency:
   group: release-${{ github.ref }}
@@ -40,6 +55,8 @@ jobs:
       # actions/checkout@v7.0.1
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
+          # A tagged dispatch releases that tag's commit, not the dispatched ref.
+          ref: ${{ inputs.tag || github.ref }}
           # Full history so commitlint and git metadata see the tagged commit.
           fetch-depth: 0
           # No push/fetch credentials persisted: this workflow never pushes.
@@ -56,11 +73,13 @@ jobs:
           test -n "$version"
           echo "version=$version" >> "$GITHUB_OUTPUT"
       - name: Assert the tag matches the workspace version
-        if: github.event_name == 'push'
+        # A tag push always names its tag, and so does a tagged dispatch — there
+        # the assertion is what refuses `-f tag=` pointing at the wrong commit.
+        if: github.event_name == 'push' || inputs.tag
         run: |
           expected="v${{ steps.version.outputs.version }}"
-          test "$expected" = "${GITHUB_REF_NAME}" || {
-            echo "FAIL: tag ${GITHUB_REF_NAME} does not match workspace version ${expected}" >&2
+          test "$expected" = "${RELEASE_TAG}" || {
+            echo "FAIL: tag ${RELEASE_TAG} does not match workspace version ${expected}" >&2
             exit 1
           }
       # dtolnay/rust-toolchain@master (SHA within master history per action docs)
@@ -207,6 +226,7 @@ jobs:
       # actions/checkout@v7.0.1
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
+          ref: ${{ inputs.tag || github.ref }}
           fetch-depth: 0
           persist-credentials: false
       - name: Resolve pinned toolchain
@@ -312,8 +332,8 @@ jobs:
     # `npm-publish` was red, leaving a complete Release next to a version that
     # was never on npm.
     needs: [build, publish, registry-validation, npm-publish]
-    # Dispatch is a dry run; only a tag push publishes.
-    if: github.event_name == 'push'
+    # A tag push or a tagged dispatch releases; an untagged dispatch is a dry run.
+    if: github.event_name == 'push' || inputs.tag
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -327,6 +347,7 @@ jobs:
       # Credentials are not persisted: the job publishes through GH_TOKEN.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
+          ref: ${{ inputs.tag || github.ref }}
           fetch-depth: 0
           persist-credentials: false
       # actions/download-artifact@v8.0.1
@@ -368,37 +389,54 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
-          previous="$(git describe --tags --abbrev=0 "${GITHUB_REF_NAME}^" 2>/dev/null || true)"
+          previous="$(git describe --tags --abbrev=0 "${RELEASE_TAG}^" 2>/dev/null || true)"
           api=(--method POST "repos/${GITHUB_REPOSITORY}/releases/generate-notes"
-            -f "tag_name=${GITHUB_REF_NAME}"
+            -f "tag_name=${RELEASE_TAG}"
             -f "configuration_file_path=.github/release.yml")
           if [ -n "$previous" ]; then
             api+=(-f "previous_tag_name=$previous")
           fi
           gh api "${api[@]}" --jq .body > generated-notes.md
-          bash scripts/release-notes.sh compose "${GITHUB_REF_NAME}" generated-notes.md release-notes.md
-          bash scripts/release-notes.sh check "${GITHUB_REF_NAME}" release-notes.md
+          bash scripts/release-notes.sh compose "${RELEASE_TAG}" generated-notes.md release-notes.md
+          bash scripts/release-notes.sh check "${RELEASE_TAG}" release-notes.md
           echo "composed release notes ($(wc -l < release-notes.md) lines)"
       - name: Publish the GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
+        # Idempotent so a tagged dispatch can re-run a release that failed
+        # halfway: an existing Release has its body and assets replaced rather
+        # than the job failing on "already exists".
         run: |
-          gh release create "${GITHUB_REF_NAME}" \
-            --verify-tag \
-            --title "do-harness ${GITHUB_REF_NAME}" \
-            --notes-file release-notes.md \
-            dist/do-harness-* dist/checksums.txt
+          if gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
+            gh release upload "${RELEASE_TAG}" \
+              dist/do-harness-* dist/checksums.txt --clobber
+            gh release edit "${RELEASE_TAG}" \
+              --title "do-harness ${RELEASE_TAG}" --notes-file release-notes.md
+          else
+            gh release create "${RELEASE_TAG}" \
+              --verify-tag \
+              --title "do-harness ${RELEASE_TAG}" \
+              --notes-file release-notes.md \
+              dist/do-harness-* dist/checksums.txt
+          fi
 
   publish:
     # crates.io versions are immutable, so publishing is gated on the same
     # preconditions as the binary release: a version tag whose commit passed
-    # preflight and whose full build matrix (and dogfood) succeeded. The
-    # dispatch path is the bootstrap/re-run escape hatch.
+    # preflight and whose full build matrix (and dogfood) succeeded. The tagged
+    # dispatch path re-runs a release; the untagged `publish` input is the
+    # bootstrap path for a version whose tag predates the publish job.
     needs: [preflight, build]
-    if: github.event_name == 'push' || inputs.publish
+    if: github.event_name == 'push' || inputs.tag || inputs.publish
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    # Serialized repository-wide: the skip-if-published probe below is
+    # check-then-act, and a publish is permanent, so two runs must not race the
+    # same version into crates.io (or into cargo's blind retry loop).
+    concurrency:
+      group: crates-io-publish-${{ github.repository }}
+      cancel-in-progress: false
     permissions:
       contents: read
       # OIDC: the job exchanges a GitHub-issued identity token for a
@@ -409,6 +447,7 @@ jobs:
       # actions/checkout@v7.0.1
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
+          ref: ${{ inputs.tag || github.ref }}
           fetch-depth: 0
           persist-credentials: false
       - name: Resolve pinned toolchain
@@ -508,6 +547,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
+          ref: ${{ inputs.tag || github.ref }}
           persist-credentials: false
       - name: Resolve pinned toolchain
         id: toolchain
@@ -543,9 +583,14 @@ jobs:
     # so it is gated on the same preconditions. Platform packages publish
     # first, then the meta package whose optionalDependencies pin them.
     needs: [preflight, build, registry-validation]
-    if: github.event_name == 'push' || inputs.publish
+    if: github.event_name == 'push' || inputs.tag || inputs.publish
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # npm versions are immutable too: serialize the platform-then-meta sequence
+    # so two runs cannot interleave a partially published set.
+    concurrency:
+      group: npm-publish-${{ github.repository }}
+      cancel-in-progress: false
     permissions:
       contents: read
       id-token: write
@@ -553,6 +598,7 @@ jobs:
       # actions/checkout@v7.0.1
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
+          ref: ${{ inputs.tag || github.ref }}
           persist-credentials: false
       # actions/download-artifact@v8.0.1
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c

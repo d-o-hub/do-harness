@@ -1,9 +1,12 @@
 # Releasing
 
-Releases are cut from `main` by pushing a `v<version>` tag. The tag must equal
-`[workspace.package].version` in `Cargo.toml`; the release preflight fails
-otherwise. Nothing publishes unless the tagged commit passes the full release
-set (verification plus `coverage`) and every build target dogfoods green.
+Releases are cut from `main` by tagging a commit whose
+`[workspace.package].version` is that tag: the tag must equal the version, and the
+preflight fails otherwise. In the ordinary case the tag is created *for* you —
+`auto-release.yml` derives the next version from the conventional commits, opens a
+release pull request, and tags it once that pull request is merged (see "Cutting a
+release"). Nothing publishes unless the tagged commit passes the full release set
+(verification plus `coverage`) and every build target dogfoods green.
 
 ## One-time setup
 
@@ -85,14 +88,18 @@ set (verification plus `coverage`) and every build target dogfoods green.
   Allowed actions** setting). The grant is per package name and takes an
   interactive 2FA challenge. Measured on the v0.1.2 tag for all five published
   packages.
-- **A tag run executes the workflow file from the tagged commit.** A `release.yml`
-  fix therefore cannot be validated by re-running or re-pushing the existing tag
-  — `gh run rerun` replays the old file identically. After a fix lands on `main`:
-  delete any release created from the tag (`gh release delete <tag>`), delete and
-  re-create the tag on the fixed commit, and push it. crates.io and npm are
-  immutable-but-idempotent per version, so a re-cut skips whatever the failed run
-  already published; a crate that has already shipped at that version cannot be
-  replaced, only followed by a new version.
+- **A tag run executes the workflow file from the tagged commit; a tagged
+  dispatch executes the file from the dispatched ref.** A `release.yml` fix can
+  therefore be applied to an already-pushed tag without moving it:
+  `gh workflow run release.yml -f tag=<tag>` runs the fixed file on `main` against
+  the tagged commit, and every publish step is idempotent (crates.io and npm skip a
+  version they already hold, and an existing Release has its assets replaced).
+  `gh run rerun` cannot do this — it replays the old file identically. Re-cut the
+  tag (delete it, re-create it on the fixed commit, push it) only when the version
+  itself must be replaced or the tag has to move. crates.io and npm are
+  immutable-but-idempotent per version, so either recovery skips whatever the
+  failed run already published; a version that has already shipped cannot be
+  replaced, only followed by a new one.
 - Trusted publishing requires Node >= 22.14.0 and npm >= 11.5.1; the release
   job pins Node 24 and checks both versions. npm generates provenance
   automatically for these public GitHub Actions publishes. After a successful
@@ -119,6 +126,54 @@ set (verification plus `coverage`) and every build target dogfoods green.
 
 ## Cutting a release
 
+The ordinary path is automatic. On every push to `main`, `auto-release.yml`
+derives the next version from the conventional commits since the last release tag
+and opens — or refreshes — a `chore(release): vX.Y.Z` pull request that applies it.
+Merging that pull request tags the version and starts the release. Two paths stay
+deliberate: the override, when the derived version is not the one you want, and the
+recovery, when a release fails halfway.
+
+`scripts/release-manager.sh` is the single source of truth for the derivation and
+the bump. `status` reports it, `next` emits it as JSON, `prepare <version>` applies
+it to every managed manifest, and `--self-test` pins the rules. The bump policy
+mirrors the Rust ecosystem's release tooling (`next_version`, the crate release-plz
+uses) rather than inventing one here:
+
+| Commits since the last tag | Bump |
+|---|---|
+| `!` subject or a `BREAKING CHANGE:`/`BREAKING-CHANGE:` footer | major at >= 1.0, minor at 0.x |
+| `feat` | minor at >= 1.0, patch at 0.x |
+| `fix`, `perf` | patch |
+| a subject that is not a conventional commit | patch |
+| docs, chore, test, refactor, ci, build | nothing on its own |
+
+Pre-1.0 comes from the same tool rather than a local rule: `0.(x+1).0` is how a
+breaking change is signalled while the crate is still `0.x`, so a feature cannot
+spend the minor and a breaking change is visible when it does. The derived version
+is a proposal — editing the version in the release pull request overrides it,
+because `ship` tags whatever version is on `main`.
+
+### What the automation does
+
+- `prepare` runs `release-manager.sh next`. A bump of `none` opens no pull request.
+  A bump of `pending` — `main` carries a version that has no tag — means the missing
+  step is a tag rather than a bump, so it goes straight to `ship`. Otherwise it
+  applies the version with `release-manager.sh prepare`, pushes `release/vX.Y.Z`,
+  and opens the pull request with the derived basis in its body.
+- `ship` tags that version at the merged commit and starts the pipeline with
+  `gh workflow run release.yml -f tag=vX.Y.Z`. A tag pushed with `GITHUB_TOKEN`
+  triggers no push workflow of its own, and `workflow_dispatch` is the one event
+  that always creates a run when it is sent with `GITHUB_TOKEN`.
+- A maintainer merges the release pull request. A pull request opened with
+  `GITHUB_TOKEN` starts its checks in an **approval required** state, so that click
+  is the one step the automation cannot take for itself; give the workflow a
+  fine-grained PAT or a GitHub App installation token and it becomes zero-touch.
+
+The flow needs no new secret: `prepare` takes `contents: write` to push the release
+branch, and `ship` takes `contents: write` and `actions: write` to tag and dispatch.
+
+### Releasing by hand
+
 Regenerate the checked-in CLI artifacts before tagging: `cargo run -q -p
 do-harness --bin do-harness -- completions <shell>` for each shell in
 `completions/` and `do-harness man man` for the man page. `completions_sync.rs`
@@ -126,12 +181,11 @@ and `man_sync.rs` compare the committed copies against the CLI and fail otherwis
 the man guard normalises only the build fingerprint, so a page still announcing
 an older semver fails there too.
 
-1. Bump `[workspace.package].version` in `Cargo.toml`, run
-   `cargo update --workspace` (or `cargo check`) so `Cargo.lock` matches,
-   update `integrations/npm/package.json` and the five
-   `integrations/npm/platforms/*/package.json` versions to match, and merge
-   that change to `main`. The release preflight enforces every managed
-   manifest against the workspace version
+1. Apply the version to every managed manifest — `[workspace.package].version` in
+   `Cargo.toml`, `Cargo.lock`, `integrations/npm/package.json`, the five
+   `integrations/npm/platforms/*/package.json`, and the generated man page — and
+   merge that change to `main`. `scripts/release-manager.sh prepare <version>` does
+   the whole set, and the release preflight enforces it afterwards
    (`scripts/check-package-contract.sh`).
 2. Tag the merge commit and push the tag:
 
@@ -141,7 +195,7 @@ an older semver fails there too.
    git push origin v0.3.0
    ```
 
-3. The `release` workflow runs:
+3. The `release` workflow runs — on that tag push, or on a tagged dispatch:
    - `preflight` — asserts tag == version, compares the published Rust API
      surfaces with `scripts/check-rust-api-compatibility.sh` (including the
      known empty API of the v0.1.2 binary-only `do-harness` baseline), checks
@@ -168,11 +222,12 @@ an older semver fails there too.
       the first package instead, naming the package and the remedy. See
       "Windows has no npm channel" above.
     - `release` — publishes the tarballs, the Windows zip, and `checksums.txt`
-      via `gh release create --notes-file`. It runs only after `publish` and
-      `npm-publish` succeed, so a Release is never created beside an
+      via `gh release create --notes-file`; an existing Release has its assets and
+      body replaced, so a repeated run is idempotent. It runs only after `publish`
+      and `npm-publish` succeed, so a Release is never created beside an
       unpublished registry version; if either publication fails, the tag exists
-      with no Release and the recovery is to re-run the tag-push workflow (a
-      `workflow_dispatch` skips `release`).
+      with no Release and the recovery is the tagged dispatch below. An untagged
+      `workflow_dispatch` skips `release` entirely.
 
 ### Verifying a download
 
@@ -531,10 +586,13 @@ binary) or install the CLI onto `PATH` with the shell installer.
 Two different situations, and only the first is a rewrite:
 
 **Before the release is published.** No immutable release exists yet, so the tag
-can still be deleted or re-pointed and the tagged run can simply be re-run. This
-is the path `v0.1.2` took: its tag was pushed three times while the build matrix
-was fixed. (Adding a `v*` tag ruleset that blocks tag updates would break exactly
-this recovery, which is why the immutability setting is preferred over one.)
+can still be deleted or re-pointed and the tagged run can simply be re-run. Prefer
+`gh workflow run release.yml -f tag=<tag>` when the fix is in the workflow rather
+than in the tagged tree: a dispatch runs the current file against the tagged
+commit, so nothing has to move. Re-pointing the tag is the heavier remedy, and it
+is what `v0.1.2` did — its tag was pushed three times while the build matrix was
+fixed. (Adding a `v*` tag ruleset that blocks tag updates would break exactly that
+recovery, which is why the immutability setting is preferred over one.)
 
 **After the release is published.** With immutable releases enabled, the assets
 and the tag are locked: an asset cannot be added, replaced, or deleted, the tag

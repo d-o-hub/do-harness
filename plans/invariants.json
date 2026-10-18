@@ -304,5 +304,17 @@
     "rationale": "A window, threshold, duration, retry count, or file mode written as a literal is unrecoverable to a reader and unsearchable to a reviewer; naming it makes the value reviewable and reusable, and the sensors that read it can point at one definition. The rule is enforced by a warn-severity sensor with a blessed findings baseline, so the existing occurrences are grandfathered and any increase is a hard regression: the rule binds new code from the day it lands without a tree-wide rewrite.",
     "sensor": "scripts/check-magic-numbers.sh",
     "category": "architecture"
+  },
+  {
+    "invariant": "The version a release cuts is derived from the conventional commits since the last tag by `scripts/release-manager.sh`, whose bump policy is mirrored from the ecosystem's release tooling rather than invented here: a breaking change takes the major at >= 1.0 and the minor at 0.x, a feature takes the minor at >= 1.0 and a patch at 0.x, a fix or perf takes a patch, a subject that is not a conventional commit takes a patch, and everything else releases nothing",
+    "rationale": "The bump used to be a hand decision, so a fix or a feature could sit on main unreleased indefinitely and a release depended on someone remembering. The rule set is now executable and shared by the automation and the runbook, and it deliberately mirrors `next_version` (the crate release-plz uses, which the Cargo book names as a representative release tool) instead of inventing a local policy: pre-1.0, `0.(x+1).0` is how a breaking change is signalled, so a feature must not spend the minor or breaking changes stop being visible in the version. SemVer section 4 is why 0.x needs no major-bump promise (anything MAY change at any time), and Conventional Commits section 15 is why the type is matched case-insensitively while the BREAKING CHANGE footer token stays uppercase. `--self-test` pins every branch, the two fail-closed guards (a manifest behind the newest tag, a version that does not supersede the current one), and the fact that a merge commit counts for nothing.",
+    "sensor": "bash scripts/release-manager.sh --self-test",
+    "category": "distribution"
+  },
+  {
+    "invariant": "A fix to the release pipeline is applied to an already-pushed tag by dispatching `release.yml` with a `tag` input, which runs the dispatching ref's workflow file against that tag's commit, and every publish step is idempotent: crates.io and npm skip a version they already hold, and an existing GitHub Release has its assets and body replaced",
+    "rationale": "A tag run executes the workflow file from the tagged commit, so before this the only remedy for a broken release job was to delete the tag (and any release built from it) and push it again - a rewrite of a published ref, which is exactly what release immutability forbids. The dispatch path runs the fixed file from the default branch against the tagged tree, so the tag never moves and the recovery is bounded by idempotency rather than by a rewrite. A publish probe that skips a version the registry already holds is check-then-act, which is why the crates.io and npm publishes are also serialized repository-wide.",
+    "sensor": ".github/workflows/release.yml (tagged workflow_dispatch: `tag` input, RELEASE_TAG plumbing, idempotent publish and release steps)",
+    "category": "distribution"
   }
 ]

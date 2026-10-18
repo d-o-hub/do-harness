@@ -1,0 +1,180 @@
+name: auto-release
+
+# Automated release preparation and tagging, so a `fix:` or `feat:` merge does
+# not wait on someone remembering to bump and tag.
+#
+#   push to main -> prepare: derive the bump from the conventional commits since
+#                            the last release tag and open (or refresh) a release
+#                            pull request that applies it.
+#                -> ship:    once that version is on main with no tag, create the
+#                            tag and start the release pipeline.
+#
+# Why a pull request and not a push: `main` requires pull requests, so CI cannot
+# commit the bump itself. And because a pull request opened with GITHUB_TOKEN
+# starts its checks in an "approval required" state, the release pull request is
+# merged by a maintainer instead of auto-merged. Everything after that merge is
+# automatic: `ship` needs no extra credential, because `workflow_dispatch` is the
+# one event that always creates a run when sent with GITHUB_TOKEN
+# (https://docs.github.com/en/actions/how-tos/writing-workflows/choosing-when-your-workflow-runs/triggering-a-workflow).
+#
+# A manual `workflow_dispatch` of this workflow runs only `ship`: the useful hand
+# lever for "this version is on main and untagged, cut it". When a `release.yml`
+# fix has to be validated for a tag that already exists, dispatch `release.yml`
+# itself with `tag` — the workflow file then comes from the dispatched ref while
+# the tree comes from the tagged commit. See docs/releasing.md ("Cutting a
+# release").
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # One at a time: two overlapping derivations could open competing release pull
+  # requests for the same commit range.
+  group: auto-release
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # A release commit is this workflow's own output: it carries no releasable
+    # change, so the derivation is skipped rather than reported as `none`.
+    # Matched against the *subject* (`startsWith`): a squashed commit message
+    # also carries the pull-request body, so `contains` would skip the
+    # derivation for any pull request that merely documents the release flow.
+    if: >-
+      github.event_name == 'push' &&
+      !startsWith(github.event.head_commit.message, 'chore(release):')
+    permissions:
+      # Pushes the release branch, opens the pull request. No registry scope:
+      # publishing happens in `release.yml`, behind its own job and OIDC token.
+      contents: write
+      pull-requests: write
+    steps:
+      # actions/checkout@v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          # Full history and tags: the derivation counts the commits since the
+          # last release tag.
+          fetch-depth: 0
+      - name: Resolve pinned toolchain
+        id: toolchain
+        run: |
+          channel="$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)"
+          echo "channel=$channel" >> "$GITHUB_OUTPUT"
+      # `prepare` runs cargo twice: `cargo metadata` to bring `Cargo.lock` in
+      # step with the bump, and `cargo run -- man man` to regenerate the page
+      # whose header announces the semver (the `man_sync` guard fails the tag
+      # otherwise). Both need the pinned toolchain, not the runner's default.
+      #
+      # dtolnay/rust-toolchain@master (SHA within master history per action docs)
+      - uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de
+        with:
+          toolchain: ${{ steps.toolchain.outputs.channel }}
+      # Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
+        with:
+          key: auto-release-prepare
+      - name: Derive the next version
+        id: derive
+        run: |
+          set -euo pipefail
+          report="$(bash scripts/release-manager.sh next --format json)"
+          printf '%s\n' "$report"
+          for field in bump next current basis commits breaking feature fix; do
+            printf '%s=%s\n' "$field" "$(printf '%s' "$report" | jq -r ".$field")" \
+              >> "$GITHUB_OUTPUT"
+          done
+      - name: Apply the bump
+        # `none` means nothing releasable landed; `pending` means main already
+        # carries an untagged version, whose missing step is a tag, not a bump.
+        if: steps.derive.outputs.bump != 'none' && steps.derive.outputs.bump != 'pending'
+        run: |
+          set -euo pipefail
+          bash scripts/release-manager.sh prepare "${{ steps.derive.outputs.next }}"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add --all
+          git commit -m "chore(release): v${{ steps.derive.outputs.next }}"
+      - name: Open or refresh the release pull request
+        if: steps.derive.outputs.bump != 'none' && steps.derive.outputs.bump != 'pending'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          version="${{ steps.derive.outputs.next }}"
+          branch="release/v${version}"
+          # Refresh the branch when one is already open for this version: the
+          # bump is a pure function of the tagged history, so the new content
+          # supersedes the old. The lease is well defined once the branch is
+          # fetched, and creating a branch needs no lease at all.
+          git fetch origin "$branch" 2>/dev/null || true
+          git push --force-with-lease origin "HEAD:refs/heads/${branch}"
+          body="$(mktemp)"
+          # Single-quoted format strings cannot carry the markdown code spans
+          # (shellcheck SC2016: backticks in single quotes never expand), so the
+          # spans are written with double quotes and escaped backticks.
+          {
+            printf "Automated release preparation for \`v%s\`.\n\n" "$version"
+            printf "Derived from the conventional commits since \`%s\` (%s commits): " \
+              "${{ steps.derive.outputs.basis }}" "${{ steps.derive.outputs.commits }}"
+            printf 'breaking=%s, feature=%s, fix=%s -> a **%s** bump.\n\n' \
+              "${{ steps.derive.outputs.breaking }}" \
+              "${{ steps.derive.outputs.feature }}" \
+              "${{ steps.derive.outputs.fix }}" \
+              "${{ steps.derive.outputs.bump }}"
+            printf "This applies \`v%s\` to every managed manifest: \`Cargo.toml\`, " "$version"
+            printf "\`Cargo.lock\`, the six npm manifests, and the generated man page.\n\n"
+            printf "Merging hands off to the \`ship\` job, which tags \`v%s\` and starts " "$version"
+            printf 'the release (crates.io, npm, binaries, GitHub Release). A curated header '
+            printf "in \`docs/releases/v%s.md\` is used by the release notes when it exists;\n" "$version"
+            printf "otherwise the release falls back to \`.github/release-notes-template.md\`.\n"
+          } >"$body"
+          if [ "$(gh pr list --head "$branch" --state open --json number --jq 'length')" = "0" ]; then
+            gh pr create --base main --head "$branch" \
+              --title "chore(release): v${version}" \
+              --body-file "$body"
+          else
+            echo "release pull request for ${branch} is already open"
+          fi
+          rm -f "$body"
+
+  ship:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Only a push to main says "this commit is the release": a manual dispatch is
+    # the same decision made on purpose, so it runs this job without `prepare`.
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    permissions:
+      contents: write
+      # `gh workflow run` needs actions: write to start `release.yml`.
+      actions: write
+    steps:
+      # actions/checkout@v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+      - name: Tag an untagged version and start the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          version="$(sed -n '/^\[workspace.package\]/,/^\[/ s/^version *= *"\(.*\)"/\1/p' Cargo.toml)"
+          test -n "$version"
+          tag="v$version"
+          if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null 2>&1; then
+            echo "$tag is already released; nothing to ship"
+            exit 0
+          fi
+          # The tagged commit is this push's commit, which is on main because
+          # main only accepts merges whose required `verify` check passed.
+          git tag "$tag" "$GITHUB_SHA"
+          git push origin "refs/tags/$tag"
+          # A tag pushed with GITHUB_TOKEN does not trigger a `push` workflow, so
+          # start the release explicitly; a dispatch always creates a run.
+          gh workflow run release.yml -f "tag=$tag"
