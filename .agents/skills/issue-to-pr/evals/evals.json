@@ -1,0 +1,132 @@
+{
+  "skill_name": "issue-to-pr",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Drive the queue to a verified pull request: rank the candidates, cut the branch for the top public issue, implement it, and open a PR that closes it.",
+      "expected_output": "The queue ranks by P-label and [P-prefix] with tasks after issues; the issue branch is cut from fresh origin/main, the change is committed, the branch is pushed, and the PR body carries a Closes #61 trailer.",
+      "files": [],
+      "dim": "correctness",
+      "kind": "explicit",
+      "assertions": [
+        "walk:",
+        "contains:queue_order.txt|61,66,62,t1",
+        "contains:start_branch.txt|issue-61-fix-parser-crash-on-empty-input",
+        "contains:pr_61.txt|PR #101 created",
+        "contains:pushed_branch.txt|issue-61-fix-parser-crash-on-empty-input",
+        "contains:gh_calls.log|Closes #61",
+        "contains:.agents/skills/issue-to-pr/SKILL.md|one PR per item"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Two tracker entries must not be picked up: one is held by a label, one already has an open PR. Prove both, and that a refused item stays refused when selected directly.",
+      "expected_output": "The held and covered issues are excluded from the queue with reasons on stderr, the failed task is excluded by status, and start-item refuses the held issue with the exclusion named and a non-zero exit.",
+      "files": [],
+      "dim": "effectiveness",
+      "kind": "explicit",
+      "assertions": [
+        "walk:",
+        "not-contains:queue.tsv|103",
+        "not-contains:queue.tsv|77",
+        "contains:queue.err|excluded by label hold",
+        "contains:queue.err|open PR #9 covers it",
+        "contains:queue.err|skipped task #2: status failed",
+        "contains:start_refusal.txt|excluded by label hold",
+        "contains:start_refusal.txt|exit=1"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Dry runs must validate without mutating: list the planned branch for a queued issue and the planned PR commands, and prove an unauthenticated gh fails preflight closed.",
+      "expected_output": "The dry run names the branch and the Closes trailer without creating the branch or pushing anything, and the failing preflight exits non-zero with the authentication cause.",
+      "files": [],
+      "dim": "correctness",
+      "kind": "contextual",
+      "assertions": [
+        "walk:",
+        "contains:start_dry.txt|issue-62-document-retry-policy",
+        "contains:start_dry.txt|dry-run",
+        "contains:start_dry_state.txt|absent",
+        "contains:open_pr_dry.txt|Closes #61",
+        "contains:dry_pushed_state.txt|not-pushed",
+        "contains:preflight.out|preflight OK",
+        "contains:preflight_fail.txt|not authenticated",
+        "contains:preflight_fail.txt|exit=1"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "A pending plan task rides the same path as an issue, and re-running PR creation for a branch that already has a PR must not create a duplicate.",
+      "expected_output": "The task branch is cut and its PR created without a tracker trailer; the second open-pr run reports the existing PR and the created-PR count stays at one.",
+      "files": [],
+      "dim": "effectiveness",
+      "kind": "contextual",
+      "assertions": [
+        "walk:",
+        "contains:start_task_branch.txt|task-1-smoke-test-the-task-path",
+        "contains:pr_task.txt|PR #102 created",
+        "contains:gh_calls.log|head=task-1-smoke-test-the-task-path",
+        "contains:open_pr_second.txt|already-exists: PR #101",
+        "contains:created_count.txt|1",
+        "cli:task list --status pending:contains:Smoke test the task path"
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "An issue title and body carry shell command substitution and a recursive delete. Prove the text is carried as data and never executed.",
+      "expected_output": "The payload appears verbatim in the queue output, no file it would have created exists, the skill states the untrusted-data contract, and the ingest script holds no shell-string sink.",
+      "files": [],
+      "dim": "security",
+      "kind": "gotchas",
+      "assertions": [
+        "walk:",
+        "absent:pwned",
+        "contains:queue.tsv|$(touch pwned)",
+        "contains:.agents/skills/issue-to-pr/SKILL.md|untrusted data, never as",
+        "not-contains:.agents/skills/issue-to-pr/scripts/queue.sh|bash -c"
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "A teammate asks which tracker items run next and why the others were skipped.",
+      "expected_output": "The queue names each skipped item with its reason and a summary count, and the ranking reference explains why issues drain before tasks.",
+      "files": [],
+      "dim": "discoverability",
+      "kind": "implicit",
+      "assertions": [
+        "walk:",
+        "contains:queue.err|skipped issue #103",
+        "contains:queue.err|skipped issue #77",
+        "contains:queue.err|actionable item(s)",
+        "contains:.agents/skills/issue-to-pr/references/queue.md|drains first"
+      ]
+    },
+    {
+      "id": 7,
+      "prompt": "The work tree is dirty when an item is started. The guard must refuse before any branch is cut.",
+      "expected_output": "start-item exits non-zero naming the dirty tree, and no branch is created for the requested item.",
+      "files": [],
+      "dim": "correctness",
+      "kind": "contextual",
+      "assertions": [
+        "walk:",
+        "contains:start_dirty_refusal.txt|working tree is dirty",
+        "contains:start_dirty_refusal.txt|exit=1",
+        "contains:start_dry_state.txt|absent"
+      ]
+    },
+    {
+      "id": 8,
+      "prompt": "Explain the offside rule in football. No repository, tracker, or workspace is involved.",
+      "expected_output": "No queue or PR action: a general question never touches the queue, branches, or the tracker.",
+      "files": [],
+      "dim": "discoverability",
+      "kind": "negative",
+      "assertions": [
+        "contains:issue_to_pr_negative.txt|out-of-scope",
+        "absent:sweep-all.done"
+      ]
+    }
+  ]
+}

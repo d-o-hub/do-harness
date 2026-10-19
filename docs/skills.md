@@ -29,6 +29,7 @@ to prevent the fire. See `docs/cli.md` for the command reference
 | `fail-closed-proxy` | Fail-closed tool-call mediation with audit and metrics |
 | `harness` | Feedforward guides + feedback sensors, self-correction and steering loops |
 | `htn-planner` | Decompose objectives into task networks with precondition guards |
+| `issue-to-pr` | Turn open issues and pending plan tasks into focused pull requests |
 | `move-only-decomposition` | Split files at the line ceiling without behavior change |
 | `nested-build-isolation` | Keep nested cargo/coverage builds from interfering |
 | `npm-github-publish` | Publish npm packages via GitHub OIDC Trusted Publishers |

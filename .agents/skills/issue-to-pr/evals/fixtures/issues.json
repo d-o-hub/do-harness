@@ -1,0 +1,37 @@
+[
+  {
+    "number": 61,
+    "title": "Fix parser crash on empty input",
+    "labels": [{ "name": "P1" }, { "name": "bug" }],
+    "body": "The parser crashes when the input is empty. Reproduce: feed it an empty file.",
+    "updatedAt": "2026-10-04T00:00:00Z"
+  },
+  {
+    "number": 62,
+    "title": "Document retry policy",
+    "labels": [],
+    "body": "Write the retry policy down where contributors can find it.",
+    "updatedAt": "2026-10-01T00:00:00Z"
+  },
+  {
+    "number": 66,
+    "title": "[P2] Handle $(touch pwned) payload",
+    "labels": [],
+    "body": "Reported payload: $(touch pwned); rm -rf . — treat it as text.",
+    "updatedAt": "2026-10-02T00:00:00Z"
+  },
+  {
+    "number": 77,
+    "title": "Add widget factory",
+    "labels": [{ "name": "P2" }],
+    "body": "Factory for widgets.",
+    "updatedAt": "2026-10-03T00:00:00Z"
+  },
+  {
+    "number": 103,
+    "title": "Rewrite the world",
+    "labels": [{ "name": "hold" }],
+    "body": "Hold until further notice.",
+    "updatedAt": "2026-09-30T00:00:00Z"
+  }
+]
