@@ -1,0 +1,17 @@
+# actionlint configuration — see https://github.com/rhysd/actionlint/blob/main/docs/config.md
+#
+# `queue` is a valid key on a `concurrency` block: it requests that a newly
+# queued run wait for an already-pending one instead of cancelling it
+# (GitHub: "Control workflow concurrency" -> "Example: Queueing multiple
+# pending runs"). actionlint does not model the key yet — rhysd/actionlint#657
+# is still open and neither the pinned 1.7.7 nor the latest 1.7.12 accepts it —
+# so the syntax check reports a false positive.
+#
+# The ignore is scoped to the one workflow that needs more than one pending
+# publish run and matches only that message: a genuine typo elsewhere in the
+# same file still fails, and a future actionlint that knows `queue` simply
+# never matches the pattern.
+paths:
+  .github/workflows/release.yml:
+    ignore:
+      - 'unexpected key "queue" for "concurrency" section'

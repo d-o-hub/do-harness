@@ -42,7 +42,21 @@ env:
   RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
 
 concurrency:
-  group: release-${{ github.ref }}
+  # Keyed on the effective release tag, not on the triggering ref: a `vX.Y.Z`
+  # tag push runs under `refs/tags/vX.Y.Z`, while a recovery dispatch
+  # (`gh workflow run release.yml -f tag=vX.Y.Z`) runs under the default branch,
+  # so keying on `github.ref` put the two runs in different groups and let them
+  # race over the same GitHub Release. A tag push supplies `github.ref_name` (the
+  # tag) with no input; a dispatch supplies `inputs.tag`, falling back to the ref
+  # name for an untagged dry run.
+  group: release-${{ inputs.tag || github.ref_name }}
+  # `queue: max` so more than one pending run can wait in the group. The default
+  # (`single`) cancels an already-`pending` run when a new run is queued into the
+  # same group, so a recovery dispatch that lands while the tag push is still
+  # pending would cancel the push — and the release would have to be dispatched
+  # again by hand. `cancel-in-progress` must stay false: `queue: max` with
+  # `cancel-in-progress: true` is a workflow validation error.
+  queue: max
   cancel-in-progress: false
 
 jobs:
@@ -436,6 +450,13 @@ jobs:
     # same version into crates.io (or into cargo's blind retry loop).
     concurrency:
       group: crates-io-publish-${{ github.repository }}
+      # `queue: max` keeps an already-`pending` publish queued instead of letting
+      # the default single-pending slot cancel it: a crates.io version is
+      # immutable and a publish is permanent, so a canceled pending run must be
+      # re-triggered by hand. Never `cancel-in-progress: true` here — with
+      # `queue: max` that combination is a workflow validation error, and
+      # canceling a publish mid-flight is exactly what the group exists to stop.
+      queue: max
       cancel-in-progress: false
     permissions:
       contents: read
@@ -590,6 +611,12 @@ jobs:
     # so two runs cannot interleave a partially published set.
     concurrency:
       group: npm-publish-${{ github.repository }}
+      # `queue: max` keeps an already-`pending` publish queued instead of letting
+      # the default single-pending slot cancel it: npm versions are immutable, so
+      # a canceled pending run drops a release that must then be re-triggered by
+      # hand. `cancel-in-progress` must stay false — `queue: max` plus
+      # `cancel-in-progress: true` is a workflow validation error.
+      queue: max
       cancel-in-progress: false
     permissions:
       contents: read
