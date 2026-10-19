@@ -353,8 +353,11 @@ the tagged commit the `release` job composes from. An untouched stub publishes
 exactly the template body; edit it in the pull request to describe the release —
 a highlight, a known blocker, a migration step. `release-notes.sh seed <tag>
 [<out>]` writes the stub by hand, for a release cut without the automation or into
-a scratch path for comparison, and never overwrites an existing header, so an edit
-made while the pull request is open survives a re-run of the step.
+a scratch path for comparison, and never overwrites an existing header — which
+protects the edit from the seeding step itself, not from the branch refresh: a
+later push to `main` re-derives the version and force-pushes the release branch,
+discarding a header edited in the pull request just as it discards a version
+override. Re-apply the edit, or merge the proposal before new commits land.
 That last one matters: a silently dropped change is worse than a badly
 categorized one. A release can therefore not ship a bare commit dump — the shape
 `v0.1.1` shipped.

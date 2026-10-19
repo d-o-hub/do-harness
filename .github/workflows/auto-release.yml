@@ -164,10 +164,12 @@ jobs:
               "$version"
             printf "This pull request also seeds \`docs/releases/v%s.md\`, the curated " \
               "$version"
-            printf "header of the published release notes. Edit it here to say what the release "
-            printf "means to a reader; it is used verbatim because the \`release\` job composes "
-            printf "the body from the tagged commit. Left untouched, the header stays the "
-            printf "generic template.\n\n"
+            printf "header of the published release notes: it is used verbatim because the "
+            printf "\`release\` job composes the body from the tagged commit, so describe the "
+            printf "release here. Left untouched, the header stays the generic template — a "
+            printf "valid release, just a less useful one. Like the version override above, an "
+            printf "edit made here is discarded when a later push to \`main\` re-derives and "
+            printf "force-pushes this branch, so re-apply it or merge first.\n\n"
           } >"$body"
           number="$(gh pr list --head "$branch" --state open \
             --json number --jq '.[0].number // empty')"
