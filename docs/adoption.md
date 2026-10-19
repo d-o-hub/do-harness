@@ -328,6 +328,31 @@ one. Repositories initialized before this scaffold can copy the script and
 runbook and add the block above. do-harness's own tag-triggered process is
 documented in `docs/releasing.md`.
 
+## Adoption contract matrix
+
+The harness enforces strict fail-closed contract rules across all supported packs (`rust`, `generic`, `node`, `web`):
+
+| Pack | Selection Criteria | Default Generated Sensors | Strict Verification Contract |
+|------|-------------------|--------------------------|------------------------------|
+| `rust` | `Cargo.toml` | `fmt`, `check`, `clippy`, `test`, `doctest`, `loc`, `deps`, `audit`, `commitlint`, `release-preflight` | Fails closed on zero tests, broken doctests, missing manifest, or missing required tools in CI. |
+| `generic` | Greenfield / non-Rust default | None (empty sensor array) | Vacuous pass (`sensor_pack = "generic"`, 0 sensors executed). Never masquerades as strict evidence for a specific language gate. |
+| `node` | `package.json` | `typecheck`, `lint`, `test`, `build` | Preserves `package.json` and `src/`. Probes package scripts, turbo, tsc, eslint, jest, vitest. |
+| `web` | `init --language web` | `viewport-ux`, `a11y`, `console`, `perf`, `visual`, `i18n` | Unconfigured pack emits `SKIP:` (warned verdict). Fails closed under `verify --strict` until `WEB_AUDIT_ROUTES` is set. |
+
+### Fail-closed verification rules
+
+1. **Advisory Local vs Required CI Behavior**:
+   - Locally, missing optional tools (e.g. `cargo-audit`, `cargo-deny`, `actionlint`) print `SKIP:` and record as `warn` so local development is not blocked.
+   - Under `CI=true` or `DO_HARNESS_REQUIRE_TOOLS=1`, missing tools or skipped checks emit `FAIL:` and exit non-zero. `verify --strict` rejects all weak or warned evidence.
+2. **Missing Declared Artifacts**:
+   - If a sensor defines `artifacts = ["dist/*.js"]` and the command succeeds without generating matching artifacts, `verify --strict` rejects the run with weak evidence (`verdict: fail`).
+3. **Mid-Run Input Mutation & Stale Evidence**:
+   - If source inputs or `do-harness.toml` configuration change during a run or post-execution, `status` reports `state = "red"` (`inputs_changed_during_run`).
+4. **Configuration Validation**:
+   - Dangling sensor references in `[signal-sets]`, unknown sensor names, or invalid TOML produce exit code 2 with actionable diagnostic output naming the failing setting.
+5. **Non-Destructive Adoption**:
+   - `init` never overwrites existing application code or configuration files without explicit `--force`.
+
 ## Troubleshooting
 
 - `unsupported platform`: install from source, or use a release target above.
