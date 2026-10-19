@@ -760,7 +760,7 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('-V', '-V ', [CompletionResultType]::ParameterName, 'Print version')
             [CompletionResult]::new('--version', '--version', [CompletionResultType]::ParameterName, 'Print version')
             [CompletionResult]::new('list', 'list', [CompletionResultType]::ParameterValue, 'List fail-fast error signatures (prefixed with `sensor:`)')
-            [CompletionResult]::new('clear', 'clear', [CompletionResultType]::ParameterValue, 'Clear fail-fast error signatures (e.g. `sensor:<name>`)')
+            [CompletionResult]::new('clear', 'clear', [CompletionResultType]::ParameterValue, 'Clear fail-fast error signatures (`--sensor sensor:<name>`)')
             [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
             break
         }
@@ -799,7 +799,7 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
         }
         'do-harness;errors;help' {
             [CompletionResult]::new('list', 'list', [CompletionResultType]::ParameterValue, 'List fail-fast error signatures (prefixed with `sensor:`)')
-            [CompletionResult]::new('clear', 'clear', [CompletionResultType]::ParameterValue, 'Clear fail-fast error signatures (e.g. `sensor:<name>`)')
+            [CompletionResult]::new('clear', 'clear', [CompletionResultType]::ParameterValue, 'Clear fail-fast error signatures (`--sensor sensor:<name>`)')
             [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
             break
         }
@@ -1322,7 +1322,7 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
         }
         'do-harness;help;errors' {
             [CompletionResult]::new('list', 'list', [CompletionResultType]::ParameterValue, 'List fail-fast error signatures (prefixed with `sensor:`)')
-            [CompletionResult]::new('clear', 'clear', [CompletionResultType]::ParameterValue, 'Clear fail-fast error signatures (e.g. `sensor:<name>`)')
+            [CompletionResult]::new('clear', 'clear', [CompletionResultType]::ParameterValue, 'Clear fail-fast error signatures (`--sensor sensor:<name>`)')
             break
         }
         'do-harness;help;errors;list' {

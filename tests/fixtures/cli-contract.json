@@ -2108,7 +2108,7 @@
     },
     {
       "path": "errors clear",
-      "about": "Clear fail-fast error signatures (e.g. `sensor:<name>`)",
+      "about": "Clear fail-fast error signatures (`--sensor sensor:<name>`)",
       "usage": "do-harness errors clear [OPTIONS]",
       "aliases": [],
       "args": [

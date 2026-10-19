@@ -77,7 +77,7 @@ dev checkout.
 | T1 | `coverage` moved into the `scheduled` set, which runs nightly from `.github/workflows/scheduled.yml` — a job that already asserts its evidence with `status --set scheduled`. The floor sat in `release` only, so a regression could land on main and surface at tag time. Nightly rather than per-PR is deliberate: the instrumented run is the heaviest sensor in the repository and AGENTS.md records the OOM an uncapped full verify caused; the job gained `cargo-llvm-cov`/`cargo-nextest` (both fail closed there) and a 45-minute timeout | `explain --set scheduled` selects `powerset` and `coverage`; `bash scripts/check-yamllint.sh` → 13 files |
 | T2 | measured rather than assumed, and the finding does not reproduce for this report: `cargo llvm-cov nextest --workspace` (caps `CARGO_BUILD_JOBS=2`, `test-threads = 2`) reports 142 source files and **none** under `tests/`, `fixtures/`, or `*_tests.rs`, so the harness's test *files* are already outside the number; unfiltered line coverage is 84.76% against the 70% floor. A `--ignore-filename-regex` for those paths was added, measured to move the total by about 1% (nothing a filter can address), and removed again rather than shipped as dead config. The residual the finding is really pointing at is the 91 `src` files carrying an **inline** `#[cfg(test)]` module, which no path filter can exclude; marking those (`LCOV_EXCL_START`/`STOP`) is a maintenance policy rather than a defect, and is recorded as such. The measured run also left no `.profraw` litter, which the T12 gate checks | `cargo llvm-cov report --summary-only` → 142 rows, 0 test-path rows, TOTAL 84.76% lines |
 | R3 | `man/do-harness.1` is generated, guarded, and no longer stale: the CLI's `man` command renders through a new `man` module (which also rewrites `clap_mangen`'s `do-harness-<name>(1)` index — the repository ships one page, so those 30 refs pointed at pages that are never generated, and now read `do-harness <name>`), and `tests/man_sync.rs` regenerates the page and compares it against the committed copy with only the build fingerprint (`<rev>[-dirty] <date>`) normalised away. The semver stays compared, which is the drift nobody noticed (the page announced `0.2.0 (01f6e3e-dirty 2026-10-03)` while the crate was `0.3.0`). `docs/releasing.md`'s runbook now says to regenerate both generated artifacts before tagging, and extracting the renderer took `main.rs` from 468 to 462 lines | `cargo test -p do-harness --test man_sync` → 1 passed; can-fail proof: restoring the stale `0.2.0` fingerprint fails it with "man/do-harness.1 is stale; regenerate with `do-harness man man`" |
-| R2 | the interim annotation the finding prescribes, since the real fix is the stranded release (R1, operator-gated): `docs/releases/v0.3.0.md` now opens with the publication status — the tag exists on `6804b41`, crates.io's newest `do-harness` is still 0.2.1, and the release job stopped before its prebuilt artifacts — points at R1 for the recovery, and says to install the last published version or build from a checkout meanwhile. The README's source-install paragraph already carried the equivalent caveat ("use the tested prebuilt artifacts above until 0.3.0 is published") | `markdownlint-cli2 docs/releases/v0.3.0.md docs/releasing.md` → 0 issues |
+| R2 | resolved by R1 landing rather than by the annotation: the release is published, so `docs/releases/v0.3.0.md` no longer opens with the publication-status blockquote, and the README and `docs/adoption.md` source-install notes now say the libSQL teardown fix ships from 0.3.0 on | crates.io `do-harness` → 0.3.0; npm `do-harness` → 0.3.0; `gh release view v0.3.0` → 6 assets |
 | R7 | the epic→heuristic citations resolve now. `plans/mcp-conformance-epic.md` cited "harness heuristic 18/19/20/21/22", a counter that lived only in the author's session: the harness file's bullet order never matched those numbers and `fail-closed-proxy`'s file holds four entries, so nothing in the tree could reconstruct them. Each citation names the file plus the lesson it stands for, matching the entries' own wording, and the two files exist. The `skills-docs` sensor gained the matching guard: a `plans/*-epic.md` may not cite a numbered heuristic, and every cited `…/references/heuristics.md` must exist on disk. The trace-ID half of the finding is a local-database convention (ids skip because strikes consumed numbers) and stays a process note | `bash scripts/check-skills-docs.sh` → OK, 13 skills; can-fail proofs: a numbered citation fails naming file and line, a dangling citation fails naming the path |
 | P16 | the high-value half of the script-polish bundle: `check-yamllint.sh` and `check-markdownlint.sh` now collect **tracked and untracked** files (`git ls-files --cached --others --exclude-standard`; ignored trees stay excluded). A new workflow or document used to be unlinted until it was staged — exactly when a syntax error is cheapest to catch — and it bit this batch: the new `scheduled.yml` was reported as "12 files linted" while untracked. `check-loc.sh` no longer hides `find` errors (the `2>/dev/null` is gone), so an unreadable tree surfaces instead of silently shrinking the scan. The rest of the bundle (unguarded `$2` under `set -u`, FAIL/SKIP lines without hints, an inconsistent python3-availability policy) stays open | `bash scripts/check-shell.sh` → 68 scripts; both sensors pass clean (13 YAML, 89 markdown) and fail on an untracked bad file: a YAML syntax error → exit 1, `#Title` → `MD018/no-missing-space-atx` → exit 1 |
 
@@ -98,7 +98,7 @@ explicit guard) instead of a raw grep error.
 
 **Residual:** none for A8 (alternate IPv4 spellings are now normalized).
 
-**Not started:** R1 (release rescue), A10 (pre-push set), S1, S6, T6, T13, P10,
+**Not started:** A10 (pre-push set), S1, S6, T6, T13, P10,
 P12, B4–B5, C2, C3, D1. **2026-10-16 swarm:** A6, A9, S2, S3, S7, B1, B3, F1,
 F2, F3, F4, P7, P8, P15, P16 (completed), D2 (completed) landed — see the
 progress table below.
@@ -107,8 +107,8 @@ progress table below.
 
 | ID | Severity | Finding | Evidence | Action | Effort |
 |----|----------|---------|----------|--------|--------|
-| R1 | **critical** | The `v0.3.0` release is stranded mid-flight. The tag exists on `6804b41`, but its publish job failed (`do-harness-libsql@0.9.30 already exists`, retried 8× — the `published()` curl check hit a malformed URL, fixed in #312/`787c19f` *after* the tag), so `registry-validation`/`npm-publish`/`release` skipped. `do-harness-libsql@0.9.30` was published **manually** by user `d-o-hub` (crates.io API: `trustpub_data: null`); future tag runs will fail the OIDC exchange until Trusted Publishing is configured | `git log -1 v0.3.0` → `6804b41`; crates.io `/api/v1/crates/do-harness-libsql`; `docs/releasing.md` recovery runbook | Configure Trusted Publishing for `do-harness-libsql`, re-cut the tag on `787c19f`, verify the release completes, then sync roadmap text | M |
-| R2 | high | The documented install command fails today: `README.md` and `docs/releases/v0.3.0.md` instruct `cargo install do-harness --version 0.3.0 --locked`, but crates.io max is 0.2.1; the curated v0.3.0 notes read as *shipped* | `README.md`; crates.io `do-harness` | Finish R1; until then annotate `docs/releases/v0.3.0.md` | S |
+| R1 | **critical** | The `v0.3.0` release is stranded mid-flight. The tag exists on `6804b41`, but its publish job failed (`do-harness-libsql@0.9.30 already exists`, retried 8× — the `published()` curl check hit a malformed URL, fixed in #312/`787c19f` *after* the tag), so `registry-validation`/`npm-publish`/`release` skipped. `do-harness-libsql@0.9.30` was published **manually** by user `d-o-hub` (crates.io API: `trustpub_data: null`); future tag runs will fail the OIDC exchange until Trusted Publishing is configured. *(**Done 2026-10-18:** re-cut on `main` (`5fa6fb5`) and published — crates.io 0.3.0 ×3 through OIDC, npm 0.3.0, GitHub Release with 6 assets; the fork crate was skipped because 0.9.30 is already there, so its unconfigured Trusted Publisher stays untested and open for the fork's next version)* | `git log -1 v0.3.0` → `6804b41`; crates.io `/api/v1/crates/do-harness-libsql`; `docs/releasing.md` recovery runbook | Configure Trusted Publishing for `do-harness-libsql`, re-cut the tag on `787c19f`, verify the release completes, then sync roadmap text | M |
+| R2 | high | The documented install command fails today: `README.md` and `docs/releases/v0.3.0.md` instruct `cargo install do-harness --version 0.3.0 --locked`, but crates.io max is 0.2.1; the curated v0.3.0 notes read as *shipped*. *(**Done 2026-10-18:** crates.io and npm are at 0.3.0, so the documented command resolves; the interim annotation is gone from `docs/releases/v0.3.0.md`)* | `README.md`; crates.io `do-harness` | Finish R1; until then annotate `docs/releases/v0.3.0.md` | S |
 | R3 | med | `man/do-harness.1` is stale (embeds `0.2.0 (01f6e3e-dirty 2026-10-03)`) and has **no drift guard** (unlike `completions/`, guarded by `completions_sync.rs`); its SUBCOMMANDS cross-references `do-harness-verify(1)` etc. are never generated | `man/do-harness.1:3`; `main.rs` single-page `man` | Add a `man_sync` test mirroring `completions_sync.rs`; regenerate; emit subcommand pages or strip the `(1)` refs | S–M |
 | R4 | med | `AGENTS.md` accuracy gaps: lists four DORA metrics (omits deployment rework rate, #309); npm "four platform packages" adjacent to the refused `win32-x64`; CI summary misstates the guardian-proxy check scope and omits the `scheduled` set, `dora --record`, and four jobs; sensor enumeration omits `check-mcp` | `AGENTS.md` §1/§4 | One sync pass (feedforward contract read by every session) | S |
 | R5 | low | `docs/compliance.md` pins "Harness version: 0.1.0" (also ships inside the published crate via `crates/do-harness/assets/compliance.md`) | `docs/compliance.md:3` | Refresh/derive at release | S |
@@ -249,8 +249,10 @@ closed final (`NO_GO`); DORA ratchet tolerates 3 breaches.
 
 ## Followups (priority order)
 
-1. **R1** — rescue the stranded `v0.3.0` release: configure Trusted Publishing
-   for `do-harness-libsql`, re-cut the tag on `787c19f`, verify completion.
+1. **`do-harness-libsql` Trusted Publishing** — the residual of R1: its publish
+   was skipped on the re-cut because 0.9.30 is already on crates.io, so the OIDC
+   exchange is still unconfigured and untested. Configure it before the fork's
+   version bumps.
 2. **A10** — one-line `pre-push` config fix (removes the OOM-amplifier footgun
    that contradicts the sensor comments).
 3. **A7** — reqwest redirect policy (closes an SSRF bypass of a documented
@@ -268,7 +270,10 @@ P4, P5, P6 (partial), P9, P11, P13, P14, P16 (partial), R2, R3, R4, R5, R6, R7, 
 S11, S12, S15, S16, S17, S18, S19, T1, T2, T3, T4, T5, T7, T8, T9, T10, T11, T12, T14,
 T15, T16, T17, T18,
 B2 (forced by A1).
-*Next:* R1 (operator-gated), A10 (maintainer decision), C2, C3.
+*Landed (2026-10-18):* R1, R2 — the `v0.3.0` release was re-cut on `main` and is
+published (crates.io 0.3.0, npm 0.3.0, GitHub Release with 6 assets); release
+cutting is automated from here (`docs/releasing.md`).
+*Next:* A10 (maintainer decision), C2, C3.
 
 ## Implementation progress (2026-10-16 swarm)
 
@@ -298,9 +303,9 @@ verified by the named command; the full workspace suite is green
 | P15 | the release job self-checks `dist/*` against its own generated `checksums.txt` via the tested digest-only verifier before publication (`check-rust-binary-provenance.sh` documented as not applicable: no cargo-auditable metadata) | `bash scripts/check-yamllint.sh`; script fence verified locally |
 | D2 | e2e coverage for `hook diff` and `overlap` (real binary; drift + missing-hook branches and threshold/JSON/usage paths, with negative controls) | `cargo test -p do-harness --test hook_diff --test overlap` → 5 passed |
 
-**Residual / deferred (with reasons):** R1 (rescue the stranded `v0.3.0`:
-configure Trusted Publishing for `do-harness-libsql`, re-cut the tag on
-`787c19f` — operator-gated, needs crates.io credentials this environment lacks);
+**Residual / deferred (with reasons):** `do-harness-libsql` Trusted Publishing
+(the residual of R1 — its publish is skipped while 0.9.30 stays current, so the
+OIDC exchange is untested until the fork bumps);
 A10 (`pre-push` full-suite list — a maintainer policy decision that changes the
 documented gate, not a code defect); S1 (the `Command` trait is exported and
 tested but has no production caller — collapsing the two writer shapes is a
@@ -313,7 +318,7 @@ nested-cargo slow path, the Windows sensor suite, script-helper extraction, and
 the `main.rs`/`cli.rs` dispatch splits — each is large or platform-gated and
 should land as its own reviewed change).
 
-*Next:* R1 (operator-gated), A10 (maintainer decision), C2, C3, S1, S6.
+*Next:* A10 (maintainer decision), C2, C3, S1, S6.
 
 *Harness addition (2026-10-16):* section 5's "named constants over magic numbers"
 is now executable rather than prose. `scripts/check-magic-numbers.sh` (with

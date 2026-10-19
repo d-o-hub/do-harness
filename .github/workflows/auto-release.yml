@@ -1,0 +1,310 @@
+name: auto-release
+
+# Automated release preparation and tagging, so a `fix:` or `feat:` merge does
+# not wait on someone remembering to bump and tag.
+#
+#   push to main -> prepare: derive the bump from the conventional commits since
+#                            the last release tag and open (or refresh) a release
+#                            pull request that applies it, retiring any earlier
+#                            proposal that the derivation has superseded.
+#                -> ship:    once that version is on main with no tag, create the
+#                            tag and start the release pipeline.
+#
+# A derivation can change while a proposal is open: a breaking change turns a
+# patch proposal into a minor one. The proposed version is in the branch name, so
+# a proposal the derivation no longer produces is closed as superseded instead of
+# being left beside the live one — at most one automation-owned proposal is open.
+#
+# Why a pull request and not a push: `main` requires pull requests, so CI cannot
+# commit the bump itself. And because a pull request opened with GITHUB_TOKEN
+# starts its checks in an "approval required" state, the release pull request is
+# merged by a maintainer instead of auto-merged. Everything after that merge is
+# automatic: `ship` needs no extra credential, because `workflow_dispatch` is the
+# one event that always creates a run when sent with GITHUB_TOKEN
+# (https://docs.github.com/en/actions/how-tos/writing-workflows/choosing-when-your-workflow-runs/triggering-a-workflow).
+#
+# A manual `workflow_dispatch` of this workflow runs only `ship`: the useful hand
+# lever for "this version is on main and untagged, cut it". Dispatch it against
+# `main`, which is the ref `ship` asserts before it tags anything. When a
+# `release.yml` fix has to be validated for a tag that already exists, dispatch
+# `release.yml` itself with `tag` — the workflow file then comes from the
+# dispatched ref while the tree comes from the tagged commit. See
+# docs/releasing.md ("Cutting a release").
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # One at a time: two overlapping derivations could open competing release pull
+  # requests for the same commit range.
+  group: auto-release
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # A release commit is this workflow's own output: it carries no releasable
+    # change, so the derivation is skipped rather than reported as `none`.
+    # Matched against the *subject* (`startsWith`): a squashed commit message
+    # also carries the pull-request body, so `contains` would skip the
+    # derivation for any pull request that merely documents the release flow.
+    if: >-
+      github.event_name == 'push' &&
+      !startsWith(github.event.head_commit.message, 'chore(release):')
+    permissions:
+      # `contents` is the release branch (push, force-push, delete on retire);
+      # `pull-requests` is the proposal (open, edit its body, close the
+      # superseded ones — closing needs write, which listing does not). No
+      # registry scope: publishing happens in `release.yml`, behind its own job
+      # and OIDC token.
+      contents: write
+      pull-requests: write
+    steps:
+      # actions/checkout@v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          # Full history and tags: the derivation counts the commits since the
+          # last release tag.
+          fetch-depth: 0
+      - name: Resolve pinned toolchain
+        id: toolchain
+        run: |
+          channel="$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)"
+          echo "channel=$channel" >> "$GITHUB_OUTPUT"
+      # `prepare` runs cargo twice: `cargo metadata` to bring `Cargo.lock` in
+      # step with the bump, and `cargo run -- man man` to regenerate the page
+      # whose header announces the semver (the `man_sync` guard fails the tag
+      # otherwise). Both need the pinned toolchain, not the runner's default.
+      #
+      # dtolnay/rust-toolchain@master (SHA within master history per action docs)
+      - uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de
+        with:
+          toolchain: ${{ steps.toolchain.outputs.channel }}
+      # Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
+        with:
+          key: auto-release-prepare
+      - name: Derive the next version
+        id: derive
+        run: |
+          set -euo pipefail
+          report="$(bash scripts/release-manager.sh next --format json)"
+          printf '%s\n' "$report"
+          for field in bump next current basis commits breaking feature fix; do
+            printf '%s=%s\n' "$field" "$(printf '%s' "$report" | jq -r ".$field")" \
+              >> "$GITHUB_OUTPUT"
+          done
+      - name: Apply the bump
+        # `none` means nothing releasable landed; `pending` means main already
+        # carries an untagged version, whose missing step is a tag, not a bump.
+        if: steps.derive.outputs.bump != 'none' && steps.derive.outputs.bump != 'pending'
+        run: |
+          set -euo pipefail
+          bash scripts/release-manager.sh prepare "${{ steps.derive.outputs.next }}"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add --all
+          git commit -m "chore(release): v${{ steps.derive.outputs.next }}"
+      - name: Open or refresh the release pull request
+        # Only a derivation with a version to propose reaches this step: `none`
+        # and `pending` have no bump to apply, and their reconciliation is the
+        # retire step below.
+        if: steps.derive.outputs.bump != 'none' && steps.derive.outputs.bump != 'pending'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # The only derivation output sourced from git refs rather than from the
+          # script's own enum/arithmetic, so it reaches the shell through the
+          # environment. `release-manager.sh` already constrains it to
+          # `v<digits>.<digits>.<digits>`, but a value read from the repository
+          # does not belong inside the script text (the same rule
+          # `.github/workflows/contributor-check.yml` states for its inputs).
+          BASIS: ${{ steps.derive.outputs.basis }}
+        run: |
+          set -euo pipefail
+          version="${{ steps.derive.outputs.next }}"
+          branch="release/v${version}"
+          # Refresh the branch when one is already open for this version: the
+          # bump is a pure function of the tagged history, so the new content
+          # supersedes the old. The lease is well defined once the branch is
+          # fetched, and creating a branch needs no lease at all.
+          git fetch origin "$branch" 2>/dev/null || true
+          git push --force-with-lease origin "HEAD:refs/heads/${branch}"
+          # The body is generated exactly once and handed to both paths. A
+          # refreshed pull request has to explain the same proposal as a new one,
+          # or commits landing on main move the diff while the review rationale
+          # silently ages.
+          body="$(mktemp)"
+          # Single-quoted format strings cannot carry the markdown code spans
+          # (shellcheck SC2016: backticks in single quotes never expand), so the
+          # spans are written with double quotes and escaped backticks.
+          {
+            printf "Automated release preparation for \`v%s\` (bump: **%s**).\n\n" \
+              "$version" "${{ steps.derive.outputs.bump }}"
+            printf "Derived from the %s commits since the last release tag \`%s\`, per " \
+              "${{ steps.derive.outputs.commits }}" "$BASIS"
+            printf "[the version-derivation policy](docs/releasing.md#cutting-a-release).\n\n"
+            printf "The version is derived, not hand-picked: edit the version in this pull "
+            printf "request to override it, because \`ship\` tags whatever version is on \`main\`.\n"
+            printf "The override lives in the open pull request, not on the branch: a later "
+            printf "push to \`main\` re-derives and force-pushes this branch, discarding the "
+            printf "edit, so merge an overridden proposal before new commits land.\n\n"
+            printf "Merging hands off to the \`ship\` job, which tags \`v%s\` and starts the release.\n" \
+              "$version"
+          } >"$body"
+          number="$(gh pr list --head "$branch" --state open \
+            --json number --jq '.[0].number // empty')"
+          if [ -z "$number" ]; then
+            gh pr create --base main --head "$branch" \
+              --title "chore(release): v${version}" \
+              --body-file "$body"
+            printf 'opened the release pull request for %s\n' "$branch"
+          else
+            # The branch was force-pushed above, so the open pull request's body
+            # is now the only stale part of it: always rewrite it, never report
+            # "already open" and move on.
+            gh pr edit "$number" --body-file "$body"
+            printf 'refreshed release pull request #%s for %s\n' "$number" "$branch"
+          fi
+          rm -f "$body"
+      - name: Retire superseded release pull requests
+        # Runs on every derivation, including the `none` and `pending` ones that
+        # skip the step above: then no version is proposed, so every open
+        # proposal is stale and this step is the whole reconciliation.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          bump="${{ steps.derive.outputs.bump }}"
+          next="${{ steps.derive.outputs.next }}"
+          current="${{ steps.derive.outputs.current }}"
+          # The proposal for the current derivation wins. The branch name is the
+          # proposed version, so the branch name is the whole identity of a
+          # proposal: a PR for another version cannot be the live one.
+          winner_branch=""
+          case "$bump" in
+            major | minor | patch) winner_branch="release/v${next}" ;;
+            *) winner_branch="" ;;
+          esac
+          winner_number=""
+          if [ -n "$winner_branch" ]; then
+            winner_number="$(gh pr list --head "$winner_branch" --state open \
+              --json number --jq '.[0].number // empty')"
+          fi
+          # What survives, in the words a reviewer reads on the closed one.
+          if [ -n "$winner_branch" ] && [ -n "$winner_number" ]; then
+            survivor="superseded by #${winner_number}, which proposes \`v${next}\` for the commits now on \`main\`"
+          elif [ -n "$winner_branch" ]; then
+            survivor="superseded by the proposal for \`${winner_branch}\`, which carries the commits now on \`main\`"
+          elif [ "$bump" = "pending" ]; then
+            survivor="superseded by \`v${current}\`, which is already on \`main\` and is what the \`ship\` job tags"
+          else
+            survivor="stale: no release is derivable from the commits now on \`main\`"
+          fi
+          # The `none` branch closes a proposal the derivation cannot reproduce
+          # at all, so its comment names the deliberate path instead of leaving
+          # the author to guess why the pull request went away.
+          if [ -z "$winner_branch" ] && [ "$bump" != "pending" ]; then
+            deliberate=' A release that no commit implies is applied by hand instead: see docs/releasing.md ("Releasing by hand").'
+          else
+            deliberate=''
+          fi
+          # Retiring a proposal cannot lose a release. The derivation is a pure
+          # function of the commits since the last release tag, so a version
+          # leaves it only when the commits that produced it are gone (reverted
+          # or rewritten) — and then the proposal built on those commits is
+          # genuinely stale, because it no longer explains the diff it would
+          # merge. If those commits come back, the next run derives the version
+          # again and this step keeps that proposal instead.
+          #
+          # Only branches this workflow could have pushed are touched. The
+          # pattern is therefore tightened from `release/v*` to the shape
+          # `release-manager.sh next` produces (`release/v<major>.<minor>.<patch>`),
+          # so a human branch such as `release/v2-docs` is never closed here.
+          #
+          # One page, bound at 100: the bound only matters in a repository with
+          # more than 100 open pull requests, and the concurrency group keeps
+          # this workflow's own creations to at most one per run.
+          owned="$(gh pr list --state open --limit 100 --json number,headRefName \
+            --jq '.[] | select(.headRefName | test("^release/v[0-9]+[.][0-9]+[.][0-9]+$")) | "\(.number) \(.headRefName)"')"
+          while read -r number head; do
+            # An empty listing still yields one blank line here, which is not a
+            # proposal: nothing to close.
+            [ -n "$number" ] || continue
+            if [ -n "$winner_branch" ] && [ "$head" = "$winner_branch" ]; then
+              printf 'kept release pull request #%s (%s)\n' "$number" "$head"
+              continue
+            fi
+            comment="$(
+              printf 'This proposal is %s.\n\n' "$survivor"
+              printf "The branch \`%s\` is deleted rather than left to rot: " "$head"
+              printf 'this workflow owns that branch and force-pushes it from the derivation, '
+              printf 'so a run that derives the same version again recreates it, and this '
+              printf 'closed pull request keeps the record of the attempt.%s\n' "$deliberate"
+            )"
+            printf 'closing release pull request #%s (%s): %s\n' "$number" "$head" "$survivor"
+            gh pr close "$number" --comment "$comment"
+            # Delete rather than abandon the branch: the closed pull request
+            # keeps the commit range, and a re-derived version is pushed again
+            # from scratch (creating a branch needs no lease). `ls-remote` first
+            # so a branch that is already gone is a no-op, not a red step.
+            if git ls-remote --exit-code --heads origin "refs/heads/${head}" >/dev/null 2>&1; then
+              git push origin --delete "refs/heads/${head}"
+            fi
+          done <<<"$owned"
+
+  ship:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Only a push to main says "this commit is the release": a manual dispatch is
+    # the same decision made on purpose, so it runs this job without `prepare`.
+    # This condition does not restrict the event's ref, so the assert step below
+    # is what requires a dispatch to have targeted `main`.
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    permissions:
+      contents: write
+      # `gh workflow run` needs actions: write to start `release.yml`.
+      actions: write
+    steps:
+      # actions/checkout@v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+      # `git tag "$GITHUB_SHA"` below tags whatever ref the run resolved to, and
+      # a `workflow_dispatch` can be sent against any branch or tag, so the ref
+      # is asserted before anything is created. Without this, a dispatch against
+      # `release/auto-release` would tag a commit that is not on `main` and
+      # release code the required `verify` check never gated on main.
+      - name: Assert the ship ref is main
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_REF" != 'refs/heads/main' ]; then
+            printf 'auto-release: refusing to ship %s; this job tags refs/heads/main only.\n' "$GITHUB_REF" >&2
+            printf 'Recovery for a tag that already exists is a release.yml dispatch, which takes the tagged commit as an explicit input:\n' >&2
+            printf '  gh workflow run release.yml -f tag=vX.Y.Z\n' >&2
+            exit 1
+          fi
+      - name: Tag an untagged version and start the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          version="$(sed -n '/^\[workspace.package\]/,/^\[/ s/^version *= *"\(.*\)"/\1/p' Cargo.toml)"
+          test -n "$version"
+          tag="v$version"
+          if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null 2>&1; then
+            echo "$tag is already released; nothing to ship"
+            exit 0
+          fi
+          # The tagged commit is this push's commit, which is on main because
+          # main only accepts merges whose required `verify` check passed.
+          git tag "$tag" "$GITHUB_SHA"
+          git push origin "refs/tags/$tag"
+          # A tag pushed with GITHUB_TOKEN does not trigger a `push` workflow, so
+          # start the release explicitly; a dispatch always creates a run.
+          gh workflow run release.yml -f "tag=$tag"

@@ -20,8 +20,8 @@ feedback = ["fmt", "check", "clippy", "loc"]
 # contract (`docs/documentation-contract.md`). Each one reads only git, the
 # working tree, and the local toolchain, and each fails closed on an empty
 # inventory, so the trio belongs to the PR-time set as well as `release`.
-verification = ["fmt", "check", "clippy", "deps", "machete", "audit", "test", "doctest", "loc", "skills", "skills-docs", "shell", "markdownlint", "docs-sync", "docs-examples", "docs-links", "yamllint", "actionlint", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "commitlint"]
-release = ["fmt", "check", "clippy", "deps", "audit", "test", "doctest", "coverage", "loc", "skills", "skills-docs", "shell", "markdownlint", "docs-sync", "docs-examples", "docs-links", "yamllint", "actionlint", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "commitlint"]
+verification = ["fmt", "check", "clippy", "deps", "machete", "audit", "test", "doctest", "loc", "skills", "skills-docs", "shell", "markdownlint", "docs-sync", "docs-examples", "docs-links", "yamllint", "actionlint", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "release-manager", "commitlint"]
+release = ["fmt", "check", "clippy", "deps", "audit", "test", "doctest", "coverage", "loc", "skills", "skills-docs", "shell", "markdownlint", "docs-sync", "docs-examples", "docs-links", "yamllint", "actionlint", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "release-manager", "release-manager-e2e", "publish-npm", "commitlint"]
 # DORA gets its own set so its evidence is addressable (`status --set metrics`)
 # without joining the gating sets. A no-`--set` status check compares against
 # every configured sensor, so a dora-only run's artifact would report
@@ -274,6 +274,38 @@ when-changed = [".agents/skills/pr-triage/**", "scripts/check-untrusted-ingest.s
 name = "release-notes"
 argv = ["bash", "scripts/release-notes.sh", "--self-test"]
 when-changed = [".github/release-notes-template.md", ".github/release.yml", ".github/workflows/release.yml", "docs/releases/**", "scripts/release-notes.sh"]
+
+[[sensors]]
+# Executable half of the release-derivation contract: the version a merge cuts
+# is a function of the conventional commits since the last tag, and the policy
+# (pre-1.0 breaking changes take the minor, features take a patch, a merge commit
+# counts for nothing) is mirrored from the Rust ecosystem's release tooling
+# rather than invented here. `auto-release.yml` calls `release-manager.sh next`
+# on every push to main, so a classifier regression decides the wrong version
+# silently; this entry pins the rules and the fail-closed guards around them.
+name = "release-manager"
+argv = ["bash", "scripts/release-manager.sh", "--self-test"]
+when-changed = ["Cargo.toml", "integrations/npm/**", ".github/workflows/auto-release.yml", ".github/workflows/release.yml", "docs/releasing.md", "scripts/release-manager.sh"]
+
+[[sensors]]
+# Release-gated end-to-end control for the release manager, deliberately absent
+# from `verification`: it runs the real `prepare` path (a scratch
+# `git worktree`, real cargo) and asserts `cargo metadata --locked` still
+# succeeds after the bump, which the hermetic `--self-test` cannot prove because
+# it fakes cargo on `PATH`. It needs a checkout, cargo, and a worktree, so it
+# must not gate every pull request.
+name = "release-manager-e2e"
+argv = ["bash", "scripts/release-manager.sh", "--e2e"]
+when-changed = ["Cargo.toml", "integrations/npm/**", "man/do-harness.1", "docs/releasing.md", "scripts/release-manager.sh"]
+
+[[sensors]]
+# Hermetic half of the npm publisher contract, in the release set only: the
+# publisher must not move the registry's `latest` dist-tag backwards when it
+# publishes an out-of-order (recovery) version, so the self-test pins that rule
+# and the registry-status handling without a token or a registry.
+name = "publish-npm"
+argv = ["bash", "scripts/publish-npm.sh", "--self-test"]
+when-changed = ["scripts/publish-npm.sh", "integrations/npm/**"]
 
 [[sensors]]
 # DORA deployment health, derived (never judged) from git history. Report-only:

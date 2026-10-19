@@ -79,11 +79,11 @@ cargo binstall do-harness          # prebuilt, no compile
 ```
 
 Registry source installs through 0.2.1 lose the local libSQL teardown patch.
-Prefer the tested prebuilt artifacts until 0.3.0 is published and its registry
-validation passes. From 0.3.0 onward, use
+From 0.3.0 on — published, with registry validation on musl and Windows — use
 `cargo install do-harness --version 0.3.0 --locked`; the normalized dependency
 names the maintained `do-harness-libsql` fork. `--locked` makes version selection
-reproducible, but cannot add a missing source fix to an older release.
+reproducible, but cannot add a missing source fix to an older release, so a
+0.2.1-or-earlier install wants the tested prebuilt artifacts.
 
 ### Air-gapped and vendored installs
 

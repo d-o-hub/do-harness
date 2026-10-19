@@ -47,10 +47,10 @@ cargo binstall do-harness
 ```
 
 Registry source installs through 0.2.1 do not include the checkout's libSQL
-teardown fix; `--locked` does not restore that missing code. Use the tested
-prebuilt artifacts above until 0.3.0 is published and its registry validation
-passes. Starting with 0.3.0, source installs use the maintained
-`do-harness-libsql` fork: `cargo install do-harness --version 0.3.0 --locked`.
+teardown fix; `--locked` does not restore that missing code. That fix ships from
+0.3.0 on — published with registry validation on musl and Windows — so source
+installs from 0.3.0 use the maintained `do-harness-libsql` fork:
+`cargo install do-harness --version 0.3.0 --locked`.
 See [source-distribution validation](docs/releasing.md#source-distribution-validation).
 
 Building from source requires Rust 1.85+:
@@ -231,7 +231,7 @@ export PATH="$HOME/.local/bin:$PATH"
 | `trace sessions [OPTIONS]` | List distinct trace session identifiers — flags: `--format <FORMAT>` |
 | `distill [OPTIONS]` | Extract a heuristic from a resolved trace into a skill. Review output against the anti-AI-slop checklist (.agents/skills/skill-creator/references/anti_ai_slop.md) — flags: `--skill <SKILL>`, `--pattern <PATTERN>`, `--description <DESCRIPTION>`, `--from-trace <ID>`, `--from-strikes`, `--min-strikes <N>`, `--task <ID>`, `--to-fixture`, `--format <FORMAT>` |
 | `errors list [OPTIONS]` | List fail-fast error signatures (prefixed with `sensor:`) — flags: `--task <ID>`, `--scope <SCOPE>`, `--format <FORMAT>` |
-| `errors clear [OPTIONS]` | Clear fail-fast error signatures (e.g. `sensor:<name>`) — flags: `--sensor <SENSOR>`, `--task <ID>`, `--scope <SCOPE>`, `--force` |
+| `errors clear [OPTIONS]` | Clear fail-fast error signatures (`--sensor sensor:<name>`) — flags: `--sensor <SENSOR>`, `--task <ID>`, `--scope <SCOPE>`, `--force` |
 | `loc [OPTIONS] [PATH]...` | Report line-of-code state for the 500-LOC invariant — flags: `--dir <DIR>`, `--ext <EXT>`, `--format <FORMAT>`, `--warn` |
 | `split [OPTIONS] <FILE>` | Extract a large top-level item into a sibling module — flags: `--target <NAME>` |
 | `eval [OPTIONS]` | Validate skill structure and benchmark skill evals — flags: `--skill <SKILL>`, `--bless`, `--list-skills`, `--fail-fast`, `--format <FORMAT>`, `--approver <NAME>`, `--no-lift`, `--agent-cmd <COMMAND>`, `--agent-timeout <SECS>`, `--strict-fixtures` |
