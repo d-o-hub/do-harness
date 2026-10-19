@@ -129,29 +129,62 @@ release"). Nothing publishes unless the tagged commit passes the full release se
 The ordinary path is automatic. On every push to `main`, `auto-release.yml`
 derives the next version from the conventional commits since the last release tag
 and opens — or refreshes — a `chore(release): vX.Y.Z` pull request that applies it.
-Merging that pull request tags the version and starts the release. Two paths stay
-deliberate: the override, when the derived version is not the one you want, and the
-recovery, when a release fails halfway.
+Refreshing means the branch *and the body* are brought up to date (the body carries
+the derived version, the bump class, the basis tag, and the commit count, so it must
+not age), and any open automation-owned `release/v<major>.<minor>.<patch>` pull
+request that no longer matches the current derivation is closed with a comment
+naming the surviving proposal. The sweep matches that full shape only, so a
+differently-shaped human branch (`release/v2-docs`) is never touched; a branch named
+exactly like a derivation (`release/v1.2.3`) is treated as the workflow's own,
+because that ref is the one it force-pushes and deletes itself. Merging that pull
+request tags the version and starts the release. Two paths stay deliberate: the
+override, when the derived version is not the one you want, and the recovery, when a
+release fails halfway.
 
 `scripts/release-manager.sh` is the single source of truth for the derivation and
-the bump. `status` reports it, `next` emits it as JSON, `prepare <version>` applies
-it to every managed manifest, and `--self-test` pins the rules. The bump policy
-mirrors the Rust ecosystem's release tooling (`next_version`, the crate release-plz
-uses) rather than inventing one here:
+the bump. `status` reports it, `next` emits it as JSON, and `prepare <version>`
+applies it to every managed manifest — the workspace version, the intra-workspace
+requirement pins in the member manifests, the six npm manifests, the lock, and the
+man page. It is pinned by two test layers. `--self-test`
+is the PR-time control: fast and hermetic — no network and no real cargo — it covers
+the full managed-manifest surface (the npm meta manifest, every platform
+manifest, and the member manifests' requirement pins, with the vendored `libsql`
+alias asserted untouched), asserts through a fake `cargo` on `PATH` that the lock
+and man steps are
+invoked, and covers the validation rules below. `--e2e` is opt-in and release-gated
+because it needs cargo and a real worktree: it runs the real `prepare` path in a
+scratch `git worktree` and asserts `cargo metadata --locked` still succeeds after the
+bump; the man page regeneration is skipped there and stays covered by the `man_sync`
+test and by the release pull request's own diff. Version strings are validated as
+plain `MAJOR.MINOR.PATCH` before they can reach a `sed` expression — this pipeline
+does not publish pre-release or build metadata — the git ref is validated before
+use, and a `rev-list` or `git log` failure fails the run instead of being reported
+as a zero-commit range. The bump policy mirrors the Rust ecosystem's release tooling
+(`next_version`, the crate release-plz uses) rather than inventing one here:
 
 | Commits since the last tag | Bump |
 |---|---|
+| any range while the version is `0.0.x` (a breaking change included) | patch |
 | `!` subject or a `BREAKING CHANGE:`/`BREAKING-CHANGE:` footer | major at >= 1.0, minor at 0.x |
 | `feat` | minor at >= 1.0, patch at 0.x |
 | `fix`, `perf` | patch |
 | a subject that is not a conventional commit | patch |
-| docs, chore, test, refactor, ci, build | nothing on its own |
+| docs, chore, test, refactor, ci, build, style, revert | nothing on its own |
+| a merge commit | nothing — the log is read with `--no-merges`, so a merge subject is never classified |
 
 Pre-1.0 comes from the same tool rather than a local rule: `0.(x+1).0` is how a
 breaking change is signalled while the crate is still `0.x`, so a feature cannot
-spend the minor and a breaking change is visible when it does. The derived version
-is a proposal — editing the version in the release pull request overrides it,
-because `ship` tags whatever version is on `main`.
+spend the minor and a breaking change is visible when it does. `0.0.x` is the one
+exception `next_version` carves out of that rule: it stays on patch releases
+whatever the commits, so the step to `0.1.0` remains a deliberate decision rather
+than the automatic effect of a single breaking change. semantic-release makes no
+such pre-1.0 distinction — its standard major/minor rule applies at any version —
+which is the concrete reason this pipeline follows `next_version` and deliberately
+not semantic-release. The derived version is a proposal — editing the version in
+the release pull request overrides it, because `ship` tags whatever version is on
+`main`. The override is a property of the open pull request, not of the branch:
+a later push to `main` re-derives and force-pushes the branch, discarding the
+edit, so merge an overridden proposal before new commits land.
 
 ### What the automation does
 
@@ -159,18 +192,38 @@ because `ship` tags whatever version is on `main`.
   A bump of `pending` — `main` carries a version that has no tag — means the missing
   step is a tag rather than a bump, so it goes straight to `ship`. Otherwise it
   applies the version with `release-manager.sh prepare`, pushes `release/vX.Y.Z`,
-  and opens the pull request with the derived basis in its body.
+  and opens the pull request with the derived basis in its body. The branch and the
+  body are refreshed on every push to `main`, and a still-open automation-owned
+  `release/v*` pull request whose version no longer matches the current derivation
+  is closed with a comment naming the surviving proposal.
 - `ship` tags that version at the merged commit and starts the pipeline with
-  `gh workflow run release.yml -f tag=vX.Y.Z`. A tag pushed with `GITHUB_TOKEN`
-  triggers no push workflow of its own, and `workflow_dispatch` is the one event
-  that always creates a run when it is sent with `GITHUB_TOKEN`.
+  `gh workflow run release.yml -f tag=vX.Y.Z`. It fails closed unless
+  `github.ref == 'refs/heads/main'`: a manual dispatch of the workflow can be sent
+  from any branch, and a tag created from an unreviewed ref would claim to release a
+  commit that never passed the `main` gate. Recovering a tag that already exists
+  stays `release.yml`'s job, where the tagged commit is an explicit input. A tag
+  pushed with `GITHUB_TOKEN` triggers no push workflow of its own, and
+  `workflow_dispatch` is the one event that always creates a run when it is sent
+  with `GITHUB_TOKEN`.
 - A maintainer merges the release pull request. A pull request opened with
   `GITHUB_TOKEN` starts its checks in an **approval required** state, so that click
   is the one step the automation cannot take for itself; give the workflow a
   fine-grained PAT or a GitHub App installation token and it becomes zero-touch.
+- The release pipeline serializes per tag. `release.yml`'s
+  workflow-level concurrency group is `release-${{ inputs.tag || github.ref_name }}`
+  — keyed to the tag being released rather than to the triggering ref — because a
+  tag push runs under `refs/tags/vX.Y.Z` while a tagged recovery dispatch runs under
+  the default branch, and the two must not race over the same GitHub Release. That
+  group and the two job-level publish groups (`crates-io-publish-…`,
+  `npm-publish-…`) set `queue: max`, because GitHub's default concurrency behaviour
+  cancels an already-*pending* run: without it, a burst of releases could silently
+  discard a waiting publication before it started. `queue: max` (up to 100 pending
+  runs, first-in-first-out) is incompatible with `cancel-in-progress: true`, which is
+  why every group keeps `cancel-in-progress: false`.
 
 The flow needs no new secret: `prepare` takes `contents: write` to push the release
-branch, and `ship` takes `contents: write` and `actions: write` to tag and dispatch.
+branch and `pull-requests: write` to close a superseded proposal, and `ship` takes
+`contents: write` and `actions: write` to tag and dispatch.
 
 ### Releasing by hand
 
@@ -487,6 +540,18 @@ launcher) and five platform package templates. The npm-publish job downloads
 the build artifacts, stages each platform package with its binary, and
 publishes platform-first so the meta package's pinned `optionalDependencies`
 resolve. Versions already on npm are skipped, so a partial run can be re-run.
+
+The publisher protects the registry's `latest` dist-tag. It reads the current
+`dist-tags.latest` and, when the version being published is older than it — an
+out-of-order recovery publish — publishes that version under `--tag backfill`
+instead. `npm publish` applies its `tag` (default `latest`) to the submitted
+package, so an unguarded late publish would reset `latest` to the older version
+rather than leave it on the newest release. The guard is pinned by
+`scripts/publish-npm.sh --self-test` (the `publish-npm` sensor), which also pins
+the fail-closed half: a registry query that errors, or a packument with no usable
+`latest`, fails the run instead of being read as a first publish and silently
+taking `latest`. The staging and version patching are exercised by the
+`publish-npm.sh --dist … --dry-run` step in `verify.yml`.
 
 The publisher's `UNAVAILABLE_PKGS` list names platform packages the registry
 refuses. They are skipped with an explicit log line, and the meta package
