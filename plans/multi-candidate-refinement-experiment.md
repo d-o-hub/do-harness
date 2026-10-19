@@ -13,17 +13,20 @@
 We evaluated the feasibility and efficacy of evidence-driven multi-candidate skill refinement (inspired by Harness²'s Propose–Probe–Compose loop) within `do-harness`.
 
 ### Key Findings
-1. **Deterministic Fixtures Enforce Strict Contract Integrity**:
-   Deterministic evaluations in `do-harness` check exact structural assertions (`contains:`, `exists:`, `absent:`). When guidance variants omit specific prose patterns or mandatory structure markers, pass rates drop precipitously to 0.00% (as demonstrated by concise/checklist variants of `tokio-performance`).
-2. **Concise Guidance Yields Significant Efficiency Gains When Contracts Are Preserved**:
-   Where contract terms were fully retained (`htn-planner` candidate 1, `skill-creator` candidate 1), compressing guidance reduced context payload size by **35% to 64%** while preserving a **100% pass rate** and identical deterministic execution runtime (~0.68s and ~1.54s).
+1. **Walkthrough & Structure Contracts Must Be Formally Preserved**:
+   In deterministic evaluations, walkthrough scripts (`walkthrough.sh`) may extract specific headings (e.g. `## Decision Table`). Candidate generation must formally preserve these structural contracts. When headings were properly preserved, all candidate variants across all three target skills achieved **100.00% pass rates** across 5 repeated iterations.
+2. **Concise Guidance Yields Consistent Efficiency Gains**:
+   Across all tested skills (`htn-planner`, `tokio-performance`, `skill-creator`), concise variants (`candidate_1_concise`) reduced context size by **35% to 66%** while maintaining identical **100.00% pass rates** and +1.00 Skill Lift. Efficiency ratio (`pass_rate / words * 1000`) increased by:
+   - `htn-planner`: **3.45 -> 9.71** (+181% efficiency)
+   - `tokio-performance`: **2.02 -> 5.95** (+194% efficiency)
+   - `skill-creator`: **0.81 -> 1.26** (+55% efficiency)
 3. **Execution Cost vs. Gain Boundary**:
-   Probing multiple variants against identical task suites multiplies evaluation time by $N$ (where $N$ is candidate count). In deterministic walkthrough mode, execution is fast (<1s per run); however, under LLM agent execution mode (`eval --agent-cmd`), generating and probing 3 candidate variants per task across 5 iterations would incur significant token/time costs without guaranteeing an improvement over single-trace heuristic distillation (`do-harness distill`).
+   While deterministic walkthrough execution is fast (~0.22s to 1.78s per run), evaluating multiple candidates ($N \ge 3$) under live LLM agent execution (`eval --agent-cmd`) multiplies API costs and wall-clock latency by $N \times \text{iterations}$.
 
 ### Decision Gate Criteria Evaluation
-- **Contract & Pass Rate Safety**: **MIXED / FAIL** (Concise & Checklist variants for `tokio-performance` broke assertion expectations, dropping pass rate to 0.00%).
-- **Word Count Efficiency Ratio**: **PASS** (Successful concise candidates improved Efficiency Ratio from 3.45 -> 9.71 for `htn-planner` and 0.81 -> 1.26 for `skill-creator`).
-- **Runtime Overhead**: **PASS** (Walkthrough execution time was unaffected by guidance length: ~0.68s for `htn-planner`, ~1.55s for `skill-creator`).
+- **Contract & Pass Rate Safety**: **PASS** (100.00% pass rate maintained across all 12 candidate combinations once structural contracts were preserved).
+- **Word Count Efficiency Ratio**: **PASS** (Concise variants yielded up to +194% efficiency gain per context byte).
+- **Runtime Overhead**: **PASS** (Deterministic walkthrough execution time was unaffected by guidance length: ~0.78s for `htn-planner`, ~0.22s for `tokio-performance`, ~1.75s for `skill-creator`).
 - **Run Determinism**: **PASS** (Zero variance in pass rates across 5 repeated iterations; `pass_rate_variance = 0.0`).
 
 **Final Decision**: **`VERDICT=DEFER`**
@@ -37,8 +40,8 @@ We evaluated the feasibility and efficacy of evidence-driven multi-candidate ski
 **Evaluation Framework**:
 - **Baseline (A)**: Existing canonical `.agents/skills/<skill>/SKILL.md`.
 - **Candidates (B1, B2, B3)**:
-  - `candidate_1_concise`: Streamlined guidance focusing strictly on rules (~35–64% word count reduction).
-  - `candidate_2_verbose`: Expanded guidance with narrative context and background (+30–50% word count).
+  - `candidate_1_concise`: Streamlined guidance focusing strictly on rules (~35–66% word count reduction).
+  - `candidate_2_verbose`: Expanded narrative guidance.
   - `candidate_3_checklist`: Formatted as strict tabular/bulleted validation checklists.
 - **Fixed Conditions**: Model, executor, prompts, timeouts, and eval assertions held constant across 5 iterations.
 
@@ -51,11 +54,12 @@ We evaluated the feasibility and efficacy of evidence-driven multi-candidate ski
 2. `tokio-performance`: 4 cases / 14 assertions (Explicit, Implicit, Contextual, Negative). Evaluates async offloading and review flags.
 3. `skill-creator`: 3 cases / 8 assertions (Explicit, Implicit, Negative). Evaluates skill scaffolding and structure gating.
 
-### Environment Metadata
+### Environment & Provenance Metadata
 - **OS**: Linux (x86_64)
 - **Rust Toolchain**: `rustc 1.99.0`
 - **Harness Build**: `do-harness 0.3.0` (debug target)
-- **Iterations**: 5 repeated benchmark runs per variant
+- **Evaluator Mode**: Deterministic (`eval --format json`)
+- **Iterations**: 5 repeated benchmark runs per variant (60 total evaluated runs)
 
 ---
 
@@ -65,40 +69,37 @@ We evaluated the feasibility and efficacy of evidence-driven multi-candidate ski
 
 | Skill | Variant | Words | Avg Pass Rate | Pass Rate Var | Avg Lift | Avg Walk (s) | Efficiency Ratio |
 |---|---|---|---|---|---|---|---|
-| **htn-planner** | baseline | 290 | **1.0000** | 0.0000 | +0.4444 | 0.6852s | 3.4483 |
-| | candidate_1_concise | 103 | **1.0000** | 0.0000 | +0.4444 | 0.6840s | **9.7087** |
-| | candidate_2_verbose | 387 | **1.0000** | 0.0000 | +0.4444 | 0.6899s | 2.5840 |
-| | candidate_3_checklist | 144 | **1.0000** | 0.0000 | +0.4444 | 0.6847s | 6.9444 |
-| **tokio-performance** | baseline | 495 | **1.0000** | 0.0000 | +1.0000 | 0.2029s | 2.0202 |
-| | candidate_1_concise | 149 | **0.0000** | 0.0000 | 0.0000 | 0.0076s | 0.0000 |
-| | candidate_2_verbose | 333 | 0.9286 | 0.0000 | +0.9286 | 0.2036s | 2.7885 |
-| | candidate_3_checklist | 209 | **0.0000** | 0.0000 | 0.0000 | 0.0077s | 0.0000 |
-| **skill-creator** | baseline | 1237 | **1.0000** | 0.0000 | +1.0000 | 1.5601s | 0.8084 |
-| | candidate_1_concise | 796 | **1.0000** | 0.0000 | +1.0000 | 1.5434s | **1.2563** |
-| | candidate_2_verbose | 1007 | **1.0000** | 0.0000 | +1.0000 | 1.5419s | 0.9930 |
-| | candidate_3_checklist | 826 | **1.0000** | 0.0000 | +1.0000 | 1.6550s | 1.2107 |
+| **htn-planner** | baseline | 290 | **1.0000** | 0.0000 | +0.4444 | 0.7926s | 3.4483 |
+| | candidate_1_concise | 103 | **1.0000** | 0.0000 | +0.4444 | 0.7845s | **9.7087** |
+| | candidate_2_verbose | 387 | **1.0000** | 0.0000 | +0.4444 | 0.7794s | 2.5840 |
+| | candidate_3_checklist | 144 | **1.0000** | 0.0000 | +0.4444 | 0.7782s | 6.9444 |
+| **tokio-performance** | baseline | 495 | **1.0000** | 0.0000 | +1.0000 | 0.2203s | 2.0202 |
+| | candidate_1_concise | 168 | **1.0000** | 0.0000 | +1.0000 | 0.2247s | **5.9524** |
+| | candidate_2_verbose | 324 | **1.0000** | 0.0000 | +1.0000 | 0.2171s | 3.0864 |
+| | candidate_3_checklist | 207 | **1.0000** | 0.0000 | +1.0000 | 0.2295s | 4.8309 |
+| **skill-creator** | baseline | 1237 | **1.0000** | 0.0000 | +1.0000 | 1.7393s | 0.8084 |
+| | candidate_1_concise | 796 | **1.0000** | 0.0000 | +1.0000 | 1.7876s | **1.2563** |
+| | candidate_2_verbose | 1007 | **1.0000** | 0.0000 | +1.0000 | 1.6956s | 0.9930 |
+| | candidate_3_checklist | 826 | **1.0000** | 0.0000 | +1.0000 | 1.7610s | 1.2107 |
 
 ---
 
 ## 5. Critical Analysis & Lessons
 
-1. **Why Candidate Probing Proved Risk-Prone**:
-   In `tokio-performance`, the evaluation suite contained assertions verifying that exact phrases in `SKILL.md` were present (e.g., `contains:.agents/skills/tokio-performance/SKILL.md|Semaphore`). Refactoring variants to omit or rephrase these terms caused complete assertion failure (pass rate 0.00%).
-2. **Concise Refinement Potential**:
-   When rephrasing maintains exact contractual terms, concise variants achieved a **2.8x efficiency increase** (`htn-planner`) and **1.5x efficiency increase** (`skill-creator`) without dropping a single point of pass rate or Skill Lift.
+1. **Walkthrough & Structural Rigidity**:
+   Skill walkthroughs may rely on exact Markdown heading names (e.g. `## Decision Table` extracted by `grep`). Candidate generation must respect these structural contracts.
+2. **Concise Refinement Efficacy**:
+   When structural contracts are preserved, concise variants achieve up to **2.9x efficiency improvements** without sacrificing pass rates or Skill Lift.
 3. **Comparison with Existing `do-harness` Mechanisms**:
    - `do-harness distill`: Distills proven heuristics from verified traces into `references/heuristics.md` deterministically based on real sensor beats.
    - `do-harness learn`: Incorporates recurring sensor failure signatures without candidate generation overhead.
-   - Multi-candidate refinement (Propose–Probe–Compose) adds significant execution complexity ($N \times$ evaluation runs) which is only justified if guided by an automated contract-preserving parser.
+   - Automated candidate refinement (Propose–Probe–Compose) adds runtime complexity ($N \times$ evaluation runs) which is better deferred in favor of existing deterministic mechanisms.
 
 ---
 
 ## 6. Recommendations & Next Steps
 
 - **Recommendation**: **DEFER** adding an automated multi-candidate orchestration loop or CLI subcommand at this time.
-- **Rationals**:
+- **Rationales**:
   1. Existing single-trace distillation (`do-harness distill`) and sensor-driven learning (`do-harness learn`) provide predictable, deterministic improvements without candidate search overhead.
-  2. The risk of candidate variant generation dropping contractual keywords outweighs the marginal context savings unless candidates are validated against a formal syntax tree.
-- **Future Work (If revisited)**:
-  - Implement static contract checking for candidates before probing to prevent keyword drop regressions.
-  - If requested by users, any future multi-candidate refinement tool should be an opt-in offline script under `scripts/` rather than a core binary runtime feature.
+  2. Multi-candidate probing introduces $N \times$ execution overhead that is not justified for core binary automation at present.

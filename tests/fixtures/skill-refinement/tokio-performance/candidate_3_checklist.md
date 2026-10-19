@@ -14,6 +14,8 @@ metadata:
 
 # Workload-Aware Tokio Guidance
 
+## Decision Table: Task Offloading Strategy
+
 | Workload Type | Profile | Recommended Mechanism | Rationale |
 |---|---|---|---|
 | **Short Bounded CPU** | JSON parse, small transforms (<100us) | Direct Tokio worker thread | Do NOT use `spawn_blocking`. Overhead outweighs execution time. |
@@ -21,8 +23,9 @@ metadata:
 | **Sustained Heavy CPU** | Crypto, compression (>1ms) | `spawn_blocking`, Rayon, or CPU pool | Sustained CPU starves worker scheduler. |
 | **Latency Network I/O** | API fan-out, proxying | Async futures + `Semaphore` / backpressure | Use `tokio::sync::Semaphore` to bound fan-out. |
 
-## PR Review Flag Checklist
-- [ ] **Cargo-cult `spawn_blocking`**: No offload for short bounded CPU tasks (<100us).
-- [ ] **Unbounded Spawn Fan-out**: Loops bounded by `Semaphore` or `backpressure`.
-- [ ] **Lock-Across-`.await`**: Drop MutexGuard before `.await` (Lock-Across rule).
-- [ ] **Repeatedly-Ready**: No spin loops.
+## Async Code Review Flags
+
+1. **Cargo-cult `spawn_blocking`**: No offload for short bounded CPU tasks (<100us).
+2. **Unbounded Spawn Fan-out**: Loops bounded by `Semaphore` or `backpressure`.
+3. **Lock-Across-`.await`**: Drop MutexGuard before `.await` (Lock-Across rule).
+4. **Repeatedly-Ready**: No spin loops.

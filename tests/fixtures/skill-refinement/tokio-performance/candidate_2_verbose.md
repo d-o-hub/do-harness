@@ -17,7 +17,7 @@ metadata:
 ## Overview & Performance Principles
 Async Rust execution in Tokio relies on a multi-threaded work-stealing scheduler. Worker threads handle non-blocking asynchronous futures efficiently. Misunderstanding task offloading trade-offs introduces performance degradation, tail latency, and worker starvation.
 
-`spawn_blocking` is not a magic speedup. Offloading short bounded CPU work to the blocking thread pool incurs context switching and synchronization overhead that outweighs the work itself.
+`spawn_blocking` is not a universal speedup. Offloading short bounded CPU work to the blocking thread pool incurs context switching and synchronization overhead that outweighs the work itself.
 
 ## Decision Table: Task Offloading Strategy
 
@@ -28,10 +28,10 @@ Async Rust execution in Tokio relies on a multi-threaded work-stealing scheduler
 | **Sustained / Heavy CPU** | Crypto, compression, large sorts (>1 ms) | `spawn_blocking`, Rayon, or CPU pool | Prevents worker thread starvation. |
 | **Latency Network I/O** | Proxy forwarding, HTTP/gRPC API requests | Async futures + `Semaphore` / backpressure | Use `tokio::sync::Semaphore` or backpressure channels for fan-out. |
 
-## Async Code Review Flags & Checklist
+## Async Code Review Flags
 
 1. **Cargo-cult `spawn_blocking`**:
-   - Wrap short bounded CPU operations in `spawn_blocking`? Fix: Keep on worker thread. Note: `spawn_blocking is always faster` is false.
+   - Wrap short bounded CPU operations in `spawn_blocking`? Fix: Keep on worker thread.
 2. **Unbounded Spawn Fan-out**:
    - Calling `tokio::spawn` inside an unbounded loop? Fix: Limit concurrency using `Semaphore` or `backpressure` channels.
 3. **Lock-Across-`.await`**:

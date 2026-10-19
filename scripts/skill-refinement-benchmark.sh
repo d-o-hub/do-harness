@@ -18,23 +18,16 @@ fi
 SKILLS=("htn-planner" "tokio-performance" "skill-creator")
 VARIANTS=("baseline" "candidate_1_concise" "candidate_2_verbose" "candidate_3_checklist")
 
-# Output TSV header if running interactively
-# Format: <iteration> <skill> <variant> <word_count> <pass_rate> <graded> <passed> <lift> <walk_secs> <efficiency_ratio>
-
 results_json="[]"
 
 temp_work="$(mktemp -d)"
 trap 'rm -rf "$temp_work"' EXIT
 
-# Prepare sandbox workspace base
+# Prepare sandbox workspace base once
 mkdir -p "$temp_work/.agents/skills"
-
 for skill in "${SKILLS[@]}"; do
   cp -R "$ROOT/.agents/skills/$skill" "$temp_work/.agents/skills/"
 done
-if [[ -d "$ROOT/.agents/skills/skill-creator" ]]; then
-  cp -R "$ROOT/.agents/skills/skill-creator" "$temp_work/.agents/skills/"
-fi
 
 echo "=== Starting Multi-Candidate Skill Refinement Benchmark ($ITERATIONS iterations) ===" >&2
 
@@ -48,12 +41,24 @@ for iter in $(seq 1 "$ITERATIONS"); do
         cp "$FIXTURES/$skill/${variant}.md" "$temp_work/.agents/skills/$skill/SKILL.md"
       fi
 
-      # Run eval
-      eval_out="$("$BIN" --root "$temp_work" eval --skill "$skill" --format json 2>/dev/null || true)"
+      # Run eval, capturing stdout and stderr
+      eval_err_file="$(mktemp)"
+      eval_out_file="$(mktemp)"
+
+      if ! "$BIN" --root "$temp_work" eval --skill "$skill" --format json >"$eval_out_file" 2>"$eval_err_file"; then
+        eval_status="failed"
+        err_msg="$(cat "$eval_err_file")"
+      else
+        eval_status="success"
+        err_msg=""
+      fi
+
+      eval_out="$(cat "$eval_out_file")"
+      rm -f "$eval_err_file" "$eval_out_file"
 
       if [[ -z "$eval_out" || "$eval_out" == "[]" ]]; then
-        echo "Error evaluating $skill ($variant) on iteration $iter" >&2
-        continue
+        echo "Error: Eval returned empty output for $skill ($variant) on iteration $iter: $err_msg" >&2
+        exit 1
       fi
 
       pass_rate="$(jq -r '.[0].pass_rate // 0.0' <<<"$eval_out")"
@@ -62,6 +67,7 @@ for iter in $(seq 1 "$ITERATIONS"); do
       lift="$(jq -r '.[0].lift // 0.0' <<<"$eval_out")"
       words="$(jq -r '.[0].skill_words // 0' <<<"$eval_out")"
       walk_secs="$(jq -r '.[0].walk_secs // 0.0' <<<"$eval_out")"
+      cases="$(jq -c '.[0].cases // []' <<<"$eval_out")"
 
       # Efficiency ratio = pass_rate / words * 1000
       eff_ratio="$(awk -v p="$pass_rate" -v w="$words" 'BEGIN { if (w == 0) print "0.0"; else printf "%.4f", (p / w) * 1000 }')"
@@ -77,7 +83,10 @@ for iter in $(seq 1 "$ITERATIONS"); do
         --arg lift "$lift" \
         --arg walk_secs "$walk_secs" \
         --arg eff "$eff_ratio" \
-        '{iteration: ($iter|tonumber), skill: $skill, variant: $variant, words: ($words|tonumber), pass_rate: ($pass_rate|tonumber), graded: ($graded|tonumber), passed: ($passed|tonumber), lift: ($lift|tonumber), walk_secs: ($walk_secs|tonumber), efficiency_ratio: ($eff|tonumber)}')"
+        --arg status "$eval_status" \
+        --arg err "$err_msg" \
+        --argjson cases "$cases" \
+        '{iteration: ($iter|tonumber), skill: $skill, variant: $variant, words: ($words|tonumber), pass_rate: ($pass_rate|tonumber), graded: ($graded|tonumber), passed: ($passed|tonumber), lift: ($lift|tonumber), walk_secs: ($walk_secs|tonumber), efficiency_ratio: ($eff|tonumber), status: $status, error: $err, cases: $cases}')"
 
       results_json="$(jq --argjson e "$entry" '. + [$e]' <<<"$results_json")"
     done
@@ -87,6 +96,10 @@ done
 # Compute aggregates and write summary report JSON
 report="$(python3 - <<< "
 import json, sys, math
+
+true = True
+false = False
+null = None
 
 data = $results_json
 
@@ -126,7 +139,14 @@ for (skill, variant), runs in by_key.items():
         'iterations': n
     })
 
-print(json.dumps({'runs': data, 'summary': summary}, indent=2))
+meta = {
+    'schema_version': 1,
+    'evaluator_mode': 'deterministic',
+    'total_runs_recorded': len(data),
+    'expected_runs': len(by_key) * ${ITERATIONS}
+}
+
+print(json.dumps({'metadata': meta, 'runs': data, 'summary': summary}, indent=2))
 ")"
 
 if [[ -n "$OUT_FILE" ]]; then
