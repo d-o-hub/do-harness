@@ -43,6 +43,9 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TEMPLATE="$ROOT/.github/release-notes-template.md"
+# Set by `seed --carry-from <file>`: a copy of the notes header taken from the
+# release branch being replaced, so a curated header survives a re-derivation.
+CARRY_FROM=""
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 
@@ -77,7 +80,7 @@ Compose and validate the GitHub Release body.
 Usage:
   release-notes.sh compose <tag> <generated-notes> <out> [<curated-notes>]
   release-notes.sh check <tag> <file>
-  release-notes.sh seed <tag> [<out>]
+  release-notes.sh seed <tag> [<out>] [--carry-from <file>]
   release-notes.sh --self-test
 EOF
 }
@@ -252,6 +255,20 @@ seed() {
         echo "release-notes.sh: $out exists; leaving it unchanged"
         return 0
     fi
+    # A refresh force-pushes the release branch, so an edit made in the pull
+    # request would be discarded. The notes header is the one file the pull request
+    # exists to edit, so a copy that differs from the template is carried forward
+    # rather than re-seeded; a copy identical to it is the stub, which the seed
+    # writes anyway.
+    if [[ -n "$CARRY_FROM" ]]; then
+        [[ -f "$CARRY_FROM" ]] || fail "seed: --carry-from needs an existing file, got '$CARRY_FROM'"
+        if ! cmp -s "$CARRY_FROM" "$TEMPLATE"; then
+            mkdir -p "$(dirname "$out")"
+            cp "$CARRY_FROM" "$out"
+            echo "release-notes.sh: carried the curated $out forward from $CARRY_FROM"
+            return 0
+        fi
+    fi
     mkdir -p "$(dirname "$out")"
     cp "$TEMPLATE" "$out"
     echo "release-notes.sh: seeded $out — edit it before the release pull request merges"
@@ -303,6 +320,27 @@ EOF
     if awk '/^### Other changes$/,/^$/' "$composed" | grep -q 'made their first contribution'; then
         fail "self-test: a contributor line was filed as a change"
     fi
+
+    # seed: the header a maintainer wrote is the one thing a refresh must not
+    # discard, while a copy that is still the template is just the stub.
+    local seed_dir="$WORK/seed" curated="$WORK/curated.md" stub_copy="$WORK/stub.md"
+    mkdir -p "$seed_dir"
+    cp "$TEMPLATE" "$stub_copy"
+    CARRY_FROM="$stub_copy"
+    seed "v0.3.9" "$seed_dir/notes.md" >/dev/null
+    cmp -s "$TEMPLATE" "$seed_dir/notes.md" ||
+        fail "self-test: a template copy was not treated as the stub"
+    rm -f "$seed_dir/notes.md"
+    cp "$TEMPLATE" "$curated"
+    printf '\n## Highlights\n\nEdited by a maintainer.\n' >>"$curated"
+    CARRY_FROM="$curated"
+    seed "v0.3.9" "$seed_dir/notes.md" >/dev/null
+    grep -q 'Edited by a maintainer' "$seed_dir/notes.md" ||
+        fail "self-test: a curated header was not carried forward"
+    CARRY_FROM=""
+    seed "v0.3.9" "$seed_dir/notes.md" >/dev/null
+    grep -q 'Edited by a maintainer' "$seed_dir/notes.md" ||
+        fail "self-test: seed overwrote an existing header"
     if [[ "$(count_bullets "$generated")" != "$(count_bullets "$composed")" ]]; then
         fail "self-test: the composed body lost pull requests"
     fi
@@ -370,7 +408,7 @@ EOF
     check "v0.1.3" "$WORK/stubbed.md" >/dev/null ||
         fail "self-test: an unedited seeded stub failed the check"
 
-    echo "release-notes.sh self-test OK (regroups by type, files contributors apart, keeps every bullet, seeds without overwriting, rejects a bare dump and an empty section)"
+    echo "release-notes.sh self-test OK (regroups by type, files contributors apart, keeps every bullet, seeds without overwriting, carries a curated header forward, rejects a bare dump and an empty section)"
 }
 
 case "${1:-}" in
@@ -393,7 +431,30 @@ case "${1:-}" in
             usage
             exit 2
         }
-        seed "$2" "${3:-}"
+        seed_tag="$2"
+        shift 2
+        seed_out=""
+        if [[ $# -gt 0 && "${1:-}" != --* ]]; then
+            seed_out="$1"
+            shift
+        fi
+        while [[ $# -gt 0 ]]; do
+            case "$1" in
+                --carry-from)
+                    CARRY_FROM="${2:-}"
+                    [[ -n "$CARRY_FROM" ]] || {
+                        usage
+                        exit 2
+                    }
+                    shift 2
+                    ;;
+                *)
+                    usage
+                    exit 2
+                    ;;
+            esac
+        done
+        seed "$seed_tag" "$seed_out"
         ;;
     --self-test)
         self_test
