@@ -358,5 +358,11 @@
     "rationale": "`0.0.x` is the pre-API phase, and `next_version` keeps it on patches; letting a breaking change jump straight to the first minor would spend the one version that is meant to mark the API's first shape. SemVer section 4 leaves the choice open (anything MAY change at 0.y.z), so the exception is a policy decision, not a semantic requirement — and it is why the bump-policy table in docs/releasing.md needs its own `0.0.x` row.",
     "sensor": "bash scripts/release-manager.sh --self-test",
     "category": "distribution"
+  },
+  {
+    "invariant": "The curated release-notes header is seeded into the release pull request as a byte-identical copy of .github/release-notes-template.md, so the header a maintainer edits during review is the one in the tagged commit the release job composes the body from, and an untouched stub still publishes the template body",
+    "rationale": "docs/releases/<tag>.md is only used when it exists at the tagged commit, so a header written after the release pull request merges never reaches the published notes — the release that introduced this step (v0.3.1) shipped the generic template because its tag predated the file, and the body for that tag had to be edited by hand. Byte-identical is the whole safety property: compose substitutes {{TAG}}/{{VERSION}} in a curated header too, so seeding changes no published byte until someone edits it, and the edit is reviewed in the same pull request as the version bump instead of out of band. The step sits in auto-release.yml rather than in release-manager.sh prepare, whose --e2e mode asserts prepare touches exactly the managed manifests and the lock. seed never overwrites an existing header, so a re-run of the workflow cannot discard an edit made while the pull request is open.",
+    "sensor": "bash scripts/release-notes.sh --self-test",
+    "category": "distribution"
   }
 ]

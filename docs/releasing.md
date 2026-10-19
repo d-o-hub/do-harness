@@ -346,6 +346,15 @@ in this repository:
 change list, and `release-notes.sh check <tag> <out>` fails the release when a
 required section is missing or empty, a placeholder survived substitution, the
 curated header does not name the version, or the composer lost a pull request.
+
+The release pull request seeds `docs/releases/v<next>.md` as a byte-identical copy
+of the template, so the header is reviewed alongside the version bump and lands in
+the tagged commit the `release` job composes from. An untouched stub publishes
+exactly the template body; edit it in the pull request to describe the release —
+a highlight, a known blocker, a migration step. `release-notes.sh seed <tag>
+[<out>]` writes the stub by hand, for a release cut without the automation or into
+a scratch path for comparison, and never overwrites an existing header, so an edit
+made while the pull request is open survives a re-run of the step.
 That last one matters: a silently dropped change is worse than a badly
 categorized one. A release can therefore not ship a bare commit dump — the shape
 `v0.1.1` shipped.
