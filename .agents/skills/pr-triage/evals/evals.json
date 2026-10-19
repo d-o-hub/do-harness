@@ -28,13 +28,16 @@
     "contains:auto_merge_summary.txt|armed_exit=1",
     "contains:auto_merge_armed.out|ARMED",
     "contains:auto_merge_disable.log|disable-auto 9",
-    "contains:auto_merge_after.out|NONE"
+    "contains:auto_merge_after.out|NONE",
+    "exists:.agents/skills/pr-triage/scripts/premerge.sh",
+    "contains:.agents/skills/pr-triage/SKILL.md|gh pr ready",
+    "contains:.agents/skills/pr-triage/SKILL.md|hard stop"
    ]
   },
   {
    "id": 2,
-   "prompt": "Given open PRs that include a stack, a draft, a hold-labeled PR, and two independent PRs, produce the merge order; then detect whether a changed PR and an empty-commit PR have any effective change.",
-   "expected_output": "Order is stack first, then oldest-first, with drafts and hold-labeled PRs excluded; the changed PR reports has-effect and the empty commit reports no-effect.",
+   "prompt": "Given open PRs that include a stack, a draft, a hold-labeled PR, and two independent PRs, produce the merge order; refuse a draft or hold-labeled PR at the merge step; then detect whether a changed PR and an empty-commit PR have any effective change.",
+   "expected_output": "Order is stack first, then oldest-first, with drafts and hold-labeled PRs excluded; the pre-merge stop refuses a draft, a hold label and a non-open PR while passing a clean one, and fails closed when the API omits the draft field; the changed PR reports has-effect and the empty commit reports no-effect.",
    "files": [],
    "dim": "correctness",
    "kind": "contextual",
@@ -42,7 +45,16 @@
     "walk:",
     "contains:pr_list_order.txt|2,5,1",
     "contains:no_effect_has.txt|has-effect",
-    "contains:no_effect_empty.txt|no-effect"
+    "contains:no_effect_empty.txt|no-effect",
+    "exists:.agents/skills/pr-triage/scripts/premerge.sh",
+    "contains:.agents/skills/pr-triage/SKILL.md|premerge.sh",
+    "contains:premerge_summary.txt|draft_exit=1",
+    "contains:premerge_summary.txt|hold_exit=1",
+    "contains:premerge_summary.txt|closed_exit=1",
+    "contains:premerge_summary.txt|ok_exit=0",
+    "contains:premerge_summary.txt|missing_field_exit=2",
+    "contains:premerge_draft.out|hard stop",
+    "contains:premerge_ok.out|MERGEABLE"
    ]
   },
   {

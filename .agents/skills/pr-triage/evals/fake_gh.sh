@@ -6,7 +6,9 @@
 #   status / graphql / compare.
 # Fixtures come from FAKE_GH_FIXTURES; check-run mode from FAKE_GH_CHECKS, and
 # the auto-merge request from FAKE_GH_AUTO_MERGE (armed|none) with disarms
-# recorded in FAKE_GH_AUTO_MERGE_LOG.
+# recorded in FAKE_GH_AUTO_MERGE_LOG. `pr view --json isDraft,…` answers from
+# FAKE_GH_PR_DRAFT (true|false, default false), FAKE_GH_PR_STATE (default OPEN),
+# and FAKE_GH_PR_LABELS (a JSON array of label objects, default []).
 # FAKE_GH_CHECKS_SEQUENCE (comma list, e.g. "pending,pass") advances one mode
 # per check-runs call and clamps at the last entry; its cursor lives in
 # FAKE_GH_SEQ_FILE (default: a file under ${TMPDIR:-/tmp}).
@@ -93,6 +95,13 @@ case "$cmd" in
           *mergeCommit*) printf '%s\n' "$sha" ;;
           *baseRefName*) printf 'main\t%s\n' "$sha" ;;
           *headRefOid*) printf '%s\n' "$sha" ;;
+          *isDraft*)
+            # Pre-merge stop fixtures: a walkthrough flips the draft flag, the
+            # state, or the label list per call.
+            printf '{"isDraft":%s,"state":"%s","labels":%s}\n' \
+              "${FAKE_GH_PR_DRAFT:-false}" "${FAKE_GH_PR_STATE:-OPEN}" \
+              "${FAKE_GH_PR_LABELS:-[]}"
+            ;;
           *) printf '{"number":%s,"baseRefName":"main","headRefOid":"%s"}\n' "$pr" "$sha" ;;
         esac
         ;;
