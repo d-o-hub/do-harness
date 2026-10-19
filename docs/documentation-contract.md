@@ -11,7 +11,7 @@ green check actually proves, and how to repair a failure. The executor is
 The CLI definitions are the single source of truth for the mechanical facts a
 reference document repeats: command paths, aliases, usage lines, argument
 arity, required status, defaults, possible values, and help text. Three
-artifacts are rendered from `Cli::command()`:
+artifacts carry generated regions rendered from `Cli::command()`:
 
 - [README.md](../README.md) — the `cli-commands` region.
 - [cli.md](cli.md) — the `cli-globals` region plus one `cli-contract <path>`
@@ -31,6 +31,25 @@ A failure names the file and region. A content diff is the only repairable
 class: a missing file, unparsable markers, a region the CLI no longer produces,
 and a region the CLI does produce but that is absent from the document are
 structural, and the tool never inserts or deletes a marker pair on its own.
+
+## Other generated CLI artifacts
+
+Two further artifacts are rendered from the same `Cli::command()` source but
+carry no marker regions, because each is a whole file rather than a document
+with editable prose:
+
+- `completions/` — one file per shell (`do-harness.bash`, `_do-harness`,
+  `do-harness.fish`, `_do-harness.ps1`, `do-harness.elv`), regenerated with
+  `do-harness completions <shell>`.
+- `man/do-harness.1` — regenerated with `do-harness man man`.
+
+Changing a command's help text — including a subcommand's `about` — can move
+several of these artifacts at once, so a help edit is not finished until all
+five have been regenerated. `scripts/docs.py sync --write` does not touch them:
+[completions_sync.rs](../crates/do-harness/tests/completions_sync.rs) and
+[man_sync.rs](../crates/do-harness/tests/man_sync.rs) compare the committed
+copies against the CLI instead and fail with the exact regeneration command, so
+the `test` sensor is the guard.
 
 ## Example blocks
 
