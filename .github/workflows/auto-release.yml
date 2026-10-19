@@ -129,7 +129,18 @@ jobs:
           # edits it during review. It has to be in *this* commit: the `release`
           # job composes the body from the tagged tree, so a header added after
           # the merge never reaches the published notes.
-          bash scripts/release-notes.sh seed "v${{ steps.derive.outputs.next }}"
+          #
+          # The branch being replaced is consulted first: a refresh force-pushes
+          # it, so a header a maintainer edited in the pull request is carried
+          # forward instead of silently reverting to the template.
+          carried="$(mktemp)"
+          if git fetch --depth=1 origin "release/v${{ steps.derive.outputs.next }}" 2>/dev/null &&
+            git show "FETCH_HEAD:docs/releases/v${{ steps.derive.outputs.next }}.md" >"$carried" 2>/dev/null; then
+            bash scripts/release-notes.sh seed "v${{ steps.derive.outputs.next }}" --carry-from "$carried"
+          else
+            bash scripts/release-notes.sh seed "v${{ steps.derive.outputs.next }}"
+          fi
+          rm -f "$carried"
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add --all
@@ -186,9 +197,9 @@ jobs:
             printf "header of the published release notes: it is used verbatim because the "
             printf "\`release\` job composes the body from the tagged commit, so describe the "
             printf "release here. Left untouched, the header stays the generic template — a "
-            printf "valid release, just a less useful one. Like the version override above, an "
-            printf "edit made here is discarded when a later push to \`main\` re-derives and "
-            printf "force-pushes this branch, so re-apply it or merge first.\n\n"
+            printf "valid release, just a less useful one. Unlike the version override above, "
+            printf "this edit survives a re-derivation: the header on the branch being replaced "
+            printf "is carried forward, so curating it does not depend on merge timing.\n\n"
           } >"$body"
           number="$(gh pr list --head "$branch" --state open \
             --json number --jq '.[0].number // empty')"
