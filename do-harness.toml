@@ -273,7 +273,7 @@ when-changed = [".agents/skills/pr-triage/**", "scripts/check-untrusted-ingest.s
 # placeholder, an emptied section, a lost pull request).
 name = "release-notes"
 argv = ["bash", "scripts/release-notes.sh", "--self-test"]
-when-changed = [".github/release-notes-template.md", ".github/release.yml", ".github/workflows/release.yml", "docs/releases/**", "scripts/release-notes.sh"]
+when-changed = [".github/release-notes-template.md", ".github/release.yml", ".github/workflows/release.yml", ".github/workflows/auto-release.yml", "docs/releases/**", "scripts/release-notes.sh"]
 
 [[sensors]]
 # Executable half of the release-derivation contract: the version a merge cuts

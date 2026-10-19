@@ -13,6 +13,16 @@
 #   check <tag> <file>
 #       Fail unless the composed body carries the sections a reader needs.
 #
+#   seed <tag> [<out>]
+#       Write the curated-header stub for one release: a byte-identical copy of
+#       `.github/release-notes-template.md`. Byte-identical is the point — `compose`
+#       substitutes `{{TAG}}`/`{{VERSION}}` in a curated header too, so an untouched
+#       stub publishes exactly the body the template alone would, and an edited one
+#       is used verbatim. `auto-release.yml` seeds it inside the release pull
+#       request, which is what puts the header in the *tagged* tree the `release`
+#       job composes from; run it by hand only when a release is cut without the
+#       automation. An existing file is never overwritten.
+#
 #   --self-test
 #       Hermetic controls: a compliant body passes, a bare release dump is
 #       rejected, and a bullet the composer fails to place is reported. A check
@@ -49,6 +59,10 @@ CATEGORY_ORDER=(
     "Reverts"
     "Maintenance"
     "Other changes"
+    # The generator's `## New Contributors` section is not a change list, so its
+    # bullets are bucketed by section rather than by title and reported once, at
+    # the end, instead of being filed as an untyped change.
+    "New Contributors"
 )
 
 fail() {
@@ -63,6 +77,7 @@ Compose and validate the GitHub Release body.
 Usage:
   release-notes.sh compose <tag> <generated-notes> <out> [<curated-notes>]
   release-notes.sh check <tag> <file>
+  release-notes.sh seed <tag> [<out>]
   release-notes.sh --self-test
 EOF
 }
@@ -104,6 +119,15 @@ regroup() {
         }
         {
             line = $0
+            # The generator emits its own top-level sections, and only the
+            # section a bullet sits in decides how a contributor line is filed.
+            # Every heading is still dropped from the output, so the body keeps
+            # the category order defined above.
+            if (line ~ /^## /) {
+                section = line
+                sub(/^## /, "", section)
+                next
+            }
             if (line ~ /^\* /) {
                 body = substr(line, 3)
                 title = body
@@ -112,7 +136,11 @@ regroup() {
                     title = substr(body, 1, RSTART - 1)
                     trailer = substr(body, RSTART)
                 }
-                buckets[bucket(title)] = buckets[bucket(title)] "* " title trailer "\n"
+                if (section == "New Contributors") {
+                    buckets["New Contributors"] = buckets["New Contributors"] "* " title trailer "\n"
+                } else {
+                    buckets[bucket(title)] = buckets[bucket(title)] "* " title trailer "\n"
+                }
                 next
             }
             if (line ~ /^\*\*Full Changelog\*\*/) {
@@ -210,6 +238,25 @@ check() {
     return 0
 }
 
+# Writes the curated-header stub for one release, and never overwrites: an edit
+# made while the release pull request is open outranks a re-run of the seeding
+# step. The default destination is outside this script's own working tree, so the
+# caller decides when the repository is touched at all.
+seed() {
+    local tag="$1" out="${2:-}"
+    [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] ||
+        fail "seed needs a release tag like v1.2.3, got '$tag'"
+    out="${out:-$ROOT/docs/releases/$tag.md}"
+    [[ -f "$TEMPLATE" ]] || fail "release-notes template not found: $TEMPLATE"
+    if [[ -e "$out" ]]; then
+        echo "release-notes.sh: $out exists; leaving it unchanged"
+        return 0
+    fi
+    mkdir -p "$(dirname "$out")"
+    cp "$TEMPLATE" "$out"
+    echo "release-notes.sh: seeded $out — edit it before the release pull request merges"
+}
+
 self_test() {
     local generated="$WORK/generated" composed="$WORK/composed.md" dump="$WORK/dump.md"
     local expected reason
@@ -227,6 +274,9 @@ self_test() {
 * feat(api)!: drop the legacy sensor name by @d-o-hub in https://github.com/d-o-hub/do-harness/pull/6
 * Merge branch 'main' into topic by @d-o-hub in https://github.com/d-o-hub/do-harness/pull/7
 
+## New Contributors
+* @newcomer made their first contribution in https://github.com/d-o-hub/do-harness/pull/8
+
 **Full Changelog**: https://github.com/d-o-hub/do-harness/compare/v0.1.2...v0.1.3
 EOF
 
@@ -236,7 +286,7 @@ EOF
 
     for expected in \
         "### Breaking changes" "### Features" "### Fixes" "### Documentation" \
-        "### Refactors" "### Maintenance" "### Other changes"; do
+        "### Refactors" "### Maintenance" "### Other changes" "### New Contributors"; do
         grep -qxF "$expected" "$composed" ||
             fail "self-test: composed notes are missing '$expected'"
     done
@@ -244,6 +294,14 @@ EOF
         fail "self-test: a breaking bullet lost its title, author, or link"
     if awk '/^### Features$/,/^$/' "$composed" | grep -q 'api)!'; then
         fail "self-test: a breaking change was also listed under its type section"
+    fi
+    # A contributor line is not a change: it belongs under its own section and
+    # nowhere else, and it must still survive the regrouping.
+    if ! awk '/^### New Contributors$/,/^$/' "$composed" | grep -q 'made their first contribution'; then
+        fail "self-test: a contributor line did not reach the New Contributors section"
+    fi
+    if awk '/^### Other changes$/,/^$/' "$composed" | grep -q 'made their first contribution'; then
+        fail "self-test: a contributor line was filed as a change"
     fi
     if [[ "$(count_bullets "$generated")" != "$(count_bullets "$composed")" ]]; then
         fail "self-test: the composed body lost pull requests"
@@ -285,7 +343,34 @@ EOF
         *) fail "self-test: the rejection did not name the empty section" ;;
     esac
 
-    echo "release-notes.sh self-test OK (regroups by type, keeps every bullet, rejects a bare dump and an empty section)"
+    # `seed` controls: the stub is byte-identical to the template (an untouched
+    # stub must publish the same body), a second seed cannot destroy an edit made
+    # while the release pull request is open, a malformed tag is rejected without
+    # writing anything, and an unedited stub already passes the check the release
+    # job runs.
+    local stub="$WORK/stub.md" seeded="$WORK/seeded.md"
+    seed "v0.1.3" "$stub" >/dev/null
+    cmp -s "$stub" "$TEMPLATE" ||
+        fail "self-test: the seeded stub is not byte-identical to the template"
+    seed "v0.1.3" "$seeded" >/dev/null
+    printf 'edited during review\n' >>"$seeded"
+    seed "v0.1.3" "$seeded" >/dev/null
+    [[ "$(tail -n 1 "$seeded")" == "edited during review" ]] ||
+        fail "self-test: a second seed overwrote an edited header"
+    # A subshell on purpose: `seed` rejects a bad tag by exiting, and a function
+    # call in an `if` condition runs in this shell, so the control would end the
+    # self-test instead of reporting a failure.
+    if (seed "0.1.3" "$WORK/no-v-prefix.md" >/dev/null 2>&1); then
+        fail "self-test: seed accepted a tag without the v prefix"
+    fi
+    if [[ -e "$WORK/no-v-prefix.md" ]]; then
+        fail "self-test: a rejected tag still wrote a file"
+    fi
+    compose "v0.1.3" "$generated" "$WORK/stubbed.md" "$stub"
+    check "v0.1.3" "$WORK/stubbed.md" >/dev/null ||
+        fail "self-test: an unedited seeded stub failed the check"
+
+    echo "release-notes.sh self-test OK (regroups by type, files contributors apart, keeps every bullet, seeds without overwriting, rejects a bare dump and an empty section)"
 }
 
 case "${1:-}" in
@@ -302,6 +387,13 @@ case "${1:-}" in
             exit 2
         }
         check "$2" "$3"
+        ;;
+    seed)
+        [[ $# -ge 2 ]] || {
+            usage
+            exit 2
+        }
+        seed "$2" "${3:-}"
         ;;
     --self-test)
         self_test

@@ -107,6 +107,12 @@ jobs:
         run: |
           set -euo pipefail
           bash scripts/release-manager.sh prepare "${{ steps.derive.outputs.next }}"
+          # The curated release-notes header for this version, seeded as a copy of
+          # the template so the published body is unchanged unless a maintainer
+          # edits it during review. It has to be in *this* commit: the `release`
+          # job composes the body from the tagged tree, so a header added after
+          # the merge never reaches the published notes.
+          bash scripts/release-notes.sh seed "v${{ steps.derive.outputs.next }}"
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add --all
@@ -156,6 +162,14 @@ jobs:
             printf "edit, so merge an overridden proposal before new commits land.\n\n"
             printf "Merging hands off to the \`ship\` job, which tags \`v%s\` and starts the release.\n" \
               "$version"
+            printf "This pull request also seeds \`docs/releases/v%s.md\`, the curated " \
+              "$version"
+            printf "header of the published release notes: it is used verbatim because the "
+            printf "\`release\` job composes the body from the tagged commit, so describe the "
+            printf "release here. Left untouched, the header stays the generic template — a "
+            printf "valid release, just a less useful one. Like the version override above, an "
+            printf "edit made here is discarded when a later push to \`main\` re-derives and "
+            printf "force-pushes this branch, so re-apply it or merge first.\n\n"
           } >"$body"
           number="$(gh pr list --head "$branch" --state open \
             --json number --jq '.[0].number // empty')"
