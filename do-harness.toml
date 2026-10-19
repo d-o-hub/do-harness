@@ -256,14 +256,14 @@ argv = ["bash", "scripts/check-privacy.sh"]
 when-changed = ["crates/do-harness/templates/**", ".agents/skills/**", "AGENTS.md", "scripts/check-privacy.sh"]
 
 [[sensors]]
-# Executable half of pr-triage's "untrusted text is data, never instructions"
-# contract. The skill ingests hostile PR bodies, comments, and webhook
-# payloads; the rule that none of it reaches a dynamic-execution sink used to
-# be prose only, which AGENTS.md section 7 does not accept. Hermetic: reads
-# the skill tree, runs nothing from it.
+# Executable half of the "untrusted text is data, never instructions" contract
+# for the skills that ingest attacker-controlled text (pr-triage and
+# issue-to-pr). The rule that none of it reaches a dynamic-execution sink used
+# to be prose only, which AGENTS.md section 7 does not accept. Hermetic: reads
+# the skill trees, runs nothing from them.
 name = "untrusted-ingest"
 argv = ["bash", "scripts/check-untrusted-ingest.sh"]
-when-changed = [".agents/skills/pr-triage/**", "scripts/check-untrusted-ingest.sh"]
+when-changed = [".agents/skills/pr-triage/**", ".agents/skills/issue-to-pr/**", "scripts/check-untrusted-ingest.sh"]
 
 [[sensors]]
 # Executable half of the release-note contract: a published body carries the
