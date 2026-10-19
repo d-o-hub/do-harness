@@ -11,7 +11,9 @@ mod support;
 use support::git_command;
 
 fn harness() -> Command {
-    Command::new(env!("CARGO_BIN_EXE_do-harness"))
+    let mut cmd = Command::new(env!("CARGO_BIN_EXE_do-harness"));
+    support::isolate_command(&mut cmd);
+    cmd
 }
 
 fn run(cmd: &mut Command) -> Output {
@@ -251,5 +253,175 @@ fn installed_pre_push_hook_blocks_a_failing_workspace() {
     assert!(
         combined.contains("check"),
         "the blocked push must name the failing sensor:\n{combined}"
+    );
+}
+
+#[test]
+fn linked_worktree_e2e_hook_execution_and_lifecycle() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let parent = dir.path().join("parent");
+    let linked = dir.path().join("linked");
+    let bin = env!("CARGO_BIN_EXE_do-harness");
+
+    std::fs::create_dir_all(&parent).expect("mkdir parent");
+    run(harness().arg("--root").arg(&parent).arg("init"));
+
+    git_ok(&parent, &["init", "-q"]);
+    git_ok(&parent, &["config", "user.email", "e2e@example.test"]);
+    git_ok(&parent, &["config", "user.name", "e2e"]);
+
+    git_ok(&parent, &["add", "-A"]);
+    git_ok_with_bin(
+        &parent,
+        &["commit", "-q", "-m", "chore: initial commit"],
+        bin,
+    );
+
+    let linked_str = linked.to_string_lossy().replace('\\', "/");
+    git_ok(
+        &parent,
+        &["worktree", "add", "-b", "fixture", &linked_str],
+    );
+
+    // Install hooks from linked worktree side
+    let install_out = harness()
+        .current_dir(&linked)
+        .arg("--root")
+        .arg(&linked)
+        .arg("hook")
+        .arg("install")
+        .output()
+        .expect("spawn hook install in linked worktree");
+    assert!(
+        install_out.status.success(),
+        "hook install from linked worktree must succeed:\nstdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&install_out.stdout),
+        String::from_utf8_lossy(&install_out.stderr)
+    );
+
+    // Verify hook status from both parent and linked sides
+    for side in [&parent, &linked] {
+        let status_out = harness()
+            .current_dir(side)
+            .arg("--root")
+            .arg(side)
+            .arg("hook")
+            .arg("status")
+            .env("DO_HARNESS_BIN", bin)
+            .output()
+            .expect("spawn hook status");
+        assert!(
+            status_out.status.success(),
+            "hook status must succeed from {}:\n{}",
+            side.display(),
+            String::from_utf8_lossy(&status_out.stderr)
+        );
+        let stdout = String::from_utf8_lossy(&status_out.stdout);
+        assert!(
+            stdout.contains("pre-commit: installed"),
+            "status stdout: {stdout}"
+        );
+        assert!(!stdout.contains("shadowed"), "status stdout: {stdout}");
+
+        let diff_out = harness()
+            .current_dir(side)
+            .arg("--root")
+            .arg(side)
+            .arg("hook")
+            .arg("diff")
+            .env("DO_HARNESS_BIN", bin)
+            .output()
+            .expect("spawn hook diff");
+        assert!(
+            diff_out.status.success(),
+            "hook diff must succeed from {}:\n{}",
+            side.display(),
+            String::from_utf8_lossy(&diff_out.stderr)
+        );
+    }
+
+    // A commit from the linked worktree with bad commit message subject must be blocked
+    std::fs::write(linked.join("note.txt"), "hello worktree\n").expect("write note");
+    git_ok(&linked, &["add", "-A"]);
+
+    let bad_commit = git_command(&linked)
+        .args(["commit", "-m", "Bad Subject Message"])
+        .env("DO_HARNESS_BIN", bin)
+        .output()
+        .expect("spawn git commit in linked worktree");
+    assert!(
+        !bad_commit.status.success(),
+        "bad commit subject must be blocked in linked worktree:\nstdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&bad_commit.stdout),
+        String::from_utf8_lossy(&bad_commit.stderr)
+    );
+    let bad_stderr = String::from_utf8_lossy(&bad_commit.stderr);
+    assert!(
+        bad_stderr.contains("non-conventional commit subject")
+            || bad_stderr.contains("Conventional-commit invariant violated"),
+        "stderr must report commitlint failure:\n{bad_stderr}"
+    );
+
+    // Break code formatting in linked worktree so pre-commit fmt sensor fails
+    std::fs::write(
+        linked.join("src/lib.rs"),
+        "pub fn  unformatted ( )   {   1+1;  }\n",
+    )
+    .expect("write unformatted lib.rs");
+    git_ok(&linked, &["add", "-A"]);
+
+    let failing_pre_commit = git_command(&linked)
+        .args(["commit", "-m", "feat: valid conventional subject"])
+        .env("DO_HARNESS_BIN", bin)
+        .output()
+        .expect("spawn git commit in linked worktree");
+    assert!(
+        !failing_pre_commit.status.success(),
+        "a commit with broken code must be blocked by pre-commit hook in linked worktree"
+    );
+    let failing_combined = format!(
+        "{}{}",
+        String::from_utf8_lossy(&failing_pre_commit.stdout),
+        String::from_utf8_lossy(&failing_pre_commit.stderr)
+    );
+    assert!(
+        failing_combined.contains("fmt") || failing_combined.contains("Failed sensors"),
+        "failing pre-commit hook output must include verification stdout/stderr:\n{failing_combined}"
+    );
+
+    // Add a foreign hook in the shared parent hooks directory
+    let parent_hooks = parent.join(".git/hooks");
+    std::fs::write(
+        parent_hooks.join("pre-push"),
+        "#!/bin/sh\necho 'foreign pre-push'\n",
+    )
+    .expect("write foreign hook");
+
+    // Uninstall from linked worktree side
+    let uninstall_out = harness()
+        .current_dir(&linked)
+        .arg("--root")
+        .arg(&linked)
+        .arg("hook")
+        .arg("uninstall")
+        .output()
+        .expect("spawn hook uninstall in linked worktree");
+    assert!(
+        uninstall_out.status.success(),
+        "uninstall from linked worktree must succeed:\n{}",
+        String::from_utf8_lossy(&uninstall_out.stderr)
+    );
+
+    assert!(
+        !parent_hooks.join("pre-commit").exists(),
+        "managed pre-commit hook should be removed"
+    );
+    assert!(
+        !parent_hooks.join("commit-msg").exists(),
+        "managed commit-msg hook should be removed"
+    );
+    assert!(
+        parent_hooks.join("pre-push").exists(),
+        "foreign pre-push hook must be preserved"
     );
 }
