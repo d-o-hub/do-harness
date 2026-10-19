@@ -41,7 +41,11 @@ fn git(root: &Path, args: &[&str]) {
         .env("GIT_COMMITTER_EMAIL", "t@t")
         .status()
         .expect("spawn git");
-    assert!(status.success(), "git {args:?} failed in {}", root.display());
+    assert!(
+        status.success(),
+        "git {args:?} failed in {}",
+        root.display()
+    );
 }
 
 #[test]
@@ -65,7 +69,11 @@ fn node_pack_initialization_preserves_sources_and_verifies() {
     std::fs::write(root.join("src/index.js"), "console.log('hello');\n").unwrap();
 
     let (code, stdout, stderr) = run(harness(root).args(["init", "--language", "node"]));
-    assert_eq!(code, Some(0), "node init must succeed: stdout={stdout} stderr={stderr}");
+    assert_eq!(
+        code,
+        Some(0),
+        "node init must succeed: stdout={stdout} stderr={stderr}"
+    );
 
     assert_eq!(
         std::fs::read_to_string(root.join("package.json")).unwrap(),
@@ -79,17 +87,36 @@ fn node_pack_initialization_preserves_sources_and_verifies() {
     );
 
     let config = std::fs::read_to_string(root.join("do-harness.toml")).unwrap();
-    assert!(config.contains("language = \"node\""), "config must select node pack");
+    assert!(
+        config.contains("language = \"node\""),
+        "config must select node pack"
+    );
 
     // Verification set runs typecheck, lint, test
-    let (code, stdout, stderr) = run(harness(root).args(["verify", "--set", "verification", "--format", "json", "--strict"]));
-    assert_eq!(code, Some(0), "strict verify on node verification set must pass: stdout={stdout} stderr={stderr}");
+    let (code, stdout, stderr) = run(harness(root).args([
+        "verify",
+        "--set",
+        "verification",
+        "--format",
+        "json",
+        "--strict",
+    ]));
+    assert_eq!(
+        code,
+        Some(0),
+        "strict verify on node verification set must pass: stdout={stdout} stderr={stderr}"
+    );
     let report: Value = serde_json::from_str(&stdout).expect("valid JSON report");
     assert_eq!(report["ok"], Value::Bool(true));
 
     // Release set runs typecheck, lint, test, build
-    let (code, stdout, stderr) = run(harness(root).args(["verify", "--set", "release", "--format", "json", "--strict"]));
-    assert_eq!(code, Some(0), "strict verify on node release set must pass: stdout={stdout} stderr={stderr}");
+    let (code, stdout, stderr) =
+        run(harness(root).args(["verify", "--set", "release", "--format", "json", "--strict"]));
+    assert_eq!(
+        code,
+        Some(0),
+        "strict verify on node release set must pass: stdout={stdout} stderr={stderr}"
+    );
     let report: Value = serde_json::from_str(&stdout).expect("valid JSON report");
     assert_eq!(report["ok"], Value::Bool(true));
 
@@ -100,7 +127,10 @@ fn node_pack_initialization_preserves_sources_and_verifies() {
         .map(|s| s["name"].as_str().unwrap())
         .collect();
     for expected in ["typecheck", "lint", "test", "build"] {
-        assert!(sensor_names.contains(&expected), "missing sensor {expected} in {sensor_names:?}");
+        assert!(
+            sensor_names.contains(&expected),
+            "missing sensor {expected} in {sensor_names:?}"
+        );
     }
 }
 
@@ -110,21 +140,37 @@ fn web_pack_unconfigured_skips_and_fails_strict() {
     let root = dir.path();
 
     let (code, stdout, stderr) = run(harness(root).args(["init", "--language", "web"]));
-    assert_eq!(code, Some(0), "web init must succeed: stdout={stdout} stderr={stderr}");
+    assert_eq!(
+        code,
+        Some(0),
+        "web init must succeed: stdout={stdout} stderr={stderr}"
+    );
 
     assert!(root.join("scripts/viewport-audit.mjs").is_file());
     assert!(root.join("scripts/a11y-audit.mjs").is_file());
 
     // Without WEB_AUDIT_ROUTES, web sensors emit SKIP: which is recorded as warn.
-    let (code, stdout, stderr) = run(harness(root).args(["verify", "--set", "verification", "--format", "json", "--strict"]));
+    let (code, stdout, stderr) = run(harness(root).args([
+        "verify",
+        "--set",
+        "verification",
+        "--format",
+        "json",
+        "--strict",
+    ]));
     assert_eq!(
         code,
         Some(1),
         "strict verify on unconfigured web pack must fail closed: stdout={stdout} stderr={stderr}"
     );
 
-    let (status_code, stdout, stderr) = run(harness(root).args(["status", "--set", "verification", "--format", "json"]));
-    assert_eq!(status_code, Some(1), "status must report failure for weak evidence: stdout={stdout} stderr={stderr}");
+    let (status_code, stdout, stderr) =
+        run(harness(root).args(["status", "--set", "verification", "--format", "json"]));
+    assert_eq!(
+        status_code,
+        Some(1),
+        "status must report failure for weak evidence: stdout={stdout} stderr={stderr}"
+    );
     let status_doc: Value = serde_json::from_str(&stdout).expect("valid status JSON");
     assert_eq!(status_doc["state"], "red");
 }
@@ -135,7 +181,11 @@ fn generic_pack_vacuous_pass_is_distinguishable_from_strict_gate() {
     let root = dir.path();
 
     let (code, stdout, stderr) = run(harness(root).args(["init", "--language", "generic"]));
-    assert_eq!(code, Some(0), "generic init must succeed: stdout={stdout} stderr={stderr}");
+    assert_eq!(
+        code,
+        Some(0),
+        "generic init must succeed: stdout={stdout} stderr={stderr}"
+    );
 
     let evidence_file = root.join("evidence.json");
     let (code, stdout, stderr) = run(harness(root).args([
@@ -146,7 +196,11 @@ fn generic_pack_vacuous_pass_is_distinguishable_from_strict_gate() {
         "--evidence",
         evidence_file.to_str().unwrap(),
     ]));
-    assert_eq!(code, Some(0), "generic verify succeeds vacuously: stdout={stdout} stderr={stderr}");
+    assert_eq!(
+        code,
+        Some(0),
+        "generic verify succeeds vacuously: stdout={stdout} stderr={stderr}"
+    );
 
     let report: Value = serde_json::from_str(&stdout).expect("valid JSON report");
     assert_eq!(report["ok"], Value::Bool(true));
@@ -181,15 +235,27 @@ artifacts = ["dist/*.js"]
     git(root, &["add", "-A"]);
     git(root, &["commit", "-qm", "initial"]);
 
-    let (code, stdout, stderr) = run(harness(root).args(["verify", "--set", "verification", "--strict", "--format", "json"]));
+    let (code, stdout, stderr) = run(harness(root).args([
+        "verify",
+        "--set",
+        "verification",
+        "--strict",
+        "--format",
+        "json",
+    ]));
     assert_eq!(
         code,
         Some(1),
         "missing declared artifact glob must fail strict verify: stdout={stdout} stderr={stderr}"
     );
 
-    let (status_code, stdout, stderr) = run(harness(root).args(["status", "--set", "verification", "--format", "json"]));
-    assert_eq!(status_code, Some(1), "status must report failure for weak evidence: stdout={stdout} stderr={stderr}");
+    let (status_code, stdout, stderr) =
+        run(harness(root).args(["status", "--set", "verification", "--format", "json"]));
+    assert_eq!(
+        status_code,
+        Some(1),
+        "status must report failure for weak evidence: stdout={stdout} stderr={stderr}"
+    );
     let status_doc: Value = serde_json::from_str(&stdout).expect("valid status JSON");
     assert_eq!(status_doc["state"], "red");
 }
@@ -211,14 +277,24 @@ argv = ["true"]
     std::fs::write(root.join("do-harness.toml"), dangling_config).unwrap();
 
     let (code, _stdout, stderr) = run(harness(root).args(["verify", "--set", "verification"]));
-    assert_eq!(code, Some(2), "dangling sensor in set must produce exit code 2");
-    assert!(stderr.contains("nonexistent_sensor"), "stderr must name missing sensor: {stderr}");
+    assert_eq!(
+        code,
+        Some(2),
+        "dangling sensor in set must produce exit code 2"
+    );
+    assert!(
+        stderr.contains("nonexistent_sensor"),
+        "stderr must name missing sensor: {stderr}"
+    );
 
     // 2. Invalid syntax in do-harness.toml
     std::fs::write(root.join("do-harness.toml"), "invalid = toml [[ syntax").unwrap();
     let (code, _stdout, stderr) = run(harness(root).args(["verify"]));
     assert_eq!(code, Some(2), "invalid TOML must produce exit code 2");
-    assert!(!stderr.is_empty(), "stderr must give actionable failure reason: {stderr}");
+    assert!(
+        !stderr.is_empty(),
+        "stderr must give actionable failure reason: {stderr}"
+    );
 }
 
 #[test]
@@ -240,15 +316,24 @@ argv = ["definitely_nonexistent_tool_12345"]
     git(root, &["commit", "-qm", "initial"]);
 
     // Local advisory run (execfail is caught as an error signature)
-    let (code, stdout, stderr) = run(harness(root).args(["verify", "--set", "verification", "--format", "json"]));
-    assert_eq!(code, Some(1), "non-existent tool must fail verify: stdout={stdout} stderr={stderr}");
+    let (code, stdout, stderr) =
+        run(harness(root).args(["verify", "--set", "verification", "--format", "json"]));
+    assert_eq!(
+        code,
+        Some(1),
+        "non-existent tool must fail verify: stdout={stdout} stderr={stderr}"
+    );
 
     // Under DO_HARNESS_REQUIRE_TOOLS=1
     let mut cmd = harness(root);
     cmd.args(["verify", "--set", "verification", "--format", "json"]);
     cmd.env("DO_HARNESS_REQUIRE_TOOLS", "1");
     let (code, stdout, stderr) = run(&mut cmd);
-    assert_eq!(code, Some(1), "missing tool under DO_HARNESS_REQUIRE_TOOLS=1 must fail: stdout={stdout} stderr={stderr}");
+    assert_eq!(
+        code,
+        Some(1),
+        "missing tool under DO_HARNESS_REQUIRE_TOOLS=1 must fail: stdout={stdout} stderr={stderr}"
+    );
 }
 
 #[test]
@@ -273,8 +358,19 @@ when-changed = ["src/s2.rs"]
     std::fs::write(root.join("do-harness.toml"), config).unwrap();
 
     // Outside git, change discovery fails, so verify --changed must select ALL sensors (fail closed)
-    let (code, stdout, stderr) = run(harness(root).args(["verify", "--set", "verification", "--changed", "--format", "json"]));
-    assert_eq!(code, Some(0), "verify --changed outside git must succeed selecting all: stdout={stdout} stderr={stderr}");
+    let (code, stdout, stderr) = run(harness(root).args([
+        "verify",
+        "--set",
+        "verification",
+        "--changed",
+        "--format",
+        "json",
+    ]));
+    assert_eq!(
+        code,
+        Some(0),
+        "verify --changed outside git must succeed selecting all: stdout={stdout} stderr={stderr}"
+    );
 
     let report: Value = serde_json::from_str(&stdout).expect("valid JSON report");
     let sensors: Vec<&str> = report["sensors"]
@@ -283,7 +379,11 @@ when-changed = ["src/s2.rs"]
         .iter()
         .map(|s| s["name"].as_str().unwrap())
         .collect();
-    assert_eq!(sensors, vec!["s1", "s2"], "all sensors must be selected when change discovery fails");
+    assert_eq!(
+        sensors,
+        vec!["s1", "s2"],
+        "all sensors must be selected when change discovery fails"
+    );
 }
 
 #[test]
@@ -310,8 +410,19 @@ when-changed = ["src/**/*.rs"]
     // Delete src/lib.rs
     std::fs::remove_file(root.join("src/lib.rs")).unwrap();
 
-    let (code, stdout, stderr) = run(harness(root).args(["explain", "--set", "verification", "--changed", "--format", "json"]));
-    assert_eq!(code, Some(0), "explain must succeed: stdout={stdout} stderr={stderr}");
+    let (code, stdout, stderr) = run(harness(root).args([
+        "explain",
+        "--set",
+        "verification",
+        "--changed",
+        "--format",
+        "json",
+    ]));
+    assert_eq!(
+        code,
+        Some(0),
+        "explain must succeed: stdout={stdout} stderr={stderr}"
+    );
 
     let doc: Value = serde_json::from_str(&stdout).expect("valid JSON explain doc");
     let selected: Vec<&str> = doc["selected"]
@@ -320,7 +431,11 @@ when-changed = ["src/**/*.rs"]
         .iter()
         .map(|s| s["name"].as_str().unwrap())
         .collect();
-    assert_eq!(selected, vec!["checker"], "deleted src/lib.rs must select checker sensor");
+    assert_eq!(
+        selected,
+        vec!["checker"],
+        "deleted src/lib.rs must select checker sensor"
+    );
 }
 
 #[test]
@@ -344,12 +459,22 @@ argv = ["true"]
     // 1. Missing evidence file
     let (code, _stdout, stderr) = run(harness(root).args(["status", "--set", "verification"]));
     assert_eq!(code, Some(1), "status with missing evidence must fail");
-    assert!(stderr.contains("missing"), "stderr must report missing: {stderr}");
+    assert!(
+        stderr.contains("missing"),
+        "stderr must report missing: {stderr}"
+    );
 
     // 2. Malformed evidence file
     std::fs::create_dir_all(root.join(".do-harness")).unwrap();
-    std::fs::write(root.join(".do-harness/evidence.verification.json"), "{ invalid json").unwrap();
+    std::fs::write(
+        root.join(".do-harness/evidence.verification.json"),
+        "{ invalid json",
+    )
+    .unwrap();
     let (code, _stdout, stderr) = run(harness(root).args(["status", "--set", "verification"]));
     assert_eq!(code, Some(1), "status with malformed evidence must fail");
-    assert!(stderr.contains("unreadable") || stderr.contains("missing") || stderr.contains("error"), "stderr must report unreadable/error: {stderr}");
+    assert!(
+        stderr.contains("unreadable") || stderr.contains("missing") || stderr.contains("error"),
+        "stderr must report unreadable/error: {stderr}"
+    );
 }
