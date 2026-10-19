@@ -16,7 +16,7 @@ We evaluated the feasibility and efficacy of evidence-driven multi-candidate ski
 1. **Walkthrough & Structure Contracts Must Be Formally Preserved**:
    In deterministic evaluations, walkthrough scripts (`walkthrough.sh`) may extract specific headings (e.g. `## Decision Table`). Candidate generation must formally preserve these structural contracts. When headings were properly preserved, all candidate variants across all three target skills achieved **100.00% pass rates** across 5 repeated iterations.
 2. **Concise Guidance Yields Consistent Efficiency Gains**:
-   Across all tested skills (`htn-planner`, `tokio-performance`, `skill-creator`), concise variants (`candidate_1_concise`) reduced context size by **35% to 66%** while maintaining identical **100.00% pass rates** and +1.00 Skill Lift. Efficiency ratio (`pass_rate / words * 1000`) increased by:
+   Across all tested skills (`htn-planner`, `tokio-performance`, `skill-creator`), concise variants (`candidate_1_concise`) reduced context size by **35% to 66%** while maintaining identical **100.00% pass rates** and an unchanged Skill Lift per skill (`htn-planner` **+0.4444**; `tokio-performance` **+1.0000**; `skill-creator` **+1.0000** — identical across all four variants of a given skill). Efficiency ratio (`pass_rate / words * 1000`) increased by:
    - `htn-planner`: **3.45 -> 9.71** (+181% efficiency)
    - `tokio-performance`: **2.02 -> 5.95** (+194% efficiency)
    - `skill-creator`: **0.81 -> 1.26** (+55% efficiency)
@@ -29,7 +29,11 @@ We evaluated the feasibility and efficacy of evidence-driven multi-candidate ski
 - **Runtime Overhead**: **PASS** (Deterministic walkthrough execution time was unaffected by guidance length: ~0.78s for `htn-planner`, ~0.22s for `tokio-performance`, ~1.75s for `skill-creator`).
 - **Run Determinism**: **PASS** (Zero variance in pass rates across 5 repeated iterations; `pass_rate_variance = 0.0`).
 
-**Final Decision**: **`VERDICT=DEFER`**
+The four criteria above are **safety gates**: each records that no contract or runtime regression was introduced. None of them is a *benefit* gate, so none of them can fail on guidance quality.
+
+- **Discriminating power of the instrument** (**post-hoc** — added during review on 2026-10-19): **FAIL** — all 60 runs scored `pass_rate = 1.0000` with `pass_rate_variance = 0.0`, so the deterministic suites cannot separate a 66%-compressed `SKILL.md` from the canonical one. Any re-run must establish this criterion *before* execution; `plans/affected-selection-experiment.md` is the predeclared-gate pattern to follow.
+
+**Final Decision**: **`VERDICT=DEFER`** — driven by execution cost together with the absence of a quality-sensitive instrument, and *not* by a failed safety gate.
 
 ---
 
@@ -60,6 +64,7 @@ We evaluated the feasibility and efficacy of evidence-driven multi-candidate ski
 - **Harness Build**: `do-harness 0.3.0` (debug target)
 - **Evaluator Mode**: Deterministic (`eval --format json`)
 - **Iterations**: 5 repeated benchmark runs per variant (60 total evaluated runs)
+- **Reproduction**: `ITERATIONS=5 scripts/skill-refinement-benchmark.sh plans/refinement-raw-data.json` (pin `DO_HARNESS_BIN` to the binary revision under test). The §4 baseline rows were independently reproduced on `main` from the three canonical skills.
 
 ---
 
@@ -82,9 +87,11 @@ We evaluated the feasibility and efficacy of evidence-driven multi-candidate ski
 | | candidate_2_verbose | 1007 | **1.0000** | 0.0000 | +1.0000 | 1.6956s | 0.9930 |
 | | candidate_3_checklist | 826 | **1.0000** | 0.0000 | +1.0000 | 1.7610s | 1.2107 |
 
+Because every run scores `1.0000` with zero variance, this table measures **contract preservation**, not guidance quality: it can show that a candidate did not break the assertions its own skill already asserts, and nothing more.
+
 ---
 
-## 5. Critical Analysis & Lessons
+## 5. Critical Analysis, Limitations & Lessons
 
 1. **Walkthrough & Structural Rigidity**:
    Skill walkthroughs may rely on exact Markdown heading names (e.g. `## Decision Table` extracted by `grep`). Candidate generation must respect these structural contracts.
@@ -94,6 +101,10 @@ We evaluated the feasibility and efficacy of evidence-driven multi-candidate ski
    - `do-harness distill`: Distills proven heuristics from verified traces into `references/heuristics.md` deterministically based on real sensor beats.
    - `do-harness learn`: Incorporates recurring sensor failure signatures without candidate generation overhead.
    - Automated candidate refinement (Propose–Probe–Compose) adds runtime complexity ($N \times$ evaluation runs) which is better deferred in favor of existing deterministic mechanisms.
+4. **Instrument sensitivity bound (limitation, recorded during review on 2026-10-19)**:
+   Every one of the 60 runs passed every assertion, so this experiment bounds its claim to *contract preservation*. It shows that these three candidates did not break the assertions those three suites already check; it does **not** show that 66% less guidance is equally good, because no case in these suites can fail on guidance quality. "Concise is no worse than verbose" is therefore not established by this data.
+5. **The cost conclusion is analytical, not measured**:
+   §1 and §6 price candidate search at $N \times$ iterations under `eval --agent-cmd`, but only deterministic runs were executed (~0.2–1.8s each). The deferral rests on an unmeasured cost model plus a benefit that the instrument in item 4 above cannot detect — which is itself the strongest argument for deferring until a quality-sensitive probe exists.
 
 ---
 
