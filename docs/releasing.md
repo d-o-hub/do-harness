@@ -159,7 +159,15 @@ test and by the release pull request's own diff. Version strings are validated a
 plain `MAJOR.MINOR.PATCH` before they can reach a `sed` expression — this pipeline
 does not publish pre-release or build metadata — the git ref is validated before
 use, and a `rev-list` or `git log` failure fails the run instead of being reported
-as a zero-commit range. The bump policy mirrors the Rust ecosystem's release tooling
+as a zero-commit range. The derivation is hermetic — it never reads the network — so
+the one fact it cannot compute for itself arrives as an input: `--published
+<tag[,tag]>` names the tags that have a published release, and a basis tag missing
+from that list derives `bump=pending-release` rather than a version, because the
+missing step is finishing that release. An absent flag means *not told* and leaves
+the derivation as it was; a present-but-empty list means *nothing has published* and
+blocks every bump. The two are different facts and stay apart: `auto-release.yml`
+always passes the flag, and a failing `gh release list` fails its step instead of
+deriving from a guess. The bump policy mirrors the Rust ecosystem's release tooling
 (`next_version`, the crate release-plz uses) rather than inventing one here:
 
 | Commits since the last tag | Bump |
@@ -188,9 +196,15 @@ edit, so merge an overridden proposal before new commits land.
 
 ### What the automation does
 
-- `prepare` runs `release-manager.sh next`. A bump of `none` opens no pull request.
+- `prepare` runs `release-manager.sh next`, told which tags have a published release
+  (`gh release list --exclude-drafts`). A bump of `none` opens no pull request.
   A bump of `pending` — `main` carries a version that has no tag — means the missing
-  step is a tag rather than a bump, so it goes straight to `ship`. Otherwise it
+  step is a tag rather than a bump, so it goes straight to `ship`. A bump of
+  `pending-release` — the basis tag exists but its release has not published —
+  derives no version at all: `ship` creates the tag, and crates.io, npm and the
+  GitHub Release are created afterwards by `release.yml`, so "tagged" is not
+  "released", and proposing a version on top of an unfinished release is how
+  `v0.3.2` came to be proposed while `v0.3.1` had no npm package and no Release. Otherwise it
   applies the version with `release-manager.sh prepare`, pushes `release/vX.Y.Z`,
   and opens the pull request with the derived basis in its body. The branch and the
   body are refreshed on every push to `main`, and a still-open automation-owned

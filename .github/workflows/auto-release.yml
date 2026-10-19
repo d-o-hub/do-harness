@@ -92,18 +92,35 @@ jobs:
           key: auto-release-prepare
       - name: Derive the next version
         id: derive
+        env:
+          # `gh release list` reads the publication state, so this step needs the
+          # same token the other `gh` steps use.
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          report="$(bash scripts/release-manager.sh next --format json)"
+          # A tag is not a finished release: `ship` creates the tag, and
+          # crates.io, npm and the GitHub Release are created afterwards by
+          # `release.yml`. Without this the derivation treats "tagged" as
+          # "released" and proposes the next version while the previous one is
+          # still publishing — which is how `v0.3.2` came to be proposed while
+          # `v0.3.1` had no npm package and no Release. Drafts are excluded
+          # because a draft is not published. A failure here fails the step
+          # instead of deriving from a guess.
+          published="$(gh release list --exclude-drafts --limit 100 \
+            --json tagName --jq '[.[].tagName] | join(",")')"
+          report="$(bash scripts/release-manager.sh next --published "$published" --format json)"
           printf '%s\n' "$report"
           for field in bump next current basis commits breaking feature fix; do
             printf '%s=%s\n' "$field" "$(printf '%s' "$report" | jq -r ".$field")" \
               >> "$GITHUB_OUTPUT"
           done
       - name: Apply the bump
-        # `none` means nothing releasable landed; `pending` means main already
-        # carries an untagged version, whose missing step is a tag, not a bump.
-        if: steps.derive.outputs.bump != 'none' && steps.derive.outputs.bump != 'pending'
+        # Only a real bump reaches here. `none` has nothing to apply, `pending`
+        # waits for `ship` to tag the version already on `main`, and
+        # `pending-release` waits for the previous release to finish publishing.
+        # An allowlist rather than a list of exclusions so a derivation outcome
+        # added later cannot start proposing a version by accident.
+        if: contains(fromJSON('["major","minor","patch"]'), steps.derive.outputs.bump)
         run: |
           set -euo pipefail
           bash scripts/release-manager.sh prepare "${{ steps.derive.outputs.next }}"
@@ -119,9 +136,11 @@ jobs:
           git commit -m "chore(release): v${{ steps.derive.outputs.next }}"
       - name: Open or refresh the release pull request
         # Only a derivation with a version to propose reaches this step: `none`
-        # and `pending` have no bump to apply, and their reconciliation is the
-        # retire step below.
-        if: steps.derive.outputs.bump != 'none' && steps.derive.outputs.bump != 'pending'
+        # and `pending` have no bump to apply, `pending-release` is waiting for
+        # the previous release to finish publishing, and their reconciliation is
+        # the retire step below. Written as an allowlist so a derivation outcome
+        # added later cannot start proposing a version by accident.
+        if: contains(fromJSON('["major","minor","patch"]'), steps.derive.outputs.bump)
         env:
           GH_TOKEN: ${{ github.token }}
           # The only derivation output sourced from git refs rather than from the
@@ -187,11 +206,13 @@ jobs:
           fi
           rm -f "$body"
       - name: Retire superseded release pull requests
-        # Runs on every derivation, including the `none` and `pending` ones that
-        # skip the step above: then no version is proposed, so every open
-        # proposal is stale and this step is the whole reconciliation.
+        # Runs on every derivation, including the `none`, `pending` and
+        # `pending-release` ones that skip the step above: then no version is
+        # proposed, so every open proposal is stale and this step is the whole
+        # reconciliation.
         env:
           GH_TOKEN: ${{ github.token }}
+          BASIS: ${{ steps.derive.outputs.basis }}
         run: |
           set -euo pipefail
           bump="${{ steps.derive.outputs.bump }}"
@@ -217,13 +238,17 @@ jobs:
             survivor="superseded by the proposal for \`${winner_branch}\`, which carries the commits now on \`main\`"
           elif [ "$bump" = "pending" ]; then
             survivor="superseded by \`v${current}\`, which is already on \`main\` and is what the \`ship\` job tags"
+          elif [ "$bump" = "pending-release" ]; then
+            survivor="held: \`${BASIS}\` is tagged but its release has not published yet, so no version is proposed on top of it until it does"
           else
             survivor="stale: no release is derivable from the commits now on \`main\`"
           fi
           # The `none` branch closes a proposal the derivation cannot reproduce
           # at all, so its comment names the deliberate path instead of leaving
-          # the author to guess why the pull request went away.
-          if [ -z "$winner_branch" ] && [ "$bump" != "pending" ]; then
+          # the author to guess why the pull request went away. `pending` and
+          # `pending-release` are named states with their own message, not an
+          # absent release.
+          if [ -z "$winner_branch" ] && [ "$bump" != "pending" ] && [ "$bump" != "pending-release" ]; then
             deliberate=' A release that no commit implies is applied by hand instead: see docs/releasing.md ("Releasing by hand").'
           else
             deliberate=''

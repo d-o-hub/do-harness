@@ -82,6 +82,15 @@ FORMAT="plain"
 DO_LOCK=true
 DO_MAN=true
 
+# The tags that have a *published* release, as a comma-separated list, and
+# whether the caller supplied one at all. An empty list and an absent flag are
+# different facts: "nothing has published" blocks a derivation, "I did not tell
+# you" does not. The script is hermetic and never reads the network, so this is
+# an input, and `.github/workflows/auto-release.yml` is the caller that reads it
+# from GitHub.
+PUBLISHED=""
+PUBLISHED_KNOWN=false
+
 # Set by derive(): CURRENT, BASIS, COMMITS, BREAKING, FEATURE, FIX,
 # NONCONVENTIONAL, BUMP, NEXT.
 CURRENT="" BASIS="" COMMITS=0 BREAKING=false FEATURE=false FIX=false
@@ -115,6 +124,10 @@ options:
   --root <dir>               repository to operate on (default: this checkout)
   --ref <rev>                revision to derive from (default: HEAD)
   --format plain|json        output shape for `next` (default: plain)
+  --published <tag[,tag]>    tags with a published release; a basis tag missing
+                             from this list derives `bump=pending-release` and
+                             proposes no new version. Absent means "not told",
+                             which leaves the derivation as it was
   --no-lock                  skip the Cargo.lock refresh in `prepare`
   --no-man                   skip regenerating man/do-harness.1 in `prepare`
 EOF
@@ -294,6 +307,19 @@ version_lt() { # version_lt <a> <b>: true when a < b
     return 1
 }
 
+# True when the comma-separated <list> contains <tag>. Spaces are dropped first
+# so a caller that wrote `a, b` is not silently told its tag is unpublished; the
+# comparison itself is exact, because a release tag is.
+list_has() {
+    local list="$1" want="$2" item
+    list="${list// /}"
+    local IFS=,
+    for item in $list; do
+        [ "$item" = "$want" ] && return 0
+    done
+    return 1
+}
+
 derive() {
     local ref="$1" range
     # A ref that does not resolve makes every git query below fail in a way that
@@ -330,8 +356,26 @@ derive() {
         BUMP="pending"
     fi
     NEXT="$(next_version "$CURRENT" "$BUMP")"
-    # NEXT is arithmetic on a validated CURRENT, so this cannot fire today; it is
-    # the assertion that keeps it that way if the bump rules ever change.
+    # A tag is not a finished release. `ship` creates it as soon as the release
+    # commit is on `main`, and crates.io, npm and the GitHub Release follow in
+    # `release.yml` — which is why `v0.3.2` was once proposed while `v0.3.1` had
+    # no npm package and no Release. The caller passes the tags that *have* a
+    # published release; a basis missing from that list means the next step is to
+    # finish that release, not to derive a version on top of it, so nothing is
+    # proposed. `none` is left alone because it proposes nothing either way, and
+    # `pending` is left alone because it means a version is already on `main` and
+    # waiting for its tag — `ship`'s step, not a new derivation.
+    if [ -n "$BASIS" ] && [ "$PUBLISHED_KNOWN" = true ] && ! list_has "$PUBLISHED" "$BASIS"; then
+        case "$BUMP" in
+            major | minor | patch)
+                BUMP="pending-release"
+                NEXT="$CURRENT"
+                ;;
+        esac
+    fi
+    # NEXT is arithmetic on a validated CURRENT, or CURRENT itself under the gate
+    # above, so this cannot fire today; it is the assertion that keeps it that way
+    # if the bump rules ever change.
     require_version "$NEXT" "the derived next version (current=$CURRENT bump=$BUMP)"
 }
 
@@ -747,6 +791,25 @@ EOF
 
     commit 'fix(db): close the write lock'
     expect patch 0.3.1 'a fix cuts a patch'
+
+    # The publication gate. `ship` tags the release commit, and crates.io, npm
+    # and the GitHub Release are created afterwards, so a basis tag says nothing
+    # about whether its release landed. `--published` carries the tags that have
+    # a published release; a basis missing from the list proposes nothing,
+    # because the missing step is finishing that release rather than a bump.
+    # Without the flag the gate stays inert, which is what keeps every other
+    # control in this function meaningful.
+    PUBLISHED="v0.3.0"
+    PUBLISHED_KNOWN=true
+    expect patch 0.3.1 'a basis with a published release leaves the derivation alone'
+    PUBLISHED="v0.2.1"
+    expect pending-release 0.3.0 'a basis whose release has not published proposes no new version'
+    PUBLISHED=""
+    expect pending-release 0.3.0 'an empty published list is a fact: nothing has published'
+    PUBLISHED=""
+    PUBLISHED_KNOWN=false
+    expect patch 0.3.1 'absent --published means "not told", so the gate stays inert'
+
     release 0.3.1
 
     commit 'feat(cli): add a status command'
@@ -767,6 +830,14 @@ EOF
 
     commit 'docs: another note'
     expect none 0.3.5 'a conventional non-bumping type still cuts nothing'
+
+    # The gate must not invent a state of its own: with nothing releasable the
+    # answer stays `none`, and a version already on `main` stays `pending`.
+    PUBLISHED="v9.9.9"
+    PUBLISHED_KNOWN=true
+    expect none 0.3.5 'nothing releasable stays none, even with an unpublished basis'
+    PUBLISHED=""
+    PUBLISHED_KNOWN=false
 
     # A merge commit's subject is generated by git; only branch commits count.
     git -C "$repo" checkout -q -b side
@@ -808,6 +879,14 @@ EOF
 
     substitute 's/^version *= *"2\.0\.0"/version = "2.1.0"/' "$repo/Cargo.toml"
     expect pending 2.1.0 'an untagged workspace version is pending'
+
+    # `pending` outranks the gate: a version already on `main` is waiting for its
+    # tag, which is `ship`'s step, so an unpublished basis must not suppress it.
+    PUBLISHED="v9.9.9"
+    PUBLISHED_KNOWN=true
+    expect pending 2.1.0 'the gate leaves a pending tag alone'
+    PUBLISHED=""
+    PUBLISHED_KNOWN=false
 
     # A manifest behind the newest tag is an inconsistency, not a bump.
     substitute 's/^version *= *"2\.1\.0"/version = "1.2.0"/' "$repo/Cargo.toml"
@@ -980,6 +1059,14 @@ main() {
                 ;;
             --format)
                 FORMAT="${2:-}"
+                shift 2
+                ;;
+            --published)
+                # Present-but-empty is a fact ("nothing has a published
+                # release"); absent is not, so the flag is tracked separately
+                # from the list.
+                PUBLISHED="${2:-}"
+                PUBLISHED_KNOWN=true
                 shift 2
                 ;;
             --no-lock)
