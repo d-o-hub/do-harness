@@ -669,3 +669,96 @@ jobs:
           printf 'Using Node v%s and npm %s for GitHub OIDC publishing\n' "$node_version" "$npm_version"
       - name: Publish npm packages
         run: bash scripts/publish-npm.sh --dist dist
+
+  verify-published:
+    # Post-publication proof, from the consumer's side: the Release's own assets,
+    # the installer's result, npm and crates.io. Report-only first — the job runs,
+    # its log carries the verdict, and `continue-on-error` keeps a failure out of
+    # the release gate until the ratchet moves (docs/releasing.md, "Verifying a
+    # published release"). Deleting that line is the next position; passing
+    # `--require-immutable` to the script is the last one.
+    needs: [release]
+    continue-on-error: true
+    if: github.event_name == 'push' || inputs.tag
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      # Read the released source and assets; no write anywhere.
+      contents: read
+      # `gh attestation verify` reads the archive's build provenance.
+      attestations: read
+    steps:
+      # actions/checkout@v7.0.1
+      #
+      # The tree must be the released one: the verifier compares the tag with the
+      # workspace version and reads the crate pins from it.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          persist-credentials: false
+      - name: Verify the published release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          version="${TAG#v}"
+          work="$(mktemp -d)"
+          facts="$work/facts.env"
+          : >"$facts"
+          # Every query below writes `missing` when it fails: an outage must not
+          # read as a pass, and the verifier treats an absent fact the same way.
+          if gh release view "$TAG" --json tagName >/dev/null 2>&1; then
+            echo "release=present" >>"$facts"
+          else
+            echo "release=missing" >>"$facts"
+          fi
+          gh release download "$TAG" --dir "$work/assets" || true
+          if npm_version="$(npm view "do-harness@$version" version 2>/dev/null)" &&
+            [ -n "$npm_version" ]; then
+            echo "npm=$npm_version" >>"$facts"
+          else
+            echo "npm=missing" >>"$facts"
+          fi
+          if [ -n "$(npm view "do-harness@$version" dist.attestations.url 2>/dev/null || true)" ]; then
+            echo "npm_provenance=ok" >>"$facts"
+          else
+            echo "npm_provenance=missing" >>"$facts"
+          fi
+          latest="$(npm view do-harness dist-tags.latest 2>/dev/null || true)"
+          if [ -n "$latest" ]; then
+            echo "npm_latest=$latest" >>"$facts"
+          fi
+          ua="do-harness verify-published (github.com/${GITHUB_REPOSITORY})"
+          crates=""
+          for crate in do-harness do-harness-db do-harness-types; do
+            if curl -fsSL -A "$ua" "https://crates.io/api/v1/crates/$crate" |
+              jq -e --arg v "$version" 'any(.versions[]; .num == $v)' >/dev/null; then
+              crates="${crates:+$crates,}$crate=$version"
+            else
+              crates="${crates:+$crates,}$crate=missing"
+            fi
+          done
+          echo "crates=$crates" >>"$facts"
+          # The installer is the consumer's own path to the binary.
+          if bash scripts/install.sh --version "$TAG" --bin-dir "$work/bin" >/dev/null 2>&1 &&
+            reported="$("$work/bin/do-harness" --version 2>/dev/null | awk '{print $2}')" &&
+            [ -n "$reported" ]; then
+            echo "install=$reported" >>"$facts"
+          else
+            echo "install=missing" >>"$facts"
+          fi
+          archive="$work/assets/do-harness-${TAG}-x86_64-unknown-linux-musl.tar.gz"
+          if [ -f "$archive" ] &&
+            gh attestation verify "$archive" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "attestation=ok" >>"$facts"
+          else
+            echo "attestation=missing" >>"$facts"
+          fi
+          if gh release verify "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "immutable=ok" >>"$facts"
+          else
+            echo "immutable=missing" >>"$facts"
+          fi
+          cat "$facts"
+          bash scripts/verify-published.sh --tag "$TAG" --dir "$work/assets" --facts "$facts"

@@ -20,8 +20,8 @@ feedback = ["fmt", "check", "clippy", "loc"]
 # contract (`docs/documentation-contract.md`). Each one reads only git, the
 # working tree, and the local toolchain, and each fails closed on an empty
 # inventory, so the trio belongs to the PR-time set as well as `release`.
-verification = ["fmt", "check", "clippy", "deps", "machete", "audit", "test", "doctest", "loc", "skills", "skills-docs", "shell", "markdownlint", "docs-sync", "docs-examples", "docs-links", "yamllint", "actionlint", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "release-manager", "commitlint"]
-release = ["fmt", "check", "clippy", "deps", "audit", "test", "doctest", "coverage", "loc", "skills", "skills-docs", "shell", "markdownlint", "docs-sync", "docs-examples", "docs-links", "yamllint", "actionlint", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "release-manager", "release-manager-e2e", "publish-npm", "commitlint"]
+verification = ["fmt", "check", "clippy", "deps", "machete", "audit", "test", "doctest", "loc", "skills", "skills-docs", "shell", "markdownlint", "docs-sync", "docs-examples", "docs-links", "yamllint", "actionlint", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "release-manager", "verify-published", "commitlint"]
+release = ["fmt", "check", "clippy", "deps", "audit", "test", "doctest", "coverage", "loc", "skills", "skills-docs", "shell", "markdownlint", "docs-sync", "docs-examples", "docs-links", "yamllint", "actionlint", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "release-manager", "release-manager-e2e", "publish-npm", "verify-published", "commitlint"]
 # DORA gets its own set so its evidence is addressable (`status --set metrics`)
 # without joining the gating sets. A no-`--set` status check compares against
 # every configured sensor, so a dora-only run's artifact would report
@@ -306,6 +306,15 @@ when-changed = ["Cargo.toml", "integrations/npm/**", "man/do-harness.1", "docs/r
 name = "publish-npm"
 argv = ["bash", "scripts/publish-npm.sh", "--self-test"]
 when-changed = ["scripts/publish-npm.sh", "integrations/npm/**"]
+
+[[sensors]]
+# Executable half of the post-publication contract: a release is complete only
+# when a consumer can verify it on every channel. Hermetic — the self-test judges
+# supplied facts, and the `verify-published` job in release.yml supplies them from
+# the network, so the same policy runs in CI and by hand.
+name = "verify-published"
+argv = ["bash", "scripts/verify-published.sh", "--self-test"]
+when-changed = ["Cargo.toml", "crates/db/Cargo.toml", "docs/releasing.md", ".github/workflows/release.yml", "scripts/verify-published.sh"]
 
 [[sensors]]
 # DORA deployment health, derived (never judged) from git history. Report-only:
