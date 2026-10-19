@@ -51,11 +51,12 @@ jobs:
       # taiki-e/install-action@v2
       - uses: taiki-e/install-action@ba47c86ac325773530516bb756137ac718732518
         with:
-          # cargo-hack for `powerset`; cargo-llvm-cov and cargo-nextest for
-          # `coverage`, which runs `cargo llvm-cov nextest`. Both fail closed in
-          # this job (`CI=true`, `DO_HARNESS_REQUIRE_TOOLS=1`), so a missing tool
-          # must not read as a skip.
-          tool: cargo-hack,cargo-llvm-cov,cargo-nextest
+          # cargo-hack for `powerset`; cargo-machete for `machete`; cargo-llvm-cov
+          # and cargo-nextest for `coverage` (which runs `cargo llvm-cov nextest`);
+          # cargo-deny and cargo-audit for scaffolded test workspace verification.
+          # All fail closed in this job (`CI=true`, `DO_HARNESS_REQUIRE_TOOLS=1`),
+          # so a missing tool must not read as a skip.
+          tool: cargo-deny,cargo-audit,cargo-hack,cargo-machete,cargo-llvm-cov,cargo-nextest
       - name: Build harness CLI
         run: cargo build --release -p do-harness
       - name: Run scheduled sensors

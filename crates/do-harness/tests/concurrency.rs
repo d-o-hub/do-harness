@@ -40,9 +40,10 @@ fn concurrent_verify_record_and_advance_keep_chain_intact() {
     // Under coverage instrumentation every spawned harness runs an order of
     // magnitude slower, so full writer waves pile up without bound (measured
     // 2026-10-14: past 11GB anon, OOM-killing the coverage run). Shrink the
-    // waves when LLVM_PROFILE_FILE is set; the retry path is still exercised.
-    let under_coverage = std::env::var_os("LLVM_PROFILE_FILE").is_some();
-    let (first_wave, second_wave) = if under_coverage { (1, 2) } else { (2, 3) };
+    // waves when coverage instrumentation is active; the retry path is still exercised.
+    let under_coverage = std::env::var_os("LLVM_PROFILE_FILE").is_some()
+        || std::env::var_os("CARGO_LLVM_COV").is_some();
+    let (first_wave, second_wave) = if under_coverage { (1, 1) } else { (2, 3) };
     let dir = tempfile::tempdir().expect("tempdir");
     let root = dir.path();
     run(root, &["init"]);
