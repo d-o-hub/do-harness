@@ -36,9 +36,7 @@ pub fn find_git_dir(cwd: &Path) -> Result<PathBuf> {
         .output();
 
     let git_common_str = match output {
-        Ok(out) if out.status.success() => {
-            String::from_utf8_lossy(&out.stdout).trim().to_owned()
-        }
+        Ok(out) if out.status.success() => String::from_utf8_lossy(&out.stdout).trim().to_owned(),
         _ => {
             let output_dir = crate::changes::git_command(cwd)
                 .args(["rev-parse", "--git-dir"])
@@ -50,12 +48,18 @@ pub fn find_git_dir(cwd: &Path) -> Result<PathBuf> {
                     cwd.display()
                 );
             }
-            String::from_utf8_lossy(&output_dir.stdout).trim().to_owned()
+            String::from_utf8_lossy(&output_dir.stdout)
+                .trim()
+                .to_owned()
         }
     };
 
     let path = PathBuf::from(&git_common_str);
-    let abs_path = if path.is_absolute() { path } else { cwd.join(path) };
+    let abs_path = if path.is_absolute() {
+        path
+    } else {
+        cwd.join(path)
+    };
     Ok(fs::canonicalize(&abs_path).unwrap_or(abs_path))
 }
 
@@ -69,7 +73,11 @@ fn resolve_dot_git(dot_git: &Path, dir: &Path) -> Result<PathBuf> {
             .lines()
             .find(|line| line.trim_start().starts_with("gitdir:"))
             .with_context(|| format!("invalid gitfile format at {}", dot_git.display()))?;
-        let ptr = gitdir_line.trim_start().strip_prefix("gitdir:").unwrap().trim();
+        let ptr = gitdir_line
+            .trim_start()
+            .strip_prefix("gitdir:")
+            .ok_or_else(|| anyhow::anyhow!("invalid gitdir prefix at {}", dot_git.display()))?
+            .trim();
         let ptr_path = Path::new(ptr);
         if ptr_path.is_absolute() {
             ptr_path.to_path_buf()
@@ -82,15 +90,15 @@ fn resolve_dot_git(dot_git: &Path, dir: &Path) -> Result<PathBuf> {
     let final_dir = if commondir_file.is_file() {
         if let Ok(commondir_content) = fs::read_to_string(&commondir_file) {
             let cptr = commondir_content.trim();
-            if !cptr.is_empty() {
+            if cptr.is_empty() {
+                target_git_dir
+            } else {
                 let cpath = Path::new(cptr);
                 if cpath.is_absolute() {
                     cpath.to_path_buf()
                 } else {
                     target_git_dir.join(cpath)
                 }
-            } else {
-                target_git_dir
             }
         } else {
             target_git_dir

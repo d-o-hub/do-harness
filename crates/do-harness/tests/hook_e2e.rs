@@ -256,6 +256,7 @@ fn installed_pre_push_hook_blocks_a_failing_workspace() {
     );
 }
 
+#[allow(clippy::too_many_lines)]
 #[test]
 fn linked_worktree_e2e_hook_execution_and_lifecycle() {
     let dir = tempfile::tempdir().expect("tempdir");
@@ -278,10 +279,7 @@ fn linked_worktree_e2e_hook_execution_and_lifecycle() {
     );
 
     let linked_str = linked.to_string_lossy().replace('\\', "/");
-    git_ok(
-        &parent,
-        &["worktree", "add", "-b", "fixture", &linked_str],
-    );
+    git_ok(&parent, &["worktree", "add", "-b", "fixture", &linked_str]);
 
     // Install hooks from linked worktree side
     let install_out = harness()

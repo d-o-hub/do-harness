@@ -144,10 +144,7 @@ fn find_git_dir_discovers_git_root_from_nested_directory() {
 
     let git_dir = find_git_dir(&nested).unwrap();
 
-    assert_eq!(
-        git_dir,
-        fs::canonicalize(temp.path().join(".git")).unwrap()
-    );
+    assert_eq!(git_dir, fs::canonicalize(temp.path().join(".git")).unwrap());
 }
 
 fn create_linked_worktree(temp: &Path) -> (PathBuf, PathBuf) {
