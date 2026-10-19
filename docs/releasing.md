@@ -331,6 +331,40 @@ and its commit. The registry channels carry their own evidence (npm attestations
 crates.io Trusted Publishing); `docs/provenance-trust-model.md` states what each
 one proves and what it does not.
 
+### Verifying a published release
+
+The `release` job's `needs` order publication, so a GitHub Release never claims a
+version that is missing on crates.io or npm. What no job could prove is what a
+*consumer* sees. `scripts/verify-published.sh` answers that, and the
+`verify-published` job runs it after `release`.
+
+It checks, and fails when any of these is not true: the tag agrees with the
+workspace version of the tree it was cut from; the GitHub Release exists; every
+asset its `checksums.txt` names is present and matches, and no asset on the
+Release is unlisted; npm serves the version with SLSA provenance; the three
+version-tracking crates (`do-harness`, `do-harness-db`, `do-harness-types`) carry
+it; the binary that `scripts/install.sh --version <tag>` installs reports it; and
+the archive verifies against its build provenance
+(`gh attestation verify`).
+
+Two checks are advisory. `gh release verify` — immutable releases — fails on every
+tag cut before the repository enables the setting, so requiring it early would fail
+every release for a switch only a human can flip; `--require-immutable` promotes
+it once that is done. `dist-tags.latest` is advisory because a backfill
+deliberately keeps `latest` ahead of the version being published.
+
+The script is hermetic: the job gathers the facts (one query per channel, each
+writing `missing` when it fails) and the script judges them, so `--self-test`
+reproduces the whole policy without a release or a network. An absent fact is
+`missing`, never "fine", and every digest comparison rejects an empty value first —
+two empty strings compare equal, which is how a gate like this passes vacuously.
+
+The job runs with `continue-on-error: true`: the first ratchet position, where the
+verdict is in the log and a failure is visible but does not redden the release.
+Deleting that line makes the job blocking; `--require-immutable` adds the last
+check. `--report-only` is the same position for a run by hand: the summary says
+`REPORTED` and the exit code stays 0.
+
 ### Release notes
 
 The `release` job routes every published body through `scripts/release-notes.sh`,
