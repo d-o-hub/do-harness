@@ -115,8 +115,8 @@ Run these steps in order. Stop the sweep on any escalation and report it.
     (push invalidates previous route decision as head SHA changed). Cap at three
     fix cycles, then escalate.
 11. **Merge.** Re-read the head SHA and run `scripts/premerge.sh PR` on it; a
-    refusal (draft, hold label, not open) is a hard stop to report, not a flag
-    to clear. Then merge directly, never with `--auto`:
+    refusal (draft, hold label, not open, `mergeable` not `MERGEABLE`, or a branch
+    that is `BEHIND`) is a hard stop to report, not a flag to clear. Then merge directly, never with `--auto`:
     `gh pr merge PR --squash --match-head-commit HEAD_SHA`
     where `HEAD_SHA` is the head you validated. After a merge, run the per-PR
     loop in [references/merge-order.md](references/merge-order.md) (rebase the
@@ -142,7 +142,9 @@ Run these steps in order. Stop the sweep on any escalation and report it.
   (`gh pr ready`) to make a merge possible, and never merge one without explicit
   human approval recorded in this session — un-drafting is the author's
   decision. `scripts/premerge.sh PR` enforces the stop immediately before the
-  merge and refuses a draft, a hold label, or a non-open PR.
+  merge and refuses a draft, a hold label, a non-open PR, a head whose mergeability
+  GitHub has not computed (`mergeable=UNKNOWN` after a force-push), and a branch
+  that is `BEHIND` its base.
 - No auto-merge; `--match-head-commit` always; re-read the head SHA immediately
   before any merge or close. A pre-armed request is disarmed
   (`scripts/auto-merge.sh PR --disable`) before the head is validated: an armed

@@ -191,9 +191,23 @@ set -e
 cp "$root/bin/gh.real" "$root/bin/gh"
 chmod +x "$root/bin/gh"
 rm -f "$root/bin/gh.real"
-printf 'draft_exit=%s\nhold_exit=%s\nclosed_exit=%s\nok_exit=%s\nmissing_field_exit=%s\n' \
+export FAKE_GH_PR_MERGEABLE=UNKNOWN
+export FAKE_GH_PR_MERGE_STATE=UNKNOWN
+set +e
+"$skill/scripts/premerge.sh" 9 > "$root/premerge_unmergeable.out" 2>&1
+premerge_unmergeable_exit=$?
+set -e
+export FAKE_GH_PR_MERGEABLE=MERGEABLE
+export FAKE_GH_PR_MERGE_STATE=BEHIND
+set +e
+"$skill/scripts/premerge.sh" 9 > "$root/premerge_behind.out" 2>&1
+premerge_behind_exit=$?
+set -e
+unset FAKE_GH_PR_MERGEABLE FAKE_GH_PR_MERGE_STATE
+printf 'draft_exit=%s\nhold_exit=%s\nclosed_exit=%s\nok_exit=%s\nmissing_field_exit=%s\nunmergeable_exit=%s\nbehind_exit=%s\n' \
   "$premerge_draft_exit" "$premerge_hold_exit" "$premerge_closed_exit" \
-  "$premerge_ok_exit" "$premerge_missing_exit" > "$root/premerge_summary.txt"
+  "$premerge_ok_exit" "$premerge_missing_exit" "$premerge_unmergeable_exit" \
+  "$premerge_behind_exit" > "$root/premerge_summary.txt"
 
 # 5f. Webhook fast path: a real receiver answers /health, persists signed
 # deliveries (rejecting unsigned ones), wakes long-polls, and drives the wait
