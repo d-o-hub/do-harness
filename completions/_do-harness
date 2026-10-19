@@ -1809,7 +1809,7 @@ _do-harness__subcmd__dora_commands() {
 _do-harness__subcmd__errors_commands() {
     local commands; commands=(
 'list:List fail-fast error signatures (prefixed with \`sensor\:\`)' \
-'clear:Clear fail-fast error signatures (e.g. \`sensor\:<name>\`)' \
+'clear:Clear fail-fast error signatures (\`--sensor sensor\:<name>\`)' \
 'help:Print this message or the help of the given subcommand(s)' \
     )
     _describe -t commands 'do-harness errors commands' commands "$@"
@@ -1823,7 +1823,7 @@ _do-harness__subcmd__errors__subcmd__clear_commands() {
 _do-harness__subcmd__errors__subcmd__help_commands() {
     local commands; commands=(
 'list:List fail-fast error signatures (prefixed with \`sensor\:\`)' \
-'clear:Clear fail-fast error signatures (e.g. \`sensor\:<name>\`)' \
+'clear:Clear fail-fast error signatures (\`--sensor sensor\:<name>\`)' \
 'help:Print this message or the help of the given subcommand(s)' \
     )
     _describe -t commands 'do-harness errors help commands' commands "$@"
@@ -1933,7 +1933,7 @@ _do-harness__subcmd__help__subcmd__dora_commands() {
 _do-harness__subcmd__help__subcmd__errors_commands() {
     local commands; commands=(
 'list:List fail-fast error signatures (prefixed with \`sensor\:\`)' \
-'clear:Clear fail-fast error signatures (e.g. \`sensor\:<name>\`)' \
+'clear:Clear fail-fast error signatures (\`--sensor sensor\:<name>\`)' \
     )
     _describe -t commands 'do-harness help errors commands' commands "$@"
 }
