@@ -98,9 +98,10 @@ case "$cmd" in
           *isDraft*)
             # Pre-merge stop fixtures: a walkthrough flips the draft flag, the
             # state, or the label list per call.
-            printf '{"isDraft":%s,"state":"%s","labels":%s}\n' \
+            printf '{"isDraft":%s,"state":"%s","labels":%s,"mergeable":"%s","mergeStateStatus":"%s"}\n' \
               "${FAKE_GH_PR_DRAFT:-false}" "${FAKE_GH_PR_STATE:-OPEN}" \
-              "${FAKE_GH_PR_LABELS:-[]}"
+              "${FAKE_GH_PR_LABELS:-[]}" "${FAKE_GH_PR_MERGEABLE:-MERGEABLE}" \
+              "${FAKE_GH_PR_MERGE_STATE:-CLEAN}"
             ;;
           *) printf '{"number":%s,"baseRefName":"main","headRefOid":"%s"}\n' "$pr" "$sha" ;;
         esac
