@@ -695,7 +695,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand -V 'Print version'
             cand --version 'Print version'
             cand list 'List fail-fast error signatures (prefixed with `sensor:`)'
-            cand clear 'Clear fail-fast error signatures (e.g. `sensor:<name>`)'
+            cand clear 'Clear fail-fast error signatures (`--sensor sensor:<name>`)'
             cand help 'Print this message or the help of the given subcommand(s)'
         }
         &'do-harness;errors;list'= {
@@ -731,7 +731,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
         }
         &'do-harness;errors;help'= {
             cand list 'List fail-fast error signatures (prefixed with `sensor:`)'
-            cand clear 'Clear fail-fast error signatures (e.g. `sensor:<name>`)'
+            cand clear 'Clear fail-fast error signatures (`--sensor sensor:<name>`)'
             cand help 'Print this message or the help of the given subcommand(s)'
         }
         &'do-harness;errors;help;list'= {
@@ -1188,7 +1188,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
         }
         &'do-harness;help;errors'= {
             cand list 'List fail-fast error signatures (prefixed with `sensor:`)'
-            cand clear 'Clear fail-fast error signatures (e.g. `sensor:<name>`)'
+            cand clear 'Clear fail-fast error signatures (`--sensor sensor:<name>`)'
         }
         &'do-harness;help;errors;list'= {
         }

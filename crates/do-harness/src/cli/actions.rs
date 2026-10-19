@@ -219,7 +219,7 @@ pub enum ErrorsAction {
         #[arg(long, value_enum, default_value_t = Format::Text)]
         format: Format,
     },
-    /// Clear fail-fast error signatures (e.g. `sensor:<name>`).
+    /// Clear fail-fast error signatures (`--sensor sensor:<name>`).
     Clear {
         /// Only clear this signature key (e.g. `sensor:<name>`).
         #[arg(long, value_name = "SENSOR")]

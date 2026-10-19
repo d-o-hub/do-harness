@@ -493,7 +493,7 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand errors; and not __
 complete -c do-harness -n "__fish_do_harness_using_subcommand errors; and not __fish_seen_subcommand_from list clear help" -s h -l help -d 'Print help'
 complete -c do-harness -n "__fish_do_harness_using_subcommand errors; and not __fish_seen_subcommand_from list clear help" -s V -l version -d 'Print version'
 complete -c do-harness -n "__fish_do_harness_using_subcommand errors; and not __fish_seen_subcommand_from list clear help" -f -a "list" -d 'List fail-fast error signatures (prefixed with `sensor:`)'
-complete -c do-harness -n "__fish_do_harness_using_subcommand errors; and not __fish_seen_subcommand_from list clear help" -f -a "clear" -d 'Clear fail-fast error signatures (e.g. `sensor:<name>`)'
+complete -c do-harness -n "__fish_do_harness_using_subcommand errors; and not __fish_seen_subcommand_from list clear help" -f -a "clear" -d 'Clear fail-fast error signatures (`--sensor sensor:<name>`)'
 complete -c do-harness -n "__fish_do_harness_using_subcommand errors; and not __fish_seen_subcommand_from list clear help" -f -a "help" -d 'Print this message or the help of the given subcommand(s)'
 complete -c do-harness -n "__fish_do_harness_using_subcommand errors; and __fish_seen_subcommand_from list" -l task -d 'Scope to one task id' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand errors; and __fish_seen_subcommand_from list" -l scope -d 'Filter by workstream scope (`branch:<name>`, `task:<id>`, `global`, or `all` for every workstream)' -r
@@ -518,7 +518,7 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand errors; and __fish
 complete -c do-harness -n "__fish_do_harness_using_subcommand errors; and __fish_seen_subcommand_from clear" -s h -l help -d 'Print help'
 complete -c do-harness -n "__fish_do_harness_using_subcommand errors; and __fish_seen_subcommand_from clear" -s V -l version -d 'Print version'
 complete -c do-harness -n "__fish_do_harness_using_subcommand errors; and __fish_seen_subcommand_from help" -f -a "list" -d 'List fail-fast error signatures (prefixed with `sensor:`)'
-complete -c do-harness -n "__fish_do_harness_using_subcommand errors; and __fish_seen_subcommand_from help" -f -a "clear" -d 'Clear fail-fast error signatures (e.g. `sensor:<name>`)'
+complete -c do-harness -n "__fish_do_harness_using_subcommand errors; and __fish_seen_subcommand_from help" -f -a "clear" -d 'Clear fail-fast error signatures (`--sensor sensor:<name>`)'
 complete -c do-harness -n "__fish_do_harness_using_subcommand errors; and __fish_seen_subcommand_from help" -f -a "help" -d 'Print this message or the help of the given subcommand(s)'
 complete -c do-harness -n "__fish_do_harness_using_subcommand loc" -l dir -d 'Scan directory, relative to workspace root (repeatable or comma-separated)' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand loc" -l ext -d 'Scan extension (repeatable or comma-separated, e.g. rs, ts, tsx)' -r
@@ -794,7 +794,7 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand help; and __fish_s
 complete -c do-harness -n "__fish_do_harness_using_subcommand help; and __fish_seen_subcommand_from trace" -f -a "list" -d 'Print traces for a session'
 complete -c do-harness -n "__fish_do_harness_using_subcommand help; and __fish_seen_subcommand_from trace" -f -a "sessions" -d 'List distinct trace session identifiers'
 complete -c do-harness -n "__fish_do_harness_using_subcommand help; and __fish_seen_subcommand_from errors" -f -a "list" -d 'List fail-fast error signatures (prefixed with `sensor:`)'
-complete -c do-harness -n "__fish_do_harness_using_subcommand help; and __fish_seen_subcommand_from errors" -f -a "clear" -d 'Clear fail-fast error signatures (e.g. `sensor:<name>`)'
+complete -c do-harness -n "__fish_do_harness_using_subcommand help; and __fish_seen_subcommand_from errors" -f -a "clear" -d 'Clear fail-fast error signatures (`--sensor sensor:<name>`)'
 complete -c do-harness -n "__fish_do_harness_using_subcommand help; and __fish_seen_subcommand_from hook" -f -a "install" -d 'Write pre-commit and pre-push hooks into `.git/hooks/`'
 complete -c do-harness -n "__fish_do_harness_using_subcommand help; and __fish_seen_subcommand_from hook" -f -a "uninstall" -d 'Remove managed hooks, leaving foreign hook files untouched'
 complete -c do-harness -n "__fish_do_harness_using_subcommand help; and __fish_seen_subcommand_from hook" -f -a "status" -d 'Show whether the managed hooks and release binary are present'
