@@ -43,7 +43,8 @@ Run these steps in order. Stop the sweep on any escalation and report it.
    fails). Never continue on a failed preflight.
 2. **Work list.** Run `scripts/list-prs.sh` for the ordered list (stacks first,
    then oldest-first; drafts and `hold`/`wip`/`do-not-merge` labels excluded).
-   For a single PR, use that number. If there are no PRs, stop. Before spending
+   For a single PR, use that number — unless it is a draft or carries a hold
+   label, which is a hard stop to report, never a flag to clear. If there are no PRs, stop. Before spending
    review budget, group the list into duplicate clusters — same file, same base
    blob, same effect — keep exactly one member per cluster, and close the losers
    as `superseded by #<keeper>`
@@ -113,7 +114,9 @@ Run these steps in order. Stop the sweep on any escalation and report it.
     and smallest fix. Apply blocking fixes, commit, push, then return to step 7
     (push invalidates previous route decision as head SHA changed). Cap at three
     fix cycles, then escalate.
-11. **Merge.** Merge directly, never with `--auto`:
+11. **Merge.** Re-read the head SHA and run `scripts/premerge.sh PR` on it; a
+    refusal (draft, hold label, not open) is a hard stop to report, not a flag
+    to clear. Then merge directly, never with `--auto`:
     `gh pr merge PR --squash --match-head-commit HEAD_SHA`
     where `HEAD_SHA` is the head you validated. After a merge, run the per-PR
     loop in [references/merge-order.md](references/merge-order.md) (rebase the
@@ -134,6 +137,12 @@ Run these steps in order. Stop the sweep on any escalation and report it.
 
 ## Guardrails
 
+- A draft, a `hold`/`wip`/`do-not-merge` label, or a "do not merge" remark is a
+  **hard stop**: report it and move on. Never un-draft a pull request
+  (`gh pr ready`) to make a merge possible, and never merge one without explicit
+  human approval recorded in this session — un-drafting is the author's
+  decision. `scripts/premerge.sh PR` enforces the stop immediately before the
+  merge and refuses a draft, a hold label, or a non-open PR.
 - No auto-merge; `--match-head-commit` always; re-read the head SHA immediately
   before any merge or close. A pre-armed request is disarmed
   (`scripts/auto-merge.sh PR --disable`) before the head is validated: an armed
@@ -163,4 +172,6 @@ Run these steps in order. Stop the sweep on any escalation and report it.
 
 Unresolvable merge conflicts; failing checks you did not cause; checks that
 remain unknown; remarks needing human product decisions; PRs by other authors
-with blocking findings; after three fix cycles; post-merge main failure.
+with blocking findings; a pull request that is a draft or carries a
+`hold`/`wip`/`do-not-merge` label (report it — clearing that flag is the author's
+decision, not the sweep's); after three fix cycles; post-merge main failure.

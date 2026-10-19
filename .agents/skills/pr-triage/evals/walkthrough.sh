@@ -151,7 +151,51 @@ set -e
 printf 'armed_exit=%s\n' "$auto_merge_armed_exit" > "$root/auto_merge_summary.txt"
 unset FAKE_GH_AUTO_MERGE FAKE_GH_AUTO_MERGE_LOG
 
-# 5e. Webhook fast path: a real receiver answers /health, persists signed
+# 5e. Pre-merge stop: a draft, a hold label and a closed PR each refuse the
+# merge (exit 1), a clean open PR passes (exit 0), and unusable API output fails
+# closed (exit 2) instead of reading as mergeable.
+export FAKE_GH_PR_DRAFT=true
+set +e
+"$skill/scripts/premerge.sh" 9 > "$root/premerge_draft.out" 2>&1
+premerge_draft_exit=$?
+set -e
+export FAKE_GH_PR_DRAFT=false
+export FAKE_GH_PR_LABELS='[{"name":"hold"}]'
+set +e
+"$skill/scripts/premerge.sh" 9 > "$root/premerge_hold.out" 2>&1
+premerge_hold_exit=$?
+set -e
+export FAKE_GH_PR_LABELS='[]'
+export FAKE_GH_PR_STATE=CLOSED
+set +e
+"$skill/scripts/premerge.sh" 9 > "$root/premerge_closed.out" 2>&1
+premerge_closed_exit=$?
+set -e
+export FAKE_GH_PR_STATE=OPEN
+set +e
+"$skill/scripts/premerge.sh" 9 > "$root/premerge_ok.out" 2>&1
+premerge_ok_exit=$?
+unset FAKE_GH_PR_DRAFT FAKE_GH_PR_LABELS FAKE_GH_PR_STATE
+# A response without the draft field is not a "no": the fail-closed branch is
+# exercised by swapping the fake for a stub that omits the field.
+cp "$root/bin/gh" "$root/bin/gh.real"
+cat > "$root/bin/gh" <<'BARE'
+#!/usr/bin/env bash
+printf '{"number":9,"baseRefName":"main"}\n'
+BARE
+chmod +x "$root/bin/gh"
+set +e
+"$skill/scripts/premerge.sh" 9 > "$root/premerge_missing.out" 2>&1
+premerge_missing_exit=$?
+set -e
+cp "$root/bin/gh.real" "$root/bin/gh"
+chmod +x "$root/bin/gh"
+rm -f "$root/bin/gh.real"
+printf 'draft_exit=%s\nhold_exit=%s\nclosed_exit=%s\nok_exit=%s\nmissing_field_exit=%s\n' \
+  "$premerge_draft_exit" "$premerge_hold_exit" "$premerge_closed_exit" \
+  "$premerge_ok_exit" "$premerge_missing_exit" > "$root/premerge_summary.txt"
+
+# 5f. Webhook fast path: a real receiver answers /health, persists signed
 # deliveries (rejecting unsigned ones), wakes long-polls, and drives the wait
 # scripts with events instead of sleeps; an unreachable receiver falls back to
 # polling. Node and curl are required for this section (present in CI).
@@ -273,7 +317,7 @@ checks_fallback_summary=$checks_fallback_summary
 post_merge_event_exit=$post_merge_event_exit
 EOF
 
-# 5f. Semantic router: drive the optional typed router wrapper against a
+# 5g. Semantic router: drive the optional typed router wrapper against a
 # hermetic fake provider. Every scenario writes residue under $root so the
 # policy (fallbacks, schema rejection, uncertainty escalation, head-bound cache,
 # zero-effect bypass, and diff text that must never be executed) is graded.
