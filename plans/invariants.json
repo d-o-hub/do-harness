@@ -304,5 +304,59 @@
     "rationale": "A window, threshold, duration, retry count, or file mode written as a literal is unrecoverable to a reader and unsearchable to a reviewer; naming it makes the value reviewable and reusable, and the sensors that read it can point at one definition. The rule is enforced by a warn-severity sensor with a blessed findings baseline, so the existing occurrences are grandfathered and any increase is a hard regression: the rule binds new code from the day it lands without a tree-wide rewrite.",
     "sensor": "scripts/check-magic-numbers.sh",
     "category": "architecture"
+  },
+  {
+    "invariant": "The version a release cuts is derived from the conventional commits since the last tag by `scripts/release-manager.sh`, whose bump policy is mirrored from the ecosystem's release tooling rather than invented here: a breaking change takes the major at >= 1.0 and the minor at 0.x, a feature takes the minor at >= 1.0 and a patch at 0.x, a fix or perf takes a patch, a subject that is not a conventional commit takes a patch, and everything else releases nothing",
+    "rationale": "The bump used to be a hand decision, so a fix or a feature could sit on main unreleased indefinitely and a release depended on someone remembering. The rule set is now executable and shared by the automation and the runbook, and it deliberately mirrors `next_version` (the crate release-plz uses, which the Cargo book names as a representative release tool) instead of inventing a local policy: pre-1.0, `0.(x+1).0` is how a breaking change is signalled, so a feature must not spend the minor or breaking changes stop being visible in the version. SemVer section 4 is why 0.x needs no major-bump promise (anything MAY change at any time), and Conventional Commits section 15 is why the type is matched case-insensitively while the BREAKING CHANGE footer token stays uppercase. `--self-test` pins every branch, the two fail-closed guards (a manifest behind the newest tag, a version that does not supersede the current one), and the fact that a merge commit counts for nothing.",
+    "sensor": "bash scripts/release-manager.sh --self-test",
+    "category": "distribution"
+  },
+  {
+    "invariant": "A fix to the release pipeline is applied to an already-pushed tag by dispatching `release.yml` with a `tag` input, which runs the dispatching ref's workflow file against that tag's commit, and every publish step is idempotent: crates.io and npm skip a version they already hold, and an existing GitHub Release has its assets and body replaced",
+    "rationale": "A tag run executes the workflow file from the tagged commit, so before this the only remedy for a broken release job was to delete the tag (and any release built from it) and push it again - a rewrite of a published ref, which is exactly what release immutability forbids. The dispatch path runs the fixed file from the default branch against the tagged tree, so the tag never moves and the recovery is bounded by idempotency rather than by a rewrite. A publish probe that skips a version the registry already holds is check-then-act, which is why the crates.io and npm publishes are also serialized repository-wide.",
+    "sensor": ".github/workflows/release.yml (tagged workflow_dispatch: `tag` input, RELEASE_TAG plumbing, idempotent publish and release steps)",
+    "category": "distribution"
+  },
+  {
+    "invariant": "Release runs are serialized per *effective release tag*, not per triggering ref: `release.yml`'s workflow-level concurrency group is keyed to `release-${{ inputs.tag || github.ref_name }}`, and that group plus both job-level publish groups (`crates-io-publish-${{ github.repository }}`, `npm-publish-${{ github.repository }}`) set `queue: max` with `cancel-in-progress: false`",
+    "rationale": "A tag push runs under `refs/tags/vX.Y.Z` while a tagged recovery dispatch runs under the default branch, so a group keyed to `github.ref` gave the two runs of the *same* release different groups and no serialization at all, while both reconcile the same GitHub Release. GitHub's default concurrency behaviour cancels a previously *pending* run, so a shared group alone is not enough for a publisher: a burst of releases would silently discard a waiting crates.io/npm publication. `queue: max` keeps up to 100 pending runs in first-in-first-out order and is incompatible with `cancel-in-progress: true`, which is why the groups keep `cancel-in-progress: false`.",
+    "sensor": ".github/workflows/release.yml concurrency block (group `release-${{ inputs.tag || github.ref_name }}`, `queue: max`) and the docs/releasing.md runbook; workflow lint sensor `bash scripts/check-actionlint.sh`",
+    "category": "distribution"
+  },
+  {
+    "invariant": "On every push to `main`, `auto-release.yml`'s `prepare` refreshes the open release pull request's branch *and body* — the body carries the derived version, the bump class, the basis tag, and the commit count, so it must not age — and closes any open automation-owned `release/v<major>.<minor>.<patch>` pull request that no longer matches the current derivation with a comment naming the surviving proposal; the sweep matches that full shape only, so a differently-shaped human branch (`release/v2-docs`) is never touched, while a branch named exactly like a derivation (`release/v1.2.3`) is treated as the workflow's own, because that ref is the one it force-pushes and deletes itself",
+    "rationale": "A release pull request left open while `main` moves on carries a stale body and a stale bump, and a second derivation over the same range opens a competing proposal, so a reviewer could merge the wrong version. Refreshing the current proposal and retiring the superseded ones keeps one automation-owned proposal alive for the live derivation (the sweep reads a bounded page of open pull requests) and its stated basis true; closing a pull request needs `pull-requests: write`, which is why the `prepare` job holds it.",
+    "sensor": ".github/workflows/auto-release.yml prepare job (branch + body refresh, superseded `release/v*` proposals closed, `pull-requests: write`); workflow lint sensor `bash scripts/check-actionlint.sh` and the docs/releasing.md runbook",
+    "category": "workflow"
+  },
+  {
+    "invariant": "`auto-release.yml`'s `ship` job fails closed unless `github.ref == 'refs/heads/main'`: tagging is refused on any other ref, because recovering an already-existing tag is `release.yml`'s job, where the tagged commit is an explicit input",
+    "rationale": "A `workflow_dispatch` of the auto-release workflow can be sent from any branch, and a tag created from an unreviewed ref would claim to release a commit that never passed the `main` gate; the guard makes the workflow's meaning (`main`'s merge is the release) executable rather than a convention, and leaves tag recovery to the path that names the tag as an input.",
+    "sensor": ".github/workflows/auto-release.yml ship job (an 'Assert the ship ref is main' step refusing any ref other than `refs/heads/main`); workflow lint sensor `bash scripts/check-actionlint.sh` and the docs/releasing.md runbook",
+    "category": "workflow"
+  },
+  {
+    "invariant": "`release-manager.sh` validates every version string against `^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$` under `LC_ALL=C` before it can reach a `sed` expression — this pipeline publishes plain `MAJOR.MINOR.PATCH`, refuses pre-release/build metadata, and refuses leading zeros and non-ASCII digits a UTF-8 locale's `[0-9]` would otherwise accept — and validates the git ref before use; a failing `rev-list --count` or `git log` dies instead of becoming a silent zero",
+    "rationale": "The version is interpolated into `sed` patterns, so an unvalidated `1.0.0-rc.1` or `1.0.0+meta` arrives at sed as regex syntax rather than a literal and corrupts every managed manifest. The commit count and the log feed the classifier, so swallowing their failure with `|| printf '0'` turns \"cannot compute the range\" into \"zero releasable commits\" and the derivation reports `bump=none` — the silent no-release the pipeline exists to prevent.",
+    "sensor": "bash scripts/release-manager.sh --self-test",
+    "category": "distribution"
+  },
+  {
+    "invariant": "`scripts/publish-npm.sh` reads the registry's current `dist-tags.latest` and publishes an out-of-order (older) version under `--tag backfill` instead of `latest`, so a recovery publish can never move `latest` backwards; it fails closed on any registry answer other than a 200 packument or a 404, so an HTTP error is never mistaken for a first publish",
+    "rationale": "`npm publish` applies its `tag` (default `latest`) to the submitted package, so republishing a superseded version without a flag silently resets the dist-tag every installer resolves through. Backfilling under its own tag keeps that recovery version installable while `latest` stays on the newest version; every publish is routed through the script, so the protection is not a per-job convention.",
+    "sensor": "bash scripts/publish-npm.sh --self-test (plus the .github/workflows/release.yml npm-publish job structure and the docs/releasing.md runbook)",
+    "category": "distribution"
+  },
+  {
+    "invariant": "The release manager is pinned by two test layers: `--self-test` is fast and hermetic — no network, no real cargo — and covers the full managed-manifest surface, the intra-workspace requirement pins in the member manifests (which `prepare` rewrites, because `^<minor>.0` cannot satisfy a minor bump) with the vendored `libsql` alias asserted untouched, the lock and man step invocation through a fake `cargo` on `PATH`, and the new validation; `--e2e` is opt-in, runs the real path in a scratch `git worktree`, and asserts `cargo metadata --locked` succeeds after the bump",
+    "rationale": "A hermetic control must not depend on a network or a real toolchain or it stops being a control, but a faked cargo cannot prove the lock file stays consistent after the bump. Splitting the two keeps the PR-time gate fast and deterministic while the real end-to-end assertion runs only where cargo and a worktree exist — the `release` set — so `--e2e` is deliberately absent from `verification`, and the man page regeneration it skips stays covered by the `man_sync` test and by the release pull request's own diff.",
+    "sensor": "bash scripts/release-manager.sh --self-test (PR-time) and bash scripts/release-manager.sh --e2e (release-gated, the `release-manager-e2e` sensor)",
+    "category": "verification"
+  },
+  {
+    "invariant": "At `0.0.x` the derivation stays on patch releases whatever the commits — a breaking change included — so the step to `0.1.0` is a decision rather than an automatic side effect of one commit",
+    "rationale": "`0.0.x` is the pre-API phase, and `next_version` keeps it on patches; letting a breaking change jump straight to the first minor would spend the one version that is meant to mark the API's first shape. SemVer section 4 leaves the choice open (anything MAY change at 0.y.z), so the exception is a policy decision, not a semantic requirement — and it is why the bump-policy table in docs/releasing.md needs its own `0.0.x` row.",
+    "sensor": "bash scripts/release-manager.sh --self-test",
+    "category": "distribution"
   }
 ]

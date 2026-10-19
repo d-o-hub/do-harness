@@ -1,6 +1,6 @@
 # Epic: Distribution and External Adoption
 
-> **Status:** released as `v0.1.0` (2026-09-13); `v0.1.1` (2026-09-15) ships the first Windows zip (crates.io published all three crates at `0.1.1`; npm publishes four Linux/macOS platform packages plus the `do-harness` meta package, all at `0.1.1` — Windows is GitHub-release-only because npm rejects the `do-harness-win32-x64` name). `v0.1.2` (2026-09-22) publishes all three crates and the GitHub release with composed release notes; the per-package npm trusted-publisher grants were completed after the staged-publishing default, and `v0.2.0` (2026-10-03) / `v0.2.1` (2026-10-09) published the crates and npm packages through GitHub Actions OIDC (`npx do-harness` resolves; see the two defect records below). The workspace is at `0.3.0` **in flight** — the libSQL fork cutover (see `plans/libsql-distribution.md`): `do-harness-libsql` 0.9.30 is on crates.io (manually published 2026-10-15 because Trusted Publishing for the new name is not yet configured), the `v0.3.0` tag exists on `6804b41` but its publish job failed (`do-harness-libsql` already present; the idempotency fix landed in #312/`787c19f` *after* the tag), so `registry-validation`, `npm-publish` and `release` never ran. Recovery: configure Trusted Publishing for `do-harness-libsql`, then re-cut the tag on `787c19f` per `docs/releasing.md`.
+> **Status:** released as `v0.1.0` (2026-09-13); `v0.1.1` (2026-09-15) ships the first Windows zip (crates.io published all three crates at `0.1.1`; npm publishes four Linux/macOS platform packages plus the `do-harness` meta package, all at `0.1.1` — Windows is GitHub-release-only because npm rejects the `do-harness-win32-x64` name). `v0.1.2` (2026-09-22) publishes all three crates and the GitHub release with composed release notes; the per-package npm trusted-publisher grants were completed after the staged-publishing default, and `v0.2.0` (2026-10-03) / `v0.2.1` (2026-10-09) published the crates and npm packages through GitHub Actions OIDC (`npx do-harness` resolves; see the two defect records below). The workspace is at `0.3.0` **published** (2026-10-18) — the libSQL fork cutover (see `plans/libsql-distribution.md`) completed: `do-harness-libsql` 0.9.30 was published manually on 2026-10-15 (Trusted Publishing for the new name is still not configured, so the tag run skips the crate rather than exchanging a token for it), the first `v0.3.0` tag run failed at `publish` before the idempotency fix landed in #312/`787c19f`, and the re-cut on `5fa6fb5` published `do-harness-types` → `do-harness-db` → `do-harness` 0.3.0 to crates.io, the npm meta package and its platform packages, and a GitHub Release with all five targets plus `checksums.txt`. Release cutting is automated now (`docs/releasing.md`, "Cutting a release").
 > **Related:** prebuilt releases, `scripts/install.sh`, pinned agent
 > instructions, release evidence
 > **Created:** 2026-09-13
@@ -292,22 +292,25 @@ was already at `0.1.1`, so the run correctly skipped each publish
 
 ## Follow-up: 0.3.0 (libSQL fork cutover)
 
-> **Progress (2026-10-15):** the fork publish landed manually
+> **Progress (2026-10-18):** completed. The fork publish landed manually
 > (`do-harness-libsql` 0.9.30 on crates.io, 2026-10-15T10:40Z, `trustpub_data:
-> null`); the `v0.3.0` tag run failed at `publish` (`already exists`, the
+> null`); the first `v0.3.0` tag run failed at `publish` (`already exists`, the
 > idempotency check fixed later in #312/`787c19f`) and skipped
-> `registry-validation`/`npm-publish`/`release`. Remaining: configure Trusted
-> Publishing for `do-harness-libsql`, re-cut the tag on `787c19f`, then the
-> registry-validation and docs steps below. Detail: `plans/analysis-followups.md`
-> (R1).
+> `registry-validation`/`npm-publish`/`release`. The re-cut on `5fa6fb5` passed
+> preflight, built and dogfooded all five targets, published the three crates
+> through OIDC, passed registry validation on musl and Windows, published the
+> npm packages, and created the GitHub Release. `do-harness-libsql`'s own
+> Trusted Publisher remains unconfigured and untested: the version already on
+> crates.io is skipped, so it only bites when the fork version bumps. Detail:
+> `plans/analysis-followups.md` (R1).
 
 | Slice | Exit criteria |
 |-------|---------------|
 | Fork publish | `do-harness-libsql` 0.9.30 published to crates.io (name rechecked at publish time; availability is time-sensitive), then `do-harness-types` → `do-harness-db` → `do-harness` 0.3.0 in dependency order through the tag-gated publish job |
 | Registry validation | `check_source_distribution.py --mode registry` installs the exact published CLI with `--locked` and checks the fixed source digest; musl + Windows packaged installs gate GitHub/npm publication |
-| Docs | `docs/releasing.md` operator step done (Trusted Publishing for the new name); README source-install note updated past "until 0.3.0 is published" |
+| Docs | README and `docs/adoption.md` source-install notes updated past "until 0.3.0 is published"; `docs/releases/v0.3.0.md` no longer opens with the interim status annotation. Still open: Trusted Publishing for the `do-harness-libsql` name, which nothing forces until that version bumps |
 
-Until 0.3.0 passes registry validation, registry installs of prior versions resolve unpatched upstream libSQL: use tested prebuilt artifacts or build this checkout with its versioned fork dependency. Detail: `plans/libsql-distribution.md`.
+0.3.0 passed registry validation on musl and Windows and is published, so registry installs carry the fork. Registry installs of 0.2.1 and earlier still resolve unpatched upstream libSQL: direct affected users to tested prebuilt artifacts or a checkout build. Detail: `plans/libsql-distribution.md`.
 
 Teardown fix (2026-10-12, #293): registry installs ship the libSQL teardown fix; packaged-install smoke (`smoke_db_distribution.py`, 32 cycles) covers the allocation-dependent teardown.
 
