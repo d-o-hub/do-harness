@@ -126,7 +126,8 @@ development decision composed from sensors: `feedback` for the edit/fix loop,
 `verification` as the mandatory pre-completion gate, `release` for
 release-time checks. Sets are declared in `[signal-sets]` and refer to sensor
 names; they never contain command lines. Unknown set names, dangling sensor
-references, and duplicate entries fail config validation loudly. Configs
+references in signal sets or `[hooks]` (`pre-commit`, `pre-push`), and duplicate
+entries fail config validation loudly before any action or hook file write. Configs
 without `[signal-sets]` keep legacy behavior: `verification`/`release`
 resolve to the full sensor list, `feedback` has no implicit guarantee and is
 rejected, and plain `verify` is unchanged.
