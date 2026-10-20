@@ -78,6 +78,59 @@ fn push_with_bin(dir: &Path, bin: &str) -> Output {
         .expect("spawn git push")
 }
 
+/// `hook install` with a config containing a dangling hook sensor reference
+/// must exit non-zero (exit 2) and leave all hook files unwritten.
+#[test]
+fn hook_install_rejects_dangling_hook_sensor_and_modifies_no_hooks() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let root = dir.path();
+    git_ok(root, &["init", "-q"]);
+    git_ok(root, &["config", "core.hooksPath", ".git/hooks"]);
+
+    let invalid_config = r#"
+language = "rust"
+[hooks]
+pre-commit = ["fmt", "loc"]
+[[sensors]]
+name = "test"
+argv = ["cargo", "test", "--workspace"]
+"#;
+    std::fs::write(root.join("do-harness.toml"), invalid_config).expect("write invalid config");
+
+    let out = harness()
+        .current_dir(root)
+        .arg("--root")
+        .arg(root)
+        .arg("hook")
+        .arg("install")
+        .output()
+        .expect("spawn hook install");
+
+    assert_eq!(
+        out.status.code(),
+        Some(2),
+        "hook install with invalid config must exit 2, got: {:?}\nstdout: {}\nstderr: {}",
+        out.status.code(),
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("hooks.pre-commit references unknown sensor 'fmt'")
+            || stderr.contains("hooks.pre-commit references unknown sensor 'loc'"),
+        "stderr must contain actionable diagnostic identifying hook and missing sensor:\n{stderr}"
+    );
+
+    let git_hooks = root.join(".git/hooks");
+    for hook_file in ["pre-commit", "pre-push", "commit-msg"] {
+        assert!(
+            !git_hooks.join(hook_file).exists(),
+            "{hook_file} file must not be written when config validation fails"
+        );
+    }
+}
+
 #[test]
 fn installed_commit_msg_hook_blocks_bad_subject() {
     let dir = tempfile::tempdir().expect("tempdir");
