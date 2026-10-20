@@ -41,12 +41,27 @@ fn git_ok(dir: &Path, args: &[&str]) {
     );
 }
 
+/// A hook-running git command: pinned to the binary under test and isolated
+/// from the cargo session that started the hook.
+///
+/// The managed hooks run `do-harness verify`, which re-enters the cargo session
+/// that started the hook: under `cargo llvm-cov` the scaffold's `coverage`
+/// sensor runs a second `cargo llvm-cov nextest` and the inherited
+/// `RUSTC_WRAPPER`/target dir make it rebuild into the outer instrumented
+/// workspace, exhausting memory (measured 2026-10-20: anonymous memory passed
+/// 7 GB within seconds). Isolate the hook exactly as `harness()` does.
+fn git_with_bin(dir: &Path, bin: &str) -> Command {
+    let mut command = git_command(dir);
+    support::isolate_command(&mut command);
+    command.env("DO_HARNESS_BIN", bin);
+    command
+}
+
 /// Runs git with the harness binary pinned, so the managed hooks execute the
 /// binary under test instead of building a release one.
 fn git_ok_with_bin(dir: &Path, args: &[&str], bin: &str) {
-    let out = git_command(dir)
+    let out = git_with_bin(dir, bin)
         .args(args)
-        .env("DO_HARNESS_BIN", bin)
         .output()
         .expect("spawn git");
     assert!(
@@ -57,9 +72,8 @@ fn git_ok_with_bin(dir: &Path, args: &[&str], bin: &str) {
 }
 
 fn push_with_bin(dir: &Path, bin: &str) -> Output {
-    git_command(dir)
+    git_with_bin(dir, bin)
         .args(["push", "origin", "HEAD:refs/heads/main"])
-        .env("DO_HARNESS_BIN", bin)
         .output()
         .expect("spawn git push")
 }
@@ -86,9 +100,9 @@ fn installed_commit_msg_hook_blocks_bad_subject() {
     std::fs::write(root.join("note.txt"), "hello\n").expect("write note");
     git_ok(root, &["add", "-A"]);
 
-    let bad = git_command(root)
+    let bin = env!("CARGO_BIN_EXE_do-harness");
+    let bad = git_with_bin(root, bin)
         .args(["commit", "-m", "Bad Subject"])
-        .env("DO_HARNESS_BIN", env!("CARGO_BIN_EXE_do-harness"))
         .output()
         .expect("spawn git commit");
     assert!(
@@ -96,9 +110,8 @@ fn installed_commit_msg_hook_blocks_bad_subject() {
         "uppercase subject must be blocked by the commit-msg hook"
     );
 
-    let good = git_command(root)
+    let good = git_with_bin(root, bin)
         .args(["commit", "-m", "feat: e2e hook check"])
-        .env("DO_HARNESS_BIN", env!("CARGO_BIN_EXE_do-harness"))
         .output()
         .expect("spawn git commit");
     assert!(
@@ -342,9 +355,8 @@ fn linked_worktree_e2e_hook_execution_and_lifecycle() {
     std::fs::write(linked.join("note.txt"), "hello worktree\n").expect("write note");
     git_ok(&linked, &["add", "-A"]);
 
-    let bad_commit = git_command(&linked)
+    let bad_commit = git_with_bin(&linked, bin)
         .args(["commit", "-m", "Bad Subject Message"])
-        .env("DO_HARNESS_BIN", bin)
         .output()
         .expect("spawn git commit in linked worktree");
     assert!(
@@ -368,9 +380,8 @@ fn linked_worktree_e2e_hook_execution_and_lifecycle() {
     .expect("write unformatted lib.rs");
     git_ok(&linked, &["add", "-A"]);
 
-    let failing_pre_commit = git_command(&linked)
+    let failing_pre_commit = git_with_bin(&linked, bin)
         .args(["commit", "-m", "feat: valid conventional subject"])
-        .env("DO_HARNESS_BIN", bin)
         .output()
         .expect("spawn git commit in linked worktree");
     assert!(

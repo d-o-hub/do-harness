@@ -47,9 +47,12 @@ pressure is shut down rather than reporting a sensor failure. Those caps bound
 the damage; they do not remove it. A test that spawns the harness, `init`
 included, must clear the outer coverage session with
 `support::isolate_command`, or its own cargo build inherits `RUSTC_WRAPPER` and
-`CARGO_TARGET_DIR` and runs a second instrumented workspace: the `concurrency`
-fixture did exactly that and pushed the `release`/`scheduled` gates past 15 GB
-with no single process above ~600 MB RSS. `cargo check` is a fast feedback
+`CARGO_TARGET_DIR` and runs a second instrumented workspace. Git hooks are the
+same hazard: `hook_e2e`'s pre-push fixture runs `do-harness verify`, whose
+`coverage` sensor starts a nested `cargo llvm-cov nextest`, so the git command
+that triggers the hook is isolated too. Both paths had pushed the
+`release`/`scheduled` gates past 15 GB with no single process above ~600 MB RSS
+— many short-lived `rustc` children, not one leaking process. `cargo check` is a fast feedback
 command, but a release build is still required to validate final code generation
 and linking.
 
