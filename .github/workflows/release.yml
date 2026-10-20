@@ -738,7 +738,12 @@ jobs:
     # the release gate until the ratchet moves (docs/releasing.md, "Verifying a
     # published release"). Deleting that line is the next position; passing
     # `--require-immutable` to the script is the last one.
-    needs: [release]
+    #
+    # npm is part of the published surface, so wait for its job before probing:
+    # the registry can keep serving the previous `dist-tags` for a few minutes
+    # after `npm publish` reports success, and the probe below polls through
+    # that window rather than reading propagation as a missing artifact.
+    needs: [release, npm-publish]
     continue-on-error: true
     if: github.event_name == 'push' || inputs.tag
     runs-on: ubuntu-latest
@@ -775,13 +780,29 @@ jobs:
             echo "release=missing" >>"$facts"
           fi
           gh release download "$TAG" --dir "$work/assets" || true
-          if npm_version="$(npm view "do-harness@$version" version 2>/dev/null)" &&
-            [ -n "$npm_version" ]; then
+          # npm's registry can serve a just-published version minutes after
+          # `npm publish` reports success (v0.3.4 was still `missing` 24s after
+          # the publish job finished). Poll instead of reading that propagation
+          # delay as a missing artifact; the bound keeps a real outage failing
+          # the job instead of waiting forever.
+          poll_npm() {
+            local query="$1" value=""
+            for _ in $(seq 1 20); do
+              value="$(npm view "$query" 2>/dev/null || true)"
+              if [ -n "$value" ]; then
+                printf '%s\n' "$value"
+                return 0
+              fi
+              sleep 15
+            done
+            return 1
+          }
+          if npm_version="$(poll_npm "do-harness@$version" version)"; then
             echo "npm=$npm_version" >>"$facts"
           else
             echo "npm=missing" >>"$facts"
           fi
-          if [ -n "$(npm view "do-harness@$version" dist.attestations.url 2>/dev/null || true)" ]; then
+          if [ -n "$(poll_npm "do-harness@$version" dist.attestations.url || true)" ]; then
             echo "npm_provenance=ok" >>"$facts"
           else
             echo "npm_provenance=missing" >>"$facts"
