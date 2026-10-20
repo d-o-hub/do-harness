@@ -43,9 +43,15 @@ setting avoids retaining CI-only incremental state. The two instrumented gates
 (`release` preflight and scheduled `coverage`) go one step further and run with
 `CARGO_BUILD_JOBS=1` and `NEXTEST_TEST_THREADS=1`: `cargo llvm-cov nextest` is
 the peak-RSS path in this repository, and a hosted runner starved under memory
-pressure is shut down rather than reporting a sensor failure. `cargo check` is a
-fast feedback command, but a release build is still required to validate final
-code generation and linking.
+pressure is shut down rather than reporting a sensor failure. Those caps bound
+the damage; they do not remove it. A test that spawns the harness, `init`
+included, must clear the outer coverage session with
+`support::isolate_command`, or its own cargo build inherits `RUSTC_WRAPPER` and
+`CARGO_TARGET_DIR` and runs a second instrumented workspace: the `concurrency`
+fixture did exactly that and pushed the `release`/`scheduled` gates past 15 GB
+with no single process above ~600 MB RSS. `cargo check` is a fast feedback
+command, but a release build is still required to validate final code generation
+and linking.
 
 On this workspace, a clean, non-incremental `cargo check --workspace` measured
 approximately 2.05 GiB peak sampled compiler-process RSS with eight jobs and
