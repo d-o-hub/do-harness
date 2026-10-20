@@ -39,9 +39,13 @@ CARGO_BUILD_JOBS=2 cargo build --workspace --locked
 
 CI sets `CARGO_BUILD_JOBS=2` and `CARGO_INCREMENTAL=0` in the build workflows.
 The job bound applies to Cargo's compiler-process scheduling; the incremental
-setting avoids retaining CI-only incremental state. `cargo check` is a fast
-feedback command, but a release build is still required to validate final code
-generation and linking.
+setting avoids retaining CI-only incremental state. The two instrumented gates
+(`release` preflight and scheduled `coverage`) go one step further and run with
+`CARGO_BUILD_JOBS=1` and `NEXTEST_TEST_THREADS=1`: `cargo llvm-cov nextest` is
+the peak-RSS path in this repository, and a hosted runner starved under memory
+pressure is shut down rather than reporting a sensor failure. `cargo check` is a
+fast feedback command, but a release build is still required to validate final
+code generation and linking.
 
 On this workspace, a clean, non-incremental `cargo check --workspace` measured
 approximately 2.05 GiB peak sampled compiler-process RSS with eight jobs and
