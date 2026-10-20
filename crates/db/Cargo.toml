@@ -21,7 +21,7 @@ serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 sha2.workspace = true
 hex.workspace = true
-do-harness-types = { path = "../types", version = "0.3.3" }
+do-harness-types = { path = "../types", version = "0.3.4" }
 
 [dev-dependencies]
 tempfile.workspace = true
