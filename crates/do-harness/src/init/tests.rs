@@ -31,6 +31,7 @@ async fn init_rust_scaffolds_full_workspace() {
         .unwrap();
 
     assert!(report.written.contains(&"AGENTS.md".to_owned()));
+    assert!(report.written.contains(&"USE_RESTRICTIONS.md".to_owned()));
     assert!(report.written.contains(&"do-harness.toml".to_owned()));
     assert!(report.written.contains(&"plans/invariants.json".to_owned()));
     assert!(report.written.contains(&"scripts/check-loc.sh".to_owned()));
@@ -90,6 +91,7 @@ async fn init_is_idempotent_without_force() {
 
     assert_eq!(report.written.len(), 0);
     assert!(report.skipped.contains(&"do-harness.toml".to_owned()));
+    assert!(report.skipped.contains(&"USE_RESTRICTIONS.md".to_owned()));
 }
 
 #[tokio::test(flavor = "current_thread")]
@@ -303,6 +305,7 @@ async fn init_minimal_skips_skills() {
     assert_eq!(report.skills, 0);
     assert!(!dir.path().join(".agents/skills").exists());
     assert!(dir.path().join("AGENTS.md").is_file());
+    assert!(dir.path().join("USE_RESTRICTIONS.md").is_file());
 }
 
 /// `--no-gitignore` leaves the ignore file absent.
@@ -358,6 +361,68 @@ async fn repository_feedback_set_covers_its_pre_commit_hook() {
     let path = root.join("do-harness.toml");
     let cfg = crate::config::load(&root, Some(&path)).await.unwrap();
     assert_fast_loop_covers_the_hook(&cfg.hooks.pre_commit, &cfg.signal_sets["feedback"]);
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn init_scaffolds_use_restrictions_policy_across_all_languages() {
+    for lang in [
+        Language::Rust,
+        Language::Generic,
+        Language::Web,
+        Language::Node,
+    ] {
+        let dir = tempfile::tempdir().unwrap();
+        let report = init_workspace(dir.path(), &opts(Some(lang)))
+            .await
+            .unwrap();
+
+        assert!(
+            report.written.contains(&"USE_RESTRICTIONS.md".to_owned()),
+            "USE_RESTRICTIONS.md must be written for language {lang:?}"
+        );
+        let path = dir.path().join("USE_RESTRICTIONS.md");
+        assert!(path.is_file(), "USE_RESTRICTIONS.md exists for {lang:?}");
+        let policy = fs::read_to_string(&path).unwrap();
+        assert!(policy.contains("# Agent Use Restrictions & Safety Policy"));
+        assert!(policy.contains("Production Deployment"));
+        assert!(policy.contains("Production Credentials & Secrets"));
+        assert!(policy.contains("Destructive Infrastructure"));
+        assert!(policy.contains("Quality Gate Integrity"));
+        assert!(policy.contains("Untrusted External Content Handling"));
+    }
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn init_use_restrictions_preexisting_is_kept_without_force() {
+    let dir = tempfile::tempdir().unwrap();
+    let custom_policy = "# Custom Adopter Policy\nDo not break stuff.\n";
+    fs::write(dir.path().join("USE_RESTRICTIONS.md"), custom_policy).unwrap();
+
+    let report = init_workspace(dir.path(), &opts(Some(Language::Rust)))
+        .await
+        .unwrap();
+
+    assert!(report.skipped.contains(&"USE_RESTRICTIONS.md".to_owned()));
+    assert!(!report.written.contains(&"USE_RESTRICTIONS.md".to_owned()));
+    let policy = fs::read_to_string(dir.path().join("USE_RESTRICTIONS.md")).unwrap();
+    assert_eq!(policy, custom_policy);
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn init_use_restrictions_preexisting_is_overwritten_with_force() {
+    let dir = tempfile::tempdir().unwrap();
+    let custom_policy = "# Custom Adopter Policy\nDo not break stuff.\n";
+    fs::write(dir.path().join("USE_RESTRICTIONS.md"), custom_policy).unwrap();
+
+    let mut force_opts = opts(Some(Language::Rust));
+    force_opts.force = true;
+
+    let report = init_workspace(dir.path(), &force_opts).await.unwrap();
+
+    assert!(report.written.contains(&"USE_RESTRICTIONS.md".to_owned()));
+    let policy = fs::read_to_string(dir.path().join("USE_RESTRICTIONS.md")).unwrap();
+    assert_ne!(policy, custom_policy);
+    assert!(policy.contains("# Agent Use Restrictions & Safety Policy"));
 }
 
 fn assert_fast_loop_covers_the_hook(pre_commit: &[String], feedback: &[String]) {

@@ -14,7 +14,8 @@
         "assets/compliance.md",
         "assets/methods.json",
         "assets/nextest.toml",
-        "templates/AGENTS.md"
+        "templates/AGENTS.md",
+        "templates/USE_RESTRICTIONS.md"
       ]
     }
   },

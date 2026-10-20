@@ -124,6 +124,14 @@ fn existing_rust_repo_is_not_rewritten() {
 /// run still writes. Sources stay untouched either way.
 #[test]
 fn existing_rust_repo_without_tests_reports_the_empty_test_gate() {
+    let has_nextest = Command::new("cargo")
+        .args(["nextest", "--version"])
+        .output()
+        .is_ok_and(|o| o.status.success());
+    if !has_nextest {
+        return;
+    }
+
     let dir = tempfile::tempdir().unwrap();
     write_clean_crate(dir.path(), false);
     let manifest_before = std::fs::read_to_string(dir.path().join("Cargo.toml")).unwrap();

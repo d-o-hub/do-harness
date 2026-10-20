@@ -109,7 +109,8 @@ The harness is designed to be adopted by any codebase, Rust or not:
    SKIP as a failure. See [docs/adoption.md web pack
    configuration](https://github.com/d-o-hub/do-harness/blob/main/docs/adoption.md#web-pack-configuration).
 
-   This writes `do-harness.toml`, `AGENTS.md`, `plans/invariants.json`,
+   This writes `do-harness.toml`, `AGENTS.md`, `USE_RESTRICTIONS.md` (standalone
+   policy for high-risk operations and human approval boundaries), `plans/invariants.json`,
    `.agents/skills/` (the `harness` skill plus `skill-creator` for building
    project-specific skills), and `.gitignore` entries, then initializes the
    local libSQL state and seeds the invariants. Existing files are left
