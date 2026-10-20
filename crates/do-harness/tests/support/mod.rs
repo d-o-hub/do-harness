@@ -83,6 +83,7 @@ pub fn isolate_command(command: &mut Command) -> &mut Command {
         command.env_remove(key);
     }
     command.env("LLVM_PROFILE_FILE", "/dev/null");
+    command.env("GIT_CONFIG_GLOBAL", "/dev/null");
     command
 }
 
@@ -93,7 +94,7 @@ pub fn isolate_command(command: &mut Command) -> &mut Command {
 /// instead of the fixture.
 pub fn git_command(root: &Path) -> Command {
     let mut command = Command::new("git");
-    command.arg("-c").arg("core.hooksPath=.git/hooks");
+    command.env("GIT_CONFIG_GLOBAL", "/dev/null");
     command.current_dir(root);
     clear_git_view(&mut command);
     command

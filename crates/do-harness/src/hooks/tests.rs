@@ -144,7 +144,89 @@ fn find_git_dir_discovers_git_root_from_nested_directory() {
 
     let git_dir = find_git_dir(&nested).unwrap();
 
-    assert_eq!(git_dir, temp.path().join(".git"));
+    assert_eq!(git_dir, fs::canonicalize(temp.path().join(".git")).unwrap());
+}
+
+fn create_linked_worktree(temp: &Path) -> (PathBuf, PathBuf) {
+    let parent = temp.join("parent");
+    let linked = temp.join("linked");
+    assert!(
+        crate::changes::git_command(temp)
+            .args(["init", "-q", "parent"])
+            .status()
+            .unwrap()
+            .success()
+    );
+    assert!(
+        crate::changes::git_command(&parent)
+            .args(["config", "core.hooksPath", ".git/hooks"])
+            .status()
+            .unwrap()
+            .success()
+    );
+    assert!(
+        crate::changes::git_command(&parent)
+            .args(["commit", "--allow-empty", "-m", "initial", "-q"])
+            .env("GIT_AUTHOR_NAME", "t")
+            .env("GIT_AUTHOR_EMAIL", "t@t")
+            .env("GIT_COMMITTER_NAME", "t")
+            .env("GIT_COMMITTER_EMAIL", "t@t")
+            .status()
+            .unwrap()
+            .success()
+    );
+    assert!(
+        crate::changes::git_command(&parent)
+            .args(["worktree", "add", "-b", "fixture", linked.to_str().unwrap()])
+            .status()
+            .unwrap()
+            .success()
+    );
+    (parent, linked)
+}
+
+#[test]
+fn find_git_dir_resolves_common_git_dir_for_linked_worktree() {
+    let temp = tempfile::tempdir().unwrap();
+    let (parent, linked) = create_linked_worktree(temp.path());
+
+    let parent_common_git_dir = find_git_dir(&parent).unwrap();
+    let linked_common_git_dir = find_git_dir(&linked).unwrap();
+
+    let expected = fs::canonicalize(parent.join(".git")).unwrap();
+    assert_eq!(parent_common_git_dir, expected);
+    assert_eq!(linked_common_git_dir, expected);
+}
+
+#[test]
+fn linked_worktree_hook_lifecycle_operates_on_shared_hooks() {
+    let temp = tempfile::tempdir().unwrap();
+    let (parent, linked) = create_linked_worktree(temp.path());
+
+    let git_dir = find_git_dir(&linked).unwrap();
+
+    // Install from linked worktree side
+    install(&git_dir, &linked, &[], &[], false).unwrap();
+
+    // Verify hooks exist in shared parent .git/hooks
+    assert!(parent.join(".git/hooks/pre-commit").exists());
+    assert!(parent.join(".git/hooks/pre-push").exists());
+    assert!(parent.join(".git/hooks/commit-msg").exists());
+
+    // Status from linked worktree side
+    let state_linked = status(&git_dir, &linked);
+    assert!(state_linked.is_all_installed());
+
+    // Status from parent side
+    let parent_git_dir = find_git_dir(&parent).unwrap();
+    let state_parent = status(&parent_git_dir, &parent);
+    assert!(state_parent.is_all_installed());
+
+    // Uninstall from linked worktree side
+    uninstall(&git_dir, &linked).unwrap();
+    assert!(!parent.join(".git/hooks/pre-commit").exists());
+    assert!(!parent.join(".git/hooks/pre-push").exists());
+    assert!(!parent.join(".git/hooks/commit-msg").exists());
 }
 
 #[test]

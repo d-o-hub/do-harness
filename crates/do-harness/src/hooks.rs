@@ -26,27 +26,88 @@ pub fn find_git_dir(cwd: &Path) -> Result<PathBuf> {
     while let Some(dir) = current {
         let dot_git = dir.join(".git");
         if dot_git.exists() {
-            return Ok(dot_git);
+            return resolve_dot_git(&dot_git, dir);
         }
         current = dir.parent();
     }
 
     let output = crate::changes::git_command(cwd)
-        .args(["rev-parse", "--git-dir"])
-        .output()
-        .with_context(|| format!("failed to run `git rev-parse` from {}", cwd.display()))?;
-    if !output.status.success() {
-        bail!(
-            "no git repository found from {} (walk-up found no .git and `git rev-parse --git-dir` failed)",
-            cwd.display()
-        );
-    }
-    let git_dir = PathBuf::from(String::from_utf8_lossy(&output.stdout).trim());
-    Ok(if git_dir.is_absolute() {
-        git_dir
+        .args(["rev-parse", "--git-common-dir"])
+        .output();
+
+    let git_common_str = match output {
+        Ok(out) if out.status.success() => String::from_utf8_lossy(&out.stdout).trim().to_owned(),
+        _ => {
+            let output_dir = crate::changes::git_command(cwd)
+                .args(["rev-parse", "--git-dir"])
+                .output()
+                .with_context(|| format!("failed to run `git rev-parse` from {}", cwd.display()))?;
+            if !output_dir.status.success() {
+                bail!(
+                    "no git repository found from {} (walk-up found no .git and `git rev-parse` failed)",
+                    cwd.display()
+                );
+            }
+            String::from_utf8_lossy(&output_dir.stdout)
+                .trim()
+                .to_owned()
+        }
+    };
+
+    let path = PathBuf::from(&git_common_str);
+    let abs_path = if path.is_absolute() {
+        path
     } else {
-        cwd.join(git_dir)
-    })
+        cwd.join(path)
+    };
+    Ok(fs::canonicalize(&abs_path).unwrap_or(abs_path))
+}
+
+fn resolve_dot_git(dot_git: &Path, dir: &Path) -> Result<PathBuf> {
+    let target_git_dir = if dot_git.is_dir() {
+        dot_git.to_path_buf()
+    } else {
+        let content = fs::read_to_string(dot_git)
+            .with_context(|| format!("failed to read gitfile {}", dot_git.display()))?;
+        let gitdir_line = content
+            .lines()
+            .find(|line| line.trim_start().starts_with("gitdir:"))
+            .with_context(|| format!("invalid gitfile format at {}", dot_git.display()))?;
+        let ptr = gitdir_line
+            .trim_start()
+            .strip_prefix("gitdir:")
+            .ok_or_else(|| anyhow::anyhow!("invalid gitdir prefix at {}", dot_git.display()))?
+            .trim();
+        let ptr_path = Path::new(ptr);
+        if ptr_path.is_absolute() {
+            ptr_path.to_path_buf()
+        } else {
+            dir.join(ptr_path)
+        }
+    };
+
+    let commondir_file = target_git_dir.join("commondir");
+    let final_dir = if commondir_file.is_file() {
+        if let Ok(commondir_content) = fs::read_to_string(&commondir_file) {
+            let cptr = commondir_content.trim();
+            if cptr.is_empty() {
+                target_git_dir
+            } else {
+                let cpath = Path::new(cptr);
+                if cpath.is_absolute() {
+                    cpath.to_path_buf()
+                } else {
+                    target_git_dir.join(cpath)
+                }
+            }
+        } else {
+            target_git_dir
+        }
+    } else {
+        target_git_dir
+    };
+
+    Ok(fs::canonicalize(&final_dir).unwrap_or(final_dir))
 }
 
 /// Queries Git configuration for `core.hooksPath`.
@@ -71,15 +132,15 @@ pub fn get_core_hooks_path(repo_root: &Path) -> Option<String> {
 pub fn get_effective_hooks_dir(git_dir: &Path, repo_root: &Path) -> (PathBuf, Option<String>) {
     let core_hooks_path = get_core_hooks_path(repo_root);
     if let Some(ref path_str) = core_hooks_path {
-        let path = expand_tilde_and_resolve(path_str, repo_root);
+        let path = expand_tilde_and_resolve(path_str, repo_root, git_dir);
         (path, core_hooks_path)
     } else {
         (git_dir.join("hooks"), None)
     }
 }
 
-/// Expands leading `~` and resolves relative paths against `repo_root`.
-fn expand_tilde_and_resolve(path_str: &str, repo_root: &Path) -> PathBuf {
+/// Expands leading `~` and resolves relative paths against `repo_root` (or `git_dir` if `.git` is a file).
+fn expand_tilde_and_resolve(path_str: &str, repo_root: &Path, git_dir: &Path) -> PathBuf {
     let path_buf = if let Some(stripped) = path_str
         .strip_prefix("~/")
         .or_else(|| path_str.strip_prefix("~\\"))
@@ -96,6 +157,12 @@ fn expand_tilde_and_resolve(path_str: &str, repo_root: &Path) -> PathBuf {
     if path_buf.is_absolute() {
         path_buf
     } else {
+        let dot_git = repo_root.join(".git");
+        if dot_git.is_file() {
+            if let Ok(rel) = path_buf.strip_prefix(".git") {
+                return git_dir.join(rel);
+            }
+        }
         repo_root.join(path_buf)
     }
 }

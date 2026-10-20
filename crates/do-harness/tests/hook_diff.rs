@@ -82,6 +82,11 @@ fn installed_repo() -> (TempDir, PathBuf) {
         .status()
         .expect("spawn git init");
     assert!(status.success(), "git init failed in {}", root.display());
+    let cfg_status = support::git_command(&root)
+        .args(["config", "core.hooksPath", ".git/hooks"])
+        .status()
+        .expect("spawn git config");
+    assert!(cfg_status.success());
     std::fs::write(root.join("do-harness.toml"), config(&["fmt"])).unwrap();
 
     let (code, stdout, stderr) = run(harness(&root).args(["hook", "install"]));
