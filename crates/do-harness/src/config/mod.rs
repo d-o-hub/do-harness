@@ -340,8 +340,24 @@ impl Config {
                 }
             }
         }
+        validate_hook_references("hooks.pre-commit", &self.hooks.pre_commit, &known)?;
+        validate_hook_references("hooks.pre-push", &self.hooks.pre_push, &known)?;
         Ok(())
     }
+}
+
+/// Validates that every non-empty hook sensor selection references a sensor
+/// present in the effective sensor pack.
+fn validate_hook_references(hook_key: &str, names: &[String], known: &[&str]) -> Result<()> {
+    for name in names {
+        if !known.contains(&name.as_str()) {
+            anyhow::bail!(
+                "{hook_key} references unknown sensor '{name}' (available: {})",
+                known.join(", ")
+            );
+        }
+    }
+    Ok(())
 }
 
 /// Whether a `[signal-sets]` key is a safe set name and evidence-file stem.
@@ -422,5 +438,7 @@ impl Config {
     }
 }
 
+#[cfg(test)]
+mod pack_tests;
 #[cfg(test)]
 mod tests;

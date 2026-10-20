@@ -10,7 +10,7 @@ async fn parses_valid_config() {
     let text = r#"
             language = "rust"
             [hooks]
-            pre-commit = ["fmt", "loc"]
+            pre-commit = ["fmt", "check"]
             pre-push = []
             [[sensors]]
             name = "fmt"
@@ -24,7 +24,7 @@ async fn parses_valid_config() {
     assert_eq!(cfg.language.as_deref(), Some("rust"));
     assert_eq!(
         cfg.hooks.pre_commit,
-        vec!["fmt".to_owned(), "loc".to_owned()]
+        vec!["fmt".to_owned(), "check".to_owned()]
     );
     assert_eq!(cfg.hooks.pre_push.len(), 0);
     assert_eq!(cfg.sensors.len(), 2);
@@ -32,6 +32,42 @@ async fn parses_valid_config() {
         cfg.sensors[0].argv,
         vec!["cargo", "fmt", "--all", "--", "--check"]
     );
+}
+
+/// A hook selection referencing an unknown sensor is rejected at config load.
+#[tokio::test(flavor = "current_thread")]
+async fn rejects_unknown_sensor_in_hooks() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let path = dir.path().join("do-harness.toml");
+    let text = r#"
+            language = "rust"
+            [hooks]
+            pre-commit = ["fmt", "loc"]
+            [[sensors]]
+            name = "fmt"
+            argv = ["cargo", "fmt"]
+        "#;
+    std::fs::write(&path, text).expect("write config");
+    let err = load(dir.path(), Some(&path))
+        .await
+        .expect_err("load must fail for dangling pre-commit sensor");
+    let err_msg = format!("{err:#}");
+    assert!(err_msg.contains("hooks.pre-commit references unknown sensor 'loc'"));
+    assert!(err_msg.contains("available: fmt"));
+
+    let text_push = r#"
+            language = "rust"
+            [hooks]
+            pre-push = ["ghost"]
+            [[sensors]]
+            name = "fmt"
+            argv = ["cargo", "fmt"]
+        "#;
+    std::fs::write(&path, text_push).expect("write config");
+    let err_push = load(dir.path(), Some(&path))
+        .await
+        .expect_err("load must fail for dangling pre-push sensor");
+    assert!(format!("{err_push:#}").contains("hooks.pre-push references unknown sensor 'ghost'"));
 }
 
 /// Unknown top-level keys are rejected by `deny_unknown_fields`.
@@ -81,29 +117,21 @@ async fn parses_severity_and_allow_failure_alias() {
             name = "strict"
             argv = ["true"]
             severity = "error"
-
             [[sensors]]
             name = "noisy"
             argv = ["true"]
             severity = "warn"
-
             [[sensors]]
             name = "legacy"
             argv = ["true"]
             allow_failure = true
-
             [[sensors]]
             name = "default"
             argv = ["true"]
         "#;
     std::fs::write(&path, text).expect("write config");
     let cfg = load(dir.path(), Some(&path)).await.expect("load config");
-    let sensor = |name: &str| {
-        cfg.sensors
-            .iter()
-            .find(|s| s.name == name)
-            .unwrap_or_else(|| panic!("missing {name}"))
-    };
+    let sensor = |name: &str| cfg.sensors.iter().find(|s| s.name == name).unwrap();
     assert_eq!(sensor("strict").effective_severity(), SensorSeverity::Error);
     assert_eq!(sensor("noisy").effective_severity(), SensorSeverity::Warn);
     assert_eq!(sensor("legacy").effective_severity(), SensorSeverity::Warn);
@@ -238,26 +266,6 @@ async fn rust_language_without_sensors_uses_builtin_pack() {
     let cfg = load(dir.path(), Some(&path)).await.expect("load config");
     assert_eq!(cfg.effective_sensors().len(), 10);
     assert!(cfg.sensor_names().contains(&"clippy".to_owned()));
-}
-
-/// The built-in pack must not carry `--no-tests=pass`: a workspace whose suite
-/// shrank to zero has to fail its `test` sensor instead of reporting green
-/// (AGENTS.md section 4, "No Vacuous Gates").
-///
-/// `tests/vacuous_gates.rs` proves the behaviour end to end where cargo-nextest
-/// is installed; this pin holds on every host.
-#[test]
-fn builtin_rust_pack_test_sensor_fails_on_zero_tests() {
-    let pack = rust_pack();
-    let test = pack
-        .iter()
-        .find(|sensor| sensor.name == "test")
-        .expect("the built-in pack ships a test sensor");
-    assert_eq!(
-        test.argv,
-        vec!["cargo", "nextest", "run", "--workspace"],
-        "nextest must fail the run when it executes zero tests"
-    );
 }
 
 /// Parses `[signal-sets]` and `when-changed` sensor patterns.
@@ -399,71 +407,4 @@ async fn parses_jobs_bound() {
     std::fs::write(&path, text).expect("write config");
     let cfg = load(dir.path(), Some(&path)).await.expect("load");
     assert_eq!(cfg.jobs, Some(4));
-}
-
-/// The built-in default ships feedback/verification/release signal sets.
-#[test]
-fn rust_default_ships_signal_sets() {
-    let cfg = rust_default();
-    assert_eq!(
-        cfg.signal_sets.get("feedback"),
-        Some(&vec![
-            "fmt".to_owned(),
-            "check".to_owned(),
-            "clippy".to_owned()
-        ])
-    );
-    assert_eq!(cfg.signal_sets.get("verification").unwrap().len(), 9);
-    assert_eq!(cfg.signal_sets.get("release").unwrap().len(), 10);
-    cfg.validate().expect("built-in default must validate");
-}
-
-/// The built-in pack pins `--all-targets` on clippy and narrows the cargo
-/// sensors with `when-changed` globs so `verify --changed` is meaningful.
-#[test]
-fn rust_pack_pins_all_targets_and_when_changed() {
-    let sensors = rust_pack();
-    let sensor = |name: &str| {
-        sensors
-            .iter()
-            .find(|spec| spec.name == name)
-            .unwrap_or_else(|| panic!("missing built-in sensor {name}"))
-    };
-
-    assert!(
-        sensor("clippy")
-            .argv
-            .iter()
-            .any(|arg| arg == "--all-targets"),
-        "clippy must analyze all targets"
-    );
-    for name in ["fmt", "check", "clippy", "test", "doctest", "coverage"] {
-        assert!(
-            !sensor(name).when_changed.is_empty(),
-            "{name} must declare when-changed globs"
-        );
-    }
-    assert_eq!(
-        sensor("fmt").when_changed,
-        vec!["**/*.rs", "Cargo.toml", "Cargo.lock", "rust-toolchain.toml"]
-    );
-    assert_eq!(
-        sensor("check").when_changed,
-        vec!["**/*.rs", "Cargo.toml", "Cargo.lock"]
-    );
-    assert_eq!(
-        sensor("clippy").when_changed,
-        sensor("check").when_changed.clone()
-    );
-    assert_eq!(
-        sensor("test").when_changed,
-        sensor("check").when_changed.clone()
-    );
-    assert_eq!(sensor("loc").when_changed, vec!["**/*.rs"]);
-    for name in ["deps", "audit", "commitlint"] {
-        assert!(
-            sensor(name).when_changed.is_empty(),
-            "{name} is a blanket sensor"
-        );
-    }
 }

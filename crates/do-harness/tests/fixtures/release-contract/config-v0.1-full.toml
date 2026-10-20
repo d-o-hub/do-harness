@@ -3,7 +3,7 @@ language = "rust"
 jobs = 2
 
 [hooks]
-pre-commit = ["fmt", "loc"]
+pre-commit = ["fmt", "check"]
 pre-push = ["check"]
 
 [signal-sets]

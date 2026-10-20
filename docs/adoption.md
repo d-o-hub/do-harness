@@ -158,7 +158,11 @@ when-changed = ["src/**", "test/**"]
 A sensor is one `argv` command; a signal set is a decision composed from
 sensor names. `when-changed` globs make a sensor apply only to the current
 change (`verify --changed`), and selection fails closed when git state cannot
-be read.
+be read. Providing a non-empty `[[sensors]]` list replaces the built-in sensor
+pack entirely. Non-empty `pre-commit` and `pre-push` hook selections under
+`[hooks]` are validated against the effective sensor pack (`effective_sensors`),
+and any unknown sensor name fails configuration loading before hooks are
+written. An empty hook list defaults to running the full effective suite.
 
 Status documents rot silently, so `init` also scaffolds a reference
 `project-check`: `scripts/check-tracker-drift.sh` compares `<n> open PRs` /
@@ -349,7 +353,7 @@ The harness enforces strict fail-closed contract rules across all supported pack
 3. **Mid-Run Input Mutation & Stale Evidence**:
    - If source inputs or `do-harness.toml` configuration change during a run or post-execution, `status` reports `state = "red"` (`inputs_changed_during_run`).
 4. **Configuration Validation**:
-   - Dangling sensor references in `[signal-sets]`, unknown sensor names, or invalid TOML produce exit code 2 with actionable diagnostic output naming the failing setting.
+   - Dangling sensor references in `[signal-sets]`, `[hooks]` (`pre-commit` or `pre-push`), unknown sensor names, or invalid TOML produce exit code 2 with actionable diagnostic output naming the failing setting.
 5. **Non-Destructive Adoption**:
    - `init` never overwrites existing application code or configuration files without explicit `--force`.
 
