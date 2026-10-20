@@ -336,7 +336,7 @@ one proves and what it does not.
 The `release` job's `needs` order publication, so a GitHub Release never claims a
 version that is missing on crates.io or npm. What no job could prove is what a
 *consumer* sees. `scripts/verify-published.sh` answers that, and the
-`verify-published` job runs it after `release`.
+`verify-published` job runs it after `release` and `npm-publish`.
 
 It checks, and fails when any of these is not true: the tag agrees with the
 workspace version of the tree it was cut from; the GitHub Release exists; every
@@ -353,8 +353,11 @@ every release for a switch only a human can flip; `--require-immutable` promotes
 it once that is done. `dist-tags.latest` is advisory because a backfill
 deliberately keeps `latest` ahead of the version being published.
 
-The script is hermetic: the job gathers the facts (one query per channel, each
-writing `missing` when it fails) and the script judges them, so `--self-test`
+The script is hermetic: the job gathers the facts (GitHub Release, crates.io, the
+installer and the attestations answer once; npm is polled for up to five minutes
+because the registry can serve a just-published version a little after
+`npm publish` reports success, and each fact still degrades to `missing` when the
+query never succeeds) and the script judges them, so `--self-test`
 reproduces the whole policy without a release or a network. An absent fact is
 `missing`, never "fine", and every digest comparison rejects an empty value first —
 two empty strings compare equal, which is how a gate like this passes vacuously.
