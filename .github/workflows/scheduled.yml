@@ -81,6 +81,7 @@ jobs:
           sudo mkswap "$swapfile" >/dev/null
           sudo swapon "$swapfile"
           free -m
+          df -h / /mnt
       - name: Run scheduled sensors
         env:
           # `check-powerset.sh` fails closed when CI=true and a missing
@@ -94,7 +95,27 @@ jobs:
           # the swap above absorbs the rest.
           CARGO_BUILD_JOBS: "1"
           NEXTEST_TEST_THREADS: "1"
-        run: ./target/release/do-harness verify --set scheduled --format json --strict
+          # glibc creates one malloc arena per thread by default; the
+          # instrumented suite is thread-heavy, and capping arenas trims RSS
+          # without changing test scheduling.
+          MALLOC_ARENA_MAX: "2"
+        # A runner shutdown skips every later step, including `if: failure()`,
+        # so stream the resource state instead of reporting it only after the
+        # fact.
+        run: |
+          (
+            while true; do
+              printf '%s ' "$(date -u +%H:%M:%S)"
+              free -m | awk 'NR==2 {printf "mem_used=%sMiB mem_avail=%sMiB ", $3, $7} NR==3 {printf "swap_used=%sMiB swap_free=%sMiB ", $3, $4}'
+              df -h / | awk 'NR==2 {printf "disk_used=%s disk_avail=%s", $3, $4}'
+              printf '\n'
+              ps -eo pid,rss,etime,comm --sort=-rss | awk 'NR==1 || NR<=6'
+              sleep 15
+            done
+          ) &
+          monitor=$!
+          trap 'kill "$monitor" 2>/dev/null || true' EXIT
+          ./target/release/do-harness verify --set scheduled --format json --strict
       - name: Assert scheduled evidence is green
         run: ./target/release/do-harness status --set scheduled --format json
       - name: Report resource state when the gate fails
