@@ -75,10 +75,11 @@ jobs:
         # depending on the filesystem and calls dd from /dev/zero the most
         # portable solution.
         run: |
-          sudo dd if=/dev/zero of=/mnt/swapfile bs=1M count=4096 status=none
-          sudo chmod 600 /mnt/swapfile
-          sudo mkswap /mnt/swapfile >/dev/null
-          sudo swapon /mnt/swapfile
+          swapfile=/mnt/do-harness-swapfile
+          sudo dd if=/dev/zero of="$swapfile" bs=1M count=4096 status=none
+          sudo chmod 600 "$swapfile"
+          sudo mkswap "$swapfile" >/dev/null
+          sudo swapon "$swapfile"
           free -m
       - name: Run scheduled sensors
         env:
