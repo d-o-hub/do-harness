@@ -39,9 +39,22 @@ CARGO_BUILD_JOBS=2 cargo build --workspace --locked
 
 CI sets `CARGO_BUILD_JOBS=2` and `CARGO_INCREMENTAL=0` in the build workflows.
 The job bound applies to Cargo's compiler-process scheduling; the incremental
-setting avoids retaining CI-only incremental state. `cargo check` is a fast
-feedback command, but a release build is still required to validate final code
-generation and linking.
+setting avoids retaining CI-only incremental state. The two instrumented gates
+(`release` preflight and scheduled `coverage`) go one step further and run with
+`CARGO_BUILD_JOBS=1` and `NEXTEST_TEST_THREADS=1`: `cargo llvm-cov nextest` is
+the peak-RSS path in this repository, and a hosted runner starved under memory
+pressure is shut down rather than reporting a sensor failure. Those caps bound
+the damage; they do not remove it. A test that spawns the harness, `init`
+included, must clear the outer coverage session with
+`support::isolate_command`, or its own cargo build inherits `RUSTC_WRAPPER` and
+`CARGO_TARGET_DIR` and runs a second instrumented workspace. Git hooks are the
+same hazard: `hook_e2e`'s pre-push fixture runs `do-harness verify`, whose
+`coverage` sensor starts a nested `cargo llvm-cov nextest`, so the git command
+that triggers the hook is isolated too. Both paths had pushed the
+`release`/`scheduled` gates past 15 GB with no single process above ~600 MB RSS
+— many short-lived `rustc` children, not one leaking process. `cargo check` is a fast feedback
+command, but a release build is still required to validate final code generation
+and linking.
 
 On this workspace, a clean, non-incremental `cargo check --workspace` measured
 approximately 2.05 GiB peak sampled compiler-process RSS with eight jobs and

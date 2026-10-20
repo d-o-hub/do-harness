@@ -33,9 +33,10 @@ mapfile -t files < <(
             -name '*.sh' -print
         find "$ROOT/.agents/skills" "$ROOT/crates/do-harness/templates/skills" \
             -name '*.sh' -print
-        # Integration helpers and fixtures are executed in CI (the benchmark
-        # runs tests/selection_impact_test.sh), so they are linted too — the
-        # old `-maxdepth 1` silently skipped both.
+        # Integration helpers and fixtures are runnable entry points even when
+        # no workflow invokes them (the selection-impact suite is manual after
+        # #359), so they are linted too — the old `-maxdepth 1` silently skipped
+        # both.
         if [[ -d "$ROOT/tests" ]]; then
             find "$ROOT/tests" -name '*.sh' -print
         fi

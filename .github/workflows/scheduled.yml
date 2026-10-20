@@ -27,7 +27,11 @@ concurrency:
 
 jobs:
   scheduled:
-    runs-on: ubuntu-latest
+    # Pinned rather than `ubuntu-latest`: the label migrates to Ubuntu 26.04
+    # over the weeks from 2026-10-19 and the documented mitigation is to pin
+    # the image (https://github.com/actions/runner-images/issues/14748). The
+    # instrumented run is the part most sensitive to a system-library change.
+    runs-on: ubuntu-24.04
     # `powerset` builds four feature combinations and `coverage` runs the whole
     # suite under instrumentation; both are heavy, which is why they are here
     # rather than on every pull request.
@@ -59,12 +63,69 @@ jobs:
           tool: cargo-deny,cargo-audit,cargo-hack,cargo-machete,cargo-llvm-cov,cargo-nextest
       - name: Build harness CLI
         run: cargo build --release -p do-harness
+      - name: Add swap headroom for the instrumented run
+        # A hosted runner has 16 GB RAM and a 14 GB SSD
+        # (https://docs.github.com/en/actions/reference/runners/github-hosted-runners).
+        # `coverage` instruments and re-runs the whole suite; once the coverage
+        # fixes let the suite run deeper, the runner was shut down with a
+        # shutdown signal a few minutes in. 4 GB of swap on the ephemeral disk
+        # turns such a spike into paging, and the caps on the verify step below
+        # bound the peak in the first place. `dd` rather than `fallocate`:
+        # swapon(8) warns that preallocated files can be treated as holes
+        # depending on the filesystem and calls dd from /dev/zero the most
+        # portable solution.
+        run: |
+          swapfile=/mnt/do-harness-swapfile
+          sudo dd if=/dev/zero of="$swapfile" bs=1M count=4096 status=none
+          sudo chmod 600 "$swapfile"
+          sudo mkswap "$swapfile" >/dev/null
+          sudo swapon "$swapfile"
+          free -m
+          df -h / /mnt
       - name: Run scheduled sensors
         env:
           # `check-powerset.sh` fails closed when CI=true and a missing
           # cargo-hack must not pass as a SKIP.
           CI: "true"
           DO_HARNESS_REQUIRE_TOOLS: "1"
-        run: ./target/release/do-harness verify --set scheduled --format json --strict
+          # `coverage` is the heaviest sensor in the repository. One compiler
+          # (CARGO_BUILD_JOBS, Cargo's "number of parallel jobs") and one test
+          # (NEXTEST_TEST_THREADS, nextest's "number of tests to run
+          # simultaneously") at a time keep the peak inside the runner's RAM;
+          # the swap above absorbs the rest.
+          CARGO_BUILD_JOBS: "1"
+          NEXTEST_TEST_THREADS: "1"
+          # glibc creates one malloc arena per thread by default; the
+          # instrumented suite is thread-heavy, and capping arenas trims RSS
+          # without changing test scheduling.
+          MALLOC_ARENA_MAX: "2"
+        # A runner shutdown skips every later step, including `if: failure()`,
+        # so stream the resource state instead of reporting it only after the
+        # fact.
+        run: |
+          (
+            while true; do
+              printf '%s ' "$(date -u +%H:%M:%S)"
+              free -m | awk 'NR==2 {printf "mem_used=%sMiB mem_avail=%sMiB ", $3, $7} NR==3 {printf "swap_used=%sMiB swap_free=%sMiB ", $3, $4}'
+              df -h / | awk 'NR==2 {printf "disk_used=%s disk_avail=%s", $3, $4}'
+              printf '\n'
+              ps -eo pid,rss,etime,comm --sort=-rss | awk 'NR==1 || NR<=6'
+              sleep 15
+            done
+          ) &
+          monitor=$!
+          trap 'kill "$monitor" 2>/dev/null || true' EXIT
+          ./target/release/do-harness verify --set scheduled --format json --strict
       - name: Assert scheduled evidence is green
         run: ./target/release/do-harness status --set scheduled --format json
+      - name: Report resource state when the gate fails
+        # A killed runner reports only exit 143 and a shutdown signal. Record
+        # memory, swap, and disk before the log is lost so the next failure
+        # names the exhausted resource instead of guessing.
+        if: failure()
+        run: |
+          free -m || true
+          swapon --show || true
+          df -h || true
+          du -sh target 2>/dev/null || true
+          sudo dmesg --ctime | tail -n 40 || true
