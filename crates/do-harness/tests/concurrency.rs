@@ -7,8 +7,18 @@
 use std::path::Path;
 use std::process::{Child, Command, Output};
 
+mod support;
+
 fn harness() -> Command {
-    Command::new(env!("CARGO_BIN_EXE_do-harness"))
+    let mut command = Command::new(env!("CARGO_BIN_EXE_do-harness"));
+    // The spawned harness runs `init`, whose baseline verify builds the
+    // scaffold. Under `cargo llvm-cov` an inherited `RUSTC_WRAPPER` and
+    // `CARGO_TARGET_DIR` turn that nested build into a second instrumented
+    // workspace; the concurrent writers then pile onto it and the run OOMs
+    // (measured 2026-10-20: past 13 GB in the coverage gate). Clear the outer
+    // coverage session exactly as the dogfood and init tests do.
+    support::isolate_command(&mut command);
+    command
 }
 
 fn run(dir: &Path, args: &[&str]) -> Output {
