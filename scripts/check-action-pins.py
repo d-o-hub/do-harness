@@ -25,7 +25,7 @@ from __future__ import annotations
 import argparse
 import os
 import re
-import subprocess
+import subprocess  # nosec B404 - the only child is git, with a fixed argv
 import sys
 from pathlib import Path
 
@@ -95,7 +95,7 @@ def discover_workflows(root: Path) -> tuple[list[str], str | None]:
     git_dir = root / ".git"
     if git_dir.exists():
         try:
-            completed = subprocess.run(
+            completed = subprocess.run(  # nosec B603 - fixed argv, no shell
                 [
                     "git",
                     "-C",
