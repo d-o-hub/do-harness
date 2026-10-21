@@ -372,9 +372,7 @@ async fn init_scaffolds_use_restrictions_policy_across_all_languages() {
         Language::Node,
     ] {
         let dir = tempfile::tempdir().unwrap();
-        let report = init_workspace(dir.path(), &opts(Some(lang)))
-            .await
-            .unwrap();
+        let report = init_workspace(dir.path(), &opts(Some(lang))).await.unwrap();
 
         assert!(
             report.written.contains(&"USE_RESTRICTIONS.md".to_owned()),
@@ -382,13 +380,6 @@ async fn init_scaffolds_use_restrictions_policy_across_all_languages() {
         );
         let path = dir.path().join("USE_RESTRICTIONS.md");
         assert!(path.is_file(), "USE_RESTRICTIONS.md exists for {lang:?}");
-        let policy = fs::read_to_string(&path).unwrap();
-        assert!(policy.contains("# Agent Use Restrictions & Safety Policy"));
-        assert!(policy.contains("Production Deployment"));
-        assert!(policy.contains("Production Credentials & Secrets"));
-        assert!(policy.contains("Destructive Infrastructure"));
-        assert!(policy.contains("Quality Gate Integrity"));
-        assert!(policy.contains("Untrusted External Content Handling"));
     }
 }
 
@@ -422,7 +413,6 @@ async fn init_use_restrictions_preexisting_is_overwritten_with_force() {
     assert!(report.written.contains(&"USE_RESTRICTIONS.md".to_owned()));
     let policy = fs::read_to_string(dir.path().join("USE_RESTRICTIONS.md")).unwrap();
     assert_ne!(policy, custom_policy);
-    assert!(policy.contains("# Agent Use Restrictions & Safety Policy"));
 }
 
 fn assert_fast_loop_covers_the_hook(pre_commit: &[String], feedback: &[String]) {

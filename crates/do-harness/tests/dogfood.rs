@@ -101,25 +101,16 @@ fn rust_init_then_full_verify_is_green() {
         !sensors.is_empty(),
         "sensors must actually run; a green report with no sensors is vacuous"
     );
-    let has_nextest = Command::new("cargo")
-        .args(["nextest", "--version"])
-        .output()
-        .is_ok_and(|o| o.status.success());
-
-    let mut expected_sensors = vec![
+    for want in [
         "fmt",
         "check",
         "clippy",
+        "test",
         "doctest",
         "loc",
         "commitlint",
         "release-preflight",
-    ];
-    if has_nextest {
-        expected_sensors.push("test");
-    }
-
-    for want in expected_sensors {
+    ] {
         assert!(
             sensors.contains(&want),
             "missing sensor {want} in {sensors:?}"
@@ -239,23 +230,17 @@ mod tests {
         "doctest sensor must be in failed array: {failed:?}"
     );
 
-    let has_nextest = Command::new("cargo")
-        .args(["nextest", "--version"])
-        .output()
-        .is_ok_and(|o| o.status.success());
-    if has_nextest {
-        let nextest_test = report["sensors"]
-            .as_array()
-            .expect("sensors")
-            .iter()
-            .find(|s| s["name"] == "test")
-            .expect("test sensor entry");
-        assert_eq!(
-            nextest_test["ok"],
-            serde_json::json!(true),
-            "nextest 'test' sensor should pass even when doctest fails"
-        );
-    }
+    let nextest_test = report["sensors"]
+        .as_array()
+        .expect("sensors")
+        .iter()
+        .find(|s| s["name"] == "test")
+        .expect("test sensor entry");
+    assert_eq!(
+        nextest_test["ok"],
+        serde_json::json!(true),
+        "nextest 'test' sensor should pass even when doctest fails"
+    );
 
     let doctest = report["sensors"]
         .as_array()
