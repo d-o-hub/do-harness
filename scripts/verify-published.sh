@@ -461,6 +461,64 @@ FACTS
     sed -i '/^npm_latest=/d' "$facts"
     expect 0 'an absent npm_latest is advisory only'
 
+    # poll_npm argument forwarding and provenance regression test.
+    mkdir -p "$work/bin"
+    cat >"$work/bin/npm" <<'MOCK_NPM'
+#!/usr/bin/env bash
+if [ "$1" = "view" ]; then
+    shift
+    if [ $# -eq 2 ]; then
+        case "$1:$2" in
+            "do-harness@9.9.9:version")
+                echo "9.9.9"
+                return 0
+                ;;
+            "do-harness@9.9.9:dist.attestations.url")
+                return 0
+                ;;
+            "do-harness-prov@9.9.9:dist.attestations.url")
+                echo "https://registry.npmjs.org/-/npm/v1/attestations/do-harness-prov@9.9.9"
+                return 0
+                ;;
+        esac
+    elif [ $# -eq 1 ]; then
+        echo "do-harness@9.9.9 | MIT | deps: none"
+        return 0
+    fi
+fi
+return 1
+MOCK_NPM
+    chmod +x "$work/bin/npm"
+
+    poll_npm_test() {
+        local PATH="$work/bin:$PATH"
+        poll_npm() {
+            local value=""
+            for _ in $(seq 1 3); do
+                value="$(npm view "$@" 2>/dev/null || true)"
+                if [ -n "$value" ]; then
+                    printf '%s\n' "$value"
+                    return 0
+                fi
+                sleep 0.1
+            done
+            return 1
+        }
+
+        local v prov_missing prov_ok
+        v="$(poll_npm "do-harness@9.9.9" version || true)"
+        prov_missing="$(poll_npm "do-harness@9.9.9" dist.attestations.url || true)"
+        prov_ok="$(poll_npm "do-harness-prov@9.9.9" dist.attestations.url || true)"
+
+        if [ "$v" = "9.9.9" ] && [ -z "$prov_missing" ] && [ -n "$prov_ok" ]; then
+            printf 'ok   poll_npm forwards field arguments and handles missing provenance\n'
+        else
+            printf 'FAIL poll_npm regression test failed: v="%s" prov_missing="%s" prov_ok="%s"\n'                 "$v" "$prov_missing" "$prov_ok" >&2
+            failures=$((failures + 1))
+        fi
+    }
+    poll_npm_test
+
     # crates.io: every published crate, including the independently versioned fork.
     reset
     sed -i 's/do-harness-types=9.9.9/do-harness-types=9.9.8/' "$facts"
