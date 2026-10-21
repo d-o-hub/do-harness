@@ -141,7 +141,11 @@ fn evaluate_reports_ok_drift_and_missing_in_path_order() {
 fn parse_and_evaluate_accepts_safety_skill_metadata_and_preserves_fields() {
     let temp = tempfile::tempdir().unwrap();
     let root = temp.path();
-    let skill_dir = write_tree(root, ".agents/skills/private-data", &[("SKILL.md", "# Private Data Guidance\n")]);
+    let skill_dir = write_tree(
+        root,
+        ".agents/skills/private-data",
+        &[("SKILL.md", "# Private Data Guidance\n")],
+    );
     let digest = tree::tree_digest(&skill_dir).unwrap();
     let commit = "f".repeat(40);
 

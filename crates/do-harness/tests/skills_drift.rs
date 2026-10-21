@@ -331,13 +331,20 @@ fn adopter_pinned_safety_skill_validates_and_reports_drift_on_change() {
     let clean_rep = report(&clean);
     assert_eq!(clean_rep["drifted"], 0);
     assert_eq!(clean_rep["skills"][0]["status"], "ok");
-    assert_eq!(clean_rep["skills"][0]["scope"], "local_context_sanitization");
+    assert_eq!(
+        clean_rep["skills"][0]["scope"],
+        "local_context_sanitization"
+    );
     assert_eq!(clean_rep["skills"][0]["trigger"], "pre_prompt_formatting");
     assert_eq!(clean_rep["skills"][0]["mode"], "required");
     assert_eq!(clean_rep["skills"][0]["required"], true);
 
     // Edit local file -> drift
-    fs::write(skill_dir.join("SKILL.md"), "# Private Data Sanitization (edited)\n").unwrap();
+    fs::write(
+        skill_dir.join("SKILL.md"),
+        "# Private Data Sanitization (edited)\n",
+    )
+    .unwrap();
     let drifted = sandbox.drift();
     assert_eq!(drifted.status.code(), Some(1));
     let drifted_rep = report(&drifted);
