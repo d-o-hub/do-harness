@@ -10,11 +10,20 @@
 //! command is `python3 scripts/docs.py <check> --check`, and `scripts/docs.py`
 //! has no `SKIP:` path, so a missing dependency is RED in every environment.
 //! Their cases below pin that instead of a warned pass.
+//!
+//! The `action-pins` cases live in the `action_pins` child module: that
+//! sensor needs two tools (an interpreter and a YAML parser), so its parity
+//! matrix is longer than the other sensors' and would push this file past
+//! the decomposition threshold.
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
+
+#[cfg(unix)]
+#[path = "ci_parity/action_pins.rs"]
+mod action_pins;
 
 fn script(name: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -73,8 +82,6 @@ fn sensor_env(cmd: &mut Command, bin: &std::path::Path, ci: bool, require_tools:
 /// Resolves a system utility that a private `bin` needs to copy in.
 #[cfg(unix)]
 fn system_utility(utility: &str) -> std::path::PathBuf {
-    use std::path::Path;
-
     ["/usr/bin", "/bin"]
         .into_iter()
         .map(|dir| Path::new(dir).join(utility))

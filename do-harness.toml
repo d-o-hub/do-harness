@@ -20,8 +20,8 @@ feedback = ["fmt", "check", "clippy", "loc"]
 # contract (`docs/documentation-contract.md`). Each one reads only git, the
 # working tree, and the local toolchain, and each fails closed on an empty
 # inventory, so the trio belongs to the PR-time set as well as `release`.
-verification = ["fmt", "check", "clippy", "deps", "machete", "audit", "test", "doctest", "loc", "skills", "skills-docs", "shell", "markdownlint", "docs-sync", "docs-examples", "docs-links", "yamllint", "actionlint", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "release-manager", "verify-published", "commitlint"]
-release = ["fmt", "check", "clippy", "deps", "audit", "test", "doctest", "coverage", "loc", "skills", "skills-docs", "shell", "markdownlint", "docs-sync", "docs-examples", "docs-links", "yamllint", "actionlint", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "release-manager", "release-manager-e2e", "publish-npm", "verify-published", "commitlint"]
+verification = ["fmt", "check", "clippy", "deps", "machete", "audit", "test", "doctest", "loc", "skills", "skills-docs", "shell", "markdownlint", "docs-sync", "docs-examples", "docs-links", "yamllint", "actionlint", "action-pins", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "release-manager", "verify-published", "commitlint"]
+release = ["fmt", "check", "clippy", "deps", "audit", "test", "doctest", "coverage", "loc", "skills", "skills-docs", "shell", "markdownlint", "docs-sync", "docs-examples", "docs-links", "yamllint", "actionlint", "action-pins", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "release-manager", "release-manager-e2e", "publish-npm", "verify-published", "commitlint"]
 # DORA gets its own set so its evidence is addressable (`status --set metrics`)
 # without joining the gating sets. A no-`--set` status check compares against
 # every configured sensor, so a dora-only run's artifact would report
@@ -148,6 +148,32 @@ when-changed = ["**/*.yml", "**/*.yaml", ".yamllint.yml", "scripts/check-yamllin
 name = "actionlint"
 argv = ["bash", "scripts/check-actionlint.sh"]
 when-changed = [".github/workflows/**", "scripts/check-actionlint.sh"]
+
+[[sensors]]
+# Immutable-reference gate for GitHub Actions. actionlint proves the workflow
+# is syntactically valid; it cannot see that `owner/repo@v4` is a mutable tag
+# that can move without a diff in this repository. This sensor requires a
+# full 40-character commit SHA for every external action and reusable
+# workflow, and a sha256 digest for every Docker action image. It is offline:
+# it never calls the GitHub API and never resolves a tag, so it proves the
+# shape of a reference, not that the commit exists. The parser is PyYAML,
+# installed by CI from `.agents/skills/skill-creator/scripts/requirements.txt`;
+# a missing parser follows the same SKIP-locally/FAIL-when-required policy as
+# a missing interpreter.
+name = "action-pins"
+argv = ["bash", "scripts/check-action-pins.sh"]
+when-changed = [
+    ".github/workflows/**",
+    "scripts/check-action-pins.sh",
+    "scripts/check-action-pins.py",
+    "scripts/action_pins/**",
+    "crates/do-harness/tests/action_pins.rs",
+    "crates/do-harness/tests/action_pins/**",
+    "crates/do-harness/tests/ci_parity.rs",
+    "crates/do-harness/tests/ci_parity/**",
+    ".agents/skills/skill-creator/scripts/requirements.txt",
+    "do-harness.toml",
+]
 
 [[sensors]]
 # Generated-block drift gate. The `cli-commands` region of `README.md`, the

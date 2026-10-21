@@ -382,5 +382,11 @@
     "rationale": "The `release` job's `needs` already order publication, so the gap is proof rather than ordering: nothing read back what a consumer downloads. The script is hermetic by construction — the workflow supplies the facts, each writing `missing` when its query fails, and the script judges them — because a verification that needs the network cannot be the control that runs on every pull request. An absent fact is `missing`, never fine, and every digest comparison rejects an empty value first: two empty strings compare equal, which is exactly how a gate like this passes vacuously (observed while building it, when an empty digest matched an empty expectation). Immutability stays advisory because `gh release verify` fails on every tag cut before a human enables the setting in repository Settings, and failing every release for a switch nobody in CI can flip would be a worse gate than no gate; `--report-only` is the same reasoning one step earlier, and the job's `continue-on-error` is the ratchet's first position on the way to blocking.",
     "sensor": "bash scripts/verify-published.sh --self-test (the `verify-published` sensor) plus the `verify-published` job in .github/workflows/release.yml, which runs it against the real release with `continue-on-error` until the ratchet moves",
     "category": "distribution"
+  },
+  {
+    "invariant": "External GitHub Actions and reusable workflows use full commit SHAs; Docker action images use sha256 digests",
+    "rationale": "Immutable references prevent mutable tags from changing executed CI dependencies without a repository diff",
+    "sensor": "bash scripts/check-action-pins.sh",
+    "category": "supply-chain"
   }
 ]
