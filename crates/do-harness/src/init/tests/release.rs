@@ -8,6 +8,7 @@ use super::super::*;
 use super::opts;
 
 /// Writes the shipped preflight script into `<root>/scripts`.
+#[cfg(unix)]
 fn write_preflight(root: &Path) -> PathBuf {
     fs::create_dir_all(root.join("scripts")).unwrap();
     let path = root.join("scripts/check-release-preflight.sh");
@@ -16,6 +17,7 @@ fn write_preflight(root: &Path) -> PathBuf {
 }
 
 /// A fixture pinning `VERSION` and a workspace `Cargo.toml` at `version`.
+#[cfg(unix)]
 pub(super) fn versioned_fixture(root: &Path, version: &str) -> PathBuf {
     let script = write_preflight(root);
     fs::write(root.join("VERSION"), format!("{version}\n")).unwrap();
@@ -31,6 +33,7 @@ pub(super) fn versioned_fixture(root: &Path, version: &str) -> PathBuf {
 ///
 /// `gh` is always injected — `Some(stub)` for the stubbed case, `None` for a
 /// path that does not exist — so no test can reach the network or a real `gh`.
+#[cfg(unix)]
 pub(super) fn preflight(
     root: &Path,
     args: &[&str],
@@ -55,6 +58,7 @@ pub(super) fn preflight(
 }
 
 /// Writes an executable stub `gh` whose program body is `body`.
+#[cfg(unix)]
 pub(super) fn stub_gh(root: &Path, body: &str) -> PathBuf {
     let path = root.join("stub-gh");
     fs::write(&path, format!("#!/usr/bin/env bash\n{body}\n")).unwrap();
@@ -63,6 +67,7 @@ pub(super) fn stub_gh(root: &Path, body: &str) -> PathBuf {
 }
 
 /// Both streams, so assertions do not depend on which one carries a message.
+#[cfg(unix)]
 pub(super) fn output_text(output: &Output) -> String {
     format!(
         "{}{}",

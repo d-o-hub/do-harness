@@ -2,10 +2,12 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
+#[cfg(unix)]
 use serde_json::Value;
 
 mod support;
 
+#[cfg(unix)]
 use support::pr_readiness::{fake_gh_router, run_pr};
 
 #[cfg(unix)]

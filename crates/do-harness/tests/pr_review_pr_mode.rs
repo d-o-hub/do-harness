@@ -2,13 +2,17 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
+#[cfg(unix)]
 use std::path::Path;
+#[cfg(unix)]
 use std::process::Command;
 
+#[cfg(unix)]
 use serde_json::Value;
 
 mod support;
 
+#[cfg(unix)]
 fn git(dir: &Path, args: &[&str]) {
     let output = support::git_command(dir)
         .args(args)
@@ -21,12 +25,14 @@ fn git(dir: &Path, args: &[&str]) {
     );
 }
 
+#[cfg(unix)]
 fn init_repo(dir: &Path) {
     git(dir, &["init", "-q", "-b", "main"]);
     git(dir, &["config", "user.email", "test@example.com"]);
     git(dir, &["config", "user.name", "Test"]);
 }
 
+#[cfg(unix)]
 fn commit_file(dir: &Path, name: &str, content: &str, message: &str) {
     if let Some(parent) = Path::new(name).parent() {
         let full = dir.join(parent);
@@ -39,12 +45,14 @@ fn commit_file(dir: &Path, name: &str, content: &str, message: &str) {
     git(dir, &["commit", "-q", "-m", message]);
 }
 
+#[cfg(unix)]
 fn harness(root: &Path) -> Command {
     let mut cmd = Command::new(env!("CARGO_BIN_EXE_do-harness"));
     cmd.arg("--root").arg(root);
     cmd
 }
 
+#[cfg(unix)]
 fn json(output: &std::process::Output) -> Value {
     assert!(
         output.status.success(),
@@ -58,6 +66,7 @@ fn json(output: &std::process::Output) -> Value {
 ///
 /// Returns the directory to prepend to `PATH`; nothing in these fixtures talks
 /// to `GitHub`.
+#[cfg(unix)]
 fn fake_gh(dir: &Path, head: &str) -> std::path::PathBuf {
     let bin = dir.join("bin");
     std::fs::create_dir_all(&bin).unwrap();
@@ -78,6 +87,7 @@ fn fake_gh(dir: &Path, head: &str) -> std::path::PathBuf {
 }
 
 /// Runs a `pr` action in PR mode with the fake `gh` first in `PATH`.
+#[cfg(unix)]
 fn pr_mode(root: &Path, bin: &Path, args: &[&str]) -> std::process::Output {
     let path = std::env::var("PATH").unwrap_or_default();
     harness(root)
@@ -88,6 +98,7 @@ fn pr_mode(root: &Path, bin: &Path, args: &[&str]) -> std::process::Output {
 }
 
 /// The revision `rev` resolves to inside `root`.
+#[cfg(unix)]
 fn rev(root: &Path, rev: &str) -> String {
     String::from_utf8(
         support::git_command(root)

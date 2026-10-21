@@ -4,12 +4,15 @@
 //! dependency, override, or `publishConfig` sub-object is not a release pin, and
 //! treating one as a pin fails a correct repository with a nonsense target.
 
+#[cfg(unix)]
 use std::path::Path;
 
 use super::super::*;
+#[cfg(unix)]
 use super::release::{output_text, preflight, versioned_fixture};
 
 /// Writes a tracked `package.json` into the fixture root.
+#[cfg(unix)]
 fn manifest(root: &Path, relative: &str, body: &str) {
     let path = root.join(relative);
     fs::create_dir_all(path.parent().unwrap()).unwrap();
