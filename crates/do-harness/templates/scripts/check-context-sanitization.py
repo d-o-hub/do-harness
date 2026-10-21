@@ -137,8 +137,9 @@ def run_child(executable: str, scratch: Path, payload: str) -> tuple[int, bytes,
     # exists to prove what that program does with the fixture. The argv is an
     # array and the shell is never involved, so nothing in it is interpreted
     # as a command.
-    completed = subprocess.run(  # nosec B603 B607 - argv array, no shell
-        argv,
+    # nosemgrep: python.lang.security.audit.dangerous-subprocess-use.dangerous-subprocess-use
+    completed = subprocess.run(  # nosemgrep # nosec B603 B607 - argv array, no shell
+        argv,  # nosemgrep
         input=payload.encode("utf-8"),
         capture_output=True,
         cwd=str(scratch),

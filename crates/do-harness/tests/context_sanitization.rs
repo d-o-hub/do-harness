@@ -41,6 +41,7 @@ fn run(env: &[(&str, &str)]) -> Output {
     cmd.output().expect("spawn check-context-sanitization.py")
 }
 
+#[cfg(unix)]
 /// Writes an executable fixture that answers with the given script body.
 fn fixture_executable(dir: &Path, name: &str, body: &str) -> PathBuf {
     let path = dir.join(name);
@@ -55,6 +56,7 @@ fn fixture_executable(dir: &Path, name: &str, body: &str) -> PathBuf {
     path
 }
 
+#[cfg(unix)]
 /// A shell fixture that echoes a fixed body and exits with a fixed code.
 fn shell_fixture(body: &str, code: i32) -> String {
     format!("#!/bin/sh\n{body}\nexit {code}\n")
@@ -149,6 +151,7 @@ fn enabled_with_missing_path_fails() {
 }
 
 /// Enabled with a non-executable file fails closed.
+#[cfg(unix)]
 #[test]
 fn enabled_with_non_executable_fails() {
     let dir = tempfile::tempdir().expect("temp dir");
@@ -172,6 +175,7 @@ fn enabled_with_non_executable_fails() {
 }
 
 /// A child that exits non-zero fails the check.
+#[cfg(unix)]
 #[test]
 fn nonzero_child_exit_fails() {
     let dir = tempfile::tempdir().expect("temp dir");
@@ -195,6 +199,7 @@ fn nonzero_child_exit_fails() {
 
 /// A child that produces no output fails the check: an empty response is not
 /// a sanitized fixture.
+#[cfg(unix)]
 #[test]
 fn empty_output_fails() {
     let dir = tempfile::tempdir().expect("temp dir");
@@ -217,6 +222,7 @@ fn empty_output_fails() {
 }
 
 /// A child that answers with JSON fails: the contract is plain text.
+#[cfg(unix)]
 #[test]
 fn json_output_fails() {
     let dir = tempfile::tempdir().expect("temp dir");
@@ -248,6 +254,7 @@ const RAW_KEY: &str = concat!("AKIA", "IOSFODNN7EXAMPLE");
 
 /// A child that leaks the raw sentinel fails, and the diagnostic never
 /// carries the leaked value.
+#[cfg(unix)]
 #[test]
 fn raw_sentinel_leakage_fails() {
     let dir = tempfile::tempdir().expect("temp dir");
@@ -276,6 +283,7 @@ fn raw_sentinel_leakage_fails() {
 
 /// A child that writes the raw sentinel to stderr fails, and its stderr is
 /// never printed.
+#[cfg(unix)]
 #[test]
 fn stderr_leakage_fails_without_printing_the_child_output() {
     let dir = tempfile::tempdir().expect("temp dir");
@@ -304,6 +312,7 @@ fn stderr_leakage_fails_without_printing_the_child_output() {
 
 /// A child that hangs fails with the timeout reason instead of hanging the
 /// verification run.
+#[cfg(unix)]
 #[test]
 fn hanging_child_fails_with_the_timeout_reason() {
     let dir = tempfile::tempdir().expect("temp dir");
@@ -323,6 +332,7 @@ fn hanging_child_fails_with_the_timeout_reason() {
 
 /// A child that answers with a wrong anchor fails: the anchors bind the
 /// answer to the input that was sent.
+#[cfg(unix)]
 #[test]
 fn wrong_anchor_fails() {
     let dir = tempfile::tempdir().expect("temp dir");
@@ -352,7 +362,7 @@ fn wrong_anchor_fails() {
 }
 
 /// A child that answers with a constant string fails: a fixed answer is not
-/// a transformation of the input.
+#[cfg(unix)]
 #[test]
 fn constant_output_fails() {
     let dir = tempfile::tempdir().expect("temp dir");
@@ -378,6 +388,7 @@ fn constant_output_fails() {
     );
 }
 
+#[cfg(unix)]
 /// The exit code of a failed run.
 fn code_of(output: &Output) -> Option<i32> {
     output.status.code()
