@@ -33,17 +33,17 @@ scheduled = ["powerset", "coverage"]
 [[sensors]]
 name = "fmt"
 argv = ["cargo", "fmt", "--all", "--", "--check"]
-when-changed = ["**/*.rs", "Cargo.toml", "Cargo.lock", "rust-toolchain.toml"]
+when-changed = ["**/*.rs", "Cargo.toml", "**/Cargo.toml", "Cargo.lock", "rust-toolchain.toml"]
 
 [[sensors]]
 name = "check"
 argv = ["cargo", "check", "--workspace"]
-when-changed = ["**/*.rs", "Cargo.toml", "Cargo.lock", "rust-toolchain.toml", ".cargo/config.toml"]
+when-changed = ["**/*.rs", "Cargo.toml", "**/Cargo.toml", "Cargo.lock", "rust-toolchain.toml", ".cargo/config.toml"]
 
 [[sensors]]
 name = "clippy"
 argv = ["cargo", "clippy", "--workspace", "--all-targets", "--", "-D", "warnings"]
-when-changed = ["**/*.rs", "Cargo.toml", "Cargo.lock", "rust-toolchain.toml", ".clippy.toml", ".cargo/config.toml"]
+when-changed = ["**/*.rs", "Cargo.toml", "**/Cargo.toml", "Cargo.lock", "rust-toolchain.toml", ".clippy.toml", ".cargo/config.toml"]
 
 [[sensors]]
 # No `--no-tests=pass`: that flag turns "the suite vanished" into a green gate,
@@ -52,18 +52,18 @@ when-changed = ["**/*.rs", "Cargo.toml", "Cargo.lock", "rust-toolchain.toml", ".
 # scaffold ships a unit test, so a workspace with a real suite never trips it.
 name = "test"
 argv = ["cargo", "nextest", "run", "--workspace"]
-when-changed = ["**/*.rs", "Cargo.toml", "Cargo.lock", "rust-toolchain.toml", ".config/nextest.toml", ".cargo/config.toml"]
+when-changed = ["**/*.rs", "Cargo.toml", "**/Cargo.toml", "Cargo.lock", "rust-toolchain.toml", ".config/nextest.toml", ".cargo/config.toml"]
 
 [[sensors]]
 name = "doctest"
 argv = ["cargo", "test", "--doc", "--workspace"]
-when-changed = ["**/*.rs", "Cargo.toml", "Cargo.lock", "rust-toolchain.toml", ".cargo/config.toml"]
+when-changed = ["**/*.rs", "Cargo.toml", "**/Cargo.toml", "Cargo.lock", "rust-toolchain.toml", ".cargo/config.toml"]
 
 [[sensors]]
 name = "coverage"
 argv = ["bash", "scripts/check-coverage.sh"]
 severity = "warn"
-when-changed = ["**/*.rs", "Cargo.toml", "Cargo.lock", "rust-toolchain.toml", ".config/nextest.toml", "scripts/check-coverage.sh"]
+when-changed = ["**/*.rs", "Cargo.toml", "**/Cargo.toml", "Cargo.lock", "rust-toolchain.toml", ".config/nextest.toml", "scripts/check-coverage.sh"]
 
 [[sensors]]
 name = "loc"
