@@ -61,6 +61,15 @@ and is announced in the commit that changes `rust-version`.
   `cargo deny check` within the `deps` sensor.
 - GitHub Actions are pinned to full-length commit SHAs with least-privilege
   `permissions`; `Cargo.lock` is committed and hashed into CI evidence.
+- The `action-pins` sensor (`bash scripts/check-action-pins.sh`) enforces that
+  pin: every external action and reusable workflow must reference a
+  40-hexadecimal commit SHA, and every Docker action image must carry a
+  `sha256:` digest. A tag, a branch, a short SHA, or an expression fails the
+  gate with the file and line. The check is offline — it never calls the
+  GitHub API and never resolves a tag — so it proves the shape of a
+  reference, not that the commit exists. Run it locally with
+  `bash scripts/check-action-pins.sh`; remediate a finding by replacing the
+  reference with the full SHA of the commit you intend to execute.
 - Release artifacts are built from tags by `.github/workflows/release.yml`;
   the release job is the only writer (`contents: write`) and publishes with
   `gh release create --verify-tag`. The installer is dogfooded in CI

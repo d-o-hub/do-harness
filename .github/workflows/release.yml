@@ -146,9 +146,12 @@ jobs:
         # contracts. Those checks are offline — `docs-links` resolves link
         # targets inside this checkout, and none assert registry availability —
         # so a tag preflight can run them without network. yamllint covers the
-        # workflow lint.
+        # workflow lint. PyYAML backs the `action-pins` sensor, which parses
+        # every workflow to prove its action references are immutable; the
+        # release set includes that sensor, so the parser must be present
+        # before the set runs.
         run: |
-          python3 -m pip install --disable-pip-version-check yamllint -r scripts/requirements-docs.txt
+          python3 -m pip install --disable-pip-version-check yamllint -r scripts/requirements-docs.txt -r .agents/skills/skill-creator/scripts/requirements.txt
           npm install -g markdownlint-cli2
       - name: Check Rust public API compatibility
         run: bash scripts/check-rust-api-compatibility.sh
