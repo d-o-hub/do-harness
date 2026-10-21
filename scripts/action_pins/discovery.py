@@ -130,7 +130,7 @@ def discover_workflows(root: Path) -> tuple[list[str], str | None]:
 
     found: set[str] = set()
     for candidate in candidates:
-        relative = candidate
+        relative = candidate.replace("\\", "/")
         if not relative:
             continue
         if not relative.endswith((".yml", ".yaml")):
