@@ -1416,17 +1416,24 @@ pins each one:
 <!-- example: id=cli_skills_manifest_toml classification=parser-check-only reason="Skills manifest TOML structure" -->
 ```toml
 [[skills]]
-name = "skill-creator"
-path = ".agents/skills/skill-creator"
-upstream = "owner/repo"
-upstream_path = ".agents/skills/skill-creator"
-version = "1.2.0"            # informational; never compared
-commit = "<40-hex>"          # provenance anchor
+name = "private-data"
+path = ".agents/skills/private-data"
+upstream = "d-oit/do-context-shield"
+upstream_path = ".agents/skills/private-data"
+version = "1.0.0"            # informational; never compared
+commit = "<40-hex>"          # provenance anchor (immutable commit SHA, not moving branch)
 content_sha256 = "<64-hex>"  # content anchor: digest of the managed tree
+scope = "local_context_sanitization" # optional execution scope pattern
+trigger = "pre_prompt_formatting"    # optional trigger condition
+mode = "required"            # optional enforcement mode ("required" | "advisory")
+required = true              # optional boolean flag
 ```
 
-The commit pin is the full 40-hex object ID: abbreviated SHAs are rejected,
-because a short prefix is ambiguous across repositories and over time.
+The commit pin is the full 40-hex object ID: abbreviated SHAs and moving branch
+references (like `main` or `HEAD`) are rejected to preserve reproducible inputs.
+Importing or pinning a safety skill installs feedforward guidance (markdown rules)
+into `.agents/skills/`. It does not prove or guarantee that the adopting application
+actually routes prompts or data through the referenced security control at runtime.
 
 The digest is `sha256` over one record per file — the path relative to the
 managed skill directory (never the repository), a NUL byte, the file's sha256
