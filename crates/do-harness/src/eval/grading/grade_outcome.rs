@@ -108,6 +108,7 @@ impl GradeOutcome {
 pub(in crate::eval) fn single_case(evals: &SkillEvals, case: &EvalCase) -> SkillEvals {
     SkillEvals {
         skill_name: evals.skill_name.clone(),
+        version: evals.version.clone(),
         evals: vec![case.clone()],
     }
 }

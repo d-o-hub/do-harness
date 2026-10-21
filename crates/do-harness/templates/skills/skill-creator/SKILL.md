@@ -30,8 +30,10 @@ contract as production code.
 └── references/ (detail loaded on demand; SKILL.md links each file)
 ```
 
-Do not add READMEs, changelogs, or setup docs. Frontmatter allows only
-`name`, `description`, `license`, `allowed-tools`, `metadata`.
+Do not add READMEs, changelogs, or setup docs. Frontmatter accepts
+`name`, `description`, `license`, `allowed-tools`, optional `version` and
+`category`, and a `metadata` mapping for custom keys. `evals/evals.json`
+accepts optional top-level `version`; other unknown fixture fields are rejected.
 
 ## Repo Invariants (Non-Negotiable)
 
