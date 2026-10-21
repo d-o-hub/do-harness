@@ -70,6 +70,9 @@ and is announced in the commit that changes `rust-version`.
   reference, not that the commit exists. Run it locally with
   `bash scripts/check-action-pins.sh`; remediate a finding by replacing the
   reference with the full SHA of the commit you intend to execute.
+  GitHub's security guidance states: “Pinning an action to a full-length
+  commit SHA is currently the only way to use an action as an immutable
+  release.” ([source](https://docs.github.com/en/actions/security-for-github-actions/security-guides/security-hardening-for-github-actions))
 - Release artifacts are built from tags by `.github/workflows/release.yml`;
   the release job is the only writer (`contents: write`) and publishes with
   `gh release create --verify-tag`. The installer is dogfooded in CI

@@ -10,11 +10,20 @@
 //! command is `python3 scripts/docs.py <check> --check`, and `scripts/docs.py`
 //! has no `SKIP:` path, so a missing dependency is RED in every environment.
 //! Their cases below pin that instead of a warned pass.
+//!
+//! The `action-pins` cases live in the `action_pins` child module: that
+//! sensor needs two tools (an interpreter and a YAML parser), so its parity
+//! matrix is longer than the other sensors' and would push this file past
+//! the decomposition threshold.
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
+
+#[cfg(unix)]
+#[path = "ci_parity/action_pins.rs"]
+mod action_pins;
 
 fn script(name: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -73,8 +82,6 @@ fn sensor_env(cmd: &mut Command, bin: &std::path::Path, ci: bool, require_tools:
 /// Resolves a system utility that a private `bin` needs to copy in.
 #[cfg(unix)]
 fn system_utility(utility: &str) -> std::path::PathBuf {
-    use std::path::Path;
-
     ["/usr/bin", "/bin"]
         .into_iter()
         .map(|dir| Path::new(dir).join(utility))
@@ -171,94 +178,6 @@ fn yamllint_sensor_fails_closed_only_when_required() {
 #[test]
 fn actionlint_sensor_fails_closed_only_when_required() {
     assert_missing_tool_policy("check-actionlint.sh", &[]);
-}
-
-#[cfg(unix)]
-#[test]
-fn action_pins_sensor_fails_closed_only_when_required() {
-    assert_missing_tool_policy("check-action-pins.sh", &[]);
-}
-
-/// The `action-pins` sensor needs two things: an interpreter and a YAML
-/// parser. The interpreter case is the wrapper's own `SKIP:`/`FAIL:` policy;
-/// the parser case is the Python half's, because `python3` can exist while
-/// PyYAML does not.
-///
-/// `python3 -S` drops site-packages, which is exactly the state the CI
-/// install step (`pip install -r
-/// .agents/skills/skill-creator/scripts/requirements.txt`) is there to
-/// prevent. The checker must apply the same policy to that state: SKIP
-/// locally, FAIL when the tools are required.
-#[cfg(unix)]
-#[test]
-fn action_pins_sensor_fails_closed_without_the_yaml_parser() {
-    let root = repository_root();
-    let python = path_utility("python3");
-    let temp = tempfile::tempdir().expect("create temp dir");
-    let bin = temp.path().join("bin");
-    std::fs::create_dir(&bin).expect("create private bin");
-    std::fs::copy(system_utility("bash"), bin.join("bash")).unwrap();
-
-    let run_scenario = |ci: bool, require_tools: bool| -> Output {
-        // The wrapper resolves its root with `dirname`, and the interpreter
-        // must be reachable as `python3` through the private `bin`.
-        std::fs::copy(system_utility("dirname"), bin.join("dirname")).unwrap();
-        // `-S` drops site-packages, which is exactly the state the CI install
-        // step prevents: the interpreter exists, the parser does not.
-        let shim = bin.join("python3");
-        std::fs::write(
-            &shim,
-            format!("#!/bin/sh\nexec {} -S \"$@\"\n", python.to_string_lossy()),
-        )
-        .expect("write python shim");
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            let mut permissions = std::fs::metadata(&shim)
-                .expect("shim metadata")
-                .permissions();
-            permissions.set_mode(0o755);
-            std::fs::set_permissions(&shim, permissions).expect("chmod shim");
-        }
-
-        let mut cmd = Command::new("/bin/bash");
-        cmd.arg(script("check-action-pins.sh"));
-        sensor_env(&mut cmd, &bin, ci, require_tools);
-        cmd.output().expect("spawn check-action-pins.sh")
-    };
-
-    // The interpreter alone is not enough: the wrapper must report the
-    // missing parser rather than a false pass.
-    let local = run_scenario(false, false);
-    let stdout = String::from_utf8_lossy(&local.stdout);
-    let stderr = String::from_utf8_lossy(&local.stderr);
-    assert!(
-        !stdout.contains("FINDINGS: 0"),
-        "a missing parser must not read as a clean check: stdout={stdout} stderr={stderr}"
-    );
-    assert!(
-        stderr.contains("PyYAML") || stdout.contains("PyYAML"),
-        "the failure must name the missing parser: stdout={stdout} stderr={stderr}"
-    );
-
-    for (label, ci, require_tools) in [
-        ("CI=true", true, false),
-        ("DO_HARNESS_REQUIRE_TOOLS=1", false, true),
-    ] {
-        let output = run_scenario(ci, require_tools);
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        assert!(
-            !output.status.success(),
-            "action-pins: {label} run must fail closed without the parser: \
-             stdout={stdout} stderr={stderr}"
-        );
-        assert!(
-            !stdout.contains("FINDINGS: 0"),
-            "action-pins: {label} run must not report a clean check without the parser: \
-             stdout={stdout} stderr={stderr}"
-        );
-    }
 }
 
 /// Runs the docs sensor line (`python3 scripts/docs.py <check> --check`) from

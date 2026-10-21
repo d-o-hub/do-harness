@@ -6,6 +6,7 @@
 #   - .github/workflows/**/*.yml and .github/workflows/**/*.yaml
 #   - scripts/check-action-pins.sh
 #   - scripts/check-action-pins.py
+#   - scripts/action_pins/*.py
 #
 # What it proves: every external action, reusable workflow, and Docker action
 # image referenced by a workflow is pinned to an immutable identifier — a full

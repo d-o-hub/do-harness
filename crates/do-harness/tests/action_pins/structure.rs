@@ -1,17 +1,20 @@
-//! Structure and discovery cases for the `action-pins` sensor.
+//! Structure cases for the `action-pins` sensor.
 //!
 //! These are the cases where a reference is hidden rather than mutable: a
 //! quoted or flow-mapped value, an alias, a duplicate key, a merge key, a
-//! cycle, and the discovery boundaries that decide which files are read at
-//! all.
+//! cycle, and the keys nested where they are inputs rather than references.
+//! The workflow shapes that declare no reference live in `shape`, and the
+//! discovery boundaries live in `discovery`.
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-use crate::fixtures::{CHECKOUT_SHA, git_workspace, run, workflow_with, workspace, write_workflow};
+use std::fmt::Write as _;
 
-/// A non-string `uses` value is a finding, never a silent skip.
+use crate::fixtures::{CHECKOUT_SHA, run, workspace, write_workflow};
+
+/// A mapping-valued step reference is a finding, never a silent skip.
 #[test]
-fn non_string_reference_fails() {
+fn mapping_step_reference_fails() {
     let dir = workspace();
     write_workflow(
         dir.path(),
@@ -116,6 +119,54 @@ fn aliases_resolve_to_the_anchored_value() {
     );
 }
 
+/// A node aliased in two different places is shared, not cyclic: the checker
+/// must not read a plain reuse as an unresolvable reference.
+#[test]
+fn shared_alias_is_not_a_cycle() {
+    let dir = workspace();
+    write_workflow(
+        dir.path(),
+        ".github/workflows/pins.yml",
+        &format!(
+            "name: pins\non: push\njobs:\n  first:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: &pinned actions/checkout@{CHECKOUT_SHA}\n  second:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: *pinned\n"
+        ),
+    );
+
+    let (code, output) = run(dir.path());
+    assert_eq!(code, 0, "a shared alias must pass: {output}");
+    assert!(
+        !output.contains("cyclic"),
+        "a shared alias must not be reported as a cycle: {output}"
+    );
+}
+
+/// A repeated alias DAG is checked once per node, not expanded exponentially.
+#[test]
+fn shared_alias_dag_is_checked_once() {
+    const ALIAS_LEVELS: usize = 24;
+
+    let dir = workspace();
+    let mut workflow = format!(
+        "name: pins\non: push\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@{CHECKOUT_SHA}\n"
+    );
+    workflow.push_str("alias_0: &alias_0 [leaf]\n");
+    for level in 1..ALIAS_LEVELS {
+        let previous = level - 1;
+        let _ = writeln!(
+            workflow,
+            "alias_{level}: &alias_{level} [*alias_{previous}, *alias_{previous}]"
+        );
+    }
+    write_workflow(dir.path(), ".github/workflows/pins.yml", &workflow);
+
+    let (code, output) = run(dir.path());
+    assert_eq!(code, 0, "a shared alias DAG must pass: {output}");
+    assert!(
+        output.contains("FINDINGS: 0"),
+        "a shared alias DAG must not be mistaken for a cycle: {output}"
+    );
+}
+
 /// A duplicate mapping key is a finding: the last value wins silently
 /// otherwise, which is exactly how a pinned value disappears.
 #[test]
@@ -199,6 +250,24 @@ fn unknown_tag_reference_fails() {
     );
 }
 
+/// A numeric `uses` value is a number, not a reference string.
+#[test]
+fn non_string_tag_reference_fails() {
+    let dir = workspace();
+    write_workflow(
+        dir.path(),
+        ".github/workflows/pins.yml",
+        "name: pins\non: push\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: 12345\n",
+    );
+
+    let (code, output) = run(dir.path());
+    assert_eq!(code, 1, "an int reference must fail: {output}");
+    assert!(
+        output.contains("not a scalar string"),
+        "the finding must name the non-string case: {output}"
+    );
+}
+
 /// A `uses:` inside a shell script or a comment is not an action reference
 /// and must not be reported.
 #[test]
@@ -220,109 +289,47 @@ fn script_text_and_comments_are_ignored() {
     );
 }
 
-/// Nested workflow directories are discovered, not only the top level.
+/// A `uses` key nested inside a step's `with:` payload is an input, not an
+/// action reference: only the step's own `uses` is inspected.
 #[test]
-fn nested_workflows_are_discovered() {
+fn nested_uses_key_is_not_inspected() {
     let dir = workspace();
     write_workflow(
         dir.path(),
-        ".github/workflows/nested/pins.yaml",
-        &workflow_with("actions/checkout@v4"),
-    );
-
-    let (code, output) = run(dir.path());
-    assert_eq!(code, 1, "a nested workflow must be checked: {output}");
-    assert!(
-        output.contains(".github/workflows/nested/pins.yaml:7:"),
-        "the nested finding must name its file: {output}"
-    );
-}
-
-/// A `.yaml` extension is discovered as well as `.yml`.
-#[test]
-fn yaml_extension_is_discovered() {
-    let dir = workspace();
-    write_workflow(
-        dir.path(),
-        ".github/workflows/pins.yaml",
-        &workflow_with("actions/checkout@v4"),
-    );
-
-    let (code, output) = run(dir.path());
-    assert_eq!(code, 1, "a .yaml workflow must be checked: {output}");
-}
-
-/// An unstaged new workflow is discovered: the file is not in the index yet.
-#[test]
-fn unstaged_workflow_is_discovered() {
-    let dir = git_workspace();
-    let root = dir.path();
-    write_workflow(
-        root,
-        ".github/workflows/new.yml",
-        &workflow_with("actions/checkout@v4"),
-    );
-
-    let (code, output) = run(root);
-    assert_eq!(code, 1, "an unstaged workflow must be checked: {output}");
-    assert!(
-        output.contains(".github/workflows/new.yml:7:"),
-        "the finding must name the new file: {output}"
-    );
-}
-
-/// A deleted workflow is not checked: the file is gone.
-#[test]
-fn deleted_workflow_is_not_checked() {
-    let dir = git_workspace();
-    let root = dir.path();
-    write_workflow(
-        root,
-        ".github/workflows/gone.yml",
-        &workflow_with("actions/checkout@v4"),
-    );
-    std::fs::remove_file(root.join(".github/workflows/gone.yml")).expect("remove workflow");
-
-    let (code, output) = run(root);
-    assert_ne!(code, 0, "a repository with no workflow must fail: {output}");
-    assert!(
-        output.contains("no workflow files found"),
-        "the failure must name the empty discovery: {output}"
-    );
-}
-
-/// A discovery command that fails fails the check closed.
-#[test]
-fn discovery_failure_fails_closed() {
-    let dir = workspace();
-    let root = dir.path();
-    // A `.git` directory that is not a repository: `git ls-files` fails, and a
-    // checker that silently checked nothing would report a vacuous pass.
-    std::fs::create_dir_all(root.join(".git")).expect("create .git");
-    write_workflow(
-        root,
         ".github/workflows/pins.yml",
-        &workflow_with("actions/checkout@v4"),
+        &format!(
+            "name: pins\non: push\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@{CHECKOUT_SHA}\n        with:\n          uses: actions/checkout@v4\n"
+        ),
     );
 
-    let (code, output) = run(root);
-    assert_eq!(code, 1, "a discovery failure must fail closed: {output}");
+    let (code, output) = run(dir.path());
+    assert_eq!(
+        code, 0,
+        "a nested `uses` key must not be inspected: {output}"
+    );
     assert!(
-        output.contains("git discovery failed"),
-        "the failure must name the discovery error: {output}"
+        output.contains("FINDINGS: 0"),
+        "no finding may come from a nested key: {output}"
     );
 }
 
-/// A repository without any workflow file fails: a gate that checks nothing
-/// is not a pass.
+/// A `uses` key under a job's other fields is not an action reference either:
+/// only `jobs.<id>.uses` and `jobs.<id>.steps[*].uses` are inspected.
 #[test]
-fn zero_workflow_files_fail() {
+fn job_level_nested_uses_key_is_not_inspected() {
     let dir = workspace();
+    write_workflow(
+        dir.path(),
+        ".github/workflows/pins.yml",
+        &format!(
+            "name: pins\non: push\njobs:\n  build:\n    runs-on: ubuntu-latest\n    with:\n      uses: actions/checkout@v4\n    steps:\n      - uses: actions/checkout@{CHECKOUT_SHA}\n"
+        ),
+    );
 
     let (code, output) = run(dir.path());
-    assert_eq!(code, 1, "an empty inventory must fail: {output}");
+    assert_eq!(code, 0, "a nested job key must not be inspected: {output}");
     assert!(
-        output.contains("no workflow files found"),
-        "the failure must name the empty inventory: {output}"
+        output.contains("FINDINGS: 0"),
+        "no finding may come from a nested job key: {output}"
     );
 }

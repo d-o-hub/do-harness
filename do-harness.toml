@@ -162,7 +162,18 @@ when-changed = [".github/workflows/**", "scripts/check-actionlint.sh"]
 # a missing interpreter.
 name = "action-pins"
 argv = ["bash", "scripts/check-action-pins.sh"]
-when-changed = [".github/workflows/**", "scripts/check-action-pins.sh", "scripts/check-action-pins.py", "crates/do-harness/tests/action_pins.rs", "crates/do-harness/tests/ci_parity.rs", ".agents/skills/skill-creator/scripts/requirements.txt", "do-harness.toml"]
+when-changed = [
+    ".github/workflows/**",
+    "scripts/check-action-pins.sh",
+    "scripts/check-action-pins.py",
+    "scripts/action_pins/**",
+    "crates/do-harness/tests/action_pins.rs",
+    "crates/do-harness/tests/action_pins/**",
+    "crates/do-harness/tests/ci_parity.rs",
+    "crates/do-harness/tests/ci_parity/**",
+    ".agents/skills/skill-creator/scripts/requirements.txt",
+    "do-harness.toml",
+]
 
 [[sensors]]
 # Generated-block drift gate. The `cli-commands` region of `README.md`, the

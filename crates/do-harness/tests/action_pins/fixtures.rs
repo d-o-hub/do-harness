@@ -18,13 +18,12 @@ use crate::support;
 
 /// The full commit SHA of `actions/checkout`, as this repository pins it.
 pub const CHECKOUT_SHA: &str = "3d3c42e5aac5ba805825da76410c181273ba90b1";
-/// The full commit SHA of `dtolnay/rust-toolchain`, as this repository pins it.
-pub const TOOLCHAIN_SHA: &str = "02cb101ec7c40f2c49e1d9714d64511d8e1b74de";
-/// The full commit SHA of `Swatinem/rust-cache`, as this repository pins it.
-pub const RUST_CACHE_SHA: &str = "6323deb102c322ba6fcbdcafc7e3dddab59af2b6";
+/// A sha256 image digest, the immutable form of a Docker action image.
+pub const IMAGE_DIGEST: &str =
+    "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
 /// The checker under test.
-fn checker() -> PathBuf {
+pub fn checker() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../scripts/check-action-pins.py")
 }
 
