@@ -90,6 +90,7 @@ pub struct InitReport {
 }
 
 const AGENTS_TEMPLATE: &str = include_str!("../templates/AGENTS.md");
+const USE_RESTRICTIONS_TEMPLATE: &str = include_str!("../templates/USE_RESTRICTIONS.md");
 const CONFIG_GENERIC: &str = include_str!("../templates/do-harness.toml.generic");
 const CONFIG_WEB: &str = include_str!("../templates/do-harness.toml.web");
 const INVARIANTS_RUST: &str = include_str!("../templates/plans/invariants.json.rust");
@@ -145,6 +146,13 @@ pub async fn init_workspace(root: &Path, opts: &InitOpts) -> Result<InitReport> 
 
     let agents_contract = AGENTS_TEMPLATE.replace("{{VERSION}}", env!("CARGO_PKG_VERSION"));
     write_if_absent(root, "AGENTS.md", &agents_contract, opts.force, &mut report)?;
+    write_if_absent(
+        root,
+        "USE_RESTRICTIONS.md",
+        USE_RESTRICTIONS_TEMPLATE,
+        opts.force,
+        &mut report,
+    )?;
     let config = match report.language {
         Language::Rust => {
             let sensors = detect::included_specs(root, report.language, &report.candidates);

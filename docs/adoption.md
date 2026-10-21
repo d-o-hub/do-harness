@@ -108,12 +108,17 @@ do-harness doctor                  # binary resolution, hooks, db skew
 ```
 
 `init` writes `do-harness.toml`, `AGENTS.md` (including a pinned installer
-line for future agents), `plans/invariants.json`, `.agents/skills/`
-(`harness` + `skill-creator`), the rust pack's `scripts/check-*.sh` helpers
-plus `scripts/check-release-preflight.sh` and its `plans/RELEASING.md`
+line for future agents), `USE_RESTRICTIONS.md` (standalone agent safety policy
+defining high-risk boundaries and human approval limits), `plans/invariants.json`,
+`.agents/skills/` (`harness` + `skill-creator`), the rust pack's `scripts/check-*.sh`
+helpers plus `scripts/check-release-preflight.sh` and its `plans/RELEASING.md`
 runbook, `.gitignore` entries, the ignored `.agents/events/` metrics-event
-tree, and the local libSQL state. Existing files are never overwritten without `--force`, and existing
-application source is never touched. The run ends with
+tree, and the local libSQL state. Scaffolding of `USE_RESTRICTIONS.md` is independent
+from skill scaffolding (it is written even under `--minimal`) and is emitted across
+all language packs (`rust`, `generic`, `web`, `node`). Existing policy files are never overwritten
+without `--force`, and existing application source is never touched. Note that policy
+prose specifies behavioral expectations and human approval boundaries, but does not claim
+technical runtime enforcement over tool execution. The run ends with
 `Initial verification: GREEN | RED | VACUOUS`; RED exits non-zero.
 
 A repository adopted before it has any test ends `RED` on the `test` sensor:
