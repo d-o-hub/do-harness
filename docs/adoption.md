@@ -131,12 +131,14 @@ untouched. For skills using top-level `version`/`category` or eval fixtures
 with a top-level `version`, first upgrade the CLI to **v0.3.5 or newer** so
 the evaluator understands the fixture schema, then run:
 
+<!-- example: id=adoption_refresh_validator classification=illustrative reason="Targeted validator refresh for existing repositories" -->
 ```bash
 do-harness skills refresh-validator
 ```
 
 This replaces only `quick_validate.py`; it preserves custom skill instructions,
 references, and other files. Do not use `init --force` for this refresh.
+
 A repository adopted before it has any test ends `RED` on the `test` sensor:
 the pack does not pass `--no-tests=pass`, so an empty suite is reported by
 name instead of recording a pass that checked nothing. Add a test, or drop the
