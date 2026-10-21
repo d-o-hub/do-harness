@@ -126,6 +126,54 @@ the pack does not pass `--no-tests=pass`, so an empty suite is reported by
 name instead of recording a pass that checked nothing. Add a test, or drop the
 sensor from `do-harness.toml` — the run writes that contract first.
 
+### Optional: verify a context sanitizer
+
+`init` writes `scripts/check-context-sanitization.py` and an inert, commented
+recipe in the generated `do-harness.toml`. The sensor is **opt-in**: it is not
+registered by default, no default signal set names it, and an installed
+sanitizer binary never enables it implicitly.
+
+The harness does not mediate context. It never captures prompts, tool
+arguments, or vault contents. The check proves one narrow thing — that a
+configured sanitizer transforms a synthetic fixture — and nothing more. That
+evidence is **capability evidence about the fixture**, not proof that a real
+coding client routes every outbound byte through the sanitizer; that claim
+needs a client-specific integration test.
+
+Activate it in two steps. First, declare the sensor and add its name to the
+signal sets your policy requires:
+
+<!-- example: id=adoption_context_sanitization_toml classification=parser-check-only reason="Sample context-sanitization sensor TOML snippet" -->
+```toml
+[[sensors]]
+name = "context-sanitization"
+argv = ["python3", "scripts/check-context-sanitization.py"]
+severity = "error"
+timeout = 45
+```
+
+Then run it with the two environment variables it reads:
+
+<!-- example: id=adoption_context_sanitization_run classification=parser-check-only reason="Sample context-sanitization invocation" -->
+```bash
+DO_HARNESS_CONTEXT_SANITIZATION=enabled \
+DO_CONTEXT_SHIELD_BIN=/absolute/path/to/do-context-shield \
+  do-harness verify --only context-sanitization --strict
+```
+
+`DO_HARNESS_CONTEXT_SANITIZATION` is `disabled` or `enabled`; unset means
+`disabled`. `DO_CONTEXT_SHIELD_BIN` names the executable and is required only
+when the mode is `enabled` — a missing or non-executable path is a hard
+failure, not a skip.
+
+The disabled mode prints `SKIP: context-sanitization: not configured`. Under
+`--strict` that skip is **missing verification, not success**: a policy that
+requires this sensor must not report green while it is disabled.
+
+For client registration, see the upstream
+[client integration guide](https://github.com/d-oit/do-context-shield/blob/main/docs/client-integration.md).
+The harness deliberately does not duplicate the MCP protocol details.
+
 `plans/invariants.json` is a JSON array of `DecisionHeader` objects
 (`{invariant, rationale, sensor, category}`), or equivalently an object with
 a top-level `invariants` array (extra keys such as `$comment` are ignored).
