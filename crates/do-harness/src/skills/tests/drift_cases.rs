@@ -66,6 +66,10 @@ fn parse_rejects_entries_that_cannot_be_checked() {
             "[[skills]]\nname = \"a\"\npath = \".agents/skills/a\"\nupstream = \"o/r\"\ncommit = \"{commit}\"\ncontent_sha256 = \"{digest}\"\n\n[[skills]]\nname = \"b\"\npath = \".agents/skills/a\"\nupstream = \"o/r\"\ncommit = \"{commit}\"\ncontent_sha256 = \"bb\"\n",
             "duplicate managed skill path",
         ),
+        (
+            "[[skills]]\nname = \"a\"\npath = \".agents/skills/a\"\nupstream = \"o/r\"\ncommit = \"{commit}\"\ncontent_sha256 = \"{digest}\"\nmode = \"invalid_mode\"\n",
+            "invalid mode",
+        ),
     ];
 
     let digest = "b".repeat(64);
@@ -131,6 +135,45 @@ fn evaluate_reports_ok_drift_and_missing_in_path_order() {
         Some(observed.as_str()),
         "a drifted tree reports its observed digest"
     );
+}
+
+#[test]
+fn parse_and_evaluate_accepts_safety_skill_metadata_and_preserves_fields() {
+    let temp = tempfile::tempdir().unwrap();
+    let root = temp.path();
+    let skill_dir = write_tree(
+        root,
+        ".agents/skills/private-data",
+        &[("SKILL.md", "# Private Data Guidance\n")],
+    );
+    let digest = tree::tree_digest(&skill_dir).unwrap();
+    let commit = "f".repeat(40);
+
+    let text = format!(
+        "[[skills]]\n\
+         name = \"private-data\"\n\
+         path = \".agents/skills/private-data\"\n\
+         upstream = \"d-oit/do-context-shield\"\n\
+         upstream_path = \".agents/skills/private-data\"\n\
+         commit = \"{commit}\"\n\
+         content_sha256 = \"{digest}\"\n\
+         scope = \"local_context_sanitization\"\n\
+         trigger = \"pre_prompt_formatting\"\n\
+         mode = \"required\"\n\
+         required = true\n"
+    );
+
+    let manifest = drift::parse(&text).expect("manifest with safety skill metadata should parse");
+    let report = drift::evaluate(root, &manifest).expect("evaluate should succeed");
+
+    assert_eq!(report.skills.len(), 1);
+    let item = &report.skills[0];
+    assert_eq!(item.name, "private-data");
+    assert_eq!(item.status, drift::Status::Ok);
+    assert_eq!(item.scope.as_deref(), Some("local_context_sanitization"));
+    assert_eq!(item.trigger.as_deref(), Some("pre_prompt_formatting"));
+    assert_eq!(item.mode.as_deref(), Some("required"));
+    assert_eq!(item.required, Some(true));
 }
 
 #[test]

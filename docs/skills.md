@@ -64,6 +64,39 @@ shared skills against their pinned commit and content digest (see
 `docs/cli.md`). Both are advisories; the `skills` sensor (sync) is the
 gate.
 
+## Shared safety skills and drift management
+
+Adopting repositories can import and pin shared safety skills—such as local context
+sanitization (`private-data` or `fail-closed-boundary` from `d-oit/do-context-shield`)—by
+declaring them in `skills-manifest.toml` (under `.agents/`):
+
+```toml
+[[skills]]
+name = "private-data"
+path = ".agents/skills/private-data"
+upstream = "d-oit/do-context-shield"
+upstream_path = ".agents/skills/private-data"
+version = "1.0.0"            # informational; never compared
+commit = "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0"  # immutable 40-hex commit
+content_sha256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" # content digest
+scope = "local_context_sanitization" # optional execution scope pattern
+trigger = "pre_prompt_formatting"    # optional trigger condition
+mode = "required"            # optional enforcement classification ("required" | "advisory")
+required = true              # optional boolean flag
+```
+
+`do-harness skills drift` verifies local copies against these immutable pins without network
+access or auto-updating. Drift is reported without silently overwriting locally customized skill
+files, and moving branch references (such as `main` or `HEAD`) are rejected to ensure reproducible,
+tamper-evident skill inputs.
+
+> **Guidance vs. Runtime Integration Proof:**
+> Importing or pinning a shared safety skill installs feedforward guidance (markdown rules and
+> instructions) for agents and developers into `.agents/skills/`. It **does not prove or guarantee**
+> that the adopting application actually routes prompts or data through the referenced security
+> control at runtime (such as `do-context-shield` runtime proxies, sanitizers, or filters). End-to-end
+> client integration proof requires runtime verification and testing within the adopting application.
+
 ## Auto-update (no stale docs)
 
 `scripts/check-skills-docs.sh` keeps this page and the `README.md` Skills

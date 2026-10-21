@@ -53,6 +53,18 @@ pub struct ManagedSkill {
     pub commit: String,
     /// Pinned digest of the managed skill tree; the content anchor.
     pub content_sha256: String,
+    /// Optional execution scope or context pattern for safety guidance.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scope: Option<String>,
+    /// Optional trigger condition or event invoking guidance.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub trigger: Option<String>,
+    /// Optional enforcement mode ("required" or "advisory").
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mode: Option<String>,
+    /// Optional boolean flag indicating whether compliance is required vs advisory.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub required: Option<bool>,
 }
 
 /// A parsed manifest: the managed skills, in declaration order.
@@ -94,6 +106,18 @@ pub struct SkillReport {
     pub actual: Option<String>,
     /// Check outcome.
     pub status: Status,
+    /// Optional execution scope from manifest.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub scope: Option<String>,
+    /// Optional trigger condition from manifest.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub trigger: Option<String>,
+    /// Optional enforcement mode ("required" or "advisory") from manifest.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mode: Option<String>,
+    /// Optional boolean required flag from manifest.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub required: Option<bool>,
 }
 
 /// Result of checking every managed skill.
@@ -181,6 +205,16 @@ fn validate(manifest: &Manifest) -> Result<()> {
                 skill.content_sha256
             );
         }
+        if let Some(mode) = &skill.mode {
+            let m = mode.to_ascii_lowercase();
+            if m != "required" && m != "advisory" {
+                bail!(
+                    "managed skill '{}' has an invalid mode '{}': expected 'required' or 'advisory'",
+                    skill.name,
+                    mode
+                );
+            }
+        }
     }
     Ok(())
 }
@@ -248,6 +282,10 @@ pub fn evaluate(root: &Path, manifest: &Manifest) -> Result<Report> {
             expected: skill.content_sha256.to_ascii_lowercase(),
             actual,
             status,
+            scope: skill.scope.clone(),
+            trigger: skill.trigger.clone(),
+            mode: skill.mode.clone(),
+            required: skill.required,
         });
     }
     skills.sort_by(|left, right| left.path.cmp(&right.path));

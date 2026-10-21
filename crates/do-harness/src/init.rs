@@ -4,6 +4,12 @@
 //! candidate sensors' tooling, generates a contract containing only proven
 //! signals, then executes that contract once. A red baseline is surfaced
 //! (and fails the command) instead of presenting the repository as ready.
+//!
+//! Note on safety guidance: Scaffolding or importing/pinning a safety skill
+//! (such as local context sanitization from `.agents/skills-manifest.toml`)
+//! installs feedforward guidance (markdown rules and instructions) for agents and
+//! developers in `.agents/skills/`. It does not prove that the adopting application
+//! actually routes prompts or data through the referenced runtime control.
 
 use std::collections::BTreeMap;
 use std::fs;
