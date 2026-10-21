@@ -37,6 +37,7 @@ fn sensor_scripts() -> Vec<PathBuf> {
 
 struct Run {
     success: bool,
+    #[allow(dead_code)]
     stdout: String,
     stderr: String,
     calls: usize,

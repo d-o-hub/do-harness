@@ -77,6 +77,7 @@ fn scaffolded_repo() -> (TempDir, PathBuf) {
 
 /// Runs the scaffolded `check-loc.sh` in `root`, returning (exit code,
 /// `stdout`, `stderr`).
+#[cfg(unix)]
 fn loc_script(root: &Path, args: &[&str]) -> (Option<i32>, String, String) {
     let output = Command::new("bash")
         .arg("scripts/check-loc.sh")

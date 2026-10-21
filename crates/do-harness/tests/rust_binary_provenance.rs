@@ -47,6 +47,7 @@ fn sandbox(artifacts: &[(&str, &[u8])], args: &[&str]) -> Sandbox {
     Sandbox { _dir: dir, root }
 }
 
+#[allow(unused_variables)]
 fn make_executable(path: &std::path::Path) {
     #[cfg(unix)]
     {

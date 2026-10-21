@@ -4,6 +4,7 @@
 //! already shipped, and degrades loudly — or fails closed under `CI=true` /
 //! `DO_HARNESS_REQUIRE_TOOLS=1` — when the comparison cannot run at all.
 
+#[cfg(unix)]
 use super::release::{output_text, preflight, stub_gh, versioned_fixture};
 
 #[cfg(unix)]

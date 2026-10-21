@@ -18,13 +18,16 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
+#[cfg(unix)]
 use std::path::{Path, PathBuf};
+#[cfg(unix)]
 use std::process::{Command, Output};
 
 #[cfg(unix)]
 #[path = "ci_parity/action_pins.rs"]
 mod action_pins;
 
+#[cfg(unix)]
 fn script(name: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../scripts")
