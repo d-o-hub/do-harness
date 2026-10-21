@@ -29,6 +29,9 @@ pub(super) use grade_outcome::{CaseOutcome, GradeOutcome, grade_skill, single_ca
 pub(super) struct SkillEvals {
     #[allow(dead_code)]
     pub(super) skill_name: String,
+    #[allow(dead_code)]
+    #[serde(default)]
+    pub(super) version: Option<serde_json::Value>,
     pub(super) evals: Vec<EvalCase>,
 }
 
@@ -161,17 +164,11 @@ pub(super) async fn gate_and_parse(
     }
 }
 
-/// Renders a fixture parse error, appending an upgrade hint for unknown
-/// fields: a field this build does not know usually means the fixture targets
-/// a newer release, not that the fixture is malformed.
+/// Renders fixture parse errors without suggesting unsupported newer schemas.
 fn fixture_parse_error(err: &serde_json::Error) -> String {
     let message = err.to_string();
     if message.contains("unknown field") {
-        format!(
-            "{message} hint: this field may require a newer do-harness than this build \
-             ({}); upgrade and re-run",
-            crate::version::version_str()
-        )
+        format!("{message}; remove the unsupported field or use the documented schema")
     } else {
         message
     }
