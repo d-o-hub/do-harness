@@ -193,6 +193,27 @@ The LOC ceiling is not Rust-only: the rust pack ships `loc` over `*.rs` by
 default, and a front-end tree gets the same invariant by scoping that sensor
 instead of forking the script.
 
+A workspace member manifest is a compilation input: a dependency, a feature,
+or a lint-policy edit in `crates/db/Cargo.toml` changes what the compiler and
+the test runner see without touching a `.rs` file or the lockfile. The rust
+pack and the repository policy therefore list both `Cargo.toml` and
+`**/Cargo.toml` in the `when-changed` globs of the `fmt`, `check`, `clippy`,
+`test`, `doctest`, and `coverage` sensors.
+
+**An existing adopter has to make this correction itself.** Installing a new
+binary does not rewrite an adopter's `do-harness.toml`: the file is the
+adopter's policy, and the harness reads it as written. Until the recursive
+pattern is added, `verify --changed` can skip compilation, tests, and doctests
+after a member-manifest edit. Add the pattern by hand:
+
+<!-- example: id=adoption_member_manifest_toml classification=parser-check-only reason="Sample member-manifest applicability TOML snippet" -->
+```toml
+[[sensors]]
+name = "check"
+argv = ["cargo", "check", "--workspace"]
+when-changed = ["**/*.rs", "Cargo.toml", "**/Cargo.toml", "Cargo.lock"]
+```
+
 <!-- example: id=adoption_loc_toml classification=parser-check-only reason="Sample loc sensor TOML snippet" -->
 ```toml
 [[sensors]]

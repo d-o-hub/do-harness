@@ -41,6 +41,12 @@ fn rust_default_ships_signal_sets() {
 
 /// The built-in pack pins `--all-targets` on clippy and narrows the cargo
 /// sensors with `when-changed` globs so `verify --changed` is meaningful.
+///
+/// The exact glob vectors are not pinned here: they are an implementation
+/// detail of the pack, and the selection behaviour they produce is proved
+/// against the built-in pack and the shipped policy in
+/// `crate::applicability`'s tests, where a wrong vector fails as a skipped
+/// sensor instead of as a changed literal.
 #[test]
 fn rust_pack_pins_all_targets_and_when_changed() {
     let sensors = rust_pack();
@@ -54,22 +60,13 @@ fn rust_pack_pins_all_targets_and_when_changed() {
     for name in ["fmt", "check", "clippy", "test", "doctest", "coverage"] {
         assert_ne!(sensor(name).when_changed, Vec::<String>::new());
     }
-    assert_eq!(
-        sensor("fmt").when_changed,
-        vec!["**/*.rs", "Cargo.toml", "Cargo.lock", "rust-toolchain.toml"]
-    );
-    assert_eq!(
-        sensor("check").when_changed,
-        vec!["**/*.rs", "Cargo.toml", "Cargo.lock"]
-    );
-    assert_eq!(
-        sensor("clippy").when_changed,
-        sensor("check").when_changed.clone()
-    );
-    assert_eq!(
-        sensor("test").when_changed,
-        sensor("check").when_changed.clone()
-    );
+    for name in ["check", "clippy", "test", "doctest", "coverage"] {
+        assert_eq!(
+            sensor(name).when_changed,
+            sensor("check").when_changed.clone(),
+            "{name} must narrow its applicability the same way check does"
+        );
+    }
     assert_eq!(sensor("loc").when_changed, vec!["**/*.rs"]);
     for name in ["deps", "audit", "commitlint"] {
         assert_eq!(sensor(name).when_changed, Vec::<String>::new());

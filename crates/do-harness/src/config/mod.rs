@@ -190,12 +190,24 @@ fn spec(name: &str, argv: &[&str], when_changed: &[&str]) -> SensorSpec {
 
 /// Builds the built-in Rust sensor pack.
 pub fn rust_pack() -> Vec<SensorSpec> {
-    const RUST_INPUTS: &[&str] = &["**/*.rs", "Cargo.toml", "Cargo.lock"];
+    // A workspace member manifest is a compilation input: a dependency, a
+    // feature, or a lint-policy edit in `crates/db/Cargo.toml` changes what
+    // the compiler and the test runner see without touching a `.rs` file or
+    // the lockfile. The explicit root pattern stays next to the recursive one
+    // so a manifest at the workspace root is still matched by name, the same
+    // convention `init.rs::RELEASE_PIN_GLOBS` uses.
+    const RUST_INPUTS: &[&str] = &["**/*.rs", "Cargo.toml", "**/Cargo.toml", "Cargo.lock"];
     vec![
         spec(
             "fmt",
             &["cargo", "fmt", "--all", "--", "--check"],
-            &["**/*.rs", "Cargo.toml", "Cargo.lock", "rust-toolchain.toml"],
+            &[
+                "**/*.rs",
+                "Cargo.toml",
+                "**/Cargo.toml",
+                "Cargo.lock",
+                "rust-toolchain.toml",
+            ],
         ),
         spec("check", &["cargo", "check", "--workspace"], RUST_INPUTS),
         spec(
