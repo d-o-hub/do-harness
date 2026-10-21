@@ -219,6 +219,7 @@ export PATH="$HOME/.local/bin:$PATH"
 | `pr waivers [OPTIONS] --lcov <PATH> [PR]` | Classify patch-coverage residue: waivable classes and lines needing tests — flags: `--base <REV>`, `--head <REV>`, `--patch <PATH>`, `--lcov <PATH>`, `--since <PATH>`, `--strip-prefix <PREFIX>`, `--format <FORMAT>` |
 | `skills suggest [OPTIONS] --query <TEXT>` | Rank skills by relevance to a query using metadata only — flags: `--query <TEXT>`, `--limit <N>`, `--format <FORMAT>` |
 | `skills drift [OPTIONS]` | Check manifest-managed shared skills against their pinned digests — flags: `--manifest <FILE>`, `--format <FORMAT>` |
+| `skills refresh-validator [OPTIONS]` | Replace only the installed skill-creator structure validator |
 | `init-db [OPTIONS]` | Apply pending database migrations — flags: `--check`, `-y, --yes` |
 | `seed [OPTIONS]` | Seed invariants from plans/invariants.json — flags: `--prune` |
 | `init [OPTIONS]` | Scaffold a harness workspace in a target directory — flags: `--language <LANG>`, `--force`, `--format <FORMAT>`, `--no-seed`, `--minimal`, `--no-gitignore` |

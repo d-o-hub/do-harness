@@ -37,6 +37,9 @@ pub fn run(root: &Path, action: SkillsAction) -> Result<(), CliError> {
             limit,
             format,
         } => suggest_command(root, &query, limit, format).map_err(CliError::Usage),
+        SkillsAction::RefreshValidator => crate::init::refresh_skill_creator_validator(root)
+            .map(|_| println!("Refreshed .agents/skills/skill-creator/scripts/quick_validate.py"))
+            .map_err(CliError::Usage),
         SkillsAction::Drift { manifest, format } => drift::run(root, manifest.as_deref(), format),
     }
 }

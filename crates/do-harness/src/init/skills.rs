@@ -1,8 +1,9 @@
 //! Portable skill scaffolding for `do-harness init`.
 
-use std::path::Path;
+use std::fs;
+use std::path::{Path, PathBuf};
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 
 use super::{InitOpts, InitReport, write_if_absent};
 
@@ -147,4 +148,15 @@ pub(super) fn scaffold_skills(root: &Path, opts: &InitOpts, report: &mut InitRep
         &root.join(".agents/skills/skill-creator/scripts/quick_validate.py"),
     )?;
     Ok(())
+}
+/// Replaces only the installed structure validator with the bundled version.
+pub(crate) fn refresh_skill_creator_validator(root: &Path) -> Result<PathBuf> {
+    let scripts = root.join(".agents/skills/skill-creator/scripts");
+    fs::create_dir_all(&scripts)
+        .with_context(|| format!("failed to create {}", scripts.display()))?;
+    let validator = scripts.join("quick_validate.py");
+    fs::write(&validator, SKILL_CREATOR_QUICK_VALIDATE)
+        .with_context(|| format!("failed to write {}", validator.display()))?;
+    crate::fs_perm::set_owner_exec(&validator)?;
+    Ok(validator)
 }

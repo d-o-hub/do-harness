@@ -349,6 +349,7 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('--version', '--version', [CompletionResultType]::ParameterName, 'Print version')
             [CompletionResult]::new('suggest', 'suggest', [CompletionResultType]::ParameterValue, 'Rank skills by relevance to a query using metadata only')
             [CompletionResult]::new('drift', 'drift', [CompletionResultType]::ParameterValue, 'Check manifest-managed shared skills against their pinned digests')
+            [CompletionResult]::new('refresh-validator', 'refresh-validator', [CompletionResultType]::ParameterValue, 'Replace only the installed skill-creator structure validator')
             [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
             break
         }
@@ -383,9 +384,23 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('--version', '--version', [CompletionResultType]::ParameterName, 'Print version')
             break
         }
+        'do-harness;skills;refresh-validator' {
+            [CompletionResult]::new('--root', '--root', [CompletionResultType]::ParameterName, 'Workspace root override (default: walk up from cwd)')
+            [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Explicit path to do-harness.toml')
+            [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)')
+            [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Suppress PASS/WARN verdict lines and the success footer')
+            [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Suppress PASS/WARN verdict lines and the success footer')
+            [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Dry run without side effects')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('-V', '-V ', [CompletionResultType]::ParameterName, 'Print version')
+            [CompletionResult]::new('--version', '--version', [CompletionResultType]::ParameterName, 'Print version')
+            break
+        }
         'do-harness;skills;help' {
             [CompletionResult]::new('suggest', 'suggest', [CompletionResultType]::ParameterValue, 'Rank skills by relevance to a query using metadata only')
             [CompletionResult]::new('drift', 'drift', [CompletionResultType]::ParameterValue, 'Check manifest-managed shared skills against their pinned digests')
+            [CompletionResult]::new('refresh-validator', 'refresh-validator', [CompletionResultType]::ParameterValue, 'Replace only the installed skill-creator structure validator')
             [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
             break
         }
@@ -393,6 +408,9 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             break
         }
         'do-harness;skills;help;drift' {
+            break
+        }
+        'do-harness;skills;help;refresh-validator' {
             break
         }
         'do-harness;skills;help;help' {
@@ -1246,12 +1264,16 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
         'do-harness;help;skills' {
             [CompletionResult]::new('suggest', 'suggest', [CompletionResultType]::ParameterValue, 'Rank skills by relevance to a query using metadata only')
             [CompletionResult]::new('drift', 'drift', [CompletionResultType]::ParameterValue, 'Check manifest-managed shared skills against their pinned digests')
+            [CompletionResult]::new('refresh-validator', 'refresh-validator', [CompletionResultType]::ParameterValue, 'Replace only the installed skill-creator structure validator')
             break
         }
         'do-harness;help;skills;suggest' {
             break
         }
         'do-harness;help;skills;drift' {
+            break
+        }
+        'do-harness;help;skills;refresh-validator' {
             break
         }
         'do-harness;help;init-db' {

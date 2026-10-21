@@ -325,6 +325,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand --version 'Print version'
             cand suggest 'Rank skills by relevance to a query using metadata only'
             cand drift 'Check manifest-managed shared skills against their pinned digests'
+            cand refresh-validator 'Replace only the installed skill-creator structure validator'
             cand help 'Print this message or the help of the given subcommand(s)'
         }
         &'do-harness;skills;suggest'= {
@@ -356,14 +357,29 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand -V 'Print version'
             cand --version 'Print version'
         }
+        &'do-harness;skills;refresh-validator'= {
+            cand --root 'Workspace root override (default: walk up from cwd)'
+            cand --config 'Explicit path to do-harness.toml'
+            cand --output 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)'
+            cand -q 'Suppress PASS/WARN verdict lines and the success footer'
+            cand --quiet 'Suppress PASS/WARN verdict lines and the success footer'
+            cand --dry-run 'Dry run without side effects'
+            cand -h 'Print help'
+            cand --help 'Print help'
+            cand -V 'Print version'
+            cand --version 'Print version'
+        }
         &'do-harness;skills;help'= {
             cand suggest 'Rank skills by relevance to a query using metadata only'
             cand drift 'Check manifest-managed shared skills against their pinned digests'
+            cand refresh-validator 'Replace only the installed skill-creator structure validator'
             cand help 'Print this message or the help of the given subcommand(s)'
         }
         &'do-harness;skills;help;suggest'= {
         }
         &'do-harness;skills;help;drift'= {
+        }
+        &'do-harness;skills;help;refresh-validator'= {
         }
         &'do-harness;skills;help;help'= {
         }
@@ -1133,10 +1149,13 @@ set edit:completion:arg-completer[do-harness] = {|@words|
         &'do-harness;help;skills'= {
             cand suggest 'Rank skills by relevance to a query using metadata only'
             cand drift 'Check manifest-managed shared skills against their pinned digests'
+            cand refresh-validator 'Replace only the installed skill-creator structure validator'
         }
         &'do-harness;help;skills;suggest'= {
         }
         &'do-harness;help;skills;drift'= {
+        }
+        &'do-harness;help;skills;refresh-validator'= {
         }
         &'do-harness;help;init-db'= {
         }

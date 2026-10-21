@@ -323,4 +323,6 @@ pub enum SkillsAction {
         #[arg(long, value_enum, default_value_t = Format::Text)]
         format: Format,
     },
+    /// Replace only the installed skill-creator structure validator.
+    RefreshValidator,
 }

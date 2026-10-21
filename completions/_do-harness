@@ -416,6 +416,20 @@ json\:"Machine-readable JSON output"))' \
 '--version[Print version]' \
 && ret=0
 ;;
+(refresh-validator)
+_arguments "${_arguments_options[@]}" : \
+'--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
+'--config=[Explicit path to do-harness.toml]:FILE:_files' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
+'--dry-run[Dry run without side effects]' \
+'-h[Print help]' \
+'--help[Print help]' \
+'-V[Print version]' \
+'--version[Print version]' \
+&& ret=0
+;;
 (help)
 _arguments "${_arguments_options[@]}" : \
 ":: :_do-harness__subcmd__skills__subcmd__help_commands" \
@@ -433,6 +447,10 @@ _arguments "${_arguments_options[@]}" : \
 && ret=0
 ;;
 (drift)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(refresh-validator)
 _arguments "${_arguments_options[@]}" : \
 && ret=0
 ;;
@@ -1490,6 +1508,10 @@ _arguments "${_arguments_options[@]}" : \
 _arguments "${_arguments_options[@]}" : \
 && ret=0
 ;;
+(refresh-validator)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
         esac
     ;;
 esac
@@ -2084,6 +2106,7 @@ _do-harness__subcmd__help__subcmd__skills_commands() {
     local commands; commands=(
 'suggest:Rank skills by relevance to a query using metadata only' \
 'drift:Check manifest-managed shared skills against their pinned digests' \
+'refresh-validator:Replace only the installed skill-creator structure validator' \
     )
     _describe -t commands 'do-harness help skills commands' commands "$@"
 }
@@ -2091,6 +2114,11 @@ _do-harness__subcmd__help__subcmd__skills_commands() {
 _do-harness__subcmd__help__subcmd__skills__subcmd__drift_commands() {
     local commands; commands=()
     _describe -t commands 'do-harness help skills drift commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__help__subcmd__skills__subcmd__refresh-validator_commands] )) ||
+_do-harness__subcmd__help__subcmd__skills__subcmd__refresh-validator_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness help skills refresh-validator commands' commands "$@"
 }
 (( $+functions[_do-harness__subcmd__help__subcmd__skills__subcmd__suggest_commands] )) ||
 _do-harness__subcmd__help__subcmd__skills__subcmd__suggest_commands() {
@@ -2418,6 +2446,7 @@ _do-harness__subcmd__skills_commands() {
     local commands; commands=(
 'suggest:Rank skills by relevance to a query using metadata only' \
 'drift:Check manifest-managed shared skills against their pinned digests' \
+'refresh-validator:Replace only the installed skill-creator structure validator' \
 'help:Print this message or the help of the given subcommand(s)' \
     )
     _describe -t commands 'do-harness skills commands' commands "$@"
@@ -2432,6 +2461,7 @@ _do-harness__subcmd__skills__subcmd__help_commands() {
     local commands; commands=(
 'suggest:Rank skills by relevance to a query using metadata only' \
 'drift:Check manifest-managed shared skills against their pinned digests' \
+'refresh-validator:Replace only the installed skill-creator structure validator' \
 'help:Print this message or the help of the given subcommand(s)' \
     )
     _describe -t commands 'do-harness skills help commands' commands "$@"
@@ -2446,10 +2476,20 @@ _do-harness__subcmd__skills__subcmd__help__subcmd__help_commands() {
     local commands; commands=()
     _describe -t commands 'do-harness skills help help commands' commands "$@"
 }
+(( $+functions[_do-harness__subcmd__skills__subcmd__help__subcmd__refresh-validator_commands] )) ||
+_do-harness__subcmd__skills__subcmd__help__subcmd__refresh-validator_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness skills help refresh-validator commands' commands "$@"
+}
 (( $+functions[_do-harness__subcmd__skills__subcmd__help__subcmd__suggest_commands] )) ||
 _do-harness__subcmd__skills__subcmd__help__subcmd__suggest_commands() {
     local commands; commands=()
     _describe -t commands 'do-harness skills help suggest commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__skills__subcmd__refresh-validator_commands] )) ||
+_do-harness__subcmd__skills__subcmd__refresh-validator_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness skills refresh-validator commands' commands "$@"
 }
 (( $+functions[_do-harness__subcmd__skills__subcmd__suggest_commands] )) ||
 _do-harness__subcmd__skills__subcmd__suggest_commands() {

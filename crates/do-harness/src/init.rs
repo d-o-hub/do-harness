@@ -23,6 +23,7 @@ pub mod detect;
 pub mod node;
 pub mod report;
 mod skills;
+pub(crate) use skills::refresh_skill_creator_validator;
 mod web;
 
 pub use baseline::{Baseline, BaselineState};

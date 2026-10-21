@@ -249,16 +249,17 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_see
 complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from help" -f -a "ready" -d 'Check whether a pull request is ready to merge: merge state, CI checks, and review conversations'
 complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from help" -f -a "waivers" -d 'Classify patch-coverage residue: waivable classes and lines needing tests'
 complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from help" -f -a "help" -d 'Print this message or the help of the given subcommand(s)'
-complete -c do-harness -n "__fish_do_harness_using_subcommand skills; and not __fish_seen_subcommand_from suggest drift help" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
-complete -c do-harness -n "__fish_do_harness_using_subcommand skills; and not __fish_seen_subcommand_from suggest drift help" -l config -d 'Explicit path to do-harness.toml' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand skills; and not __fish_seen_subcommand_from suggest drift help" -l output -d 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand skills; and not __fish_seen_subcommand_from suggest drift help" -s q -l quiet -d 'Suppress PASS/WARN verdict lines and the success footer'
-complete -c do-harness -n "__fish_do_harness_using_subcommand skills; and not __fish_seen_subcommand_from suggest drift help" -l dry-run -d 'Dry run without side effects'
-complete -c do-harness -n "__fish_do_harness_using_subcommand skills; and not __fish_seen_subcommand_from suggest drift help" -s h -l help -d 'Print help'
-complete -c do-harness -n "__fish_do_harness_using_subcommand skills; and not __fish_seen_subcommand_from suggest drift help" -s V -l version -d 'Print version'
-complete -c do-harness -n "__fish_do_harness_using_subcommand skills; and not __fish_seen_subcommand_from suggest drift help" -f -a "suggest" -d 'Rank skills by relevance to a query using metadata only'
-complete -c do-harness -n "__fish_do_harness_using_subcommand skills; and not __fish_seen_subcommand_from suggest drift help" -f -a "drift" -d 'Check manifest-managed shared skills against their pinned digests'
-complete -c do-harness -n "__fish_do_harness_using_subcommand skills; and not __fish_seen_subcommand_from suggest drift help" -f -a "help" -d 'Print this message or the help of the given subcommand(s)'
+complete -c do-harness -n "__fish_do_harness_using_subcommand skills; and not __fish_seen_subcommand_from suggest drift refresh-validator help" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
+complete -c do-harness -n "__fish_do_harness_using_subcommand skills; and not __fish_seen_subcommand_from suggest drift refresh-validator help" -l config -d 'Explicit path to do-harness.toml' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand skills; and not __fish_seen_subcommand_from suggest drift refresh-validator help" -l output -d 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand skills; and not __fish_seen_subcommand_from suggest drift refresh-validator help" -s q -l quiet -d 'Suppress PASS/WARN verdict lines and the success footer'
+complete -c do-harness -n "__fish_do_harness_using_subcommand skills; and not __fish_seen_subcommand_from suggest drift refresh-validator help" -l dry-run -d 'Dry run without side effects'
+complete -c do-harness -n "__fish_do_harness_using_subcommand skills; and not __fish_seen_subcommand_from suggest drift refresh-validator help" -s h -l help -d 'Print help'
+complete -c do-harness -n "__fish_do_harness_using_subcommand skills; and not __fish_seen_subcommand_from suggest drift refresh-validator help" -s V -l version -d 'Print version'
+complete -c do-harness -n "__fish_do_harness_using_subcommand skills; and not __fish_seen_subcommand_from suggest drift refresh-validator help" -f -a "suggest" -d 'Rank skills by relevance to a query using metadata only'
+complete -c do-harness -n "__fish_do_harness_using_subcommand skills; and not __fish_seen_subcommand_from suggest drift refresh-validator help" -f -a "drift" -d 'Check manifest-managed shared skills against their pinned digests'
+complete -c do-harness -n "__fish_do_harness_using_subcommand skills; and not __fish_seen_subcommand_from suggest drift refresh-validator help" -f -a "refresh-validator" -d 'Replace only the installed skill-creator structure validator'
+complete -c do-harness -n "__fish_do_harness_using_subcommand skills; and not __fish_seen_subcommand_from suggest drift refresh-validator help" -f -a "help" -d 'Print this message or the help of the given subcommand(s)'
 complete -c do-harness -n "__fish_do_harness_using_subcommand skills; and __fish_seen_subcommand_from suggest" -l query -d 'Task description to match against skill metadata' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand skills; and __fish_seen_subcommand_from suggest" -l limit -d 'Maximum number of candidates to return' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand skills; and __fish_seen_subcommand_from suggest" -l format -d 'Output format' -r -f -a "text\t'Human-readable text output'
@@ -280,8 +281,16 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand skills; and __fish
 complete -c do-harness -n "__fish_do_harness_using_subcommand skills; and __fish_seen_subcommand_from drift" -l dry-run -d 'Dry run without side effects'
 complete -c do-harness -n "__fish_do_harness_using_subcommand skills; and __fish_seen_subcommand_from drift" -s h -l help -d 'Print help (see more with \'--help\')'
 complete -c do-harness -n "__fish_do_harness_using_subcommand skills; and __fish_seen_subcommand_from drift" -s V -l version -d 'Print version'
+complete -c do-harness -n "__fish_do_harness_using_subcommand skills; and __fish_seen_subcommand_from refresh-validator" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
+complete -c do-harness -n "__fish_do_harness_using_subcommand skills; and __fish_seen_subcommand_from refresh-validator" -l config -d 'Explicit path to do-harness.toml' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand skills; and __fish_seen_subcommand_from refresh-validator" -l output -d 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand skills; and __fish_seen_subcommand_from refresh-validator" -s q -l quiet -d 'Suppress PASS/WARN verdict lines and the success footer'
+complete -c do-harness -n "__fish_do_harness_using_subcommand skills; and __fish_seen_subcommand_from refresh-validator" -l dry-run -d 'Dry run without side effects'
+complete -c do-harness -n "__fish_do_harness_using_subcommand skills; and __fish_seen_subcommand_from refresh-validator" -s h -l help -d 'Print help'
+complete -c do-harness -n "__fish_do_harness_using_subcommand skills; and __fish_seen_subcommand_from refresh-validator" -s V -l version -d 'Print version'
 complete -c do-harness -n "__fish_do_harness_using_subcommand skills; and __fish_seen_subcommand_from help" -f -a "suggest" -d 'Rank skills by relevance to a query using metadata only'
 complete -c do-harness -n "__fish_do_harness_using_subcommand skills; and __fish_seen_subcommand_from help" -f -a "drift" -d 'Check manifest-managed shared skills against their pinned digests'
+complete -c do-harness -n "__fish_do_harness_using_subcommand skills; and __fish_seen_subcommand_from help" -f -a "refresh-validator" -d 'Replace only the installed skill-creator structure validator'
 complete -c do-harness -n "__fish_do_harness_using_subcommand skills; and __fish_seen_subcommand_from help" -f -a "help" -d 'Print this message or the help of the given subcommand(s)'
 complete -c do-harness -n "__fish_do_harness_using_subcommand init-db" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
 complete -c do-harness -n "__fish_do_harness_using_subcommand init-db" -l config -d 'Explicit path to do-harness.toml' -r -F
@@ -781,6 +790,7 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand help; and __fish_s
 complete -c do-harness -n "__fish_do_harness_using_subcommand help; and __fish_seen_subcommand_from pr" -f -a "waivers" -d 'Classify patch-coverage residue: waivable classes and lines needing tests'
 complete -c do-harness -n "__fish_do_harness_using_subcommand help; and __fish_seen_subcommand_from skills" -f -a "suggest" -d 'Rank skills by relevance to a query using metadata only'
 complete -c do-harness -n "__fish_do_harness_using_subcommand help; and __fish_seen_subcommand_from skills" -f -a "drift" -d 'Check manifest-managed shared skills against their pinned digests'
+complete -c do-harness -n "__fish_do_harness_using_subcommand help; and __fish_seen_subcommand_from skills" -f -a "refresh-validator" -d 'Replace only the installed skill-creator structure validator'
 complete -c do-harness -n "__fish_do_harness_using_subcommand help; and __fish_seen_subcommand_from task" -f -a "export" -d 'Write the task list to plans/tasks.json or specified output'
 complete -c do-harness -n "__fish_do_harness_using_subcommand help; and __fish_seen_subcommand_from task" -f -a "import" -d 'Validate plans/tasks.json against the state database'
 complete -c do-harness -n "__fish_do_harness_using_subcommand help; and __fish_seen_subcommand_from task" -f -a "list" -d 'Print tasks from the state database'
