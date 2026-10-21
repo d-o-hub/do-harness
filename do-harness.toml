@@ -379,3 +379,28 @@ when-changed = ["crates/guardian-proxy/**", "Cargo.toml", "Cargo.lock", "scripts
 name = "machete"
 argv = ["bash", "scripts/check-machete.sh"]
 when-changed = ["**/Cargo.toml", "Cargo.lock", "scripts/check-machete.sh"]
+
+# Optional context-sanitization check.
+#
+# The harness does not mediate context: it never captures prompts, tool
+# arguments, or vault contents. This sensor proves that a configured
+# sanitizer transforms one synthetic fixture, and nothing more. The evidence
+# is capability evidence about the fixture — it is not proof that a real
+# coding client routes every outbound byte through the sanitizer. Client
+# registration is a client-specific integration:
+# https://github.com/d-oit/do-context-shield/blob/main/docs/client-integration.md
+#
+# The check is off unless DO_HARNESS_CONTEXT_SANITIZATION=enabled, and
+# DO_CONTEXT_SHIELD_BIN must name the executable when it is on. An unset mode
+# reports "SKIP: context-sanitization: not configured", which strict
+# verification treats as missing verification rather than as a pass.
+#
+# The script is the canonical helper, copied from
+# `crates/do-harness/templates/scripts/check-context-sanitization.py`; install
+# it into `scripts/` before uncommenting the block below.
+#
+# [[sensors]]
+# name = "context-sanitization"
+# argv = ["python3", "scripts/check-context-sanitization.py"]
+# severity = "error"
+# timeout = 45
