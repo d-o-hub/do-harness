@@ -214,6 +214,7 @@ fn cache_predicate_matches_only_generated_bytecode() {
 async fn documentation_only_assertions_are_not_graded() {
     let evals = SkillEvals {
         skill_name: "s".into(),
+        version: None,
         evals: vec![EvalCase {
             id: 1,
             prompt: "run it".into(),
@@ -233,4 +234,89 @@ async fn documentation_only_assertions_are_not_graded() {
     assert_eq!(outcome.passed, 0);
     assert_eq!(outcome.pass_rate, None);
     assert_eq!(outcome.prompt, None);
+}
+
+/// Top-level `version` and `category` in `SKILL.md` are accepted by the structure gate.
+#[test]
+fn structure_gate_accepts_top_level_version_and_category() {
+    let dir = tempfile::tempdir().unwrap();
+    let skill_dir = dir.path().join("codacy");
+    fs::create_dir_all(&skill_dir).unwrap();
+    let frontmatter = "\
+---
+name: codacy
+version: 1.1.0
+description: Orchestrate static analysis using Codacy.
+category: quality
+allowed-tools: Bash Read
+license: MIT
+---
+# codacy
+";
+    fs::write(skill_dir.join("SKILL.md"), frontmatter).unwrap();
+    let gate_script = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../.agents/skills/skill-creator/scripts/quick_validate.py");
+    assert!(
+        gate_script.is_file(),
+        "missing validator: {}",
+        gate_script.display()
+    );
+    let (verdict, message) = run_structure_gate(&skill_dir, &gate_script);
+    assert_eq!(verdict, GateVerdict::Pass, "gate should pass: {message}");
+}
+
+/// An unexpected frontmatter key fails the structure gate and names the `metadata:` remedy.
+#[test]
+fn structure_gate_error_remedy_suggests_metadata() {
+    let dir = tempfile::tempdir().unwrap();
+    let skill_dir = dir.path().join("invalid-key-skill");
+    fs::create_dir_all(&skill_dir).unwrap();
+    let frontmatter = "\
+---
+name: invalid-key-skill
+description: A test skill with an unknown key.
+license: MIT
+custom_unknown_key: true
+---
+# invalid
+";
+    fs::write(skill_dir.join("SKILL.md"), frontmatter).unwrap();
+    let gate_script = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../.agents/skills/skill-creator/scripts/quick_validate.py");
+    assert!(
+        gate_script.is_file(),
+        "missing validator: {}",
+        gate_script.display()
+    );
+    let (verdict, message) = run_structure_gate(&skill_dir, &gate_script);
+    assert_eq!(verdict, GateVerdict::Fail);
+    assert!(
+        message.contains("metadata:"),
+        "diagnostic must suggest putting custom keys under metadata: {message}"
+    );
+}
+
+/// `SkillEvals` accepts a top-level `version` in `evals/evals.json`.
+#[test]
+fn evals_schema_accepts_top_level_version() {
+    let json = r#"{
+      "skill_name": "codacy",
+      "version": "1.1.0",
+      "evals": []
+    }"#;
+    let parsed: SkillEvals = serde_json::from_str(json).expect("parse evals with version");
+    assert_eq!(parsed.skill_name, "codacy");
+    assert_eq!(
+        parsed.version,
+        Some(serde_json::Value::String("1.1.0".into()))
+    );
+
+    let json_number = r#"{
+      "skill_name": "codacy",
+      "version": 1,
+      "evals": []
+    }"#;
+    let parsed_num: SkillEvals =
+        serde_json::from_str(json_number).expect("parse evals with numeric version");
+    assert_eq!(parsed_num.version, Some(serde_json::json!(1)));
 }

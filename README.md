@@ -117,8 +117,12 @@ The harness is designed to be adopted by any codebase, Rust or not:
    untouched unless you pass `--force`. When no `Cargo.toml` exists, the rust
    pack also scaffolds a minimal crate (`Cargo.toml` + `src/lib.rs`) so
    `init && verify` is green on a truly empty tree; existing crates are never
-   touched, not even with `--force`. `init` then runs the generated contract
-   once and reports `Initial verification: GREEN | RED | VACUOUS`, exiting
+   touched, not even with `--force`. Every pack also gets an inert, commented
+   recipe for the optional context-sanitization check
+   (`scripts/check-context-sanitization.py`): the sensor is off unless you
+   declare it and set `DO_HARNESS_CONTEXT_SANITIZATION=enabled`, and it never
+   captures prompts, tool arguments, or vault contents. `init` then runs the
+   generated contract once and reports `Initial verification: GREEN | RED | VACUOUS`, exiting
    non-zero on RED instead of claiming a verified workspace.
 
    The generated `AGENTS.md` is a routing/completion contract only. This

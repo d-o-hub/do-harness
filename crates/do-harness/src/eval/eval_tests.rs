@@ -443,45 +443,5 @@ async fn json_report_includes_case_and_assertion_detail() {
     assert!(reason.contains("absent-needle"), "{reason}");
 }
 
-#[tokio::test(flavor = "current_thread")]
-async fn unknown_fixture_field_reports_upgrade_hint() {
-    let json = r#"{
-      "skill_name": "test-skill",
-      "evals": [
-        {
-          "id": 1,
-          "prompt": "prompt one",
-          "expected_output": "out one",
-          "files": [],
-          "assertions": ["exists:."],
-          "future_field": true
-        }
-      ]
-    }"#;
-    let dir = fixture_root(VALID_SKILL_MD, Some(json));
-    let skill_dir = dir.path().join(".agents/skills/test-skill");
-    let gate = dir
-        .path()
-        .join(".agents/skills/skill-creator/scripts/quick_validate.py");
-    match grading::gate_and_parse(&skill_dir, "test-skill", &gate)
-        .await
-        .unwrap()
-    {
-        grading::GateOutcome::InvalidEvals(report) => {
-            assert!(report.line.contains("unknown field"), "{}", report.line);
-            assert!(
-                report.line.contains("upgrade and re-run"),
-                "{}",
-                report.line
-            );
-            assert!(
-                report.line.contains(env!("CARGO_PKG_VERSION")),
-                "{}",
-                report.line
-            );
-        }
-        _ => panic!("expected InvalidEvals for an unknown fixture field"),
-    }
-}
-
+mod issue_383;
 mod lift;

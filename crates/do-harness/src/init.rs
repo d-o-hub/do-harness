@@ -18,6 +18,7 @@ use std::path::Path;
 use anyhow::{Context, Result};
 
 pub mod baseline;
+mod context_sanitization;
 pub mod detect;
 pub mod node;
 pub mod report;
@@ -159,7 +160,7 @@ pub async fn init_workspace(root: &Path, opts: &InitOpts) -> Result<InitReport> 
         opts.force,
         &mut report,
     )?;
-    let config = match report.language {
+    let mut config = match report.language {
         Language::Rust => {
             let sensors = detect::included_specs(root, report.language, &report.candidates);
             generate_rust_config(&sensors)?
@@ -171,6 +172,10 @@ pub async fn init_workspace(root: &Path, opts: &InitOpts) -> Result<InitReport> 
         Language::Generic => CONFIG_GENERIC.to_owned(),
         Language::Web => CONFIG_WEB.to_owned(),
     };
+    // The optional context-sanitization recipe is appended to every pack's
+    // policy. It is commented out, so it changes no sensor and adds none to
+    // any signal set; it documents the opt-in for an adopter who wants it.
+    context_sanitization::append_config_hint(&mut config);
     write_if_absent(root, "do-harness.toml", &config, opts.force, &mut report)?;
     let invariants = match report.language {
         Language::Rust => INVARIANTS_RUST,
@@ -194,6 +199,11 @@ pub async fn init_workspace(root: &Path, opts: &InitOpts) -> Result<InitReport> 
         &mut report,
     )?;
     crate::fs_perm::set_owner_exec(&root.join("scripts/check-tracker-drift.sh"))?;
+    // The optional context-sanitization check is language-agnostic and
+    // independent of skill scaffolding, so it ships in every pack and under
+    // `--minimal`. The sensor itself stays opt-in: the script is inert until
+    // the adopter declares it and enables it.
+    context_sanitization::scaffold(root, opts, &mut report)?;
     if report.language == Language::Rust {
         scaffold_scripts(root, opts, &mut report)?;
         // The runbook documents the release step the pack otherwise leaves to

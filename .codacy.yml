@@ -10,3 +10,4 @@
 # https://docs.codacy.com/repositories-configure/codacy-configuration-file
 exclude_paths:
   - "crates/db/migrations/**"
+  - "crates/do-harness/templates/**"

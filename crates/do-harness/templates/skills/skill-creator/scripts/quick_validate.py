@@ -138,7 +138,15 @@ def validate_skill(skill_path):
     except yaml.YAMLError as e:
         return False, f"Invalid YAML in frontmatter: {e}"
 
-    allowed_properties = {"name", "description", "license", "allowed-tools", "metadata"}
+    allowed_properties = {
+        "name",
+        "description",
+        "license",
+        "allowed-tools",
+        "metadata",
+        "version",
+        "category",
+    }
 
     unexpected_keys = set(frontmatter.keys()) - allowed_properties
     if unexpected_keys:
@@ -146,8 +154,17 @@ def validate_skill(skill_path):
         unexpected = ", ".join(sorted(unexpected_keys))
         return (
             False,
-            f"Unexpected key(s) in SKILL.md frontmatter: {unexpected}. Allowed properties are: {allowed}",
+            f"Unexpected key(s) in SKILL.md frontmatter: {unexpected}. Allowed properties are: {allowed}. "
+            "Put custom keys under 'metadata:' (e.g. metadata: { key: value }).",
         )
+
+    version = frontmatter.get("version")
+    if version is not None and not isinstance(version, (str, int, float)):
+        return False, f"Version must be a string or number, got {type(version).__name__}"
+
+    category = frontmatter.get("category")
+    if category is not None and not isinstance(category, str):
+        return False, f"Category must be a string, got {type(category).__name__}"
 
     if "name" not in frontmatter:
         return False, "Missing 'name' in frontmatter"
