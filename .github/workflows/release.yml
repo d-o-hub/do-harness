@@ -789,9 +789,9 @@ jobs:
           # delay as a missing artifact; the bound keeps a real outage failing
           # the job instead of waiting forever.
           poll_npm() {
-            local query="$1" value=""
+            local value=""
             for _ in $(seq 1 20); do
-              value="$(npm view "$query" 2>/dev/null || true)"
+              value="$(npm view "$@" 2>/dev/null || true)"
               if [ -n "$value" ]; then
                 printf '%s\n' "$value"
                 return 0
