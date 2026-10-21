@@ -282,6 +282,102 @@ fn unmanaged_skills_are_never_checked() {
     assert_eq!(absent.status.code(), Some(0));
 }
 
+#[test]
+fn adopter_pinned_safety_skill_validates_and_reports_drift_on_change() {
+    let sandbox = Sandbox::new(None);
+    let skill_dir = sandbox.root.join(".agents/skills/private-data");
+    fs::create_dir_all(&skill_dir).unwrap();
+    fs::write(skill_dir.join("SKILL.md"), "# Private Data Sanitization\n").unwrap();
+
+    // Read observed digest from placeholder run
+    let commit = "b".repeat(40);
+    let placeholder_manifest = format!(
+        "[[skills]]\n\
+         name = \"private-data\"\n\
+         path = \".agents/skills/private-data\"\n\
+         upstream = \"d-oit/do-context-shield\"\n\
+         upstream_path = \".agents/skills/private-data\"\n\
+         commit = \"{commit}\"\n\
+         content_sha256 = \"{}\"\n\
+         scope = \"local_context_sanitization\"\n\
+         trigger = \"pre_prompt_formatting\"\n\
+         mode = \"required\"\n\
+         required = true\n",
+        "0".repeat(64)
+    );
+    sandbox.write_manifest(&placeholder_manifest);
+    let first = sandbox.drift();
+    let rep = report(&first);
+    let actual_digest = rep["skills"][0]["actual"].as_str().unwrap().to_owned();
+
+    // Now write clean manifest with actual digest
+    let clean_manifest = format!(
+        "[[skills]]\n\
+         name = \"private-data\"\n\
+         path = \".agents/skills/private-data\"\n\
+         upstream = \"d-oit/do-context-shield\"\n\
+         upstream_path = \".agents/skills/private-data\"\n\
+         commit = \"{commit}\"\n\
+         content_sha256 = \"{actual_digest}\"\n\
+         scope = \"local_context_sanitization\"\n\
+         trigger = \"pre_prompt_formatting\"\n\
+         mode = \"required\"\n\
+         required = true\n"
+    );
+    sandbox.write_manifest(&clean_manifest);
+
+    let clean = sandbox.drift();
+    assert_eq!(clean.status.code(), Some(0));
+    let clean_rep = report(&clean);
+    assert_eq!(clean_rep["drifted"], 0);
+    assert_eq!(clean_rep["skills"][0]["status"], "ok");
+    assert_eq!(
+        clean_rep["skills"][0]["scope"],
+        "local_context_sanitization"
+    );
+    assert_eq!(clean_rep["skills"][0]["trigger"], "pre_prompt_formatting");
+    assert_eq!(clean_rep["skills"][0]["mode"], "required");
+    assert_eq!(clean_rep["skills"][0]["required"], true);
+
+    // Edit local file -> drift
+    fs::write(
+        skill_dir.join("SKILL.md"),
+        "# Private Data Sanitization (edited)\n",
+    )
+    .unwrap();
+    let drifted = sandbox.drift();
+    assert_eq!(drifted.status.code(), Some(1));
+    let drifted_rep = report(&drifted);
+    assert_eq!(drifted_rep["skills"][0]["status"], "drift");
+    assert_eq!(
+        fs::read_to_string(skill_dir.join("SKILL.md")).unwrap(),
+        "# Private Data Sanitization (edited)\n",
+        "drift check must report drift without overwriting local modifications"
+    );
+
+    // Test rejection of moving branch ref like 'main'
+    let moving_ref_manifest = format!(
+        "[[skills]]\n\
+         name = \"private-data\"\n\
+         path = \".agents/skills/private-data\"\n\
+         upstream = \"d-oit/do-context-shield\"\n\
+         commit = \"main\"\n\
+         content_sha256 = \"{actual_digest}\"\n"
+    );
+    sandbox.write_manifest(&moving_ref_manifest);
+    let invalid_commit = sandbox.drift();
+    assert_eq!(
+        invalid_commit.status.code(),
+        Some(2),
+        "moving branch refs like 'main' must be rejected as non-40-hex commit pins"
+    );
+    assert!(
+        String::from_utf8_lossy(&invalid_commit.stderr).contains("invalid commit pin"),
+        "error message must cite invalid commit pin: {}",
+        String::from_utf8_lossy(&invalid_commit.stderr)
+    );
+}
+
 #[cfg(unix)]
 #[test]
 fn managed_path_resolving_outside_the_root_is_a_usage_error() {
