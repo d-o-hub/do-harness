@@ -8,6 +8,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use crate::fixtures::{CHECKOUT_SHA, run, workspace, write_workflow};
+const END_OF_STREAM_LINE: usize = 6;
 
 /// A file with two YAML documents is a finding: the checker must not read
 /// only the first one and call the file clean.
@@ -232,7 +233,7 @@ fn parse_error_names_the_broken_line() {
         .and_then(|number| number.parse().ok())
         .unwrap_or_else(|| panic!("the finding must carry a line number: {line}"));
     assert_eq!(
-        reported, 6,
+        reported, END_OF_STREAM_LINE,
         "the parser must report the end-of-stream line, not line 1: {line}"
     );
 }

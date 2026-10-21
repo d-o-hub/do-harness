@@ -13,6 +13,8 @@ use std::process::{Command, Output};
 use super::{
     assert_missing_tool_policy, path_utility, repository_root, script, sensor_env, system_utility,
 };
+#[cfg(unix)]
+const TEST_EXECUTABLE_MODE: u32 = 0o755;
 
 #[cfg(unix)]
 #[test]
@@ -56,7 +58,7 @@ fn action_pins_sensor_fails_closed_without_the_yaml_parser() {
             let mut permissions = std::fs::metadata(&shim)
                 .expect("shim metadata")
                 .permissions();
-            permissions.set_mode(0o755);
+            permissions.set_mode(TEST_EXECUTABLE_MODE);
             std::fs::set_permissions(&shim, permissions).expect("chmod shim");
         }
 

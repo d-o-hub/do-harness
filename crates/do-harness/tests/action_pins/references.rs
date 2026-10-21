@@ -7,6 +7,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use crate::fixtures::{CHECKOUT_SHA, run, workflow_with, workspace, write_workflow};
+const MULTIPLE_FINDING_LINES: [usize; 3] = [7, 8, 9];
 
 /// A pinned action passes and leaves the findings count at zero.
 #[test]
@@ -363,7 +364,7 @@ fn multiple_findings_report_each_line() {
         output.contains("FINDINGS: 3"),
         "all three references must be counted: {output}"
     );
-    for line in [7, 8, 9] {
+    for line in MULTIPLE_FINDING_LINES {
         assert!(
             output.contains(&format!(".github/workflows/pins.yml:{line}:")),
             "line {line} must be reported: {output}"
