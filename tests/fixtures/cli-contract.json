@@ -979,7 +979,8 @@
       "args": [],
       "subcommands": [
         "suggest",
-        "drift"
+        "drift",
+        "refresh-validator"
       ],
       "invocable": false
     },
@@ -1092,6 +1093,15 @@
           "index": null
         }
       ],
+      "subcommands": [],
+      "invocable": true
+    },
+    {
+      "path": "skills refresh-validator",
+      "about": "Replace only the installed skill-creator structure validator",
+      "usage": "do-harness skills refresh-validator [OPTIONS]",
+      "aliases": [],
+      "args": [],
       "subcommands": [],
       "invocable": true
     },

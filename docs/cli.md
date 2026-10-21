@@ -1308,7 +1308,7 @@ lines a test still has to cover.
 <!-- BEGIN GENERATED: cli-contract skills -->
 `do-harness skills [OPTIONS] <COMMAND>`
 
-Subcommands: `suggest`, `drift`.
+Subcommands: `suggest`, `drift`, `refresh-validator`.
 <!-- END GENERATED: cli-contract skills -->
 Progressive-disclosure skill selection and opt-in drift checks for shared
 skills.
@@ -1469,6 +1469,14 @@ a changed pin invalidates stale evidence instead of hiding behind it.
 validation, and status rules; `crates/do-harness/tests/skills_drift.rs` drives
 the real binary's exit codes, output determinism, and unmanaged-skill
 isolation.
+
+#### `skills refresh-validator`
+<!-- BEGIN GENERATED: cli-contract skills refresh-validator -->
+`do-harness skills refresh-validator [OPTIONS]`
+<!-- END GENERATED: cli-contract skills refresh-validator -->
+Replace only `.agents/skills/skill-creator/scripts/quick_validate.py` with the
+validator bundled in the installed binary. Upgrade to do-harness v0.3.5 or
+newer first when fixture `version` support is needed.
 
 ### `ci-explain`
 <!-- BEGIN GENERATED: cli-contract ci-explain -->
