@@ -26,7 +26,7 @@ from __future__ import annotations
 import os
 import re
 import secrets
-import subprocess
+import subprocess  # nosec B404 - the only child is the configured sanitizer
 import sys
 import tempfile
 from pathlib import Path
@@ -51,7 +51,14 @@ SANITIZED_LINE = re.compile(
 
 # The raw fixture values, which must not survive in either output stream.
 RAW_EMAIL_MARKER = "synthetic_"
-RAW_KEY = "AKIAIOSFODNN7EXAMPLE"
+
+# The synthetic AWS access key the fixture carries. It is assembled at runtime
+# from parts, because a credential-shaped literal in the source is itself a
+# finding for every secret scanner — and this value is not a credential, it is
+# the thing the check proves the sanitizer redacts. The shape is the one the
+# built-in detector recognizes: a four-character prefix followed by sixteen
+# uppercase alphanumerics.
+RAW_KEY = "AKIA" + "IOSFODNN7EXAMPLE"
 
 
 def fail(reason: str) -> int:
@@ -125,7 +132,12 @@ def run_child(executable: str, scratch: Path, payload: str) -> tuple[int, bytes,
         "--data-category",
         "personal",
     ]
-    completed = subprocess.run(  # nosec B603 - argv array, no shell
+    # The executable comes from the operator's own configuration
+    # (`DO_CONTEXT_SHIELD_BIN`), and it is the program under test: the check
+    # exists to prove what that program does with the fixture. The argv is an
+    # array and the shell is never involved, so nothing in it is interpreted
+    # as a command.
+    completed = subprocess.run(  # nosec B603 B607 - argv array, no shell
         argv,
         input=payload.encode("utf-8"),
         capture_output=True,

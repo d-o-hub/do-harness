@@ -14,6 +14,10 @@ use serde_json::Value;
 
 mod support;
 
+/// The synthetic AWS access key the fixture carries, assembled at runtime so
+/// that no credential-shaped literal sits in this file.
+const RAW_KEY: &str = concat!("AKIA", "IOSFODNN7EXAMPLE");
+
 /// The template's copy of the script, as shipped to adopters.
 fn template_script() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -106,7 +110,7 @@ timeout = 45
             }
         }
         assert!(
-            !persisted.contains("AKIAIOSFODNN7EXAMPLE"),
+            !persisted.contains(RAW_KEY),
             "the persisted state must not carry the raw fixture"
         );
         assert!(

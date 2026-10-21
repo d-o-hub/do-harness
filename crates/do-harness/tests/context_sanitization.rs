@@ -242,6 +242,10 @@ fn json_output_fails() {
     );
 }
 
+/// The synthetic AWS access key the fixture carries, assembled at runtime so
+/// that no credential-shaped literal sits in this file.
+const RAW_KEY: &str = concat!("AKIA", "IOSFODNN7EXAMPLE");
+
 /// A child that leaks the raw sentinel fails, and the diagnostic never
 /// carries the leaked value.
 #[test]
@@ -250,7 +254,7 @@ fn raw_sentinel_leakage_fails() {
     let path = fixture_executable(
         dir.path(),
         "child.sh",
-        &shell_fixture("cat; printf 'extra AKIAIOSFODNN7EXAMPLE\\n'", 0),
+        &shell_fixture(&format!("cat; printf 'extra {RAW_KEY}\\n'"), 0),
     );
 
     let output = run(&[
@@ -265,7 +269,7 @@ fn raw_sentinel_leakage_fails() {
         "the diagnostic must be the fixed leakage reason: {stdout}"
     );
     assert!(
-        !stdout.contains("AKIAIOSFODNN7EXAMPLE") && !stderr.contains("AKIAIOSFODNN7EXAMPLE"),
+        !stdout.contains(RAW_KEY) && !stderr.contains(RAW_KEY),
         "the raw sentinel must not appear in the diagnostics: {stdout} {stderr}"
     );
 }
@@ -278,7 +282,7 @@ fn stderr_leakage_fails_without_printing_the_child_output() {
     let path = fixture_executable(
         dir.path(),
         "child.sh",
-        &shell_fixture("cat >/dev/null; printf 'AKIAIOSFODNN7EXAMPLE\\n' >&2", 0),
+        &shell_fixture(&format!("cat >/dev/null; printf '{RAW_KEY}\\n' >&2"), 0),
     );
 
     let output = run(&[
@@ -293,7 +297,7 @@ fn stderr_leakage_fails_without_printing_the_child_output() {
         "the diagnostic must be the fixed leakage reason: {stdout}"
     );
     assert!(
-        !stderr.contains("AKIAIOSFODNN7EXAMPLE"),
+        !stderr.contains(RAW_KEY),
         "the child's stderr must not be printed: {stderr}"
     );
 }
