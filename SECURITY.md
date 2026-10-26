@@ -53,6 +53,13 @@ and is announced in the commit that changes `rust-version`.
 
 ## Supply-Chain Posture
 
+Context-sanitization fixtures establish sanitizer capability only. Installed
+guidance does not establish execution. The opt-in
+[client conformance contract](docs/client-conformance.md) records observations
+for a named client version and instrumented synthetic routes, with unsupported
+or untested behavior marked unknown. It does not establish universal mediation
+or capture production context, secrets, or vault mappings.
+
 - `#![forbid(unsafe_code)]` across the workspace.
 - `cargo-deny` policy in `deny.toml`: license allowlist, yanked-crate deny,
   unknown registry/git source deny.
