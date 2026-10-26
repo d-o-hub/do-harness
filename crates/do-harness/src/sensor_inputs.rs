@@ -249,9 +249,15 @@ fn entry(root: &Path, path: &str, kind: &str) -> Option<Entry> {
         let target = full.canonicalize().ok()?;
         let canonical_root = root.canonicalize().ok()?;
         let relative = target.strip_prefix(&canonical_root).ok()?.to_str()?;
-        let bytes = std::fs::read(&target).ok()?;
+        let content = if target.is_dir() {
+            // Git records the link itself. The target tree's tracked and
+            // nonignored files already enter the source manifest separately.
+            "directory".to_owned()
+        } else {
+            hex::encode(Sha256::digest(std::fs::read(&target).ok()?))
+        };
         let digest = crate::fingerprint::hash_canonical(&serde_json::json!({
-            "target": relative, "content": hex::encode(Sha256::digest(&bytes)),
+            "target": relative, "content": content,
         }));
         return Some((
             kind.to_owned(),

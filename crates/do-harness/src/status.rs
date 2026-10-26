@@ -61,6 +61,8 @@ pub struct CurrentSide {
     pub policy_fingerprint: String,
     /// Failed sensors when the state is red.
     pub failed: Vec<String>,
+    /// Sensors with changed or unestablished canonical inputs.
+    pub input_mismatches: Vec<String>,
 }
 
 /// Machine-readable status report (the `--format json` contract).
@@ -150,6 +152,12 @@ impl CurrentFacts {
                 workspace_fingerprint: workspace.clone(),
                 policy_fingerprint: policy.clone(),
                 failed: Vec::new(),
+                input_mismatches: manifest
+                    .sensors
+                    .iter()
+                    .filter(|(_, digest)| digest.is_none())
+                    .map(|(name, _)| name.clone())
+                    .collect(),
             },
             required,
             workspace,
@@ -185,6 +193,26 @@ fn missing_report(
     }
 }
 
+/// Name changed or unknown input identities without exposing their values.
+fn current_input_side(facts: &CurrentFacts, document: &EvidenceDocument) -> CurrentSide {
+    let mut current_side = facts.side.clone();
+    current_side.input_mismatches = facts
+        .manifest
+        .sensors
+        .iter()
+        .filter(|(name, current)| {
+            current.is_none()
+                || document
+                    .input_manifest
+                    .as_ref()
+                    .and_then(|m| m.sensors.get(*name))
+                    != Some(*current)
+        })
+        .map(|(name, _)| name.clone())
+        .collect();
+    current_side
+}
+
 /// Decides green/red/stale/missing for one evidence document.
 ///
 /// Same-set evidence decides green/red/stale against the full policy;
@@ -192,6 +220,7 @@ fn missing_report(
 /// fingerprint and covers every required sensor — even when sensors outside
 /// the requested contract failed.
 fn decide(set: Option<&str>, facts: &CurrentFacts, document: &EvidenceDocument) -> StatusReport {
+    let current_side = current_input_side(facts, document);
     let evidence = EvidenceSide {
         signal_set: document.signal_set.clone(),
         verdict: document.summary.verdict.clone(),
@@ -242,7 +271,7 @@ fn decide(set: Option<&str>, facts: &CurrentFacts, document: &EvidenceDocument) 
     let policy_ok = if same_set { policy_match } else { config_match };
     if covers && workspace_match && policy_ok && provenance_ok {
         if let Some(reason) = &document.invalidated_reason {
-            let mut current = facts.side.clone();
+            let mut current = current_side.clone();
             current.failed.clone_from(&evidence.failed);
             return StatusReport {
                 state: EvidenceState::Red,
@@ -253,7 +282,7 @@ fn decide(set: Option<&str>, facts: &CurrentFacts, document: &EvidenceDocument) 
             };
         }
         if same_set && document.summary.verdict == "fail" {
-            let mut current = facts.side.clone();
+            let mut current = current_side.clone();
             current.failed.clone_from(&evidence.failed);
             return StatusReport {
                 state: EvidenceState::Red,
@@ -268,7 +297,7 @@ fn decide(set: Option<&str>, facts: &CurrentFacts, document: &EvidenceDocument) 
             set: set.map(ToOwned::to_owned),
             reason: "current".to_owned(),
             evidence: Some(evidence),
-            current: facts.side.clone(),
+            current: current_side.clone(),
         };
     }
     if !covers {
@@ -277,7 +306,7 @@ fn decide(set: Option<&str>, facts: &CurrentFacts, document: &EvidenceDocument) 
             set: set.map(ToOwned::to_owned),
             reason: "insufficient_coverage".to_owned(),
             evidence: Some(evidence),
-            current: facts.side.clone(),
+            current: current_side.clone(),
         };
     }
     let reason = if workspace_match && policy_ok {
@@ -292,7 +321,7 @@ fn decide(set: Option<&str>, facts: &CurrentFacts, document: &EvidenceDocument) 
         set: set.map(ToOwned::to_owned),
         reason: reason.to_owned(),
         evidence: Some(evidence),
-        current: facts.side.clone(),
+        current: current_side.clone(),
     }
 }
 

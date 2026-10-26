@@ -247,3 +247,25 @@ fn concurrent_evidence_writers_publish_whole_chained_documents() {
     .unwrap();
     assert!(doc["prev_hash"].as_str().is_some());
 }
+
+#[cfg(unix)]
+#[test]
+fn contained_directory_aliases_preserve_established_source_identity() {
+    let dir = fixture();
+    std::fs::create_dir(dir.path().join("skills")).unwrap();
+    std::fs::write(dir.path().join("skills/guide.md"), "one").unwrap();
+    std::os::unix::fs::symlink("skills", dir.path().join("alias")).unwrap();
+    let path = dir.path().join("do-harness.toml");
+    let config = std::fs::read_to_string(&path)
+        .unwrap()
+        .replace("inputs=['input.txt']\n", "");
+    std::fs::write(path, config).unwrap();
+    assert!(
+        harness(dir.path(), &["verify", "--set", "verification"])
+            .status
+            .success()
+    );
+    assert_eq!(state(dir.path()), "green");
+    std::fs::write(dir.path().join("skills/guide.md"), "two").unwrap();
+    assert_eq!(state(dir.path()), "stale");
+}
