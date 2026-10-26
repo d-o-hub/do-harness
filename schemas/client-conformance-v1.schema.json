@@ -1,0 +1,153 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Client boundary conformance v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "claim",
+    "client",
+    "integration_method",
+    "test_suite_version",
+    "timestamp",
+    "claims",
+    "scenarios",
+    "verdict",
+    "limitations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "claim": {
+      "const": "client-boundary"
+    },
+    "client": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "version"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "version": {
+          "type": "string",
+          "maxLength": 100
+        }
+      }
+    },
+    "integration_method": {
+      "type": "string",
+      "maxLength": 100
+    },
+    "test_suite_version": {
+      "const": "1"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "claims": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "guidance_installed",
+        "sanitizer_fixture",
+        "client_boundary"
+      ],
+      "properties": {
+        "guidance_installed": {
+          "enum": [
+            "pass",
+            "fail",
+            "unknown"
+          ]
+        },
+        "sanitizer_fixture": {
+          "enum": [
+            "pass",
+            "fail",
+            "unknown"
+          ]
+        },
+        "client_boundary": {
+          "enum": [
+            "pass",
+            "fail",
+            "unknown"
+          ]
+        }
+      }
+    },
+    "scenarios": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "expected_policy",
+          "observed_outcome",
+          "reason"
+        ],
+        "properties": {
+          "id": {
+            "enum": [
+              "prompt",
+              "tool-arguments",
+              "file-excerpt",
+              "outbound-request"
+            ]
+          },
+          "expected_policy": {
+            "const": "transform-or-refuse"
+          },
+          "observed_outcome": {
+            "enum": [
+              "pass",
+              "fail",
+              "unknown"
+            ]
+          },
+          "reason": {
+            "enum": [
+              "adapter-failed",
+              "oversized-observation",
+              "raw-marker-leakage",
+              "adapter-timeout",
+              "malformed-observation",
+              "unsupported-client",
+              "missing-instrumentation",
+              "refused",
+              "refusal-sent-data",
+              "no-boundary-observation",
+              "transformed",
+              "untested-client"
+            ]
+          }
+        }
+      }
+    },
+    "verdict": {
+      "enum": [
+        "pass",
+        "fail",
+        "unknown"
+      ]
+    },
+    "limitations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "maxLength": 300
+      }
+    }
+  }
+}

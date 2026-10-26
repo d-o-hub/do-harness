@@ -60,6 +60,13 @@ pub(super) fn scaffold(root: &Path, opts: &InitOpts, report: &mut InitReport) ->
         opts.force,
         report,
     )?;
+    write_if_absent(
+        root,
+        "scripts/check-client-conformance.py",
+        include_str!("../../templates/scripts/check-client-conformance.py"),
+        opts.force,
+        report,
+    )?;
     Ok(())
 }
 
