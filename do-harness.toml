@@ -20,8 +20,8 @@ feedback = ["fmt", "check", "clippy", "loc"]
 # contract (`docs/documentation-contract.md`). Each one reads only git, the
 # working tree, and the local toolchain, and each fails closed on an empty
 # inventory, so the trio belongs to the PR-time set as well as `release`.
-verification = ["fmt", "check", "clippy", "deps", "machete", "audit", "test", "doctest", "loc", "skills", "skills-docs", "shell", "markdownlint", "docs-sync", "docs-examples", "docs-links", "yamllint", "actionlint", "action-pins", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "release-manager", "verify-published", "commitlint"]
-release = ["fmt", "check", "clippy", "deps", "audit", "test", "doctest", "coverage", "loc", "skills", "skills-docs", "shell", "markdownlint", "docs-sync", "docs-examples", "docs-links", "yamllint", "actionlint", "action-pins", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "release-manager", "release-manager-e2e", "publish-npm", "verify-published", "commitlint"]
+verification = ["fmt", "check", "clippy", "deps", "machete", "audit", "test", "doctest", "loc", "skills", "skills-docs", "shell", "markdownlint", "docs-sync", "docs-examples", "docs-links", "yamllint", "actionlint", "action-pins", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "release-manager", "verify-published", "commitlint", "ci-concurrency-guardrails"]
+release = ["fmt", "check", "clippy", "deps", "audit", "test", "doctest", "coverage", "loc", "skills", "skills-docs", "shell", "markdownlint", "docs-sync", "docs-examples", "docs-links", "yamllint", "actionlint", "action-pins", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "release-manager", "release-manager-e2e", "publish-npm", "verify-published", "commitlint", "ci-concurrency-guardrails"]
 # DORA gets its own set so its evidence is addressable (`status --set metrics`)
 # without joining the gating sets. A no-`--set` status check compares against
 # every configured sensor, so a dora-only run's artifact would report
@@ -404,3 +404,16 @@ when-changed = ["**/Cargo.toml", "Cargo.lock", "scripts/check-machete.sh"]
 # argv = ["python3", "scripts/check-context-sanitization.py"]
 # severity = "error"
 # timeout = 45
+
+[[sensors]]
+# Automated check for CI concurrency guardrails, Windows test timeouts,
+# coverage wave reduction, and environment bounds. Runs self-tests to prove
+# negative mutation controls.
+name = "ci-concurrency-guardrails"
+argv = ["python3", "scripts/check_ci_concurrency_guardrails.py", "--self-test"]
+when-changed = [
+    ".github/workflows/**",
+    "crates/do-harness/tests/concurrency.rs",
+    "scripts/check_ci_concurrency_guardrails.py",
+    "do-harness.toml"
+]
