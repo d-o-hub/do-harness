@@ -245,6 +245,21 @@ fn compile(patterns: &[String]) -> Option<GlobSet> {
 fn entry(root: &Path, path: &str, kind: &str) -> Option<Entry> {
     let full = root.join(path);
     let metadata = std::fs::symlink_metadata(&full).ok()?;
+    if kind == "source" && metadata.file_type().is_symlink() {
+        let target = full.canonicalize().ok()?;
+        let canonical_root = root.canonicalize().ok()?;
+        let relative = target.strip_prefix(&canonical_root).ok()?.to_str()?;
+        let bytes = std::fs::read(&target).ok()?;
+        let digest = crate::fingerprint::hash_canonical(&serde_json::json!({
+            "target": relative, "content": hex::encode(Sha256::digest(&bytes)),
+        }));
+        return Some((
+            kind.to_owned(),
+            path.to_owned(),
+            digest,
+            file_mode(&metadata),
+        ));
+    }
     if !metadata.file_type().is_file() {
         return None;
     }
@@ -303,6 +318,7 @@ mod tests {
             transient_exit_codes: Vec::new(),
             when_changed: Vec::new(),
             artifacts: Vec::new(),
+            environment_inputs: Vec::new(),
             coverage_inputs: Vec::new(),
             inputs: inputs.iter().map(|i| (*i).to_owned()).collect(),
         }

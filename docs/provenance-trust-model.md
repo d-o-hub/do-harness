@@ -1,5 +1,9 @@
 # Provenance Verification Trust Model
 
+Verification evidence has a separate [canonical freshness contract](evidence-freshness.md):
+an artifact can be readable and hash-consistent while its input provenance is
+stale or unknown. Completion gates require current named-sensor observations.
+
 This document specifies the trust model for `do-harness` artifact and document provenance verification. It outlines the precise claims proven and not proven by each provenance mechanism, delineates source-level auditing from artifact-level verification, and provides the consumer verification model for release artifacts.
 
 ---

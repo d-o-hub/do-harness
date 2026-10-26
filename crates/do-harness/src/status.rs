@@ -124,6 +124,7 @@ struct CurrentFacts {
     policy: String,
     /// Current set-free config fingerprint.
     config: String,
+    manifest: crate::provenance::InputManifest,
 }
 
 impl CurrentFacts {
@@ -138,24 +139,12 @@ impl CurrentFacts {
         let changed = crate::changes::discover(root);
         let selection = crate::applicability::select(&candidates, &changed);
         let required = selection.selected_names();
-        let workspace = crate::fingerprint::workspace_fingerprint(root, &changed);
-        let baseline_digest = crate::baselines::digest(root);
-        let coverage_digest = crate::fingerprint::coverage_digest(root, &candidates);
-        let policy = crate::fingerprint::policy_fingerprint(
-            cfg,
-            config_bytes,
-            set,
-            &candidates,
-            &baseline_digest,
-            &coverage_digest,
-        );
-        let config = crate::fingerprint::config_fingerprint(
-            cfg,
-            config_bytes,
-            &candidates,
-            &baseline_digest,
-            &coverage_digest,
-        );
+        let fingerprints =
+            crate::fingerprint::for_run(root, cfg, config_bytes, set, &candidates, &changed);
+        let workspace = fingerprints.workspace;
+        let policy = fingerprints.policy;
+        let config = fingerprints.config;
+        let manifest = crate::provenance::InputManifest::capture(root, &candidates, config_bytes);
         Ok(Self {
             side: CurrentSide {
                 workspace_fingerprint: workspace.clone(),
@@ -166,6 +155,7 @@ impl CurrentFacts {
             workspace,
             policy,
             config,
+            manifest,
         })
     }
 }
@@ -239,8 +229,18 @@ fn decide(set: Option<&str>, facts: &CurrentFacts, document: &EvidenceDocument) 
     let policy_match = document.policy_fingerprint == facts.policy;
     let config_match = document.config_fingerprint == facts.config;
 
+    let provenance_ok = document.input_manifest.as_ref().is_some_and(|manifest| {
+        manifest.established()
+            && facts.manifest.established()
+            && manifest.git_revision == facts.manifest.git_revision
+            && manifest.branch == facts.manifest.branch
+            && facts
+                .required
+                .iter()
+                .all(|name| manifest.sensors.get(name) == facts.manifest.sensors.get(name))
+    }) && document.verify_chain(document.prev_hash.as_deref());
     let policy_ok = if same_set { policy_match } else { config_match };
-    if covers && workspace_match && policy_ok {
+    if covers && workspace_match && policy_ok && provenance_ok {
         if let Some(reason) = &document.invalidated_reason {
             let mut current = facts.side.clone();
             current.failed.clone_from(&evidence.failed);
@@ -280,7 +280,9 @@ fn decide(set: Option<&str>, facts: &CurrentFacts, document: &EvidenceDocument) 
             current: facts.side.clone(),
         };
     }
-    let reason = if workspace_match {
+    let reason = if workspace_match && policy_ok {
+        "inputs_changed_or_unknown"
+    } else if workspace_match {
         "policy_changed"
     } else {
         "workspace_changed"
