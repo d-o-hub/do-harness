@@ -58,7 +58,8 @@ including verification. Both output streams are capped at 64 KiB each and
 discarded; artifacts contain fixed reason codes and measurements only.
 Timeout, excessive output, or exhausted attempts escalate the unresolved case.
 POSIX children run in a process group terminated at cleanup; Windows uses
-`taskkill /T /F`. Adapters are trusted local executables, not an OS security
+`SystemRoot/System32/taskkill.exe /T /F`, falling back to the direct child if
+that utility is unavailable. Adapters are trusted local executables, not an OS security
 sandbox: hostile detached processes or writes outside the workspace require
 external isolation. Use synthetic data only.
 

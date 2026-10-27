@@ -6,7 +6,7 @@ import math
 import os
 from pathlib import Path
 import platform
-import subprocess
+import subprocess  # nosec B404 - fixed git argv, no shell
 import sys
 import tempfile
 import time
@@ -159,7 +159,7 @@ def run_case(case, workflow, command, budgets, allowed):
                 "verification_ms": int(verification_seconds * 1000) if command else None,
                 "timing": "measured-wall-clock" if command else "unmeasured-fixture",
                 "escalated_unresolved": not final, "reason": reason,
-                "token_cost": None, "currency_cost": None,
+                "token_cost": None, "currency_cost": None,  # nosec B105 - unavailable measurements, not credentials
                 "usage_reason": "provider usage unavailable in adapter protocol"}
 
 
@@ -200,7 +200,8 @@ def benchmark(data, baseline=None, treatment=None, allowed=()):
     for key in list(env):
         if key.startswith("GIT_"):
             env.pop(key)
-    revision = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, env=env,
+    revision = subprocess.run(  # nosec B603 B607 - fixed git argv, no shell
+                              ["git", "rev-parse", "HEAD"], cwd=ROOT, env=env,
                               capture_output=True, text=True, check=False)
     mode = "external-agent" if baseline else "deterministic-fixture"
     return {"schema_version": 1, "benchmark_version": data["benchmark_version"],

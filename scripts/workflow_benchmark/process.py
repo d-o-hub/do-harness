@@ -1,7 +1,7 @@
 """Bounded subprocess observations; child output never becomes an artifact."""
 import os
 import signal
-import subprocess
+import subprocess  # nosec B404 - bounded children use argv without a shell
 import threading
 import time
 
@@ -13,8 +13,16 @@ def terminate(child):
         except ProcessLookupError:
             pass
     else:
-        subprocess.run(["taskkill", "/PID", str(child.pid), "/T", "/F"],
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+        # Do not resolve the cleanup utility through the adapter's PATH.
+        system_root = os.environ.get("SystemRoot", "")
+        if os.path.isabs(system_root):
+            taskkill = os.path.join(system_root, "System32", "taskkill.exe")
+            try:
+                subprocess.run(  # nosec B603 - fixed utility and integer PID, no shell
+                    [taskkill, "/PID", str(child.pid), "/T", "/F"],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+            except OSError:
+                pass  # Fall back to killing the direct child below.
     if child.poll() is None:
         child.kill()
     child.wait()
@@ -25,7 +33,7 @@ def execute(argv, root, payload, env, seconds, limit):
     if seconds <= 0:
         return None, b"", "deadline"
     try:
-        child = subprocess.Popen(  # nosec B603 - explicit trusted adapter argv
+        child = subprocess.Popen(  # nosec B603 - operator-selected trusted adapter, no shell
             argv, cwd=root, env=env, stdin=subprocess.PIPE,
             stdout=subprocess.PIPE, stderr=subprocess.PIPE,
             start_new_session=os.name == "posix",

@@ -7,7 +7,9 @@ import sys
 import tempfile
 import time
 import unittest
+from unittest import mock
 
+from . import process
 from .process import execute
 from .runner import CORPUS, benchmark, environment, load_corpus, run_case
 
@@ -42,6 +44,29 @@ class BenchmarkTests(unittest.TestCase):
             _, _, reason = execute([sys.executable, "-c", "import time;time.sleep(10)"],
                                     root, b"", environment(), 0.1, 1024)
             self.assertEqual(reason, "deadline")
+
+    def test_adapter_arguments_are_not_interpreted_by_a_shell(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            argument = "$(touch injected)"
+            code, raw, reason = execute([sys.executable, "-c", "import sys;print(sys.argv[1])", argument],
+                                        root, b"", environment(), 2, 1024)
+            self.assertEqual((code, raw.strip(), reason), (0, argument.encode(), None))
+            self.assertFalse((root / "injected").exists())
+
+    def test_windows_cleanup_uses_system_directory(self):
+        child = mock.Mock(pid=123)
+        child.poll.return_value = None
+        with mock.patch.object(process.os, "name", "nt"), \
+             mock.patch.object(process.os.path, "isabs", return_value=True), \
+             mock.patch.dict(process.os.environ, {"SystemRoot": "/trusted/windows"}), \
+             mock.patch.object(process.subprocess, "run") as run:
+            process.terminate(child)
+        self.assertEqual(run.call_args.args[0],
+                         [os.path.join("/trusted/windows", "System32", "taskkill.exe"),
+                          "/PID", "123", "/T", "/F"])
+        child.kill.assert_called_once()
+        child.wait.assert_called_once()
 
     def test_private_environment_and_child_output_are_not_artifacts(self):
         data = load_corpus(CORPUS)
