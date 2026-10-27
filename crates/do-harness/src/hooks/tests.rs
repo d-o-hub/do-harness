@@ -138,7 +138,13 @@ fn uninstall_removes_managed_hooks_and_keeps_foreign() {
 #[test]
 fn find_git_dir_discovers_git_root_from_nested_directory() {
     let temp = tempfile::tempdir().unwrap();
-    fs::create_dir_all(temp.path().join(".git")).unwrap();
+    assert!(
+        crate::changes::git_command(temp.path())
+            .args(["init", "-q"])
+            .status()
+            .unwrap()
+            .success()
+    );
     let nested = temp.path().join("a/b/c");
     fs::create_dir_all(&nested).unwrap();
 

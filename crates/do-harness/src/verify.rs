@@ -404,11 +404,11 @@ async fn write_evidence(
         finished_at,
         invalidated_reason: invalidated_reason.map(ToOwned::to_owned),
     };
+    let path = crate::managed_path::evidence_path(root, &path).map_err(CliError::Usage)?;
     let mut doc = evidence::EvidenceDocument::from_run(report, &meta);
     // Chain artifacts in the same workspace: reading an existing artifact's
     // chain hash makes tampering/reordering detectable.
-    let prev_hash = tokio::fs::read(&path)
-        .await
+    let prev_hash = crate::managed_path::read_evidence(&path)
         .ok()
         .and_then(|bytes| serde_json::from_slice::<serde_json::Value>(&bytes).ok())
         .and_then(|value| {
@@ -426,9 +426,8 @@ async fn write_evidence(
         }
     }
     let json = serde_json::to_vec_pretty(&doc).map_err(|e| CliError::Verify(e.into()))?;
-    tokio::fs::write(&path, json)
-        .await
-        .map_err(|e| CliError::Verify(e.into()))?;
+    crate::managed_path::evidence_path(root, &path).map_err(CliError::Usage)?;
+    crate::managed_path::write_atomic(&path, &json).map_err(CliError::Verify)?;
 
     if opts.strict && !(doc.is_strict_clean() && doc.verify_chain(prev_hash.as_deref())) {
         eprintln!(

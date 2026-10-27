@@ -55,6 +55,43 @@ pub fn db_path(root: &Path) -> PathBuf {
     root.join(STATE_DIR).join("agent_state.db")
 }
 
+/// Check managed database/state paths before opening or writing any of them.
+/// This requires a stable worktree; it does not isolate hostile concurrent renames.
+///
+/// # Errors
+/// Rejects non-UTF-8 roots, state symlinks and unreadable metadata.
+pub fn validate_state_paths(root: &Path) -> Result<()> {
+    if root.to_str().is_none() {
+        return Err(DbError::Invariant(
+            "managed state root must be UTF-8".into(),
+        ));
+    }
+    let paths = [
+        root.join(STATE_DIR),
+        db_path(root),
+        root.join(STATE_DIR).join("agent_state.db-wal"),
+        root.join(STATE_DIR).join("agent_state.db-shm"),
+        root.join(STATE_DIR).join("agent_state.db.bak"),
+    ];
+    for path in paths {
+        match std::fs::symlink_metadata(&path) {
+            Ok(meta)
+                if meta.file_type().is_symlink()
+                    || (path == root.join(STATE_DIR) && !meta.is_dir())
+                    || (path != root.join(STATE_DIR) && !meta.is_file()) =>
+            {
+                return Err(DbError::Invariant(
+                    "managed .do-harness state path must be a regular file/directory without symlinks".into(),
+                ));
+            }
+            Ok(_) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+            Err(source) => return Err(DbError::Io { path, source }),
+        }
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     #![allow(clippy::unwrap_used, clippy::expect_used)]
@@ -89,5 +126,15 @@ mod tests {
     fn find_harness_root_rejects_plain_directory() {
         let dir = tempfile::tempdir().expect("tempdir");
         assert!(find_harness_root(dir.path()).is_err());
+    }
+
+    #[cfg(unix)]
+    #[tokio::test(flavor = "current_thread")]
+    async fn state_symlinks_are_rejected_before_opening_the_database() {
+        let root = tempfile::tempdir().unwrap();
+        let outside = tempfile::tempdir().unwrap();
+        std::os::unix::fs::symlink(outside.path(), root.path().join(STATE_DIR)).unwrap();
+        assert!(crate::connect_and_migrate(root.path()).await.is_err());
+        assert_eq!(std::fs::read_dir(outside.path()).unwrap().count(), 0);
     }
 }

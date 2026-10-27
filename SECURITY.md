@@ -53,6 +53,10 @@ and is announced in the commit that changes `rust-version`.
 
 ## Supply-Chain Posture
 
+The [sensor execution contract](docs/sensor-execution.md) defines timeout,
+output, redaction, environment and managed-path limits. Sensors execute with
+the caller's permissions; these controls do not provide an OS security sandbox.
+
 - `#![forbid(unsafe_code)]` across the workspace.
 - `cargo-deny` policy in `deny.toml`: license allowlist, yanked-crate deny,
   unknown registry/git source deny.

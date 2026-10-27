@@ -205,6 +205,9 @@ before trusting `verify`.
 
 ## Configure sensors for your stack
 
+Review the [sensor execution trust boundary and resource policy](sensor-execution.md)
+before running third-party configuration or checks from untrusted pull requests.
+
 <!-- example: id=adoption_toml_config classification=parser-check-only reason="Sample do-harness.toml configuration fragment" -->
 ```toml
 # do-harness.toml

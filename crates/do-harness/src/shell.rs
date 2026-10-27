@@ -102,15 +102,18 @@ pub fn resolve_program(program: &str) -> PathBuf {
 /// Windows.
 ///
 /// On Windows this uses `taskkill /T /F`, which walks the process tree. On
-/// POSIX, killing the direct child is sufficient because the shell substitutes
-/// `exec` for the final command in a simple pipeline, so the child *is* the
-/// work. A failure to run `taskkill` falls back to `Child::kill` so termination
+/// POSIX this legacy helper kills only the direct child; sensor execution
+/// separately owns and kills a process group, including ordinary descendants. A failure to run `taskkill` falls back to `Child::kill` so termination
 /// is always attempted.
 pub fn kill_tree(child: &mut std::process::Child) {
     if cfg!(windows) {
         {
             let pid = child.id();
-            let killed = Command::new("taskkill")
+            let taskkill = std::env::var_os("SystemRoot").map_or_else(
+                || PathBuf::from("taskkill"),
+                |root| PathBuf::from(root).join("System32").join("taskkill.exe"),
+            );
+            let killed = Command::new(taskkill)
                 .args(["/PID", &pid.to_string(), "/T", "/F"])
                 .stdout(std::process::Stdio::null())
                 .stderr(std::process::Stdio::null())

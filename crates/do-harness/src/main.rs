@@ -50,10 +50,12 @@ mod init;
 mod learn;
 mod loc;
 mod man;
+mod managed_path;
 mod methods;
 mod metrics;
 mod overlap;
 mod pr;
+mod redaction;
 mod report;
 mod sensor_inputs;
 mod sensors;
@@ -142,6 +144,7 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
         }
         _ => commands::resolve_root(cli.root.as_deref()).map_err(CliError::Usage)?,
     };
+    do_harness_db::root::validate_state_paths(&root).map_err(|e| CliError::Usage(e.into()))?;
 
     // An explicitly targeted directory selects exactly `<root>/do-harness.toml`
     // as a required explicit file: it must not silently fall back to the
