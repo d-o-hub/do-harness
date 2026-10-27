@@ -112,11 +112,6 @@ jobs:
       - uses: taiki-e/install-action@ba47c86ac325773530516bb756137ac718732518
         with:
           tool: cargo-deny,cargo-audit,cargo-nextest,shellcheck,cargo-machete
-      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
-        id: cache-actionlint
-        with:
-          path: ${{ runner.temp }}/actionlint
-          key: actionlint-1.7.7-linux-amd64
       - name: Install actionlint
         # The `actionlint` sensor's script fails closed under CI=true when the
         # tool is missing, and `actionlint` is not in `taiki-e/install-action`'s
@@ -125,17 +120,15 @@ jobs:
         # digest together (checksums:
         # https://github.com/rhysd/actionlint/releases/download/v1.7.7/actionlint_1.7.7_checksums.txt).
         run: |
-          if [ "${{ steps.cache-actionlint.outputs.cache-hit }}" != "true" ]; then
-            version=1.7.7
-            archive="actionlint_${version}_linux_amd64.tar.gz"
-            curl --fail --silent --show-error --location \
-              --output "$RUNNER_TEMP/$archive" \
-              "https://github.com/rhysd/actionlint/releases/download/v${version}/${archive}"
-            echo "023070a287cd8cccd71515fedc843f1985bf96c436b7effaecce67290e7e0757  $RUNNER_TEMP/$archive" \
-              | sha256sum --check
-            tar --extract --gzip --file "$RUNNER_TEMP/$archive" \
-              --directory "$RUNNER_TEMP" actionlint
-          fi
+          version=1.7.7
+          archive="actionlint_${version}_linux_amd64.tar.gz"
+          curl --fail --silent --show-error --location \
+            --output "$RUNNER_TEMP/$archive" \
+            "https://github.com/rhysd/actionlint/releases/download/v${version}/${archive}"
+          echo "023070a287cd8cccd71515fedc843f1985bf96c436b7effaecce67290e7e0757  $RUNNER_TEMP/$archive" \
+            | sha256sum --check
+          tar --extract --gzip --file "$RUNNER_TEMP/$archive" \
+            --directory "$RUNNER_TEMP" actionlint
           echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
       - name: Install linter and doc tooling dependencies
         # One install for every parser the Python-side sensors need, run before
@@ -162,21 +155,18 @@ jobs:
           node --check integrations/npm/bin/do-harness.js
           node --check integrations/npm/lib/platform.js
           node --test integrations/npm/test/*.test.mjs
-      # actions/cache@v4: the Chromium download is ~150 MB and node_modules
-      # contains the playwright CLI. Caching both avoids re-fetching on warm runs.
+      # actions/cache@v4: the Chromium download is ~150 MB and was the step's
+      # slowest avoidable cost, re-fetched on every run. `playwright install`
+      # reuses the browser when it is already present.
       - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
         with:
-          path: |
-            ~/.cache/ms-playwright
-            target/web-ui-browser-deps/node_modules
+          path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-1.50.1
       - name: Browser-test web UI pack
         run: |
-          if [ ! -d "target/web-ui-browser-deps/node_modules/playwright" ]; then
-            mkdir -p target/web-ui-browser-deps
-            npm init -y --prefix target/web-ui-browser-deps >/dev/null
-            npm install --prefix target/web-ui-browser-deps --no-save --no-package-lock --no-audit --no-fund playwright@1.50.1
-          fi
+          mkdir -p target/web-ui-browser-deps
+          npm init -y --prefix target/web-ui-browser-deps >/dev/null
+          npm install --prefix target/web-ui-browser-deps --no-save --no-package-lock --no-audit --no-fund playwright@1.50.1
           target/web-ui-browser-deps/node_modules/.bin/playwright install --with-deps chromium
           NODE_PATH="$GITHUB_WORKSPACE/target/web-ui-browser-deps/node_modules" node --test integrations/web-ui/audit.browser.test.mjs
       - name: Package npm wrapper (assembly dry run)
@@ -441,6 +431,10 @@ jobs:
       # than a build-only target. POSIX-only tests are `#[cfg(unix)]`-gated
       # (eval walkthrough shebangs, hook exit codes, file-mode helpers) and the
       # runners provide Git Bash, so `sh`/`bash` sensors work as written.
+      - name: Install skill tooling dependencies
+        # quick_validate.py and action-pins parse YAML frontmatter and need
+        # PyYAML. Ubuntu images ship it; windows-latest does not, so install it.
+        run: python -m pip install --disable-pip-version-check -r .agents/skills/skill-creator/scripts/requirements.txt
       - name: Install pnpm for the node init tests
         # `init::tests::init_node_pnpm_turbo_workspace_first_run_is_green`
         # declares a pnpm workspace, so its baseline can only go Green when

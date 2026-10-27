@@ -24,7 +24,7 @@
             "build_harness": {"duration_seconds": 42, "cache_hit": true},
             "installer_test": {"duration_seconds": 5, "cache_hit": null},
             "npm_wrapper_test": {"duration_seconds": 4, "cache_hit": null},
-            "playwright_browser_test": {"duration_seconds": 28, "cache_hit": true, "notes": "npm install playwright uncached on warm runs"},
+            "playwright_browser_test": {"duration_seconds": 28, "cache_hit": true},
             "npm_wrapper_package": {"duration_seconds": 6, "cache_hit": null},
             "install_doc_deps": {"duration_seconds": 12, "cache_hit": false, "notes": "Second pip install step"},
             "do_harness_verify": {"duration_seconds": 88, "cache_hit": null},
@@ -50,7 +50,7 @@
             "install_toolchain": {"duration_seconds": 20, "cache_hit": true},
             "rust_cache": {"duration_seconds": 25, "cache_hit": true},
             "install_tools": {"duration_seconds": 38, "cache_hit": false, "notes": "Includes cargo-llvm-cov which is unused in windows job"},
-            "install_skill_deps": {"duration_seconds": 28, "cache_hit": false, "notes": "pip install for doc tooling"},
+            "install_skill_deps": {"duration_seconds": 12, "cache_hit": false, "notes": "pip install for PyYAML"},
             "install_pnpm": {"duration_seconds": 10, "cache_hit": null},
             "test_workspace": {"duration_seconds": 110, "cache_hit": null},
             "test_db_serial": {"duration_seconds": 12, "cache_hit": null},
@@ -131,7 +131,7 @@
       "rank": 3,
       "category": "Windows Duplicate Doc Checking & Unused Tool Installs",
       "workflow": "verify.yml (windows job)",
-      "impact": "88s per Windows run across unused cargo-llvm-cov download, pip install, and duplicate docs.py checks."
+      "impact": "50s per Windows run across unused cargo-llvm-cov download and duplicate docs.py checks."
     },
     {
       "rank": 4,
@@ -155,21 +155,15 @@
     },
     {
       "id": "remove_windows_duplicate_doc_checks",
-      "description": "Remove duplicate docs.py contract checks, unused cargo-llvm-cov, and skill pip install from windows job.",
-      "estimated_savings_seconds": 65,
-      "coverage_preserved": "docs-sync, docs-examples, docs-links sensors remain strictly enforced in verify job on Linux; Rust sync unit tests continue running in Windows cargo nextest."
+      "description": "Remove duplicate docs.py contract checks and unused cargo-llvm-cov download from windows job.",
+      "estimated_savings_seconds": 50,
+      "coverage_preserved": "docs-sync, docs-examples, docs-links sensors remain strictly enforced in verify job on Linux; Rust sync unit tests and action-pins PyYAML tests continue running in Windows cargo nextest."
     },
     {
       "id": "consolidate_pip_installs",
       "description": "Combine separate pip install invocations in verify job into a single step.",
       "estimated_savings_seconds": 8,
       "coverage_preserved": "All python dependencies (yamllint, markdown-it-py, PyYAML) are installed before sensors execute."
-    },
-    {
-      "id": "cache_actionlint_and_playwright_deps",
-      "description": "Add actions/cache for actionlint binary download and Playwright node_modules.",
-      "estimated_savings_seconds": 15,
-      "coverage_preserved": "actionlint binary integrity is checked via SHA256 before caching; Playwright tests verify chromium browser execution."
     }
   ],
   "retained_checks_matrix": {
