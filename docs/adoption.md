@@ -331,6 +331,10 @@ audit stages, matrix contract, and visual-baseline semantics.
 
 ## The agent loop
 
+Use the [workflow benchmark](workflow-benchmarks.md) to compare a pinned skill
+or policy against a baseline with identical inputs and budgets. Start with its
+offline deterministic checks; external agent evaluation is an explicit opt-in.
+
 Agents (and CI) only need three commands:
 
 <!-- example: id=adoption_agent_loop classification=illustrative reason="Agent edit loop CLI commands" -->

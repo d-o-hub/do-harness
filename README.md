@@ -344,6 +344,11 @@ canonical copy).
 
 ## CI
 
+The offline [workflow effectiveness benchmark](docs/workflow-benchmarks.md)
+checks a versioned synthetic corpus and measurement contract. External agent
+comparisons are explicit, bounded, and advisory; fixture replay is not evidence
+that a skill improves an agent.
+
 GitHub Actions runs three cadences as separate gates. Per pull request,
 `.github/workflows/verify.yml` lints shell sensors, builds `do-harness`,
 dogfoods `init && verify` on fresh rust/generic workspaces, runs `do-harness
