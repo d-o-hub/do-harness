@@ -148,10 +148,39 @@ fn file_digest(root: &Path, file: &crate::changes::ChangedFile) -> String {
     if file.kind == ChangeKind::Deleted {
         return "deleted".to_owned();
     }
-    match std::fs::read(root.join(&file.path)) {
-        Ok(bytes) => hex::encode(Sha256::digest(&bytes)),
-        Err(_) => "unreadable".to_owned(),
+    let full = root.join(&file.path);
+    let contained = full
+        .canonicalize()
+        .ok()
+        .zip(root.canonicalize().ok())
+        .is_some_and(|(path, root)| path.starts_with(root));
+    if !contained {
+        return "unreadable".to_owned();
     }
+    content_hash(&full).unwrap_or_else(|| "unreadable".to_owned())
+}
+
+/// Stream a regular file without allocating its full contents or opening FIFOs.
+pub(crate) fn content_hash(path: &Path) -> Option<String> {
+    use std::io::Read;
+    const BUFFER_BYTES: usize = 8192;
+    if !std::fs::metadata(path).ok()?.is_file() {
+        return None;
+    }
+    let mut file = std::fs::File::open(path).ok()?;
+    if !file.metadata().ok()?.is_file() {
+        return None;
+    }
+    let mut buffer = [0; BUFFER_BYTES];
+    let mut hash = Sha256::new();
+    loop {
+        let count = file.read(&mut buffer).ok()?;
+        if count == 0 {
+            break;
+        }
+        hash.update(&buffer[..count]);
+    }
+    Some(hex::encode(hash.finalize()))
 }
 
 /// Effective run policy hash (`sha256:…`).
@@ -256,6 +285,10 @@ mod tests {
                 name: "a".to_owned(),
                 argv: vec!["true".to_owned()],
                 retry: None,
+                timeout_justification: None,
+                max_output_bytes: None,
+                environment_allowlist: None,
+                redact_env: Vec::new(),
                 timeout: None,
                 severity: None,
                 allow_failure: false,

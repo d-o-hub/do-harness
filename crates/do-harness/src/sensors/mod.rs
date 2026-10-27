@@ -77,6 +77,7 @@ pub(crate) fn sensor_reused(spec: &SensorSpec, beat_id: i64) -> SensorResult {
         findings: None,
         baseline: None,
         execution: crate::report::Execution::Reused,
+        details: crate::report::ExecutionDetails::default(),
         reused_beat_id: Some(beat_id),
         output: "unchanged inputs; reused recorded passing beat".to_owned(),
     }
@@ -341,3 +342,4 @@ mod tests;
 
 mod exec;
 mod parallel;
+mod process;

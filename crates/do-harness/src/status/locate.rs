@@ -50,7 +50,7 @@ pub(super) fn find_covering_evidence(
 ) -> (Option<EvidenceDocument>, Coverage) {
     let mut coverage = Coverage::None;
     for path in paths {
-        let Ok(bytes) = std::fs::read(path) else {
+        let Ok(bytes) = crate::managed_path::read_evidence(path) else {
             continue;
         };
         match serde_json::from_slice::<EvidenceDocument>(&bytes) {
@@ -89,7 +89,7 @@ pub(super) fn find_covering_evidence(
         .collect();
     siblings.sort();
     for path in siblings {
-        let Ok(bytes) = std::fs::read(&path) else {
+        let Ok(bytes) = crate::managed_path::read_evidence(&path) else {
             continue;
         };
         if let Ok(document) = serde_json::from_slice::<EvidenceDocument>(&bytes) {

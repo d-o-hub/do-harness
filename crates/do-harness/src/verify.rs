@@ -391,8 +391,9 @@ fn write_evidence(
         finished_at,
         invalidated_reason: invalidated_reason.map(ToOwned::to_owned),
     };
+    let path = crate::managed_path::evidence_path(root, &path).map_err(CliError::Usage)?;
     let mut doc = evidence::EvidenceDocument::from_run(report, &meta);
-    evidence::write_document(&path, &mut doc).map_err(CliError::Verify)?;
+    evidence::write_document(root, &path, &mut doc).map_err(CliError::Verify)?;
 
     if opts.strict && !(doc.is_strict_clean() && doc.verify_chain(doc.prev_hash.as_deref())) {
         eprintln!(

@@ -44,9 +44,33 @@ pub struct SensorSpec {
     /// Optional number of retry attempts on failure.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub retry: Option<u32>,
-    /// Optional process execution timeout budget in seconds.
+    /// Process timeout seconds (default one hour); 0 requires a justification.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub timeout: Option<u64>,
+    /// Required reason for the explicit timeout=0 unlimited opt-out.
+    #[serde(
+        default,
+        rename = "timeout-justification",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub timeout_justification: Option<String>,
+    /// Combined raw stdout/stderr budget; defaults to 1 `MiB`, at most 16 `MiB`.
+    #[serde(
+        default,
+        rename = "max-output-bytes",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub max_output_bytes: Option<usize>,
+    /// None inherits the environment; Some explicitly allowlists inherited keys.
+    #[serde(
+        default,
+        rename = "environment-allowlist",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub environment_allowlist: Option<Vec<String>>,
+    /// Additional environment keys whose nonempty values must be redacted.
+    #[serde(default, rename = "redact-env", skip_serializing_if = "Vec::is_empty")]
+    pub redact_env: Vec<String>,
     /// Gate severity (`error` default, `warn` advisory).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub severity: Option<SensorSeverity>,

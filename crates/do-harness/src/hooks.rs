@@ -25,7 +25,8 @@ pub fn find_git_dir(cwd: &Path) -> Result<PathBuf> {
     let mut current = Some(cwd);
     while let Some(dir) = current {
         let dot_git = dir.join(".git");
-        if dot_git.exists() {
+        if dot_git.is_file() || (dot_git.join("HEAD").is_file() && dot_git.join("objects").is_dir())
+        {
             return resolve_dot_git(&dot_git, dir);
         }
         current = dir.parent();

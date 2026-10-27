@@ -53,6 +53,10 @@ and is announced in the commit that changes `rust-version`.
 
 ## Supply-Chain Posture
 
+The [sensor execution contract](docs/sensor-execution.md) defines timeout,
+output, redaction, environment and managed-path limits. Sensors execute with
+the caller's permissions; these controls do not provide an OS security sandbox.
+
 Context-sanitization fixtures establish sanitizer capability only. Installed
 guidance does not establish execution. The opt-in
 [client conformance contract](docs/client-conformance.md) records observations
