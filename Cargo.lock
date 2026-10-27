@@ -541,6 +541,7 @@ dependencies = [
  "clap_mangen",
  "do-harness-db",
  "do-harness-types",
+ "fs2",
  "globset",
  "hex",
  "serde",

@@ -73,9 +73,10 @@ pub use repo_skill_eval::{
 };
 pub use repo_trace::{NewTrace, get_trace, insert_trace, list_traces, list_traces_page};
 pub use repo_workflow::{
-    WorkflowEventRow, advance_subtask_with_event, canonical_payload, chain_hash,
-    count_tasks_without_added_event, insert_task_with_event, list_all_events,
-    list_events_ascending, update_task_status_with_event,
+    FreshTaskInputs, FreshTransition, OBSERVATION_ONLY_PREFIX, WorkflowEventRow,
+    advance_subtask_with_event, canonical_payload, chain_hash, count_tasks_without_added_event,
+    insert_task_with_event, list_all_events, list_events_ascending, transition_with_freshness,
+    update_task_status_with_event,
 };
 pub use root::{db_path, find_harness_root};
 

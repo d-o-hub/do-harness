@@ -24,26 +24,46 @@ pub(super) fn write_catalog(root: &Path) {
         ]}"#,
     )
     .unwrap();
+    fs::write(root.join("do-harness.toml"),
+        "language='generic'\n[[sensors]]\nname='test'\nargv=['true']\n[[sensors]]\nname='check'\nargv=['true']\n[[sensors]]\nname='fmt'\nargv=['true']\n").unwrap();
+    fs::write(root.join(".gitignore"), ".do-harness/\nplans/tasks.json\n").unwrap();
+    assert!(
+        crate::changes::git_command(root)
+            .args(["init", "-q"])
+            .status()
+            .unwrap()
+            .success()
+    );
 }
 
 /// Inserts an `"ok"` sensor beat scoped to `task_id` for the named sensor.
 pub(super) async fn insert_ok_beat(root: &Path, task_id: i64, sensor: &str) {
     let conn = do_harness_db::connect_and_migrate(root).await.unwrap();
     let now = do_harness_db::unix_now();
-    do_harness_db::record_sensor_outcome(
+    let (cfg, bytes) = crate::config::load_raw(root, None).await.unwrap();
+    let spec = cfg
+        .effective_sensors()
+        .iter()
+        .find(|s| s.name == sensor)
+        .unwrap();
+    let digest = crate::provenance::sensor_digest(root, spec, bytes.as_deref()).unwrap();
+    do_harness_db::record_verify_batch(
         &conn,
-        &do_harness_db::NewBeat {
-            task_id: Some(task_id),
-            scope: None,
-            beat_type: BeatType::Sensor,
-            status: BeatStatus::Ok,
-            sensor_exit_code: Some(0),
-            sensor_name: Some(sensor),
-            started_at: now,
-            completed_at: Some(now),
-        },
-        true,
-        None,
+        &[do_harness_db::SensorOutcome {
+            beat: do_harness_db::NewBeat {
+                task_id: Some(task_id),
+                scope: None,
+                beat_type: BeatType::Sensor,
+                status: BeatStatus::Ok,
+                sensor_exit_code: Some(0),
+                sensor_name: Some(sensor),
+                started_at: now,
+                completed_at: Some(now),
+            },
+            ok: true,
+            message: None,
+            input_digest: Some(&digest),
+        }],
     )
     .await
     .unwrap();

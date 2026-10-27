@@ -13,6 +13,11 @@ use do_harness_types::{
 };
 use libsql::{Connection, params, params::Params};
 
+mod fresh;
+pub use fresh::{
+    FreshTaskInputs, FreshTransition, OBSERVATION_ONLY_PREFIX, transition_with_freshness,
+};
+
 pub use do_harness_types::chain_hash;
 
 /// Structured database row from `workflow_events` with sequence and hash chain.

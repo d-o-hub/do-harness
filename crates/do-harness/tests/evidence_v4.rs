@@ -59,7 +59,7 @@ fn artifacts_and_coverage_land_in_evidence() {
     assert_eq!(code, Some(0), "verify failed:\n{stdout}\n{stderr}");
 
     let doc = evidence(root);
-    assert_eq!(doc["schema_version"], serde_json::json!(4));
+    assert_eq!(doc["schema_version"], serde_json::json!(5));
     assert_eq!(
         doc["sensors"][0]["artifacts"][0]["path"],
         serde_json::json!("out/report.json")
