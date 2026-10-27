@@ -9,10 +9,13 @@ use crate::artifacts::EvidenceArtifact;
 use crate::config::Config;
 use crate::report::VerifyReport;
 
-pub const EVIDENCE_SCHEMA_VERSION: u32 = 4;
+mod write;
+pub(crate) use write::write as write_document;
 
-/// Oldest schema `status` still treats as current evidence: v3 (fingerprints,
-/// no artifacts/coverage) parses into v4 with defaults.
+pub const EVIDENCE_SCHEMA_VERSION: u32 = 5;
+
+/// Oldest readable fingerprinted schema. v3/v4 parse with defaults, but need
+/// regeneration because they lack the v5 canonical input manifest.
 pub const MIN_CURRENT_SCHEMA_VERSION: u32 = 3;
 
 /// A sensor skipped by change-aware selection, with its reason.
@@ -69,6 +72,9 @@ pub struct EvidenceSummary {
 #[serde(deny_unknown_fields)]
 pub struct EvidenceDocument {
     pub schema_version: u32,
+    /// Canonical input provenance. Historical evidence parses without it but is stale.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub input_manifest: Option<crate::provenance::InputManifest>,
     pub tool: String,
     pub harness_version: String,
     pub git_sha: Option<String>,
@@ -131,7 +137,7 @@ impl EvidenceDocument {
     ///
     /// Returns an error when the canonical payload cannot be serialized.
     pub fn seal(&mut self, prev: Option<String>) -> Result<(), serde_json::Error> {
-        let payload = serde_json::json!({
+        let mut payload = serde_json::json!({
             "schema_version": self.schema_version,
             "tool": self.tool,
             "harness_version": self.harness_version,
@@ -152,6 +158,9 @@ impl EvidenceDocument {
             "coverage": self.coverage,
             "summary": self.summary,
         });
+        if let Some(manifest) = &self.input_manifest {
+            payload["input_manifest"] = serde_json::to_value(manifest)?;
+        }
         let canonical = do_harness_types::canonical_value(&payload)?;
         self.chain_hash = do_harness_types::chain_hash(prev.as_deref(), &canonical);
         self.prev_hash = prev;
@@ -191,7 +200,7 @@ impl EvidenceDocument {
         let mut fail_count = 0;
         let mut skip_count = 0;
 
-        for spec in selected_specs {
+        for spec in &selected_specs {
             if let Some(res) = report.sensors.iter().find(|r| r.name == spec.name) {
                 // A reused pass is not a fresh observation: it is recorded
                 // as a skip with no exit code, duration, output, or
@@ -272,6 +281,11 @@ impl EvidenceDocument {
 
         EvidenceDocument {
             schema_version: EVIDENCE_SCHEMA_VERSION,
+            input_manifest: Some(crate::provenance::InputManifest::capture(
+                meta.root,
+                &selected_specs,
+                meta.config_bytes,
+            )),
             tool: "do-harness".to_owned(),
             harness_version: env!("CARGO_PKG_VERSION").to_owned(),
             git_sha,
@@ -306,6 +320,8 @@ impl EvidenceDocument {
 pub struct RunMeta<'a> {
     /// Configuration the run executed under.
     pub cfg: &'a Config,
+    /// Raw bytes of the loaded policy, including an explicit alternate policy.
+    pub config_bytes: Option<&'a [u8]>,
     /// Workspace root the run executed from.
     pub root: &'a Path,
     /// Selected signal-set name; `None` for full runs.

@@ -117,6 +117,22 @@ fn default_evidence_directory_cannot_be_a_symlink_escape() {
     assert!(!outside.path().join("evidence.json").exists());
 }
 
+#[cfg(unix)]
+#[test]
+fn evidence_lock_symlink_is_rejected_without_touching_its_target() {
+    use std::os::unix::fs::symlink;
+    let root = tempfile::tempdir().unwrap();
+    let outside = tempfile::tempdir().unwrap();
+    let target = outside.path().join("lock-target");
+    std::fs::write(&target, "untouched").unwrap();
+    policy(root.path(), "print('ok')", "timeout=5");
+    std::fs::create_dir(root.path().join(".do-harness")).unwrap();
+    symlink(&target, root.path().join(".do-harness/evidence.lock")).unwrap();
+    let out = verify(root.path());
+    assert!(!out.status.success());
+    assert_eq!(std::fs::read_to_string(target).unwrap(), "untouched");
+}
+
 #[test]
 fn environment_policy_is_explicit_and_backward_compatible() {
     for allowlist in [false, true] {

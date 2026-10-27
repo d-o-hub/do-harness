@@ -8,6 +8,7 @@ use super::super::*;
 fn serialization_matches_schema() {
     let doc = EvidenceDocument {
         schema_version: 1,
+        input_manifest: None,
         tool: "do-harness".to_owned(),
         harness_version: "0.1.0".to_owned(),
         git_sha: Some("46463ef".into()),

@@ -35,6 +35,7 @@ fn allow_failure_sensor_does_not_fail_gate_but_surfaces_output() {
             allow_failure: true,
             transient_exit_codes: vec![],
             artifacts: Vec::new(),
+            environment_inputs: Vec::new(),
             coverage_inputs: Vec::new(),
             inputs: Vec::new(),
             when_changed: vec![],

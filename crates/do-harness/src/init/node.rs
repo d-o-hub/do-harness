@@ -167,6 +167,7 @@ pub fn probe_node(root: &Path) -> (Vec<Candidate>, Vec<SensorSpec>) {
             transient_exit_codes: Vec::new(),
             when_changed: ts_globs,
             artifacts: Vec::new(),
+            environment_inputs: Vec::new(),
             coverage_inputs: Vec::new(),
             inputs: Vec::new(),
         });
@@ -231,6 +232,7 @@ pub fn probe_node(root: &Path) -> (Vec<Candidate>, Vec<SensorSpec>) {
             transient_exit_codes: Vec::new(),
             when_changed: code_globs.clone(),
             artifacts: Vec::new(),
+            environment_inputs: Vec::new(),
             coverage_inputs: Vec::new(),
             inputs: Vec::new(),
         });
@@ -292,6 +294,7 @@ pub fn probe_node(root: &Path) -> (Vec<Candidate>, Vec<SensorSpec>) {
             transient_exit_codes: Vec::new(),
             when_changed: code_globs,
             artifacts: Vec::new(),
+            environment_inputs: Vec::new(),
             coverage_inputs: Vec::new(),
             inputs: Vec::new(),
         });
@@ -340,6 +343,7 @@ pub fn probe_node(root: &Path) -> (Vec<Candidate>, Vec<SensorSpec>) {
             transient_exit_codes: Vec::new(),
             when_changed: build_globs,
             artifacts: Vec::new(),
+            environment_inputs: Vec::new(),
             coverage_inputs: Vec::new(),
             inputs: Vec::new(),
         });

@@ -29,6 +29,7 @@ fn artifacts_and_coverage_are_recorded() {
         transient_exit_codes: vec![],
         when_changed: vec![],
         artifacts: vec!["out/*.txt".into()],
+        environment_inputs: Vec::new(),
         coverage_inputs: vec![],
         inputs: vec![],
     }];
@@ -56,6 +57,7 @@ fn artifacts_and_coverage_are_recorded() {
     };
     let meta = RunMeta {
         cfg: &cfg,
+        config_bytes: None,
         root: dir.path(),
         set: None,
         selected: &["web".to_owned()],
@@ -73,7 +75,7 @@ fn artifacts_and_coverage_are_recorded() {
         invalidated_reason: None,
     };
     let doc = EvidenceDocument::from_run(&report, &meta);
-    assert_eq!(doc.schema_version, 4);
+    assert_eq!(doc.schema_version, EVIDENCE_SCHEMA_VERSION);
     assert_eq!(doc.sensors[0].artifacts.len(), 1);
     assert_eq!(doc.sensors[0].artifacts[0].path, "out/report.txt");
     assert_eq!(
@@ -108,6 +110,7 @@ fn missing_declared_artifact_records_warn() {
         transient_exit_codes: vec![],
         when_changed: vec![],
         artifacts: vec!["out/*.png".into()],
+        environment_inputs: Vec::new(),
         coverage_inputs: vec![],
         inputs: vec![],
     }];
@@ -135,6 +138,7 @@ fn missing_declared_artifact_records_warn() {
     };
     let meta = RunMeta {
         cfg: &cfg,
+        config_bytes: None,
         root: dir.path(),
         set: None,
         selected: &["web".to_owned()],

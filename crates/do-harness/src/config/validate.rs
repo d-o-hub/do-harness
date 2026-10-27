@@ -51,6 +51,7 @@ impl Config {
                 .redact_env
                 .iter()
                 .chain(sensor.environment_allowlist.iter().flatten())
+                .chain(&sensor.environment_inputs)
             {
                 if key.is_empty()
                     || !key.bytes().enumerate().all(|(i, b)| {

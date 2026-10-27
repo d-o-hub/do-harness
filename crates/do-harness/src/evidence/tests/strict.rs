@@ -8,6 +8,7 @@ use super::super::*;
 fn strict_clean_checks() {
     let doc = EvidenceDocument {
         schema_version: 1,
+        input_manifest: None,
         tool: "do-harness".to_owned(),
         harness_version: "0.1.0".to_owned(),
         git_sha: Some("46463ef".into()),
@@ -88,6 +89,7 @@ fn soft_failure_is_recorded_as_warn_not_pass() {
         allow_failure: true,
         transient_exit_codes: vec![],
         artifacts: Vec::new(),
+        environment_inputs: Vec::new(),
         coverage_inputs: Vec::new(),
         inputs: Vec::new(),
         when_changed: vec![],
@@ -116,6 +118,7 @@ fn soft_failure_is_recorded_as_warn_not_pass() {
     };
     let meta = RunMeta {
         cfg: &cfg,
+        config_bytes: None,
         root: dir.path(),
         set: None,
         selected: &["links".to_owned()],
@@ -160,6 +163,7 @@ fn warned_sensor_is_recorded_as_warn_and_fails_summary() {
         allow_failure: false,
         transient_exit_codes: vec![],
         artifacts: Vec::new(),
+        environment_inputs: Vec::new(),
         coverage_inputs: Vec::new(),
         inputs: Vec::new(),
         when_changed: vec![],
@@ -188,6 +192,7 @@ fn warned_sensor_is_recorded_as_warn_and_fails_summary() {
     };
     let meta = RunMeta {
         cfg: &cfg,
+        config_bytes: None,
         root: dir.path(),
         set: None,
         selected: &["tool".to_owned()],

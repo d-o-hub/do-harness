@@ -286,6 +286,7 @@ fn release_preflight_spec() -> crate::config::SensorSpec {
             .map(|glob| (*glob).to_owned())
             .collect(),
         artifacts: Vec::new(),
+        environment_inputs: Vec::new(),
         coverage_inputs: Vec::new(),
         inputs: Vec::new(),
     }
