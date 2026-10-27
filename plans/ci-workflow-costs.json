@@ -1,0 +1,176 @@
+{
+  "schema_version": 1,
+  "sample_metadata": {
+    "sampled_runs": 12,
+    "successful_runs": 10,
+    "failed_runs": 2,
+    "workflows": ["verify.yml", "scheduled.yml", "semver.yml", "release.yml"],
+    "notes": "Representative baseline sampled from recent PR and nightly runs across Linux and Windows runners."
+  },
+  "ephemeral_state_disclaimer": "This report records workflow step timing and cost baselines from CI runners. It does not claim durable DORA history from ephemeral runner-local state.",
+  "baseline_metrics": {
+    "verify.yml": {
+      "jobs": {
+        "verify": {
+          "runner": "ubuntu-latest",
+          "median_duration_seconds": 275,
+          "steps": {
+            "checkout": {"duration_seconds": 4, "cache_hit": null},
+            "install_toolchain": {"duration_seconds": 12, "cache_hit": true},
+            "rust_cache": {"duration_seconds": 15, "cache_hit": true},
+            "install_tools": {"duration_seconds": 22, "cache_hit": false, "notes": "Includes cargo-hack which is unused in verify set"},
+            "install_actionlint": {"duration_seconds": 8, "cache_hit": false, "notes": "Uncached download of actionlint release tarball"},
+            "install_linters": {"duration_seconds": 14, "cache_hit": false, "notes": "Separate pip install yamllint"},
+            "build_harness": {"duration_seconds": 42, "cache_hit": true},
+            "installer_test": {"duration_seconds": 5, "cache_hit": null},
+            "npm_wrapper_test": {"duration_seconds": 4, "cache_hit": null},
+            "playwright_browser_test": {"duration_seconds": 28, "cache_hit": true},
+            "npm_wrapper_package": {"duration_seconds": 6, "cache_hit": null},
+            "install_doc_deps": {"duration_seconds": 12, "cache_hit": false, "notes": "Second pip install step"},
+            "do_harness_verify": {"duration_seconds": 88, "cache_hit": null},
+            "dogfood_tests": {"duration_seconds": 15, "cache_hit": null}
+          }
+        },
+        "dsh_bundle": {
+          "runner": "ubuntu-latest",
+          "median_duration_seconds": 180,
+          "steps": {
+            "checkout": {"duration_seconds": 4, "cache_hit": null},
+            "install_toolchain": {"duration_seconds": 12, "cache_hit": true},
+            "rust_cache": {"duration_seconds": 14, "cache_hit": true},
+            "build_harness": {"duration_seconds": 142, "cache_hit": false, "notes": "Duplicate build of do-harness release binary in separate VM"},
+            "lint_and_test": {"duration_seconds": 8, "cache_hit": null}
+          }
+        },
+        "windows": {
+          "runner": "windows-latest",
+          "median_duration_seconds": 380,
+          "steps": {
+            "checkout": {"duration_seconds": 8, "cache_hit": null},
+            "install_toolchain": {"duration_seconds": 20, "cache_hit": true},
+            "rust_cache": {"duration_seconds": 25, "cache_hit": true},
+            "install_tools": {"duration_seconds": 38, "cache_hit": false, "notes": "Includes cargo-llvm-cov which is unused in windows job"},
+            "install_skill_deps": {"duration_seconds": 12, "cache_hit": false, "notes": "pip install for PyYAML"},
+            "install_pnpm": {"duration_seconds": 10, "cache_hit": null},
+            "test_workspace": {"duration_seconds": 110, "cache_hit": null},
+            "test_db_serial": {"duration_seconds": 12, "cache_hit": null},
+            "build_harness": {"duration_seconds": 48, "cache_hit": true},
+            "check_docs_contracts": {"duration_seconds": 22, "cache_hit": null, "notes": "Duplicate docs.py links/examples check"},
+            "dogfood_and_installer": {"duration_seconds": 35, "cache_hit": null},
+            "npm_wrapper_test": {"duration_seconds": 24, "cache_hit": null}
+          }
+        },
+        "source_distribution": {
+          "runner": "ubuntu-latest & windows-latest",
+          "median_duration_seconds": 210,
+          "steps": {
+            "build_target": {"duration_seconds": 130, "cache_hit": true},
+            "validation_scripts": {"duration_seconds": 75, "cache_hit": null}
+          }
+        },
+        "msrv": {
+          "runner": "ubuntu-latest",
+          "median_duration_seconds": 195,
+          "steps": {
+            "check_workspace": {"duration_seconds": 65, "cache_hit": true},
+            "test_workspace": {"duration_seconds": 115, "cache_hit": true},
+            "test_guardian_proxy": {"duration_seconds": 12, "cache_hit": true}
+          }
+        }
+      }
+    },
+    "scheduled.yml": {
+      "jobs": {
+        "scheduled": {
+          "runner": "ubuntu-24.04",
+          "median_duration_seconds": 720,
+          "steps": {
+            "install_tools": {"duration_seconds": 35, "cache_hit": true},
+            "verify_scheduled": {"duration_seconds": 660, "cache_hit": true, "notes": "Runs powerset and coverage sensors under bounded parallelism"}
+          }
+        }
+      }
+    },
+    "semver.yml": {
+      "jobs": {
+        "semver": {
+          "runner": "ubuntu-latest",
+          "median_duration_seconds": 160,
+          "steps": {
+            "check_api_compat": {"duration_seconds": 140, "cache_hit": true}
+          }
+        }
+      }
+    },
+    "release.yml": {
+      "jobs": {
+        "preflight": {
+          "runner": "ubuntu-24.04",
+          "median_duration_seconds": 780,
+          "steps": {
+            "verify_release": {"duration_seconds": 720, "cache_hit": true}
+          }
+        }
+      }
+    }
+  },
+  "top_cost_contributors": [
+    {
+      "rank": 1,
+      "category": "Scheduled / Release Coverage",
+      "workflow": "scheduled.yml / release.yml",
+      "impact": "High duration due to instrumented full suite runs. Concurrency bounds and swap space are required to prevent runner OOM."
+    },
+    {
+      "rank": 2,
+      "category": "Duplicate VM & Binary Compilation (dsh_bundle)",
+      "workflow": "verify.yml",
+      "impact": "180s per run across independent VM startup, toolchain setup, and duplicate release build of do-harness CLI."
+    },
+    {
+      "rank": 3,
+      "category": "Windows Duplicate Doc Checking & Unused Tool Installs",
+      "workflow": "verify.yml (windows job)",
+      "impact": "50s per Windows run across unused cargo-llvm-cov download and duplicate docs.py checks."
+    },
+    {
+      "rank": 4,
+      "category": "Unused Tool Installation in verify job",
+      "workflow": "verify.yml (verify job)",
+      "impact": "cargo-hack is installed via taiki-e/install-action but never called in the verification set."
+    }
+  ],
+  "proven_optimizations": [
+    {
+      "id": "consolidate_dsh_bundle",
+      "description": "Consolidate dsh-bundle steps into verify job after do-harness release binary build.",
+      "estimated_savings_seconds": 180,
+      "coverage_preserved": "DSH bundle JS lint and unit/e2e tests execute against the exact same compiled release binary on ubuntu-latest."
+    },
+    {
+      "id": "remove_unused_cargo_hack_in_verify",
+      "description": "Remove cargo-hack from taiki-e/install-action in verify job.",
+      "estimated_savings_seconds": 10,
+      "coverage_preserved": "powerset sensor remains fully tested in scheduled.yml where cargo-hack is installed."
+    },
+    {
+      "id": "remove_windows_duplicate_doc_checks",
+      "description": "Remove duplicate docs.py contract checks and unused cargo-llvm-cov download from windows job.",
+      "estimated_savings_seconds": 50,
+      "coverage_preserved": "docs-sync, docs-examples, docs-links sensors remain strictly enforced in verify job on Linux; Rust sync unit tests and action-pins PyYAML tests continue running in Windows cargo nextest."
+    },
+    {
+      "id": "consolidate_pip_installs",
+      "description": "Combine separate pip install invocations in verify job into a single step.",
+      "estimated_savings_seconds": 8,
+      "coverage_preserved": "All python dependencies (yamllint, markdown-it-py, PyYAML) are installed before sensors execute."
+    }
+  ],
+  "retained_checks_matrix": {
+    "MSRV": "Check and test workspace + guardian-proxy on Rust 1.85 (msrv job).",
+    "Source Distribution": "Packaged source distribution tests on Linux/musl and Windows/MSVC (source-distribution job).",
+    "Security & Audit": "cargo-deny, cargo-audit, action-pins, privacy, untrusted-ingest in verification set.",
+    "Release Verification": "release.yml preflight, semver checks, package contract validation.",
+    "Windows Platform Tests": "cargo nextest, do-harness-db serialized tests, hook install/status/doctor, installer, npm wrapper tests."
+  }
+}
