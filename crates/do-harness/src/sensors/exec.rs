@@ -7,7 +7,6 @@
 //! sequential non-fail-fast runs, so that path is unaffected.
 
 use std::ffi::OsString;
-use std::io::Read;
 use std::path::Path;
 use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -17,9 +16,6 @@ use std::time::{Duration, Instant};
 use crate::baselines::Baselines;
 use crate::config::{SensorSeverity, SensorSpec};
 use crate::report::SensorResult;
-
-/// Poll interval for child exit, timeout, and cancel checks.
-const POLL_INTERVAL: Duration = Duration::from_millis(10);
 
 /// Elapsed milliseconds since `start`, saturating at `u64::MAX`.
 fn elapsed_ms(start: Instant) -> u64 {
@@ -45,6 +41,8 @@ pub(crate) fn sensor_result(
     duration_ms: u64,
     output: String,
 ) -> SensorResult {
+    let redactor = crate::redaction::Redactor::from_environment(&spec.redact_env);
+    let output = redactor.owned_text(output);
     let severity = spec.effective_severity();
     let warned = ok
         && output
@@ -58,10 +56,15 @@ pub(crate) fn sensor_result(
         severity,
         allow_failure: severity == SensorSeverity::Warn,
         warned,
-        fix: if ok { None } else { spec.fix.clone() },
+        fix: if ok {
+            None
+        } else {
+            spec.fix.as_ref().map(|fix| redactor.text(fix))
+        },
         findings: parse_findings(&output),
         baseline: None,
         execution: crate::report::Execution::Ran,
+        details: crate::report::ExecutionDetails::default(),
         reused_beat_id: None,
         output,
     }
@@ -78,6 +81,9 @@ fn apply_ratchet(
     spec: &SensorSpec,
     baselines: &Baselines,
 ) -> SensorResult {
+    if result.details.reason.is_some() {
+        return result;
+    }
     let Some(findings) = result.findings else {
         return result;
     };
@@ -156,61 +162,35 @@ fn spawn_sensor(
     start: Instant,
 ) -> Result<Child, SensorResult> {
     let mut command = crate::shell::command(program, rest);
+    if let Some(keys) = &spec.environment_allowlist {
+        command.env_clear();
+        for key in keys {
+            if let Some(value) = std::env::var_os(key) {
+                command.env(key, value);
+            }
+        }
+    }
+    super::process::configure(&mut command);
     command
+        .stdin(Stdio::null())
         .current_dir(root)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
     strip_launcher_crate_env(&mut command, std::env::vars_os());
     command.spawn().map_err(|err| {
-        sensor_result(
+        let mut result = sensor_result(
             spec,
             false,
             None,
             elapsed_ms(start),
             format!("failed to spawn {program}: {err}"),
-        )
+        );
+        result.details.reason = Some(crate::report::FailureReason::Spawn);
+        result
     })
 }
 
-/// Spawns a thread that drains one piped stream to EOF.
-fn pump(mut pipe: impl Read + Send + 'static) -> thread::JoinHandle<Vec<u8>> {
-    thread::spawn(move || {
-        let mut buf = Vec::new();
-        let _ = pipe.read_to_end(&mut buf);
-        buf
-    })
-}
-
-/// Joins the pump threads and concatenates stdout then stderr.
-fn drain_pipes(
-    stdout: Option<thread::JoinHandle<Vec<u8>>>,
-    stderr: Option<thread::JoinHandle<Vec<u8>>>,
-) -> String {
-    let stdout = stdout.and_then(|h| h.join().ok()).unwrap_or_default();
-    let stderr = stderr.and_then(|h| h.join().ok()).unwrap_or_default();
-    format!(
-        "{}\n{}",
-        String::from_utf8_lossy(&stdout),
-        String::from_utf8_lossy(&stderr)
-    )
-}
-
-/// Kills and reaps the child, returning a failed result with `message`.
-fn kill_and_report(
-    child: &mut Child,
-    spec: &SensorSpec,
-    start: Instant,
-    message: String,
-) -> SensorResult {
-    crate::shell::kill_tree(child);
-    sensor_result(spec, false, None, elapsed_ms(start), message)
-}
-
-/// Runs a single sensor attempt from `root`, enforcing the spec timeout and
-/// the shared fail-fast cancel flag.
-///
-/// A set cancel flag kills the child and reports a non-pass `cancelled`
-/// result; timeout expiry kills the child and reports a non-pass timeout.
+/// Runs one attempt through bounded capture and complete process-group cleanup.
 pub(crate) fn run_sensor_attempt(
     spec: &SensorSpec,
     root: &Path,
@@ -226,60 +206,37 @@ pub(crate) fn run_sensor_attempt(
             format!("sensor '{}' has an empty argv", spec.name),
         );
     };
-    let timeout = spec.timeout.map(Duration::from_secs);
-
-    let mut child = match spawn_sensor(spec, root, program, rest, start) {
+    let child = match spawn_sensor(spec, root, program, rest, start) {
         Ok(child) => child,
         Err(result) => return result,
     };
-    let stdout = child.stdout.take().map(pump);
-    let stderr = child.stderr.take().map(pump);
-
-    loop {
-        if cancel.load(Ordering::SeqCst) {
-            return kill_and_report(
-                &mut child,
-                spec,
-                start,
-                format!(
-                    "sensor '{}' cancelled: fail-fast stopped this run",
-                    spec.name
-                ),
-            );
-        }
-        match child.try_wait() {
-            Ok(Some(status)) => {
-                let output = drain_pipes(stdout, stderr);
-                return sensor_result(
-                    spec,
-                    status.success(),
-                    status.code(),
-                    elapsed_ms(start),
-                    output,
-                );
-            }
-            Ok(None) => {
-                if timeout.is_some_and(|budget| start.elapsed() >= budget) {
-                    let secs = timeout.map_or(0, |budget| budget.as_secs());
-                    return kill_and_report(
-                        &mut child,
-                        spec,
-                        start,
-                        format!("sensor '{}' timed out after {secs}s", spec.name),
-                    );
-                }
-                thread::sleep(POLL_INTERVAL);
-            }
-            Err(err) => {
-                return kill_and_report(
-                    &mut child,
-                    spec,
-                    start,
-                    format!("error waiting for child {program}: {err}"),
-                );
-            }
-        }
-    }
+    let redactor = crate::redaction::Redactor::from_environment(&spec.redact_env);
+    let captured = super::process::capture(child, spec, cancel, start, &redactor);
+    let diagnostic = match captured.details.reason {
+        Some(crate::report::FailureReason::Timeout) => format!(
+            "sensor '{}' timed out after {}s",
+            spec.name,
+            spec.timeout
+                .unwrap_or(crate::config::DEFAULT_SENSOR_TIMEOUT_SECS)
+        ),
+        Some(crate::report::FailureReason::Cancelled) => format!(
+            "sensor '{}' cancelled: fail-fast stopped this run",
+            spec.name
+        ),
+        Some(reason) => format!("sensor '{}' process failure: {reason:?}", spec.name),
+        None => String::new(),
+    };
+    let mut result = sensor_result(
+        spec,
+        captured.details.reason.is_none() && captured.status.is_some_and(|status| status.success()),
+        captured.status.and_then(|status| status.code()),
+        elapsed_ms(start),
+        format!("{}\n{diagnostic}", captured.output),
+    );
+    result.warned = result.ok && captured.warned;
+    result.findings = captured.findings;
+    result.details = captured.details;
+    result
 }
 
 /// Runs a single sensor command from `root`, retrying on transient failures
@@ -307,7 +264,7 @@ pub(crate) fn run_sensor(
             return apply_ratchet(result, spec, baselines);
         }
 
-        if attempts >= max_retries || (attempts > 0 && cancel.load(Ordering::SeqCst)) {
+        if attempts >= max_retries || cancel.load(Ordering::SeqCst) {
             return apply_ratchet(result, spec, baselines);
         }
 

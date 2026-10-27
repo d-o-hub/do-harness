@@ -31,6 +31,7 @@ fn serialization_matches_schema() {
             duration_ms: Some(4200),
             output_sha256: "abc123".into(),
             artifacts: Vec::new(),
+            details: crate::report::ExecutionDetails::default(),
             recorded: true,
         }],
         skipped: Vec::new(),

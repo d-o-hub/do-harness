@@ -16,7 +16,6 @@
 use std::path::Path;
 
 use globset::{GlobBuilder, GlobSet, GlobSetBuilder};
-use sha2::{Digest, Sha256};
 
 use crate::config::SensorSpec;
 
@@ -254,7 +253,7 @@ fn entry(root: &Path, path: &str, kind: &str) -> Option<Entry> {
             // nonignored files already enter the source manifest separately.
             "directory".to_owned()
         } else {
-            hex::encode(Sha256::digest(std::fs::read(&target).ok()?))
+            crate::fingerprint::content_hash(&target)?
         };
         let digest = crate::fingerprint::hash_canonical(&serde_json::json!({
             "target": relative, "content": content,
@@ -269,11 +268,17 @@ fn entry(root: &Path, path: &str, kind: &str) -> Option<Entry> {
     if !metadata.file_type().is_file() {
         return None;
     }
-    let bytes = std::fs::read(&full).ok()?;
+    if !full
+        .canonicalize()
+        .ok()?
+        .starts_with(root.canonicalize().ok()?)
+    {
+        return None;
+    }
     Some((
         kind.to_owned(),
         path.to_owned(),
-        hex::encode(Sha256::digest(&bytes)),
+        crate::fingerprint::content_hash(&full)?,
         file_mode(&metadata),
     ))
 }
@@ -318,6 +323,10 @@ mod tests {
             name: "probe".to_owned(),
             argv: vec!["true".to_owned()],
             retry: None,
+            timeout_justification: None,
+            max_output_bytes: None,
+            environment_allowlist: None,
+            redact_env: Vec::new(),
             timeout: None,
             severity: None,
             allow_failure: false,

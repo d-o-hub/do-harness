@@ -279,7 +279,11 @@ fn untracked_files(root: &Path) -> Vec<ChangedFile> {
 
 /// Normalizes a git-reported path: `/` separators on every OS, no `./`.
 pub(crate) fn normalize(path: &str) -> String {
-    let path = path.replace('\\', "/");
+    let path = if cfg!(windows) {
+        path.replace('\\', "/")
+    } else {
+        path.to_owned()
+    };
     path.strip_prefix("./").unwrap_or(&path).to_owned()
 }
 
@@ -293,7 +297,10 @@ mod tests {
     #[test]
     fn normalize_unifies_separators() {
         assert_eq!(normalize("a/b"), "a/b");
-        assert_eq!(normalize("a\\b"), "a/b");
+        assert_eq!(
+            normalize("a\\b"),
+            if cfg!(windows) { "a/b" } else { "a\\b" }
+        );
         assert_eq!(normalize("./a/b"), "a/b");
     }
 

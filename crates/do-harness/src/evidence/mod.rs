@@ -32,6 +32,12 @@ pub struct EvidenceSkipped {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct EvidenceSensor {
+    /// Process failure and bounded-output observations; absent in older artifacts.
+    #[serde(
+        default,
+        skip_serializing_if = "crate::report::ExecutionDetails::is_empty"
+    )]
+    pub details: crate::report::ExecutionDetails,
     /// Sensor name as configured.
     pub name: String,
     /// Exact argv executed (including the program).
@@ -220,7 +226,9 @@ impl EvidenceDocument {
                 };
                 // A declared artifact glob that matched nothing is weak
                 // evidence: record a warn so strict/status stay honest.
-                if !spec.artifacts.is_empty() && artifacts.is_empty() {
+                if !spec.artifacts.is_empty()
+                    && (artifacts.is_empty() || artifacts.iter().any(|a| a.sha256 == "unreadable"))
+                {
                     verdict = "warn";
                 }
                 match verdict {
@@ -233,7 +241,7 @@ impl EvidenceDocument {
 
                 sensors.push(EvidenceSensor {
                     name: spec.name.clone(),
-                    argv: spec.argv.clone(),
+                    argv: redacted_argv(spec),
                     verdict: verdict.to_string(),
                     exit_code: res.exit_code,
                     duration_ms: Some(res.duration_ms),
@@ -242,18 +250,20 @@ impl EvidenceDocument {
                     // A beat exists only for results this run executed and
                     // persisted; a blocked, quarantined, or cancelled sensor
                     // never wrote one.
+                    details: res.details.clone(),
                     recorded: meta.record && res.execution == crate::report::Execution::Ran,
                 });
             } else {
                 skip_count += 1;
                 sensors.push(EvidenceSensor {
                     name: spec.name.clone(),
-                    argv: spec.argv.clone(),
+                    argv: redacted_argv(spec),
                     verdict: "skip".to_string(),
                     exit_code: None,
                     duration_ms: None,
                     output_sha256: String::new(),
                     artifacts: Vec::new(),
+                    details: crate::report::ExecutionDetails::default(),
                     recorded: false,
                 });
             }
@@ -344,12 +354,13 @@ pub struct RunMeta<'a> {
 fn reused_sensor(spec: &crate::config::SensorSpec) -> EvidenceSensor {
     EvidenceSensor {
         name: spec.name.clone(),
-        argv: spec.argv.clone(),
+        argv: redacted_argv(spec),
         verdict: "skip".to_string(),
         exit_code: None,
         duration_ms: None,
         output_sha256: String::new(),
         artifacts: Vec::new(),
+        details: crate::report::ExecutionDetails::default(),
         recorded: false,
     }
 }
@@ -388,3 +399,9 @@ fn resolve_git_sha(root: &Path) -> Option<String> {
 
 #[cfg(test)]
 mod tests;
+
+/// Keep known secret values out of persisted command metadata as well as output.
+fn redacted_argv(spec: &crate::config::SensorSpec) -> Vec<String> {
+    let redactor = crate::redaction::Redactor::from_environment(&spec.redact_env);
+    spec.argv.iter().map(|arg| redactor.text(arg)).collect()
+}

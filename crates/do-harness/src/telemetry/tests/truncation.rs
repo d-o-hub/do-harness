@@ -55,6 +55,7 @@ async fn record_verify_persists_actionable_nextest_failure_context() {
             findings: None,
             baseline: None,
             execution: crate::report::Execution::Ran,
+            details: crate::report::ExecutionDetails::default(),
             reused_beat_id: None,
             output: synthetic_nextest_output(),
         }],

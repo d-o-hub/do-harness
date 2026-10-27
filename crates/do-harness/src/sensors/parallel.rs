@@ -85,6 +85,10 @@ fn cancelled_result(spec: &SensorSpec) -> SensorResult {
         findings: None,
         baseline: None,
         execution: crate::report::Execution::NotRun,
+        details: crate::report::ExecutionDetails {
+            reason: Some(crate::report::FailureReason::Cancelled),
+            ..crate::report::ExecutionDetails::default()
+        },
         reused_beat_id: None,
         output: format!(
             "sensor '{}' cancelled before start: fail-fast stopped this run",
@@ -237,6 +241,10 @@ mod tests {
             name: name.to_owned(),
             argv: argv.iter().map(|a| (*a).to_owned()).collect(),
             retry: None,
+            timeout_justification: None,
+            max_output_bytes: None,
+            environment_allowlist: None,
+            redact_env: Vec::new(),
             timeout: None,
             severity: None,
             allow_failure: false,

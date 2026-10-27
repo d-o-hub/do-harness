@@ -1,7 +1,44 @@
 //! Report types and printers for `do-harness verify` and `do-harness list`.
 
 use clap::ValueEnum;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
+
+/// Structured process failure, distinct from a sensor's ordinary exit status.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FailureReason {
+    /// The program could not start.
+    Spawn,
+    /// Its configured wall-clock budget expired.
+    Timeout,
+    /// Fail-fast cancelled the process tree.
+    Cancelled,
+    /// Captured output exceeded the configured budget.
+    OutputLimit,
+    /// Waiting for or reading the child failed.
+    Wait,
+    /// Pipe cleanup could not be established on this platform.
+    CleanupUnverified,
+}
+
+/// Bounded output and process observations persisted with sensor results.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ExecutionDetails {
+    /// Process-level failure, when present.
+    pub reason: Option<FailureReason>,
+    /// Raw byte count observed across both streams (contents are redacted).
+    pub output_bytes: u64,
+    /// Output exceeded the budget or could not be drained completely.
+    pub output_truncated: bool,
+}
+
+impl ExecutionDetails {
+    /// Whether legacy evidence can omit this field without losing observations.
+    pub fn is_empty(&self) -> bool {
+        self == &Self::default()
+    }
+}
 
 /// Output format for reports and listings.
 #[derive(ValueEnum, Clone, Copy, Debug, PartialEq, Eq, Default)]
@@ -33,6 +70,8 @@ pub enum Execution {
 /// Sensor verdict with timing and exit information.
 #[derive(Debug, Clone, Serialize)]
 pub struct SensorResult {
+    /// Process failure and output-budget observations.
+    pub details: ExecutionDetails,
     /// Sensor name as configured.
     pub name: String,
     /// Whether the sensor exited successfully.
@@ -226,6 +265,7 @@ mod tests {
                 findings: None,
                 baseline: None,
                 execution: Execution::Ran,
+                details: crate::report::ExecutionDetails::default(),
                 reused_beat_id: None,
                 output: "hidden".to_owned(),
             }],

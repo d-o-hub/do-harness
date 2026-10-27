@@ -49,11 +49,16 @@ pub use sensor::{SensorSeverity, SensorSpec};
 /// Language pack identifiers accepted in `Config.language`.
 pub const SUPPORTED_LANGUAGES: &[&str] = &["rust", "generic", "web", "node"];
 
+pub(crate) const DEFAULT_SENSOR_TIMEOUT_SECS: u64 = 3600;
+pub(crate) const DEFAULT_OUTPUT_BYTES: usize = 1024 * 1024;
+pub(crate) const MIN_OUTPUT_BYTES: usize = 1024;
+pub(crate) const MAX_OUTPUT_BYTES: usize = 16 * 1024 * 1024;
+
 /// The built-in Rust sensor pack, in canonical order.
 static RUST_SENSORS: std::sync::LazyLock<Vec<SensorSpec>> = std::sync::LazyLock::new(rust_pack);
 
 /// Builds a built-in sensor spec with the pack-default execution policy
-/// (no retries, no timeout, mandatory pass) and the given `when-changed`
+/// (no retries, default timeout, mandatory pass) and the given `when-changed`
 /// applicability globs (empty means always applicable).
 fn spec(name: &str, argv: &[&str], when_changed: &[&str]) -> SensorSpec {
     SensorSpec {
@@ -61,6 +66,10 @@ fn spec(name: &str, argv: &[&str], when_changed: &[&str]) -> SensorSpec {
         kind: None,
         argv: argv.iter().map(|arg| (*arg).to_owned()).collect(),
         retry: None,
+        timeout_justification: None,
+        max_output_bytes: None,
+        environment_allowlist: None,
+        redact_env: Vec::new(),
         timeout: None,
         severity: None,
         fix: None,
@@ -127,6 +136,10 @@ pub fn rust_pack() -> Vec<SensorSpec> {
             name: "coverage".to_owned(),
             argv: vec!["bash".to_owned(), "scripts/check-coverage.sh".to_owned()],
             retry: None,
+            timeout_justification: None,
+            max_output_bytes: None,
+            environment_allowlist: None,
+            redact_env: Vec::new(),
             timeout: None,
             severity: Some(SensorSeverity::Warn),
             allow_failure: false,
@@ -184,122 +197,7 @@ pub async fn load_raw(root: &Path, explicit: Option<&Path>) -> Result<(Config, O
     Ok((cfg, Some(text.into_bytes())))
 }
 
-impl Config {
-    /// Rejects unsupported language pack identifiers, malformed signal-set
-    /// names, dangling sensor references, duplicate entries in sets, and a
-    /// zero `jobs` worker bound.
-    pub(crate) fn validate(&self) -> Result<()> {
-        if let Some(jobs) = self.jobs {
-            if jobs == 0 {
-                anyhow::bail!("jobs must be at least 1 (got 0)");
-            }
-        }
-        if let Some(language) = &self.language {
-            if !SUPPORTED_LANGUAGES.contains(&language.as_str()) {
-                anyhow::bail!(
-                    "unsupported language pack '{language}' (supported: {})",
-                    SUPPORTED_LANGUAGES.join(", ")
-                );
-            }
-        }
-        let known: Vec<&str> = self
-            .effective_sensors()
-            .iter()
-            .map(|s| s.name.as_str())
-            .collect();
-        for sensor in &self.sensors {
-            for key in &sensor.environment_inputs {
-                if key.is_empty()
-                    || !key.bytes().enumerate().all(|(i, b)| {
-                        b == b'_' || b.is_ascii_alphabetic() || (i > 0 && b.is_ascii_digit())
-                    })
-                {
-                    anyhow::bail!(
-                        "sensor '{}' has an invalid environment input name",
-                        sensor.name
-                    );
-                }
-            }
-            validate_globs(&sensor.name, "when-changed", &sensor.when_changed)?;
-            validate_globs(&sensor.name, "artifacts", &sensor.artifacts)?;
-            validate_globs(&sensor.name, "coverage-inputs", &sensor.coverage_inputs)?;
-            validate_globs(&sensor.name, "inputs", &sensor.inputs)?;
-            if sensor.allow_failure && sensor.severity == Some(SensorSeverity::Error) {
-                anyhow::bail!(
-                    "sensor '{}' sets both allow_failure = true and severity = \"error\"; \
-                     use one severity source",
-                    sensor.name
-                );
-            }
-        }
-        for (set, names) in &self.signal_sets {
-            if !is_valid_set_name(set) {
-                anyhow::bail!(
-                    "invalid signal set name '{set}' (use letters, digits, '.', '_' or '-')"
-                );
-            }
-            let mut seen = std::collections::HashSet::new();
-            for name in names {
-                if !seen.insert(name) {
-                    anyhow::bail!("duplicate sensor '{name}' in signal set '{set}'");
-                }
-                if !known.contains(&name.as_str()) {
-                    anyhow::bail!(
-                        "signal set '{set}' references unknown sensor '{name}' (available: {})",
-                        known.join(", ")
-                    );
-                }
-            }
-        }
-        validate_hook_references("hooks.pre-commit", &self.hooks.pre_commit, &known)?;
-        validate_hook_references("hooks.pre-push", &self.hooks.pre_push, &known)?;
-        Ok(())
-    }
-}
-
-/// Validates that every non-empty hook sensor selection references a sensor
-/// present in the effective sensor pack.
-fn validate_hook_references(hook_key: &str, names: &[String], known: &[&str]) -> Result<()> {
-    for name in names {
-        if !known.contains(&name.as_str()) {
-            anyhow::bail!(
-                "{hook_key} references unknown sensor '{name}' (available: {})",
-                known.join(", ")
-            );
-        }
-    }
-    Ok(())
-}
-
-/// Whether a `[signal-sets]` key is a safe set name and evidence-file stem.
-fn is_valid_set_name(set: &str) -> bool {
-    !set.is_empty()
-        && set
-            .chars()
-            .all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '_' || c == '-')
-}
-
-/// Rejects glob patterns that cannot compile, so a typo fails at config load
-/// instead of silently changing applicability or evidence at verify time.
-fn validate_globs(sensor: &str, field: &str, patterns: &[String]) -> Result<()> {
-    if patterns.is_empty() {
-        return Ok(());
-    }
-    let mut builder = globset::GlobSetBuilder::new();
-    for pattern in patterns {
-        let glob = globset::GlobBuilder::new(pattern)
-            .literal_separator(true)
-            .build()
-            .with_context(|| {
-                format!("sensor '{sensor}' has an invalid {field} pattern '{pattern}'")
-            })?;
-        builder.add(glob);
-    }
-    builder
-        .build()
-        .with_context(|| format!("sensor '{sensor}' has unusable {field} patterns"))?;
-    Ok(())
-}
+mod validate;
 
 /// Returns the built-in Rust configuration with the full sensor pack and the
 /// feedback/verification/release signal sets.

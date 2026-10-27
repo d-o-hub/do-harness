@@ -273,6 +273,10 @@ fn release_preflight_spec() -> crate::config::SensorSpec {
             "scripts/check-release-preflight.sh".to_owned(),
         ],
         retry: None,
+        timeout_justification: None,
+        max_output_bytes: None,
+        environment_allowlist: None,
+        redact_env: Vec::new(),
         timeout: None,
         severity: None,
         allow_failure: false,
@@ -410,7 +414,7 @@ fn write_if_absent(
     force: bool,
     report: &mut InitReport,
 ) -> Result<()> {
-    let path = root.join(relative);
+    let path = crate::managed_path::within(root, Path::new(relative))?;
     if path.exists() && !force {
         report.skipped.push(relative.to_owned());
         return Ok(());
@@ -419,7 +423,8 @@ fn write_if_absent(
         fs::create_dir_all(parent)
             .with_context(|| format!("failed to create {}", parent.display()))?;
     }
-    fs::write(&path, body).with_context(|| format!("failed to write {}", path.display()))?;
+    crate::managed_path::within(root, &path)?;
+    crate::managed_path::write_atomic(&path, body.as_bytes())?;
     report.written.push(relative.to_owned());
     Ok(())
 }

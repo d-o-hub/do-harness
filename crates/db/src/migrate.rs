@@ -240,6 +240,7 @@ pub async fn connect_and_migrate(root: &Path) -> Result<Connection> {
 /// Single attempt body for [`connect_and_migrate`], retried as a unit when the
 /// connection or migration probe hits transient lock contention.
 async fn connect_and_migrate_once(root: &Path) -> Result<Connection> {
+    crate::root::validate_state_paths(root)?;
     let path = crate::root::db_path(root);
     let conn = connect(&path).await?;
     let skew = inspect_migrations(&conn).await?;

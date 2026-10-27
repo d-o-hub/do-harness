@@ -390,6 +390,10 @@ See [docs/compliance.md](https://github.com/d-o-hub/do-harness/blob/main/docs/co
 
 ## Configuration
 
+Sensors have documented [execution trust and resource limits](docs/sensor-execution.md),
+including a one-hour default timeout, bounded redacted output and an optional
+environment allowlist. Local commands retain the caller's permissions.
+
 `do-harness.toml` at the workspace root configures the harness:
 
 - `language` — the language pack (`"rust"`, `"generic"`, `"web"`, or `"node"`;
