@@ -2,6 +2,10 @@
 
 A compiled agent-execution harness CLI: feedforward guides (AGENTS.md, `.agents/skills/`) plus feedback sensors (computational checks) that agents and CI must pass.
 
+Optional [client boundary conformance](docs/client-conformance.md) distinguishes
+installed guidance, sanitizer fixture capability, and instrumented client
+observations. A passing fixture alone never proves client mediation.
+
 ## Install
 
 Zero-install with npx on Linux and macOS (Node 18+; resolves the prebuilt

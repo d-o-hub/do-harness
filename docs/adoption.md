@@ -192,6 +192,11 @@ For client registration, see the upstream
 [client integration guide](https://github.com/d-oit/do-context-shield/blob/main/docs/client-integration.md).
 The harness deliberately does not duplicate the MCP protocol details.
 
+To require evidence for a particular client's outbound boundary, use the
+separate [client conformance contract](client-conformance.md). Guidance
+installation, a passing sanitizer fixture, and a verified client boundary
+are separate claims; unsupported routes remain unknown.
+
 `plans/invariants.json` is a JSON array of `DecisionHeader` objects
 (`{invariant, rationale, sensor, category}`), or equivalently an object with
 a top-level `invariants` array (extra keys such as `$comment` are ignored).
