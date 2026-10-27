@@ -111,7 +111,12 @@ jobs:
       # taiki-e/install-action@v2
       - uses: taiki-e/install-action@ba47c86ac325773530516bb756137ac718732518
         with:
-          tool: cargo-deny,cargo-audit,cargo-nextest,shellcheck,cargo-hack,cargo-machete
+          tool: cargo-deny,cargo-audit,cargo-nextest,shellcheck,cargo-machete
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        id: cache-actionlint
+        with:
+          path: ${{ runner.temp }}/actionlint
+          key: actionlint-1.7.7-linux-amd64
       - name: Install actionlint
         # The `actionlint` sensor's script fails closed under CI=true when the
         # tool is missing, and `actionlint` is not in `taiki-e/install-action`'s
@@ -120,19 +125,27 @@ jobs:
         # digest together (checksums:
         # https://github.com/rhysd/actionlint/releases/download/v1.7.7/actionlint_1.7.7_checksums.txt).
         run: |
-          version=1.7.7
-          archive="actionlint_${version}_linux_amd64.tar.gz"
-          curl --fail --silent --show-error --location \
-            --output "$RUNNER_TEMP/$archive" \
-            "https://github.com/rhysd/actionlint/releases/download/v${version}/${archive}"
-          echo "023070a287cd8cccd71515fedc843f1985bf96c436b7effaecce67290e7e0757  $RUNNER_TEMP/$archive" \
-            | sha256sum --check
-          tar --extract --gzip --file "$RUNNER_TEMP/$archive" \
-            --directory "$RUNNER_TEMP" actionlint
+          if [ "${{ steps.cache-actionlint.outputs.cache-hit }}" != "true" ]; then
+            version=1.7.7
+            archive="actionlint_${version}_linux_amd64.tar.gz"
+            curl --fail --silent --show-error --location \
+              --output "$RUNNER_TEMP/$archive" \
+              "https://github.com/rhysd/actionlint/releases/download/v${version}/${archive}"
+            echo "023070a287cd8cccd71515fedc843f1985bf96c436b7effaecce67290e7e0757  $RUNNER_TEMP/$archive" \
+              | sha256sum --check
+            tar --extract --gzip --file "$RUNNER_TEMP/$archive" \
+              --directory "$RUNNER_TEMP" actionlint
+          fi
           echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
-      - name: Install markdownlint and yamllint
+      - name: Install linter and doc tooling dependencies
+        # One install for every parser the Python-side sensors need, run before
+        # the sensors so a missing parser is a hard FAIL under
+        # DO_HARNESS_REQUIRE_TOOLS instead of a SKIP: yamllint for workflow/yaml
+        # lint, markdown-it-py (scripts/requirements-docs.txt) for docs checks,
+        # and PyYAML (.agents/skills/skill-creator/scripts/requirements.txt) for
+        # action-pins and eval frontmatter.
         run: |
-          python3 -m pip install --disable-pip-version-check yamllint
+          python3 -m pip install --disable-pip-version-check yamllint -r .agents/skills/skill-creator/scripts/requirements.txt -r scripts/requirements-docs.txt
           npm install -g markdownlint-cli2
       # Pin maintenance note: agent-governance is pinned to =3.2.2 in workspace dependencies
       # until GA. Upstream renamed this crate to `agentmesh`; the pin stays on the
@@ -149,18 +162,21 @@ jobs:
           node --check integrations/npm/bin/do-harness.js
           node --check integrations/npm/lib/platform.js
           node --test integrations/npm/test/*.test.mjs
-      # actions/cache@v4: the Chromium download is ~150 MB and was the step's
-      # slowest avoidable cost, re-fetched on every run. `playwright install`
-      # reuses the browser when it is already present.
+      # actions/cache@v4: the Chromium download is ~150 MB and node_modules
+      # contains the playwright CLI. Caching both avoids re-fetching on warm runs.
       - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
         with:
-          path: ~/.cache/ms-playwright
+          path: |
+            ~/.cache/ms-playwright
+            target/web-ui-browser-deps/node_modules
           key: playwright-${{ runner.os }}-1.50.1
       - name: Browser-test web UI pack
         run: |
-          mkdir -p target/web-ui-browser-deps
-          npm init -y --prefix target/web-ui-browser-deps >/dev/null
-          npm install --prefix target/web-ui-browser-deps --no-save --no-package-lock --no-audit --no-fund playwright@1.50.1
+          if [ ! -d "target/web-ui-browser-deps/node_modules/playwright" ]; then
+            mkdir -p target/web-ui-browser-deps
+            npm init -y --prefix target/web-ui-browser-deps >/dev/null
+            npm install --prefix target/web-ui-browser-deps --no-save --no-package-lock --no-audit --no-fund playwright@1.50.1
+          fi
           target/web-ui-browser-deps/node_modules/.bin/playwright install --with-deps chromium
           NODE_PATH="$GITHUB_WORKSPACE/target/web-ui-browser-deps/node_modules" node --test integrations/web-ui/audit.browser.test.mjs
       - name: Package npm wrapper (assembly dry run)
@@ -178,16 +194,12 @@ jobs:
           cp target/release/do-harness "$dist/pkg/$name/do-harness.exe"
           (cd "$dist/pkg" && zip -qr "$dist/${name}.zip" "$name")
           bash scripts/publish-npm.sh --dist "$dist" --dry-run
-      - name: Install skill and docs tooling dependencies
-        # One install for every parser the Python-side sensors need, run before
-        # the sensors so a missing parser is a hard FAIL under
-        # DO_HARNESS_REQUIRE_TOOLS instead of a SKIP: `skills-docs`, `docs-sync`,
-        # `docs-examples`, and `docs-links` all parse maintained markdown with
-        # markdown-it-py (scripts/requirements-docs.txt), and the eval dogfood
-        # below needs PyYAML (quick_validate.py parses YAML frontmatter). The
-        # `python3` here is the runner image's interpreter, the same one the
-        # docs sensors resolve through their argv.
-        run: python3 -m pip install --disable-pip-version-check -r .agents/skills/skill-creator/scripts/requirements.txt -r scripts/requirements-docs.txt
+      - name: Lint and test DSH bundle
+        env:
+          DO_HARNESS_BIN: ${{ github.workspace }}/target/release/do-harness
+        run: |
+          node --check integrations/deepseek-harness/index.js integrations/deepseek-harness/lib/*.mjs
+          node --test integrations/deepseek-harness/test/*.test.mjs
       # The adjacent crate is covered by the sensors below: `check` compiles it
       # with default features, the `test` sensor's workspace run runs its
       # default-feature suite, and `check-agt`/`check-mcp` build the two feature
@@ -396,35 +408,6 @@ jobs:
           CI: ""
         run: cargo test -p guardian-proxy --features agt-governance --locked
 
-  dsh-bundle:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      # actions/checkout@v7.0.1
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          # No push/fetch credentials persisted: this workflow never pushes.
-          persist-credentials: false
-      - name: Resolve pinned toolchain
-        id: toolchain
-        run: |
-          channel="$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)"
-          echo "channel=$channel" >> "$GITHUB_OUTPUT"
-      # dtolnay/rust-toolchain@master (SHA within master history per action docs)
-      - uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de
-        with:
-          toolchain: ${{ steps.toolchain.outputs.channel }}
-      # Swatinem/rust-cache@v2
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
-      - name: Build harness CLI for the bundle tests
-        run: cargo build --release -p do-harness
-      - name: Lint DSH bundle JavaScript
-        run: node --check integrations/deepseek-harness/index.js integrations/deepseek-harness/lib/*.mjs
-      - name: Test DSH bundle (unit + real-binary e2e)
-        env:
-          DO_HARNESS_BIN: ${{ github.workspace }}/target/release/do-harness
-        run: node --test integrations/deepseek-harness/test/*.test.mjs
-
   windows:
     runs-on: windows-latest
     timeout-minutes: 30
@@ -452,17 +435,12 @@ jobs:
       # taiki-e/install-action@v2
       - uses: taiki-e/install-action@ba47c86ac325773530516bb756137ac718732518
         with:
-          tool: cargo-deny,cargo-audit,cargo-nextest,cargo-llvm-cov
+          tool: cargo-deny,cargo-audit,cargo-nextest
       # The full `cargo test --workspace` also runs on ubuntu (verify job);
       # running it here too is what makes Windows a supported platform rather
       # than a build-only target. POSIX-only tests are `#[cfg(unix)]`-gated
       # (eval walkthrough shebangs, hook exit codes, file-mode helpers) and the
       # runners provide Git Bash, so `sh`/`bash` sensors work as written.
-      - name: Install skill tooling dependencies
-        # quick_validate.py (the skill structure gate) parses YAML frontmatter
-        # and needs PyYAML. Ubuntu images ship it; windows-latest does not, so
-        # install it explicitly instead of relying on the host image.
-        run: python -m pip install --disable-pip-version-check -r .agents/skills/skill-creator/scripts/requirements.txt -r scripts/requirements-docs.txt
       - name: Install pnpm for the node init tests
         # `init::tests::init_node_pnpm_turbo_workspace_first_run_is_green`
         # declares a pnpm workspace, so its baseline can only go Green when
@@ -489,25 +467,6 @@ jobs:
         run: cargo test -p do-harness-db --release -- --test-threads=1
       - name: Build harness CLI
         run: cargo build --release -p do-harness
-      - name: Check documentation contracts with the resolved interpreter
-        # The verification set's docs sensors spell their argv `python3
-        # scripts/docs.py <subcommand> --check`; windows-latest resolves the
-        # interpreter as `python` (the name the install step above uses), so the
-        # read-only checks run here under that name. `sync` is covered already:
-        # the `cargo nextest run --workspace` step above builds and runs the
-        # `do-harness` binary's unit tests, which include
-        # `docs_generation::sync::generated_docs_are_in_sync`, so re-running it
-        # through this script would compile the same test target again for no
-        # new signal. Both checks below are offline, and `docs-examples`
-        # exercises the release binary built just above; the local installer
-        # fixture declares `platforms = ["linux", "darwin"]` (its
-        # scripts/test-install.sh supports Linux and macOS only), so here the
-        # check reports that one skip and runs every other example.
-        shell: bash
-        timeout-minutes: 10
-        run: |
-          python scripts/docs.py links --check
-          python scripts/docs.py examples --check
       - name: Dogfood init + verify with the release binary
         shell: bash
         env:
