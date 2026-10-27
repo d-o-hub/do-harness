@@ -18,6 +18,7 @@ fn spec(name: &str, when_changed: &[&str]) -> SensorSpec {
         allow_failure: false,
         transient_exit_codes: Vec::new(),
         artifacts: Vec::new(),
+        environment_inputs: Vec::new(),
         coverage_inputs: Vec::new(),
         inputs: Vec::new(),
         when_changed: when_changed.iter().map(ToString::to_string).collect(),

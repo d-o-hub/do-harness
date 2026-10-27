@@ -6,7 +6,7 @@ use crate::baselines::{Baselines, BlessOutcome};
 use crate::config::SensorSeverity;
 use crate::evidence::EvidenceSkipped;
 use crate::sensors::VerifyOpts;
-use crate::{CliError, config, evidence, report, sensor_inputs, sensors, telemetry};
+use crate::{CliError, config, evidence, report, sensors, telemetry};
 
 /// Marker exported by managed git hooks (`hook install`); see
 /// `hook_script::EXEC_VERIFY`.
@@ -67,14 +67,12 @@ pub(crate) async fn run(root: &Path, mut opts: VerifyOpts) -> std::result::Resul
 
     // Compute pre-execution input digests for all selected sensors so mid-run
     // mutations can be detected for every run, including non---record runs.
-    let mut pre_digests = std::collections::BTreeMap::new();
-    for spec in &selection.specs {
-        if let Some(digest) =
-            sensor_inputs::effective_input_digest(root, spec, config_bytes.as_deref())
-        {
-            pre_digests.insert(spec.name.clone(), digest);
-        }
-    }
+    let pre_digests: std::collections::BTreeMap<String, String> =
+        crate::provenance::InputManifest::capture(root, &selection.specs, config_bytes.as_deref())
+            .sensors
+            .into_iter()
+            .filter_map(|(name, digest)| digest.map(|d| (name, d)))
+            .collect();
 
     if opts.record {
         let struck = telemetry::struck_sensors(root, &cfg.sensor_names(), &beat_scope.key())
@@ -92,15 +90,7 @@ pub(crate) async fn run(root: &Path, mut opts: VerifyOpts) -> std::result::Resul
                 opts.blocked.push(name);
             }
         }
-        prepare_reuse(
-            root,
-            &cfg,
-            config_bytes.as_deref(),
-            &beat_scope,
-            &mut opts,
-            &selection,
-        )
-        .await?;
+        prepare_reuse(root, &cfg, &pre_digests, &beat_scope, &mut opts, &selection).await?;
     } else {
         opts.pre_digests = pre_digests.clone();
     }
@@ -120,25 +110,22 @@ pub(crate) async fn run(root: &Path, mut opts: VerifyOpts) -> std::result::Resul
             // recording and a baseline bless — because those are deliberate
             // harness writes, not input drift, and the blessed baseline file
             // is itself part of the digest being compared.
-            let mut invalidated_reason = None;
-            for spec in &selection.specs {
-                if opts.blocked.contains(&spec.name) || opts.quarantined.contains(&spec.name) {
-                    continue;
-                }
-                if let Some(pre) = pre_digests.get(&spec.name) {
-                    if let Some(post) =
-                        sensor_inputs::effective_input_digest(root, spec, config_bytes.as_deref())
-                    {
-                        if post != *pre {
-                            invalidated_reason = Some("inputs_changed_during_run".to_string());
-                            break;
-                        }
-                    } else {
-                        invalidated_reason = Some("inputs_changed_during_run".to_string());
-                        break;
-                    }
-                }
-            }
+            let post = crate::provenance::InputManifest::capture(
+                root,
+                &selection.specs,
+                config_bytes.as_deref(),
+            );
+            let invalidated_reason = selection
+                .specs
+                .iter()
+                .any(|spec| {
+                    !opts.blocked.contains(&spec.name)
+                        && !opts.quarantined.contains(&spec.name)
+                        && pre_digests.get(&spec.name).is_some_and(|before| {
+                            post.sensors.get(&spec.name).and_then(Option::as_ref) != Some(before)
+                        })
+                })
+                .then(|| "inputs_changed_during_run".to_owned());
 
             if opts.record {
                 telemetry::record_verify(
@@ -168,8 +155,7 @@ pub(crate) async fn run(root: &Path, mut opts: VerifyOpts) -> std::result::Resul
                 started_at,
                 &selection,
                 invalidated_reason.as_deref(),
-            )
-            .await?;
+            )?;
 
             if let Some(reason) = invalidated_reason {
                 return Err(CliError::Verify(anyhow::anyhow!(
@@ -208,7 +194,7 @@ pub(crate) async fn run(root: &Path, mut opts: VerifyOpts) -> std::result::Resul
 async fn prepare_reuse(
     root: &Path,
     _cfg: &config::Config,
-    config_bytes: Option<&[u8]>,
+    pre_digests: &std::collections::BTreeMap<String, String>,
     scope: &telemetry::BeatScope,
     opts: &mut VerifyOpts,
     selection: &sensors::ResolvedSelection<'_>,
@@ -221,10 +207,10 @@ async fn prepare_reuse(
         if opts.blocked.contains(&spec.name) || opts.quarantined.contains(&spec.name) {
             continue;
         }
-        let Some(digest) = sensor_inputs::digest(root, spec, config_bytes) else {
+        let Some(digest) = pre_digests.get(&spec.name).cloned() else {
             continue;
         };
-        if lookup {
+        if lookup && !spec.inputs.is_empty() {
             let db = match conn.take() {
                 Some(db) => db,
                 None => do_harness_db::connect_and_migrate(root)
@@ -336,7 +322,7 @@ fn to_i64(value: u64) -> i64 {
 /// clobber verification evidence (or vice versa). Runs without `--set` keep
 /// the legacy behavior: an artifact only for `--evidence` or `--strict`.
 #[allow(clippy::too_many_arguments)]
-async fn write_evidence(
+fn write_evidence(
     root: &Path,
     cfg: &config::Config,
     config_bytes: Option<&[u8]>,
@@ -392,6 +378,7 @@ async fn write_evidence(
         .map_or(0, |d| i64::try_from(d.as_secs()).unwrap_or(i64::MAX));
     let meta = evidence::RunMeta {
         cfg,
+        config_bytes,
         root,
         set: opts.set.as_deref(),
         selected: &selected,
@@ -405,32 +392,9 @@ async fn write_evidence(
         invalidated_reason: invalidated_reason.map(ToOwned::to_owned),
     };
     let mut doc = evidence::EvidenceDocument::from_run(report, &meta);
-    // Chain artifacts in the same workspace: reading an existing artifact's
-    // chain hash makes tampering/reordering detectable.
-    let prev_hash = tokio::fs::read(&path)
-        .await
-        .ok()
-        .and_then(|bytes| serde_json::from_slice::<serde_json::Value>(&bytes).ok())
-        .and_then(|value| {
-            value
-                .get("chain_hash")
-                .and_then(|hash| hash.as_str())
-                .map(ToOwned::to_owned)
-        })
-        .filter(|hash| !hash.is_empty());
-    doc.seal(prev_hash.clone())
-        .map_err(|e| CliError::Verify(e.into()))?;
-    if let Some(parent) = path.parent() {
-        if !parent.as_os_str().is_empty() {
-            let _ = tokio::fs::create_dir_all(parent).await;
-        }
-    }
-    let json = serde_json::to_vec_pretty(&doc).map_err(|e| CliError::Verify(e.into()))?;
-    tokio::fs::write(&path, json)
-        .await
-        .map_err(|e| CliError::Verify(e.into()))?;
+    evidence::write_document(&path, &mut doc).map_err(CliError::Verify)?;
 
-    if opts.strict && !(doc.is_strict_clean() && doc.verify_chain(prev_hash.as_deref())) {
+    if opts.strict && !(doc.is_strict_clean() && doc.verify_chain(doc.prev_hash.as_deref())) {
         eprintln!(
             "strict evidence check failed; artifact at {}",
             path.display()

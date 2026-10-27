@@ -111,6 +111,7 @@ pub async fn add_task(
 /// Validated state for an `advance` transition: the open connection plus the
 /// current subtask's name and sensor.
 struct AdvanceGate {
+    task: do_harness_types::TaskRecord,
     conn: do_harness_db::Connection,
     sensor: Option<String>,
     subtask_name: String,
@@ -125,13 +126,13 @@ async fn advance_gate(root: &Path, id: i64) -> Result<AdvanceGate> {
     if matches!(task.status, TaskState::Done | TaskState::Failed) {
         anyhow::bail!("task {id} is {}; cannot advance", task.status.as_str());
     }
-    let Some(method_name) = task.method else {
+    let Some(method_name) = task.method.as_deref() else {
         anyhow::bail!("task {id} has no method; cannot advance");
     };
     let idx = usize::try_from(task.subtask_index)
         .with_context(|| format!("task {id} has an invalid subtask_index"))?;
     let methods = crate::methods::load_methods(root).await?;
-    let method = crate::methods::find_method(&methods, &method_name)
+    let method = crate::methods::find_method(&methods, method_name)
         .with_context(|| format!("task {id} references unknown method '{method_name}'"))?;
     if idx >= method.subtasks.len() {
         anyhow::bail!("task {id} has no more subtasks to advance");
@@ -146,6 +147,7 @@ async fn advance_gate(root: &Path, id: i64) -> Result<AdvanceGate> {
         }
     }
     Ok(AdvanceGate {
+        task,
         conn,
         sensor: method.subtasks[idx].sensor.clone(),
         subtask_name: method.subtasks[idx].name.clone(),
@@ -158,13 +160,19 @@ async fn advance_gate(root: &Path, id: i64) -> Result<AdvanceGate> {
 ///
 /// Returns the same refusals [`advance_task`] would produce.
 pub async fn preview_advance(root: &Path, id: i64) -> Result<()> {
-    advance_gate(root, id).await.map(|_| ())
+    let gate = advance_gate(root, id).await?;
+    let sensors: Vec<String> = gate.sensor.iter().cloned().collect();
+    super::freshness::preview(root, &gate.conn, &gate.task, &sensors, false).await
 }
 
 /// Advances the subtask pointer of a task.
 pub async fn advance_task(root: &Path, id: i64) -> Result<(i64, WorkflowEvent)> {
     let gate = advance_gate(root, id).await?;
-    do_harness_db::advance_subtask_with_event(&gate.conn, id, gate.sensor.as_deref())
+    let sensors: Vec<String> = gate.sensor.iter().cloned().collect();
+    do_harness_db::transition_with_freshness(
+        &gate.conn, id, do_harness_db::FreshTransition::Advance,
+        || super::freshness::snapshot(root, &gate.task, &sensors, false),
+    )
         .await
         .map_err(|err| match err {
             do_harness_db::DbError::GateUnsatisfied { sensor, .. } => anyhow::anyhow!(
@@ -185,6 +193,7 @@ fn latest_sensor_beat_ok(beats: &[Beat], sensor: &str) -> bool {
 
 /// Validated state for a `done` transition.
 struct DoneGate {
+    task: do_harness_types::TaskRecord,
     conn: do_harness_db::Connection,
     required_sensors: Vec<String>,
 }
@@ -198,14 +207,15 @@ async fn done_gate(root: &Path, id: i64) -> Result<DoneGate> {
     if matches!(task.status, TaskState::Done | TaskState::Failed) {
         anyhow::bail!("task {id} is {}; cannot mark done", task.status.as_str());
     }
-    let Some(method_name) = task.method else {
+    let Some(method_name) = task.method.as_deref() else {
         return Ok(DoneGate {
+            task,
             conn,
             required_sensors: Vec::new(),
         });
     };
     let methods = crate::methods::load_methods(root).await?;
-    let method = crate::methods::find_method(&methods, &method_name)
+    let method = crate::methods::find_method(&methods, method_name)
         .with_context(|| format!("task {id} references unknown method '{method_name}'"))?;
     let index = usize::try_from(task.subtask_index)
         .with_context(|| format!("task {id} has an invalid subtask_index"))?;
@@ -226,6 +236,7 @@ async fn done_gate(root: &Path, id: i64) -> Result<DoneGate> {
         .filter_map(|sub| sub.sensor.clone())
         .collect();
     Ok(DoneGate {
+        task,
         conn,
         required_sensors,
     })
@@ -237,22 +248,22 @@ async fn done_gate(root: &Path, id: i64) -> Result<DoneGate> {
 ///
 /// Returns the same refusals [`done_task`] would produce.
 pub async fn preview_done(root: &Path, id: i64) -> Result<()> {
-    done_gate(root, id).await.map(|_| ())
+    let gate = done_gate(root, id).await?;
+    super::freshness::preview(root, &gate.conn, &gate.task, &gate.required_sensors, true).await
 }
 
 /// Marks a task as done once all sensor-gated subtasks have passed.
 pub async fn done_task(root: &Path, id: i64) -> Result<WorkflowEvent> {
     let gate = done_gate(root, id).await?;
-    do_harness_db::update_task_status_with_event(
-        &gate.conn,
-        id,
-        TaskState::Done,
-        &gate.required_sensors,
+    do_harness_db::transition_with_freshness(
+        &gate.conn, id, do_harness_db::FreshTransition::Complete,
+        || super::freshness::snapshot(root, &gate.task, &gate.required_sensors, true),
     )
     .await
+    .map(|(_, event)| event)
     .map_err(|err| match err {
         do_harness_db::DbError::GateUnsatisfied { sensor, .. } => anyhow::anyhow!(
-            "cannot mark task {id} done: sensor '{sensor}' has no passing beat (run: do-harness verify --record --task {id})"
+            "cannot mark task {id} done: sensor '{sensor}' has no fresh passing beat (run: do-harness verify --record --task {id})"
         ),
         other => other.into(),
     })

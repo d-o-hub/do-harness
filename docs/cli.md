@@ -203,7 +203,9 @@ missing information into a pass. Commands that read the environment, network,
 generated outputs, or history cannot declare a complete input set and must
 stay undeclared; the built-in pack therefore ships no cached sensors.
 
-Evidence schema v4 records each sensor's exact `argv` and a SHA-256 of its
+The [canonical freshness contract](evidence-freshness.md) defines input invalidation and
+transactional task gates. Historical v3/v4 evidence stays readable but needs
+regeneration to establish freshness. Evidence schema v5 records each sensor's exact `argv` and a SHA-256 of its
 captured output, the selected `signal_set`, the post-run workspace
 fingerprint (content hashes of staged, unstaged, deleted, renamed, and
 relevant untracked files — never mtimes, and never harness-owned
@@ -220,8 +222,8 @@ editing the matrix definition makes evidence stale without re-running.
 Artifacts chain to the previous file at the same path
 (`chain_hash`/`prev_hash`) so tampering or reordering is detectable. CI
 uploads only the artifact and a `Cargo.lock` hash; the local database is not
-uploaded and can be pruned with `maintenance`. Schema v3 artifacts (no
-artifacts/coverage) stay readable and current; pre-fingerprint (v2 or older)
+uploaded and can be pruned with `maintenance`. Schema v3/v4 artifacts
+stay readable but require regeneration for current provenance; pre-fingerprint (v2 or older)
 artifacts are legacy (missing).
 
 Schema v2 artifacts (no fingerprints) are still chain-linked when a v4 run

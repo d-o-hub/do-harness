@@ -279,7 +279,7 @@ fn evidence_carries_fingerprints_and_schema_v4() {
     let path = root.join(".do-harness/evidence.verification.json");
     let doc: Value =
         serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).expect("evidence json");
-    assert_eq!(doc["schema_version"], serde_json::json!(4));
+    assert_eq!(doc["schema_version"], serde_json::json!(5));
     assert_eq!(doc["signal_set"], serde_json::json!("verification"));
     for field in [
         "workspace_fingerprint",

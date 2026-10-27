@@ -148,6 +148,9 @@ fn web_pack_unconfigured_skips_and_fails_strict() {
 
     assert!(root.join("scripts/viewport-audit.mjs").is_file());
     assert!(root.join("scripts/a11y-audit.mjs").is_file());
+    // A current failure needs established Git provenance; a non-repository
+    // can only establish unknown/stale inputs under the canonical contract.
+    git(root, &["init", "-q"]);
 
     // Without WEB_AUDIT_ROUTES, web sensors emit SKIP: which is recorded as warn.
     let (code, stdout, stderr) = run(harness(root).args([

@@ -54,6 +54,7 @@ mod methods;
 mod metrics;
 mod overlap;
 mod pr;
+mod provenance;
 mod report;
 mod sensor_inputs;
 mod sensors;

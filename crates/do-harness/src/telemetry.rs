@@ -178,19 +178,25 @@ fn cache_digest(
     if !sensor.ok || sensor.exit_code != Some(0) || sensor.warned {
         return None;
     }
-    if sensor.findings.is_some_and(|findings| findings > 0) || !spec.artifacts.is_empty() {
+    if !spec.artifacts.is_empty() && crate::artifacts::resolve(root, &spec.artifacts).is_empty() {
         return None;
     }
-    if sensor
-        .output
-        .lines()
-        .any(|line| line.trim_start().starts_with("COVERAGE:"))
-    {
-        return None;
-    }
+    let observation_only = spec.inputs.is_empty()
+        || sensor.findings.is_some_and(|findings| findings > 0)
+        || !spec.artifacts.is_empty()
+        || sensor
+            .output
+            .lines()
+            .any(|line| line.trim_start().starts_with("COVERAGE:"));
     let pre = pre_digests.get(&sensor.name)?;
-    let post = crate::sensor_inputs::digest(root, spec, config_bytes)?;
-    (post == *pre).then_some(post)
+    let post = crate::provenance::sensor_digest(root, spec, config_bytes)?;
+    (post == *pre).then(|| {
+        if observation_only {
+            format!("{}{post}", do_harness_db::OBSERVATION_ONLY_PREFIX)
+        } else {
+            post
+        }
+    })
 }
 
 /// Bounds a sensor output while preserving its first actionable failure and

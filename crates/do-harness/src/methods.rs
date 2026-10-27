@@ -55,6 +55,16 @@ pub async fn load_methods(root: &Path) -> Result<Vec<Method>> {
     }
 }
 
+/// Reads the same catalog inside a synchronous input snapshot.
+pub(crate) fn load_methods_sync(root: &Path) -> Result<Vec<Method>> {
+    let text = match std::fs::read_to_string(root.join("plans/methods.json")) {
+        Ok(text) => text,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => BUILTIN_CATALOG.to_owned(),
+        Err(e) => return Err(e.into()),
+    };
+    Ok(serde_json::from_str::<MethodFile>(&text)?.methods)
+}
+
 /// Returns the method with the given name, if present.
 #[must_use]
 pub fn find_method<'a>(methods: &'a [Method], name: &str) -> Option<&'a Method> {

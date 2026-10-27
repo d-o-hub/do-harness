@@ -61,6 +61,8 @@ pub struct CurrentSide {
     pub policy_fingerprint: String,
     /// Failed sensors when the state is red.
     pub failed: Vec<String>,
+    /// Sensors with changed or unestablished canonical inputs.
+    pub input_mismatches: Vec<String>,
 }
 
 /// Machine-readable status report (the `--format json` contract).
@@ -124,6 +126,7 @@ struct CurrentFacts {
     policy: String,
     /// Current set-free config fingerprint.
     config: String,
+    manifest: crate::provenance::InputManifest,
 }
 
 impl CurrentFacts {
@@ -138,34 +141,29 @@ impl CurrentFacts {
         let changed = crate::changes::discover(root);
         let selection = crate::applicability::select(&candidates, &changed);
         let required = selection.selected_names();
-        let workspace = crate::fingerprint::workspace_fingerprint(root, &changed);
-        let baseline_digest = crate::baselines::digest(root);
-        let coverage_digest = crate::fingerprint::coverage_digest(root, &candidates);
-        let policy = crate::fingerprint::policy_fingerprint(
-            cfg,
-            config_bytes,
-            set,
-            &candidates,
-            &baseline_digest,
-            &coverage_digest,
-        );
-        let config = crate::fingerprint::config_fingerprint(
-            cfg,
-            config_bytes,
-            &candidates,
-            &baseline_digest,
-            &coverage_digest,
-        );
+        let fingerprints =
+            crate::fingerprint::for_run(root, cfg, config_bytes, set, &candidates, &changed);
+        let workspace = fingerprints.workspace;
+        let policy = fingerprints.policy;
+        let config = fingerprints.config;
+        let manifest = crate::provenance::InputManifest::capture(root, &candidates, config_bytes);
         Ok(Self {
             side: CurrentSide {
                 workspace_fingerprint: workspace.clone(),
                 policy_fingerprint: policy.clone(),
                 failed: Vec::new(),
+                input_mismatches: manifest
+                    .sensors
+                    .iter()
+                    .filter(|(_, digest)| digest.is_none())
+                    .map(|(name, _)| name.clone())
+                    .collect(),
             },
             required,
             workspace,
             policy,
             config,
+            manifest,
         })
     }
 }
@@ -195,6 +193,26 @@ fn missing_report(
     }
 }
 
+/// Name changed or unknown input identities without exposing their values.
+fn current_input_side(facts: &CurrentFacts, document: &EvidenceDocument) -> CurrentSide {
+    let mut current_side = facts.side.clone();
+    current_side.input_mismatches = facts
+        .manifest
+        .sensors
+        .iter()
+        .filter(|(name, current)| {
+            current.is_none()
+                || document
+                    .input_manifest
+                    .as_ref()
+                    .and_then(|m| m.sensors.get(*name))
+                    != Some(*current)
+        })
+        .map(|(name, _)| name.clone())
+        .collect();
+    current_side
+}
+
 /// Decides green/red/stale/missing for one evidence document.
 ///
 /// Same-set evidence decides green/red/stale against the full policy;
@@ -202,6 +220,7 @@ fn missing_report(
 /// fingerprint and covers every required sensor — even when sensors outside
 /// the requested contract failed.
 fn decide(set: Option<&str>, facts: &CurrentFacts, document: &EvidenceDocument) -> StatusReport {
+    let current_side = current_input_side(facts, document);
     let evidence = EvidenceSide {
         signal_set: document.signal_set.clone(),
         verdict: document.summary.verdict.clone(),
@@ -239,10 +258,20 @@ fn decide(set: Option<&str>, facts: &CurrentFacts, document: &EvidenceDocument) 
     let policy_match = document.policy_fingerprint == facts.policy;
     let config_match = document.config_fingerprint == facts.config;
 
+    let provenance_ok = document.input_manifest.as_ref().is_some_and(|manifest| {
+        manifest.established()
+            && facts.manifest.established()
+            && manifest.git_revision == facts.manifest.git_revision
+            && manifest.branch == facts.manifest.branch
+            && facts
+                .required
+                .iter()
+                .all(|name| manifest.sensors.get(name) == facts.manifest.sensors.get(name))
+    }) && document.verify_chain(document.prev_hash.as_deref());
     let policy_ok = if same_set { policy_match } else { config_match };
-    if covers && workspace_match && policy_ok {
+    if covers && workspace_match && policy_ok && provenance_ok {
         if let Some(reason) = &document.invalidated_reason {
-            let mut current = facts.side.clone();
+            let mut current = current_side.clone();
             current.failed.clone_from(&evidence.failed);
             return StatusReport {
                 state: EvidenceState::Red,
@@ -253,7 +282,7 @@ fn decide(set: Option<&str>, facts: &CurrentFacts, document: &EvidenceDocument) 
             };
         }
         if same_set && document.summary.verdict == "fail" {
-            let mut current = facts.side.clone();
+            let mut current = current_side.clone();
             current.failed.clone_from(&evidence.failed);
             return StatusReport {
                 state: EvidenceState::Red,
@@ -268,7 +297,7 @@ fn decide(set: Option<&str>, facts: &CurrentFacts, document: &EvidenceDocument) 
             set: set.map(ToOwned::to_owned),
             reason: "current".to_owned(),
             evidence: Some(evidence),
-            current: facts.side.clone(),
+            current: current_side.clone(),
         };
     }
     if !covers {
@@ -277,10 +306,12 @@ fn decide(set: Option<&str>, facts: &CurrentFacts, document: &EvidenceDocument) 
             set: set.map(ToOwned::to_owned),
             reason: "insufficient_coverage".to_owned(),
             evidence: Some(evidence),
-            current: facts.side.clone(),
+            current: current_side.clone(),
         };
     }
-    let reason = if workspace_match {
+    let reason = if workspace_match && policy_ok {
+        "inputs_changed_or_unknown"
+    } else if workspace_match {
         "policy_changed"
     } else {
         "workspace_changed"
@@ -290,7 +321,7 @@ fn decide(set: Option<&str>, facts: &CurrentFacts, document: &EvidenceDocument) 
         set: set.map(ToOwned::to_owned),
         reason: reason.to_owned(),
         evidence: Some(evidence),
-        current: facts.side.clone(),
+        current: current_side.clone(),
     }
 }
 

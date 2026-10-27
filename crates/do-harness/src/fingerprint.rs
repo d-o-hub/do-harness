@@ -204,19 +204,7 @@ pub fn config_fingerprint(
 
 /// Canonical JSON view of one sensor definition for policy hashing.
 fn policy_sensor(spec: &SensorSpec) -> serde_json::Value {
-    serde_json::json!({
-        "name": spec.name,
-        "argv": spec.argv,
-        "retry": spec.retry,
-        "timeout": spec.timeout,
-        "severity": spec.effective_severity(),
-        "allow_failure": spec.allow_failure,
-        "transient_exit_codes": spec.transient_exit_codes,
-        "when_changed": spec.when_changed,
-        "artifacts": spec.artifacts,
-        "coverage_inputs": spec.coverage_inputs,
-        "inputs": spec.inputs,
-    })
+    serde_json::json!({"definition": spec, "effective_severity": spec.effective_severity()})
 }
 
 /// Config identity: hex of the raw bytes, or the built-in marker.
@@ -273,6 +261,7 @@ mod tests {
                 allow_failure: false,
                 transient_exit_codes: Vec::new(),
                 artifacts: Vec::new(),
+                environment_inputs: Vec::new(),
                 coverage_inputs: Vec::new(),
                 inputs: Vec::new(),
                 when_changed: Vec::new(),

@@ -8,6 +8,7 @@ use super::super::*;
 fn seal_and_verify_chain() {
     let mut doc = EvidenceDocument {
         schema_version: 2,
+        input_manifest: None,
         tool: "do-harness".to_owned(),
         harness_version: "0.1.0".to_owned(),
         git_sha: Some("abc".into()),
