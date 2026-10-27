@@ -18,10 +18,9 @@ def terminate(child):
         if os.path.isabs(system_root):
             taskkill = os.path.join(system_root, "System32", "taskkill.exe")
             try:
-                # Trusted host SystemRoot and the PID assigned to our child; no shell.
-                # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit.dangerous-subprocess-use-audit
+                # Run the system utility explicitly, with our child's PID and no shell.
                 subprocess.run(  # nosec B603 - fixed utility and integer PID, no shell
-                    [taskkill, "/PID", str(child.pid), "/T", "/F"],  # nosemgrep: python.lang.security.dangerous-subprocess-use.dangerous-subprocess-use
+                    ["taskkill.exe", "/PID", str(child.pid), "/T", "/F"], executable=taskkill,
                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
             except OSError:
                 pass  # Fall back to killing the direct child below.

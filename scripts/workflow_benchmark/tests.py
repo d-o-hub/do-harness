@@ -62,9 +62,9 @@ class BenchmarkTests(unittest.TestCase):
              mock.patch.dict(process.os.environ, {"SystemRoot": "/trusted/windows"}), \
              mock.patch.object(process.subprocess, "run") as run:
             process.terminate(child)
-        self.assertEqual(run.call_args.args[0],
-                         [os.path.join("/trusted/windows", "System32", "taskkill.exe"),
-                          "/PID", "123", "/T", "/F"])
+        self.assertEqual(run.call_args.args[0], ["taskkill.exe", "/PID", "123", "/T", "/F"])
+        self.assertEqual(run.call_args.kwargs["executable"],
+                         os.path.join("/trusted/windows", "System32", "taskkill.exe"))
         child.kill.assert_called_once()
         child.wait.assert_called_once()
 
