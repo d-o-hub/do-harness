@@ -8,6 +8,8 @@
 //! (deterministic PR analysis), `dora` (deterministic deployment metrics),
 //! and `version` (version information).
 
+#![forbid(unsafe_code)]
+
 use std::process::ExitCode;
 
 use clap::{CommandFactory, Parser};

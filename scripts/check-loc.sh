@@ -115,11 +115,35 @@ ITEM_RE='^(fn |pub fn |pub\(crate\) fn |impl |mod |struct |enum |trait |const |s
 # Line number of the first inline `#[cfg(test)]` marker, or 0 when absent.
 test_boundary() {
     local file="$1" match
-    match="$(grep -nE '^[[:space:]]*#\[cfg\(test\)\]' "$file" | head -n 1 || true)"
+    match="$(awk '
+        /^[[:space:]]*#\[cfg\(test\)\]/ {
+            start = NR
+            rest = $0
+            sub(/^[[:space:]]*#\[cfg\(test\)\][[:space:]]*/, "", rest)
+            if (rest == "") {
+                while ((getline line) > 0) {
+                    if (line ~ /^[[:space:]]*(\/\/|\/\*|\*|#\[)/) continue
+                    if (line ~ /^[[:space:]]*$/) continue
+                    rest = line
+                    break
+                }
+            }
+            if (rest ~ /^[[:space:]]*mod[[:space:]]+[a-zA-Z0-9_]+/) {
+                while (rest !~ /[{;]/) {
+                    if ((getline line) <= 0) break
+                    rest = rest " " line
+                }
+                if (rest ~ /\{/) {
+                    print start
+                    exit
+                }
+            }
+        }
+    ' "$file" | head -n 1 || true)"
     if [[ -z "$match" ]]; then
         printf '0'
     else
-        printf '%s' "${match%%:*}"
+        printf '%s' "$match"
     fi
 }
 
