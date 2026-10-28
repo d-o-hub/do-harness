@@ -174,6 +174,7 @@ if command -v python3 >/dev/null 2>&1 &&
     python3 "$ROOT/scripts/test_doc_tools.py" || failures=1
     python3 "$ROOT/scripts/tests/test_examples.py" || failures=1
     python3 "$ROOT/scripts/tests/test_doc_impact.py" || failures=1
+    python3 "$ROOT/scripts/tests/test_ci_workflow_costs.py" || failures=1
     python3 "$ROOT/scripts/tests/test_docs_review_benchmark.py" || failures=1
     python3 "$ROOT/scripts/docs-review-benchmark.py" || failures=1
     python3 "$ROOT/scripts/docs.py" links --check || failures=1

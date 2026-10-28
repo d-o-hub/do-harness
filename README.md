@@ -2,7 +2,7 @@
 
 A compiled agent-execution harness CLI: feedforward guides (AGENTS.md, `.agents/skills/`) plus feedback sensors (computational checks) that agents and CI must pass.
 
-Optional [client boundary conformance](docs/client-conformance.md) distinguishes
+Optional [client boundary conformance](https://github.com/d-o-hub/do-harness/blob/main/docs/client-conformance.md) distinguishes
 installed guidance, sanitizer fixture capability, and instrumented client
 observations. A passing fixture alone never proves client mediation.
 
@@ -55,7 +55,7 @@ teardown fix; `--locked` does not restore that missing code. That fix ships from
 0.3.0 on — published with registry validation on musl and Windows — so source
 installs from 0.3.0 use the maintained `do-harness-libsql` fork:
 `cargo install do-harness --version 0.3.0 --locked`.
-See [source-distribution validation](docs/releasing.md#source-distribution-validation).
+See [source-distribution validation](https://github.com/d-o-hub/do-harness/blob/main/docs/releasing.md#source-distribution-validation).
 
 Building from source requires Rust 1.85+:
 
@@ -344,7 +344,7 @@ canonical copy).
 
 ## CI
 
-The offline [workflow effectiveness benchmark](docs/workflow-benchmarks.md)
+The offline [workflow effectiveness benchmark](https://github.com/d-o-hub/do-harness/blob/main/docs/workflow-benchmarks.md)
 checks a versioned synthetic corpus and measurement contract. External agent
 comparisons are explicit, bounded, and advisory; fixture replay is not evidence
 that a skill improves an agent.
@@ -395,7 +395,7 @@ See [docs/compliance.md](https://github.com/d-o-hub/do-harness/blob/main/docs/co
 
 ## Configuration
 
-Sensors have documented [execution trust and resource limits](docs/sensor-execution.md),
+Sensors have documented [execution trust and resource limits](https://github.com/d-o-hub/do-harness/blob/main/docs/sensor-execution.md),
 including a one-hour default timeout, bounded redacted output and an optional
 environment allowlist. Local commands retain the caller's permissions.
 

@@ -20,3 +20,5 @@
 //! target and fails every release with `no library targets found`. It exports
 //! no items on purpose — re-exporting a module would commit this crate to a
 //! semver surface that no consumer has asked for, and the CLI is the contract.
+
+#![forbid(unsafe_code)]

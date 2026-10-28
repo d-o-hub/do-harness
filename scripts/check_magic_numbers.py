@@ -58,6 +58,26 @@ NUMBER = re.compile(r"(?<![\w.$])(0[oObB][0-9a-fA-F_]+|0[xX][0-9a-fA-F_]+|\d+(?:
 
 #: `const NAME: T = ...` / `static NAME: T = ...`: where a value earns its name.
 DECLARATION = re.compile(r"\b(?:const|static)\s+[A-Z_][A-Z0-9_]*\s*:")
+#: Opener for a raw string literal (e.g. `r#"`, `r##"`, `r"`).
+RAW_STRING_OPEN = re.compile(r'(?<![a-zA-Z0-9_])r(#*)"')
+
+
+def find_unclosed_raw_string(line: str) -> str | None:
+    """Returns the closing delimiter if `line` opens an unclosed raw string."""
+    index = 0
+    while index < len(line):
+        match = RAW_STRING_OPEN.search(line, index)
+        if not match:
+            break
+        hashes = len(match.group(1))
+        term = '"' + "#" * hashes
+        content_start = match.end()
+        close = line.find(term, content_start)
+        if close == -1:
+            return term
+        index = close + len(term)
+    return None
+
 
 
 def blank(count: int) -> str:
@@ -143,9 +163,19 @@ def findings_in(path: pathlib.Path) -> list[str]:
     """Returns `line: literal` findings for one file."""
     found: list[str] = []
     inside_literal = False
+    raw_terminator: str | None = None
     for number, raw in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+        if raw_terminator is not None:
+            close = raw.find(raw_terminator)
+            if close != -1:
+                raw_terminator = find_unclosed_raw_string(raw[close + len(raw_terminator) :])
+            continue
         if inside_literal:
             inside_literal = raw.count('"') % 2 == 0
+            continue
+        unclosed = find_unclosed_raw_string(raw)
+        if unclosed:
+            raw_terminator = unclosed
             continue
         if DECLARATION.search(raw):
             continue

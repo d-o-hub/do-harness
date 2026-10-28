@@ -1034,6 +1034,18 @@ EOF
         printf 'FAIL version_lt mis-orders versions\n' >&2
         failures=$((failures + 1))
     fi
+    expect_die '--ref requires a value' \
+        'missing option value for --ref fails closed with diagnostic' \
+        main status --ref
+    expect_die '--root requires a value' \
+        'missing option value for --root fails closed with diagnostic' \
+        main status --root
+    expect_die '--format requires a value' \
+        'missing option value for --format fails closed with diagnostic' \
+        main status --format
+    expect_die '--published requires a value' \
+        'missing option value for --published fails closed with diagnostic' \
+        main status --published
 
     if [ "$failures" -ne 0 ]; then
         printf 'release-manager: %s self-test failures\n' "$failures" >&2
@@ -1043,6 +1055,9 @@ EOF
 }
 
 main() {
+    require_arg() {
+        [ $# -ge 2 ] || die "$1 requires a value"
+    }
     local command="${1:-}" version=""
     if [ $# -gt 0 ]; then
         shift
@@ -1050,18 +1065,22 @@ main() {
     while [ $# -gt 0 ]; do
         case "$1" in
             --root)
+                require_arg "$@"
                 ROOT="${2:-}"
                 shift 2
                 ;;
             --ref)
+                require_arg "$@"
                 REF="${2:-}"
                 shift 2
                 ;;
             --format)
+                require_arg "$@"
                 FORMAT="${2:-}"
                 shift 2
                 ;;
             --published)
+                require_arg "$@"
                 # Present-but-empty is a fact ("nothing has a published
                 # release"); absent is not, so the flag is tracked separately
                 # from the list.

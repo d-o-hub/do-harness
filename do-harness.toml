@@ -20,8 +20,8 @@ feedback = ["fmt", "check", "clippy", "loc"]
 # contract (`docs/documentation-contract.md`). Each one reads only git, the
 # working tree, and the local toolchain, and each fails closed on an empty
 # inventory, so the trio belongs to the PR-time set as well as `release`.
-verification = ["fmt", "check", "clippy", "deps", "machete", "audit", "test", "doctest", "loc", "skills", "skills-docs", "shell", "markdownlint", "docs-sync", "docs-examples", "docs-links", "yamllint", "actionlint", "action-pins", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "release-manager", "verify-published", "commitlint", "ci-concurrency-guardrails", "workflow-benchmark"]
-release = ["fmt", "check", "clippy", "deps", "audit", "test", "doctest", "coverage", "loc", "skills", "skills-docs", "shell", "markdownlint", "docs-sync", "docs-examples", "docs-links", "yamllint", "actionlint", "action-pins", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "release-manager", "release-manager-e2e", "publish-npm", "verify-published", "commitlint", "ci-concurrency-guardrails", "workflow-benchmark"]
+verification = ["fmt", "check", "clippy", "deps", "machete", "audit", "test", "doctest", "loc", "skills", "skills-docs", "shell", "markdownlint", "docs-sync", "docs-examples", "docs-links", "yamllint", "actionlint", "action-pins", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "release-manager", "verify-published", "commitlint", "ci-concurrency-guardrails", "workflow-benchmark", "ci-workflow-costs"]
+release = ["fmt", "check", "clippy", "deps", "audit", "test", "doctest", "coverage", "loc", "skills", "skills-docs", "shell", "markdownlint", "docs-sync", "docs-examples", "docs-links", "yamllint", "actionlint", "action-pins", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "release-manager", "release-manager-e2e", "publish-npm", "verify-published", "commitlint", "ci-concurrency-guardrails", "workflow-benchmark", "ci-workflow-costs"]
 # DORA gets its own set so its evidence is addressable (`status --set metrics`)
 # without joining the gating sets. A no-`--set` status check compares against
 # every configured sensor, so a dora-only run's artifact would report
@@ -423,3 +423,8 @@ name = "workflow-benchmark"
 argv = ["python3", "scripts/workflow-benchmark.py", "--self-test"]
 timeout = 30
 when-changed = ["benchmarks/**", "scripts/workflow-benchmark.py", "scripts/workflow_benchmark/**", "do-harness.toml"]
+
+[[sensors]]
+name = "ci-workflow-costs"
+argv = ["python3", "scripts/ci_workflow_costs.py", "--check"]
+when-changed = ["scripts/ci_workflow_costs.py", "plans/ci-workflow-costs.json", ".github/workflows/**"]
