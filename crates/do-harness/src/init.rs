@@ -20,6 +20,7 @@ use anyhow::{Context, Result};
 pub mod baseline;
 mod context_sanitization;
 pub mod detect;
+pub mod inspect;
 pub mod node;
 pub mod report;
 mod skills;
@@ -28,16 +29,8 @@ mod web;
 
 pub use baseline::{Baseline, BaselineState};
 pub use detect::{Candidate, CandidateStatus};
+pub use inspect::run_inspect;
 pub use report::print_report;
-
-/// `.gitignore` entries the harness needs; appended, never clobbered.
-const GITIGNORE_ENTRIES: &str = ".do-harness/\n.agents/events/\n";
-
-/// Build output the Rust pack's own sensors generate: Cargo writes `target/`
-/// and the coverage sensor writes `lcov.info` at the repository root. Untracked
-/// nonignored files are sensor input identity, so without these entries a
-/// scaffolded run invalidates its own evidence mid-run.
-const GITIGNORE_RUST_ENTRIES: &str = "/target\n/lcov.info\n";
 
 /// Target language for the scaffolded sensor pack.
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, serde::Serialize, clap::ValueEnum)]
@@ -225,7 +218,12 @@ pub async fn init_workspace(root: &Path, opts: &InitOpts) -> Result<InitReport> 
         skills::scaffold_skills(root, opts, &mut report)?;
     }
     if !opts.no_gitignore {
-        append_gitignore(root, report.language, &mut report)?;
+        detect::append_gitignore(
+            root,
+            report.language,
+            &mut report.written,
+            &mut report.skipped,
+        )?;
     }
     // The metrics-event tree the scaffolded harness skill writes into; it is
     // ignored local state, so the directory is created rather than reported as
@@ -444,51 +442,6 @@ fn scaffold_crate(root: &Path, report: &mut InitReport) -> Result<()> {
     write_if_absent(root, "Cargo.toml", CRATE_MANIFEST, false, report)?;
     write_if_absent(root, "src/lib.rs", CRATE_LIB, false, report)?;
     write_if_absent(root, ".config/nextest.toml", NEXTEST_CONFIG, false, report)?;
-    Ok(())
-}
-
-/// `.gitignore` entries for `language`: the harness's own state plus the build
-/// output the language pack's sensors generate.
-fn gitignore_entries(language: Language) -> String {
-    let mut entries = GITIGNORE_ENTRIES.to_owned();
-    if language == Language::Rust {
-        entries.push_str(GITIGNORE_RUST_ENTRIES);
-    }
-    entries
-}
-
-/// Appends the harness `.gitignore` entries when missing; creates the file
-/// when it does not exist yet.
-fn append_gitignore(root: &Path, language: Language, report: &mut InitReport) -> Result<()> {
-    let entries = gitignore_entries(language);
-    let path = root.join(".gitignore");
-    let Ok(existing) = fs::read_to_string(&path) else {
-        fs::write(&path, &entries)
-            .with_context(|| format!("failed to write {}", path.display()))?;
-        report.written.push(".gitignore".to_owned());
-        return Ok(());
-    };
-    let existing_lines: std::collections::HashSet<&str> = existing.lines().collect();
-    // Exact-line matching: a substring hit (e.g. `.do-harness-old/` or a
-    // comment mentioning the dir) must not suppress the real entry.
-    let missing: Vec<&str> = entries
-        .lines()
-        .filter(|line| !line.is_empty() && !existing_lines.contains(line))
-        .collect();
-    if missing.is_empty() {
-        report.skipped.push(".gitignore".to_owned());
-        return Ok(());
-    }
-    let mut updated = existing;
-    if !updated.ends_with('\n') {
-        updated.push('\n');
-    }
-    for entry in &missing {
-        updated.push_str(entry);
-        updated.push('\n');
-    }
-    fs::write(&path, updated).with_context(|| format!("failed to write {}", path.display()))?;
-    report.written.push(".gitignore".to_owned());
     Ok(())
 }
 

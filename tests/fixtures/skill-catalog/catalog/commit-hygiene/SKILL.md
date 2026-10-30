@@ -12,3 +12,6 @@ metadata:
 
 Body prose for commit-hygiene. This text must never be sent to a selector or appear
 in suggestion output; only the frontmatter metadata above is.
+
+## Required Decision Rules
+- entire conventional commit subject must be lowercase

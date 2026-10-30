@@ -9,12 +9,12 @@
 
 use std::path::Path;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use super::Language;
 
 /// Probe outcome for one candidate sensor.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum CandidateStatus {
     /// Required tooling is present.
@@ -27,7 +27,7 @@ pub enum CandidateStatus {
 }
 
 /// One probed candidate development signal.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Candidate {
     /// Sensor name as it would appear in `do-harness.toml`.
     pub name: String,
@@ -263,6 +263,58 @@ fn has_non_hidden_entries(root: &Path) -> bool {
             .any(|entry| !entry.file_name().to_string_lossy().starts_with('.'))
     })
 }
+/// `.gitignore` entries the harness needs; appended, never clobbered.
+pub const GITIGNORE_ENTRIES: &str = ".do-harness/\n.agents/events/\n";
+pub const GITIGNORE_RUST_ENTRIES: &str = "/target\n/lcov.info\n";
+
+#[must_use]
+pub fn gitignore_entries(language: Language) -> String {
+    let mut entries = GITIGNORE_ENTRIES.to_owned();
+    if language == Language::Rust {
+        entries.push_str(GITIGNORE_RUST_ENTRIES);
+    }
+    entries
+}
+
+/// Appends the harness `.gitignore` entries when missing; creates the file
+/// when it does not exist yet.
+pub fn append_gitignore(
+    root: &Path,
+    language: Language,
+    written: &mut Vec<String>,
+    skipped: &mut Vec<String>,
+) -> anyhow::Result<()> {
+    use anyhow::Context as _;
+    let entries = gitignore_entries(language);
+    let path = root.join(".gitignore");
+    let Ok(existing) = std::fs::read_to_string(&path) else {
+        std::fs::write(&path, &entries)
+            .with_context(|| format!("failed to write {}", path.display()))?;
+        written.push(".gitignore".to_owned());
+        return Ok(());
+    };
+    let existing_lines: std::collections::HashSet<&str> = existing.lines().collect();
+    let missing: Vec<&str> = entries
+        .lines()
+        .filter(|line| !line.is_empty() && !existing_lines.contains(line))
+        .collect();
+    if missing.is_empty() {
+        skipped.push(".gitignore".to_owned());
+        return Ok(());
+    }
+    let mut updated = existing;
+    if !updated.ends_with('\n') {
+        updated.push('\n');
+    }
+    for entry in &missing {
+        updated.push_str(entry);
+        updated.push('\n');
+    }
+    std::fs::write(&path, updated)
+        .with_context(|| format!("failed to write {}", path.display()))?;
+    written.push(".gitignore".to_owned());
+    Ok(())
+}
 
 #[cfg(test)]
 mod tests {
@@ -311,7 +363,7 @@ mod tests {
         std::fs::write(dir.path().join("package.json"), "{}\n").unwrap();
         let detection = inspect(dir.path(), None, None);
         assert_eq!(detection.language, Language::Generic);
-        assert!(detection.candidates.is_empty());
+        assert_eq!(detection.candidates.len(), 0);
     }
 
     /// An explicit request wins over repository detection.

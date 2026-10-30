@@ -12,3 +12,6 @@ metadata:
 
 Body prose for pr-triage. This text must never be sent to a selector or appear
 in suggestion output; only the frontmatter metadata above is.
+
+## Required Decision Rules
+- never merge draft without explicit human approval

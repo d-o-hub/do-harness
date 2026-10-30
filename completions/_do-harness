@@ -229,6 +229,8 @@ json\:"Machine-readable JSON output"))' \
 _arguments "${_arguments_options[@]}" : \
 '--base=[Base revision (local mode; requires --head)]:REV:_default' \
 '--head=[Head revision (local mode; requires --base)]:REV:_default' \
+'--view=[Review payload view]:VIEW:((audit\:"Full audit report including exempt and proven changes"
+agent\:"Compact agent-facing envelope with review-required content"))' \
 '--format=[Output format]:FORMAT:((text\:"Human-readable text output"
 json\:"Machine-readable JSON output"))' \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
@@ -513,6 +515,7 @@ json\:"Machine-readable JSON output"))' \
 '--no-seed[Do not seed invariants]' \
 '--minimal[Minimal setup without extra skills]' \
 '--no-gitignore[Skip creating/modifying .gitignore]' \
+'--inspect[Inspect repository and report candidate signals without writing files]' \
 '-q[Suppress PASS/WARN verdict lines and the success footer]' \
 '--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
 '--dry-run[Dry run without side effects]' \
@@ -1018,8 +1021,9 @@ _arguments "${_arguments_options[@]}" : \
 '--format=[Output format]:FORMAT:((text\:"Human-readable text output"
 json\:"Machine-readable JSON output"))' \
 '--approver=[Approver identity recorded with \`--bless\` (defaults to \`DO_HARNESS_APPROVER\` or the git user email)]:NAME:_default' \
-'--agent-cmd=[Run this shell command once per eval case instead of the deterministic walkthrough (real Skill Lift). cwd is the sandbox root; the prompt is in \`\$DO_HARNESS_PROMPT\` and on stdin; stdout is saved to \`agent_stdout.txt\` for assertions]:COMMAND:_default' \
+'--agent-cmd=[Run once per eval case instead of the deterministic walkthrough. cwd is the sandbox root; the prompt is in \`\$DO_HARNESS_PROMPT\` and on stdin. Captured output is redacted and bounded; stdout is saved to \`agent_stdout.txt\` for assertions]:COMMAND:_default' \
 '--agent-timeout=[Kill an agent run after this many seconds]:SECS:_default' \
+'--trials=[Number of repeated trials to run for evaluation (default\: 1)]:N:_default' \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
 '--config=[Explicit path to do-harness.toml]:FILE:_files' \
 '--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
@@ -1424,6 +1428,120 @@ _arguments "${_arguments_options[@]}" : \
 ':dir -- Output directory for man pages:_files -/' \
 && ret=0
 ;;
+(feedback)
+_arguments "${_arguments_options[@]}" : \
+'--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
+'--config=[Explicit path to do-harness.toml]:FILE:_files' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
+'--dry-run[Dry run without side effects]' \
+'-h[Print help]' \
+'--help[Print help]' \
+'-V[Print version]' \
+'--version[Print version]' \
+":: :_do-harness__subcmd__feedback_commands" \
+"*::: :->feedback" \
+&& ret=0
+
+    case $state in
+    (feedback)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:do-harness-feedback-command-$line[1]:"
+        case $line[1] in
+            (draft)
+_arguments "${_arguments_options[@]}" : \
+'--repo=[Target repository (\`OWNER/REPO\`)]:OWNER/REPO:_default' \
+'--days=[Historical search window in days (default\: 30)]:DAYS:_default' \
+'--min-fires=[Minimum independent attributable fires required (default\: 3)]:N:_default' \
+'--out=[Write draft to specific file path]:FILE:_files' \
+'--format=[Output format]:FORMAT:((text\:"Human-readable text output"
+json\:"Machine-readable JSON output"))' \
+'--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
+'--config=[Explicit path to do-harness.toml]:FILE:_files' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
+'--dry-run[Dry run without side effects]' \
+'-h[Print help (see more with '\''--help'\'')]' \
+'--help[Print help (see more with '\''--help'\'')]' \
+'-V[Print version]' \
+'--version[Print version]' \
+&& ret=0
+;;
+(submit)
+_arguments "${_arguments_options[@]}" : \
+'--draft=[Path to the prepared draft JSON file]:FILE:_files' \
+'--repo=[Target repository override]:OWNER/REPO:_default' \
+'--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
+'--config=[Explicit path to do-harness.toml]:FILE:_files' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
+'--yes[Skip interactive confirmation (unattended mode)]' \
+'--dry-run[Perform search and preview without creating an issue]' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
+'-h[Print help]' \
+'--help[Print help]' \
+'-V[Print version]' \
+'--version[Print version]' \
+&& ret=0
+;;
+(auto)
+_arguments "${_arguments_options[@]}" : \
+'--repo=[Target repository (\`OWNER/REPO\`)]:OWNER/REPO:_default' \
+'--days=[Historical search window in days (default\: 30)]:DAYS:_default' \
+'--min-fires=[Minimum independent attributable fires required (default\: 3)]:N:_default' \
+'--format=[Output format]:FORMAT:((text\:"Human-readable text output"
+json\:"Machine-readable JSON output"))' \
+'--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
+'--config=[Explicit path to do-harness.toml]:FILE:_files' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
+'--dry-run[Perform candidate generation and deduplication search without publishing]' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
+'-h[Print help (see more with '\''--help'\'')]' \
+'--help[Print help (see more with '\''--help'\'')]' \
+'-V[Print version]' \
+'--version[Print version]' \
+&& ret=0
+;;
+(help)
+_arguments "${_arguments_options[@]}" : \
+":: :_do-harness__subcmd__feedback__subcmd__help_commands" \
+"*::: :->help" \
+&& ret=0
+
+    case $state in
+    (help)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:do-harness-feedback-help-command-$line[1]:"
+        case $line[1] in
+            (draft)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(submit)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(auto)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(help)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+        esac
+    ;;
+esac
+;;
+        esac
+    ;;
+esac
+;;
 (help)
 _arguments "${_arguments_options[@]}" : \
 ":: :_do-harness__subcmd__help_commands" \
@@ -1740,6 +1858,34 @@ _arguments "${_arguments_options[@]}" : \
 _arguments "${_arguments_options[@]}" : \
 && ret=0
 ;;
+(feedback)
+_arguments "${_arguments_options[@]}" : \
+":: :_do-harness__subcmd__help__subcmd__feedback_commands" \
+"*::: :->feedback" \
+&& ret=0
+
+    case $state in
+    (feedback)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:do-harness-help-feedback-command-$line[1]:"
+        case $line[1] in
+            (draft)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(submit)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(auto)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+        esac
+    ;;
+esac
+;;
 (help)
 _arguments "${_arguments_options[@]}" : \
 && ret=0
@@ -1788,6 +1934,7 @@ _do-harness_commands() {
 'ci:Explain a CI run'\''s failures and cancellations with local repro commands' \
 'completions:Generate shell completions' \
 'man:Generate man page documentation' \
+'feedback:Manage impact-gated feedback and issue proposals' \
 'help:Print this message or the help of the given subcommand(s)' \
     )
     _describe -t commands 'do-harness commands' commands "$@"
@@ -1880,6 +2027,61 @@ _do-harness__subcmd__explain_commands() {
     local commands; commands=()
     _describe -t commands 'do-harness explain commands' commands "$@"
 }
+(( $+functions[_do-harness__subcmd__feedback_commands] )) ||
+_do-harness__subcmd__feedback_commands() {
+    local commands; commands=(
+'draft:Generate a local feedback draft from recurring or severe failure evidence' \
+'submit:Explicitly submit a feedback draft' \
+'auto:Fully automated end-to-end feedback generation, deduplication, and submission' \
+'help:Print this message or the help of the given subcommand(s)' \
+    )
+    _describe -t commands 'do-harness feedback commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__feedback__subcmd__auto_commands] )) ||
+_do-harness__subcmd__feedback__subcmd__auto_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness feedback auto commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__feedback__subcmd__draft_commands] )) ||
+_do-harness__subcmd__feedback__subcmd__draft_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness feedback draft commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__feedback__subcmd__help_commands] )) ||
+_do-harness__subcmd__feedback__subcmd__help_commands() {
+    local commands; commands=(
+'draft:Generate a local feedback draft from recurring or severe failure evidence' \
+'submit:Explicitly submit a feedback draft' \
+'auto:Fully automated end-to-end feedback generation, deduplication, and submission' \
+'help:Print this message or the help of the given subcommand(s)' \
+    )
+    _describe -t commands 'do-harness feedback help commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__feedback__subcmd__help__subcmd__auto_commands] )) ||
+_do-harness__subcmd__feedback__subcmd__help__subcmd__auto_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness feedback help auto commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__feedback__subcmd__help__subcmd__draft_commands] )) ||
+_do-harness__subcmd__feedback__subcmd__help__subcmd__draft_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness feedback help draft commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__feedback__subcmd__help__subcmd__help_commands] )) ||
+_do-harness__subcmd__feedback__subcmd__help__subcmd__help_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness feedback help help commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__feedback__subcmd__help__subcmd__submit_commands] )) ||
+_do-harness__subcmd__feedback__subcmd__help__subcmd__submit_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness feedback help submit commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__feedback__subcmd__submit_commands] )) ||
+_do-harness__subcmd__feedback__subcmd__submit_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness feedback submit commands' commands "$@"
+}
 (( $+functions[_do-harness__subcmd__help_commands] )) ||
 _do-harness__subcmd__help_commands() {
     local commands; commands=(
@@ -1912,6 +2114,7 @@ _do-harness__subcmd__help_commands() {
 'ci-explain:Explain a CI run'\''s failures and cancellations with local repro commands' \
 'completions:Generate shell completions' \
 'man:Generate man page documentation' \
+'feedback:Manage impact-gated feedback and issue proposals' \
 'help:Print this message or the help of the given subcommand(s)' \
     )
     _describe -t commands 'do-harness help commands' commands "$@"
@@ -1978,6 +2181,30 @@ _do-harness__subcmd__help__subcmd__eval_commands() {
 _do-harness__subcmd__help__subcmd__explain_commands() {
     local commands; commands=()
     _describe -t commands 'do-harness help explain commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__help__subcmd__feedback_commands] )) ||
+_do-harness__subcmd__help__subcmd__feedback_commands() {
+    local commands; commands=(
+'draft:Generate a local feedback draft from recurring or severe failure evidence' \
+'submit:Explicitly submit a feedback draft' \
+'auto:Fully automated end-to-end feedback generation, deduplication, and submission' \
+    )
+    _describe -t commands 'do-harness help feedback commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__help__subcmd__feedback__subcmd__auto_commands] )) ||
+_do-harness__subcmd__help__subcmd__feedback__subcmd__auto_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness help feedback auto commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__help__subcmd__feedback__subcmd__draft_commands] )) ||
+_do-harness__subcmd__help__subcmd__feedback__subcmd__draft_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness help feedback draft commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__help__subcmd__feedback__subcmd__submit_commands] )) ||
+_do-harness__subcmd__help__subcmd__feedback__subcmd__submit_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness help feedback submit commands' commands "$@"
 }
 (( $+functions[_do-harness__subcmd__help__subcmd__help_commands] )) ||
 _do-harness__subcmd__help__subcmd__help_commands() {

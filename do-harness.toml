@@ -2,7 +2,9 @@ language = "rust"
 
 [hooks]
 pre-commit = ["fmt", "loc"]
-pre-push = []
+# Bounded to ordinary checks (matching signal-sets.verification) so heavy
+# scheduled checks (`coverage`, `powerset`) and release preflights never execute on local push.
+pre-push = ["fmt", "check", "clippy", "deps", "machete", "audit", "test", "doctest", "loc", "skills", "skills-docs", "shell", "markdownlint", "docs-sync", "docs-examples", "docs-links", "yamllint", "actionlint", "action-pins", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "release-manager", "verify-published", "commitlint", "ci-concurrency-guardrails", "workflow-benchmark", "ci-workflow-costs"]
 
 [signal-sets]
 # `feedback` is the fast loop, so it names the sensors the generated pre-commit

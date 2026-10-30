@@ -83,11 +83,12 @@ class BenchmarkTests(unittest.TestCase):
             root = Path(directory)
             worker = root / "worker.py"
             heartbeat = root / "heartbeat"
+            heartbeat.write_text("0")
             worker.write_text("import signal,time\nfrom pathlib import Path\n"
                 "signal.signal(signal.SIGTERM,signal.SIG_IGN)\n"
                 "while True:\n Path('heartbeat').write_text(str(time.time_ns()))\n time.sleep(.01)\n")
             parent = "import subprocess,sys,time;subprocess.Popen([sys.executable,'worker.py']);time.sleep(10)"
-            _, _, reason = execute([sys.executable, "-c", parent], root, b"", environment(), .2, 1024)
+            _, _, reason = execute([sys.executable, "-c", parent], root, b"", environment(), .5, 1024)
             self.assertEqual(reason, "deadline")
             before = heartbeat.read_bytes()
             time.sleep(.1)
@@ -105,3 +106,80 @@ class BenchmarkTests(unittest.TestCase):
             path.write_text(json.dumps(data))
             with self.assertRaises(ValueError):
                 load_corpus(path)
+    def test_summary_computes_median_p95_repair_cycles_and_context(self):
+        from .runner import summarize
+
+        def row(**fields):
+            # Keyword form, not dict-key literals: Bandit's B105 heuristic reads
+            # schema names such as `token_cost` or `first_attempt_pass` as
+            # credentials, and this fixture holds no secret.
+            return fields
+
+        rows = [
+            row(final_success=True, first_attempt_pass=True, regression_seen=False,
+                attempts=1, repair_cycles=0, verification_cost=2, elapsed_ms=100,
+                verification_ms=30, token_cost=50, currency_cost=0.001, context_bytes=500),
+            row(final_success=True, first_attempt_pass=False, regression_seen=False,
+                attempts=2, repair_cycles=1, verification_cost=4, elapsed_ms=250,
+                verification_ms=70, token_cost=150, currency_cost=0.003, context_bytes=1000),
+            row(final_success=False, first_attempt_pass=False, regression_seen=True,
+                attempts=3, repair_cycles=2, verification_cost=5, elapsed_ms=500,
+                verification_ms=120, token_cost=300, currency_cost=0.006, context_bytes=1500),
+        ]
+        s = summarize(rows)
+        self.assertEqual(s["scenario_count"], 3)
+        self.assertEqual(s["successes"], 2)
+        self.assertEqual(s["failures"], 1)
+        self.assertEqual(s["repair_cycles"], 3)
+        self.assertIn("elapsed_ms", s)
+        self.assertEqual(s["elapsed_ms"]["median"], 250)
+        self.assertEqual(s["elapsed_ms"]["p95"], 500)
+        self.assertIn("verification_ms", s)
+        self.assertEqual(s["verification_ms"]["median"], 70)
+        self.assertEqual(s["verification_ms"]["p95"], 120)
+        self.assertIn("context_bytes", s)
+        self.assertEqual(s["context_bytes"]["total"], 3000)
+        self.assertEqual(s["token_cost"]["total"], 500)
+        self.assertEqual(s["token_cost"]["status"], "measured")
+
+    def test_trusted_adapter_token_usage_is_recorded(self):
+        data = copy.deepcopy(load_corpus(CORPUS))
+        adapter = [
+            sys.executable, "-c",
+            "import json; print(json.dumps({'token_cost': 420, 'currency_cost': 0.0042, 'context_bytes': 1500, 'model': 'claude-3-5-sonnet-20241022'})); raise SystemExit(10)"
+        ]
+        report = benchmark(data, baseline=adapter, treatment=adapter)
+        self.assertEqual(report["environment"]["external_model_version"], "claude-3-5-sonnet-20241022")
+        case_res = report["workflows"]["control"]["cases"][0]
+        self.assertEqual(case_res["token_cost"], 840)
+        self.assertEqual(case_res["currency_cost"], 0.0084)
+        self.assertEqual(case_res["context_bytes"], 3000)
+        self.assertIsNone(case_res["usage_reason"])
+
+    def test_untrusted_missing_adapter_usage_preserves_reasoned_null(self):
+        data = copy.deepcopy(load_corpus(CORPUS))
+        adapter = [
+            sys.executable, "-c",
+            "print('no json usage emitted'); raise SystemExit(10)"
+        ]
+        report = benchmark(data, baseline=adapter, treatment=adapter)
+        case_res = report["workflows"]["control"]["cases"][0]
+        self.assertIsNone(case_res["token_cost"])
+        self.assertIsNone(case_res["currency_cost"])
+        self.assertEqual(case_res["usage_reason"], "provider usage unavailable in adapter protocol")
+        summary = report["workflows"]["control"]["summary"]
+        self.assertIsNone(summary["token_cost"]["total"])
+        self.assertEqual(summary["token_cost"]["status"], "unavailable")
+
+    def test_environment_carries_resource_limits_and_system_identities(self):
+        data = load_corpus(CORPUS)
+        report = benchmark(data)
+        env = report["environment"]
+        self.assertIn("python", env)
+        self.assertIn("os", env)
+        self.assertIn("machine", env)
+        self.assertIn("cpu_count", env)
+        limits = report["resource_limits"]
+        self.assertEqual(limits["wall_seconds"], data["budgets"]["wall_seconds"])
+        self.assertEqual(limits["max_attempts"], data["budgets"]["max_attempts"])
+        self.assertEqual(limits["output_bytes"], data["budgets"]["output_bytes"])

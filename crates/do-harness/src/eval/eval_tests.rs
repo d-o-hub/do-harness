@@ -78,6 +78,7 @@ async fn eval_run(dir: &Path, skill: Option<&str>, bless: bool) -> Result<()> {
             agent_cmd: None,
             agent_timeout_secs: 600,
             strict_fixtures: false,
+            trials: 1,
         },
     )
     .await
@@ -98,6 +99,7 @@ pub(super) async fn eval_run_strict(dir: &Path) -> Result<()> {
             agent_cmd: None,
             agent_timeout_secs: 600,
             strict_fixtures: true,
+            trials: 1,
         },
     )
     .await

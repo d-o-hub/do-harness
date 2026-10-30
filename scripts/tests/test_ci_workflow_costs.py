@@ -74,6 +74,7 @@ SAMPLE_BASELINE_JSON = {
             "id": "consolidate_dsh_bundle",
             "description": "Consolidate dsh_bundle into verify job.",
             "estimated_savings_seconds": 150,
+            "metric_kind": "historical_estimate",
             "coverage_preserved": "Runs node tests on release binary.",
         }
     ],
@@ -88,10 +89,13 @@ class TestCiWorkflowCosts(unittest.TestCase):
         report = calculate_cost_report(SAMPLE_BASELINE_JSON)
 
         self.assertEqual(report["disclaimer"], DISCLAIMER)
-        # Total baseline = 200 + 150 + 500 = 850
+        # Total baseline = 200 + 150 + 500 = 850 runner-seconds
         self.assertEqual(report["total_baseline_duration_seconds"], 850)
-        # Total savings = 150
-        self.assertEqual(report["total_proven_savings_seconds"], 150)
+        self.assertEqual(report["total_runner_duration_seconds"], 850)
+        # Estimated savings = 150 (projection)
+        self.assertEqual(report["total_estimated_savings_seconds"], 150)
+        # Measured savings without attributable runs = 0
+        self.assertEqual(report["total_measured_savings_seconds"], 0)
         # Projected = 850 - 150 = 700
         self.assertEqual(report["projected_duration_seconds"], 700)
         # Savings percentage = (150 / 850) * 100 = 17.6%
@@ -108,13 +112,49 @@ class TestCiWorkflowCosts(unittest.TestCase):
         text = format_text_report(report)
 
         self.assertIn("CI WORKFLOW COST & SAVINGS REPORT", text)
-        self.assertIn("Baseline Median Duration Total: 850s", text)
-        self.assertIn("Proven Savings From Optimization: 150s (17.6%)", text)
+        self.assertIn("Baseline Total Runner Compute: 850 runner-seconds", text)
+        self.assertNotIn("Proven Savings From Optimization", text)
+        self.assertIn("Estimated / Projected Savings: 150s (17.6%) (projection)", text)
+        self.assertIn("Measured Savings: 0s", text)
         self.assertIn("Projected Median Duration Total: 700s", text)
         self.assertIn("#1 [scheduled.yml] Scheduled Coverage", text)
-        self.assertIn("consolidate_dsh_bundle: -150s", text)
+        self.assertIn("consolidate_dsh_bundle: -150s [HISTORICAL ESTIMATE / PROJECTION]", text)
         self.assertIn("MSRV: Check and test on Rust 1.85", text)
 
+    def test_measured_savings_with_attributable_runs(self):
+        measured_sample = {
+            "schema_version": 2,
+            "sample_metadata": {
+                "collection_window": {"start": "2026-10-14T00:00:00Z", "end": "2026-10-15T00:00:00Z"},
+                "attributable_sample": True,
+            },
+            "baseline_metrics": {
+                "verify.yml": {"jobs": {"verify": {"median_duration_seconds": 100, "steps": {}}}},
+            },
+            "top_cost_contributors": [],
+            "proven_optimizations": [
+                {
+                    "id": "real_step_cache",
+                    "description": "Cache step",
+                    "measured_savings_seconds": 25,
+                    "metric_kind": "measured_runner_seconds",
+                    "attributable_runs": {
+                        "before_run_id": "111000",
+                        "before_timestamp": "2026-10-14T10:00:00Z",
+                        "after_run_id": "111001",
+                        "after_timestamp": "2026-10-14T11:00:00Z",
+                    },
+                    "coverage_preserved": "Identical step output.",
+                }
+            ],
+            "retained_checks_matrix": {},
+        }
+        report = calculate_cost_report(measured_sample)
+        self.assertEqual(report["total_measured_savings_seconds"], 25)
+        text = format_text_report(report)
+        self.assertIn("Measured Savings: 25s", text)
+        self.assertIn("before run 111000", text)
+        self.assertIn("after run 111001", text)
     def test_load_baseline_valid_and_invalid(self):
         with tempfile.NamedTemporaryFile("w+", suffix=".json") as tmp:
             tmp.write(json.dumps(SAMPLE_BASELINE_JSON))

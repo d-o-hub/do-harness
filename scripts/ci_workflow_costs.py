@@ -56,13 +56,23 @@ def calculate_cost_report(data: dict) -> dict:
         }
         total_baseline_seconds += wf_total
 
-    total_savings_seconds = sum(
-        opt.get("estimated_savings_seconds", 0) for opt in proven_optimizations
-    )
+    total_estimated_savings_seconds = 0
+    total_measured_savings_seconds = 0
 
-    projected_post_change_seconds = max(0, total_baseline_seconds - total_savings_seconds)
+    for opt in proven_optimizations:
+        kind = opt.get("metric_kind", "historical_estimate")
+        est = opt.get("estimated_savings_seconds", 0)
+        meas = opt.get("measured_savings_seconds", 0)
+        if kind == "historical_estimate" or est > 0:
+            total_estimated_savings_seconds += est
+        if kind != "historical_estimate" and meas > 0:
+            total_measured_savings_seconds += meas
+
+    projected_post_change_seconds = max(
+        0, total_baseline_seconds - total_estimated_savings_seconds
+    )
     savings_percentage = (
-        (total_savings_seconds / total_baseline_seconds * 100.0)
+        (total_estimated_savings_seconds / total_baseline_seconds * 100.0)
         if total_baseline_seconds > 0
         else 0.0
     )
@@ -71,7 +81,10 @@ def calculate_cost_report(data: dict) -> dict:
         "disclaimer": DISCLAIMER,
         "sample_metadata": data.get("sample_metadata", {}),
         "total_baseline_duration_seconds": total_baseline_seconds,
-        "total_proven_savings_seconds": total_savings_seconds,
+        "total_runner_duration_seconds": total_baseline_seconds,
+        "total_proven_savings_seconds": total_measured_savings_seconds,
+        "total_estimated_savings_seconds": total_estimated_savings_seconds,
+        "total_measured_savings_seconds": total_measured_savings_seconds,
         "projected_duration_seconds": projected_post_change_seconds,
         "savings_percentage": round(savings_percentage, 1),
         "workflows": workflow_summaries,
@@ -97,10 +110,12 @@ def format_text_report(report: dict) -> str:
     lines.append("")
 
     lines.append("--- SUMMARY METRICS ---")
+    lines.append(f"Baseline Total Runner Compute: {report['total_runner_duration_seconds']} runner-seconds")
     lines.append(f"Baseline Median Duration Total: {report['total_baseline_duration_seconds']}s")
     lines.append(
-        f"Proven Savings From Optimization: {report['total_proven_savings_seconds']}s ({report['savings_percentage']}%)"
+        f"Estimated / Projected Savings: {report['total_estimated_savings_seconds']}s ({report['savings_percentage']}%) (projection)"
     )
+    lines.append(f"Measured Savings: {report.get('total_measured_savings_seconds', 0)}s")
     lines.append(f"Projected Median Duration Total: {report['projected_duration_seconds']}s")
     lines.append("")
 
@@ -110,13 +125,25 @@ def format_text_report(report: dict) -> str:
         lines.append(f"   Impact: {item.get('impact', '')}")
     lines.append("")
 
-    lines.append("--- PROVEN OPTIMIZATIONS & COVERAGE PRESERVATION ---")
+    lines.append("--- OPTIMIZATIONS & COVERAGE PRESERVATION ---")
     for opt in report.get("proven_optimizations", []):
-        lines.append(f"* {opt.get('id', 'opt')}: -{opt.get('estimated_savings_seconds', 0)}s")
+        kind = opt.get("metric_kind", "historical_estimate")
+        if kind == "measured_runner_seconds" or "attributable_runs" in opt:
+            runs = opt.get("attributable_runs", {})
+            before_r = runs.get("before_run_id", "?")
+            after_r = runs.get("after_run_id", "?")
+            before_ts = runs.get("before_timestamp", "?")
+            after_ts = runs.get("after_timestamp", "?")
+            savings = opt.get("measured_savings_seconds", opt.get("estimated_savings_seconds", 0))
+            lines.append(
+                f"* {opt.get('id', 'opt')}: -{savings}s [MEASURED: before run {before_r} @ {before_ts} vs after run {after_r} @ {after_ts}]"
+            )
+        else:
+            savings = opt.get("estimated_savings_seconds", 0)
+            lines.append(f"* {opt.get('id', 'opt')}: -{savings}s [HISTORICAL ESTIMATE / PROJECTION]")
         lines.append(f"  Description: {opt.get('description', '')}")
         lines.append(f"  Coverage Preserved: {opt.get('coverage_preserved', '')}")
     lines.append("")
-
     lines.append("--- RETAINED CHECKS MATRIX ---")
     for check, details in report.get("retained_checks_matrix", {}).items():
         lines.append(f"* {check}: {details}")
@@ -158,8 +185,11 @@ def main():
         if report["total_baseline_duration_seconds"] <= 0:
             print("FAIL: total_baseline_duration_seconds must be > 0", file=sys.stderr)
             sys.exit(1)
-        if report["total_proven_savings_seconds"] < 0:
-            print("FAIL: total_proven_savings_seconds cannot be negative", file=sys.stderr)
+        if report["total_estimated_savings_seconds"] < 0:
+            print("FAIL: total_estimated_savings_seconds cannot be negative", file=sys.stderr)
+            sys.exit(1)
+        if report["total_measured_savings_seconds"] < 0:
+            print("FAIL: total_measured_savings_seconds cannot be negative", file=sys.stderr)
             sys.exit(1)
         print("OK: ci_workflow_costs check passed.")
         sys.exit(0)

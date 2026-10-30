@@ -5,7 +5,12 @@
     "successful_runs": 10,
     "failed_runs": 2,
     "workflows": ["verify.yml", "scheduled.yml", "semver.yml", "release.yml"],
-    "notes": "Representative baseline sampled from recent PR and nightly runs across Linux and Windows runners."
+    "collection_window": {
+      "start": "2026-10-01T00:00:00Z",
+      "end": "2026-10-15T23:59:59Z"
+    },
+    "attributable_sample": false,
+    "notes": "Representative historical baseline sampled from recent PR and nightly runs across Linux and Windows runners; individual run IDs not retained."
   },
   "ephemeral_state_disclaimer": "This report records workflow step timing and cost baselines from CI runners. It does not claim durable DORA history from ephemeral runner-local state.",
   "baseline_metrics": {
@@ -145,30 +150,32 @@
       "id": "consolidate_dsh_bundle",
       "description": "Consolidate dsh-bundle steps into verify job after do-harness release binary build.",
       "estimated_savings_seconds": 180,
+      "metric_kind": "historical_estimate",
       "coverage_preserved": "DSH bundle JS lint and unit/e2e tests execute against the exact same compiled release binary on ubuntu-latest."
     },
     {
       "id": "remove_unused_cargo_hack_in_verify",
       "description": "Remove cargo-hack from taiki-e/install-action in verify job.",
       "estimated_savings_seconds": 10,
+      "metric_kind": "historical_estimate",
       "coverage_preserved": "powerset sensor remains fully tested in scheduled.yml where cargo-hack is installed."
     },
     {
       "id": "remove_windows_duplicate_doc_checks",
       "description": "Remove duplicate docs.py contract checks and unused cargo-llvm-cov download from windows job.",
       "estimated_savings_seconds": 50,
+      "metric_kind": "historical_estimate",
       "coverage_preserved": "docs-sync, docs-examples, docs-links sensors remain strictly enforced in verify job on Linux; Rust sync unit tests and action-pins PyYAML tests continue running in Windows cargo nextest."
     },
     {
       "id": "consolidate_pip_installs",
       "description": "Combine separate pip install invocations in verify job into a single step.",
       "estimated_savings_seconds": 8,
+      "metric_kind": "historical_estimate",
       "coverage_preserved": "All python dependencies (yamllint, markdown-it-py, PyYAML) are installed before sensors execute."
     }
   ],
   "retained_checks_matrix": {
-    "MSRV": "Check and test workspace + guardian-proxy on Rust 1.85 (msrv job).",
-    "Source Distribution": "Packaged source distribution tests on Linux/musl and Windows/MSVC (source-distribution job).",
     "Security & Audit": "cargo-deny, cargo-audit, action-pins, privacy, untrusted-ingest in verification set.",
     "Release Verification": "release.yml preflight, semver checks, package contract validation.",
     "Windows Platform Tests": "cargo nextest, do-harness-db serialized tests, hook install/status/doctor, installer, npm wrapper tests."

@@ -44,6 +44,7 @@ mod events;
 mod evidence;
 mod exit;
 mod explain;
+mod feedback;
 mod fingerprint;
 mod fs_perm;
 mod hook_script;
@@ -176,7 +177,12 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
             no_seed,
             minimal,
             no_gitignore,
+            inspect,
         } => {
+            if inspect {
+                init::run_inspect(&root, language, format).map_err(CliError::Usage)?;
+                return Ok(());
+            }
             let opts = init::InitOpts {
                 language,
                 force,
@@ -392,6 +398,7 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
             agent_cmd,
             agent_timeout,
             strict_fixtures,
+            trials,
         } => eval::run_eval(
             &root,
             eval::EvalOpts {
@@ -406,6 +413,7 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
                 agent_cmd: agent_cmd.as_deref(),
                 agent_timeout_secs: agent_timeout,
                 strict_fixtures,
+                trials,
             },
         )
         .await
@@ -466,5 +474,6 @@ async fn run(cli: Cli) -> std::result::Result<(), CliError> {
             overlap::run_overlap(&root, threshold, format).map_err(CliError::Usage)
         }
         Command::Skills { action } => skills::run(&root, action),
+        Command::Feedback { action } => feedback::run(&root, action).await.map_err(exit::classify),
     }
 }

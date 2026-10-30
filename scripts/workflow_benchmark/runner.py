@@ -11,8 +11,10 @@ import sys
 import tempfile
 import time
 
-from .process import execute
-
+try:
+    from .process import execute
+except ImportError:
+    from process import execute
 ROOT = Path(__file__).resolve().parents[2]
 CORPUS = ROOT / "benchmarks/workflow-v1.json"
 GRADER = Path(__file__).with_name("grade.py")
@@ -105,6 +107,15 @@ def grade(case, root, seconds, limit):
         return {"target": False, "regressions": False}
 
 
+def percentile(values, p):
+    if not values:
+        return None
+    sorted_vals = sorted(values)
+    rank = math.ceil(p * len(sorted_vals))
+    index = max(0, min(rank - 1, len(sorted_vals) - 1))
+    return sorted_vals[index]
+
+
 def run_case(case, workflow, command, budgets, allowed):
     started = time.monotonic()
     deadline = started + budgets["wall_seconds"]
@@ -121,6 +132,10 @@ def run_case(case, workflow, command, budgets, allowed):
         checks = 1
         reason = "attempt-budget"
         feedback = []
+        case_token_cost = None
+        case_currency_cost = None
+        case_context_bytes = None
+        case_model = None
         for attempt in range(1, budgets["max_attempts"] + 1):
             if command is None:
                 patches = case[workflow]
@@ -132,8 +147,25 @@ def run_case(case, workflow, command, budgets, allowed):
                 request = {"protocol_version": 1, "case": digest(case["id"])[:12],
                            "task": case["description"], "workspace": str(root),
                            "attempt": attempt, "feedback": feedback}
-                code, _, failure = execute(command, root, json.dumps(request).encode(),
+                code, raw_output, failure = execute(command, root, json.dumps(request).encode(),
                     environment(allowed), deadline - time.monotonic(), budgets["output_bytes"])
+                if raw_output:
+                    try:
+                        adapter_res = json.loads(raw_output)
+                        if isinstance(adapter_res, dict):
+                            t_cost = adapter_res.get("token_cost")
+                            if isinstance(t_cost, (int, float)) and t_cost >= 0:
+                                case_token_cost = (case_token_cost or 0) + int(t_cost)
+                            c_cost = adapter_res.get("currency_cost")
+                            if isinstance(c_cost, (int, float)) and c_cost >= 0:
+                                case_currency_cost = (case_currency_cost or 0.0) + float(c_cost)
+                            c_bytes = adapter_res.get("context_bytes")
+                            if isinstance(c_bytes, int) and c_bytes >= 0:
+                                case_context_bytes = (case_context_bytes or 0) + c_bytes
+                            if adapter_res.get("model") and case_model is None:
+                                case_model = str(adapter_res["model"])
+                    except (ValueError, TypeError):
+                        pass
             verification_started = time.monotonic()
             result = grade(case, root, deadline - time.monotonic(), budgets["output_bytes"])
             verification_seconds += time.monotonic() - verification_started
@@ -152,6 +184,9 @@ def run_case(case, workflow, command, budgets, allowed):
                 reason = failure
                 break
             feedback = [key + "-failed" for key, ok in result.items() if not ok]
+        usage_reason = None if case_token_cost is not None else (
+            "unmeasured-fixture" if command is None else "provider usage unavailable in adapter protocol"
+        )
         return {"case_id": case["id"], "kind": case["kind"], "first_attempt_pass": first,
                 "final_success": final, "regression_seen": regression, "attempts": attempt,
                 "repair_cycles": max(0, attempt - 1), "verification_cost": checks,
@@ -159,9 +194,11 @@ def run_case(case, workflow, command, budgets, allowed):
                 "verification_ms": int(verification_seconds * 1000) if command else None,
                 "timing": "measured-wall-clock" if command else "unmeasured-fixture",
                 "escalated_unresolved": not final, "reason": reason,
-                "token_cost": None, "currency_cost": None,  # nosec B105 - unavailable measurements, not credentials
-                "usage_reason": "provider usage unavailable in adapter protocol"}
-
+                "token_cost": case_token_cost,
+                "currency_cost": round(case_currency_cost, 4) if case_currency_cost is not None else None,
+                "context_bytes": case_context_bytes,
+                "adapter_model": case_model,
+                "usage_reason": usage_reason}
 
 def interval(successes, total):
     """Wilson 95% binomial interval: descriptive, not a paired causal estimate."""
@@ -177,16 +214,57 @@ def summarize(rows):
     count = len(rows)
     success = sum(row["final_success"] for row in rows)
     first_passes = sum(r["first_attempt_pass"] for r in rows)
+    repair_cycles = sum(r["repair_cycles"] for r in rows)
+    attempts = sum(r["attempts"] for r in rows)
+    verification_cost = sum(r["verification_cost"] for r in rows)
+
+    elapsed_vals = [r["elapsed_ms"] for r in rows if r["elapsed_ms"] is not None]
+    elapsed_summary = {
+        "median": percentile(elapsed_vals, 0.50),
+        "p95": percentile(elapsed_vals, 0.95),
+    } if elapsed_vals else None
+
+    verification_vals = [r["verification_ms"] for r in rows if r["verification_ms"] is not None]
+    verification_summary = {
+        "median": percentile(verification_vals, 0.50),
+        "p95": percentile(verification_vals, 0.95),
+    } if verification_vals else None
+
+    has_context = any(r.get("context_bytes") is not None for r in rows)
+    context_summary = {
+        "total": sum(r.get("context_bytes") or 0 for r in rows)
+    } if has_context else None
+
+    measured_tokens = [r["token_cost"] for r in rows if r["token_cost"] is not None]
+    if len(measured_tokens) == count and count > 0:
+        usage_status = "measured"
+        total_tokens = sum(measured_tokens)
+    elif measured_tokens:
+        usage_status = "partial"
+        total_tokens = sum(measured_tokens)
+    else:
+        usage_status = "unavailable"
+        total_tokens = None
+    token_summary = {"total": total_tokens, "status": usage_status}
+
+    measured_currency = [r["currency_cost"] for r in rows if r["currency_cost"] is not None]
+    currency_total = round(sum(measured_currency), 4) if measured_currency else None
+
     return {"scenario_count": count, "successes": success, "failures": count - success,
             "first_attempt_pass_rate": first_passes / count,
             "first_attempt_95_interval": interval(first_passes, count),
             "final_success_rate": success / count, "final_success_95_interval": interval(success, count),
             "regression_rate": sum(r["regression_seen"] for r in rows) / count,
-            "attempts": sum(r["attempts"] for r in rows),
-            "verification_cost": sum(r["verification_cost"] for r in rows)}
+            "attempts": attempts,
+            "repair_cycles": repair_cycles,
+            "verification_cost": verification_cost,
+            "elapsed_ms": elapsed_summary,
+            "verification_ms": verification_summary,
+            "context_bytes": context_summary,
+            "token_cost": token_summary,
+            "currency_cost": {"total": currency_total}}
 
-
-def benchmark(data, baseline=None, treatment=None, allowed=()):
+def benchmark(data, baseline=None, treatment=None, allowed=(), model_version=None):
     if (baseline is None) != (treatment is None):
         raise ValueError("both workflow commands are required")
     rows = {"control": [], "treatment": []}
@@ -204,12 +282,29 @@ def benchmark(data, baseline=None, treatment=None, allowed=()):
                               ["git", "rev-parse", "HEAD"], cwd=ROOT, env=env,
                               capture_output=True, text=True, check=False)
     mode = "external-agent" if baseline else "deterministic-fixture"
+
+    effective_model = model_version
+    if effective_model is None:
+        for r_list in rows.values():
+            for r in r_list:
+                if r.get("adapter_model"):
+                    effective_model = r["adapter_model"]
+                    break
+            if effective_model:
+                break
+
     return {"schema_version": 1, "benchmark_version": data["benchmark_version"],
             "rubric_version": data["rubric_version"], "corpus_sha256": digest(data),
             "grader_sha256": hashlib.sha256(GRADER.read_bytes()).hexdigest(),
             "commit": revision.stdout.strip() if revision.returncode == 0 else None,
             "environment": {"python": platform.python_version(), "os": platform.system(),
-                            "machine": platform.machine(), "external_model_version": None},
+                            "machine": platform.machine(), "cpu_count": os.cpu_count(),
+                            "external_model_version": effective_model},
+            "resource_limits": {
+                "wall_seconds": data["budgets"]["wall_seconds"],
+                "max_attempts": data["budgets"]["max_attempts"],
+                "output_bytes": data["budgets"]["output_bytes"],
+            },
             "mode": mode, "budgets": data["budgets"],
             "verification_cost_unit": "grader-invocations",
             "workflow_identities": {name: digest(command) if command else "fixture-" + name + "-v1"
@@ -234,6 +329,7 @@ def main():
     parser.add_argument("--baseline-command-json", type=command_json)
     parser.add_argument("--treatment-command-json", type=command_json)
     parser.add_argument("--allow-env", action="append", default=[])
+    parser.add_argument("--model-version", type=str, default=None)
     args = parser.parse_args()
     if args.self_test:
         import unittest
@@ -242,7 +338,8 @@ def main():
         return int(not result.wasSuccessful())
     try:
         report = benchmark(load_corpus(args.corpus), args.baseline_command_json,
-                           args.treatment_command_json, args.allow_env)
+                           args.treatment_command_json, args.allow_env,
+                           model_version=args.model_version)
         print(json.dumps(report, sort_keys=True))
         if report["mode"] == "deterministic-fixture":
             return int(any(w["summary"]["failures"] for w in report["workflows"].values()))

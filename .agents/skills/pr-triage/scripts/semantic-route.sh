@@ -172,6 +172,18 @@ def main():
 
     pr_num = report.get("pr")
     head_sha = report.get("head", "")
+    if head_sha:
+        try:
+            rev_res = subprocess.run(
+                ["git", "rev-parse", head_sha],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            if rev_res.stdout.strip():
+                head_sha = rev_res.stdout.strip()
+        except Exception:
+            pass
     merge_base = report.get("merge_base", "")
     review_schema_version = report.get("schema_version", 3)
     policy_sha256 = report.get("policy", {}).get("sha256", "none")

@@ -37,8 +37,10 @@ pub(in crate::eval) struct CaseOutcome {
     pub(in crate::eval) id: i64,
     /// Dataset intent from the fixture.
     pub(in crate::eval) kind: EvalKind,
-    /// Scored dimension.
     pub(in crate::eval) dim: EvalDim,
+    /// Trial number when multiple trials are evaluated.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(in crate::eval) trial: Option<usize>,
     /// Graded assertions in this case.
     pub(in crate::eval) graded: u32,
     /// Graded assertions that passed.
@@ -177,6 +179,7 @@ pub(in crate::eval) async fn grade_skill(
                 id: case.id,
                 kind: case.kind,
                 dim: case.dim,
+                trial: None,
                 graded: case_graded,
                 passed: case_passed,
                 assertions: case_assertions,

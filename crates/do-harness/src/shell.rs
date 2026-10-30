@@ -11,6 +11,9 @@
 
 use std::path::PathBuf;
 use std::process::Command;
+use std::time::Duration;
+
+pub(crate) const PROCESS_CLEANUP_BUDGET: Duration = Duration::from_secs(2);
 
 /// Well-known Git Bash locations, most specific first.
 ///
@@ -92,37 +95,57 @@ pub fn resolve_program(program: &str) -> PathBuf {
     PathBuf::from(program)
 }
 
-/// Terminates a child and everything it spawned.
+/// Starts a child in a private POSIX process group for descendant cleanup.
+pub(crate) fn configure_process_group(command: &mut Command) {
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt;
+        command.process_group(0);
+    }
+    #[cfg(not(unix))]
+    let _ = command;
+}
+
+/// Terminates a child and its ordinary descendants.
 ///
-/// `Child::kill` on Windows calls `TerminateProcess` on the direct child only.
-/// A shell wrapper (`bash -c "…"`) is a *parent* of the real work, so killing
-/// it orphans the grandchild, which then keeps the inherited stdout/stderr pipe
-/// open — a reader draining that pipe blocks forever, which is how a
-/// `--fail-fast` cancellation or an agent timeout could hang indefinitely on
-/// Windows.
-///
-/// On Windows this uses `taskkill /T /F`, which walks the process tree. On
-/// POSIX this legacy helper kills only the direct child; sensor execution
-/// separately owns and kills a process group, including ordinary descendants. A failure to run `taskkill` falls back to `Child::kill` so termination
-/// is always attempted.
+/// On POSIX, callers must use [`configure_process_group`] before spawning so
+/// this can kill the child's private process group. On Windows, `taskkill /T /F`
+/// walks the process tree. A failed tree-kill command still falls back to
+/// terminating and reaping the direct child.
 pub fn kill_tree(child: &mut std::process::Child) {
-    if cfg!(windows) {
-        {
-            let pid = child.id();
-            let taskkill = std::env::var_os("SystemRoot").map_or_else(
-                || PathBuf::from("taskkill"),
-                |root| PathBuf::from(root).join("System32").join("taskkill.exe"),
-            );
-            let killed = Command::new(taskkill)
-                .args(["/PID", &pid.to_string(), "/T", "/F"])
+    #[cfg(windows)]
+    {
+        let pid = child.id();
+        let taskkill = std::env::var_os("SystemRoot").map_or_else(
+            || PathBuf::from("taskkill"),
+            |root| PathBuf::from(root).join("System32").join("taskkill.exe"),
+        );
+        let killed = Command::new(taskkill)
+            .args(["/PID", &pid.to_string(), "/T", "/F"])
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .is_ok_and(|status| status.success());
+        if killed {
+            let _ = child.wait();
+            return;
+        }
+    }
+    #[cfg(unix)]
+    {
+        let group = format!("-{}", child.id());
+        let killed = Command::new("/bin/kill")
+            .args(["-KILL", "--", &group])
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .is_ok_and(|status| status.success());
+        if !killed {
+            let _ = Command::new("kill")
+                .args(["-KILL", "--", &group])
                 .stdout(std::process::Stdio::null())
                 .stderr(std::process::Stdio::null())
-                .status()
-                .is_ok_and(|status| status.success());
-            if killed {
-                let _ = child.wait();
-                return;
-            }
+                .status();
         }
     }
     let _ = child.kill();

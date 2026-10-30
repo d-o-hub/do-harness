@@ -47,6 +47,8 @@ pub struct EvalOpts<'a> {
     pub agent_timeout_secs: u64,
     /// Fail skills whose fixture has dataset-quality gaps.
     pub strict_fixtures: bool,
+    /// Number of evaluation trials (default: 1).
+    pub trials: usize,
 }
 
 /// Runs the skill-eval benchmark for skills under `.agents/skills`.
@@ -64,13 +66,25 @@ pub async fn run_eval(root: &Path, opts: EvalOpts<'_>) -> Result<()> {
         agent_cmd,
         agent_timeout_secs,
         strict_fixtures,
+        trials,
     } = opts;
+    if trials == 0 {
+        bail!(crate::exit::UsageError::msg("--trials must be at least 1"));
+    }
     let skills_root = root.join(".agents/skills");
     if list_skills {
         let skills = discover_skills(&skills_root);
-        for s in &skills {
-            if let Some(name) = s.file_name().and_then(|n| n.to_str()) {
-                println!("{name}");
+        if format == Format::Json {
+            let names: Vec<_> = skills
+                .iter()
+                .filter_map(|s| s.file_name().and_then(|n| n.to_str()))
+                .collect();
+            println!("{}", serde_json::to_string(&names)?);
+        } else {
+            for s in &skills {
+                if let Some(name) = s.file_name().and_then(|n| n.to_str()) {
+                    println!("{name}");
+                }
             }
         }
         return Ok(());
@@ -127,9 +141,13 @@ pub async fn run_eval(root: &Path, opts: EvalOpts<'_>) -> Result<()> {
         if let Some(baseline) = &baseline {
             if !hashes.matches_baseline(baseline) {
                 if bless {
-                    println!("{name}: grader-DRIFT: graders changed, re-blessing under --bless");
+                    super::diag!(
+                        format,
+                        "{name}: grader-DRIFT: graders changed, re-blessing under --bless"
+                    );
                 } else {
-                    println!(
+                    super::diag!(
+                        format,
                         "{name}: grader-DRIFT: graders changed since last bless; review the diff \
                          then run `do-harness eval --bless --skill {name}`"
                     );
@@ -143,7 +161,7 @@ pub async fn run_eval(root: &Path, opts: EvalOpts<'_>) -> Result<()> {
         }
 
         if dry_run {
-            println!("{name}: dry run, skipped evaluation");
+            super::diag!(format, "{name}: dry run, skipped evaluation");
             continue;
         }
 
@@ -155,7 +173,7 @@ pub async fn run_eval(root: &Path, opts: EvalOpts<'_>) -> Result<()> {
             match gate_and_parse(&entry, &name, &gate_script).await? {
                 GateOutcome::Ready { structure, evals } => {
                     let outcome =
-                        check_skill_agent(root, &entry, &name, &evals, spec, false).await?;
+                        check_skill_agent(root, &entry, &name, &evals, spec, false, trials).await?;
                     report_from_outcome(
                         &name,
                         &structure,
@@ -182,12 +200,14 @@ pub async fn run_eval(root: &Path, opts: EvalOpts<'_>) -> Result<()> {
         };
 
         report.mode = mode;
-
+        report.trials = trials;
         if !no_lift && !report.gate_failed && report.pass_rate.is_some() {
             let mut contaminated = false;
             let baseline = if let Some(spec) = &agent_spec {
                 match load_evals(&entry).await? {
-                    Some(evals) => check_skill_agent(root, &entry, &name, &evals, spec, true).await,
+                    Some(evals) => {
+                        check_skill_agent(root, &entry, &name, &evals, spec, true, trials).await
+                    }
                     None => Err(anyhow::anyhow!("evals vanished for '{name}'")),
                 }
             } else {
@@ -250,9 +270,9 @@ pub async fn run_eval(root: &Path, opts: EvalOpts<'_>) -> Result<()> {
         if !report.fixture_warnings.is_empty() {
             for warning in &report.fixture_warnings {
                 if strict_fixtures {
-                    println!("{name}: FIXTURE-MISS: {warning}");
+                    super::diag!(format, "{name}: FIXTURE-MISS: {warning}");
                 } else {
-                    println!("{name}: fixture-WARN: {warning}");
+                    super::diag!(format, "{name}: fixture-WARN: {warning}");
                 }
             }
             if strict_fixtures && !invalid.contains(&name) {
@@ -296,11 +316,12 @@ pub async fn run_eval(root: &Path, opts: EvalOpts<'_>) -> Result<()> {
 
         if bless {
             let approver = approver.as_deref().unwrap_or("unknown");
-            bless_skill(&conn, &name, &report, &hashes, approver).await?;
+            bless_skill(&conn, &name, &report, &hashes, approver, format).await?;
         } else if let Some(floor) = do_harness_db::get_skill_bar(&conn, &name, mode).await? {
             if let Some(rate) = report.pass_rate {
                 if rate < floor {
-                    println!(
+                    super::diag!(
+                        format,
                         "{name}: BAR-MISS: pass_rate {rate:.2} below blessed floor {floor:.2}"
                     );
                     invalid.push(name.clone());
@@ -311,7 +332,8 @@ pub async fn run_eval(root: &Path, opts: EvalOpts<'_>) -> Result<()> {
             if let Some(floor) = do_harness_db::get_lift_floor(&conn, &name, mode).await? {
                 if let Some(lift) = report.lift {
                     if lift < floor {
-                        println!(
+                        super::diag!(
+                            format,
                             "{name}: LIFT-MISS: lift {lift:+.2} below blessed floor {floor:+.2}"
                         );
                         if !invalid.contains(&name) {
@@ -331,7 +353,7 @@ pub async fn run_eval(root: &Path, opts: EvalOpts<'_>) -> Result<()> {
         }
     }
 
-    if format == Format::Json && !reports_json.is_empty() {
+    if format == Format::Json {
         println!("{}", serde_json::to_string(&reports_json)?);
     }
 
@@ -382,8 +404,13 @@ fn finish_line(report: &mut super::grading::SkillReport, mode: EvalMode) {
     } else {
         "warn"
     };
+    let trials_suffix = if report.trials > 1 {
+        format!(" trials={}", report.trials)
+    } else {
+        String::new()
+    };
     report.line = format!(
-        "{} lift={lift} words={} walk={:.1}s mode={mode} fixture={fixture}",
+        "{} lift={lift} words={} walk={:.1}s mode={mode}{trials_suffix} fixture={fixture}",
         report.line, report.skill_words, report.walk_secs
     );
 }
@@ -399,6 +426,7 @@ pub(super) fn report_json(
         "mode": mode.as_str(),
         "line": report.line,
         "pass_rate": report.pass_rate,
+        "trials": report.trials,
         "graded": report.graded,
         "passed": report.passed,
         "gate_failed": report.gate_failed,

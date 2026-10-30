@@ -3,9 +3,11 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use std::path::Path;
+use std::time::{Duration, Instant};
 
 use anyhow::Result;
 
+use super::agent::{AgentSpec, run_agent, run_agent_with_redactor};
 use super::eval_tests::{VALID_SKILL_MD, fixture_root};
 use super::orchestrator::run_eval;
 use crate::report::Format;
@@ -25,6 +27,7 @@ async fn eval_run_agent(dir: &Path, agent_cmd: &str, timeout_secs: u64) -> Resul
             agent_cmd: Some(agent_cmd),
             agent_timeout_secs: timeout_secs,
             strict_fixtures: false,
+            trials: 1,
         },
     )
     .await
@@ -154,6 +157,7 @@ async fn eval_run_agent_bless(dir: &Path, agent_cmd: &str, timeout_secs: u64) ->
             agent_cmd: Some(agent_cmd),
             agent_timeout_secs: timeout_secs,
             strict_fixtures: false,
+            trials: 1,
         },
     )
     .await
@@ -213,4 +217,89 @@ async fn agent_runs_use_agent_floors_only() {
         .await
         .unwrap_err();
     assert!(err.to_string().contains("test-skill"), "{err:#}");
+}
+
+#[cfg(unix)]
+const DESCENDANT_SLEEP_SECS: u64 = 4;
+#[cfg(unix)]
+const DESCENDANT_COMPLETION_LIMIT: Duration = Duration::from_secs(3);
+
+#[test]
+fn agent_output_over_budget_fails_and_retains_bounded_stdout() {
+    let dir = tempfile::tempdir().unwrap();
+    let limit = crate::config::DEFAULT_OUTPUT_BYTES;
+    let spec = AgentSpec {
+        command: format!("printf '%{}s' ''", limit + 1),
+        timeout: Duration::from_secs(5),
+    };
+    let run = run_agent(&spec, "prompt", dir.path());
+    assert!(!run.success, "oversized output passed");
+    let detail = run.detail.expect("output-limit failure detail");
+    assert!(detail.contains("output limit"), "detail: {detail}");
+    let stdout = std::fs::read(dir.path().join("agent_stdout.txt")).unwrap();
+    assert!(
+        stdout.len() <= limit,
+        "retained {} bytes, limit {limit}",
+        stdout.len()
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn agent_timeout_kills_descendants_that_retain_output_pipes() {
+    let dir = tempfile::tempdir().unwrap();
+    let spec = AgentSpec {
+        command: format!("sleep {DESCENDANT_SLEEP_SECS} & wait"),
+        timeout: Duration::from_millis(100),
+    };
+    let started = Instant::now();
+    let run = run_agent(&spec, "prompt", dir.path());
+    assert!(!run.success);
+    assert!(
+        started.elapsed() < DESCENDANT_COMPLETION_LIMIT,
+        "inherited pipe held completion for {:?}",
+        started.elapsed()
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn agent_successful_parent_kills_pipe_holding_descendants() {
+    let dir = tempfile::tempdir().unwrap();
+    let spec = AgentSpec {
+        command: format!("sleep {DESCENDANT_SLEEP_SECS} &"),
+        timeout: Duration::from_secs(DESCENDANT_SLEEP_SECS + 1),
+    };
+    let started = Instant::now();
+    let run = run_agent(&spec, "prompt", dir.path());
+    assert!(run.success, "detail: {:?}", run.detail);
+    assert!(
+        started.elapsed() < DESCENDANT_COMPLETION_LIMIT,
+        "inherited pipe held completion for {:?}",
+        started.elapsed()
+    );
+}
+
+#[test]
+fn agent_redacts_synthetic_secrets_before_retention() {
+    let dir = tempfile::tempdir().unwrap();
+    let secret = "synthetic-agent-private";
+    let spec = AgentSpec {
+        command: format!("printf '%s' '{secret}'; printf '%s' '{secret}' >&2; exit 1"),
+        timeout: Duration::from_secs(5),
+    };
+    let redactor = crate::redaction::Redactor::synthetic(&[secret]);
+    let run = run_agent_with_redactor(&spec, "prompt", dir.path(), redactor);
+    let detail = run.detail.expect("agent failure detail");
+    assert!(
+        !detail.contains(secret),
+        "secret leaked in detail: {detail}"
+    );
+    assert!(detail.contains("[REDACTED]"), "detail: {detail}");
+    let stdout = std::fs::read_to_string(dir.path().join("agent_stdout.txt")).unwrap();
+    assert!(
+        !stdout.contains(secret),
+        "secret leaked in stdout: {stdout}"
+    );
+    assert!(stdout.contains("[REDACTED]"), "stdout: {stdout}");
 }

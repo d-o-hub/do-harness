@@ -19,6 +19,7 @@ async fn eval_run_with_lift(dir: &Path, skill: Option<&str>) -> Result<()> {
             agent_cmd: None,
             agent_timeout_secs: 600,
             strict_fixtures: false,
+            trials: 1,
         },
     )
     .await
