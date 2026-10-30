@@ -108,3 +108,93 @@ fn unreadable_check_state_fails_closed() {
         "no readiness report may be emitted when the check state is unknown: {stdout}"
     );
 }
+
+/// A merge conflict stops `GitHub` from scheduling workflow checks, so the runs
+/// that do report are a subset of the suite. Counting them as a passing suite
+/// reads as green while the verification never ran — the pull request this was
+/// observed on reported `7 passed, 0 pending` with `verify` and the platform
+/// matrix absent entirely.
+#[cfg(unix)]
+#[test]
+fn conflicting_pull_request_reports_its_check_set_as_incomplete() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    let bin = fake_gh_router(root);
+
+    std::fs::write(
+        root.join("view.json"),
+        r#"{
+            "number": 1050,
+            "baseRefName": "main",
+            "headRefOid": "abcd1234abcd1234abcd1234abcd1234abcd1234",
+            "mergeStateStatus": "DIRTY",
+            "mergeable": "CONFLICTING",
+            "autoMergeRequest": null
+        }"#,
+    )
+    .unwrap();
+    std::fs::write(
+        root.join("check_runs.json"),
+        r#"{"id": 1, "name": "Codacy Static Code Analysis", "status": "completed", "conclusion": "success", "html_url": "https://github.com/d-o-hub/do-harness/actions/runs/1/job/1"}
+{"id": 2, "name": "Analyze (rust)", "status": "completed", "conclusion": "success", "html_url": "https://github.com/d-o-hub/do-harness/actions/runs/1/job/2"}"#,
+    )
+    .unwrap();
+
+    let (code, stdout, stderr) = run_pr(root, &bin, &["pr", "ready", "1050"]);
+    assert_eq!(code, Some(1), "conflicts block readiness");
+    assert!(
+        stdout.contains(
+            "checks are INCOMPLETE: merge conflicts stop workflow checks from being scheduled"
+        ),
+        "{stdout}"
+    );
+    assert!(
+        stdout.contains("checks are incomplete: merge conflicts stop workflow checks from being scheduled (2 check run(s) reported)"),
+        "the blocker must name the count it is qualifying: {stdout}"
+    );
+    assert!(stderr.contains("not ready to merge"), "{stderr}");
+
+    let (code, stdout, _stderr) = run_pr(root, &bin, &["pr", "ready", "1050", "--format", "json"]);
+    assert_eq!(code, Some(1));
+    let report: Value = serde_json::from_str(&stdout).expect("readiness JSON");
+    assert_eq!(report["checks"]["incomplete"], true, "{stdout}");
+    assert_eq!(report["ready"], false);
+}
+
+/// A clean pull request with the same checks is complete: the flag keys off
+/// conflicts, not off the check count.
+#[cfg(unix)]
+#[test]
+fn a_clean_pull_request_does_not_flag_its_checks_as_incomplete() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    let bin = fake_gh_router(root);
+
+    std::fs::write(
+        root.join("view.json"),
+        r#"{
+            "number": 1051,
+            "baseRefName": "main",
+            "headRefOid": "abcd1234abcd1234abcd1234abcd1234abcd1234",
+            "mergeStateStatus": "CLEAN",
+            "mergeable": "MERGEABLE",
+            "autoMergeRequest": null
+        }"#,
+    )
+    .unwrap();
+    std::fs::write(
+        root.join("check_runs.json"),
+        r#"{"id": 1, "name": "verify", "status": "completed", "conclusion": "success", "html_url": "https://github.com/d-o-hub/do-harness/actions/runs/1/job/1"}"#,
+    )
+    .unwrap();
+
+    let (code, stdout, stderr) = run_pr(root, &bin, &["pr", "ready", "1051", "--format", "json"]);
+    assert_eq!(
+        code,
+        Some(0),
+        "a clean, green pull request is ready: {stderr}"
+    );
+    let report: Value = serde_json::from_str(&stdout).expect("readiness JSON");
+    assert_eq!(report["checks"]["incomplete"], false, "{stdout}");
+    assert_eq!(report["ready"], true);
+}

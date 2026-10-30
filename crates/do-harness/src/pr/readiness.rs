@@ -70,6 +70,14 @@ pub struct CheckSummary {
     pub cancelled: Vec<CancelledCheck>,
     pub pending: Vec<String>,
     pub skipped: usize,
+    /// Whether these are all the checks the merge is meant to wait for.
+    ///
+    /// A merge conflict stops `GitHub` from scheduling workflow checks at all,
+    /// so a conflicting pull request reports only the checks that do not need a
+    /// mergeable head. Counting those as a passing suite would read as green
+    /// while the verification never ran.
+    #[serde(default)]
+    pub incomplete: bool,
 }
 
 /// A failed check run or commit status.
@@ -143,6 +151,9 @@ pub fn evaluate(root: &Path, number: u64) -> Result<ReadinessReport> {
                 view.mergeable
             ));
         }
+        // A conflict stops workflow scheduling, so the check set is a subset of
+        // the suite; record that before the state strings move into the report.
+        let conflicts = view.merge_state_status == "DIRTY" || view.mergeable == "CONFLICTING";
         let merge_state = MergeState {
             status: view.merge_state_status,
             mergeable: view.mergeable,
@@ -150,7 +161,7 @@ pub fn evaluate(root: &Path, number: u64) -> Result<ReadinessReport> {
         };
 
         // 2. Checks & Statuses
-        let checks = evaluate_checks(root, &initial_head, &mut blockers)?;
+        let checks = evaluate_checks(root, &initial_head, conflicts, &mut blockers)?;
 
         // 3. Review Threads & Issue Comments
         let (conversations, codecov) =
@@ -190,6 +201,7 @@ pub fn evaluate(root: &Path, number: u64) -> Result<ReadinessReport> {
 fn evaluate_checks(
     root: &Path,
     head_ref_oid: &str,
+    conflicts: bool,
     blockers: &mut Vec<String>,
 ) -> Result<CheckSummary> {
     // Fail closed: a `gh` failure means the check state is unknown, not empty.
@@ -262,6 +274,12 @@ fn evaluate_checks(
     }
 
     let total = passed + skipped + pending.len() + failed.len() + cancelled.len();
+    let incomplete = conflicts && total > 0;
+    if incomplete {
+        blockers.push(format!(
+            "checks are incomplete: merge conflicts stop workflow checks from being scheduled ({total} check run(s) reported)"
+        ));
+    }
     Ok(CheckSummary {
         total,
         passed,
@@ -269,6 +287,7 @@ fn evaluate_checks(
         cancelled,
         pending,
         skipped,
+        incomplete,
     })
 }
 
@@ -386,6 +405,11 @@ fn print_text(report: &ReadinessReport) {
         report.checks.pending.len(),
         report.checks.skipped,
     );
+    if report.checks.incomplete {
+        println!(
+            "  checks are INCOMPLETE: merge conflicts stop workflow checks from being scheduled"
+        );
+    }
     for c in &report.checks.cancelled {
         println!("    CANCELLED: {} -> {}", c.name, c.rerun_command);
     }
