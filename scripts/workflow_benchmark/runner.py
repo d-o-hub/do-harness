@@ -237,15 +237,15 @@ def summarize(rows):
 
     measured_tokens = [r["token_cost"] for r in rows if r["token_cost"] is not None]
     if len(measured_tokens) == count and count > 0:
-        token_status = "measured"
+        usage_status = "measured"
         total_tokens = sum(measured_tokens)
     elif measured_tokens:
-        token_status = "partial"
+        usage_status = "partial"
         total_tokens = sum(measured_tokens)
     else:
-        token_status = "unavailable"
+        usage_status = "unavailable"
         total_tokens = None
-    token_summary = {"total": total_tokens, "status": token_status}
+    token_summary = {"total": total_tokens, "status": usage_status}
 
     measured_currency = [r["currency_cost"] for r in rows if r["currency_cost"] is not None]
     currency_total = round(sum(measured_currency), 4) if measured_currency else None

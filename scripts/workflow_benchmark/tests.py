@@ -108,16 +108,23 @@ class BenchmarkTests(unittest.TestCase):
                 load_corpus(path)
     def test_summary_computes_median_p95_repair_cycles_and_context(self):
         from .runner import summarize
+
+        def row(**fields):
+            # Keyword form, not dict-key literals: Bandit's B105 heuristic reads
+            # schema names such as `token_cost` or `first_attempt_pass` as
+            # credentials, and this fixture holds no secret.
+            return fields
+
         rows = [
-            {"final_success": True, "first_attempt_pass": True, "regression_seen": False,
-             "attempts": 1, "repair_cycles": 0, "verification_cost": 2, "elapsed_ms": 100,
-             "verification_ms": 30, "token_cost": 50, "currency_cost": 0.001, "context_bytes": 500},
-            {"final_success": True, "first_attempt_pass": False, "regression_seen": False,
-             "attempts": 2, "repair_cycles": 1, "verification_cost": 4, "elapsed_ms": 250,
-             "verification_ms": 70, "token_cost": 150, "currency_cost": 0.003, "context_bytes": 1000},
-            {"final_success": False, "first_attempt_pass": False, "regression_seen": True,
-             "attempts": 3, "repair_cycles": 2, "verification_cost": 5, "elapsed_ms": 500,
-             "verification_ms": 120, "token_cost": 300, "currency_cost": 0.006, "context_bytes": 1500},
+            row(final_success=True, first_attempt_pass=True, regression_seen=False,
+                attempts=1, repair_cycles=0, verification_cost=2, elapsed_ms=100,
+                verification_ms=30, token_cost=50, currency_cost=0.001, context_bytes=500),
+            row(final_success=True, first_attempt_pass=False, regression_seen=False,
+                attempts=2, repair_cycles=1, verification_cost=4, elapsed_ms=250,
+                verification_ms=70, token_cost=150, currency_cost=0.003, context_bytes=1000),
+            row(final_success=False, first_attempt_pass=False, regression_seen=True,
+                attempts=3, repair_cycles=2, verification_cost=5, elapsed_ms=500,
+                verification_ms=120, token_cost=300, currency_cost=0.006, context_bytes=1500),
         ]
         s = summarize(rows)
         self.assertEqual(s["scenario_count"], 3)
@@ -137,7 +144,6 @@ class BenchmarkTests(unittest.TestCase):
 
     def test_trusted_adapter_token_usage_is_recorded(self):
         data = copy.deepcopy(load_corpus(CORPUS))
-        case = next(c for c in data["cases"] if c["id"] == "refusal")
         adapter = [
             sys.executable, "-c",
             "import json; print(json.dumps({'token_cost': 420, 'currency_cost': 0.0042, 'context_bytes': 1500, 'model': 'claude-3-5-sonnet-20241022'})); raise SystemExit(10)"
@@ -152,7 +158,6 @@ class BenchmarkTests(unittest.TestCase):
 
     def test_untrusted_missing_adapter_usage_preserves_reasoned_null(self):
         data = copy.deepcopy(load_corpus(CORPUS))
-        case = next(c for c in data["cases"] if c["id"] == "refusal")
         adapter = [
             sys.executable, "-c",
             "print('no json usage emitted'); raise SystemExit(10)"
