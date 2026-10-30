@@ -15,7 +15,9 @@ to prevent the fire. See `docs/cli.md` for the command reference
   repositories. One-way sync only: templates mirror the canonical files
   byte-for-byte, enforced by the `skills` sensor
   (`scripts/check-skills-sync.sh`). Edit the canonical copy, never the
-  template.
+  template. `bash scripts/check-skills-sync.sh --write` mirrors the canonical
+  files into the existing template subset and then re-runs every check, so a
+  canonical edit is repaired mechanically instead of by hand `cp`.
 - The development-methodology skills (HTN planning, spikes, event modeling,
   distillation) describe how to build do-harness itself and are intentionally
   not scaffolded into adopting projects.

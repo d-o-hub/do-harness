@@ -19,6 +19,14 @@ mod support;
 
 use support::pr_metrics::{copy_fixtures, fake_gh_router, run_metrics};
 
+/// The fixture rows carry fixed 2026-09-30 timestamps, so the measured window
+/// must be pinned to a date. `--since 30d` is resolved against the wall clock:
+/// it included all three rows until 2026-10-30T14:30:31Z, when #268's merge
+/// fell out of the window and these assertions started failing on every
+/// platform. Duration spellings stay covered by `pr_loop`'s
+/// `windows_parse_durations_and_dates`, which does not read fixture rows.
+const FIXTURE_SINCE: &str = "2026-09-01";
+
 /// A fixture root with a git directory (the snapshot cache needs one).
 fn fixture_root() -> (tempfile::TempDir, std::path::PathBuf) {
     let dir = tempfile::tempdir().unwrap();
@@ -36,7 +44,7 @@ fn fixture_root() -> (tempfile::TempDir, std::path::PathBuf) {
 
 /// JSON report of a fixture run.
 fn report(root: &Path, bin: &Path, extra: &[&str]) -> Value {
-    let mut args = vec!["--repo", "d-o-hub/do-harness", "--since", "30d"];
+    let mut args = vec!["--repo", "d-o-hub/do-harness", "--since", FIXTURE_SINCE];
     args.extend_from_slice(extra);
     args.extend_from_slice(&["--format", "json"]);
     let (code, stdout, stderr) = run_metrics(root, bin, &args);
@@ -60,11 +68,11 @@ fn the_text_report_shows_the_measured_rows_and_totals() {
     let (code, stdout, stderr) = run_metrics(
         dir.path(),
         &bin,
-        &["--repo", "d-o-hub/do-harness", "--since", "30d"],
+        &["--repo", "d-o-hub/do-harness", "--since", FIXTURE_SINCE],
     );
     assert_eq!(code, Some(0), "stderr: {stderr}");
     assert!(
-        stdout.starts_with("metrics pr: d-o-hub/do-harness since 30d (3 PR(s), 2 green)"),
+        stdout.starts_with("metrics pr: d-o-hub/do-harness since 2026-09-01 (3 PR(s), 2 green)"),
         "{stdout}"
     );
     // The measured rows: #269 went green 26m45s after its first push, #268 after
@@ -167,7 +175,7 @@ fn a_failing_gh_read_fails_the_run_instead_of_reporting_zero() {
     let (code, stdout, stderr) = run_metrics(
         dir.path(),
         &bin,
-        &["--repo", "d-o-hub/do-harness", "--since", "30d"],
+        &["--repo", "d-o-hub/do-harness", "--since", FIXTURE_SINCE],
     );
     assert_eq!(code, Some(1), "stdout: {stdout}");
     assert!(stderr.contains("cannot list pull requests"), "{stderr}");

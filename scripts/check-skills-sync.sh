@@ -16,6 +16,24 @@
 # Finally it fails when a reference file that two canonical skills both ship
 # (`anti_ai_slop.md`) drifts between them: the copies are byte-identical today,
 # and nothing else would notice a divergent edit.
+#
+# `--write` mirrors the drift direction instead of reporting it: canonical
+# `.agents/skills` -> `templates/skills`. It repairs only files that already
+# exist in the template subset (the subset is a deliberate choice, not
+# something to widen) and then re-runs every check, so the write mode cannot
+# report success on a tree the check mode would reject.
+write=0
+case "${1:-}" in
+  --write)
+    write=1
+    ;;
+  "")
+    ;;
+  *)
+    echo "usage: check-skills-sync.sh [--write]" >&2
+    exit 2
+    ;;
+esac
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -29,6 +47,20 @@ fi
 if [[ ! -d "$canonical" ]]; then
   echo "check-skills-sync: missing $canonical" >&2
   exit 1
+fi
+
+if [[ "$write" -eq 1 ]]; then
+  written=0
+  while IFS= read -r -d '' file; do
+    rel="${file#"$templates"/}"
+    [[ -f "$canonical/$rel" ]] || continue
+    if ! cmp -s "$file" "$canonical/$rel"; then
+      cp "$canonical/$rel" "$file"
+      echo "check-skills-sync: wrote templates/skills/$rel"
+      written=$((written + 1))
+    fi
+  done < <(find "$templates" -type f -print0)
+  echo "check-skills-sync: $written file(s) rewritten from .agents/skills"
 fi
 
 failures=0
