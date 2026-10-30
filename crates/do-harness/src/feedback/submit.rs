@@ -134,7 +134,7 @@ pub fn submit_draft(
     }
 
     if !skip_confirmation {
-        bail!("submission requires explicit confirmation; pass --yes or use interactive mode");
+        bail!("submission requires explicit confirmation; re-run with --yes to publish to {repo}");
     }
 
     // Issue creation with fixed argv and stdin body
