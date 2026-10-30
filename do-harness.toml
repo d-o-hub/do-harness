@@ -432,7 +432,10 @@ when-changed = [
 [[sensors]]
 name = "workflow-benchmark"
 argv = ["python3", "scripts/workflow-benchmark.py", "--self-test"]
-timeout = 30
+# Measured 19.8s for the 12 self-tests on an idle machine (each of the six
+# synthetic cases runs the harness), so the previous 30s ceiling left 10s of
+# headroom and failed the pre-push gate whenever a build shared the box.
+timeout = 120
 when-changed = ["benchmarks/**", "scripts/workflow-benchmark.py", "scripts/workflow_benchmark/**", "do-harness.toml"]
 
 [[sensors]]
