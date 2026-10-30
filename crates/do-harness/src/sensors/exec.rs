@@ -170,7 +170,7 @@ fn spawn_sensor(
             }
         }
     }
-    super::process::configure(&mut command);
+    crate::shell::configure_process_group(&mut command);
     command
         .stdin(Stdio::null())
         .current_dir(root)

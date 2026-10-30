@@ -12,3 +12,6 @@ metadata:
 
 Body prose for docs-writer. This text must never be sent to a selector or appear
 in suggestion output; only the frontmatter metadata above is.
+
+## Required Decision Rules
+- regenerated regions must match clap definition byte for byte

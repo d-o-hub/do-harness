@@ -73,14 +73,26 @@ limit=5
 task_count="$(jq -r '.tasks | length' "$TASKS")"
 selector="${DO_HARNESS_SKILL_SELECTOR:-}"
 
-# Full-context bytes per task for the load-all arm: every body in the catalog.
-catalog_bytes=0
+# Full-context bytes per task for the load-all arm: every body and reference.
+catalog_skills_bytes=0
+catalog_ref_bytes=0
 catalog_skills=0
+all_catalog_text=""
+
 while IFS= read -r -d '' skill_md; do
-  catalog_bytes=$((catalog_bytes + $(wc -c < "$skill_md" | tr -d ' ')))
+  skill_len="$(wc -c < "$skill_md" | tr -d ' ')"
+  catalog_skills_bytes=$((catalog_skills_bytes + skill_len))
   catalog_skills=$((catalog_skills + 1))
+  all_catalog_text+="$(cat "$skill_md")"$'\n'
 done < <(find "$work/.agents/skills" -name 'SKILL.md' -print0)
 
+while IFS= read -r -d '' ref_file; do
+  ref_len="$(wc -c < "$ref_file" | tr -d ' ')"
+  catalog_ref_bytes=$((catalog_ref_bytes + ref_len))
+  all_catalog_text+="$(cat "$ref_file")"$'\n'
+done < <(find "$work/.agents/skills" -path '*/references/*' -type f -print0)
+
+catalog_bytes=$((catalog_skills_bytes + catalog_ref_bytes))
 pct() {  # <numerator> <denominator>
   awk -v n="$1" -v d="$2" 'BEGIN { if (d == 0) { print "0.0" } else { printf "%.1f", (n / d) * 100 } }'
 }
@@ -94,13 +106,46 @@ has_in_top() {  # <names> <k> <expected>
 run_arm() {  # <arm>
   local arm="$1"
   local top1_hits=0 top3_hits=0 top5_hits=0
-  local metadata_total=0 context_total=0 latency_total_ms=0
+  local decision_hits=0 task_success_hits=0
+  local metadata_total=0 skill_bytes_total=0 ref_bytes_total=0 context_total=0 latency_total_ms=0
 
   for index in $(seq 0 $((task_count - 1))); do
-    local query expected start_ms end_ms json names top1 metadata_bytes
+    local query expected req_decision
     query="$(jq -r ".tasks[$index].query" "$TASKS")"
     expected="$(jq -r ".tasks[$index].expected_top1" "$TASKS")"
+    req_decision="$(jq -r ".tasks[$index].required_decision // \"\"" "$TASKS")"
 
+    if [[ "$arm" == "load-all" ]]; then
+      local top1="load-all"
+      local top1_flag=yes top3_flag=yes top5_flag=yes
+      local metadata_bytes=0
+      local skill_bytes=$catalog_skills_bytes
+      local ref_bytes=$catalog_ref_bytes
+      local context_bytes=$catalog_bytes
+
+      local decision_preserved=yes
+      if [[ -n "$req_decision" ]] && ! grep -qiF "$req_decision" <<<"$all_catalog_text"; then
+        decision_preserved=no
+      fi
+      local task_success="$decision_preserved"
+
+      top1_hits=$((top1_hits + 1))
+      top3_hits=$((top3_hits + 1))
+      top5_hits=$((top5_hits + 1))
+      [[ "$decision_preserved" == "yes" ]] && decision_hits=$((decision_hits + 1))
+      [[ "$task_success" == "yes" ]] && task_success_hits=$((task_success_hits + 1))
+
+      skill_bytes_total=$((skill_bytes_total + skill_bytes))
+      ref_bytes_total=$((ref_bytes_total + ref_bytes))
+      context_total=$((context_total + context_bytes))
+
+      printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+        "$arm" "$index" "$expected" "$top1" "$decision_preserved" "$task_success" \
+        "$metadata_bytes" "$skill_bytes" "$ref_bytes" "$context_bytes"
+      continue
+    fi
+
+    local start_ms end_ms json names top1 metadata_bytes
     start_ms="$(date +%s%3N)"
     json="$("$BIN" --root "$work" skills suggest \
       --query "$query" --limit "$limit" --format json)"
@@ -121,38 +166,66 @@ run_arm() {  # <arm>
     [[ "$top3_flag" == "yes" ]] && top3_hits=$((top3_hits + 1))
     [[ "$top5_flag" == "yes" ]] && top5_hits=$((top5_hits + 1))
 
-    # Progressive disclosure: only the selected skill's body is read this task.
-    local context_bytes=0 loaded_skills=0
+    # Progressive disclosure: load selected skill and its references only
+    local skill_bytes=0 ref_bytes=0
+    local loaded_content=""
     if [[ -f "$work/.agents/skills/$top1/SKILL.md" ]]; then
-      context_bytes="$(wc -c < "$work/.agents/skills/$top1/SKILL.md" | tr -d ' ')"
-      loaded_skills=1
+      skill_bytes="$(wc -c < "$work/.agents/skills/$top1/SKILL.md" | tr -d ' ')"
+      loaded_content+="$(cat "$work/.agents/skills/$top1/SKILL.md")"$'\n'
     fi
 
+    if [[ -d "$work/.agents/skills/$top1/references" ]]; then
+      while IFS= read -r -d '' ref; do
+        ref_bytes=$((ref_bytes + $(wc -c < "$ref" | tr -d ' ')))
+        loaded_content+="$(cat "$ref")"$'\n'
+      done < <(find "$work/.agents/skills/$top1/references" -type f -print0)
+    fi
+
+    local decision_preserved=no
+    if [[ -z "$req_decision" ]] || grep -qiF "$req_decision" <<<"$loaded_content"; then
+      decision_preserved=yes
+      decision_hits=$((decision_hits + 1))
+    fi
+
+    local task_success=no
+    if [[ "$top1_flag" == "yes" && "$decision_preserved" == "yes" ]]; then
+      task_success=yes
+      task_success_hits=$((task_success_hits + 1))
+    fi
+
+    local context_bytes=$((metadata_bytes + skill_bytes + ref_bytes))
     metadata_total=$((metadata_total + metadata_bytes))
+    skill_bytes_total=$((skill_bytes_total + skill_bytes))
+    ref_bytes_total=$((ref_bytes_total + ref_bytes))
     context_total=$((context_total + context_bytes))
 
     printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
-      "$arm" "$index" "$expected" "$top1" "$top1_flag" "$top3_flag" "$top5_flag" \
-      "$metadata_bytes" "$context_bytes" "$loaded_skills"
+      "$arm" "$index" "$expected" "$top1" "$decision_preserved" "$task_success" \
+      "$metadata_bytes" "$skill_bytes" "$ref_bytes" "$context_bytes"
   done
 
   {
     echo "arm=$arm tasks=$task_count catalog_skills=$catalog_skills"
+    echo "  downstream_task_success_rate=$(pct "$task_success_hits" "$task_count") decision_preservation_rate=$(pct "$decision_hits" "$task_count")"
     echo "  top1_accuracy=$(pct "$top1_hits" "$task_count") top3_recall=$(pct "$top3_hits" "$task_count") top5_recall=$(pct "$top5_hits" "$task_count")"
     echo "  unnecessary_skill_load_rate=$(pct $((task_count - top1_hits)) "$task_count")"
     echo "  metadata_bytes_per_task=$(awk -v t="$metadata_total" -v n="$task_count" 'BEGIN { printf "%.1f", t / n }')"
-    echo "  loaded_context_bytes_per_task=$(awk -v t="$context_total" -v n="$task_count" 'BEGIN { printf "%.1f", t / n }')"
+    echo "  selected_skill_bytes_per_task=$(awk -v t="$skill_bytes_total" -v n="$task_count" 'BEGIN { printf "%.1f", t / n }')"
+    echo "  reference_bytes_per_task=$(awk -v t="$ref_bytes_total" -v n="$task_count" 'BEGIN { printf "%.1f", t / n }')"
+    echo "  total_context_bytes_per_task=$(awk -v t="$context_total" -v n="$task_count" 'BEGIN { printf "%.1f", t / n }')"
     echo "  catalog_bytes_per_task=$catalog_bytes"
     echo "  context_reduction_vs_load_all=$(awk -v a="$catalog_bytes" -v b="$context_total" -v n="$task_count" 'BEGIN { if (a == 0 || n == 0) { print "0.000" } else { printf "%.3f", 1 - ((b / n) / a) } }')"
+    echo "  provider_usage=null (unmeasured; bytes/4 is not a token measurement)"
     echo "  latency_ms_per_task=$(awk -v t="$latency_total_ms" -v n="$task_count" 'BEGIN { printf "%.1f", t / n }')"
   } >&2
 }
-
 # Arm 2 (and 3 when configured) always run with the selector explicitly removed
 # first, so an inherited variable cannot silently turn both arms into one.
 if [[ -n "$selector" ]]; then
   echo "selector=$selector selector_bytes_in_per_task=$(printf '%s' "$(jq -c '.tasks' "$TASKS")" | wc -c | tr -d ' ') (candidate metadata only)" >&2
 fi
+
+run_arm load-all
 
 unset DO_HARNESS_SKILL_SELECTOR
 run_arm deterministic-only

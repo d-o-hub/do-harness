@@ -84,6 +84,8 @@ pub(super) struct SkillReport {
     pub(super) walk_secs: f64,
     /// Dataset-quality findings; empty when the fixture is well-formed.
     pub(super) fixture_warnings: Vec<String>,
+    /// Number of evaluation trials.
+    pub(super) trials: usize,
 }
 
 /// Per-dimension tally with the baseline merged in.
@@ -200,6 +202,7 @@ fn empty_report() -> SkillReport {
         passed: 0,
         prompt: None,
         expected_outcome: None,
+        trials: 1,
         lift: None,
         lift_contaminated: false,
         without_pass_rate: None,
@@ -291,6 +294,7 @@ pub(super) fn report_from_outcome(
         passed: outcome.passed,
         prompt: outcome.prompt,
         expected_outcome: outcome.expected_outcome,
+        trials: 1,
         lift: None,
         lift_contaminated: false,
         without_pass_rate: None,

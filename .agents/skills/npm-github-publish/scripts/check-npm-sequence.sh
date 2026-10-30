@@ -51,7 +51,7 @@ check_publisher_order() {
   # Anchors are deliberately `$`-free: shellcheck SC2016 rejects quoting a
   # literal `$` in grep patterns.
   loop="$(grep -nF -m1 'for entry in ' "$publisher" | cut -d: -f1)"
-  meta="$(grep -nF -m1 '"do-harness"' "$publisher" | grep -F 'publish_dir' | cut -d: -f1 | tail -1)"
+  meta="$(grep -nF 'publish_dir' "$publisher" | grep -F '"do-harness"' | cut -d: -f1 | head -1)"
   if [[ -z "$loop" || -z "$meta" ]]; then
     fail "publisher is missing the platform loop or the meta publish step"
     return 1

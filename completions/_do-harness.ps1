@@ -63,6 +63,7 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('ci', 'ci', [CompletionResultType]::ParameterValue, 'Explain a CI run''s failures and cancellations with local repro commands')
             [CompletionResult]::new('completions', 'completions', [CompletionResultType]::ParameterValue, 'Generate shell completions')
             [CompletionResult]::new('man', 'man', [CompletionResultType]::ParameterValue, 'Generate man page documentation')
+            [CompletionResult]::new('feedback', 'feedback', [CompletionResultType]::ParameterValue, 'Manage impact-gated feedback and issue proposals')
             [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
             break
         }
@@ -237,6 +238,7 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
         'do-harness;pr;review' {
             [CompletionResult]::new('--base', '--base', [CompletionResultType]::ParameterName, 'Base revision (local mode; requires --head)')
             [CompletionResult]::new('--head', '--head', [CompletionResultType]::ParameterName, 'Head revision (local mode; requires --base)')
+            [CompletionResult]::new('--view', '--view', [CompletionResultType]::ParameterName, 'Review payload view')
             [CompletionResult]::new('--format', '--format', [CompletionResultType]::ParameterName, 'Output format')
             [CompletionResult]::new('--root', '--root', [CompletionResultType]::ParameterName, 'Workspace root override (default: walk up from cwd)')
             [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Explicit path to do-harness.toml')
@@ -456,6 +458,7 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('--no-seed', '--no-seed', [CompletionResultType]::ParameterName, 'Do not seed invariants')
             [CompletionResult]::new('--minimal', '--minimal', [CompletionResultType]::ParameterName, 'Minimal setup without extra skills')
             [CompletionResult]::new('--no-gitignore', '--no-gitignore', [CompletionResultType]::ParameterName, 'Skip creating/modifying .gitignore')
+            [CompletionResult]::new('--inspect', '--inspect', [CompletionResultType]::ParameterName, 'Inspect repository and report candidate signals without writing files')
             [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Suppress PASS/WARN verdict lines and the success footer')
             [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Suppress PASS/WARN verdict lines and the success footer')
             [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Dry run without side effects')
@@ -865,8 +868,9 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('--skill', '--skill', [CompletionResultType]::ParameterName, 'Restrict evaluation to this skill directory name')
             [CompletionResult]::new('--format', '--format', [CompletionResultType]::ParameterName, 'Output format')
             [CompletionResult]::new('--approver', '--approver', [CompletionResultType]::ParameterName, 'Approver identity recorded with `--bless` (defaults to `DO_HARNESS_APPROVER` or the git user email)')
-            [CompletionResult]::new('--agent-cmd', '--agent-cmd', [CompletionResultType]::ParameterName, 'Run this shell command once per eval case instead of the deterministic walkthrough (real Skill Lift). cwd is the sandbox root; the prompt is in `$DO_HARNESS_PROMPT` and on stdin; stdout is saved to `agent_stdout.txt` for assertions')
+            [CompletionResult]::new('--agent-cmd', '--agent-cmd', [CompletionResultType]::ParameterName, 'Run once per eval case instead of the deterministic walkthrough. cwd is the sandbox root; the prompt is in `$DO_HARNESS_PROMPT` and on stdin. Captured output is redacted and bounded; stdout is saved to `agent_stdout.txt` for assertions')
             [CompletionResult]::new('--agent-timeout', '--agent-timeout', [CompletionResultType]::ParameterName, 'Kill an agent run after this many seconds')
+            [CompletionResult]::new('--trials', '--trials', [CompletionResultType]::ParameterName, 'Number of repeated trials to run for evaluation (default: 1)')
             [CompletionResult]::new('--root', '--root', [CompletionResultType]::ParameterName, 'Workspace root override (default: walk up from cwd)')
             [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Explicit path to do-harness.toml')
             [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)')
@@ -1194,6 +1198,93 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('--version', '--version', [CompletionResultType]::ParameterName, 'Print version')
             break
         }
+        'do-harness;feedback' {
+            [CompletionResult]::new('--root', '--root', [CompletionResultType]::ParameterName, 'Workspace root override (default: walk up from cwd)')
+            [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Explicit path to do-harness.toml')
+            [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)')
+            [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Suppress PASS/WARN verdict lines and the success footer')
+            [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Suppress PASS/WARN verdict lines and the success footer')
+            [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Dry run without side effects')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('-V', '-V ', [CompletionResultType]::ParameterName, 'Print version')
+            [CompletionResult]::new('--version', '--version', [CompletionResultType]::ParameterName, 'Print version')
+            [CompletionResult]::new('draft', 'draft', [CompletionResultType]::ParameterValue, 'Generate a local feedback draft from recurring or severe failure evidence')
+            [CompletionResult]::new('submit', 'submit', [CompletionResultType]::ParameterValue, 'Explicitly submit a feedback draft')
+            [CompletionResult]::new('auto', 'auto', [CompletionResultType]::ParameterValue, 'Fully automated end-to-end feedback generation, deduplication, and submission')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'do-harness;feedback;draft' {
+            [CompletionResult]::new('--repo', '--repo', [CompletionResultType]::ParameterName, 'Target repository (`OWNER/REPO`)')
+            [CompletionResult]::new('--days', '--days', [CompletionResultType]::ParameterName, 'Historical search window in days (default: 30)')
+            [CompletionResult]::new('--min-fires', '--min-fires', [CompletionResultType]::ParameterName, 'Minimum independent attributable fires required (default: 3)')
+            [CompletionResult]::new('--out', '--out', [CompletionResultType]::ParameterName, 'Write draft to specific file path')
+            [CompletionResult]::new('--format', '--format', [CompletionResultType]::ParameterName, 'Output format')
+            [CompletionResult]::new('--root', '--root', [CompletionResultType]::ParameterName, 'Workspace root override (default: walk up from cwd)')
+            [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Explicit path to do-harness.toml')
+            [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)')
+            [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Suppress PASS/WARN verdict lines and the success footer')
+            [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Suppress PASS/WARN verdict lines and the success footer')
+            [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Dry run without side effects')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            [CompletionResult]::new('-V', '-V ', [CompletionResultType]::ParameterName, 'Print version')
+            [CompletionResult]::new('--version', '--version', [CompletionResultType]::ParameterName, 'Print version')
+            break
+        }
+        'do-harness;feedback;submit' {
+            [CompletionResult]::new('--draft', '--draft', [CompletionResultType]::ParameterName, 'Path to the prepared draft JSON file')
+            [CompletionResult]::new('--repo', '--repo', [CompletionResultType]::ParameterName, 'Target repository override')
+            [CompletionResult]::new('--root', '--root', [CompletionResultType]::ParameterName, 'Workspace root override (default: walk up from cwd)')
+            [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Explicit path to do-harness.toml')
+            [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)')
+            [CompletionResult]::new('--yes', '--yes', [CompletionResultType]::ParameterName, 'Skip interactive confirmation (unattended mode)')
+            [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Perform search and preview without creating an issue')
+            [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Suppress PASS/WARN verdict lines and the success footer')
+            [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Suppress PASS/WARN verdict lines and the success footer')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('-V', '-V ', [CompletionResultType]::ParameterName, 'Print version')
+            [CompletionResult]::new('--version', '--version', [CompletionResultType]::ParameterName, 'Print version')
+            break
+        }
+        'do-harness;feedback;auto' {
+            [CompletionResult]::new('--repo', '--repo', [CompletionResultType]::ParameterName, 'Target repository (`OWNER/REPO`)')
+            [CompletionResult]::new('--days', '--days', [CompletionResultType]::ParameterName, 'Historical search window in days (default: 30)')
+            [CompletionResult]::new('--min-fires', '--min-fires', [CompletionResultType]::ParameterName, 'Minimum independent attributable fires required (default: 3)')
+            [CompletionResult]::new('--format', '--format', [CompletionResultType]::ParameterName, 'Output format')
+            [CompletionResult]::new('--root', '--root', [CompletionResultType]::ParameterName, 'Workspace root override (default: walk up from cwd)')
+            [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Explicit path to do-harness.toml')
+            [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)')
+            [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Perform candidate generation and deduplication search without publishing')
+            [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Suppress PASS/WARN verdict lines and the success footer')
+            [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Suppress PASS/WARN verdict lines and the success footer')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            [CompletionResult]::new('-V', '-V ', [CompletionResultType]::ParameterName, 'Print version')
+            [CompletionResult]::new('--version', '--version', [CompletionResultType]::ParameterName, 'Print version')
+            break
+        }
+        'do-harness;feedback;help' {
+            [CompletionResult]::new('draft', 'draft', [CompletionResultType]::ParameterValue, 'Generate a local feedback draft from recurring or severe failure evidence')
+            [CompletionResult]::new('submit', 'submit', [CompletionResultType]::ParameterValue, 'Explicitly submit a feedback draft')
+            [CompletionResult]::new('auto', 'auto', [CompletionResultType]::ParameterValue, 'Fully automated end-to-end feedback generation, deduplication, and submission')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'do-harness;feedback;help;draft' {
+            break
+        }
+        'do-harness;feedback;help;submit' {
+            break
+        }
+        'do-harness;feedback;help;auto' {
+            break
+        }
+        'do-harness;feedback;help;help' {
+            break
+        }
         'do-harness;help' {
             [CompletionResult]::new('version', 'version', [CompletionResultType]::ParameterValue, 'Print CLI version information')
             [CompletionResult]::new('verify', 'verify', [CompletionResultType]::ParameterValue, 'Run computational sensors')
@@ -1224,6 +1315,7 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('ci-explain', 'ci-explain', [CompletionResultType]::ParameterValue, 'Explain a CI run''s failures and cancellations with local repro commands')
             [CompletionResult]::new('completions', 'completions', [CompletionResultType]::ParameterValue, 'Generate shell completions')
             [CompletionResult]::new('man', 'man', [CompletionResultType]::ParameterValue, 'Generate man page documentation')
+            [CompletionResult]::new('feedback', 'feedback', [CompletionResultType]::ParameterValue, 'Manage impact-gated feedback and issue proposals')
             [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
             break
         }
@@ -1416,6 +1508,21 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             break
         }
         'do-harness;help;man' {
+            break
+        }
+        'do-harness;help;feedback' {
+            [CompletionResult]::new('draft', 'draft', [CompletionResultType]::ParameterValue, 'Generate a local feedback draft from recurring or severe failure evidence')
+            [CompletionResult]::new('submit', 'submit', [CompletionResultType]::ParameterValue, 'Explicitly submit a feedback draft')
+            [CompletionResult]::new('auto', 'auto', [CompletionResultType]::ParameterValue, 'Fully automated end-to-end feedback generation, deduplication, and submission')
+            break
+        }
+        'do-harness;help;feedback;draft' {
+            break
+        }
+        'do-harness;help;feedback;submit' {
+            break
+        }
+        'do-harness;help;feedback;auto' {
             break
         }
         'do-harness;help;help' {

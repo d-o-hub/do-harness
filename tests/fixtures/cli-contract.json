@@ -116,7 +116,8 @@
       "dora",
       "ci-explain",
       "completions",
-      "man"
+      "man",
+      "feedback"
     ],
     "invocable": false
   },
@@ -754,6 +755,27 @@
           "index": null
         },
         {
+          "id": "view",
+          "kind": "option",
+          "short": null,
+          "long": "view",
+          "value_names": [
+            "VIEW"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [
+            "audit"
+          ],
+          "possible_values": [
+            "audit",
+            "agent"
+          ],
+          "help": "Review payload view",
+          "index": null
+        },
+        {
           "id": "format",
           "kind": "option",
           "short": null,
@@ -1283,6 +1305,22 @@
           "default_values": [],
           "possible_values": [],
           "help": "Skip creating/modifying .gitignore",
+          "index": null
+        },
+        {
+          "id": "inspect",
+          "kind": "option",
+          "short": null,
+          "long": "inspect",
+          "value_names": [
+            "INSPECT"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": false,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Inspect repository and report candidate signals without writing files",
           "index": null
         }
       ],
@@ -2463,7 +2501,7 @@
           "takes_value": true,
           "default_values": [],
           "possible_values": [],
-          "help": "Run this shell command once per eval case instead of the deterministic walkthrough (real Skill Lift). cwd is the sandbox root; the prompt is in `$DO_HARNESS_PROMPT` and on stdin; stdout is saved to `agent_stdout.txt` for assertions",
+          "help": "Run once per eval case instead of the deterministic walkthrough. cwd is the sandbox root; the prompt is in `$DO_HARNESS_PROMPT` and on stdin. Captured output is redacted and bounded; stdout is saved to `agent_stdout.txt` for assertions",
           "index": null
         },
         {
@@ -2498,6 +2536,24 @@
           "default_values": [],
           "possible_values": [],
           "help": "Fail skills whose fixture has dataset-quality gaps (thin cases, no negative out-of-scope case)",
+          "index": null
+        },
+        {
+          "id": "trials",
+          "kind": "option",
+          "short": null,
+          "long": "trials",
+          "value_names": [
+            "N"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [
+            "1"
+          ],
+          "possible_values": [],
+          "help": "Number of repeated trials to run for evaluation (default: 1)",
           "index": null
         }
       ],
@@ -3340,6 +3396,251 @@
           "possible_values": [],
           "help": "Output directory for man pages",
           "index": 1
+        }
+      ],
+      "subcommands": [],
+      "invocable": true
+    },
+    {
+      "path": "feedback",
+      "about": "Manage impact-gated feedback and issue proposals",
+      "usage": "do-harness feedback [OPTIONS] <COMMAND>",
+      "aliases": [],
+      "args": [],
+      "subcommands": [
+        "draft",
+        "submit",
+        "auto"
+      ],
+      "invocable": false
+    },
+    {
+      "path": "feedback draft",
+      "about": "Generate a local feedback draft from recurring or severe failure evidence",
+      "usage": "do-harness feedback draft [OPTIONS] --repo <OWNER/REPO>",
+      "aliases": [],
+      "args": [
+        {
+          "id": "repo",
+          "kind": "option",
+          "short": null,
+          "long": "repo",
+          "value_names": [
+            "OWNER/REPO"
+          ],
+          "required": true,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Target repository (`OWNER/REPO`)",
+          "index": null
+        },
+        {
+          "id": "days",
+          "kind": "option",
+          "short": null,
+          "long": "days",
+          "value_names": [
+            "DAYS"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Historical search window in days (default: 30)",
+          "index": null
+        },
+        {
+          "id": "min_fires",
+          "kind": "option",
+          "short": null,
+          "long": "min-fires",
+          "value_names": [
+            "N"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Minimum independent attributable fires required (default: 3)",
+          "index": null
+        },
+        {
+          "id": "out",
+          "kind": "option",
+          "short": null,
+          "long": "out",
+          "value_names": [
+            "FILE"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Write draft to specific file path",
+          "index": null
+        },
+        {
+          "id": "format",
+          "kind": "option",
+          "short": null,
+          "long": "format",
+          "value_names": [
+            "FORMAT"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [
+            "text"
+          ],
+          "possible_values": [
+            "text",
+            "json"
+          ],
+          "help": "Output format",
+          "index": null
+        }
+      ],
+      "subcommands": [],
+      "invocable": true
+    },
+    {
+      "path": "feedback submit",
+      "about": "Explicitly submit a feedback draft",
+      "usage": "do-harness feedback submit [OPTIONS] --draft <FILE>",
+      "aliases": [],
+      "args": [
+        {
+          "id": "draft",
+          "kind": "option",
+          "short": null,
+          "long": "draft",
+          "value_names": [
+            "FILE"
+          ],
+          "required": true,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Path to the prepared draft JSON file",
+          "index": null
+        },
+        {
+          "id": "repo",
+          "kind": "option",
+          "short": null,
+          "long": "repo",
+          "value_names": [
+            "OWNER/REPO"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Target repository override",
+          "index": null
+        },
+        {
+          "id": "yes",
+          "kind": "option",
+          "short": null,
+          "long": "yes",
+          "value_names": [
+            "YES"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": false,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Skip interactive confirmation (unattended mode)",
+          "index": null
+        }
+      ],
+      "subcommands": [],
+      "invocable": true
+    },
+    {
+      "path": "feedback auto",
+      "about": "Fully automated end-to-end feedback generation, deduplication, and submission",
+      "usage": "do-harness feedback auto [OPTIONS] --repo <OWNER/REPO>",
+      "aliases": [],
+      "args": [
+        {
+          "id": "repo",
+          "kind": "option",
+          "short": null,
+          "long": "repo",
+          "value_names": [
+            "OWNER/REPO"
+          ],
+          "required": true,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Target repository (`OWNER/REPO`)",
+          "index": null
+        },
+        {
+          "id": "days",
+          "kind": "option",
+          "short": null,
+          "long": "days",
+          "value_names": [
+            "DAYS"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Historical search window in days (default: 30)",
+          "index": null
+        },
+        {
+          "id": "min_fires",
+          "kind": "option",
+          "short": null,
+          "long": "min-fires",
+          "value_names": [
+            "N"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Minimum independent attributable fires required (default: 3)",
+          "index": null
+        },
+        {
+          "id": "format",
+          "kind": "option",
+          "short": null,
+          "long": "format",
+          "value_names": [
+            "FORMAT"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [
+            "text"
+          ],
+          "possible_values": [
+            "text",
+            "json"
+          ],
+          "help": "Output format",
+          "index": null
         }
       ],
       "subcommands": [],

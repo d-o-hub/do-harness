@@ -134,6 +134,9 @@ pub enum PrAction {
         /// Ignore the cached report and recompute from scratch.
         #[arg(long)]
         recompute: bool,
+        /// Review payload view.
+        #[arg(long, value_enum, default_value_t = crate::pr::ReviewView::Audit)]
+        view: crate::pr::ReviewView,
         /// Output format.
         #[arg(long, value_enum, default_value_t = Format::Text)]
         format: Format,
@@ -325,4 +328,59 @@ pub enum SkillsAction {
     },
     /// Replace only the installed skill-creator structure validator.
     RefreshValidator,
+}
+/// Available impact-gated feedback actions.
+#[derive(Debug, Subcommand)]
+pub enum FeedbackAction {
+    /// Generate a local feedback draft from recurring or severe failure evidence.
+    Draft {
+        /// Target repository (`OWNER/REPO`).
+        #[arg(long, value_name = "OWNER/REPO")]
+        repo: String,
+        /// Historical search window in days (default: 30).
+        #[arg(long, value_name = "DAYS")]
+        days: Option<i64>,
+        /// Minimum independent attributable fires required (default: 3).
+        #[arg(long, value_name = "N")]
+        min_fires: Option<u32>,
+        /// Write draft to specific file path.
+        #[arg(long, value_hint = ValueHint::FilePath, value_name = "FILE")]
+        out: Option<PathBuf>,
+        /// Output format.
+        #[arg(long, value_enum, default_value_t = Format::Text)]
+        format: Format,
+    },
+    /// Explicitly submit a feedback draft.
+    Submit {
+        /// Path to the prepared draft JSON file.
+        #[arg(long, value_hint = ValueHint::FilePath, value_name = "FILE")]
+        draft: PathBuf,
+        /// Target repository override.
+        #[arg(long, value_name = "OWNER/REPO")]
+        repo: Option<String>,
+        /// Skip interactive confirmation (unattended mode).
+        #[arg(long)]
+        yes: bool,
+        /// Perform search and preview without creating an issue.
+        #[arg(long)]
+        dry_run: bool,
+    },
+    /// Fully automated end-to-end feedback generation, deduplication, and submission.
+    Auto {
+        /// Target repository (`OWNER/REPO`).
+        #[arg(long, value_name = "OWNER/REPO")]
+        repo: String,
+        /// Historical search window in days (default: 30).
+        #[arg(long, value_name = "DAYS")]
+        days: Option<i64>,
+        /// Minimum independent attributable fires required (default: 3).
+        #[arg(long, value_name = "N")]
+        min_fires: Option<u32>,
+        /// Perform candidate generation and deduplication search without publishing.
+        #[arg(long)]
+        dry_run: bool,
+        /// Output format.
+        #[arg(long, value_enum, default_value_t = Format::Text)]
+        format: Format,
+    },
 }

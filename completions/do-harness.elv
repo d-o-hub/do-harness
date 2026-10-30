@@ -60,6 +60,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand ci 'Explain a CI run''s failures and cancellations with local repro commands'
             cand completions 'Generate shell completions'
             cand man 'Generate man page documentation'
+            cand feedback 'Manage impact-gated feedback and issue proposals'
             cand help 'Print this message or the help of the given subcommand(s)'
         }
         &'do-harness;version'= {
@@ -224,6 +225,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
         &'do-harness;pr;review'= {
             cand --base 'Base revision (local mode; requires --head)'
             cand --head 'Head revision (local mode; requires --base)'
+            cand --view 'Review payload view'
             cand --format 'Output format'
             cand --root 'Workspace root override (default: walk up from cwd)'
             cand --config 'Explicit path to do-harness.toml'
@@ -421,6 +423,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand --no-seed 'Do not seed invariants'
             cand --minimal 'Minimal setup without extra skills'
             cand --no-gitignore 'Skip creating/modifying .gitignore'
+            cand --inspect 'Inspect repository and report candidate signals without writing files'
             cand -q 'Suppress PASS/WARN verdict lines and the success footer'
             cand --quiet 'Suppress PASS/WARN verdict lines and the success footer'
             cand --dry-run 'Dry run without side effects'
@@ -789,8 +792,9 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand --skill 'Restrict evaluation to this skill directory name'
             cand --format 'Output format'
             cand --approver 'Approver identity recorded with `--bless` (defaults to `DO_HARNESS_APPROVER` or the git user email)'
-            cand --agent-cmd 'Run this shell command once per eval case instead of the deterministic walkthrough (real Skill Lift). cwd is the sandbox root; the prompt is in `$DO_HARNESS_PROMPT` and on stdin; stdout is saved to `agent_stdout.txt` for assertions'
+            cand --agent-cmd 'Run once per eval case instead of the deterministic walkthrough. cwd is the sandbox root; the prompt is in `$DO_HARNESS_PROMPT` and on stdin. Captured output is redacted and bounded; stdout is saved to `agent_stdout.txt` for assertions'
             cand --agent-timeout 'Kill an agent run after this many seconds'
+            cand --trials 'Number of repeated trials to run for evaluation (default: 1)'
             cand --root 'Workspace root override (default: walk up from cwd)'
             cand --config 'Explicit path to do-harness.toml'
             cand --output 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)'
@@ -1090,6 +1094,84 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand -V 'Print version'
             cand --version 'Print version'
         }
+        &'do-harness;feedback'= {
+            cand --root 'Workspace root override (default: walk up from cwd)'
+            cand --config 'Explicit path to do-harness.toml'
+            cand --output 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)'
+            cand -q 'Suppress PASS/WARN verdict lines and the success footer'
+            cand --quiet 'Suppress PASS/WARN verdict lines and the success footer'
+            cand --dry-run 'Dry run without side effects'
+            cand -h 'Print help'
+            cand --help 'Print help'
+            cand -V 'Print version'
+            cand --version 'Print version'
+            cand draft 'Generate a local feedback draft from recurring or severe failure evidence'
+            cand submit 'Explicitly submit a feedback draft'
+            cand auto 'Fully automated end-to-end feedback generation, deduplication, and submission'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'do-harness;feedback;draft'= {
+            cand --repo 'Target repository (`OWNER/REPO`)'
+            cand --days 'Historical search window in days (default: 30)'
+            cand --min-fires 'Minimum independent attributable fires required (default: 3)'
+            cand --out 'Write draft to specific file path'
+            cand --format 'Output format'
+            cand --root 'Workspace root override (default: walk up from cwd)'
+            cand --config 'Explicit path to do-harness.toml'
+            cand --output 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)'
+            cand -q 'Suppress PASS/WARN verdict lines and the success footer'
+            cand --quiet 'Suppress PASS/WARN verdict lines and the success footer'
+            cand --dry-run 'Dry run without side effects'
+            cand -h 'Print help (see more with ''--help'')'
+            cand --help 'Print help (see more with ''--help'')'
+            cand -V 'Print version'
+            cand --version 'Print version'
+        }
+        &'do-harness;feedback;submit'= {
+            cand --draft 'Path to the prepared draft JSON file'
+            cand --repo 'Target repository override'
+            cand --root 'Workspace root override (default: walk up from cwd)'
+            cand --config 'Explicit path to do-harness.toml'
+            cand --output 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)'
+            cand --yes 'Skip interactive confirmation (unattended mode)'
+            cand --dry-run 'Perform search and preview without creating an issue'
+            cand -q 'Suppress PASS/WARN verdict lines and the success footer'
+            cand --quiet 'Suppress PASS/WARN verdict lines and the success footer'
+            cand -h 'Print help'
+            cand --help 'Print help'
+            cand -V 'Print version'
+            cand --version 'Print version'
+        }
+        &'do-harness;feedback;auto'= {
+            cand --repo 'Target repository (`OWNER/REPO`)'
+            cand --days 'Historical search window in days (default: 30)'
+            cand --min-fires 'Minimum independent attributable fires required (default: 3)'
+            cand --format 'Output format'
+            cand --root 'Workspace root override (default: walk up from cwd)'
+            cand --config 'Explicit path to do-harness.toml'
+            cand --output 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)'
+            cand --dry-run 'Perform candidate generation and deduplication search without publishing'
+            cand -q 'Suppress PASS/WARN verdict lines and the success footer'
+            cand --quiet 'Suppress PASS/WARN verdict lines and the success footer'
+            cand -h 'Print help (see more with ''--help'')'
+            cand --help 'Print help (see more with ''--help'')'
+            cand -V 'Print version'
+            cand --version 'Print version'
+        }
+        &'do-harness;feedback;help'= {
+            cand draft 'Generate a local feedback draft from recurring or severe failure evidence'
+            cand submit 'Explicitly submit a feedback draft'
+            cand auto 'Fully automated end-to-end feedback generation, deduplication, and submission'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'do-harness;feedback;help;draft'= {
+        }
+        &'do-harness;feedback;help;submit'= {
+        }
+        &'do-harness;feedback;help;auto'= {
+        }
+        &'do-harness;feedback;help;help'= {
+        }
         &'do-harness;help'= {
             cand version 'Print CLI version information'
             cand verify 'Run computational sensors'
@@ -1120,6 +1202,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand ci-explain 'Explain a CI run''s failures and cancellations with local repro commands'
             cand completions 'Generate shell completions'
             cand man 'Generate man page documentation'
+            cand feedback 'Manage impact-gated feedback and issue proposals'
             cand help 'Print this message or the help of the given subcommand(s)'
         }
         &'do-harness;help;version'= {
@@ -1257,6 +1340,17 @@ set edit:completion:arg-completer[do-harness] = {|@words|
         &'do-harness;help;completions'= {
         }
         &'do-harness;help;man'= {
+        }
+        &'do-harness;help;feedback'= {
+            cand draft 'Generate a local feedback draft from recurring or severe failure evidence'
+            cand submit 'Explicitly submit a feedback draft'
+            cand auto 'Fully automated end-to-end feedback generation, deduplication, and submission'
+        }
+        &'do-harness;help;feedback;draft'= {
+        }
+        &'do-harness;help;feedback;submit'= {
+        }
+        &'do-harness;help;feedback;auto'= {
         }
         &'do-harness;help;help'= {
         }

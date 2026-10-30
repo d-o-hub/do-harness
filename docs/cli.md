@@ -421,6 +421,7 @@ drift from the file.
 | `--no-seed` | no | — | — | Do not seed invariants |
 | `--minimal` | no | — | — | Minimal setup without extra skills |
 | `--no-gitignore` | no | — | — | Skip creating/modifying .gitignore |
+| `--inspect` | no | — | — | Inspect repository and report candidate signals without writing files |
 <!-- END GENERATED: cli-contract init -->
 Scaffolds a harness workspace in the target directory and proves the
 generated contract before presenting the repository as ready.
@@ -437,10 +438,15 @@ derived from the included subset), writes the portable skill subset
 - `VACUOUS` — the generic pack has zero sensors; the pass is explicitly not
   evidence.
 
+- `--inspect`: Inspect the repository and print discovered project facts,
+  candidate commands, missing tools, and language guidance without writing
+  files, installing packages, or executing project scripts. A repository with
+  `package.json` defaults to the generic pack and prints guidance recommending
+  `--language node` to adopt discovered JS/TS sensors.
+
 The generated `AGENTS.md` embeds a pinned installer command so an agent
 landing in the repository can obtain the exact CLI version it was initialized
 with.
-
 The Rust pack also scaffolds the release step: `plans/RELEASING.md` (runbook)
 and `scripts/check-release-preflight.sh` (read-only; every version pin must
 agree, and `--release` additionally fails when the target is already
@@ -617,9 +623,10 @@ Diagnostic health checks covering binary resolution, git hook status, and databa
 | `--format <FORMAT>` | no | `text` | `text`, `json` | Output format |
 | `--approver <NAME>` | no | — | — | Approver identity recorded with `--bless` (defaults to `DO_HARNESS_APPROVER` or the git user email) |
 | `--no-lift` | no | — | — | Skip the without-skill baseline run (no Skill Lift measured) |
-| `--agent-cmd <COMMAND>` | no | — | — | Run this shell command once per eval case instead of the deterministic walkthrough (real Skill Lift). cwd is the sandbox root; the prompt is in `$DO_HARNESS_PROMPT` and on stdin; stdout is saved to `agent_stdout.txt` for assertions |
+| `--agent-cmd <COMMAND>` | no | — | — | Run once per eval case instead of the deterministic walkthrough. cwd is the sandbox root; the prompt is in `$DO_HARNESS_PROMPT` and on stdin. Captured output is redacted and bounded; stdout is saved to `agent_stdout.txt` for assertions |
 | `--agent-timeout <SECS>` | no | `600` | — | Kill an agent run after this many seconds |
 | `--strict-fixtures` | no | — | — | Fail skills whose fixture has dataset-quality gaps (thin cases, no negative out-of-scope case) |
+| `--trials <N>` | no | `1` | — | Number of repeated trials to run for evaluation (default: 1) |
 <!-- END GENERATED: cli-contract eval -->
 Skill structure validation and evaluation benchmark runner.
 
@@ -635,17 +642,27 @@ Skill structure validation and evaluation benchmark runner.
 - `--no-lift`: Skip the without-skill baseline run (no Skill Lift measured).
 - `--agent-cmd <COMMAND>`: Run this shell command once per eval case instead
   of the deterministic walkthrough (true Skill Lift). cwd is the sandbox root;
-  the prompt is in `$DO_HARNESS_PROMPT` and on stdin; stdout is saved to
-  `agent_stdout.txt` for assertions.
+  the prompt is in `$DO_HARNESS_PROMPT` and on stdin. Sensitive environment
+  values are redacted from retained stdout/stderr. Combined raw stdout/stderr
+  above 1 MiB fails the case; `agent_stdout.txt` is capped at 1 MiB for grading.
+  The command's process tree is terminated on exit or timeout, with a two-second
+  budget for inherited-pipe cleanup.
 - `--agent-timeout <SECS>`: Kill an agent run after this many seconds
   (default 600).
 - `--strict-fixtures`: Fail skills whose fixture has dataset-quality gaps
   (no cases, an ungraded case, or no negative out-of-scope case). CI runs
   this so thin datasets cannot silently return.
+- `--trials <N>`: Number of repeated evaluation trials to execute (default 1).
+  Each trial runs sequentially in a fresh, isolated sandbox to measure per-case
+  variability without cross-trial contamination; pass rates remain
+  assertion-weighted across all trials.
 - `--list-skills`: List discovered skills under `.agents/skills`.
 - `--fail-fast`: Halt evaluation on first failing skill.
 - `--dry-run`: Perform dry-run evaluation without updating state.
-- `--format <Format>`: Output format (`text` or `json`).
+- `--format <Format>`: Output format (`text` or `json`). In JSON mode, stdout
+  emits a single JSON array report across all outcomes (success, warnings,
+  strict misses, grader drift, floor misses, and bless runs). Text diagnostics
+  are routed to stderr so machine consumers always observe parseable stdout.
 
 Failing runs print one `CASE-FAIL:` line per failing assertion in text mode
 (case id, kind, dimension, assertion spec, and the grader reason); `--format
@@ -1162,6 +1179,7 @@ error is never reported as `no-effect`.
 | `--base <REV>` | no | — | — | Base revision (local mode; requires --head) |
 | `--head <REV>` | no | — | — | Head revision (local mode; requires --base) |
 | `--recompute` | no | — | — | Ignore the cached report and recompute from scratch |
+| `--view <VIEW>` | no | `audit` | `audit`, `agent` | Review payload view |
 | `--format <FORMAT>` | no | `text` | `text`, `json` | Output format |
 <!-- END GENERATED: cli-contract pr review -->
 Emit the semantic residual for a pull request or revision range: the changed
@@ -1199,6 +1217,11 @@ nothing and adds a warning.
   the report must pin the comparison.
 - `--base <REV> --head <REV>`: Local mode without GitHub.
 - `--recompute`: Ignore the cached report and recompute from scratch.
+- `--view <VIEW>`: Payload view (`audit` or `agent`, default `audit`). In `agent`
+  view, JSON output emits a compact envelope that carries review-required units
+  and exemption identities while omitting full lines for exempt and skipped
+  changes; it compares the structured residual with an equivalently enveloped
+  raw-diff representation and selects the smaller complete payload.
 - `--format <Format>`: Output format (`text` or `json`).
 
 Exit `0` when a report is produced (even with a full residual), `1` when the
@@ -1547,6 +1570,52 @@ Generate shell completions for `bash`, `zsh`, `fish`, `powershell`, `elvish`.
 | `<DIR>` | yes | — | — | Output directory for man pages |
 <!-- END GENERATED: cli-contract man -->
 Generate man page documentation into specified directory.
+### `feedback`
+<!-- BEGIN GENERATED: cli-contract feedback -->
+`do-harness feedback [OPTIONS] <COMMAND>`
+
+Subcommands: `draft`, `submit`, `auto`.
+<!-- END GENERATED: cli-contract feedback -->
+Manage impact-gated feedback proposals and issue reporting.
+
+#### `feedback draft`
+<!-- BEGIN GENERATED: cli-contract feedback draft -->
+`do-harness feedback draft [OPTIONS] --repo <OWNER/REPO>`
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `--repo <OWNER/REPO>` | yes | — | — | Target repository (`OWNER/REPO`) |
+| `--days <DAYS>` | no | — | — | Historical search window in days (default: 30) |
+| `--min-fires <N>` | no | — | — | Minimum independent attributable fires required (default: 3) |
+| `--out <FILE>` | no | — | — | Write draft to specific file path |
+| `--format <FORMAT>` | no | `text` | `text`, `json` | Output format |
+<!-- END GENERATED: cli-contract feedback draft -->
+Generate local-only feedback draft proposals from recurring or severe failure evidence.
+
+#### `feedback submit`
+<!-- BEGIN GENERATED: cli-contract feedback submit -->
+`do-harness feedback submit [OPTIONS] --draft <FILE>`
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `--draft <FILE>` | yes | — | — | Path to the prepared draft JSON file |
+| `--repo <OWNER/REPO>` | no | — | — | Target repository override |
+| `--yes` | no | — | — | Skip interactive confirmation (unattended mode) |
+<!-- END GENERATED: cli-contract feedback submit -->
+Explicitly submit a prepared feedback draft to GitHub with deduplication.
+
+#### `feedback auto`
+<!-- BEGIN GENERATED: cli-contract feedback auto -->
+`do-harness feedback auto [OPTIONS] --repo <OWNER/REPO>`
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `--repo <OWNER/REPO>` | yes | — | — | Target repository (`OWNER/REPO`) |
+| `--days <DAYS>` | no | — | — | Historical search window in days (default: 30) |
+| `--min-fires <N>` | no | — | — | Minimum independent attributable fires required (default: 3) |
+| `--format <FORMAT>` | no | `text` | `text`, `json` | Output format |
+<!-- END GENERATED: cli-contract feedback auto -->
+Fully automated unattended feedback candidate generation, deduplication search, and submission.
 
 ## Exit Codes
 

@@ -9,6 +9,17 @@ mod fixture_tests;
 #[cfg(test)]
 mod tests;
 
+macro_rules! diag {
+    ($format:expr, $($arg:tt)*) => {
+        if $format == $crate::report::Format::Json {
+            eprintln!($($arg)*);
+        } else {
+            println!($($arg)*);
+        }
+    };
+}
+pub(super) use diag;
+
 mod agent;
 mod bless;
 mod fixture;

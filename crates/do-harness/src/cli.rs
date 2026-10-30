@@ -7,13 +7,12 @@ use std::path::PathBuf;
 use clap::{ArgAction, Parser, Subcommand, ValueHint};
 
 use crate::init;
-
+use crate::report::Format;
 mod actions;
 mod learn;
-
-use crate::report::Format;
 pub use actions::{
-    ErrorsAction, HookAction, MetricsAction, PrAction, SkillsAction, TaskAction, TraceAction,
+    ErrorsAction, FeedbackAction, HookAction, MetricsAction, PrAction, SkillsAction, TaskAction,
+    TraceAction,
 };
 pub use learn::LearnArgs;
 
@@ -193,6 +192,9 @@ pub enum Command {
         /// Skip creating/modifying .gitignore.
         #[arg(long)]
         no_gitignore: bool,
+        /// Inspect repository and report candidate signals without writing files.
+        #[arg(long)]
+        inspect: bool,
     },
     /// Inspect and export task state.
     Task {
@@ -305,10 +307,10 @@ pub enum Command {
         /// Skip the without-skill baseline run (no Skill Lift measured).
         #[arg(long)]
         no_lift: bool,
-        /// Run this shell command once per eval case instead of the
-        /// deterministic walkthrough (real Skill Lift). cwd is the sandbox
-        /// root; the prompt is in `$DO_HARNESS_PROMPT` and on stdin; stdout
-        /// is saved to `agent_stdout.txt` for assertions.
+        /// Run once per eval case instead of the deterministic walkthrough.
+        /// cwd is the sandbox root; the prompt is in `$DO_HARNESS_PROMPT` and
+        /// on stdin. Captured output is redacted and bounded; stdout is saved
+        /// to `agent_stdout.txt` for assertions.
         #[arg(long, value_name = "COMMAND")]
         agent_cmd: Option<String>,
         /// Kill an agent run after this many seconds.
@@ -318,6 +320,9 @@ pub enum Command {
         /// no negative out-of-scope case).
         #[arg(long)]
         strict_fixtures: bool,
+        /// Number of repeated trials to run for evaluation (default: 1).
+        #[arg(long, default_value_t = 1, value_name = "N")]
+        trials: usize,
     },
     /// Manage git hooks that run `do-harness verify`.
     Hook {
@@ -442,6 +447,11 @@ pub enum Command {
         /// Output directory for man pages.
         #[arg(value_hint = ValueHint::DirPath, value_name = "DIR")]
         dir: PathBuf,
+    },
+    /// Manage impact-gated feedback and issue proposals.
+    Feedback {
+        #[command(subcommand)]
+        action: crate::cli::actions::FeedbackAction,
     },
 }
 

@@ -1,7 +1,7 @@
 //! Bounded, redacted capture and process-tree lifecycle for local sensors.
 use std::collections::VecDeque;
 use std::io::Read;
-use std::process::{Child, Command, ExitStatus, Stdio};
+use std::process::{Child, ExitStatus};
 use std::sync::{
     Arc,
     atomic::{AtomicBool, AtomicU64, Ordering},
@@ -15,7 +15,6 @@ use crate::redaction::Redactor;
 use crate::report::{ExecutionDetails, FailureReason};
 
 const POLL: Duration = Duration::from_millis(10);
-const CLEANUP_BUDGET: Duration = Duration::from_secs(2);
 const CHUNK_BYTES: usize = 8192;
 
 pub(super) struct CapturedProcess {
@@ -109,34 +108,6 @@ fn pump(
     receiver
 }
 
-/// Put a POSIX sensor in an owned process group before exec. Windows uses
-/// taskkill's process-tree traversal; neither method is an OS sandbox.
-pub(super) fn configure(command: &mut Command) {
-    #[cfg(unix)]
-    {
-        use std::os::unix::process::CommandExt;
-        command.process_group(0);
-    }
-    #[cfg(not(unix))]
-    let _ = command;
-}
-
-fn stop_tree(child: &mut Child) {
-    #[cfg(unix)]
-    {
-        let group = format!("-{}", child.id());
-        let _ = Command::new("/bin/kill")
-            .args(["-KILL", "--", &group])
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status();
-        let _ = child.kill();
-        let _ = child.wait();
-    }
-    #[cfg(not(unix))]
-    crate::shell::kill_tree(child);
-}
-
 /// Drain both streams while enforcing timeout, fail-fast cancellation and output
 /// policy. Pumps never block the caller past the fixed cleanup budget.
 pub(super) fn capture(
@@ -203,13 +174,13 @@ pub(super) fn capture(
             }
         }
         if (status.is_some() || reason.is_some()) && cleanup.is_none() {
-            stop_tree(&mut child);
+            crate::shell::kill_tree(&mut child);
             cleanup = Some(Instant::now());
         }
         if streams.iter().all(Option::is_some) && cleanup.is_some() {
             break;
         }
-        if cleanup.is_some_and(|since| since.elapsed() >= CLEANUP_BUDGET) {
+        if cleanup.is_some_and(|since| since.elapsed() >= crate::shell::PROCESS_CLEANUP_BUDGET) {
             reason = Some(FailureReason::CleanupUnverified);
             break;
         }
@@ -252,6 +223,7 @@ pub(super) fn capture(
 mod tests {
     #![allow(clippy::unwrap_used, clippy::expect_used)]
     use super::*;
+    use std::process::{Command, Stdio};
 
     #[test]
     fn success_and_failure_capture_are_redacted_before_retention() {
@@ -261,7 +233,7 @@ mod tests {
             let mut command = Command::new("python3");
             command.args(["-c", &format!("import sys;print('synthetic-private');sys.stderr.write('synthetic-private');raise SystemExit({code})")])
                 .stdout(Stdio::piped()).stderr(Stdio::piped()).current_dir(root.path());
-            configure(&mut command);
+            crate::shell::configure_process_group(&mut command);
             let result = capture(
                 command.spawn().unwrap(),
                 &spec,

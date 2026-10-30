@@ -100,9 +100,10 @@ pub fn run(root: &Path, action: PrAction) -> Result<(), CliError> {
             head,
             recompute,
             format,
+            view,
         } => {
             let target = target_from(pr, base, head)?;
-            run_review(root, &target, recompute, format).map_err(CliError::Verify)
+            run_review(root, &target, recompute, format, view).map_err(CliError::Verify)
         }
         PrAction::Ready { pr, format } => super::readiness::run(root, pr, format),
         PrAction::Waivers {
@@ -188,14 +189,48 @@ fn run_no_effect(root: &Path, target: Target, format: Format) -> Result<()> {
     Ok(())
 }
 
-fn run_review(root: &Path, target: &Target, recompute: bool, format: Format) -> Result<()> {
+fn run_review(
+    root: &Path,
+    target: &Target,
+    recompute: bool,
+    format: Format,
+    view: super::ReviewView,
+) -> Result<()> {
     let report = review::analyze(root, target, recompute)?;
-    if matches!(format, Format::Json) {
-        println!("{}", serde_json::to_string_pretty(&report)?);
-    } else {
-        print_review(&report);
+    match view {
+        super::ReviewView::Audit => {
+            if matches!(format, Format::Json) {
+                println!("{}", serde_json::to_string_pretty(&report)?);
+            } else {
+                print_review(&report);
+            }
+        }
+        super::ReviewView::Agent => {
+            let envelope = super::agent_view::build_agent_envelope(&report);
+            if matches!(format, Format::Json) {
+                println!("{}", serde_json::to_string_pretty(&envelope)?);
+            } else {
+                print_agent_review(&report, &envelope);
+            }
+        }
     }
     Ok(())
+}
+
+fn print_agent_review(report: &ReviewReport, envelope: &super::agent_view::AgentReviewEnvelope) {
+    print_review(report);
+    let rep = match envelope.representation {
+        super::agent_view::Representation::Residual => "residual",
+        super::agent_view::Representation::RawDiff => "raw_diff",
+    };
+    println!(
+        "view agent ({rep}): review_required={} exempt={} skipped={} ({} bytes, ratio {:.3})",
+        envelope.review_required_units.len(),
+        envelope.exempt_count,
+        envelope.skipped_count,
+        envelope.measurement.emitted_bytes,
+        envelope.measurement.ratio,
+    );
 }
 
 fn print_review(report: &ReviewReport) {

@@ -3,6 +3,9 @@
 //! Reads only the repository and the `gh` CLI; the sole write is a
 //! best-effort review cache under the repository git directory.
 
+pub mod agent_view;
+pub use agent_view::ReviewView;
+
 pub mod cache;
 pub mod command;
 pub mod diff;

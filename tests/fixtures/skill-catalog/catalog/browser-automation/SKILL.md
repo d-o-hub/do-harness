@@ -12,3 +12,6 @@ metadata:
 
 Body prose for browser-automation. This text must never be sent to a selector or appear
 in suggestion output; only the frontmatter metadata above is.
+
+## Required Decision Rules
+- interactive actions require visual or ax proof

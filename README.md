@@ -218,7 +218,7 @@ export PATH="$HOME/.local/bin:$PATH"
 | `explain [OPTIONS]` | Explain which sensors the current change selects, without running them — flags: `--set <SET>`, `--changed`, `--format <FORMAT>` |
 | `status [OPTIONS]` | Report verification evidence freshness without running sensors — flags: `--set <SET>`, `--evidence <FILE>`, `--format <FORMAT>` |
 | `pr no-effect [OPTIONS] [PR]` | Report whether a PR or revision range introduces any effective change — flags: `--base <REV>`, `--head <REV>`, `--format <FORMAT>` |
-| `pr review [OPTIONS] [PR]` | Emit the semantic residual: changed units evidence could not prove — flags: `--base <REV>`, `--head <REV>`, `--recompute`, `--format <FORMAT>` |
+| `pr review [OPTIONS] [PR]` | Emit the semantic residual: changed units evidence could not prove — flags: `--base <REV>`, `--head <REV>`, `--recompute`, `--view <VIEW>`, `--format <FORMAT>` |
 | `pr ready [OPTIONS] <PR>` | Check whether a pull request is ready to merge: merge state, CI checks, and review conversations (aliases: `readiness`, `check`) — flags: `--format <FORMAT>` |
 | `pr waivers [OPTIONS] --lcov <PATH> [PR]` | Classify patch-coverage residue: waivable classes and lines needing tests — flags: `--base <REV>`, `--head <REV>`, `--patch <PATH>`, `--lcov <PATH>`, `--since <PATH>`, `--strip-prefix <PREFIX>`, `--format <FORMAT>` |
 | `skills suggest [OPTIONS] --query <TEXT>` | Rank skills by relevance to a query using metadata only — flags: `--query <TEXT>`, `--limit <N>`, `--format <FORMAT>` |
@@ -226,7 +226,7 @@ export PATH="$HOME/.local/bin:$PATH"
 | `skills refresh-validator [OPTIONS]` | Replace only the installed skill-creator structure validator |
 | `init-db [OPTIONS]` | Apply pending database migrations — flags: `--check`, `-y, --yes` |
 | `seed [OPTIONS]` | Seed invariants from plans/invariants.json — flags: `--prune` |
-| `init [OPTIONS]` | Scaffold a harness workspace in a target directory — flags: `--language <LANG>`, `--force`, `--format <FORMAT>`, `--no-seed`, `--minimal`, `--no-gitignore` |
+| `init [OPTIONS]` | Scaffold a harness workspace in a target directory — flags: `--language <LANG>`, `--force`, `--format <FORMAT>`, `--no-seed`, `--minimal`, `--no-gitignore`, `--inspect` |
 | `task export [OPTIONS]` | Write the task list to plans/tasks.json or specified output — flags: `--stdout`, `--format <FORMAT>` |
 | `task import [OPTIONS]` | Validate plans/tasks.json against the state database — flags: `--file <FILE>`, `--check` |
 | `task list [OPTIONS]` | Print tasks from the state database — flags: `--status <STATUS>`, `--method <METHOD>`, `--parent <ID>`, `--format <FORMAT>` |
@@ -244,7 +244,7 @@ export PATH="$HOME/.local/bin:$PATH"
 | `errors clear [OPTIONS]` | Clear fail-fast error signatures (`--sensor sensor:<name>`) — flags: `--sensor <SENSOR>`, `--task <ID>`, `--scope <SCOPE>`, `--force` |
 | `loc [OPTIONS] [PATH]...` | Report line-of-code state for the 500-LOC invariant — flags: `--dir <DIR>`, `--ext <EXT>`, `--format <FORMAT>`, `--warn` |
 | `split [OPTIONS] <FILE>` | Extract a large top-level item into a sibling module — flags: `--target <NAME>` |
-| `eval [OPTIONS]` | Validate skill structure and benchmark skill evals — flags: `--skill <SKILL>`, `--bless`, `--list-skills`, `--fail-fast`, `--format <FORMAT>`, `--approver <NAME>`, `--no-lift`, `--agent-cmd <COMMAND>`, `--agent-timeout <SECS>`, `--strict-fixtures` |
+| `eval [OPTIONS]` | Validate skill structure and benchmark skill evals — flags: `--skill <SKILL>`, `--bless`, `--list-skills`, `--fail-fast`, `--format <FORMAT>`, `--approver <NAME>`, `--no-lift`, `--agent-cmd <COMMAND>`, `--agent-timeout <SECS>`, `--strict-fixtures`, `--trials <N>` |
 | `hook install [OPTIONS]` | Write pre-commit and pre-push hooks into `.git/hooks/` — flags: `--force` |
 | `hook uninstall [OPTIONS]` | Remove managed hooks, leaving foreign hook files untouched |
 | `hook status [OPTIONS]` | Show whether the managed hooks and release binary are present — flags: `--format <FORMAT>` |
@@ -261,6 +261,9 @@ export PATH="$HOME/.local/bin:$PATH"
 | `ci-explain [OPTIONS] <RUN_ID>` | Explain a CI run's failures and cancellations with local repro commands (alias: `ci`) — flags: `--format <FORMAT>` |
 | `completions [OPTIONS] <SHELL>` | Generate shell completions |
 | `man [OPTIONS] <DIR>` | Generate man page documentation |
+| `feedback draft [OPTIONS] --repo <OWNER/REPO>` | Generate a local feedback draft from recurring or severe failure evidence — flags: `--repo <OWNER/REPO>`, `--days <DAYS>`, `--min-fires <N>`, `--out <FILE>`, `--format <FORMAT>` |
+| `feedback submit [OPTIONS] --draft <FILE>` | Explicitly submit a feedback draft — flags: `--draft <FILE>`, `--repo <OWNER/REPO>`, `--yes` |
+| `feedback auto [OPTIONS] --repo <OWNER/REPO>` | Fully automated end-to-end feedback generation, deduplication, and submission — flags: `--repo <OWNER/REPO>`, `--days <DAYS>`, `--min-fires <N>`, `--format <FORMAT>` |
 
 Global flags: `--root <DIR>`, `--config <FILE>`, `-q, --quiet`, `--output <FILE>`, `--dry-run`.
 <!-- END GENERATED: cli-commands -->

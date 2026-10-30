@@ -359,3 +359,20 @@ R7.
 - <https://github.com/tursodatabase/libsql/issues> (#2254/#2271/#2272/#2285)
 - <https://github.com/obi1kenobi/cargo-semver-checks>
 - <https://github.com/EmbarkStudios/cargo-deny> and rustsec/cargo-audit advisories workflow
+
+## 0.4.0 follow-up (2026-10-28)
+
+The release analysis and per-slice progress record are in
+[v0.4.0-roadmap.md](v0.4.0-roadmap.md) and
+[v0.4.0-progress.md](v0.4.0-progress.md). All scheduled roadmap slices
+(WF-01, WF-02, WF-03, WF-04, WF-05, WF-06, WF-07, WF-08, WF-09, WF-10, WF-11,
+and WF-12) are now implemented and verified; WF-13–WF-14 remain not scheduled.
+Exact WF-01–WF-12 tests, CLI smoke, and artifact identity are in the progress
+record; no benchmark or GitHub issue/PR publication is claimed.
+
+**A10 resolved by [WF-07](v0.4.0-roadmap.md#wf-07--bound-this-repositorys-pre-push-gate-explicitly-p1-already-implemented):** `do-harness.toml` now explicitly bounds the pre-push hook to `signal-sets.verification` (32 sensors), ensuring local pushes never trigger heavy scheduled checks (`coverage`, `powerset`) while keeping global empty-list semantics and strict CI unchanged.
+
+**WF-14 status correction:** GitHub announced workflow lockfiles in public
+preview on 2026-10-14 and general availability on 2026-10-28. The roadmap
+records optional evaluation only, with no automatic migration or release
+dependency.
