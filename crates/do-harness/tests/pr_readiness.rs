@@ -135,8 +135,8 @@ fn conflicting_pull_request_reports_its_check_set_as_incomplete() {
     .unwrap();
     std::fs::write(
         root.join("check_runs.json"),
-        r#"{"id": 1, "name": "Codacy Static Code Analysis", "status": "completed", "conclusion": "success", "html_url": "https://github.com/d-o-hub/do-harness/actions/runs/1/job/1"}
-{"id": 2, "name": "Analyze (rust)", "status": "completed", "conclusion": "success", "html_url": "https://github.com/d-o-hub/do-harness/actions/runs/1/job/2"}"#,
+        r#"{"id": 1, "name": "Codacy Static Code Analysis", "status": "completed", "conclusion": "success"}
+{"id": 2, "name": "Analyze (rust)", "status": "completed", "conclusion": "success"}"#,
     )
     .unwrap();
 
@@ -184,7 +184,7 @@ fn a_clean_pull_request_does_not_flag_its_checks_as_incomplete() {
     .unwrap();
     std::fs::write(
         root.join("check_runs.json"),
-        r#"{"id": 1, "name": "verify", "status": "completed", "conclusion": "success", "html_url": "https://github.com/d-o-hub/do-harness/actions/runs/1/job/1"}"#,
+        r#"{"id": 1, "name": "verify", "status": "completed", "conclusion": "success"}"#,
     )
     .unwrap();
 

@@ -418,5 +418,11 @@
     "rationale": "Incremental compilation artifacts balloon disk and memory usage in CI without reuse benefits across clean runner environments",
     "sensor": "python3 scripts/check_ci_concurrency_guardrails.py --self-test",
     "category": "ci"
+  },
+  {
+    "invariant": "The CLI works in every GitHub repository: no shipped surface names this one where the current repository is meant; identity comes from gh/git or an explicit argument, and scaffolded artifacts describe the adopting repository",
+    "rationale": "A hardcoded owner/repo is a silent defect rather than a crash: it files an adopter's incident against this project and attributes another repository's checks, so every consumer checkout would do the wrong thing while looking correct",
+    "sensor": "scripts/check-repo-links.sh",
+    "category": "contracts"
   }
 ]
