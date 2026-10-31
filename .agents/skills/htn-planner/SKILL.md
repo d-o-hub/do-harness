@@ -38,11 +38,11 @@ Decompose incoming software objectives into deterministic Hierarchical Task Netw
   5. `transition-to-slice`: Invoke `Vertical Event Slice` method.
 
 ## Execution Rules
+- Before repository-dependent decomposition or persisting a plan, run the harness freshness step (`bash .agents/skills/harness/scripts/latest-main.sh [--read-only]`). Read-only planning observes remote state via `--read-only` without writing Git, DB, or working-tree state, and reports advertised SHA and local HEAD separately. Clean `main` can fast-forward only; dirty/diverged/in-progress branches are never reset, auto-stashed, or automatically rebased. Fetch or network failure blocks claims of freshness; do not substitute stale source as latest.
 - Check method preconditions before selecting a method; if they are unmet, pick the matching alternative or defer.
 - Always persist current method state and subtask index into `plans/tasks.json` or libSQL.
 - Never advance subtask pointer until the corresponding sensor passes with exit code 0.
 - When a decomposed subtask carries high uncertainty, delegate to `.agents/skills/spike-runner` before advancing.
-
 ## Gotchas
 - Do not decompose a task that lacks a specified domain requirement — the precondition of `Vertical Event Slice` is unmet.
 - A spike decision is made at planning time, not discovered mid-implementation.

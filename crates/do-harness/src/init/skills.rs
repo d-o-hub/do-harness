@@ -29,10 +29,16 @@ pub(super) const SKILLS: &[SkillSpec] = &[SkillSpec {
     walkthrough: Some(include_str!(
         "../../templates/skills/harness/evals/walkthrough.sh"
     )),
-    references: &[(
-        "references/heuristics.md",
-        include_str!("../../templates/skills/harness/references/heuristics.md"),
-    )],
+    references: &[
+        (
+            "references/heuristics.md",
+            include_str!("../../templates/skills/harness/references/heuristics.md"),
+        ),
+        (
+            "scripts/latest-main.sh",
+            include_str!("../../templates/skills/harness/scripts/latest-main.sh"),
+        ),
+    ],
 }];
 
 /// skill-creator ships its scaffolding script and the structure gate so that a

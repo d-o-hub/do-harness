@@ -1,6 +1,7 @@
 # AGENTS.md — Autonomous & Interactive Agent Execution Harness
 
 ## 1. System Operating Invariants (Hard Constraints)
+- **Latest-main First**: Every new top-level repository work request MUST begin by checking and obtaining latest `origin/main` before planning, code inspection, editing, or subagent delegation (using `.agents/skills/harness/scripts/latest-main.sh [--root DIR] [--read-only]`). Clean `main` can fast-forward only; dirty, diverged, or in-progress branches are never reset, auto-stashed, or automatically rebased. For new work, branch from the fresh base without discarding existing work; for ongoing PR work, record the fetched base and retain existing branch-update rules. In read-only/dry-run mode, invoke with `--read-only`, report advertised SHA and local HEAD separately, and inspect upstream sources pinned to that SHA if the object is unavailable locally. Network or fetch failure blocks claims of freshness; do not substitute stale source as latest. Verification never mutates Git state.
 - **Modularity Cap**: Maximum 500 Lines of Code (LOC) per source file. Decompose when nearing 450 LOC.
 - **Persistence Engine**: Local libSQL instance (`.do-harness/agent_state.db`) for tracking beats, task execution traces, and learned heuristics. The database is local state and is never committed (`.do-harness/` is ignored): a live SQLite file has no diff or merge, carries `-wal`/`-shm` sidecars, and a copy taken while a transaction is active can be corrupt. Version the contract instead — `crates/db/migrations/*.sql`, `plans/*.json`, and `task export` snapshots (see `docs/retention.md`).
 - **Persistence & Roadmap**: The `do-harness-db` repository layer implements persistence writers for tasks, beats, traces, heuristics, error signatures, and skill evals (`verify --record` persists beats scoped to `--task` or git branch, resetting strikes on pass; `task list`/`task export` read task state). The workflow runtime (`task add/advance/done/fail`, gated on `plans/methods.json` and named sensor ok beats, with typed Commands/Events and `TaskBoard` projections), fail-fast recovery (`errors list/clear`, strike counters scoped per workstream), the sandboxed skill-eval runner (`do-harness eval` with blessed tamper-evident baselines and `eval --agent-cmd` lift measurement), the `metrics` command, the deterministic DORA collector (`dora`), and commit enforcement (`check-commitlint.sh`) are implemented. The development-signal contract (`[signal-sets]` + `verify --set`, `when-changed` + `verify --changed`/`explain`, workspace/policy fingerprints, evidence schema v4, and status reporting) is documented in `plans/development-signals-epic.md`. Architecture policies and sensor decisions live in `plans/invariants.json`. Distilled operational heuristics reside in `.agents/skills/harness/references/heuristics.md`. Release distribution (multi-platform static binaries, cargo-binstall metadata, zero-install npm platform packages, automated SemVer release proposals via `scripts/release-manager.sh` and `.github/workflows/auto-release.yml`, and post-publication verification) is documented in `docs/releasing.md` and `plans/distribution-epic.md`. MCP conformance and governance policies are tracked in `plans/mcp-conformance-epic.md` and `plans/agt-governance-epic.md`.
@@ -13,6 +14,9 @@
 
 ```
 [ Objective / User Request ]
+             │
+             ▼
+[ 0. Baseline Freshness (.agents/skills/harness/scripts/latest-main.sh) ]
              │
              ▼
 [ 1. HTN Task Decomposition (.agents/skills/htn-planner) ]
@@ -38,6 +42,11 @@
 ---
 
 ## 3. The 6-Phase Coding Workflow
+
+### Phase 0: Baseline Freshness (Latest-main First)
+- At the boundary of every new top-level repository work request, execute `bash .agents/skills/harness/scripts/latest-main.sh [--root DIR] [--read-only]`.
+- Clean `main` fast-forwards via `git merge --ff-only origin/main`. For new work, branch from the refreshed tip; dirty or active feature branches are never reset, auto-stashed, or automatically rebased.
+- Read-only planning runs with `--read-only` and inspects pinned upstream source if the object is not local. Remote failure fails closed.
 
 ### Phase 1: HTN Planning & Decomposition
 - Break compound requests into primitive tasks stored in `plans/tasks.json` or `.do-harness/agent_state.db`.

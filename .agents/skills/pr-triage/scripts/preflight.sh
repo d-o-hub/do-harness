@@ -2,6 +2,38 @@
 # Preflight checks for a pr-triage sweep.
 set -euo pipefail
 
+
+dry_run=0
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --dry-run)
+      dry_run=1
+      shift
+      ;;
+    *)
+      printf 'preflight: unknown argument: %s\n' "$1" >&2
+      exit 2
+      ;;
+  esac
+done
+
+root="$(git rev-parse --show-toplevel 2>/dev/null)" || {
+  printf 'preflight: not inside a git work tree\n' >&2
+  exit 2
+}
+
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+latest_main="$script_dir/../../harness/scripts/latest-main.sh"
+[ -f "$latest_main" ] || {
+  printf 'preflight: latest-main helper not found at %s\n' "$latest_main" >&2
+  exit 2
+}
+
+if [ "$dry_run" -eq 1 ]; then
+  bash "$latest_main" --root "$root" --read-only >/dev/null || exit 2
+else
+  bash "$latest_main" --root "$root" >/dev/null || exit 2
+fi
 fail=0
 ok() { printf 'ok: %s\n' "$1"; }
 warn() { printf 'warn: %s\n' "$1"; }
