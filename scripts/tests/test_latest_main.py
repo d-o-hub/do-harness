@@ -89,11 +89,12 @@ class BaseGitTestCase(unittest.TestCase):
         return self.git(self.seeder, "rev-parse", "HEAD").stdout.strip()
 
     def run_helper(self, args=None, cwd=None, env=None):
-        cmd = ["bash", str(HELPER_SCRIPT)] + (args or [])
         return subprocess.run(  # nosec B603 B607
-            cmd, cwd=cwd or str(self.client),
-            env=(env if env is not None else self.git_env),
-            capture_output=True, text=True
+            ["bash", str(HELPER_SCRIPT), *(args or [])],
+            cwd=cwd or str(self.client),
+            env=env if env is not None else self.git_env,
+            capture_output=True,
+            text=True,
         )
 
     def assert_helper_fails_closed(self, args):
