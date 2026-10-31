@@ -21,26 +21,31 @@
     },
     {
       "id": 2,
-      "prompt": "The same test has failed 3 consecutive times for the same subtask. What now?",
-      "expected_output": "Apply the fail-fast policy: halt, record the error signature, and surface a diagnostic to the developer.",
+      "prompt": "Before starting repository work, obtain and verify latest origin/main. Prove that remote tracking advances while the checked-out HEAD remains preserved.",
+      "expected_output": "Read-only mode advertises commit B without fetching or changing local checkout state; normal mode fetches B into refs/remotes/origin/main and preserves HEAD at commit A.",
       "files": [],
-      "dim": "effectiveness",
-      "kind": "implicit",
+      "dim": "correctness",
+      "kind": "explicit",
       "assertions": [
-        "contains:.agents/skills/harness/SKILL.md|3 consecutive times",
-        "contains:.agents/skills/harness/SKILL.md|halt"
+        "walk:",
+        "contains:freshness_ro.err|advertised only; not fetched",
+        "contains:freshness_ro_state.txt|preserved",
+        "contains:freshness.err|fetched",
+        "contains:freshness_result.txt|match"
       ]
     },
     {
       "id": 3,
-      "prompt": "Explain what a for-loop is. No repository or workspace is involved.",
-      "expected_output": "No harness action: general knowledge needs no init, no sensors run, and no workspace is touched.",
+      "prompt": "Attempt to refresh latest origin/main outside a git worktree. What happens?",
+      "expected_output": "The helper exits with code 2, emits no success commit SHA to stdout, reports not inside a git work tree on stderr, and touches no workspace.",
       "files": [],
       "dim": "discoverability",
       "kind": "negative",
       "assertions": [
-        "contains:harness_negative.txt|no init",
-        "contains:.agents/skills/harness/SKILL.md|never assumed"
+        "walk:",
+        "contains:outside_git_exit.txt|exit=2",
+        "contains:outside_git.err|not inside a git work tree",
+        "absent:outside_git.out"
       ]
     }
   ]

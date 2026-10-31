@@ -47,10 +47,13 @@ cat >> "$root/.git/info/exclude" <<'EOF'
 /start_task.out
 /start_task_branch.txt
 /pr_task.txt
-/issue_to_pr_negative.txt
+/no-origin-fixture/
+/no_origin_refusal.txt
+/no_origin_gh_calls.txt
+/no_origin_branch.txt
 EOF
 
-"$bin" --root "$root" init --minimal >/dev/null
+"$bin" --root "$root" init --language rust >/dev/null
 git add -A
 git commit -q -m "chore: initial workspace"
 git init -q --bare "$root/origin.git"
@@ -153,8 +156,40 @@ git add "$root/item-task-1.txt"
 git commit -q -m "chore: exercise the task path"
 "$skill/scripts/open-pr.sh" --task 1 > "$root/pr_task.txt"
 
-# 7. Negative case: an out-of-scope question is not queue material.
-cat > "$root/issue_to_pr_negative.txt" <<'TXT'
-out-of-scope: a general question is not a queue item; no branch, no PR, and no
-tracker mutation belong to it.
-TXT
+# 7. Negative case: a clean-main repo with no origin remote refuses with exit 2
+# before issue discovery or branch creation.
+no_origin_repo="$root/no-origin-fixture"
+mkdir -p "$no_origin_repo"
+(
+  cd "$no_origin_repo"
+  git init -q -b main
+  git config user.email "eval@example.com"
+  git config user.name "Eval"
+  echo "content" > file.txt
+  git add file.txt
+  git commit -q -m "initial commit"
+)
+
+gh_log_before=$(wc -l < "$FAKE_GH_LOG" | tr -d ' ')
+
+set +e
+(
+  cd "$no_origin_repo"
+  "$skill/scripts/start-item.sh" --issue 62 > /dev/null 2> "$root/no_origin_refusal.txt"
+)
+no_origin_exit=$?
+set -e
+printf 'exit=%s\n' "$no_origin_exit" >> "$root/no_origin_refusal.txt"
+
+gh_log_after=$(wc -l < "$FAKE_GH_LOG" | tr -d ' ')
+if [ "$gh_log_before" = "$gh_log_after" ]; then
+  printf 'unchanged\n'
+else
+  printf 'changed\n'
+fi > "$root/no_origin_gh_calls.txt"
+
+if git -C "$no_origin_repo" branch --list 'issue-62*' | grep -q .; then
+  printf 'present\n'
+else
+  printf 'absent\n'
+fi > "$root/no_origin_branch.txt"

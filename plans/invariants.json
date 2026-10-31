@@ -424,5 +424,11 @@
     "rationale": "A hardcoded owner/repo is a silent defect rather than a crash: it files an adopter's incident against this project and attributes another repository's checks, so every consumer checkout would do the wrong thing while looking correct",
     "sensor": "scripts/check-repo-links.sh",
     "category": "contracts"
+  },
+  {
+    "invariant": "Refresh origin/main before repository analysis, planning, editing, or delegation; preserve worktree state and fail closed when freshness is unproven",
+    "rationale": "Prevents stale baselines and lost upstream commits during agent audit, planning, and task execution",
+    "sensor": "python3 scripts/tests/test_latest_main.py",
+    "category": "workflow"
   }
 ]

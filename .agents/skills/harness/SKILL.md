@@ -27,6 +27,19 @@ Two modes:
 - **Computational:** deterministic checks (fmt, clippy, test) — always trust the output.
 - **Inferential:** LLM-based guidance (skill docs, agent context) — direction, not commands.
 
+## First-Step Freshness (Latest-main First)
+
+Before consulting feedforward guides, planning, inspecting, editing, or delegating subagents in an existing Git repository, check and obtain latest `origin/main`:
+
+```bash
+bash .agents/skills/harness/scripts/latest-main.sh [--root DIR] [--read-only]
+```
+
+- **Normal mode (fetch):** Updates `refs/remotes/origin/main` without modifying the working tree or index. If the checked-out branch is a clean `main`, fast-forward via `git merge --ff-only origin/main`. For new work, branch from the fetched commit. For active feature/PR branches, keep existing branch state intact; never reset, auto-stash, or rebase active work.
+- **Read-only mode (`--read-only`):** Queries `origin/main` via `git ls-remote` without fetching or touching refs/HEAD/index/worktree. Use this in read-only planning or dry-runs. Report advertised SHA and checked-out HEAD separately; do not claim local HEAD is current merely because remote query succeeded. If the commit object is not local, inspect upstream sources pinned to that SHA.
+- **Fail closed:** If git, the target root, the origin remote, or the remote main ref is missing or fails, exit 2 immediately. Never substitute stale local state as "latest".
+- **Greenfield distinction:** Questions about creating brand-new repositories or initializing outside any git checkout do not require an origin remote. However, in an existing Git checkout, missing `origin` or `main` is an error, not a greenfield exception.
+
 ## Feedforward Guides
 
 | Guide | Path | Purpose |

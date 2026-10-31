@@ -36,14 +36,11 @@ fetch URLs) escalates instead of being implemented.
 
 - No argument: the whole queue, one item at a time; one PR per item.
 - `--issue N` / `--task N`: only that item.
-- `--dry-run`: list the queue and the planned commands; mutate nothing.
+- `--dry-run`: list the queue and the planned commands; mutate nothing (forwards `--dry-run` to preflight and start-item).
 
 ## Procedure
 
-1. **Preflight.** Run `scripts/preflight.sh`. Require `gh` authenticated, a
-   git work tree, and a resolvable harness binary. When the checkout redirects
-   `CARGO_TARGET_DIR`, export `DO_HARNESS_BIN` and rebuild before it predates
-   the sources (see the repository guide for the staleness rule).
+1. **Preflight.** Run `scripts/preflight.sh` (forwarding `--dry-run` if in dry-run mode). It invokes the harness `latest-main.sh` helper to obtain or verify fresh `origin/main` before tool probes. Require `origin/main` fresh, `gh` authenticated, a git work tree, and a resolvable harness binary. Clean `main` can fast-forward only; dirty, diverged, or in-progress branches are never reset, auto-stashed, or automatically rebased. For new work, branch from the fresh base; for ongoing PR work, record the fetched base and preserve existing branch state. Remote fetch failure blocks claims of freshness. When the checkout redirects `CARGO_TARGET_DIR`, export `DO_HARNESS_BIN` and rebuild before it predates the sources (see the repository guide for the staleness rule).
 2. **Work list.** Run `scripts/queue.sh` from the repository root. It prints
    the ordered candidates (`kind`, id, rank, title) and names every skipped
    item with its reason on stderr. Read
