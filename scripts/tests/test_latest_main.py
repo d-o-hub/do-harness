@@ -4,6 +4,7 @@
 import os
 import pathlib
 import stat
+import shutil
 import subprocess  # nosec B404
 import tempfile
 import unittest
@@ -60,9 +61,25 @@ class BaseGitTestCase(unittest.TestCase):
 
     def git(self, cwd, *args, check=True):
         return subprocess.run(  # nosec B603 B607
-            ["git", "-C", str(cwd)] + list(args),
+            ["git", "-C", str(cwd), *args],
             env=self.git_env, check=check, capture_output=True, text=True
         )
+
+    @staticmethod
+    def snapshot_files(root):
+        return {
+            path.relative_to(root).as_posix(): path.read_bytes()
+            for path in root.rglob("*")
+            if path.is_file()
+        }
+
+    @staticmethod
+    def snapshot_worktree(root):
+        return {
+            path.relative_to(root).as_posix(): path.read_bytes()
+            for path in root.rglob("*")
+            if path.is_file() and path.relative_to(root).parts[0] != ".git"
+        }
 
     def advance_origin(self, msg="commit B"):
         (self.seeder / "README.md").write_text(f"{msg}\n", encoding="utf-8")
@@ -79,6 +96,11 @@ class BaseGitTestCase(unittest.TestCase):
             capture_output=True, text=True
         )
 
+    def assert_helper_fails_closed(self, args):
+        res = self.run_helper(args)
+        self.assertEqual(res.returncode, 2, res.stderr)
+        self.assertEqual(res.stdout, "")
+
 
 class TestLatestMain(BaseGitTestCase):
     def test_remote_advancement(self):
@@ -93,28 +115,18 @@ class TestLatestMain(BaseGitTestCase):
     def test_read_only(self):
         commit_b = self.advance_origin("commit B")
 
-        # Snapshot FETCH_HEAD, refs, index, HEAD, and worktree before
-        fetch_head = self.client / ".git" / "FETCH_HEAD"
-        fetch_head_before = fetch_head.read_bytes() if fetch_head.exists() else None
-        refs_before = self.git(self.client, "show-ref").stdout
-        idx_before = self.git(self.client, "ls-files", "-s").stdout
-        head_before = self.git(self.client, "rev-parse", "HEAD").stdout
-        status_before = self.git(self.client, "status", "--porcelain").stdout
+        # Snapshot the actual checkout files; Git status can refresh the index.
+        before = self.snapshot_files(self.client)
 
         res = self.run_helper(["--read-only"])
         self.assertEqual(res.returncode, 0, res.stderr)
         self.assertEqual(res.stdout.strip(), commit_b)
         self.assertIn(f"latest-main: advertised only; not fetched: {commit_b}", res.stderr)
 
-        # origin/main remains at commit A, object B is absent, state unchanged
+        # Read-only query leaves every file (including index, refs, and HEAD) unchanged.
+        self.assertEqual(self.snapshot_files(self.client), before)
         self.assertEqual(self.git(self.client, "rev-parse", "refs/remotes/origin/main").stdout.strip(), self.commit_a)
         self.assertNotEqual(self.git(self.client, "cat-file", "-e", commit_b, check=False).returncode, 0)
-        fetch_head_after = fetch_head.read_bytes() if fetch_head.exists() else None
-        self.assertEqual(fetch_head_after, fetch_head_before)
-        self.assertEqual(self.git(self.client, "show-ref").stdout, refs_before)
-        self.assertEqual(self.git(self.client, "ls-files", "-s").stdout, idx_before)
-        self.assertEqual(self.git(self.client, "rev-parse", "HEAD").stdout, head_before)
-        self.assertEqual(self.git(self.client, "status", "--porcelain").stdout, status_before)
 
     def test_dirty_feature_branch(self):
         self.git(self.client, "checkout", "-b", "feat-1")
@@ -122,11 +134,15 @@ class TestLatestMain(BaseGitTestCase):
         self.git(self.client, "add", "staged.txt")
         (self.client / "README.md").write_text("unstaged modification\n", encoding="utf-8")
         (self.client / "untracked.txt").write_text("untracked content\n", encoding="utf-8")
+        index_before = (self.client / ".git" / "index").read_bytes()
+        head_file_before = (self.client / ".git" / "HEAD").read_bytes()
 
         commit_b = self.advance_origin("commit B")
         res = self.run_helper()
         self.assertEqual(res.returncode, 0, res.stderr)
         self.assertEqual(res.stdout.strip(), commit_b)
+        self.assertEqual((self.client / ".git" / "index").read_bytes(), index_before)
+        self.assertEqual((self.client / ".git" / "HEAD").read_bytes(), head_file_before)
 
         self.assertEqual((self.client / "staged.txt").read_text(encoding="utf-8"), "staged content\n")
         self.assertEqual((self.client / "README.md").read_text(encoding="utf-8"), "unstaged modification\n")
@@ -147,25 +163,25 @@ class TestLatestMain(BaseGitTestCase):
     def test_failure_closed(self):
         empty_dir = self.base / "empty"
         empty_dir.mkdir()
-        self.assertEqual(self.run_helper(["--root", str(empty_dir)]).returncode, 2)
+        self.assert_helper_fails_closed(["--root", str(empty_dir)])
 
         no_remote = self.base / "no-remote"
         subprocess.run(["git", "init", str(no_remote)], env=self.git_env, check=True)  # nosec B603 B607
-        self.assertEqual(self.run_helper(["--root", str(no_remote)]).returncode, 2)
+        self.assert_helper_fails_closed(["--root", str(no_remote)])
 
-        self.assertEqual(self.run_helper(["--invalid"]).returncode, 2)
-        self.assertEqual(self.run_helper(["--root"]).returncode, 2)
+        self.assert_helper_fails_closed(["--invalid"])
+        self.assert_helper_fails_closed(["--root"])
 
         no_main = self.base / "no-main.git"
         subprocess.run(["git", "init", "--bare", "-b", "feature", str(no_main)], env=self.git_env, check=True)  # nosec B603 B607
         no_main_client = self.base / "no-main-client"
         subprocess.run(["git", "clone", str(no_main), str(no_main_client)], env=self.git_env, check=True)  # nosec B603 B607
-        self.assertEqual(self.run_helper(["--root", str(no_main_client)]).returncode, 2)
+        self.assert_helper_fails_closed(["--root", str(no_main_client)])
 
         bad_origin = self.base / "bad-origin-client"
         subprocess.run(["git", "clone", str(self.origin), str(bad_origin)], env=self.git_env, check=True)  # nosec B603 B607
         self.git(bad_origin, "remote", "set-url", "origin", "/nonexistent/repo.git")
-        self.assertEqual(self.run_helper(["--root", str(bad_origin)]).returncode, 2)
+        self.assert_helper_fails_closed(["--root", str(bad_origin)])
 
         # Shim git to verify malformed length, extra columns, and multiple lines fail closed
         shim_dir = self.base / "shim_git"
@@ -180,12 +196,15 @@ if [ "${3:-}" = "ls-remote" ]; then
   esac
   exit 0
 fi
-exec /usr/bin/git "$@"
+exec "$REAL_GIT" "$@"
 """, encoding="utf-8")
         shim_git.chmod(shim_git.stat().st_mode | stat.S_IXUSR)
 
+        real_git = shutil.which("git")
+        self.assertIsNotNone(real_git)
         shim_env = self.git_env.copy()
         shim_env["PATH"] = f"{shim_dir}:{shim_env['PATH']}"
+        shim_env["REAL_GIT"] = real_git
         for mode in ["bad_hex", "extra_col", "multi_line"]:
             shim_env["SHIM_MODE"] = mode
             res = self.run_helper(["--read-only"], env=shim_env)
@@ -274,33 +293,39 @@ esac
         self.assertEqual(self.git(self.client, "rev-parse", "refs/remotes/origin/main").stdout.strip(), commit_d)
 
     def test_preflight_scripts(self):
+        pr_client = self.base / "pr-client"
+        subprocess.run(["git", "clone", str(self.origin), str(pr_client)], env=self.git_env, check=True)  # nosec B603 B607
+        clients = [self.client, pr_client]
+        scripts = [ISSUE_PREFLIGHT, PR_PREFLIGHT]
         commit_b = self.advance_origin("commit B")
 
-        # 1. Preflight dry-run (issue-to-pr & pr-triage)
-        for script in [ISSUE_PREFLIGHT, PR_PREFLIGHT]:
-            res = subprocess.run(["bash", str(script), "--dry-run"], cwd=str(self.client), env=self.wf_env, capture_output=True, text=True)  # nosec B603 B607
-            self.assertEqual(res.returncode, 0, f"{script.name}: {res.stderr}")
+        for script, client in zip(scripts, clients):
+            dry_run = subprocess.run(["bash", str(script), "--dry-run"], cwd=str(client), env=self.wf_env, capture_output=True, text=True)  # nosec B603 B607
+            self.assertEqual(dry_run.returncode, 0, f"{script.name} dry-run: {dry_run.stderr}")
+            self.assertEqual(self.git(client, "rev-parse", "refs/remotes/origin/main").stdout.strip(), self.commit_a)
 
-        # origin/main was not fetched during dry-run
-        self.assertEqual(self.git(self.client, "rev-parse", "refs/remotes/origin/main").stdout.strip(), self.commit_a)
+            normal = subprocess.run(["bash", str(script)], cwd=str(client), env=self.wf_env, capture_output=True, text=True)  # nosec B603 B607
+            self.assertEqual(normal.returncode, 0, f"{script.name}: {normal.stderr}")
+            self.assertEqual(self.git(client, "rev-parse", "refs/remotes/origin/main").stdout.strip(), commit_b)
 
-        # 2. Preflight normal run: fetches origin/main for BOTH scripts
-        for script in [ISSUE_PREFLIGHT, PR_PREFLIGHT]:
-            res = subprocess.run(["bash", str(script)], cwd=str(self.client), env=self.wf_env, capture_output=True, text=True)  # nosec B603 B607
-            self.assertEqual(res.returncode, 0, f"{script.name}: {res.stderr}")
-
-        self.assertEqual(self.git(self.client, "rev-parse", "refs/remotes/origin/main").stdout.strip(), commit_b)
-
-        # 3. Dirty state: preflight preserves dirty state byte-for-byte on both scripts
+        # Preflights preserve tracked, staged, and untracked state in both modes.
         dirty_file = self.client / "dirty_preflight.txt"
         dirty_file.write_text("preflight dirty content\n", encoding="utf-8")
+        self.git(self.client, "add", "dirty_preflight.txt")
         readme = self.client / "README.md"
         readme.write_text("modified for preflight\n", encoding="utf-8")
-        for script in [ISSUE_PREFLIGHT, PR_PREFLIGHT]:
-            res = subprocess.run(["bash", str(script), "--dry-run"], cwd=str(self.client), env=self.wf_env, capture_output=True, text=True)  # nosec B603 B607
-            self.assertEqual(res.returncode, 0, f"{script.name}: {res.stderr}")
-            self.assertEqual(dirty_file.read_text(encoding="utf-8"), "preflight dirty content\n")
-            self.assertEqual(readme.read_text(encoding="utf-8"), "modified for preflight\n")
+        (self.client / "untracked_preflight.txt").write_text("untracked content\n", encoding="utf-8")
+        worktree_before = self.snapshot_worktree(self.client)
+        index_before = (self.client / ".git" / "index").read_bytes()
+        head_file_before = (self.client / ".git" / "HEAD").read_bytes()
+
+        for script in scripts:
+            for args in (["--dry-run"], []):
+                result = subprocess.run(["bash", str(script), *args], cwd=str(self.client), env=self.wf_env, capture_output=True, text=True)  # nosec B603 B607
+                self.assertEqual(result.returncode, 0, f"{script.name} {args}: {result.stderr}")
+                self.assertEqual(self.snapshot_worktree(self.client), worktree_before)
+                self.assertEqual((self.client / ".git" / "index").read_bytes(), index_before)
+                self.assertEqual((self.client / ".git" / "HEAD").read_bytes(), head_file_before)
 
         # 4. Preflight fails closed when origin is broken/missing
         no_remote = self.base / "no-remote-preflight"
@@ -309,15 +334,16 @@ esac
             res = subprocess.run(["bash", str(script)], cwd=str(no_remote), env=self.wf_env, capture_output=True, text=True)  # nosec B603 B607
             self.assertEqual(res.returncode, 2, f"{script.name} should fail closed")
 
-        # 5. Preflight fails closed when latest-main.sh helper is missing
-        fake_skill_dir = self.base / "fake_skill"
-        (fake_skill_dir / "scripts").mkdir(parents=True)
-        fake_script = fake_skill_dir / "scripts" / "preflight.sh"
-        fake_script.write_text(ISSUE_PREFLIGHT.read_text(encoding="utf-8"), encoding="utf-8")
-        fake_script.chmod(fake_script.stat().st_mode | stat.S_IXUSR)
-        res = subprocess.run(["bash", str(fake_script)], cwd=str(self.client), env=self.wf_env, capture_output=True, text=True)  # nosec B603 B607
-        self.assertEqual(res.returncode, 2, "Missing helper must fail closed with exit 2")
-        self.assertIn("latest-main helper not found", res.stderr)
+        # 5. Both preflights fail closed when latest-main.sh is missing.
+        for index, script in enumerate(scripts):
+            fake_skill_dir = self.base / f"fake_skill_{index}"
+            (fake_skill_dir / "scripts").mkdir(parents=True)
+            fake_script = fake_skill_dir / "scripts" / "preflight.sh"
+            fake_script.write_text(script.read_text(encoding="utf-8"), encoding="utf-8")
+            fake_script.chmod(fake_script.stat().st_mode | stat.S_IXUSR)
+            result = subprocess.run(["bash", str(fake_script)], cwd=str(self.client), env=self.wf_env, capture_output=True, text=True)  # nosec B603 B607
+            self.assertEqual(result.returncode, 2, f"{script.name} must fail closed")
+            self.assertIn("latest-main helper not found", result.stderr)
 
 
 if __name__ == "__main__":

@@ -22,13 +22,14 @@
     {
       "id": 2,
       "prompt": "Before starting repository work, obtain and verify latest origin/main. Prove that remote tracking advances while the checked-out HEAD remains preserved.",
-      "expected_output": "The latest-main helper queries the remote, fetches commit B to refs/remotes/origin/main, and leaves checked-out HEAD at commit A.",
+      "expected_output": "Read-only mode advertises commit B without fetching or changing local checkout state; normal mode fetches B into refs/remotes/origin/main and preserves HEAD at commit A.",
       "files": [],
       "dim": "correctness",
       "kind": "explicit",
       "assertions": [
         "walk:",
         "contains:freshness_ro.err|advertised only; not fetched",
+        "contains:freshness_ro_state.txt|preserved",
         "contains:freshness.err|fetched",
         "contains:freshness_result.txt|match"
       ]

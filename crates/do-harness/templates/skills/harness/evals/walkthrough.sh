@@ -71,10 +71,32 @@ commit_b="$(git -C "$seeder" rev-parse HEAD)"
 
 helper="$root/.agents/skills/harness/scripts/latest-main.sh"
 
-bash "$helper" --root "$consumer" --read-only > "$root/freshness_ro_sha.txt" 2> "$root/freshness_ro.err"
-bash "$helper" --root "$consumer" > "$root/freshness_sha.txt" 2> "$root/freshness.err"
+head_before="$(git -C "$consumer" rev-parse HEAD)"
+origin_main_before="$(git -C "$consumer" rev-parse refs/remotes/origin/main)"
+cp "$consumer/.git/HEAD" "$freshness_dir/head.before"
+cp "$consumer/.git/index" "$freshness_dir/index.before"
+cp "$consumer/README.md" "$freshness_dir/readme.before"
 
-if [ "$(cat "$root/freshness_sha.txt")" = "$commit_b" ]; then
+bash "$helper" --root "$consumer" --read-only > "$root/freshness_ro_sha.txt" 2> "$root/freshness_ro.err"
+if [ "$(cat "$root/freshness_ro_sha.txt")" = "$commit_b" ] \
+  && [ "$(git -C "$consumer" rev-parse HEAD)" = "$head_before" ] \
+  && [ "$(git -C "$consumer" rev-parse refs/remotes/origin/main)" = "$origin_main_before" ] \
+  && ! git -C "$consumer" cat-file -e "${commit_b}^{commit}" 2>/dev/null \
+  && cmp -s "$consumer/.git/HEAD" "$freshness_dir/head.before" \
+  && cmp -s "$consumer/.git/index" "$freshness_dir/index.before" \
+  && cmp -s "$consumer/README.md" "$freshness_dir/readme.before"; then
+  printf 'preserved\n'
+else
+  printf 'changed\n'
+fi > "$root/freshness_ro_state.txt"
+
+bash "$helper" --root "$consumer" > "$root/freshness_sha.txt" 2> "$root/freshness.err"
+if [ "$(cat "$root/freshness_sha.txt")" = "$commit_b" ] \
+  && [ "$(git -C "$consumer" rev-parse refs/remotes/origin/main)" = "$commit_b" ] \
+  && [ "$(git -C "$consumer" rev-parse HEAD)" = "$head_before" ] \
+  && cmp -s "$consumer/.git/HEAD" "$freshness_dir/head.before" \
+  && cmp -s "$consumer/.git/index" "$freshness_dir/index.before" \
+  && cmp -s "$consumer/README.md" "$freshness_dir/readme.before"; then
   printf 'match\n'
 else
   printf 'mismatch\n'
