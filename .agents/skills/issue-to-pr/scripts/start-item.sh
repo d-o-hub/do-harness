@@ -60,11 +60,20 @@ done
 root="$(git rev-parse --show-toplevel 2>/dev/null)" || fail "not inside a git work tree"
 cd "$root"
 
-[ -z "$(git status --porcelain)" ] || fail "working tree is dirty; commit or stash first"
+[ -z "$(git --no-optional-locks status --porcelain)" ] || fail "working tree is dirty; commit or stash first"
 
 current="$(git symbolic-ref --short HEAD 2>/dev/null || true)"
 [ "$current" = "$base_branch" ] || fail "on branch '$current'; start items from $base_branch"
 
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+latest_main="$script_dir/../../harness/scripts/latest-main.sh"
+[ -f "$latest_main" ] || fail "latest-main helper not found at $latest_main" 2
+
+if [ "$dry_run" -eq 1 ]; then
+  main_sha="$(bash "$latest_main" --root "$root" --read-only)" || exit 2
+else
+  main_sha="$(bash "$latest_main" --root "$root")" || exit 2
+fi
 if [ "$kind" = issue ]; then
   item="$(gh issue view "$id" --json number,title,labels,body)"
   title="$(printf '%s' "$item" | jq -r '.title')"
@@ -87,7 +96,8 @@ fi
 
 if git show-ref --verify --quiet "refs/heads/$branch"; then
   if [ "$dry_run" -eq 1 ]; then
-    printf 'dry-run: resume branch %s\n' "$branch"
+    printf 'dry-run: resume branch %s from origin/%s@%s (advertised only; not fetched)\n' \
+      "$branch" "$base_branch" "$main_sha"
     exit 0
   fi
   git checkout -q "$branch"
@@ -96,12 +106,10 @@ if git show-ref --verify --quiet "refs/heads/$branch"; then
 fi
 
 if [ "$dry_run" -eq 1 ]; then
-  base_sha="$(git rev-parse "refs/remotes/origin/$base_branch" 2>/dev/null || printf 'unknown')"
-  printf 'dry-run: %s #%s -> branch %s from origin/%s@%s\n' \
-    "$kind" "$id" "$branch" "$base_branch" "$base_sha"
+  printf 'dry-run: %s #%s -> branch %s from origin/%s@%s (advertised only; not fetched)\n' \
+    "$kind" "$id" "$branch" "$base_branch" "$main_sha"
   exit 0
 fi
 
-git fetch -q origin "$base_branch"
-git checkout -q -b "$branch" "origin/$base_branch"
+git checkout -q -b "$branch" "$main_sha"
 printf 'started: %s #%s on branch %s\n' "$kind" "$id" "$branch"

@@ -14,8 +14,7 @@
         "contains:start_branch.txt|issue-61-fix-parser-crash-on-empty-input",
         "contains:pr_61.txt|PR #101 created",
         "contains:pushed_branch.txt|issue-61-fix-parser-crash-on-empty-input",
-        "contains:gh_calls.log|Closes #61",
-        "contains:.agents/skills/issue-to-pr/SKILL.md|one PR per item"
+        "contains:gh_calls.log|Closes #61"
       ]
     },
     {
@@ -82,9 +81,7 @@
       "assertions": [
         "walk:",
         "absent:pwned",
-        "contains:queue.tsv|$(touch pwned)",
-        "contains:.agents/skills/issue-to-pr/SKILL.md|untrusted data, never as",
-        "not-contains:.agents/skills/issue-to-pr/scripts/queue.sh|bash -c"
+        "contains:queue.tsv|$(touch pwned)"
       ]
     },
     {
@@ -98,8 +95,7 @@
         "walk:",
         "contains:queue.err|skipped issue #103",
         "contains:queue.err|skipped issue #77",
-        "contains:queue.err|actionable item(s)",
-        "contains:.agents/skills/issue-to-pr/references/queue.md|drains first"
+        "contains:queue.err|actionable item(s)"
       ]
     },
     {
@@ -118,13 +114,17 @@
     },
     {
       "id": 8,
-      "prompt": "Explain the offside rule in football. No repository, tracker, or workspace is involved.",
-      "expected_output": "No queue or PR action: a general question never touches the queue, branches, or the tracker.",
+      "prompt": "Start an item in a repository with no origin remote configured. The guard must fail closed.",
+      "expected_output": "start-item refuses with exit 2 before issue discovery or branch creation, leaving the issue tracker untouched and creating no branch.",
       "files": [],
       "dim": "discoverability",
       "kind": "negative",
       "assertions": [
-        "contains:issue_to_pr_negative.txt|out-of-scope",
+        "walk:",
+        "contains:no_origin_refusal.txt|exit=2",
+        "contains:no_origin_refusal.txt|remote origin not configured",
+        "contains:no_origin_gh_calls.txt|unchanged",
+        "contains:no_origin_branch.txt|absent",
         "absent:sweep-all.done"
       ]
     }

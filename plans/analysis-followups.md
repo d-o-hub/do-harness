@@ -376,3 +376,38 @@ record; no benchmark or GitHub issue/PR publication is claimed.
 preview on 2026-10-14 and general availability on 2026-10-28. The roadmap
 records optional evaluation only, with no automatic migration or release
 dependency.
+
+## Post-v0.4.1 codebase review (2026-10-31)
+
+The published release baseline is [do-harness v0.4.1](https://github.com/d-o-hub/do-harness/releases/tag/v0.4.1) (Release ID `429800183`, published `2026-10-31T08:01:24Z`, immutable release baseline).
+
+### Baseline and audit scope
+
+- **Original local HEAD:** `b29d9383872541ea34a9f584b6d7f6b06e1ed871`
+- **Advertised remote main SHA:** `fbd3f4fef682c9cbeebefb5a018c855e0ef6aadf` (queried via read-only `git ls-remote`)
+- **Fetched execution-base SHA:** `fbd3f4fef682c9cbeebefb5a018c855e0ef6aadf` (fast-forward merged into local `main`)
+- **Implementation branch:** `chore/latest-main-guardrails`
+- **Tracked execution progress:** [codebase-improvements-progress.md](codebase-improvements-progress.md)
+
+**Audit coverage:**
+1. *Workflow and persistence:* libSQL schema migrations and backup semantics (`crates/db/src/migrate.rs`), typed workflow commands (`crates/types/src/workflow.rs`), HTN preconditions (`crates/types/src/htn.rs`).
+2. *Execution and proxy:* Guardian proxy address verification policy (`docs/threat-model-proxy.md`), sensor raw stream bounding and retained tail policy (`docs/sensor-execution.md`).
+3. *Web, DSH, and npm integrations:* Multi-dimensional audit suite (`integrations/web-ui/lib/audit.mjs`, `integrations/web-ui/lib/i18n-audit.mjs`, `integrations/web-ui/README.md`).
+4. *Freshness workflows & eval diagnostics:* Remote main fetch gaps in `.agents/skills/issue-to-pr/scripts/start-item.sh` and preflights, false self-answering fixture check in `crates/do-harness/src/eval/fixture.rs` (in progress under CG-03–CG-06 in [codebase-improvements-progress.md](codebase-improvements-progress.md)).
+
+### Unresolved follow-ups
+
+| ID | Priority | Finding / source | State | Next action | Acceptance evidence | References |
+|---|---|---|---|---|---|---|
+| FU-01 | P1 recommendation | Migration backup copies live database file without holding a consistent snapshot and ignores checkpoint/query errors; existing test covers uncontended case only (`crates/db/src/migrate.rs:299-319`, `crates/db/src/migrate/tests.rs:280-306`). | source-confirmed; runtime-unverified; not implemented | Reproduce a blocked checkpoint / concurrent writer before a separately scoped consistent-snapshot correction; preserve the documented best-effort-policy distinction. | A backup contains committed WAL state and passes integrity validation under concurrency fixture; snapshot failure preserves previous backup. | [SQLite checkpoint contract](https://sqlite.org/pragma.html#pragma_wal_checkpoint), [SQLite backup API](https://sqlite.org/backup.html) |
+| FU-02 | P2 | Web-UI locale audit checks document direction before navigating to the target locale under test, risking false flags for correct RTL and missing broken LTR (`integrations/web-ui/lib/i18n-audit.mjs:99-117`). | source-confirmed; runtime-unverified; not implemented | Reproduce with English LTR baseline, correct Arabic RTL, and broken Hebrew LTR; move direction inspection after locale navigation/probe in a separately scoped correction. | No direction finding for correct Arabic page; Hebrew-specific direction finding for broken Hebrew page. | [integrations/web-ui/lib/i18n-audit.mjs:99-117](../integrations/web-ui/lib/i18n-audit.mjs) |
+| FU-03 | P2 | Web-UI README claims route × viewport × locale × scheme auditing, but orchestration audits routes/viewports only and `auditLocales()` is separate, lacking color-scheme matrix (`integrations/web-ui/README.md:4`, `integrations/web-ui/lib/audit.mjs:102-125`). | source-confirmed missing advertised behavior; not implemented | Scope the explicit scheme dimension and public API before implementation. | Matrix exercises light/dark rendering and detects a defect visible only in dark mode, with findings attributed to exercised scheme. | [Playwright media emulation](https://playwright.dev/docs/emulation#color-scheme-and-media), [integrations/web-ui/README.md:4](../integrations/web-ui/README.md) |
+
+### Ruled-out candidates
+
+The following audit candidates were evaluated and confirmed to be intentional architecture designs or existing implementations, not defects:
+- **DNS address validation in guardian-proxy:** Explicitly documented as out of scope by [docs/threat-model-proxy.md:47-49](../docs/threat-model-proxy.md) (the proxy operates at L7 HTTP/REST level, not an L3/L4 egress packet filter).
+- **Sensor output tails:** [docs/sensor-execution.md:24-29](../docs/sensor-execution.md) specifies independent bounds for raw streaming output and separately allocated retained tails (max 100 lines/8 KB), not a combined single-allocation cap.
+- **Workflow commands:** Workflow command types already implement `Command` in [crates/types/src/workflow.rs:1-71](../crates/types/src/workflow.rs).
+- **HTN Preconditions:** `Precondition` in [crates/types/src/htn.rs:46-51](../crates/types/src/htn.rs) exposes descriptive text by design; an executable predicate engine is a separate capability, not a missing implementation.
+- **Roadmap backlog:** WF-01–WF-12 are fully verified in [plans/v0.4.0-progress.md](v0.4.0-progress.md); WF-13–WF-14 remain intentionally unscheduled.

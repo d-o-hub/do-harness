@@ -31,16 +31,13 @@ rather than in the diff.
 
 - No argument: all open PRs.
 - A PR number: only that PR.
-- `--dry-run`: analyze and report, perform no `gh` mutations.
+- `--dry-run`: analyze and report, perform no `gh` mutations (forwards `--dry-run` to preflight).
 
 ## Procedure
 
 Run these steps in order. Stop the sweep on any escalation and report it.
 
-1. **Preflight.** Run `scripts/preflight.sh`. Require `gh` authenticated, inside
-   a git work tree, and repository resolved. If the clone is shallow, run
-   `git fetch --unshallow` (fall back to `scripts/no-effect.sh` API mode if that
-   fails). Never continue on a failed preflight.
+1. **Preflight.** Run `scripts/preflight.sh` (forwarding `--dry-run` if in dry-run mode). It invokes the harness `latest-main.sh` helper to check or obtain fresh `origin/main` before external tool probes. Require `origin/main` fresh, `gh` authenticated, inside a git work tree, and repository resolved. Clean `main` can fast-forward only; dirty, diverged, or in-progress branches are never reset, auto-stashed, or automatically rebased. For ongoing PR work, record the fetched base and retain existing branch-update rules (`gh pr update-branch` or rebase). Remote fetch failure blocks claims of freshness. If the clone is shallow, run `git fetch --unshallow` (fall back to `scripts/no-effect.sh` API mode if that fails). Never continue on a failed preflight.
 2. **Work list.** Run `scripts/list-prs.sh` for the ordered list (stacks first,
    then oldest-first; drafts and `hold`/`wip`/`do-not-merge` labels excluded).
    For a single PR, use that number — unless it is a draft or carries a hold

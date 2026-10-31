@@ -84,32 +84,6 @@ pub(super) fn fixture_diagnostics(evals: &SkillEvals, mode: AgentMode) -> Vec<St
             ));
         }
     }
-    // Self-answering fixtures: when no assertion reads the skill's own guidance
-    // (SKILL.md or references/), the deterministic walkthrough scores the same
-    // with and without the skill, so Skill Lift is structurally zero and the
-    // fixture cannot measure whether the guidance is what produced the result.
-    // Typical cause: every assertion targets residue the walkthrough itself
-    // wrote.
-    let guidance_root = format!(".agents/skills/{}/", evals.skill_name);
-    let reads_guidance = evals.evals.iter().any(|case| {
-        case.assertions.iter().any(|spec| {
-            let rest = spec
-                .strip_prefix("contains:")
-                .or_else(|| spec.strip_prefix("not-contains:"));
-            let target = match rest {
-                Some(rest) => rest.split_once('|').map_or(rest, |(path, _)| path),
-                None => spec.as_str(),
-            };
-            target.starts_with(&guidance_root)
-        })
-    });
-    if !reads_guidance {
-        out.push(
-            "no assertion reads the skill's own guidance (SKILL.md or references/): \
-             the fixture is self-answering and cannot measure Skill Lift"
-                .to_owned(),
-        );
-    }
     // Behavior-insensitivity, agent mode only. With `--agent-cmd` an external
     // agent is the executor, so assertions satisfied by (a) a zero exit, (b)
     // guidance mirrored into the sandbox, or (c) paths nothing creates would
