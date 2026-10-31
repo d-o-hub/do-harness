@@ -4,7 +4,7 @@
 import os
 import pathlib
 import stat
-import subprocess
+import subprocess  # nosec B404
 import tempfile
 import unittest
 
@@ -43,9 +43,9 @@ class BaseGitTestCase(unittest.TestCase):
         })
 
         self.origin = self.base / "origin.git"
-        subprocess.run(["git", "init", "--bare", "-b", "main", str(self.origin)], env=self.git_env, check=True)
+        subprocess.run(["git", "init", "--bare", "-b", "main", str(self.origin)], env=self.git_env, check=True)  # nosec B603 B607
         self.seeder = self.base / "seeder"
-        subprocess.run(["git", "clone", str(self.origin), str(self.seeder)], env=self.git_env, check=True)
+        subprocess.run(["git", "clone", str(self.origin), str(self.seeder)], env=self.git_env, check=True)  # nosec B603 B607
 
         (self.seeder / "README.md").write_text("commit A\n", encoding="utf-8")
         self.git(self.seeder, "add", ".")
@@ -56,10 +56,10 @@ class BaseGitTestCase(unittest.TestCase):
         self.git(self.origin, "symbolic-ref", "HEAD", "refs/heads/main")
 
         self.client = self.base / "client"
-        subprocess.run(["git", "clone", str(self.origin), str(self.client)], env=self.git_env, check=True)
+        subprocess.run(["git", "clone", str(self.origin), str(self.client)], env=self.git_env, check=True)  # nosec B603 B607
 
     def git(self, cwd, *args, check=True):
-        return subprocess.run(
+        return subprocess.run(  # nosec B603 B607
             ["git", "-C", str(cwd)] + list(args),
             env=self.git_env, check=check, capture_output=True, text=True
         )
@@ -73,7 +73,7 @@ class BaseGitTestCase(unittest.TestCase):
 
     def run_helper(self, args=None, cwd=None, env=None):
         cmd = ["bash", str(HELPER_SCRIPT)] + (args or [])
-        return subprocess.run(
+        return subprocess.run(  # nosec B603 B607
             cmd, cwd=cwd or str(self.client),
             env=(env if env is not None else self.git_env),
             capture_output=True, text=True
@@ -150,20 +150,20 @@ class TestLatestMain(BaseGitTestCase):
         self.assertEqual(self.run_helper(["--root", str(empty_dir)]).returncode, 2)
 
         no_remote = self.base / "no-remote"
-        subprocess.run(["git", "init", str(no_remote)], env=self.git_env, check=True)
+        subprocess.run(["git", "init", str(no_remote)], env=self.git_env, check=True)  # nosec B603 B607
         self.assertEqual(self.run_helper(["--root", str(no_remote)]).returncode, 2)
 
         self.assertEqual(self.run_helper(["--invalid"]).returncode, 2)
         self.assertEqual(self.run_helper(["--root"]).returncode, 2)
 
         no_main = self.base / "no-main.git"
-        subprocess.run(["git", "init", "--bare", "-b", "feature", str(no_main)], env=self.git_env, check=True)
+        subprocess.run(["git", "init", "--bare", "-b", "feature", str(no_main)], env=self.git_env, check=True)  # nosec B603 B607
         no_main_client = self.base / "no-main-client"
-        subprocess.run(["git", "clone", str(no_main), str(no_main_client)], env=self.git_env, check=True)
+        subprocess.run(["git", "clone", str(no_main), str(no_main_client)], env=self.git_env, check=True)  # nosec B603 B607
         self.assertEqual(self.run_helper(["--root", str(no_main_client)]).returncode, 2)
 
         bad_origin = self.base / "bad-origin-client"
-        subprocess.run(["git", "clone", str(self.origin), str(bad_origin)], env=self.git_env, check=True)
+        subprocess.run(["git", "clone", str(self.origin), str(bad_origin)], env=self.git_env, check=True)  # nosec B603 B607
         self.git(bad_origin, "remote", "set-url", "origin", "/nonexistent/repo.git")
         self.assertEqual(self.run_helper(["--root", str(bad_origin)]).returncode, 2)
 
@@ -230,7 +230,7 @@ esac
         commit_b = self.advance_origin("commit B")
 
         # 1. Dry-run: observes advertised commit B without fetching or creating branch
-        res = subprocess.run(
+        res = subprocess.run(  # nosec B603 B607
             ["bash", str(START_ITEM), "--issue", "62", "--dry-run"],
             cwd=str(self.client), env=self.wf_env, capture_output=True, text=True
         )
@@ -245,7 +245,7 @@ esac
         self.assertEqual(self.git(self.client, "rev-parse", "refs/remotes/origin/main").stdout.strip(), self.commit_a)
 
         # 3. Start item: cuts new branch from commit B
-        res = subprocess.run(["bash", str(START_ITEM), "--issue", "62"], cwd=str(self.client), env=self.wf_env, capture_output=True, text=True)
+        res = subprocess.run(["bash", str(START_ITEM), "--issue", "62"], cwd=str(self.client), env=self.wf_env, capture_output=True, text=True)  # nosec B603 B607
         self.assertEqual(res.returncode, 0, res.stderr)
         self.assertIn("started: issue #62 on branch issue-62-document-retry-policy", res.stdout)
         self.assertEqual(self.git(self.client, "rev-parse", "HEAD").stdout.strip(), commit_b)
@@ -261,13 +261,13 @@ esac
         commit_d = self.advance_origin("commit D")
 
         # 3. Resume: dry-run observes D, normal resume refreshes origin/main to D
-        res_dry = subprocess.run(["bash", str(START_ITEM), "--issue", "62", "--dry-run"], cwd=str(self.client), env=self.wf_env, capture_output=True, text=True)
+        res_dry = subprocess.run(["bash", str(START_ITEM), "--issue", "62", "--dry-run"], cwd=str(self.client), env=self.wf_env, capture_output=True, text=True)  # nosec B603 B607
         self.assertEqual(res_dry.returncode, 0, res_dry.stderr)
         self.assertIn("dry-run: resume branch issue-62-document-retry-policy", res_dry.stdout)
         self.assertIn(f"@{commit_d}", res_dry.stdout)
         self.assertIn("(advertised only; not fetched)", res_dry.stdout)
 
-        res_resume = subprocess.run(["bash", str(START_ITEM), "--issue", "62"], cwd=str(self.client), env=self.wf_env, capture_output=True, text=True)
+        res_resume = subprocess.run(["bash", str(START_ITEM), "--issue", "62"], cwd=str(self.client), env=self.wf_env, capture_output=True, text=True)  # nosec B603 B607
         self.assertEqual(res_resume.returncode, 0, res_resume.stderr)
         self.assertIn("resumed: issue #62 on branch issue-62-document-retry-policy", res_resume.stdout)
         self.assertEqual(self.git(self.client, "rev-parse", "HEAD").stdout.strip(), commit_c)
@@ -278,7 +278,7 @@ esac
 
         # 1. Preflight dry-run (issue-to-pr & pr-triage)
         for script in [ISSUE_PREFLIGHT, PR_PREFLIGHT]:
-            res = subprocess.run(["bash", str(script), "--dry-run"], cwd=str(self.client), env=self.wf_env, capture_output=True, text=True)
+            res = subprocess.run(["bash", str(script), "--dry-run"], cwd=str(self.client), env=self.wf_env, capture_output=True, text=True)  # nosec B603 B607
             self.assertEqual(res.returncode, 0, f"{script.name}: {res.stderr}")
 
         # origin/main was not fetched during dry-run
@@ -286,7 +286,7 @@ esac
 
         # 2. Preflight normal run: fetches origin/main for BOTH scripts
         for script in [ISSUE_PREFLIGHT, PR_PREFLIGHT]:
-            res = subprocess.run(["bash", str(script)], cwd=str(self.client), env=self.wf_env, capture_output=True, text=True)
+            res = subprocess.run(["bash", str(script)], cwd=str(self.client), env=self.wf_env, capture_output=True, text=True)  # nosec B603 B607
             self.assertEqual(res.returncode, 0, f"{script.name}: {res.stderr}")
 
         self.assertEqual(self.git(self.client, "rev-parse", "refs/remotes/origin/main").stdout.strip(), commit_b)
@@ -297,16 +297,16 @@ esac
         readme = self.client / "README.md"
         readme.write_text("modified for preflight\n", encoding="utf-8")
         for script in [ISSUE_PREFLIGHT, PR_PREFLIGHT]:
-            res = subprocess.run(["bash", str(script), "--dry-run"], cwd=str(self.client), env=self.wf_env, capture_output=True, text=True)
+            res = subprocess.run(["bash", str(script), "--dry-run"], cwd=str(self.client), env=self.wf_env, capture_output=True, text=True)  # nosec B603 B607
             self.assertEqual(res.returncode, 0, f"{script.name}: {res.stderr}")
             self.assertEqual(dirty_file.read_text(encoding="utf-8"), "preflight dirty content\n")
             self.assertEqual(readme.read_text(encoding="utf-8"), "modified for preflight\n")
 
         # 4. Preflight fails closed when origin is broken/missing
         no_remote = self.base / "no-remote-preflight"
-        subprocess.run(["git", "init", str(no_remote)], env=self.git_env, check=True)
+        subprocess.run(["git", "init", str(no_remote)], env=self.git_env, check=True)  # nosec B603 B607
         for script in [ISSUE_PREFLIGHT, PR_PREFLIGHT]:
-            res = subprocess.run(["bash", str(script)], cwd=str(no_remote), env=self.wf_env, capture_output=True, text=True)
+            res = subprocess.run(["bash", str(script)], cwd=str(no_remote), env=self.wf_env, capture_output=True, text=True)  # nosec B603 B607
             self.assertEqual(res.returncode, 2, f"{script.name} should fail closed")
 
         # 5. Preflight fails closed when latest-main.sh helper is missing
@@ -315,7 +315,7 @@ esac
         fake_script = fake_skill_dir / "scripts" / "preflight.sh"
         fake_script.write_text(ISSUE_PREFLIGHT.read_text(encoding="utf-8"), encoding="utf-8")
         fake_script.chmod(fake_script.stat().st_mode | stat.S_IXUSR)
-        res = subprocess.run(["bash", str(fake_script)], cwd=str(self.client), env=self.wf_env, capture_output=True, text=True)
+        res = subprocess.run(["bash", str(fake_script)], cwd=str(self.client), env=self.wf_env, capture_output=True, text=True)  # nosec B603 B607
         self.assertEqual(res.returncode, 2, "Missing helper must fail closed with exit 2")
         self.assertIn("latest-main helper not found", res.stderr)
 
