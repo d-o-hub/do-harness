@@ -2,7 +2,7 @@
 
 ## Baseline
 
-- **Observation and update timestamp:** 2026-10-31T14:04:46Z.
+- **Observation and update timestamp:** 2026-10-31T14:19:36Z.
 - **Current published release:** [do-harness v0.4.1](https://github.com/d-o-hub/do-harness/releases/tag/v0.4.1) (Release ID `429800183`, published `2026-10-31T08:01:24Z`, immutable release baseline).
 - **Original local HEAD:** `b29d9383872541ea34a9f584b6d7f6b06e1ed871`
 - **Advertised remote main SHA:** `fbd3f4fef682c9cbeebefb5a018c855e0ef6aadf` (queried via read-only remote discovery)
@@ -47,7 +47,7 @@
 ### CG-04
 - **Affected paths:** `.agents/skills/issue-to-pr/scripts/preflight.sh`, `.agents/skills/pr-triage/scripts/preflight.sh`, `.agents/skills/issue-to-pr/scripts/start-item.sh`.
 - **Previous behavior:** Preflights did not check origin/main; `start-item.sh` used inline fetch only when creating branches, leaving resume and dry-run stale.
-- **New behavior:** Preflights and `start-item.sh` invoke `latest-main.sh` as first git step; dry-run passes `--read-only` and reports advertised-only status; new branches cut from fetched SHA.
+- **New behavior:** Preflights verify/fetch `origin/main` before external GitHub probes. `start-item.sh` first refuses unsafe dirty/non-main state, then resolves freshness before issue/task discovery; dry-run uses `--read-only`, and new branches start at the fetched SHA.
 - **Commit/PR:** PR #410 (implementation branch `chore/latest-main-guardrails`).
 
 ### CG-05
@@ -112,6 +112,7 @@
 - Direct end-to-end harness walkthrough: exit `0` using the release binary in a disposable workspace with the scaffolded helper; read-only state `preserved`, normal fetch `match`, and non-Git failure exit `2`.
 - Current `python3 scripts/tests/test_latest_main.py -v`: exit `0`, all 7 tests passed in 6.677s after the final assertion refinements.
 - Current `do-harness verify --only latest-main-guardrails --only skills --only skills-docs --only docs-sync --only docs-examples --only docs-links --only markdownlint`: exit `0`, all 7 sensors passed.
+- Push of `e4377f3` to `origin` exited `0`; every configured pre-push sensor reported `PASS`.
 
 ## References and follow-ups
 
