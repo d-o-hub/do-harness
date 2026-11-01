@@ -21,8 +21,6 @@ fn task_board_folds_events() {
             id: 1,
             title: "a".to_owned(),
             method: None,
-            parent_id: None,
-            precondition: None,
         }))
         .unwrap();
     board
@@ -30,8 +28,6 @@ fn task_board_folds_events() {
             id: 2,
             title: "b".to_owned(),
             method: None,
-            parent_id: None,
-            precondition: None,
         }))
         .unwrap();
     board
@@ -64,8 +60,6 @@ fn task_board_replay_is_idempotent() {
             id: 1,
             title: "a".to_owned(),
             method: None,
-            parent_id: None,
-            precondition: None,
         }),
         WorkflowEvent::TaskAdvanced(TaskAdvanced {
             id: 1,
@@ -93,8 +87,6 @@ fn task_board_is_order_independent_across_tasks() {
             id,
             title: "t".to_owned(),
             method: None,
-            parent_id: None,
-            precondition: None,
         })
     };
     let forward = [added(1), added(2), added(3)];
@@ -136,8 +128,6 @@ fn wrapped_event_delegates_name() {
         id: 1,
         title: "t".to_owned(),
         method: None,
-        parent_id: None,
-        precondition: None,
     });
     assert_eq!(event.name(), "TaskAdded");
 }
@@ -197,8 +187,6 @@ fn projection_rejects_unmatched_event() {
             id: 1,
             title: "t".to_owned(),
             method: None,
-            parent_id: None,
-            precondition: None,
         }))
         .unwrap();
     let err = board
@@ -214,5 +202,64 @@ fn projection_rejects_unmatched_event() {
     assert_eq!(
         err.to_string(),
         "event TaskAdvanced cannot be applied to this projection"
+    );
+}
+
+/// The published event payloads keep exactly these keys.
+///
+/// `do-harness-types` is on crates.io, so a new field on one of these structs
+/// breaks every downstream exhaustive literal — `constructible_struct_adds_field`
+/// in `cargo-semver-checks`, which is why this lives next to the types instead of
+/// only in CI. The `semver` workflow proves the same thing against the registry
+/// baseline; this test proves it in a checkout, offline, in milliseconds.
+///
+/// Changing a key set is a **released API change**: bump the version per
+/// `docs/releasing.md` and update this list in the same reviewed change. It is
+/// not an edit to sneak into a refactor.
+#[test]
+fn published_event_payloads_are_pinned() {
+    use serde_json::{Value, json};
+
+    /// Distinct ids, so a payload that copied a command-only field would show
+    /// up as a different value rather than as a passing coincidence.
+    const PARENT_TASK_ID: i64 = 7;
+    const ADVANCED_INDEX: i64 = 3;
+
+    fn keys(value: &Value) -> Vec<String> {
+        let object = value.as_object().expect("payload is a JSON object");
+        let mut keys: Vec<String> = object.keys().cloned().collect();
+        keys.sort();
+        keys
+    }
+
+    let added = AddTask {
+        title: "t".to_owned(),
+        method: Some("mini".to_owned()),
+        parent_id: Some(PARENT_TASK_ID),
+        precondition: Some("guard".to_owned()),
+    }
+    .event(1);
+    assert_eq!(
+        keys(&json!(added)),
+        ["id", "method", "title"],
+        "TaskAdded gained or lost a field: that is a published-crate API break"
+    );
+
+    assert_eq!(
+        keys(&json!(AdvanceTask { task_id: 1 }.event(ADVANCED_INDEX))),
+        ["id", "subtask_index"],
+        "TaskAdvanced gained or lost a field: that is a published-crate API break"
+    );
+
+    assert_eq!(
+        keys(&json!(CompleteTask { task_id: 1 }.event())),
+        ["id"],
+        "TaskCompleted gained or lost a field: that is a published-crate API break"
+    );
+
+    assert_eq!(
+        keys(&json!(FailTask { task_id: 1 }.event())),
+        ["id"],
+        "TaskFailed gained or lost a field: that is a published-crate API break"
     );
 }
