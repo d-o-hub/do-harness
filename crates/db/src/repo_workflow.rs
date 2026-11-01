@@ -78,8 +78,10 @@ async fn insert_task_with_event_once(
     let tx = crate::tx::begin_immediate(conn).await?;
     let id = insert_task(&tx, task).await?;
     // Build the command the CLI issued, then let it produce its event: the
-    // handler never restates the event fields, so a field the command carries
-    // cannot be dropped silently.
+    // handler never restates the event fields by hand. The event is the
+    // *published* payload (`TaskAdded`), so a command-only field such as
+    // `parent_id` reaches the row but not the event — extending the payload is a
+    // released API change, not an edit.
     let command = AddTask {
         title: task.title.to_owned(),
         method: task.method.map(ToOwned::to_owned),
