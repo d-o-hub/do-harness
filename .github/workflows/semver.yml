@@ -8,7 +8,13 @@ name: semver
 # `scripts/check-rust-api-compatibility.sh` against the crates.io baselines for
 # `do-harness-types` (`crates/types/Cargo.toml`), `do-harness-db`
 # (`crates/db/Cargo.toml`), and `do-harness` (`crates/do-harness/Cargo.toml`) —
-# on every push to `main` and on demand, so the break is visible where it lands.
+# on every push to `main`, on every pull request, and on demand.
+#
+# The pull-request trigger is the load-bearing one: running only after the merge
+# means the review never saw the break (that is how `TaskAdded` gaining two
+# fields turned `main` red in 2026-11-01 with no PR check to point at). The
+# offline half of the same guard is
+# `do_harness_types::workflow::tests::published_event_payloads_are_pinned`.
 #
 # It is deliberately NOT a `do-harness` sensor: `check-release` resolves the
 # published baseline from the registry, so the job needs network access, and a
@@ -17,6 +23,12 @@ name: semver
 on:
   push:
     branches: [main]
+  # Also gate the pull request, not only the merge. The job was added for
+  # visibility on `main`, but a break that merges green and turns `main` red
+  # lands a release-blocking surface change nobody reviewed as one: the same
+  # check has to answer *before* the merge. A feature-branch push fires
+  # `pull_request` for the same commit, so `push` stays restricted to `main`.
+  pull_request:
   workflow_dispatch:
 
 permissions:

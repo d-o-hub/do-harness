@@ -34,14 +34,18 @@ impl AddTask {
     /// Folds the command and the database-assigned id into the event a handler
     /// appends. One constructor per command keeps the event vocabulary aligned
     /// with the command vocabulary instead of restating it in every writer.
+    ///
+    /// The event carries the *published* payload only. `parent_id` and
+    /// `precondition` stay on the command (they are what the row is written
+    /// with) because adding fields to `TaskAdded` breaks every downstream
+    /// exhaustive struct literal — a published-crate API change, gated by
+    /// `tests::published_event_payloads_are_pinned` and the `semver` workflow.
     #[must_use]
     pub fn event(&self, id: i64) -> TaskAdded {
         TaskAdded {
             id,
             title: self.title.clone(),
             method: self.method.clone(),
-            parent_id: self.parent_id,
-            precondition: self.precondition.clone(),
         }
     }
 }
@@ -117,9 +121,11 @@ impl FailTask {
 
 /// Event emitted after a task is inserted.
 ///
-/// Carries every field the [`AddTask`] command accepts: a handler that dropped
-/// `parent_id` or `precondition` here would append an event that disagrees with
-/// the row it was written beside, and nothing downstream could tell.
+/// The field set is a **published contract**: `do-harness-types` is on
+/// crates.io, and a new field breaks every downstream `TaskAdded { … }` literal
+/// (`constructible_struct_adds_field`). Extend it only with a version bump, and
+/// prefer [`AddTask::event`] in writers so the event cannot drift from the
+/// command by hand.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct TaskAdded {
@@ -129,12 +135,6 @@ pub struct TaskAdded {
     pub title: String,
     /// Name of the HTN method this task follows, when given.
     pub method: Option<String>,
-    /// Parent task id, when this task is a subtask.
-    #[serde(default)]
-    pub parent_id: Option<i64>,
-    /// Recorded precondition guard the task was created under.
-    #[serde(default)]
-    pub precondition: Option<String>,
 }
 
 impl DomainEvent for TaskAdded {

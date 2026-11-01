@@ -199,13 +199,16 @@ async fn advance_rechecks_sensor_gate_inside_transaction() {
         .unwrap();
 }
 
-/// The `TaskAdded` event must carry every field its `AddTask` command does.
+/// The writer derives the event from the command, and the command's extra
+/// fields stay in the row rather than in the published payload.
 ///
-/// The command half of the event-sourcing contract is only real if the writer
-/// derives the event from it: `parent_id` and `precondition` used to stop at
-/// the `tasks` row while the appended event silently disagreed.
+/// `TaskAdded` is a released type: adding `parent_id`/`precondition` to it broke
+/// every downstream exhaustive literal (`constructible_struct_adds_field`), so
+/// the payload keeps its three fields while the row keeps the rest. This test
+/// pins both halves — an event built by hand in the writer would drop one of
+/// them, and a payload that grew would be an unreleased API change.
 #[tokio::test(flavor = "current_thread")]
-async fn task_added_event_carries_the_whole_command() {
+async fn task_added_event_is_derived_from_the_command() {
     let dir = tempfile::tempdir().unwrap();
     let conn = connect_and_migrate(dir.path()).await.unwrap();
 
@@ -224,14 +227,34 @@ async fn task_added_event_carries_the_whole_command() {
     let WorkflowEvent::TaskAdded(added) = event else {
         panic!("expected TaskAdded, got {event:?}");
     };
-    assert_eq!(added.id, child_id);
-    assert_eq!(added.parent_id, Some(parent_id));
-    assert_eq!(added.precondition.as_deref(), Some("parent guard holds"));
+    assert_eq!(
+        added,
+        AddTask {
+            title: "child".to_owned(),
+            method: Some("mini".to_owned()),
+            parent_id: Some(parent_id),
+            precondition: Some("parent guard holds".to_owned()),
+        }
+        .event(child_id),
+        "the appended event must be the command's own event, not a hand-built one"
+    );
+
+    // The fields the payload does not carry still reach the row.
+    let record = crate::repo::get_task(&conn, child_id)
+        .await
+        .unwrap()
+        .expect("child row");
+    assert_eq!(record.parent_id, Some(parent_id));
+    assert_eq!(record.precondition.as_deref(), Some("parent guard holds"));
 
     let stored = list_events_ascending(&conn).await.unwrap();
     let appended = stored
         .iter()
         .find(|row| row.task_id == child_id)
         .expect("child TaskAdded event is stored");
-    assert!(appended.canonical_payload.contains("parent guard holds"));
+    assert!(
+        !appended.canonical_payload.contains("parent guard holds"),
+        "the published payload must not carry a field the released type lacks: {}",
+        appended.canonical_payload
+    );
 }
