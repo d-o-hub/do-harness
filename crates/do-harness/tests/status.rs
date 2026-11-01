@@ -7,42 +7,15 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 use serde_json::Value;
 
 mod support;
 
-use support::{git_command, harness};
+use support::{git, harness, run};
 
 /// Runs a harness command, returning (exit code, `stdout`, `stderr`).
-fn run(cmd: &mut Command) -> (Option<i32>, String, String) {
-    let output = cmd.output().expect("spawn do-harness");
-    (
-        output.status.code(),
-        String::from_utf8_lossy(&output.stdout).into_owned(),
-        String::from_utf8_lossy(&output.stderr).into_owned(),
-    )
-}
-
 /// Runs a git command inside `root`, asserting success.
-fn git(root: &Path, args: &[&str]) {
-    let status = git_command(root)
-        .args(args)
-        .env("GIT_CONFIG_NOSYSTEM", "1")
-        .env("GIT_AUTHOR_NAME", "t")
-        .env("GIT_AUTHOR_EMAIL", "t@t")
-        .env("GIT_COMMITTER_NAME", "t")
-        .env("GIT_COMMITTER_EMAIL", "t@t")
-        .status()
-        .expect("spawn git");
-    assert!(
-        status.success(),
-        "git {args:?} failed in {}",
-        root.display()
-    );
-}
-
 /// Creates a committed git repo with fast sensors and a verification set.
 fn fixture_repo() -> (tempfile::TempDir, PathBuf) {
     fixture_repo_with_sensors(

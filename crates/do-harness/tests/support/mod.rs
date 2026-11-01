@@ -102,6 +102,42 @@ pub fn harness(root: &Path) -> Command {
     command
 }
 
+/// Runs a harness command, returning `(exit code, stdout, stderr)`.
+///
+/// `None` means "no exit status" — the process was killed by a signal — which
+/// every caller must treat as a failure rather than as success.
+pub fn run(cmd: &mut Command) -> (Option<i32>, String, String) {
+    let output = cmd.output().expect("spawn do-harness");
+    (
+        output.status.code(),
+        String::from_utf8_lossy(&output.stdout).into_owned(),
+        String::from_utf8_lossy(&output.stderr).into_owned(),
+    )
+}
+
+/// Runs `git <args>` in `root`, asserting success.
+///
+/// The fixture identity is pinned here rather than inherited from the host so a
+/// commit works in a container with no global git config, and
+/// `GIT_CONFIG_NOSYSTEM` keeps a machine-level config from changing what the
+/// fixture commits.
+pub fn git(root: &Path, args: &[&str]) {
+    let status = git_command(root)
+        .args(args)
+        .env("GIT_CONFIG_NOSYSTEM", "1")
+        .env("GIT_AUTHOR_NAME", "t")
+        .env("GIT_AUTHOR_EMAIL", "t@t")
+        .env("GIT_COMMITTER_NAME", "t")
+        .env("GIT_COMMITTER_EMAIL", "t@t")
+        .status()
+        .expect("spawn git");
+    assert!(
+        status.success(),
+        "git {args:?} failed in {}",
+        root.display()
+    );
+}
+
 /// Builds a `git` command rooted at `root` with [`GIT_VIEW_ENV`] removed.
 ///
 /// Tests that create their own repositories must not inherit the view

@@ -14,6 +14,8 @@ use serde_json::Value;
 
 mod support;
 
+use support::run;
+
 /// Builds a `do-harness` command invoked from `cwd` (never a process-global
 /// directory change, so tests stay parallel-safe).
 ///
@@ -56,15 +58,6 @@ fn fixture() -> Fixture {
 }
 
 /// Runs a harness command, returning (exit code, `stdout`, `stderr`).
-fn run(cmd: &mut Command) -> (Option<i32>, String, String) {
-    let output = cmd.output().expect("spawn do-harness");
-    (
-        output.status.code(),
-        String::from_utf8_lossy(&output.stdout).into_owned(),
-        String::from_utf8_lossy(&output.stderr).into_owned(),
-    )
-}
-
 /// Sensor names from an `explain --format json` report.
 fn selected_names(stdout: &str) -> Vec<String> {
     let report: Value = serde_json::from_str(stdout).expect("explain JSON report");
