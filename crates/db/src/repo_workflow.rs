@@ -9,7 +9,7 @@ use crate::error::{DbError, Result};
 use crate::migrate::unix_now;
 use crate::repo::{NewTask, advance_subtask, insert_task, update_task_status};
 use do_harness_types::{
-    DomainEvent, TaskAdded, TaskAdvanced, TaskCompleted, TaskFailed, TaskState, WorkflowEvent,
+    AddTask, AdvanceTask, CompleteTask, DomainEvent, FailTask, TaskState, WorkflowEvent,
 };
 use libsql::{Connection, params, params::Params};
 
@@ -77,11 +77,16 @@ async fn insert_task_with_event_once(
 ) -> Result<(i64, WorkflowEvent)> {
     let tx = crate::tx::begin_immediate(conn).await?;
     let id = insert_task(&tx, task).await?;
-    let event = WorkflowEvent::TaskAdded(TaskAdded {
-        id,
+    // Build the command the CLI issued, then let it produce its event: the
+    // handler never restates the event fields, so a field the command carries
+    // cannot be dropped silently.
+    let command = AddTask {
         title: task.title.to_owned(),
         method: task.method.map(ToOwned::to_owned),
-    });
+        parent_id: task.parent_id,
+        precondition: task.precondition.map(ToOwned::to_owned),
+    };
+    let event = WorkflowEvent::TaskAdded(command.event(id));
     append_event_on(&tx, id, &event).await?;
     tx.commit().await?;
     Ok((id, event))
@@ -121,10 +126,8 @@ async fn advance_subtask_with_event_once(
         ensure_sensor_ok_on(&tx, id, sensor).await?;
     }
     let index = advance_subtask(&tx, id).await?;
-    let event = WorkflowEvent::TaskAdvanced(TaskAdvanced {
-        id,
-        subtask_index: index,
-    });
+    let command = AdvanceTask { task_id: id };
+    let event = WorkflowEvent::TaskAdvanced(command.event(index));
     append_event_on(&tx, id, &event).await?;
     tx.commit().await?;
     Ok((index, event))
@@ -162,8 +165,8 @@ async fn update_task_status_with_event_once(
     required_sensors: &[String],
 ) -> Result<WorkflowEvent> {
     let event = match status {
-        TaskState::Done => WorkflowEvent::TaskCompleted(TaskCompleted { id }),
-        TaskState::Failed => WorkflowEvent::TaskFailed(TaskFailed { id }),
+        TaskState::Done => WorkflowEvent::TaskCompleted(CompleteTask { task_id: id }.event()),
+        TaskState::Failed => WorkflowEvent::TaskFailed(FailTask { task_id: id }.event()),
         other => {
             return Err(DbError::InvalidTerminalState(other.as_str().to_owned()));
         }

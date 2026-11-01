@@ -30,6 +30,22 @@ impl Command for AddTask {
     }
 }
 
+impl AddTask {
+    /// Folds the command and the database-assigned id into the event a handler
+    /// appends. One constructor per command keeps the event vocabulary aligned
+    /// with the command vocabulary instead of restating it in every writer.
+    #[must_use]
+    pub fn event(&self, id: i64) -> TaskAdded {
+        TaskAdded {
+            id,
+            title: self.title.clone(),
+            method: self.method.clone(),
+            parent_id: self.parent_id,
+            precondition: self.precondition.clone(),
+        }
+    }
+}
+
 /// Command to advance a task's subtask pointer.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -41,6 +57,17 @@ pub struct AdvanceTask {
 impl Command for AdvanceTask {
     fn name(&self) -> &'static str {
         "AdvanceTask"
+    }
+}
+
+impl AdvanceTask {
+    /// Folds the command and the new subtask index into its event.
+    #[must_use]
+    pub fn event(&self, subtask_index: i64) -> TaskAdvanced {
+        TaskAdvanced {
+            id: self.task_id,
+            subtask_index,
+        }
     }
 }
 
@@ -58,6 +85,14 @@ impl Command for CompleteTask {
     }
 }
 
+impl CompleteTask {
+    /// Folds the command into its event.
+    #[must_use]
+    pub fn event(&self) -> TaskCompleted {
+        TaskCompleted { id: self.task_id }
+    }
+}
+
 /// Command to fail a task.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -72,7 +107,19 @@ impl Command for FailTask {
     }
 }
 
+impl FailTask {
+    /// Folds the command into its event.
+    #[must_use]
+    pub fn event(&self) -> TaskFailed {
+        TaskFailed { id: self.task_id }
+    }
+}
+
 /// Event emitted after a task is inserted.
+///
+/// Carries every field the [`AddTask`] command accepts: a handler that dropped
+/// `parent_id` or `precondition` here would append an event that disagrees with
+/// the row it was written beside, and nothing downstream could tell.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct TaskAdded {
@@ -82,6 +129,12 @@ pub struct TaskAdded {
     pub title: String,
     /// Name of the HTN method this task follows, when given.
     pub method: Option<String>,
+    /// Parent task id, when this task is a subtask.
+    #[serde(default)]
+    pub parent_id: Option<i64>,
+    /// Recorded precondition guard the task was created under.
+    #[serde(default)]
+    pub precondition: Option<String>,
 }
 
 impl DomainEvent for TaskAdded {

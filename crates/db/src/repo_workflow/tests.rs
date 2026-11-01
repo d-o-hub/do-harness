@@ -2,7 +2,7 @@
 
 use super::*;
 use crate::migrate::connect_and_migrate;
-use do_harness_types::{BeatStatus, BeatType};
+use do_harness_types::{BeatStatus, BeatType, TaskCompleted};
 
 fn new_task(title: &str) -> NewTask<'_> {
     NewTask {
@@ -197,4 +197,41 @@ async fn advance_rechecks_sensor_gate_inside_transaction() {
     advance_subtask_with_event(&conn, id, Some("check"))
         .await
         .unwrap();
+}
+
+/// The `TaskAdded` event must carry every field its `AddTask` command does.
+///
+/// The command half of the event-sourcing contract is only real if the writer
+/// derives the event from it: `parent_id` and `precondition` used to stop at
+/// the `tasks` row while the appended event silently disagreed.
+#[tokio::test(flavor = "current_thread")]
+async fn task_added_event_carries_the_whole_command() {
+    let dir = tempfile::tempdir().unwrap();
+    let conn = connect_and_migrate(dir.path()).await.unwrap();
+
+    let (parent_id, _) = insert_task_with_event(&conn, &new_task("parent"))
+        .await
+        .unwrap();
+    let child = NewTask {
+        title: "child",
+        method: Some("mini"),
+        subtask_index: 0,
+        precondition: Some("parent guard holds"),
+        parent_id: Some(parent_id),
+    };
+    let (child_id, event) = insert_task_with_event(&conn, &child).await.unwrap();
+
+    let WorkflowEvent::TaskAdded(added) = event else {
+        panic!("expected TaskAdded, got {event:?}");
+    };
+    assert_eq!(added.id, child_id);
+    assert_eq!(added.parent_id, Some(parent_id));
+    assert_eq!(added.precondition.as_deref(), Some("parent guard holds"));
+
+    let stored = list_events_ascending(&conn).await.unwrap();
+    let appended = stored
+        .iter()
+        .find(|row| row.task_id == child_id)
+        .expect("child TaskAdded event is stored");
+    assert!(appended.canonical_payload.contains("parent guard holds"));
 }
