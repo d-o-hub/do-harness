@@ -47,6 +47,20 @@ fn pattern_matches(pattern: &str, path: &str) -> bool {
     walk(pattern.as_bytes(), path.as_bytes())
 }
 
+/// Does this script body source `lib.sh`?
+///
+/// A mention is not a source: `scripts/check-dora.sh` documents that it
+/// *deliberately* does not source the shared file (it is copied standalone into
+/// a fixture tree), so substring matching would demand an input it never reads.
+fn sources_lib(body: &str) -> bool {
+    body.lines().any(|line| {
+        let line = line.trim_start();
+        line.strip_prefix("source ")
+            .or_else(|| line.strip_prefix(". "))
+            .is_some_and(|target| target.contains("lib.sh"))
+    })
+}
+
 /// The `scripts/*.sh` files a sensor's argv names.
 fn argv_scripts(argv: &[toml::Value], root: &Path) -> Vec<(String, PathBuf)> {
     argv.iter()
@@ -80,10 +94,10 @@ fn every_sensor_that_runs_a_lib_sourcing_script_declares_lib_sh_as_an_input() {
             .and_then(|value| value.as_array())
             .expect("sensor argv");
 
-        let sources_lib = argv_scripts(argv, &root).into_iter().any(|(_, path)| {
-            std::fs::read_to_string(&path).is_ok_and(|body| body.contains("lib.sh"))
-        });
-        if !sources_lib {
+        let reads_lib = argv_scripts(argv, &root)
+            .into_iter()
+            .any(|(_, path)| std::fs::read_to_string(&path).is_ok_and(|body| sources_lib(&body)));
+        if !reads_lib {
             continue;
         }
 
@@ -110,6 +124,18 @@ fn every_sensor_that_runs_a_lib_sourcing_script_declares_lib_sh_as_an_input() {
         "sensor(s) {findings:?} run a script that sources scripts/lib.sh but do not list it in \
          `when-changed`, so `verify --changed` would skip them after a lib.sh edit"
     );
+}
+
+#[test]
+fn a_comment_that_mentions_lib_sh_is_not_a_source() {
+    assert!(sources_lib(
+        "source \"$(dirname \"${BASH_SOURCE[0]}\")/lib.sh\"\n"
+    ));
+    assert!(sources_lib(". scripts/lib.sh\n"));
+    assert!(!sources_lib(
+        "# This shim deliberately does not source scripts/lib.sh.\n"
+    ));
+    assert!(!sources_lib("echo lib.sh\n"));
 }
 
 #[test]
