@@ -546,6 +546,15 @@ A deliberate pre-1.0 contract break follows the normal reviewed version-change
 process: update the corresponding fixture in the same PR and document the break
 and migration guidance in the release notes. No waiver mechanism is added.
 
+The API compatibility check also runs on every pull request, not only after a
+merge, because a break that lands green and turns `main` red never appears in
+review. At 0.x the minor is the major bump, so a break is satisfied by the
+version-change PR itself (`cargo-semver-checks` documents "1.2.3 to 2.0.0 or
+0.5.2 to 0.6.0" for a major-required lint). The offline half of that gate is
+`do_harness_types::workflow::tests::published_event_payloads_are_pinned`: it
+fails in a checkout, without the network, when a released event payload gains,
+loses, or renames a field.
+
 ### Source-distribution validation
 
 Versions through 0.2.1 used a workspace-local libSQL patch that is removed by
