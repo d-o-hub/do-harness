@@ -48,6 +48,7 @@ mod explain;
 mod feedback;
 mod fingerprint;
 mod fs_perm;
+mod gh;
 mod hook_script;
 mod hooks;
 mod init;

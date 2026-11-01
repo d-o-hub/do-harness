@@ -6,9 +6,8 @@
 //! never turn into an unbounded crawl of a large repository.
 
 use std::path::Path;
-use std::process::Command;
 
-use anyhow::{Context, Result, bail};
+use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
 use super::gh::{CheckRun, Comment};
@@ -217,25 +216,15 @@ pub fn comments(root: &Path, repo: &str, number: u64) -> Result<Vec<Comment>> {
 
 /// Runs `gh api`, optionally paginated and streamed through `jq`.
 fn api(root: &Path, endpoint: &str, jq: Option<&str>, paginate: bool) -> Result<Vec<u8>> {
-    let mut command = Command::new("gh");
-    command.current_dir(root).arg("api");
+    let mut args: Vec<&str> = vec!["api"];
     if paginate {
-        command.arg("--paginate");
+        args.push("--paginate");
     }
     if let Some(filter) = jq {
-        command.args(["--jq", filter]);
+        args.extend(["--jq", filter]);
     }
-    let output = command
-        .arg(endpoint)
-        .output()
-        .context("failed to run gh api (is the GitHub CLI installed?)")?;
-    if !output.status.success() {
-        bail!(
-            "gh api {endpoint} failed: {}",
-            String::from_utf8_lossy(&output.stderr).trim()
-        );
-    }
-    Ok(output.stdout)
+    args.push(endpoint);
+    Ok(crate::gh::output(root, &args, &format!("api {endpoint}"))?.stdout)
 }
 
 /// Parses newline-delimited JSON documents of one kind.
