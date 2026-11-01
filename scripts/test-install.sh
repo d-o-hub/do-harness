@@ -8,7 +8,10 @@
 # Usage: scripts/test-install.sh [--bin PATH] [--version vX.Y.Z]
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck disable=SC1091 # resolved at runtime from this script's directory
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib.sh"
+
+ROOT="$(dh_repo_root)"
 BIN="${ROOT}/target/release/do-harness"
 VERSION=""
 
@@ -35,7 +38,7 @@ done
 }
 
 if [[ -z "$VERSION" ]]; then
-    VERSION="v$(sed -n '/^\[workspace.package\]/,/^\[/ s/^version *= *"\(.*\)"/\1/p' "$ROOT/Cargo.toml")"
+    VERSION="v$(dh_workspace_version "$ROOT")"
 fi
 [[ "$VERSION" == v* ]] || VERSION="v${VERSION}"
 
@@ -50,12 +53,11 @@ case "$(uname -s)/$(uname -m)" in
         ;;
 esac
 
+# sha256_of <file>: the artifacts' checksums.txt digest, from the portable tool
+# fallback scripts/lib.sh owns. An empty digest is not special-cased here: the
+# installer rejects it as a checksum mismatch, the same verdict as before.
 sha256_of() {
-    if command -v sha256sum >/dev/null 2>&1; then
-        sha256sum "$1" | awk '{print $1}'
-    else
-        shasum -a 256 "$1" | awk '{print $1}'
-    fi
+    dh_sha256_of "$1"
 }
 
 tmp="$(mktemp -d)"

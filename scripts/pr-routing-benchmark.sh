@@ -28,7 +28,10 @@
 # must not be presented as exact token counts.
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck disable=SC1091 # resolved at runtime from this script's directory
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib.sh"
+
+ROOT="$(dh_repo_root)"
 BIN="${DO_HARNESS_BIN:-$ROOT/target/debug/do-harness}"
 FIXTURES="$ROOT/tests/fixtures/pr-routing"
 COUNT=""

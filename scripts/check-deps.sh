@@ -14,10 +14,12 @@
 
 set -euo pipefail
 
-# Fail-closed when the caller demands real gates: CI or an explicit opt-in.
-require_tools() { [[ "${CI:-}" == "true" || "${DO_HARNESS_REQUIRE_TOOLS:-}" == "1" ]]; }
+# Fail-closed when the caller demands real gates (CI or an explicit opt-in);
+# scripts/lib.sh owns that predicate, this script owns the SKIP/FAIL message.
+# shellcheck disable=SC1091 # resolved at runtime from this script's directory
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib.sh"
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT="$(dh_repo_root)"
 TYPES_MANIFEST="$ROOT/crates/types/Cargo.toml"
 FAIL=0
 
@@ -33,7 +35,7 @@ if closure="$(cd "$ROOT" && cargo tree -p do-harness-types --edges normal --pref
         echo "FAIL: do-harness-types closure must not contain storage or adapters."
         FAIL=1
     fi
-elif require_tools; then
+elif dh_require_tools; then
     echo "FAIL: cargo tree failed under required-tools mode."
     FAIL=1
 else
@@ -45,7 +47,7 @@ if closure="$(cd "$ROOT" && cargo tree -p guardian-proxy --edges normal --prefix
         echo "FAIL: guardian-proxy must not depend on the do-harness CLI."
         FAIL=1
     fi
-elif require_tools; then
+elif dh_require_tools; then
     echo "FAIL: cargo tree failed under required-tools mode."
     FAIL=1
 else
@@ -54,7 +56,7 @@ fi
 
 if command -v cargo-deny >/dev/null 2>&1; then
     (cd "$ROOT" && cargo deny check) || FAIL=1
-elif require_tools; then
+elif dh_require_tools; then
     echo "FAIL: cargo-deny is required when CI=true or DO_HARNESS_REQUIRE_TOOLS=1."
     FAIL=1
 else

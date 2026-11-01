@@ -20,7 +20,10 @@
 # always reports its own in/out byte volume next to the deterministic arm.
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck disable=SC1091 # resolved at runtime from this script's directory
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib.sh"
+
+ROOT="$(dh_repo_root)"
 FIXTURES="$ROOT/tests/fixtures/skill-catalog"
 TASKS=""
 

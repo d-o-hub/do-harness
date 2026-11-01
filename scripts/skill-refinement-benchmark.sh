@@ -4,7 +4,10 @@
 # (Concise, Verbose, Checklist) across representative skill evaluation suites.
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck disable=SC1091 # resolved at runtime from this script's directory
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib.sh"
+
+ROOT="$(dh_repo_root)"
 BIN="${DO_HARNESS_BIN:-$ROOT/target/debug/do-harness}"
 FIXTURES="$ROOT/tests/fixtures/skill-refinement"
 ITERATIONS="${ITERATIONS:-5}"

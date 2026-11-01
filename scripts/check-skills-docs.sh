@@ -20,10 +20,11 @@
 # separator the `--fix` rewrite splits on).
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-cd "$ROOT"
+# shellcheck disable=SC1091 # resolved at runtime from this script's directory
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib.sh"
 
-require_tools() { [[ "${CI:-}" == "true" || "${DO_HARNESS_REQUIRE_TOOLS:-}" == "1" ]]; }
+ROOT="$(dh_repo_root)"
+cd "$ROOT"
 
 FIX=0
 if [[ "${1:-}" == "--fix" ]]; then
@@ -180,7 +181,7 @@ if command -v python3 >/dev/null 2>&1 &&
     python3 "$ROOT/scripts/docs.py" links --check || failures=1
     python3 "$ROOT/scripts/docs.py" examples --check || failures=1
 else
-    if require_tools; then
+    if dh_require_tools; then
         echo "FAIL: python3 and markdown-it-py are required when CI=true or DO_HARNESS_REQUIRE_TOOLS=1 (install: python3 -m pip install -r scripts/requirements-docs.txt)." >&2
         exit 1
     fi

@@ -46,8 +46,10 @@ set -euo pipefail
 
 export LC_ALL=C
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+# shellcheck disable=SC1091 # resolved at runtime from this script's directory
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib.sh"
+
+ROOT="$(dh_repo_root)"
 
 TAG=""
 DIR=""
@@ -80,13 +82,11 @@ note() {
     printf 'NOTE\t%s\t%s\n' "$1" "$2"
 }
 
-# digest_of <file>: SHA-256 hex, or empty when no tool is available.
+# digest_of <file>: SHA-256 hex, or empty when no tool is available. The
+# tool fallback is scripts/lib.sh's; the empty-digest verdict stays here
+# (the checksums check is what turns it into a FAIL).
 digest_of() {
-    if command -v sha256sum >/dev/null 2>&1; then
-        sha256sum "$1" | awk '{print $1}'
-    elif command -v shasum >/dev/null 2>&1; then
-        shasum -a 256 "$1" | awk '{print $1}'
-    fi
+    dh_sha256_of "$1"
 }
 
 # fact <key>: the value of <key> in the facts file, empty when absent.
@@ -103,8 +103,7 @@ tag_version() {
 }
 
 tree_version() {
-    sed -n '/^\[workspace.package\]/,/^\[/ s/^version *= *"\([^"]*\)"/\1/p' \
-        "$ROOT/Cargo.toml" | head -1
+    dh_workspace_version "$ROOT" | head -1
 }
 
 # The vendored libsql fork is versioned independently, so its expected version

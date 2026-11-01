@@ -16,32 +16,47 @@
 # pass `--record`). Exit 2 is propagated as a hard failure: a collector that
 # cannot read git history must never read as healthy.
 #
-# Binary resolution order matches hook_script.rs RESOLVE_BIN, including its
-# stale-binary guard: an explicit DO_HARNESS_BIN, then PATH, then the repo-local
-# release build (including the .exe suffix so it works under Git Bash on
-# Windows). A PATH-installed or cargo-installed `do-harness` can predate the
-# workspace, so when the repo build is newer it wins — otherwise `verify`
-# dogfoods an old CLI and reports failures the working tree does not have.
+# Binary resolution order matches the documented resolution order of the managed
+# hooks' RESOLVE_BIN block: an explicit DO_HARNESS_BIN, then the workspace
+# release build (`${CARGO_TARGET_DIR:-target}/release/do-harness`, including the
+# .exe suffix so it works under Git Bash on Windows), then PATH.
+#
+# The workspace build is preferred whenever it exists: a PATH-installed or
+# cargo-installed `do-harness` can predate the checkout, and running it makes
+# `verify` dogfood an old CLI and report failures the working tree does not
+# have. The old `-nt` tie-break existed only to let the newer of the two win;
+# with the workspace build ranked above PATH that comparison has nothing left to
+# decide, while the reverse case — a stale *workspace* build — is exactly what
+# the "older than workspace sources" warning below reports.
+#
+# `${CARGO_TARGET_DIR}` is honoured, and a relative value resolves against the
+# repository root: a build redirected away from `target/` otherwise leaves this
+# shim executing a binary that silently predates the schema (AGENTS.md, Hooks).
+#
+# This shim deliberately does not source scripts/lib.sh, unlike the sibling
+# sensors: the DORA acceptance fixtures copy it on its own into a scratch
+# repository (crates/do-harness/tests/support/dora.rs), so it has to run with
+# nothing but itself. That is why the root and the resolver are written out here
+# rather than shared.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
+TARGET_DIR="${CARGO_TARGET_DIR:-target}"
+case "$TARGET_DIR" in
+    /* | [A-Za-z]:[\\/]*) ;;
+    *) TARGET_DIR="$ROOT/$TARGET_DIR" ;;
+esac
+REPO_BIN="$TARGET_DIR/release/do-harness"
+[[ -x "$REPO_BIN" ]] || { [[ -x "$REPO_BIN.exe" ]] && REPO_BIN="$REPO_BIN.exe"; }
+
 if [[ -n "${DO_HARNESS_BIN:-}" && -x "$DO_HARNESS_BIN" ]]; then
     BIN="$DO_HARNESS_BIN"
+elif [[ -x "$REPO_BIN" ]]; then
+    BIN="$REPO_BIN"
 elif command -v do-harness >/dev/null 2>&1; then
     BIN="$(command -v do-harness)"
 else
-    BIN="$ROOT/target/release/do-harness"
-    [[ -x "$BIN" ]] || { [[ -x "$BIN.exe" ]] && BIN="$BIN.exe"; }
-fi
-
-REPO_BIN="$ROOT/target/release/do-harness"
-[[ -x "$REPO_BIN" ]] || { [[ -x "$REPO_BIN.exe" ]] && REPO_BIN="$REPO_BIN.exe"; }
-if [[ -z "${DO_HARNESS_BIN:-}" && -x "$REPO_BIN" && "$REPO_BIN" -nt "$BIN" ]]; then
-    BIN="$REPO_BIN"
-fi
-
-if [[ ! -x "$BIN" ]]; then
     echo "FAIL: do-harness binary not found. Set DO_HARNESS_BIN, add do-harness to PATH, or build with: cargo build --release -p do-harness" >&2
     # Discovery failure, not a metric verdict: exit 2 so it is a hard failure
     # rather than the advisory breach code (exit 1 would be indistinguishable

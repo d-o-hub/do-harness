@@ -32,7 +32,10 @@
 # substance is the epic's own recorded evidence, reviewed by a human.
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck disable=SC1091 # resolved at runtime from this script's directory
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib.sh"
+
+ROOT="$(dh_repo_root)"
 MANIFEST="$ROOT/crates/guardian-proxy/Cargo.toml"
 FAIL=0
 
