@@ -7,6 +7,7 @@ use std::path::Path;
 use clap::Parser;
 
 use super::*;
+use crate::report::Format;
 
 #[test]
 fn visible_aliases_parse_correctly() {

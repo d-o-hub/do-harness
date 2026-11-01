@@ -25,6 +25,8 @@ mod bless;
 mod fixture;
 mod gate;
 mod grading;
+mod opts;
 mod orchestrator;
 
-pub use orchestrator::{EvalOpts, run_eval};
+pub use opts::EvalOpts;
+pub use orchestrator::run_eval;
