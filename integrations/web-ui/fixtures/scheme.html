@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>web-ui audit scheme fixture</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { margin: 0; padding: 24px; background: #fff; color: #111;
+         font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  h1 { margin: 0 0 16px; font-size: 28px; }
+  /* Correct in light mode: dark grey on a near-white chip. */
+  .note { display: inline-block; background: #f0f0f0; color: #444;
+          padding: 4px 8px; font-size: 14px; }
+  /* Intentional defect visible only in dark mode: the chip darkens but its
+     text does not lighten enough to stay readable. */
+  @media (prefers-color-scheme: dark) {
+    body { background: #111; color: #eee; }
+    .note { background: #1a1a1a; color: #3a3a3a; }
+  }
+</style>
+</head>
+<body>
+  <main>
+    <h1>Scheme fixture</h1>
+    <p><span class="note">theme-specific surface</span></p>
+  </main>
+</body>
+</html>
