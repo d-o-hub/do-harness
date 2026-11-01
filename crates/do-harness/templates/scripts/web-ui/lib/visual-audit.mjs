@@ -24,11 +24,17 @@ export const DEFAULT_BASELINE_DIR = ".do-harness/visual";
  * colliding or producing unsafe filenames.
  * @param {string} route
  * @param {{ label: string, width: number, height: number }} viewport
+ * @param {string} [scheme] — color scheme; omitted keeps the original key
  */
-export function cellKey(route, viewport) {
+export function cellKey(route, viewport, scheme) {
   const slug = viewport.label.replace(/[^a-z0-9-]+/gi, "-").replace(/^-+|-+$/g, "");
   const routeHash = createHash("sha256").update(route).digest("hex").slice(0, 12);
-  return `${slug || "viewport"}-${routeHash}`;
+  // The scheme suffix keeps light and dark captures from overwriting one
+  // another; calls without a scheme keep the original key shape.
+  const schemeSlug = scheme
+    ? `${String(scheme).toLowerCase().replace(/[^a-z0-9-]+/gi, "-")}-`
+    : "";
+  return `${slug || "viewport"}-${schemeSlug}${routeHash}`;
 }
 
 /**

@@ -1,10 +1,10 @@
 # web-ui — viewport text audit for do-harness
 
 The browser-side sensor library for do-harness's web-ui pack (issue #68).
-It validates, per **route × viewport × locale × scheme**, that all text is
-readable: visible, not occluded, not overlapping, and not overflowing —
-grounded in WCAG 2.2 (1.4.3 contrast, 1.4.10 reflow, 2.4.7 focus visibility,
-2.5.8 target size).
+It validates, per **route × viewport × color scheme** (`auditMatrix`) and per
+**locale** (`auditLocales`), that all text is readable: visible, not occluded,
+not overlapping, and not overflowing — grounded in WCAG 2.2 (1.4.3 contrast,
+1.4.10 reflow, 2.4.7 focus visibility, 2.5.8 target size).
 
 ## Layout
 
@@ -18,7 +18,7 @@ grounded in WCAG 2.2 (1.4.3 contrast, 1.4.10 reflow, 2.4.7 focus visibility,
 | `lib/i18n-audit.mjs` | per-locale probe diffing + RTL direction contract (3.1.1/3.1.2) | diffing + direction yes |
 | `lib/perf-audit.mjs` | Lighthouse adapter (peer dep) + CWV budget evaluation | budget evaluation yes |
 | `lib/visual-audit.mjs` | screenshot capture + digest baselines under `.do-harness/visual/` | classification yes |
-| `lib/audit.mjs` | matrix normalization + orchestrator | normalization yes |
+| `lib/audit.mjs` | viewport/scheme matrix normalization + orchestrator | normalization yes |
 | `lib/annotate.mjs` | transient outline/label screenshots for rect-bearing findings | via browser suite |
 | `audit.test.mjs` | `node --test` unit tests (no browser needed) | — |
 | `audit.browser.test.mjs` | rendered Playwright regression suite + committed fixtures | optional |
@@ -47,6 +47,25 @@ grounded in WCAG 2.2 (1.4.3 contrast, 1.4.10 reflow, 2.4.7 focus visibility,
    traversal visibility (2.4.7) and target size (2.5.8, which exempts
    `display:inline` targets by the success criterion itself).
 
+## Matrix dimensions
+
+`auditMatrix` covers routes × viewports × color schemes.
+
+- Default viewports: 12, from 320×568 mobile to 1920×1080 desktop, including
+  360, 412, 640, and landscape mobile. Viewports require integer dimensions:
+  width 200–7680, height 200–4320. Empty matrices are rejected.
+- Default schemes: `light` and `dark` (`DEFAULT_SCHEME_MATRIX`), because a
+  defect that appears only in dark mode is invisible to a light-only run.
+  `normalizeScheme` rejects anything else, and duplicate schemes are rejected
+  rather than silently collapsed.
+- `auditPage` sets the viewport and emulates the requested scheme
+  (`page.emulateMedia`), then navigates and probes; findings carry `route`,
+  `viewport`, and `scheme`. Omitting `scheme` resets emulation to the browser
+  default, so a dark cell cannot leak its theme into the next capture.
+- Audit each route per viewport per scheme; pass `schemes: ["light"]` for a
+  single-theme run. Locale differences stay in `auditLocales`, which runs the
+  probe per locale instead of per scheme.
+
 ## Running the tests
 
 Headless unit tests cover every pure helper and run without browser dependencies:
@@ -73,8 +92,10 @@ runs this suite as a required browser regression check.
 
 `auditMatrix(page, { annotate: true, findingsDir })` draws transient,
 viewport-coordinate outlines and labels over every rect-bearing finding,
-writes one PNG per route × viewport cell, and removes the overlays before the
-page is reused. The returned JSON includes `annotationArtifacts` paths.
+writes one PNG per route × viewport × scheme cell (the artifact key carries
+the scheme, so light and dark captures never overwrite each other), and
+removes the overlays before the page is reused. The returned JSON includes
+`annotationArtifacts` paths.
 `scripts/viewport-audit.mjs` exposes the same behavior with
 `WEB_AUDIT_ANNOTATE=1` and `WEB_AUDIT_FINDINGS_DIR=...`. Finding images are
 kept outside `.do-harness/visual/`, so annotations never alter visual

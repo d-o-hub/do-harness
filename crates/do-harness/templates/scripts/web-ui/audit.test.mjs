@@ -23,7 +23,14 @@ import {
   contrastRatio,
   minimumRatio,
 } from "./lib/contrast.mjs";
-import { normalizeViewport, normalizeMatrix, DEFAULT_VIEWPORT_MATRIX } from "./lib/audit.mjs";
+import {
+  normalizeViewport,
+  normalizeMatrix,
+  DEFAULT_VIEWPORT_MATRIX,
+  normalizeScheme,
+  normalizeSchemeMatrix,
+  DEFAULT_SCHEME_MATRIX,
+} from "./lib/audit.mjs";
 import { classifyConsoleMessage } from "./lib/console-audit.mjs";
 import {
   expectedDirection,
@@ -226,6 +233,11 @@ test("i18n: locale diff isolates locale-only regressions", () => {
 test("visual: cell keys are deterministic, slugged, and collision-safe", () => {
   const vp = { label: "mobile-md", width: 360, height: 800 };
   assert.equal(cellKey("/login", vp), cellKey("/login", vp));
+  // Light and dark captures must not share a baseline path, and an omitted
+  // scheme must keep the historical key.
+  assert.equal(cellKey("/login", vp, undefined), cellKey("/login", vp));
+  assert.notEqual(cellKey("/login", vp, "light"), cellKey("/login", vp, "dark"));
+  assert.match(cellKey("/login", vp, "dark"), /^mobile-md-dark-[0-9a-f]{12}$/);
   const keyA = cellKey("/books?id=1", vp);
   const keyB = cellKey("/books?id=2", vp);
   assert.notEqual(keyA, keyB); // query strings must not collide
@@ -289,6 +301,18 @@ test("viewport matrix: normalizes, validates, and rejects garbage", () => {
   assert.throws(() => normalizeMatrix([]), RangeError);
   assert.ok(DEFAULT_VIEWPORT_MATRIX.some((v) => v.width === 320)); // reflow floor
   assert.ok(DEFAULT_VIEWPORT_MATRIX.some((v) => v.width === 360)); // Android majority
+});
+
+test("scheme matrix: defaults to both themes and rejects bad input", () => {
+  assert.deepEqual(DEFAULT_SCHEME_MATRIX, ["light", "dark"]);
+  assert.deepEqual(normalizeSchemeMatrix(), ["light", "dark"]);
+  assert.equal(normalizeScheme(" DARK "), "dark");
+  assert.deepEqual(normalizeSchemeMatrix(["dark"]), ["dark"]);
+  assert.throws(() => normalizeScheme("auto"), RangeError);
+  assert.throws(() => normalizeScheme(42), TypeError);
+  assert.throws(() => normalizeSchemeMatrix([]), RangeError);
+  assert.throws(() => normalizeSchemeMatrix(["light", "light"]), RangeError);
+  assert.throws(() => normalizeSchemeMatrix("light"), TypeError);
 });
 
 test("perf: budgets parse strictly and merge over defaults", () => {

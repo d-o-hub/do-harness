@@ -9,7 +9,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 import assert from "node:assert/strict";
-import { auditMatrix } from "./lib/audit.mjs";
+import { auditPage, auditMatrix, DEFAULT_SCHEME_MATRIX } from "./lib/audit.mjs";
 import { auditVisual } from "./lib/visual-audit.mjs";
 
 const require = createRequire(import.meta.url);
@@ -89,6 +89,8 @@ test("browser: rendered fixtures cover clean, overlap, contrast, and baseline is
 
     const clean = await auditMatrix(page, { routes: [cleanUrl], matrix });
     assert.equal(clean.findingCount, 0, JSON.stringify(clean, null, 2));
+    assert.deepEqual(clean.schemes, DEFAULT_SCHEME_MATRIX);
+    assert.equal(clean.cells.length, matrix.length * DEFAULT_SCHEME_MATRIX.length);
 
     const overlap = await auditMatrix(page, {
       routes: [overlapUrl],
@@ -107,7 +109,8 @@ test("browser: rendered fixtures cover clean, overlap, contrast, and baseline is
       assert.match(findings[0].selector, /span$/);
       assert.match(findings[0].overlapsWith, /h1/);
     }
-    assert.equal(overlap.annotationArtifacts.length, matrix.length);
+    assert.equal(overlap.annotationArtifacts.length, matrix.length * DEFAULT_SCHEME_MATRIX.length);
+    assert.equal(new Set(overlap.annotationArtifacts).size, overlap.annotationArtifacts.length);
     for (const artifact of overlap.annotationArtifacts) {
       const png = await readFile(artifact);
       assert.deepEqual([...png.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
@@ -134,6 +137,39 @@ test("browser: rendered fixtures cover clean, overlap, contrast, and baseline is
     const shell = await auditMatrix(page, { routes: [shellUrl], matrix: [matrix[1]] });
     assert.ok(shell.findingCount > 0, "the app-shell flyout must be reported");
     assert.ok(shell.cells[0].findings.some((finding) => finding.stage === "text-overlap"));
+
+    const schemeUrl = route(fixtureServer.baseUrl, "scheme.html");
+    const schemes = await auditMatrix(page, {
+      routes: [schemeUrl],
+      matrix: [matrix[1]],
+      schemes: ["light", "dark"],
+    });
+    const lightCell = schemes.cells.find((cell) => cell.scheme === "light");
+    const darkCell = schemes.cells.find((cell) => cell.scheme === "dark");
+    assert.ok(lightCell && darkCell, JSON.stringify(schemes, null, 2));
+    assert.equal(
+      lightCell.findings.filter((finding) => finding.stage === "contrast").length,
+      0,
+      JSON.stringify(lightCell, null, 2),
+    );
+    assert.equal(
+      darkCell.findings.filter((finding) => finding.stage === "contrast").length,
+      1,
+      JSON.stringify(darkCell, null, 2),
+    );
+    assert.ok(darkCell.findings.every((finding) => finding.scheme === "dark"));
+
+    // Omitting the scheme keeps the legacy payload and clears emulation: the
+    // dark cell above must not leave the next caller in dark mode, which the
+    // scheme-only defect would expose as a stray contrast finding.
+    const legacy = await auditPage(page, { route: schemeUrl, viewport: matrix[1] });
+    assert.equal(legacy.scheme, null);
+    assert.ok(legacy.findings.every((finding) => finding.scheme === null));
+    assert.equal(
+      legacy.findings.filter((finding) => finding.stage === "contrast").length,
+      0,
+      JSON.stringify(legacy, null, 2),
+    );
 
     await page.goto(cleanUrl, { waitUntil: "networkidle" });
     await page.setViewportSize({ width: matrix[1].width, height: matrix[1].height });
