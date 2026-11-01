@@ -159,11 +159,17 @@ test("browser: rendered fixtures cover clean, overlap, contrast, and baseline is
     );
     assert.ok(darkCell.findings.every((finding) => finding.scheme === "dark"));
 
-    // Omitting the scheme keeps the legacy payload and clears emulation so a
-    // preceding dark cell cannot tint a light-only caller.
-    const legacy = await auditPage(page, { route: cleanUrl, viewport: matrix[1] });
+    // Omitting the scheme keeps the legacy payload and clears emulation: the
+    // dark cell above must not leave the next caller in dark mode, which the
+    // scheme-only defect would expose as a stray contrast finding.
+    const legacy = await auditPage(page, { route: schemeUrl, viewport: matrix[1] });
     assert.equal(legacy.scheme, null);
     assert.ok(legacy.findings.every((finding) => finding.scheme === null));
+    assert.equal(
+      legacy.findings.filter((finding) => finding.stage === "contrast").length,
+      0,
+      JSON.stringify(legacy, null, 2),
+    );
 
     await page.goto(cleanUrl, { waitUntil: "networkidle" });
     await page.setViewportSize({ width: matrix[1].width, height: matrix[1].height });

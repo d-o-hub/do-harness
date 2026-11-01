@@ -31,6 +31,37 @@ export const DEFAULT_VIEWPORT_MATRIX = [
   { label: "landscape-mobile", width: 812, height: 375 },
 ];
 
+/** Schemes audited by default: a defect that appears only in dark mode is
+ * invisible to a light-only run. */
+export const DEFAULT_SCHEME_MATRIX = ["light", "dark"];
+
+const SUPPORTED_SCHEMES = new Set(DEFAULT_SCHEME_MATRIX);
+
+/** Validate + lowercase one color scheme; throws on an unsupported value. */
+export function normalizeScheme(scheme) {
+  if (typeof scheme !== "string") {
+    throw new TypeError("scheme must be a string");
+  }
+  const normalized = scheme.trim().toLowerCase();
+  if (!SUPPORTED_SCHEMES.has(normalized)) {
+    throw new RangeError(`unsupported color scheme: ${scheme}`);
+  }
+  return normalized;
+}
+
+/** @returns {string[]} validated, duplicate-free scheme matrix. */
+export function normalizeSchemeMatrix(matrix = DEFAULT_SCHEME_MATRIX) {
+  if (!Array.isArray(matrix)) {
+    throw new TypeError("scheme matrix must be an array");
+  }
+  const normalized = matrix.map(normalizeScheme);
+  if (normalized.length === 0) throw new RangeError("scheme matrix is empty");
+  if (new Set(normalized).size !== normalized.length) {
+    throw new RangeError("scheme matrix contains duplicates");
+  }
+  return normalized;
+}
+
 /** Validate + fill a matrix entry; throws on malformed input. */
 export function normalizeViewport(entry) {
   if (!entry || typeof entry !== "object") {
@@ -60,13 +91,17 @@ export function normalizeMatrix(matrix = DEFAULT_VIEWPORT_MATRIX) {
 
 /**
  * Run the text audit on an already-loaded page at a single viewport.
- * Returns a serializable report; findings carry route/viewport context.
+ * Returns a serializable report; findings carry route/viewport/scheme context.
  * @param {import('playwright').Page} page
- * @param {{ route: string, viewport: {label, width, height}, allowlist?: string[], maxFindings?: number, checkFocusVisibility?: boolean, annotate?: boolean, findingsDir?: string }} options
+ * @param {{ route: string, viewport: {label, width, height}, scheme?: "light" | "dark", allowlist?: string[], maxFindings?: number, checkFocusVisibility?: boolean, annotate?: boolean, findingsDir?: string }} options
  */
 export async function auditPage(page, options) {
   const viewport = normalizeViewport(options.viewport);
+  const scheme = options.scheme === undefined ? undefined : normalizeScheme(options.scheme);
   await page.setViewportSize({ width: viewport.width, height: viewport.height });
+  // null restores the browser's own preference so an omitted scheme cannot
+  // inherit the previous cell's emulation.
+  await page.emulateMedia({ colorScheme: scheme ?? null });
   if (options.route !== undefined) await page.goto(options.route, { waitUntil: "networkidle" });
   const probe = await page.evaluate(pageProbe, {
     allowlist: options.allowlist ?? [],
@@ -75,11 +110,16 @@ export async function auditPage(page, options) {
     viewport: { width: viewport.width, height: viewport.height },
   });
   const route = options.route ?? page.url();
-  const findings = probe.findings.map((f) => ({ ...f, route, viewport: viewport.label }));
+  const findings = probe.findings.map((f) => ({
+    ...f,
+    route,
+    viewport: viewport.label,
+    scheme: scheme ?? null,
+  }));
   const annotationArtifacts = [];
   if (options.annotate === true && findings.length > 0) {
     const annotation = await annotateFindings(page, findings, {
-      key: cellKey(route, viewport),
+      key: cellKey(route, viewport, scheme),
       outDir: options.findingsDir,
     });
     if (annotation?.path) annotationArtifacts.push(annotation.path);
@@ -87,6 +127,7 @@ export async function auditPage(page, options) {
   return {
     route,
     viewport,
+    scheme: scheme ?? null,
     textLeaves: probe.textLeaves,
     truncated: probe.truncated,
     findings,
@@ -95,29 +136,34 @@ export async function auditPage(page, options) {
 }
 
 /**
- * Run the audit across a full route x viewport matrix.
+ * Run the audit across a full route x viewport x scheme matrix.
  * @param {import('playwright').Page} page
- * @param {{ routes: string[], matrix?: Array<{label,width,height}>, allowlist?: string[], annotate?: boolean, findingsDir?: string }} options
+ * @param {{ routes: string[], matrix?: Array<{label,width,height}>, schemes?: string[], allowlist?: string[], annotate?: boolean, findingsDir?: string }} options
  */
 export async function auditMatrix(page, options) {
   const matrix = normalizeMatrix(options.matrix);
+  const schemes = normalizeSchemeMatrix(options.schemes);
   const reports = [];
   for (const route of options.routes) {
     await page.goto(route, { waitUntil: "networkidle" });
     for (const viewport of matrix) {
-      reports.push(
-        await auditPage(page, {
-          route,
-          viewport,
-          allowlist: options.allowlist,
-          annotate: options.annotate,
-          findingsDir: options.findingsDir,
-        }),
-      );
+      for (const scheme of schemes) {
+        reports.push(
+          await auditPage(page, {
+            route,
+            viewport,
+            scheme,
+            allowlist: options.allowlist,
+            annotate: options.annotate,
+            findingsDir: options.findingsDir,
+          }),
+        );
+      }
     }
   }
   return {
     matrix: matrix.map((m) => m.label),
+    schemes,
     routes: options.routes,
     cells: reports,
     findingCount: reports.reduce((n, r) => n + r.findings.length, 0),
