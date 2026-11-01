@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>web-ui audit locale fixture</title>
+<script>
+  // Query-parameter locale switching, the mechanism auditLocales drives with
+  // switchVia: { param: "lang" }. Arabic renders correctly (rtl); Hebrew is
+  // the intentional defect: it renders left-to-right.
+  const locale = new URLSearchParams(location.search).get("lang") ?? "en";
+  const directions = { en: "ltr", ar: "rtl", he: "ltr" };
+  document.documentElement.lang = locale;
+  document.documentElement.dir = directions[locale] ?? "ltr";
+</script>
+<style>
+  body { margin: 0; padding: 24px; background: #fff; color: #111;
+         font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  h1 { margin: 0 0 16px; font-size: 28px; }
+</style>
+</head>
+<body>
+  <main>
+    <h1>Locale fixture</h1>
+    <p>Readable sentence for the locale regression probe.</p>
+  </main>
+</body>
+</html>

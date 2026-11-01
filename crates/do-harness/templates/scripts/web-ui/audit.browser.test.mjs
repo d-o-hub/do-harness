@@ -11,6 +11,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { auditPage, auditMatrix, DEFAULT_SCHEME_MATRIX } from "./lib/audit.mjs";
 import { auditVisual } from "./lib/visual-audit.mjs";
+import { auditLocales } from "./lib/i18n-audit.mjs";
 
 const require = createRequire(import.meta.url);
 const projectRoot = fileURLToPath(new URL("../../", import.meta.url));
@@ -170,6 +171,27 @@ test("browser: rendered fixtures cover clean, overlap, contrast, and baseline is
       0,
       JSON.stringify(legacy, null, 2),
     );
+
+    // FU-02: the direction finding must describe the locale just navigated to.
+    // The fixture renders Arabic rtl (correct) and Hebrew ltr (the defect), so
+    // a baseline-page reading would flag Arabic and miss Hebrew entirely.
+    const localeUrl = route(fixtureServer.baseUrl, "locales.html");
+    await page.setViewportSize({ width: matrix[1].width, height: matrix[1].height });
+    const locales = await auditLocales(page, {
+      route: localeUrl,
+      locales: ["en", "ar", "he"],
+      baselineLocale: "en",
+      switchVia: { param: "lang" },
+    });
+    const directionFindings = locales.findings.filter(
+      (finding) => finding.stage === "i18n-direction",
+    );
+    assert.deepEqual(
+      directionFindings.map((finding) => finding.locale),
+      ["he"],
+      JSON.stringify(locales, null, 2),
+    );
+    assert.match(directionFindings[0].reason, /locale he expects 'rtl'/);
 
     await page.goto(cleanUrl, { waitUntil: "networkidle" });
     await page.setViewportSize({ width: matrix[1].width, height: matrix[1].height });

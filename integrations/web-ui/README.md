@@ -66,6 +66,16 @@ not overlapping, and not overflowing — grounded in WCAG 2.2 (1.4.3 contrast,
   single-theme run. Locale differences stay in `auditLocales`, which runs the
   probe per locale instead of per scheme.
 
+## Locale audits
+
+`auditLocales` probes each locale and reports only locale-specific findings
+(the diff against the baseline locale), plus the direction contract. It reads
+`document.documentElement.dir` **after** navigating to the locale under test,
+so each `i18n-direction` finding names the locale it was measured on;
+`directionReason(dir, locale)` holds that rule as a pure helper, and an absent
+`dir` counts as `ltr` (HTML's default). Direction findings are reported per
+locale, not merged into the probe delta.
+
 ## Running the tests
 
 Headless unit tests cover every pure helper and run without browser dependencies:

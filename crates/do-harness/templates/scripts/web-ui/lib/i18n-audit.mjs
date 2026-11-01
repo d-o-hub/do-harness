@@ -29,6 +29,23 @@ export function expectedDirection(locale) {
 }
 
 /**
+ * Reason a rendered document direction violates its locale's writing
+ * direction, or null when it matches. Callers must pass the `dir` attribute of
+ * the page already navigated to this locale — reading it from another
+ * locale's page reports that page's direction under the wrong name.
+ *
+ * An absent `dir` is treated as `ltr`: HTML's own default direction.
+ * @param {string | null} dir — raw `documentElement` dir attribute
+ * @param {string} locale — BCP-47 tag being audited
+ * @returns {string | null}
+ */
+export function directionReason(dir, locale) {
+  const expected = expectedDirection(locale);
+  if ((dir ?? "ltr") === expected) return null;
+  return `document dir is '${dir ?? "unset"}' but locale ${locale} expects '${expected}' (WCAG 3.1.2)`;
+}
+
+/**
  * Build the URL for one route x locale via a query parameter.
  * @param {string} route — absolute URL or path with any existing search.
  * @param {string} param
@@ -99,22 +116,20 @@ export async function auditLocales(page, options) {
   const baseline = await runProbe(baselineLocale);
   for (const locale of locales) {
     if (locale === baselineLocale) continue;
-    // Direction contract: a rendered RTL locale must carry dir="rtl" (WCAG
-    // 3.1.1/3.1.2) — check the document element, not the probe.
-    const dir = await page.evaluate(() => ({
-      dir: document.documentElement.getAttribute("dir"),
-      lang: document.documentElement.getAttribute("lang"),
-    }));
-    if ((dir.dir ?? "ltr") !== expectedDirection(locale)) {
+    // Probe first: the direction contract (WCAG 3.1.1/3.1.2) must be read from
+    // this locale's own document, so the finding names the locale it describes.
+    const localeResult = await runProbe(locale);
+    const dir = await page.evaluate(() => document.documentElement.getAttribute("dir"));
+    const reason = directionReason(dir, locale);
+    if (reason !== null) {
       findings.push({
         stage: "i18n-direction",
         selector: "html",
         route: options.route,
         locale,
-        reason: `document dir is '${dir.dir ?? "unset"}' but locale ${locale} expects '${expectedDirection(locale)}' (WCAG 3.1.2)`,
+        reason,
       });
     }
-    const localeResult = await runProbe(locale);
     for (const delta of diffLocaleFindings(baseline.findings, localeResult.findings)) {
       findings.push({ ...delta, route: options.route, locale });
     }

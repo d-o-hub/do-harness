@@ -34,6 +34,7 @@ import {
 import { classifyConsoleMessage } from "./lib/console-audit.mjs";
 import {
   expectedDirection,
+  directionReason,
   buildLocaleUrl,
   keyFinding,
   diffLocaleFindings,
@@ -207,6 +208,19 @@ test("i18n: direction map and locale URL building", () => {
     buildLocaleUrl("http://app.test/catalog?sort=asc", "lang", "de"),
     "http://app.test/catalog?sort=asc&lang=de",
   );
+});
+
+test("i18n: direction reason names the locale actually inspected", () => {
+  assert.equal(directionReason("ltr", "en"), null);
+  assert.equal(directionReason("rtl", "ar"), null);
+  assert.equal(directionReason("rtl", "he-IL"), null);
+  // An absent dir attribute is HTML's default LTR direction.
+  assert.equal(directionReason(null, "de"), null);
+  assert.match(directionReason("ltr", "ar"), /locale ar expects 'rtl'/);
+  assert.match(directionReason("rtl", "de"), /locale de expects 'ltr'/);
+  // The broken-Hebrew case FU-02 names: LTR rendering of an RTL locale.
+  assert.match(directionReason("ltr", "he"), /locale he expects 'rtl'/);
+  assert.match(directionReason(null, "ar"), /document dir is 'unset'/);
 });
 
 test("i18n: locale diff isolates locale-only regressions", () => {
