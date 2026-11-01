@@ -12,6 +12,7 @@ use std::path::Path;
 use anyhow::{Context, Result};
 
 use super::gh;
+use super::gh::{CheckRun, CommitStatus};
 use super::waiver_comment::first_line;
 #[allow(unused_imports)]
 pub use super::waiver_comment::{CodecovStatus, CodecovSummary, WaiverAuditRecord};
@@ -31,6 +32,9 @@ pub(crate) fn is_codecov_author(login: &str) -> bool {
 pub(crate) fn is_bot_login(login: &str) -> bool {
     login.ends_with("[bot]") || login == "dependabot" || login == "renovate"
 }
+
+#[cfg(test)]
+mod tests;
 
 mod model;
 pub use model::{
@@ -122,6 +126,20 @@ fn evaluate_checks(
     let statuses =
         gh::commit_statuses(root, head_ref_oid).context("could not read commit statuses")?;
 
+    Ok(summarize_checks(check_runs, statuses, conflicts, blockers))
+}
+
+/// Classifies check runs and commit statuses into a merge-gating summary.
+///
+/// Pure over its inputs, so the classification that decides whether a pull
+/// request may merge is covered on every supported platform, not only where a
+/// fake `gh` executable can be put on `PATH`.
+fn summarize_checks(
+    check_runs: Vec<CheckRun>,
+    statuses: Vec<CommitStatus>,
+    conflicts: bool,
+    blockers: &mut Vec<String>,
+) -> CheckSummary {
     let mut passed = 0;
     let mut skipped = 0;
     let mut pending = Vec::new();
@@ -193,7 +211,7 @@ fn evaluate_checks(
             "checks are incomplete: merge conflicts stop workflow checks from being scheduled ({total} check run(s) reported)"
         ));
     }
-    Ok(CheckSummary {
+    CheckSummary {
         total,
         passed,
         failed,
@@ -201,7 +219,7 @@ fn evaluate_checks(
         pending,
         skipped,
         incomplete,
-    })
+    }
 }
 
 fn evaluate_conversations(

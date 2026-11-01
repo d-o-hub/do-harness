@@ -461,6 +461,19 @@ jobs:
         run: cargo test -p do-harness-db --release -- --test-threads=1
       - name: Build harness CLI
         run: cargo build --release -p do-harness
+      - name: Run the portable sensor suite on Windows
+        # P10: Windows was a build-and-test target, never a platform where this
+        # repository's own sensors ran. The full `verification` set needs
+        # shellcheck, yamllint, markdownlint and actionlint, whose Windows
+        # availability is not worth the risk here; the Rust sensors are
+        # portable, and running them through `do-harness verify` exercises the
+        # sensor runner itself on Windows rather than re-stating the same
+        # commands by hand.
+        timeout-minutes: 15
+        shell: bash
+        run: |
+          ./target/release/do-harness.exe verify \
+            --only fmt --only check --only clippy --only doctest --only loc
       - name: Dogfood init + verify with the release binary
         shell: bash
         env:
