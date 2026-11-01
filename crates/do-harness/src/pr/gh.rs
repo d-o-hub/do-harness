@@ -40,7 +40,7 @@ pub fn view(root: &Path, number: u64) -> Result<PrView> {
             "--json",
             "number,baseRefName,headRefOid",
         ],
-        "pr view",
+        &format!("pr view {number}"),
     )
 }
 
@@ -199,7 +199,7 @@ pub fn readiness_view(root: &Path, number: u64) -> Result<PrReadinessView> {
             "--json",
             "number,baseRefName,headRefOid,mergeStateStatus,mergeable,autoMergeRequest",
         ],
-        "pr view",
+        &format!("pr view {number}"),
     )
 }
 
