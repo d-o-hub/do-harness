@@ -137,7 +137,11 @@ const OUTPUT_TAIL_LINES: usize = 80;
 /// stdout carries exactly one JSON object. Failing-sensor output tails always
 /// go to stderr, prefixed with six spaces. With `quiet` set, PASS/WARN verdict
 /// lines and the green footer are omitted; failures stay visible.
-pub fn print_report(report: &VerifyReport, format: Format, quiet: bool) {
+///
+/// # Errors
+///
+/// Returns an error when the report cannot be serialized as JSON.
+pub fn print_report(report: &VerifyReport, format: Format, quiet: bool) -> anyhow::Result<()> {
     for sensor in &report.sensors {
         let verdict = match sensor.execution {
             Execution::Reused => "SKIP",
@@ -203,11 +207,33 @@ pub fn print_report(report: &VerifyReport, format: Format, quiet: bool) {
         eprintln!("Failed sensors: {}", report.failed.join(", "));
     }
     if format == Format::Json {
-        match serde_json::to_writer_pretty(std::io::stdout(), report) {
-            Ok(()) => println!(),
-            Err(err) => eprintln!("error: failed to serialize report: {err}"),
-        }
+        println!("{}", json_pretty(report)?);
     }
+    Ok(())
+}
+
+/// Serializes `value` as pretty JSON for stdout.
+///
+/// Every renderer returns the failure instead of printing to stderr and
+/// exiting 0: a report that could not be serialized is not a successful run.
+///
+/// # Errors
+///
+/// Returns an error when the value cannot be represented as JSON, for example
+/// a non-finite float.
+pub fn json_pretty<T: serde::Serialize + ?Sized>(value: &T) -> anyhow::Result<String> {
+    serde_json::to_string_pretty(value)
+        .map_err(|err| anyhow::anyhow!("failed to serialize JSON output: {err}"))
+}
+
+/// Serializes `value` as compact JSON, for a single-line marker.
+///
+/// # Errors
+///
+/// Returns an error when the value cannot be represented as JSON.
+pub fn json_compact<T: serde::Serialize + ?Sized>(value: &T) -> anyhow::Result<String> {
+    serde_json::to_string(value)
+        .map_err(|err| anyhow::anyhow!("failed to serialize JSON output: {err}"))
 }
 
 /// Human-readable findings/baseline suffix for a sensor verdict line.
@@ -226,18 +252,21 @@ fn findings_suffix(sensor: &SensorResult) -> String {
 }
 
 /// Prints a list of sensor names in the requested format.
-pub fn print_names(names: &[String], format: Format) {
+///
+/// # Errors
+///
+/// Returns an error when the names cannot be serialized, so a JSON consumer
+/// never receives an empty payload behind a zero exit code.
+pub fn print_names(names: &[String], format: Format) -> anyhow::Result<()> {
     match format {
         Format::Text => {
             for name in names {
                 println!("{name}");
             }
         }
-        Format::Json => match serde_json::to_string(names) {
-            Ok(json) => println!("{json}"),
-            Err(err) => eprintln!("error: failed to serialize names: {err}"),
-        },
+        Format::Json => println!("{}", json_compact(names)?),
     }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -245,6 +274,21 @@ mod tests {
     #![allow(clippy::unwrap_used, clippy::expect_used)]
 
     use super::*;
+
+    #[test]
+    fn json_pretty_reports_an_unserializable_value() {
+        struct Failing;
+        impl serde::Serialize for Failing {
+            fn serialize<S: serde::Serializer>(&self, _: S) -> Result<S::Ok, S::Error> {
+                Err(serde::ser::Error::custom("boom"))
+            }
+        }
+        let err = json_pretty(&Failing).unwrap_err();
+        assert!(
+            err.to_string().contains("failed to serialize JSON output"),
+            "unexpected error: {err}"
+        );
+    }
 
     /// The JSON contract exposes verdict fields but never the raw output.
     #[test]

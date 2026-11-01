@@ -181,9 +181,10 @@ async fn route(root: &Path, config_path: Option<PathBuf>, cli: Cli) -> Result<()
                 .await
                 .map_err(CliError::Usage)?;
             if sets {
-                report::print_names(&crate::signals::available(&cfg), format);
+                report::print_names(&crate::signals::available(&cfg), format)
+                    .map_err(CliError::Usage)?;
             } else {
-                report::print_names(&cfg.sensor_names(), format);
+                report::print_names(&cfg.sensor_names(), format).map_err(CliError::Usage)?;
             }
             Ok(())
         }
