@@ -9,6 +9,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use std::path::{Path, PathBuf};
+#[cfg(unix)]
 use std::process::Command;
 
 use serde_json::Value;
@@ -16,44 +17,10 @@ use tempfile::{TempDir, tempdir};
 
 mod support;
 
-use support::git_command;
-
-/// Builds a `do-harness --root <root>` command using the real binary.
-fn harness(root: &Path) -> Command {
-    let mut cmd = Command::new(env!("CARGO_BIN_EXE_do-harness"));
-    support::isolate_command(&mut cmd);
-    cmd.arg("--root").arg(root);
-    cmd
-}
+use support::{git, harness, run};
 
 /// Runs a harness command, returning (exit code, `stdout`, `stderr`).
-fn run(cmd: &mut Command) -> (Option<i32>, String, String) {
-    let output = cmd.output().expect("spawn do-harness");
-    (
-        output.status.code(),
-        String::from_utf8_lossy(&output.stdout).into_owned(),
-        String::from_utf8_lossy(&output.stderr).into_owned(),
-    )
-}
-
 /// Runs a git command inside `root`, asserting success.
-fn git(root: &Path, args: &[&str]) {
-    let status = git_command(root)
-        .args(args)
-        .env("GIT_CONFIG_NOSYSTEM", "1")
-        .env("GIT_AUTHOR_NAME", "t")
-        .env("GIT_AUTHOR_EMAIL", "t@t")
-        .env("GIT_COMMITTER_NAME", "t")
-        .env("GIT_COMMITTER_EMAIL", "t@t")
-        .status()
-        .expect("spawn git");
-    assert!(
-        status.success(),
-        "git {args:?} failed in {}",
-        root.display()
-    );
-}
-
 /// `lines` lines of TypeScript-shaped source, so the file is a plausible
 /// front-end module rather than a repeated filler line.
 fn big_module(lines: usize) -> String {

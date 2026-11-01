@@ -10,9 +10,9 @@
 use std::path::Path;
 
 use anyhow::{Context, Result};
-use serde::{Deserialize, Serialize};
 
 use super::gh;
+use super::gh::{CheckRun, CommitStatus};
 use super::waiver_comment::first_line;
 #[allow(unused_imports)]
 pub use super::waiver_comment::{CodecovStatus, CodecovSummary, WaiverAuditRecord};
@@ -33,97 +33,14 @@ pub(crate) fn is_bot_login(login: &str) -> bool {
     login.ends_with("[bot]") || login == "dependabot" || login == "renovate"
 }
 
-fn default_true() -> bool {
-    true
-}
+#[cfg(test)]
+mod tests;
 
-/// Merge readiness evaluation report.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ReadinessReport {
-    pub pr: u64,
-    #[serde(rename = "headRefOid", default)]
-    pub head_ref_oid: String,
-    #[serde(rename = "collectionComplete", default = "default_true")]
-    pub collection_complete: bool,
-    pub ready: bool,
-    pub merge_state: MergeState,
-    pub checks: CheckSummary,
-    pub conversations: ConversationSummary,
-    pub codecov: Option<CodecovSummary>,
-    pub blockers: Vec<String>,
-}
-
-/// PR mergeability state from `GitHub`.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MergeState {
-    pub status: String,
-    pub mergeable: String,
-    pub auto_merge: bool,
-}
-
-/// Categorized CI checks and commit statuses.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CheckSummary {
-    pub total: usize,
-    pub passed: usize,
-    pub failed: Vec<FailedCheck>,
-    pub cancelled: Vec<CancelledCheck>,
-    pub pending: Vec<String>,
-    pub skipped: usize,
-    /// Whether these are all the checks the merge is meant to wait for.
-    ///
-    /// A merge conflict stops `GitHub` from scheduling workflow checks at all,
-    /// so a conflicting pull request reports only the checks that do not need a
-    /// mergeable head. Counting those as a passing suite would read as green
-    /// while the verification never ran.
-    #[serde(default)]
-    pub incomplete: bool,
-}
-
-/// A failed check run or commit status.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FailedCheck {
-    pub name: String,
-    pub url: Option<String>,
-}
-
-/// A cancelled check run with exact rerun command.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CancelledCheck {
-    pub name: String,
-    pub rerun_command: String,
-    pub url: Option<String>,
-}
-
-/// Review threads and actionable comments.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ConversationSummary {
-    pub unresolved_threads: Vec<UnresolvedThread>,
-    pub actionable_comments: Vec<ActionableComment>,
-    #[serde(default = "default_true")]
-    pub complete: bool,
-}
-
-/// An unresolved review thread.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UnresolvedThread {
-    pub id: String,
-    pub path: Option<String>,
-    pub line: Option<u64>,
-    pub author: String,
-    pub excerpt: String,
-    #[serde(rename = "isOutdated", default)]
-    pub is_outdated: bool,
-}
-
-/// An actionable top-level comment (e.g. Codecov gap).
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ActionableComment {
-    pub id: Option<u64>,
-    pub author: String,
-    pub excerpt: String,
-    pub url: Option<String>,
-}
+mod model;
+pub use model::{
+    ActionableComment, CancelledCheck, CheckSummary, ConversationSummary, FailedCheck, MergeState,
+    ReadinessReport, UnresolvedThread,
+};
 
 /// Evaluates merge readiness for PR `number`.
 ///
@@ -209,6 +126,20 @@ fn evaluate_checks(
     let statuses =
         gh::commit_statuses(root, head_ref_oid).context("could not read commit statuses")?;
 
+    Ok(summarize_checks(check_runs, statuses, conflicts, blockers))
+}
+
+/// Classifies check runs and commit statuses into a merge-gating summary.
+///
+/// Pure over its inputs, so the classification that decides whether a pull
+/// request may merge is covered on every supported platform, not only where a
+/// fake `gh` executable can be put on `PATH`.
+fn summarize_checks(
+    check_runs: Vec<CheckRun>,
+    statuses: Vec<CommitStatus>,
+    conflicts: bool,
+    blockers: &mut Vec<String>,
+) -> CheckSummary {
     let mut passed = 0;
     let mut skipped = 0;
     let mut pending = Vec::new();
@@ -280,7 +211,7 @@ fn evaluate_checks(
             "checks are incomplete: merge conflicts stop workflow checks from being scheduled ({total} check run(s) reported)"
         ));
     }
-    Ok(CheckSummary {
+    CheckSummary {
         total,
         passed,
         failed,
@@ -288,7 +219,7 @@ fn evaluate_checks(
         pending,
         skipped,
         incomplete,
-    })
+    }
 }
 
 fn evaluate_conversations(

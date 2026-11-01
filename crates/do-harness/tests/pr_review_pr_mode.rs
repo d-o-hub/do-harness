@@ -4,13 +4,14 @@
 
 #[cfg(unix)]
 use std::path::Path;
-#[cfg(unix)]
-use std::process::Command;
 
 #[cfg(unix)]
 use serde_json::Value;
 
 mod support;
+
+#[cfg(unix)]
+use support::harness;
 
 #[cfg(unix)]
 fn git(dir: &Path, args: &[&str]) {
@@ -46,12 +47,6 @@ fn commit_file(dir: &Path, name: &str, content: &str, message: &str) {
 }
 
 #[cfg(unix)]
-fn harness(root: &Path) -> Command {
-    let mut cmd = Command::new(env!("CARGO_BIN_EXE_do-harness"));
-    cmd.arg("--root").arg(root);
-    cmd
-}
-
 #[cfg(unix)]
 fn json(output: &std::process::Output) -> Value {
     assert!(

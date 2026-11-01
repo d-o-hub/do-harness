@@ -144,7 +144,7 @@ pub(crate) async fn run(root: &Path, mut opts: VerifyOpts) -> std::result::Resul
                 bless_baselines(root, &report, &opts).await?;
             }
 
-            report::print_report(&report, opts.format, opts.quiet);
+            report::print_report(&report, opts.format, opts.quiet).map_err(CliError::Verify)?;
 
             write_evidence(
                 root,

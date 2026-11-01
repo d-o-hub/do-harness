@@ -25,7 +25,10 @@
 # exercise the tool rather than ship as its behaviour.
 set -euo pipefail
 
-repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck disable=SC1091 # resolved at runtime from this script's directory
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib.sh"
+
+repo_root="$(dh_repo_root)"
 
 # Files where `d-o-hub` is the tool's identity, not an assumption about the
 # caller's repository. Keep this list small; a new entry needs a reason here.

@@ -16,6 +16,8 @@ const EXEC_PERMS: u32 = 0o755;
 
 mod support;
 
+use support::harness;
+
 fn git(dir: &Path, args: &[&str]) {
     let output = support::git_command(dir)
         .args(args)
@@ -44,12 +46,6 @@ fn commit_file(dir: &Path, name: &str, content: &str, message: &str) {
     fs::write(dir.join(name), content).unwrap();
     git(dir, &["add", name]);
     git(dir, &["commit", "-q", "-m", message]);
-}
-
-fn harness(root: &Path) -> Command {
-    let mut cmd = Command::new(env!("CARGO_BIN_EXE_do-harness"));
-    cmd.arg("--root").arg(root);
-    cmd
 }
 
 fn review_json(cmd: &mut Command) -> Value {

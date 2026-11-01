@@ -59,7 +59,7 @@ pub async fn run(
         record_snapshot(root, &snapshot).await?;
     }
 
-    emit(&snapshot, format);
+    emit(&snapshot, format)?;
 
     if snapshot.breaches.is_empty() {
         Ok(())
@@ -78,8 +78,7 @@ pub async fn run(
 /// Returns an error when the state database cannot be opened or migrated, the
 /// derivation manifest cannot be serialized, or the insert fails.
 async fn record_snapshot(root: &Path, snapshot: &dora::DoraSnapshot) -> Result<(), CliError> {
-    let derivation =
-        serde_json::to_string(&snapshot.derivation).map_err(|err| CliError::Usage(err.into()))?;
+    let derivation = crate::report::json_compact(&snapshot.derivation).map_err(CliError::Usage)?;
     let breach_count =
         i64::try_from(snapshot.breaches.len()).map_err(|err| CliError::Usage(err.into()))?;
     let row = do_harness_db::NewDoraSnapshot {
@@ -116,12 +115,12 @@ async fn record_snapshot(root: &Path, snapshot: &dora::DoraSnapshot) -> Result<(
 /// The markers go to stderr so `--format json` keeps stdout exactly one JSON
 /// object while the sensor runner still parses `FINDINGS:`/`COVERAGE:` from
 /// the combined capture.
-fn emit(snapshot: &dora::DoraSnapshot, format: Format) {
+fn emit(snapshot: &dora::DoraSnapshot, format: Format) -> Result<(), CliError> {
     match format {
-        Format::Json => match serde_json::to_string_pretty(snapshot) {
-            Ok(json) => println!("{json}"),
-            Err(err) => eprintln!("error: failed to serialize DORA snapshot: {err}"),
-        },
+        Format::Json => println!(
+            "{}",
+            crate::report::json_pretty(snapshot).map_err(CliError::Usage)?
+        ),
         Format::Text => print!("{}", render_text(snapshot)),
     }
 
@@ -130,10 +129,9 @@ fn emit(snapshot: &dora::DoraSnapshot, format: Format) {
     }
     eprintln!("{FINDINGS_MARKER} {}", snapshot.breaches.len());
     // Compact so the marker stays on exactly one line.
-    match serde_json::to_string(&snapshot.derivation) {
-        Ok(derivation) => eprintln!("{COVERAGE_MARKER} {derivation}"),
-        Err(err) => eprintln!("error: failed to serialize DORA derivation: {err}"),
-    }
+    let derivation = crate::report::json_compact(&snapshot.derivation).map_err(CliError::Usage)?;
+    eprintln!("{COVERAGE_MARKER} {derivation}");
+    Ok(())
 }
 
 /// Length of the abbreviated revision shown in text mode.

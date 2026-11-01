@@ -21,6 +21,8 @@ fn task_board_folds_events() {
             id: 1,
             title: "a".to_owned(),
             method: None,
+            parent_id: None,
+            precondition: None,
         }))
         .unwrap();
     board
@@ -28,6 +30,8 @@ fn task_board_folds_events() {
             id: 2,
             title: "b".to_owned(),
             method: None,
+            parent_id: None,
+            precondition: None,
         }))
         .unwrap();
     board
@@ -60,6 +64,8 @@ fn task_board_replay_is_idempotent() {
             id: 1,
             title: "a".to_owned(),
             method: None,
+            parent_id: None,
+            precondition: None,
         }),
         WorkflowEvent::TaskAdvanced(TaskAdvanced {
             id: 1,
@@ -87,6 +93,8 @@ fn task_board_is_order_independent_across_tasks() {
             id,
             title: "t".to_owned(),
             method: None,
+            parent_id: None,
+            precondition: None,
         })
     };
     let forward = [added(1), added(2), added(3)];
@@ -128,6 +136,8 @@ fn wrapped_event_delegates_name() {
         id: 1,
         title: "t".to_owned(),
         method: None,
+        parent_id: None,
+        precondition: None,
     });
     assert_eq!(event.name(), "TaskAdded");
 }
@@ -187,6 +197,8 @@ fn projection_rejects_unmatched_event() {
             id: 1,
             title: "t".to_owned(),
             method: None,
+            parent_id: None,
+            precondition: None,
         }))
         .unwrap();
     let err = board

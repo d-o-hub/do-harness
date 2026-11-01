@@ -23,7 +23,10 @@
 
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck disable=SC1091 # resolved at runtime from this script's directory
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib.sh"
+
+ROOT="$(dh_repo_root)"
 # Skills whose input is attacker-controlled by design.
 SKILL_ROOTS=("pr-triage" "issue-to-pr")
 FAIL_COUNT=0

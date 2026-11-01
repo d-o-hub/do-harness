@@ -7,11 +7,14 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
+#[cfg(unix)]
 use std::process::Command;
 
 mod support;
 
+#[cfg(unix)]
 use support::ci_explain::{fake_gh, fixture_root, report, run_ci};
+#[cfg(unix)]
 use support::{git_command, isolate_command};
 
 #[cfg(unix)]

@@ -14,12 +14,13 @@
 #     `do-harness verify --fail-fast` usable; CI lints shell explicitly).
 set -euo pipefail
 
-require_tools() { [[ "${CI:-}" == "true" || "${DO_HARNESS_REQUIRE_TOOLS:-}" == "1" ]]; }
+# shellcheck disable=SC1091 # resolved at runtime from this script's directory
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib.sh"
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT="$(dh_repo_root)"
 
 if ! command -v shellcheck >/dev/null 2>&1; then
-    if require_tools; then
+    if dh_require_tools; then
         echo "FAIL: shellcheck is required when CI=true or DO_HARNESS_REQUIRE_TOOLS=1."
         exit 1
     fi

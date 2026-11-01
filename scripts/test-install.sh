@@ -8,7 +8,10 @@
 # Usage: scripts/test-install.sh [--bin PATH] [--version vX.Y.Z]
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck disable=SC1091 # resolved at runtime from this script's directory
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib.sh"
+
+ROOT="$(dh_repo_root)"
 BIN="${ROOT}/target/release/do-harness"
 VERSION=""
 
@@ -35,7 +38,7 @@ done
 }
 
 if [[ -z "$VERSION" ]]; then
-    VERSION="v$(sed -n '/^\[workspace.package\]/,/^\[/ s/^version *= *"\(.*\)"/\1/p' "$ROOT/Cargo.toml")"
+    VERSION="v$(dh_workspace_version "$ROOT")"
 fi
 [[ "$VERSION" == v* ]] || VERSION="v${VERSION}"
 
@@ -50,14 +53,6 @@ case "$(uname -s)/$(uname -m)" in
         ;;
 esac
 
-sha256_of() {
-    if command -v sha256sum >/dev/null 2>&1; then
-        sha256sum "$1" | awk '{print $1}'
-    else
-        shasum -a 256 "$1" | awk '{print $1}'
-    fi
-}
-
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
@@ -67,7 +62,9 @@ name="do-harness-${VERSION}-${target}"
 mkdir -p "$dist" "$tmp/pkg/$name"
 cp "$BIN" "$tmp/pkg/$name/do-harness"
 tar -czf "$dist/${name}.tar.gz" -C "$tmp/pkg" "$name"
-printf '%s  %s\n' "$(sha256_of "$dist/${name}.tar.gz")" "${name}.tar.gz" >"$dist/checksums.txt"
+# The digest comes from scripts/lib.sh's hashing-tool fallback. A missing tool
+# yields an empty digest, which the installer rejects as a checksum mismatch.
+printf '%s  %s\n' "$(dh_sha256_of "$dist/${name}.tar.gz")" "${name}.tar.gz" >"$dist/checksums.txt"
 
 install_ok() {
     local bin_dir="$1" log="$2"
@@ -140,7 +137,7 @@ EOF
     fi
 fi
 if [[ "$win_staged" == "1" ]] && { command -v unzip >/dev/null 2>&1 || command -v 7z >/dev/null 2>&1; }; then
-    printf '%s  %s\n' "$(sha256_of "$windist/${win_name}.zip")" "${win_name}.zip" >"$windist/checksums.txt"
+    printf '%s  %s\n' "$(dh_sha256_of "$windist/${win_name}.zip")" "${win_name}.zip" >"$windist/checksums.txt"
     if ! DO_HARNESS_TARGET="$win_target" bash "$ROOT/scripts/install.sh" --version "$VERSION" --base-url "$winbase" --bin-dir "$tmp/bin-win" >"$tmp/win-install.log" 2>&1; then
         cat "$tmp/win-install.log" >&2
         echo "FAIL: windows installer exited non-zero" >&2

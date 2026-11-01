@@ -3,7 +3,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use std::path::Path;
-use std::process::Command;
 
 use serde_json::Value;
 
@@ -13,6 +12,8 @@ const EXEC_PERMS: u32 = 0o755;
 const READ_PERMS: u32 = 0o644;
 
 mod support;
+
+use support::harness;
 
 fn git(dir: &Path, args: &[&str]) {
     let output = support::git_command(dir)
@@ -42,12 +43,6 @@ fn commit_file(dir: &Path, name: &str, content: &str, message: &str) {
     std::fs::write(dir.join(name), content).unwrap();
     git(dir, &["add", name]);
     git(dir, &["commit", "-q", "-m", message]);
-}
-
-fn harness(root: &Path) -> Command {
-    let mut cmd = Command::new(env!("CARGO_BIN_EXE_do-harness"));
-    cmd.arg("--root").arg(root);
-    cmd
 }
 
 fn review_agent(root: &Path, extra: &[&str]) -> Value {

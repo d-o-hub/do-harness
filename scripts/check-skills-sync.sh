@@ -36,7 +36,10 @@ case "${1:-}" in
 esac
 set -euo pipefail
 
-repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck disable=SC1091 # resolved at runtime from this script's directory
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib.sh"
+
+repo_root="$(dh_repo_root)"
 templates="$repo_root/crates/do-harness/templates/skills"
 canonical="$repo_root/.agents/skills"
 

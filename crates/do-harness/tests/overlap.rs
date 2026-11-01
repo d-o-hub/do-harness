@@ -9,12 +9,13 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 use serde_json::Value;
 use tempfile::{TempDir, tempdir};
 
 mod support;
+
+use support::{harness, run};
 
 /// Default `--threshold`, mirroring `overlap::DEFAULT_THRESHOLD`.
 const DEFAULT_THRESHOLD: f64 = 0.45;
@@ -36,24 +37,7 @@ const BETA: &str = "# Beta\nSpike scratchpad hypothesis verification cleanup tra
 /// A third skill whose prose is disjoint from both above.
 const GAMMA: &str = "# Gamma\nUnrelated haiku prose ocean waves.";
 
-/// Builds a `do-harness --root <root>` command with session state isolated.
-fn harness(root: &Path) -> Command {
-    let mut cmd = Command::new(env!("CARGO_BIN_EXE_do-harness"));
-    support::isolate_command(&mut cmd);
-    cmd.arg("--root").arg(root);
-    cmd
-}
-
 /// Runs a harness command, returning (exit code, `stdout`, `stderr`).
-fn run(cmd: &mut Command) -> (Option<i32>, String, String) {
-    let out = cmd.output().expect("spawn do-harness");
-    (
-        out.status.code(),
-        String::from_utf8_lossy(&out.stdout).into_owned(),
-        String::from_utf8_lossy(&out.stderr).into_owned(),
-    )
-}
-
 /// Writes `.agents/skills/<name>/SKILL.md` under `root`.
 fn write_skill(root: &Path, name: &str, body: &str) {
     let dir = root.join(".agents/skills").join(name);

@@ -6,7 +6,7 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::Command;
 
 use serde_json::Value;
@@ -14,14 +14,7 @@ use tempfile::{TempDir, tempdir};
 
 mod support;
 
-use support::git_command;
-
-/// Builds a `do-harness --root <root>` command using the real binary.
-fn harness(root: &Path) -> Command {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_do-harness"));
-    command.arg("--root").arg(root);
-    command
-}
+use support::{git_command, harness};
 
 /// Runs a command, returning (exit code, `stdout`, `stderr`).
 fn run(command: &mut Command) -> (Option<i32>, String, String) {

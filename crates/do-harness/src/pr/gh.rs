@@ -1,7 +1,6 @@
 //! Read-only `GitHub` metadata through the `gh` CLI.
 
 use std::path::Path;
-use std::process::Command;
 
 use anyhow::{Context, Result, bail};
 use serde::Deserialize;
@@ -32,24 +31,17 @@ pub struct PrView {
 /// malformed payload.
 pub fn view(root: &Path, number: u64) -> Result<PrView> {
     let number_arg = number.to_string();
-    let output = Command::new("gh")
-        .current_dir(root)
-        .args([
+    crate::gh::json(
+        root,
+        &[
             "pr",
             "view",
             &number_arg,
             "--json",
             "number,baseRefName,headRefOid",
-        ])
-        .output()
-        .context("failed to run gh (is the GitHub CLI installed?)")?;
-    if !output.status.success() {
-        bail!(
-            "gh pr view {number} failed: {}",
-            String::from_utf8_lossy(&output.stderr).trim()
-        );
-    }
-    serde_json::from_slice(&output.stdout).context("unexpected gh pr view JSON")
+        ],
+        &format!("pr view {number}"),
+    )
 }
 
 /// Reads the unified diff of a PR through `gh pr diff`.
@@ -62,17 +54,7 @@ pub fn view(root: &Path, number: u64) -> Result<PrView> {
 /// Returns an error when `gh` cannot produce the diff.
 pub fn diff(root: &Path, number: u64) -> Result<String> {
     let number_arg = number.to_string();
-    let output = Command::new("gh")
-        .current_dir(root)
-        .args(["pr", "diff", &number_arg])
-        .output()
-        .context("failed to run gh (is the GitHub CLI installed?)")?;
-    if !output.status.success() {
-        bail!(
-            "gh pr diff {number} failed: {}",
-            String::from_utf8_lossy(&output.stderr).trim()
-        );
-    }
+    let output = crate::gh::output(root, &["pr", "diff", &number_arg], "pr diff")?;
     Ok(String::from_utf8_lossy(&output.stdout).into_owned())
 }
 
@@ -86,17 +68,11 @@ pub fn diff(root: &Path, number: u64) -> Result<String> {
 /// Returns an error when `gh` cannot answer the compare request.
 pub fn compare_file_count(root: &Path, base: &str, head: &str) -> Result<usize> {
     let endpoint = format!("repos/{{owner}}/{{repo}}/compare/{base}...{head}");
-    let output = Command::new("gh")
-        .current_dir(root)
-        .args(["api", &endpoint, "--jq", ".files | length"])
-        .output()
-        .context("failed to run gh api")?;
-    if !output.status.success() {
-        bail!(
-            "gh api compare {base}...{head} failed: {}",
-            String::from_utf8_lossy(&output.stderr).trim()
-        );
-    }
+    let output = crate::gh::output(
+        root,
+        &["api", &endpoint, "--jq", ".files | length"],
+        "api compare",
+    )?;
     String::from_utf8_lossy(&output.stdout)
         .trim()
         .parse::<usize>()
@@ -214,24 +190,17 @@ struct PermissionResponse {
 /// Returns an error when `gh` fails.
 pub fn readiness_view(root: &Path, number: u64) -> Result<PrReadinessView> {
     let number_arg = number.to_string();
-    let output = Command::new("gh")
-        .current_dir(root)
-        .args([
+    crate::gh::json(
+        root,
+        &[
             "pr",
             "view",
             &number_arg,
             "--json",
             "number,baseRefName,headRefOid,mergeStateStatus,mergeable,autoMergeRequest",
-        ])
-        .output()
-        .context("failed to run gh pr view")?;
-    if !output.status.success() {
-        bail!(
-            "gh pr view {number} failed: {}",
-            String::from_utf8_lossy(&output.stderr).trim()
-        );
-    }
-    serde_json::from_slice(&output.stdout).context("unexpected gh pr view JSON")
+        ],
+        &format!("pr view {number}"),
+    )
 }
 
 /// Reads all check runs for a commit.
@@ -243,24 +212,12 @@ pub fn check_runs(root: &Path, head: &str) -> Result<Vec<CheckRun>> {
     let endpoint = format!("repos/{{owner}}/{{repo}}/commits/{head}/check-runs?per_page=100");
     // `--jq` streams one object per line so every page is read: a commit can
     // carry more than the 100 runs of the first page.
-    let output = Command::new("gh")
-        .current_dir(root)
-        .args(["api", "--paginate", "--jq", ".check_runs[]", &endpoint])
-        .output()
-        .context("failed to run gh api check-runs")?;
-    if !output.status.success() {
-        bail!(
-            "gh api check-runs failed: {}",
-            String::from_utf8_lossy(&output.stderr).trim()
-        );
-    }
-    let text = String::from_utf8_lossy(&output.stdout);
-    let mut runs = Vec::new();
-    for line in text.lines().filter(|line| !line.trim().is_empty()) {
-        let run: CheckRun = serde_json::from_str(line).context("unexpected check-runs JSON")?;
-        runs.push(run);
-    }
-    Ok(runs)
+    let output = crate::gh::output(
+        root,
+        &["api", "--paginate", "--jq", ".check_runs[]", &endpoint],
+        "api check-runs",
+    )?;
+    crate::gh::json_lines(&output.stdout, "check-runs")
 }
 
 /// Reads commit statuses for a commit.
@@ -270,17 +227,7 @@ pub fn check_runs(root: &Path, head: &str) -> Result<Vec<CheckRun>> {
 /// Returns an error when `gh api` fails.
 pub fn commit_statuses(root: &Path, head: &str) -> Result<Vec<CommitStatus>> {
     let endpoint = format!("repos/{{owner}}/{{repo}}/commits/{head}/status?per_page=100");
-    let output = Command::new("gh")
-        .current_dir(root)
-        .args(["api", "--paginate", &endpoint])
-        .output()
-        .context("failed to run gh api status")?;
-    if !output.status.success() {
-        bail!(
-            "gh api status failed: {}",
-            String::from_utf8_lossy(&output.stderr).trim()
-        );
-    }
+    let output = crate::gh::output(root, &["api", "--paginate", &endpoint], "api status")?;
     // `--paginate` concatenates one page document per page.
     let pages =
         serde_json::Deserializer::from_slice(&output.stdout).into_iter::<CommitStatusesResponse>();
@@ -303,17 +250,11 @@ pub fn commit_statuses(root: &Path, head: &str) -> Result<Vec<CommitStatus>> {
 /// Returns an error when `gh api` fails.
 pub fn issue_comments(root: &Path, number: u64) -> Result<Vec<Comment>> {
     let endpoint = format!("repos/{{owner}}/{{repo}}/issues/{number}/comments?per_page=100");
-    let output = Command::new("gh")
-        .current_dir(root)
-        .args(["api", "--paginate", &endpoint])
-        .output()
-        .context("failed to run gh api issue comments")?;
-    if !output.status.success() {
-        bail!(
-            "gh api issue comments failed: {}",
-            String::from_utf8_lossy(&output.stderr).trim()
-        );
-    }
+    let output = crate::gh::output(
+        root,
+        &["api", "--paginate", &endpoint],
+        "api issue comments",
+    )?;
     let pages = serde_json::Deserializer::from_slice(&output.stdout).into_iter::<Vec<Comment>>();
     let mut comments = Vec::new();
     for page in pages {
@@ -332,19 +273,8 @@ pub fn user_permission(root: &Path, login: &str) -> Result<String> {
         bail!("empty login");
     }
     let endpoint = format!("repos/{{owner}}/{{repo}}/collaborators/{login}/permission");
-    let output = Command::new("gh")
-        .current_dir(root)
-        .args(["api", &endpoint])
-        .output()
-        .context("failed to run gh api collaborator permission")?;
-    if !output.status.success() {
-        bail!(
-            "gh api collaborator permission failed: {}",
-            String::from_utf8_lossy(&output.stderr).trim()
-        );
-    }
-    let res: PermissionResponse = serde_json::from_slice(&output.stdout)
-        .context("unexpected collaborator permission JSON")?;
+    let res: PermissionResponse =
+        crate::gh::json(root, &["api", &endpoint], "api collaborator permission")?;
     let perm = res.role_name.or(res.permission).unwrap_or_default();
     Ok(perm)
 }

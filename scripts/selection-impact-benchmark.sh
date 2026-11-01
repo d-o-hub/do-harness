@@ -3,7 +3,10 @@
 # Compares baseline (A) vs candidate resolver+policy (B) and checks safety against planted defect oracles.
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck disable=SC1091 # resolved at runtime from this script's directory
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib.sh"
+
+ROOT="$(dh_repo_root)"
 BIN="${DO_HARNESS_BIN:-$ROOT/target/release/do-harness}"
 MANIFEST="${1:-$ROOT/tests/fixtures/selection-impact/manifest.json}"
 export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$ROOT/target/selection-impact-target}"

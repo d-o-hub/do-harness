@@ -4,9 +4,12 @@
 
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 use serde_json::Value;
+
+mod support;
+
+use support::harness;
 
 const TRIALS_COUNT: usize = 3;
 const EXPECTED_PASS_RATE: f64 = 0.6667;
@@ -63,12 +66,6 @@ fn fixture(name: &str, assertions: &[&str]) -> Fixture {
     fs::write(evals_dir.join("evals.json"), evals_json).expect("write evals.json");
 
     Fixture { _temp: temp, root }
-}
-
-fn harness(root: &Path) -> Command {
-    let mut cmd = Command::new(env!("CARGO_BIN_EXE_do-harness"));
-    cmd.arg("--root").arg(root);
-    cmd
 }
 
 #[test]

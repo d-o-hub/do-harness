@@ -8,12 +8,13 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use std::path::{Path, PathBuf};
-use std::process::Command;
 use std::time::Duration;
 
 use serde_json::Value;
 
 mod support;
+
+use support::{harness, run};
 
 /// Beats recorded before the prune: the fixture's whole history.
 const RECORDED_BEATS: i64 = 3;
@@ -35,22 +36,6 @@ fn prune_args() -> Vec<String> {
         "--keep-per-task".to_owned(),
         KEEP_PER_TASK.to_string(),
     ]
-}
-
-fn harness(root: &Path) -> Command {
-    let mut cmd = Command::new(env!("CARGO_BIN_EXE_do-harness"));
-    support::isolate_command(&mut cmd);
-    cmd.arg("--root").arg(root);
-    cmd
-}
-
-fn run(cmd: &mut Command) -> (Option<i32>, String, String) {
-    let out = cmd.output().expect("spawn do-harness");
-    (
-        out.status.code(),
-        String::from_utf8_lossy(&out.stdout).into_owned(),
-        String::from_utf8_lossy(&out.stderr).into_owned(),
-    )
 }
 
 /// A workspace whose only sensor is trivially cheap, so beats are cheap to

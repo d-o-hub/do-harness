@@ -12,6 +12,23 @@ use std::process::Command;
 
 use serde_json::Value;
 
+mod support;
+
+use support::run;
+
+/// Builds a `do-harness` command invoked from `cwd` (never a process-global
+/// directory change, so tests stay parallel-safe).
+///
+/// This fixture is the one that must *not* use `support::harness`: selection
+/// here depends on the invocation directory, so the command is anchored with
+/// `current_dir` and the caller passes `--root` explicitly where it wants one.
+fn harness(cwd: &Path) -> Command {
+    let mut cmd = Command::new(env!("CARGO_BIN_EXE_do-harness"));
+    support::isolate_command(&mut cmd);
+    cmd.current_dir(cwd);
+    cmd
+}
+
 /// One-line TOML sensor block for a fixture config.
 fn sensor_config(name: &str, argv: &str) -> String {
     format!(
@@ -40,24 +57,7 @@ fn fixture() -> Fixture {
     Fixture { _temp: temp, a, b }
 }
 
-/// Builds a `do-harness` command invoked from `cwd` (never a process-global
-/// directory change, so tests stay parallel-safe).
-fn harness(cwd: &Path) -> Command {
-    let mut cmd = Command::new(env!("CARGO_BIN_EXE_do-harness"));
-    cmd.current_dir(cwd);
-    cmd
-}
-
 /// Runs a harness command, returning (exit code, `stdout`, `stderr`).
-fn run(cmd: &mut Command) -> (Option<i32>, String, String) {
-    let output = cmd.output().expect("spawn do-harness");
-    (
-        output.status.code(),
-        String::from_utf8_lossy(&output.stdout).into_owned(),
-        String::from_utf8_lossy(&output.stderr).into_owned(),
-    )
-}
-
 /// Sensor names from an `explain --format json` report.
 fn selected_names(stdout: &str) -> Vec<String> {
     let report: Value = serde_json::from_str(stdout).expect("explain JSON report");

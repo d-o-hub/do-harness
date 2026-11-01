@@ -12,8 +12,10 @@
 
 mod support;
 
+#[cfg(unix)]
 use serde_json::Value;
 
+#[cfg(unix)]
 use support::ci_explain::{fake_gh, fixture_root, report, run_ci};
 
 #[cfg(unix)]

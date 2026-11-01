@@ -72,6 +72,9 @@ set -euo pipefail
 # C also makes every glob, sort and comparison byte-deterministic.
 export LC_ALL=C
 
+# shellcheck disable=SC1091 # resolved at runtime from this script's directory
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib.sh"
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly SCRIPT_DIR
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -160,8 +163,9 @@ require_version() {
 workspace_version() {
     # The whole quoted value, not a numeric prefix: a stale `2.1.0-beta` has to
     # reach require_version and fail there, rather than be read as `2.1.0`.
-    sed -n '/^\[workspace.package\]/,/^\[/ s/^version *= *"\([^"]*\)"/\1/p' \
-        "$ROOT/Cargo.toml"
+    # scripts/lib.sh owns the parse; `$ROOT` follows `--root` and the e2e
+    # scratch worktree, so the tree being released is the tree that is read.
+    dh_workspace_version "$ROOT"
 }
 
 # The highest release tag reachable from <ref>, by version order, so v0.10.0

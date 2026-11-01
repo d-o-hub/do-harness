@@ -12,11 +12,12 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 use tempfile::{TempDir, tempdir};
 
 mod support;
+
+use support::{harness, run};
 
 /// stdout when every installed hook matches the template its config implies.
 const MATCHING_STDOUT: &str = "Hooks match installed templates.";
@@ -29,24 +30,7 @@ const MATCH_EXIT: i32 = 0;
 /// A drifted or missing managed hook is a usage/configuration error (exit `2`).
 const DRIFT_EXIT: i32 = 2;
 
-/// Builds a `do-harness --root <root>` command with session state isolated.
-fn harness(root: &Path) -> Command {
-    let mut cmd = Command::new(env!("CARGO_BIN_EXE_do-harness"));
-    support::isolate_command(&mut cmd);
-    cmd.arg("--root").arg(root);
-    cmd
-}
-
 /// Runs a harness command, returning (exit code, `stdout`, `stderr`).
-fn run(cmd: &mut Command) -> (Option<i32>, String, String) {
-    let out = cmd.output().expect("spawn do-harness");
-    (
-        out.status.code(),
-        String::from_utf8_lossy(&out.stdout).into_owned(),
-        String::from_utf8_lossy(&out.stderr).into_owned(),
-    )
-}
-
 fn hook_diff(root: &Path) -> (Option<i32>, String, String) {
     run(harness(root).args(["hook", "diff"]))
 }

@@ -22,7 +22,10 @@ set -euo pipefail
 # would accept a version npm cannot publish.
 export LC_ALL=C
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck disable=SC1091 # resolved at runtime from this script's directory
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib.sh"
+
+ROOT="$(dh_repo_root)"
 NPM_DIR="$ROOT/integrations/npm"
 
 VERSION=""
@@ -334,7 +337,7 @@ fi
 [[ -n "$DIST" ]] || die "--dist is required"
 [[ -d "$DIST" ]] || die "dist directory not found: $DIST"
 if [[ -z "$VERSION" ]]; then
-    VERSION="$(sed -n '/^\[workspace.package\]/,/^\[/ s/^version *= *"\(.*\)"/\1/p' "$ROOT/Cargo.toml")"
+    VERSION="$(dh_workspace_version "$ROOT")"
 fi
 VERSION="${VERSION#v}"
 valid_version "$VERSION" || die "invalid version: $VERSION"

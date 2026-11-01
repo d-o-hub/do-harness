@@ -3,7 +3,6 @@
 //! Split out of `gh.rs` (move-only) to keep that module under the LOC ceiling.
 
 use std::path::Path;
-use std::process::Command;
 
 use anyhow::{Context, Result, bail};
 use serde::Deserialize;
@@ -129,19 +128,7 @@ pub fn review_threads(root: &Path, number: u64) -> Result<Vec<ReviewThread>> {
         args.push("-F");
         args.push(&query_arg);
 
-        let output = Command::new("gh")
-            .current_dir(root)
-            .args(&args)
-            .output()
-            .context("failed to run gh api graphql reviewThreads")?;
-
-        if !output.status.success() {
-            bail!(
-                "gh api graphql reviewThreads failed: {}",
-                String::from_utf8_lossy(&output.stderr).trim()
-            );
-        }
-
+        let output = crate::gh::output(root, &args, "api graphql reviewThreads")?;
         let res: GqlResponse =
             serde_json::from_slice(&output.stdout).context("unexpected reviewThreads JSON")?;
 

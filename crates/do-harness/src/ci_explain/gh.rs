@@ -2,9 +2,9 @@
 
 use std::io::{BufRead, BufReader};
 use std::path::Path;
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 
-use anyhow::{Context, Result, bail};
+use anyhow::{Context, Result};
 use serde::Deserialize;
 
 /// Workflow run header.
@@ -160,8 +160,7 @@ pub fn fetch_annotations(root: &Path, job_id: u64) -> Vec<AnnotationItem> {
 pub fn failed_step_signals(root: &Path, job_id: u64) -> FailedLogSignals {
     let mut signals = FailedLogSignals::default();
     let mut lines_seen = 0usize;
-    if let Ok(mut child) = Command::new("gh")
-        .current_dir(root)
+    if let Ok(mut child) = crate::gh::command(root)
         .args(["run", "view", "--job", &job_id.to_string(), "--log-failed"])
         .stdout(Stdio::piped())
         .stderr(Stdio::null())
@@ -221,13 +220,5 @@ fn api(root: &Path, endpoint: &str) -> Result<Vec<u8>> {
 
 /// Runs `gh` with `args` and returns stdout when it exits 0.
 fn api_with(root: &Path, args: &[&str]) -> Result<Vec<u8>> {
-    let output = Command::new("gh")
-        .current_dir(root)
-        .args(args)
-        .output()
-        .context("failed to run gh (is the GitHub CLI installed?)")?;
-    if !output.status.success() {
-        bail!("{}", String::from_utf8_lossy(&output.stderr).trim());
-    }
-    Ok(output.stdout)
+    Ok(crate::gh::output(root, args, "api")?.stdout)
 }

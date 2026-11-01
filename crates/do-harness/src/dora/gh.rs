@@ -244,20 +244,7 @@ fn fetch_runs(root: &Path) -> Result<Vec<RunRow>> {
 /// repository, unauthenticated, rate-limited), or emits a payload that does
 /// not match the expected row shape.
 fn gh_json<T: serde::de::DeserializeOwned>(root: &Path, args: &[&str]) -> Result<Vec<T>> {
-    let output = std::process::Command::new("gh")
-        .current_dir(root)
-        .args(args)
-        .output()
-        .context("failed to run gh (is the GitHub CLI installed?)")?;
-    if !output.status.success() {
-        bail!(
-            "gh {} failed: {}",
-            args.join(" "),
-            String::from_utf8_lossy(&output.stderr).trim()
-        );
-    }
-    serde_json::from_slice(&output.stdout)
-        .with_context(|| format!("unexpected gh {} JSON", args.join(" ")))
+    crate::gh::json(root, args, &args.join(" "))
 }
 
 /// Parses `YYYY-MM-DDTHH:MM:SS[.fff]Z` into Unix seconds.

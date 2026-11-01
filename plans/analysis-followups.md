@@ -100,8 +100,10 @@ explicit guard) instead of a raw grep error.
 
 **Residual:** none for A8 (alternate IPv4 spellings are now normalized).
 
-**Not started:** A10 (pre-push set), S1, S6, T6, T13, P10,
-P12, B4–B5, C2, C3, D1. **2026-10-16 swarm:** A6, A9, S2, S3, S7, B1, B3, F1,
+**Not started (as of 2026-10-16):** A10 (pre-push set), S1, S6, T6, T13, P10,
+P12, B4–B5, C2, C3, D1 — **all closed on 2026-11-01**, see
+[the backlog-closure table](#implementation-progress-2026-11-01-backlog-closure).
+**2026-10-16 swarm:** A6, A9, S2, S3, S7, B1, B3, F1,
 F2, F3, F4, P7, P8, P15, P16 (completed), D2 (completed) landed — see the
 progress table below.
 
@@ -411,3 +413,36 @@ The following audit candidates were evaluated and confirmed to be intentional ar
 - **Workflow commands:** Workflow command types already implement `Command` in [crates/types/src/workflow.rs:1-71](../crates/types/src/workflow.rs).
 - **HTN Preconditions:** `Precondition` in [crates/types/src/htn.rs:46-51](../crates/types/src/htn.rs) exposes descriptive text by design; an executable predicate engine is a separate capability, not a missing implementation.
 - **Roadmap backlog:** WF-01–WF-12 are fully verified in [plans/v0.4.0-progress.md](v0.4.0-progress.md); WF-13–WF-14 remain intentionally unscheduled.
+
+## Implementation progress (2026-11-01 backlog closure)
+
+The 2026-10-16 pass deferred eleven items as "large or platform-gated"; this
+pass closes them on branch `feat/close-analysis-followups`, each verified by the
+named computational sensor. Nothing here is reported from self-assessment: the
+`Verification` column names the command that proved the claim.
+
+| Item | Change | Verification |
+|------|--------|--------------|
+| A10 | No code change was needed. `[hooks] pre-push` in `do-harness.toml` already enumerates the `signal-sets.verification` sensors explicitly (WF-07), so the local gate no longer means "the whole suite, including `coverage` and `powerset`". The item stays listed because the *decision* was open, not the implementation | `cargo nextest run -p do-harness --test pre_push_policy` asserts pre-push equals the verification set and names no scheduled sensor; `do-harness list --sets` enumerates the five sets |
+| B4 | `crates/do-harness/src/main.rs` 466 → 118 LOC: the ~25-arm dispatch moved to `src/dispatch.rs`, split into `run` (workspace-free commands, then root resolution), `resolve_root` and `route` (the per-subcommand arms). `main.rs` keeps only argument parsing and the exit-code mapping | `bash scripts/check-loc.sh` → `FINDINGS: 0`; `cargo check --workspace --all-targets` |
+| B5 | the warning-band files were split move-only instead of waiting for the hard cap: inline test modules extracted to `sensor_inputs_tests.rs`, `dora/tests.rs`, `changes_tests.rs`; `cli::Command` moved to `src/cli/command.rs`; `pr/readiness/model.rs`, `pr/command/render.rs` and `eval/opts.rs` carved out of their parents | `bash scripts/check-loc.sh` → `FINDINGS: 0` (`do-harness split` refuses files under 500, so the decomposition was manual and diff-reviewed as moved code) |
+| C2 | one `gh` runner: `src/gh.rs` exposes `command`/`output`/`json`/`json_lines` and the four independent runners in `pr/gh.rs`, `pr/loop_fetch.rs`, `dora/gh.rs` and `ci_explain/gh.rs` now delegate to it (`pr/review_threads.rs` too) | `cargo nextest run -p do-harness` green; two new unit tests pin the newline-delimited parser: blank lines are skipped, and a bad line names the payload (`unexpected check run JSON`) |
+| C3 | a JSON serialization failure is no longer an exit-0 `eprintln!`: `report::json_pretty`/`json_compact` return `Result`, and `print_report`/`print_names` propagate it, so `status` and `dora` fail like every other subcommand. `skills/cache.rs` (a best-effort cache write) and `distill_strikes.rs` (a pure renderer) stay exceptions, documented in place | `cargo nextest run -p do-harness --bins` includes the new `json_pretty_reports_an_unserializable_value`; the failing branch is exercised, not assumed |
+| S1 | the `Command` trait has a production consumer: `TaskAdded` carries `parent_id`/`precondition`, and `AddTask`/`AdvanceTask`/`CompleteTask`/`FailTask` each derive their event, so `repo_workflow` writers no longer hand-assemble one | `cargo nextest run -p do-harness-db` green, including `task_added_event_carries_the_whole_command` in `repo_workflow/tests.rs`; `cargo nextest run -p do-harness --test audit_recovery --test beat_scope --test signals --test status` green |
+| S6 | no implementation, by design: `Precondition` is descriptive text and an executable predicate engine is a separate capability ([ruled out above](#ruled-out-candidates)). Recorded here so the backlog does not carry it as debt | `crates/types/src/htn.rs:46-51`; the ruling-out entry above |
+| T6 | the merge-gating decision is now testable off unix: `summarize_checks` (the fold that decides "may this merge?") was extracted from the `gh`-shelling path, and `pr/readiness/tests.rs` pins eight cases (pending, failed, cancelled, success/neutral, completed-without-conclusion, commit statuses by context, and conflicts both with and without reported checks) with no `#[cfg(unix)]` | `cargo nextest run -p do-harness --bin do-harness pr::readiness` → 8 passed; the previous coverage was `#[cfg(unix)]`-gated end to end |
+| T13 | investigated and closed as an inherent cost rather than silently dropped: the OOM-feeding half of the finding is fixed (the nested build no longer inherits the outer `RUSTC_WRAPPER`/target dir, `.config/nextest.toml` bounds the suite at two threads, CI sets `CARGO_BUILD_JOBS=1`), and the remaining cost is real cargo work — `do-harness verify` on a freshly scaffolded crate measures 2.53 s cold and 2.61 s warm, i.e. the fixture is already reusing its own artifacts | measured locally on the `init`-scaffolded fixture (cold/warm `time do-harness verify`); `cargo nextest run -p do-harness --test dogfood --test init_bootstrap --test coverage_sensor` → 32 passed in 58 s. Cutting further would mean not dogfooding a real toolchain |
+| P10 | the Windows job no longer skips the Rust sensors: `.github/workflows/verify.yml` runs `do-harness verify` for the portable subset on `windows-latest`, so the Windows leg can fail the same way Linux does | `bash scripts/check-yamllint.sh`, `bash scripts/check-actionlint.sh`, `bash scripts/check-action-pins.sh` all green on the edited workflow |
+| P12 | `scripts/lib.sh` holds the four mechanisms 29 scripts had duplicated verbatim (`dh_repo_root`, `dh_require_tools`, `dh_sha256_of`, `dh_workspace_version`); each script keeps its own SKIP/FAIL policy. Because a `lib.sh` edit changes what those sensors report, `scripts/lib.sh` is now declared in the `when-changed` list of the 21 sensors that run a lib-sourcing script | `bash scripts/check-shell.sh` → 87 scripts, exit 0; `bash scripts/release-manager.sh --self-test`, `scripts/test-install.sh`, `scripts/verify-published.sh --self-test`, pytest 44 passed; the new `--test script_sensor_inputs` derives the wiring from the scripts (and fails when one entry is removed) |
+| D1 | the per-binary `fn harness(root: &Path)` copy is gone: `support::harness(root)` replaces 32 copies across the integration suite, and 19 of them gain `isolate_command` they were missing — a nested `do-harness` can no longer inherit the outer cargo/coverage session or the outer git view. Four now-unused `isolated_command` copies were deleted; the identical `run(cmd)` (13 copies) and `git(root, args)` (6) bodies followed into `support`, taking the shared helpers from 0 to 51 call sites | `cargo nextest run --workspace` green; `cargo clippy --workspace --all-targets -- -D warnings` clean |
+
+**Deferred on purpose (with the reason):** the last 13 helper copies, whose
+*shapes* differ by design — `run` returning `(bool, String)`, `(bool, String,
+String)` or `Output`, `git` returning `Output`, taking a date, or asserting
+inline (4 `run`, 9 `git`). Collapsing them means rewriting every call site in
+those files, and each rewrite has to decide what the fixture *meant* by the
+narrower shape (does it assert on exit status, or merely print it?). That is a
+semantic edit disguised as a rename, so it stays open. The two tranches landed
+first because they remove duplicated bodies *and* close a latent isolation gap
+(the 19 unisolated harness copies). `T13`'s speed residual stays recorded above
+rather than "fixed" by weakening the dogfood contract.

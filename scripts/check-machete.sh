@@ -8,23 +8,25 @@
 #
 # Enforcement policy (fail-open locally with SKIP marker, fail-closed on demand):
 #   - If cargo-machete is available: runs cargo machete
-#   - If cargo-machete is missing AND require_tools (CI=true or DO_HARNESS_REQUIRE_TOOLS=1):
+#   - If cargo-machete is missing AND dh_require_tools (CI=true or DO_HARNESS_REQUIRE_TOOLS=1):
 #       echo "FAIL: cargo-machete is required when CI=true or DO_HARNESS_REQUIRE_TOOLS=1." and exit 1
 #   - If cargo-machete is missing otherwise:
 #       prints SKIP: marker and exits 0.
 
 set -euo pipefail
 
-# Fail-closed when the caller demands real gates: CI or an explicit opt-in.
-require_tools() { [[ "${CI:-}" == "true" || "${DO_HARNESS_REQUIRE_TOOLS:-}" == "1" ]]; }
+# Fail-closed when the caller demands real gates (CI or an explicit opt-in);
+# scripts/lib.sh owns that predicate, this script owns the SKIP/FAIL message.
+# shellcheck disable=SC1091 # resolved at runtime from this script's directory
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib.sh"
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT="$(dh_repo_root)"
 cd "$ROOT"
 
 if command -v cargo-machete >/dev/null 2>&1 || cargo machete --version >/dev/null 2>&1; then
     cargo machete
 else
-    if require_tools; then
+    if dh_require_tools; then
         echo "FAIL: cargo-machete is required when CI=true or DO_HARNESS_REQUIRE_TOOLS=1."
         exit 1
     fi

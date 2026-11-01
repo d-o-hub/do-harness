@@ -346,10 +346,10 @@ pub(crate) async fn run(
     .map_err(CliError::Usage)?;
     match format {
         Format::Text => print_text(&report),
-        Format::Json => match serde_json::to_writer_pretty(std::io::stdout(), &report) {
-            Ok(()) => println!(),
-            Err(err) => eprintln!("error: failed to serialize report: {err}"),
-        },
+        Format::Json => println!(
+            "{}",
+            crate::report::json_pretty(&report).map_err(CliError::Usage)?
+        ),
     }
     match report.state {
         EvidenceState::Green => Ok(()),

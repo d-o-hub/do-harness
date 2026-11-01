@@ -20,6 +20,8 @@ use std::process::Command;
 
 mod support;
 
+use support::harness;
+
 #[path = "../src/shell.rs"]
 #[allow(dead_code)]
 mod shell;
@@ -41,20 +43,6 @@ const LCOV_WITHOUT_LINE_COUNTS: &str =
 /// Fake `cargo-llvm-cov` whose report is exactly at the target (70.00%).
 const LCOV_AT_TARGET: &str =
     r#"std::fs::write("lcov.info", "SF:src/lib.rs\nLF:100\nLH:70\nend_of_record\n").unwrap();"#;
-
-/// Removes ambient git state so a spawned command cannot inherit this test
-/// run's repository.
-fn isolated_command(program: &str) -> Command {
-    let mut command = Command::new(program);
-    support::isolate_command(&mut command);
-    command
-}
-
-fn harness(root: &Path) -> Command {
-    let mut cmd = isolated_command(env!("CARGO_BIN_EXE_do-harness"));
-    cmd.arg("--root").arg(root);
-    cmd
-}
 
 /// Compiles a fake `cargo-<name>` whose `main` executes `main_body`.
 fn create_fake_tool(bin_dir: &Path, name: &str, main_body: &str) {

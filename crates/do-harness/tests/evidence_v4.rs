@@ -3,27 +3,14 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use std::path::Path;
-use std::process::Command;
 
 use serde_json::Value;
 
-/// Builds a `do-harness --root <root>` command using the real binary.
-fn harness(root: &Path) -> Command {
-    let mut cmd = Command::new(env!("CARGO_BIN_EXE_do-harness"));
-    cmd.arg("--root").arg(root);
-    cmd
-}
+mod support;
+
+use support::{harness, run};
 
 /// Runs a harness command, returning (exit code, stdout, stderr).
-fn run(cmd: &mut Command) -> (Option<i32>, String, String) {
-    let output = cmd.output().expect("spawn do-harness");
-    (
-        output.status.code(),
-        String::from_utf8_lossy(&output.stdout).into_owned(),
-        String::from_utf8_lossy(&output.stderr).into_owned(),
-    )
-}
-
 /// Reads the per-set evidence artifact as JSON.
 fn evidence(root: &Path) -> Value {
     let path = root.join(".do-harness/evidence.verification.json");

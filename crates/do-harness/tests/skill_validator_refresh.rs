@@ -3,17 +3,11 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use std::fs;
-use std::path::Path;
 use std::process::Command;
 
 mod support;
 
-fn harness(root: &Path) -> Command {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_do-harness"));
-    support::isolate_command(&mut command);
-    command.arg("--root").arg(root);
-    command
-}
+use support::harness;
 
 fn output(command: &mut Command) -> (bool, String, String) {
     let output = command.output().expect("spawn do-harness");

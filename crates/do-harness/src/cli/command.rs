@@ -1,0 +1,424 @@
+//! Subcommand definitions for the `do-harness` CLI.
+//!
+//! Extracted from `cli.rs` so the root type and the dispatch surface stay
+//! under the 500-LOC ceiling as the command set grows.
+
+use std::path::PathBuf;
+
+use clap::{ArgAction, Subcommand, ValueHint};
+
+use crate::init;
+use crate::report::Format;
+
+use super::LearnArgs;
+use super::actions::{
+    ErrorsAction, FeedbackAction, HookAction, MetricsAction, PrAction, SkillsAction, TaskAction,
+    TraceAction,
+};
+
+/// Available subcommands.
+#[derive(Debug, Subcommand)]
+pub enum Command {
+    /// Print CLI version information.
+    Version {
+        /// Output format.
+        #[arg(long, value_enum, default_value_t = Format::Text)]
+        format: Format,
+    },
+    /// Run computational sensors.
+    #[command(visible_alias = "check")]
+    Verify {
+        /// Halt at the first failing sensor.
+        #[arg(long)]
+        fail_fast: bool,
+        /// Output format.
+        #[arg(long, value_enum, default_value_t = Format::Text)]
+        format: Format,
+        /// Run only the sensors in this development signal set.
+        #[arg(long, value_name = "SET")]
+        set: Option<String>,
+        /// Run only sensors applicable to the working-tree change.
+        #[arg(long)]
+        changed: bool,
+        /// Run only the named sensor (repeatable or comma-separated).
+        #[arg(long = "only", action = ArgAction::Append, value_name = "SENSOR")]
+        only: Vec<String>,
+        /// Exclude named sensors from the run.
+        #[arg(long = "exclude", action = ArgAction::Append, value_name = "SENSOR")]
+        exclude: Vec<String>,
+        /// Maximum sensors in flight (overrides `jobs` in do-harness.toml).
+        #[arg(long, value_name = "N")]
+        jobs: Option<usize>,
+        /// Reuse recorded passing beats for sensors whose declared inputs are
+        /// unchanged: `warn` (default) executes and advises, `skip` reuses
+        /// without executing (requires --record), `run` always executes.
+        #[arg(long, value_enum, value_name = "MODE", default_value_t = crate::sensors::UnchangedMode::Warn)]
+        unchanged: crate::sensors::UnchangedMode,
+        /// Persist beats and error signatures into the state database.
+        #[arg(long)]
+        record: bool,
+        /// Scope records and fail-fast strikes to this task id (or 'global').
+        #[arg(long, requires = "record", value_name = "ID")]
+        task: Option<String>,
+        /// Record unscoped beats in the global namespace.
+        #[arg(long, requires = "record", conflicts_with = "task")]
+        global: bool,
+        /// Write a machine-readable evidence artifact to path.
+        #[arg(long, value_hint = ValueHint::FilePath, value_name = "FILE")]
+        evidence: Option<PathBuf>,
+        /// Enforce strong evidence: exit non-zero on skips or missing timing/exit codes.
+        #[arg(long)]
+        strict: bool,
+        /// Lower or initialize blessed findings baselines from this run
+        /// (requires --record; a bless never raises a baseline).
+        #[arg(long, requires = "record")]
+        bless: bool,
+        /// Approver identity recorded with `--bless` (defaults to
+        /// `DO_HARNESS_APPROVER` or the git user email).
+        #[arg(long, requires = "bless", value_name = "NAME")]
+        approver: Option<String>,
+    },
+    /// List sensor names.
+    #[command(visible_alias = "ls")]
+    List {
+        /// List development signal-set names instead of sensors.
+        #[arg(long)]
+        sets: bool,
+        /// Output format.
+        #[arg(long, value_enum, default_value_t = Format::Text)]
+        format: Format,
+    },
+    /// Explain which sensors the current change selects, without running them.
+    Explain {
+        /// Explain this development signal set (default: all sensors).
+        #[arg(long, value_name = "SET")]
+        set: Option<String>,
+        /// Select by working-tree change instead of listing everything.
+        #[arg(long)]
+        changed: bool,
+        /// Output format.
+        #[arg(long, value_enum, default_value_t = Format::Text)]
+        format: Format,
+    },
+    /// Report verification evidence freshness without running sensors.
+    Status {
+        /// Check evidence for this development signal set.
+        #[arg(long, value_name = "SET")]
+        set: Option<String>,
+        /// Read evidence from this file instead of the default artifact.
+        #[arg(long, value_hint = ValueHint::FilePath, value_name = "FILE")]
+        evidence: Option<PathBuf>,
+        /// Output format.
+        #[arg(long, value_enum, default_value_t = Format::Text)]
+        format: Format,
+    },
+    /// Deterministic PR analysis (read-only; works in any git repository).
+    Pr {
+        #[command(subcommand)]
+        action: PrAction,
+    },
+    /// Inspect and select skills by progressive disclosure.
+    Skills {
+        #[command(subcommand)]
+        action: SkillsAction,
+    },
+    /// Apply pending database migrations.
+    InitDb {
+        /// Report pending migrations and exit non-zero when any are pending.
+        #[arg(long)]
+        check: bool,
+        /// Report pending migrations without applying them (exit 0).
+        #[arg(long)]
+        dry_run: bool,
+        /// Skip the interactive confirmation prompt.
+        #[arg(long, short = 'y')]
+        yes: bool,
+    },
+    /// Seed invariants from plans/invariants.json.
+    Seed {
+        /// Delete invariants no longer present in plans/invariants.json.
+        #[arg(long)]
+        prune: bool,
+    },
+    /// Scaffold a harness workspace in a target directory.
+    Init {
+        /// Language pack to scaffold (default: detect from the repository).
+        #[arg(long, value_enum, value_name = "LANG")]
+        language: Option<init::Language>,
+        /// Overwrite existing files.
+        #[arg(long)]
+        force: bool,
+        /// Output format.
+        #[arg(long, value_enum, default_value_t = Format::Text)]
+        format: Format,
+        /// Do not seed invariants.
+        #[arg(long)]
+        no_seed: bool,
+        /// Minimal setup without extra skills.
+        #[arg(long)]
+        minimal: bool,
+        /// Skip creating/modifying .gitignore.
+        #[arg(long)]
+        no_gitignore: bool,
+        /// Inspect repository and report candidate signals without writing files.
+        #[arg(long)]
+        inspect: bool,
+    },
+    /// Inspect and export task state.
+    Task {
+        #[command(subcommand)]
+        action: TaskAction,
+    },
+    /// Record and list interaction traces.
+    Trace {
+        #[command(subcommand)]
+        action: TraceAction,
+    },
+    /// Extract a heuristic from a resolved trace into a skill.
+    /// Review output against the anti-AI-slop checklist (.agents/skills/skill-creator/references/anti_ai_slop.md).
+    Distill {
+        /// Skill the heuristic belongs to.
+        #[arg(long, value_name = "SKILL")]
+        skill: Option<String>,
+        /// Generalized pattern to record.
+        #[arg(long)]
+        pattern: Option<String>,
+        /// When the pattern applies.
+        #[arg(long)]
+        description: Option<String>,
+        /// Source trace id; required as evidence of a resolved fix.
+        #[arg(long = "from-trace", value_name = "ID")]
+        from_trace: Option<i64>,
+        /// Generate a starter skill scaffold from recorded sensor strikes
+        /// (AGENTS.md §6 steering loop) instead of distilling from a trace.
+        #[arg(long = "from-strikes")]
+        from_strikes: bool,
+        /// Strike count at or above which a signature sculpts a scaffold
+        /// (default: the fail-fast threshold).
+        #[arg(long = "min-strikes", value_name = "N")]
+        min_strikes: Option<i64>,
+        /// Scope strike lookup to this task id.
+        #[arg(long, value_name = "ID", requires = "from_strikes")]
+        task: Option<i64>,
+        /// Raise the skill's pass-rate bar after this recovery (review ticks anti-AI-slop checklist first).
+        #[arg(long = "to-fixture")]
+        to_fixture: bool,
+        /// Perform dry run without modifying skill files.
+        #[arg(long)]
+        dry_run: bool,
+        /// Output format.
+        #[arg(long, value_enum, default_value_t = Format::Text)]
+        format: Format,
+    },
+    /// Inspect and clear fail-fast error signatures.
+    Errors {
+        #[command(subcommand)]
+        action: ErrorsAction,
+    },
+    /// Report line-of-code state for the 500-LOC invariant.
+    Loc {
+        /// Scan directory, relative to workspace root (repeatable or comma-separated).
+        #[arg(long = "dir", value_name = "DIR", action = ArgAction::Append)]
+        dir: Vec<String>,
+        /// Scan extension (repeatable or comma-separated, e.g. rs, ts, tsx).
+        #[arg(long = "ext", value_name = "EXT", action = ArgAction::Append)]
+        ext: Vec<String>,
+        /// Output format.
+        #[arg(long, value_enum, default_value_t = Format::Text)]
+        format: Format,
+        /// Show only files at or above the 450-line decomposition threshold.
+        #[arg(long)]
+        warn: bool,
+        /// Files or directories to measure (default: scan workspace roots).
+        #[arg(value_hint = ValueHint::AnyPath, value_name = "PATH")]
+        paths: Vec<PathBuf>,
+    },
+    /// Extract a large top-level item into a sibling module.
+    Split {
+        /// Source file to decompose.
+        #[arg(value_hint = ValueHint::FilePath, value_name = "FILE")]
+        file: PathBuf,
+        /// Print the plan without writing files.
+        #[arg(long)]
+        dry_run: bool,
+        /// Name the sibling module instead of deriving it from the item.
+        #[arg(long, value_name = "NAME")]
+        target: Option<String>,
+    },
+    /// Validate skill structure and benchmark skill evals.
+    Eval {
+        /// Restrict evaluation to this skill directory name.
+        #[arg(long, value_name = "SKILL")]
+        skill: Option<String>,
+        /// Bless a fully green run: re-baseline graders and update pass-rate floor.
+        #[arg(
+            long,
+            help = "Re-baseline graders and update pass-rate floor on green run"
+        )]
+        bless: bool,
+        /// List available skills.
+        #[arg(long)]
+        list_skills: bool,
+        /// Halt on first failing evaluation.
+        #[arg(long)]
+        fail_fast: bool,
+        /// Perform dry-run evaluation.
+        #[arg(long)]
+        dry_run: bool,
+        /// Output format.
+        #[arg(long, value_enum, default_value_t = Format::Text)]
+        format: Format,
+        /// Approver identity recorded with `--bless` (defaults to
+        /// `DO_HARNESS_APPROVER` or the git user email).
+        #[arg(long, value_name = "NAME")]
+        approver: Option<String>,
+        /// Skip the without-skill baseline run (no Skill Lift measured).
+        #[arg(long)]
+        no_lift: bool,
+        /// Run once per eval case instead of the deterministic walkthrough.
+        /// cwd is the sandbox root; the prompt is in `$DO_HARNESS_PROMPT` and
+        /// on stdin. Captured output is redacted and bounded; stdout is saved
+        /// to `agent_stdout.txt` for assertions.
+        #[arg(long, value_name = "COMMAND")]
+        agent_cmd: Option<String>,
+        /// Kill an agent run after this many seconds.
+        #[arg(long, value_name = "SECS", default_value_t = 600)]
+        agent_timeout: u64,
+        /// Fail skills whose fixture has dataset-quality gaps (thin cases,
+        /// no negative out-of-scope case).
+        #[arg(long)]
+        strict_fixtures: bool,
+        /// Number of repeated trials to run for evaluation (default: 1).
+        #[arg(long, default_value_t = 1, value_name = "N")]
+        trials: usize,
+    },
+    /// Manage git hooks that run `do-harness verify`.
+    Hook {
+        #[command(subcommand)]
+        action: HookAction,
+    },
+    /// Run diagnostic checks on binary resolution and git hook health.
+    Doctor {
+        /// Output format.
+        #[arg(long, value_enum, default_value_t = Format::Text)]
+        format: Format,
+        /// Strictly enforce warning checks as failures.
+        #[arg(long)]
+        strict: bool,
+    },
+    /// Report harness trends: sensor stats, strikes, eval pass-rate history.
+    Metrics {
+        /// Report the PR loop instead: `metrics pr --repo OWNER/NAME`.
+        #[command(subcommand)]
+        action: Option<MetricsAction>,
+        /// Output format.
+        #[arg(long, value_enum, default_value_t = Format::Text)]
+        format: Format,
+        /// Filter by sensor name.
+        #[arg(long, value_name = "SENSOR")]
+        sensor: Option<String>,
+        /// Filter by skill name.
+        #[arg(long, value_name = "SKILL")]
+        skill: Option<String>,
+        /// Filter metrics since a Unix timestamp in seconds.
+        #[arg(long, value_name = "UNIX_SECONDS")]
+        since: Option<String>,
+        /// Filter by workstream scope (e.g. `branch:main`, `task:1`, `global`, or `all`).
+        /// Defaults to the current git branch.
+        #[arg(long, value_name = "SCOPE")]
+        scope: Option<String>,
+        /// Filter by task id (equivalent to `--scope task:<ID>`).
+        #[arg(long, value_name = "ID", conflicts_with = "scope")]
+        task: Option<i64>,
+        /// Filter by branch name (equivalent to `--scope branch:<NAME>`).
+        #[arg(long, value_name = "BRANCH", conflicts_with = "scope")]
+        branch: Option<String>,
+        /// Aggregate across all workstreams and scopes.
+        #[arg(long, conflicts_with_all = ["scope", "task", "branch"])]
+        all: bool,
+    },
+    /// Draft skill/guide updates from sensors that keep firing (never applies them).
+    Learn {
+        /// Draft arguments (`--draft` is required; the command writes nothing).
+        #[command(flatten)]
+        args: LearnArgs,
+    },
+    /// Rank skill pairs by guidance overlap (Tier-2 distinctiveness advisory).
+    Overlap {
+        /// Cosine similarity at or above which a pair prints as WARN.
+        #[arg(long, default_value_t = crate::overlap::DEFAULT_THRESHOLD)]
+        threshold: f64,
+        /// Output format.
+        #[arg(long, value_enum, default_value_t = Format::Text)]
+        format: Format,
+    },
+    /// Prune old beats and compact the state database.
+    Maintenance {
+        /// Delete beats older than this many days (keeps the most recent per task).
+        #[arg(long, value_name = "DAYS")]
+        prune_beats: Option<i64>,
+        /// Minimum most-recent beats kept per task when pruning.
+        #[arg(long, value_name = "N", default_value_t = 20)]
+        keep_per_task: i64,
+    },
+    /// Print compliance mapping to OWASP Agentic Top 10, NIST AI RMF, and EU AI Act.
+    Compliance {
+        /// Filter framework (owasp, nist, eu, soc; hyphenated ids accepted).
+        #[arg(long)]
+        framework: Option<String>,
+        /// Output format.
+        #[arg(long, value_enum, default_value_t = Format::Text)]
+        format: Format,
+    },
+    /// Recompute workflow event hash chain and report first divergence.
+    AuditChain {
+        /// Output format.
+        #[arg(long, value_enum, default_value_t = Format::Text)]
+        format: Format,
+    },
+    /// Derive DORA deployment metrics from git history (deterministic, read-only).
+    Dora {
+        /// Rolling window in days (overrides the pinned policy for this run).
+        #[arg(long, value_name = "DAYS")]
+        days: Option<i64>,
+        /// Output format.
+        #[arg(long, value_enum, default_value_t = Format::Text)]
+        format: Format,
+        /// Persist the snapshot into the state database.
+        #[arg(long)]
+        record: bool,
+        /// Where the numbers come from.
+        #[arg(long, value_enum, default_value_t = crate::dora::Source::Git)]
+        source: crate::dora::Source,
+        /// Measurement clock as Unix seconds (default: system clock).
+        #[arg(long, value_name = "UNIX_SECONDS")]
+        now: Option<i64>,
+    },
+    /// Explain a CI run's failures and cancellations with local repro commands.
+    #[command(visible_alias = "ci")]
+    CiExplain {
+        /// Workflow run ID or the run's URL.
+        #[arg(value_name = "RUN_ID")]
+        run_id: String,
+        /// Output format.
+        #[arg(long, value_enum, default_value_t = Format::Text)]
+        format: Format,
+    },
+    /// Generate shell completions.
+    Completions {
+        /// Target shell (bash, zsh, fish, powershell, elvish).
+        #[arg(value_enum)]
+        shell: clap_complete::Shell,
+    },
+    /// Generate man page documentation.
+    Man {
+        /// Output directory for man pages.
+        #[arg(value_hint = ValueHint::DirPath, value_name = "DIR")]
+        dir: PathBuf,
+    },
+    /// Manage impact-gated feedback and issue proposals.
+    Feedback {
+        #[command(subcommand)]
+        action: FeedbackAction,
+    },
+}

@@ -41,7 +41,10 @@
 # change is worse than a badly categorized one.
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck disable=SC1091 # resolved at runtime from this script's directory
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib.sh"
+
+ROOT="$(dh_repo_root)"
 TEMPLATE="$ROOT/.github/release-notes-template.md"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
