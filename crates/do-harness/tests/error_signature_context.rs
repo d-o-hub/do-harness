@@ -2,17 +2,14 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-use std::path::Path;
 use std::process::{Command, Output};
 
 use serde_json::Value;
 use tempfile::tempdir;
 
-fn harness(root: &Path) -> Command {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_do-harness"));
-    command.arg("--root").arg(root);
-    command
-}
+mod support;
+
+use support::harness;
 
 fn run(command: &mut Command) -> Output {
     command.output().expect("run do-harness")

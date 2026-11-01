@@ -10,17 +10,7 @@ use serde_json::Value;
 
 mod support;
 
-fn isolated_command(program: &str) -> Command {
-    let mut command = Command::new(program);
-    support::isolate_command(&mut command);
-    command
-}
-
-fn harness(root: &Path) -> Command {
-    let mut cmd = isolated_command(env!("CARGO_BIN_EXE_do-harness"));
-    cmd.arg("--root").arg(root);
-    cmd
-}
+use support::harness;
 
 fn run(cmd: &mut Command) -> (Option<i32>, String, String) {
     let output = cmd.output().expect("spawn do-harness");

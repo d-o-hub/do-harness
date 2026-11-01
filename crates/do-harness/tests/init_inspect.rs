@@ -4,8 +4,12 @@
 use serde_json::Value;
 use std::ffi::OsString;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::Command;
+
+mod support;
+
+use support::harness;
 
 const EXEC_PERMS: u32 = 0o755;
 const EXPECTED_SENTINEL_EXIT_CODE: i32 = 99;
@@ -88,11 +92,6 @@ fn test_sentinel_tripwire_positive_control_fires_on_execution() {
     );
 }
 
-fn harness(root: &Path) -> Command {
-    let mut cmd = Command::new(env!("CARGO_BIN_EXE_do-harness"));
-    cmd.arg("--root").arg(root);
-    cmd
-}
 #[test]
 fn test_node_fixture_yields_actionable_candidates_without_execution() {
     let temp = tempfile::tempdir().unwrap();

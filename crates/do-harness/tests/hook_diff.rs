@@ -18,6 +18,8 @@ use tempfile::{TempDir, tempdir};
 
 mod support;
 
+use support::harness;
+
 /// stdout when every installed hook matches the template its config implies.
 const MATCHING_STDOUT: &str = "Hooks match installed templates.";
 /// stdout header when at least one installed hook differs or is missing.
@@ -28,14 +30,6 @@ const OUT_OF_DATE_STDERR: &str = "managed hooks are out of date";
 const MATCH_EXIT: i32 = 0;
 /// A drifted or missing managed hook is a usage/configuration error (exit `2`).
 const DRIFT_EXIT: i32 = 2;
-
-/// Builds a `do-harness --root <root>` command with session state isolated.
-fn harness(root: &Path) -> Command {
-    let mut cmd = Command::new(env!("CARGO_BIN_EXE_do-harness"));
-    support::isolate_command(&mut cmd);
-    cmd.arg("--root").arg(root);
-    cmd
-}
 
 /// Runs a harness command, returning (exit code, `stdout`, `stderr`).
 fn run(cmd: &mut Command) -> (Option<i32>, String, String) {

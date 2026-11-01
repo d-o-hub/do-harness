@@ -8,10 +8,12 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::Command;
 
 mod support;
+
+use support::harness;
 
 /// A bare `bash` is wrong on Windows: `PATH` finds the WSL launcher in
 /// `System32`, which exits non-zero with an empty diagnostic when no
@@ -21,19 +23,6 @@ mod support;
 #[path = "../src/shell.rs"]
 #[allow(dead_code)]
 mod shell;
-
-fn isolated_command(program: &str) -> Command {
-    let mut command = Command::new(program);
-    support::isolate_command(&mut command);
-    command
-}
-
-/// Builds a `do-harness --root <root>` command using the real binary.
-fn harness(root: &Path) -> Command {
-    let mut cmd = isolated_command(env!("CARGO_BIN_EXE_do-harness"));
-    cmd.arg("--root").arg(root);
-    cmd
-}
 
 /// Runs a harness command, returning (success, stdout).
 fn run(cmd: &mut Command) -> (bool, String) {

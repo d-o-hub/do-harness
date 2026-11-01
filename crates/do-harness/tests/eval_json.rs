@@ -9,6 +9,10 @@ use std::process::Command;
 
 use serde_json::Value;
 
+mod support;
+
+use support::harness;
+
 #[cfg(unix)]
 const EXEC_PERMS: u32 = 0o755;
 
@@ -80,12 +84,6 @@ exit 0
     }
 
     Fixture { _temp: temp, root }
-}
-
-fn harness(root: &Path) -> Command {
-    let mut cmd = Command::new(env!("CARGO_BIN_EXE_do-harness"));
-    cmd.arg("--root").arg(root);
-    cmd
 }
 
 fn run_cmd(cmd: &mut Command) -> (Option<i32>, String, String) {

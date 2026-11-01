@@ -15,6 +15,8 @@ use serde_json::Value;
 
 mod support;
 
+use support::harness;
+
 /// Beats recorded before the prune: the fixture's whole history.
 const RECORDED_BEATS: i64 = 3;
 /// Most-recent beats the prune is told to keep per scope.
@@ -35,13 +37,6 @@ fn prune_args() -> Vec<String> {
         "--keep-per-task".to_owned(),
         KEEP_PER_TASK.to_string(),
     ]
-}
-
-fn harness(root: &Path) -> Command {
-    let mut cmd = Command::new(env!("CARGO_BIN_EXE_do-harness"));
-    support::isolate_command(&mut cmd);
-    cmd.arg("--root").arg(root);
-    cmd
 }
 
 fn run(cmd: &mut Command) -> (Option<i32>, String, String) {

@@ -11,14 +11,7 @@ use serde_json::Value;
 
 mod support;
 
-use support::git_command;
-
-/// Builds a `do-harness --root <root>` command using the real binary.
-fn harness(root: &Path) -> Command {
-    let mut cmd = Command::new(env!("CARGO_BIN_EXE_do-harness"));
-    cmd.arg("--root").arg(root);
-    cmd
-}
+use support::{git_command, harness};
 
 /// Runs a harness command, returning (exit code, `stdout`, `stderr`).
 fn run(cmd: &mut Command) -> (Option<i32>, String, String) {

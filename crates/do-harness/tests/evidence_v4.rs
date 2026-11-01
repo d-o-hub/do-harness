@@ -7,12 +7,9 @@ use std::process::Command;
 
 use serde_json::Value;
 
-/// Builds a `do-harness --root <root>` command using the real binary.
-fn harness(root: &Path) -> Command {
-    let mut cmd = Command::new(env!("CARGO_BIN_EXE_do-harness"));
-    cmd.arg("--root").arg(root);
-    cmd
-}
+mod support;
+
+use support::harness;
 
 /// Runs a harness command, returning (exit code, stdout, stderr).
 fn run(cmd: &mut Command) -> (Option<i32>, String, String) {

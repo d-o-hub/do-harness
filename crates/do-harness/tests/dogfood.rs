@@ -17,17 +17,12 @@ use serde_json::Value;
 
 mod support;
 
+use support::harness;
+
 fn isolated_command(program: &str) -> Command {
     let mut command = Command::new(program);
     support::isolate_command(&mut command);
     command
-}
-
-/// Builds a `do-harness --root <root>` command using the real binary.
-fn harness(root: &Path) -> Command {
-    let mut cmd = isolated_command(env!("CARGO_BIN_EXE_do-harness"));
-    cmd.arg("--root").arg(root);
-    cmd
 }
 
 /// Runs a harness command, returning (success, stdout).

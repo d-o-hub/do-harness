@@ -87,6 +87,21 @@ pub fn isolate_command(command: &mut Command) -> &mut Command {
     command
 }
 
+/// Builds a `do-harness --root <root>` command from the test binary's own
+/// executable, with [`isolate_command`] applied.
+///
+/// Every fixture that drives the real CLI should start here: a nested
+/// `do-harness` that inherits the outer cargo/coverage session is the failure
+/// mode `nested-build-isolation` documents (it dies with `os error 11` under
+/// `cargo llvm-cov` only), and one that inherits the outer git view can act on
+/// the wrong repository.
+pub fn harness(root: &Path) -> Command {
+    let mut command = Command::new(env!("CARGO_BIN_EXE_do-harness"));
+    isolate_command(&mut command);
+    command.arg("--root").arg(root);
+    command
+}
+
 /// Builds a `git` command rooted at `root` with [`GIT_VIEW_ENV`] removed.
 ///
 /// Tests that create their own repositories must not inherit the view

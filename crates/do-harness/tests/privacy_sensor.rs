@@ -6,25 +6,13 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-use std::process::Command;
-
 mod support;
+
+use support::harness;
 
 #[path = "../src/shell.rs"]
 #[allow(dead_code)]
 mod shell;
-
-fn isolated_command(program: &str) -> Command {
-    let mut command = Command::new(program);
-    support::isolate_command(&mut command);
-    command
-}
-
-fn harness(root: &std::path::Path) -> Command {
-    let mut cmd = isolated_command(env!("CARGO_BIN_EXE_do-harness"));
-    cmd.arg("--root").arg(root);
-    cmd
-}
 
 #[test]
 fn privacy_sensor_rejects_real_email_in_templates() {

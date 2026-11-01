@@ -10,6 +10,10 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+mod support;
+
+use support::harness;
+
 /// A configured root that is deliberately not a git repository.
 struct Fixture {
     _temp: tempfile::TempDir,
@@ -37,12 +41,6 @@ fn inside_git_repo(dir: &Path) -> bool {
         .args(["rev-parse", "--show-toplevel"])
         .output()
         .is_ok_and(|output| output.status.success())
-}
-
-fn harness(root: &Path) -> Command {
-    let mut cmd = Command::new(env!("CARGO_BIN_EXE_do-harness"));
-    cmd.arg("--root").arg(root);
-    cmd
 }
 
 /// Runs a harness command, returning (exit code, `stdout`, `stderr`).

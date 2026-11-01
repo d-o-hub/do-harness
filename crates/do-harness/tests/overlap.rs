@@ -16,6 +16,8 @@ use tempfile::{TempDir, tempdir};
 
 mod support;
 
+use support::harness;
+
 /// Default `--threshold`, mirroring `overlap::DEFAULT_THRESHOLD`.
 const DEFAULT_THRESHOLD: f64 = 0.45;
 
@@ -35,14 +37,6 @@ const ALPHA: &str = "# Alpha\nSpike scratchpad hypothesis verification cleanup t
 const BETA: &str = "# Beta\nSpike scratchpad hypothesis verification cleanup transition extra.";
 /// A third skill whose prose is disjoint from both above.
 const GAMMA: &str = "# Gamma\nUnrelated haiku prose ocean waves.";
-
-/// Builds a `do-harness --root <root>` command with session state isolated.
-fn harness(root: &Path) -> Command {
-    let mut cmd = Command::new(env!("CARGO_BIN_EXE_do-harness"));
-    support::isolate_command(&mut cmd);
-    cmd.arg("--root").arg(root);
-    cmd
-}
 
 /// Runs a harness command, returning (exit code, `stdout`, `stderr`).
 fn run(cmd: &mut Command) -> (Option<i32>, String, String) {
