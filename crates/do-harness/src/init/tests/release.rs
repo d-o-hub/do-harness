@@ -1,8 +1,12 @@
 //! Release-scaffold tests: the runbook, the preflight script `init` writes,
 //! and the `release-preflight` sensor generated with the Rust config.
 
-use std::path::{Path, PathBuf};
-use std::process::{Command, Output};
+use std::path::Path;
+#[cfg(unix)]
+use std::path::PathBuf;
+use std::process::Command;
+#[cfg(unix)]
+use std::process::Output;
 
 use super::super::*;
 use super::opts;

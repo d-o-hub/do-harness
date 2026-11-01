@@ -7,6 +7,7 @@
 #[cfg(unix)]
 use std::path::Path;
 
+#[cfg(unix)]
 use super::super::*;
 #[cfg(unix)]
 use super::release::{output_text, preflight, versioned_fixture};

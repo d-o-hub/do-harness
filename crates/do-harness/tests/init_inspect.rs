@@ -11,6 +11,7 @@ mod support;
 
 use support::harness;
 
+#[cfg(unix)]
 const EXEC_PERMS: u32 = 0o755;
 const EXPECTED_SENTINEL_EXIT_CODE: i32 = 99;
 

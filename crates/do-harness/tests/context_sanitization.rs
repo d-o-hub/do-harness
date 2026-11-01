@@ -12,7 +12,9 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-use std::path::{Path, PathBuf};
+#[cfg(unix)]
+use std::path::Path;
+use std::path::PathBuf;
 use std::process::{Command, Output};
 
 mod support;
@@ -250,6 +252,7 @@ fn json_output_fails() {
 
 /// The synthetic AWS access key the fixture carries, assembled at runtime so
 /// that no credential-shaped literal sits in this file.
+#[cfg(unix)]
 const RAW_KEY: &str = concat!("AKIA", "IOSFODNN7EXAMPLE");
 
 /// A child that leaks the raw sentinel fails, and the diagnostic never

@@ -10,6 +10,7 @@ use serde_json::Value;
 
 mod support;
 
+#[cfg(unix)]
 use support::harness;
 
 #[cfg(unix)]
