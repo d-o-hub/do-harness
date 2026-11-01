@@ -53,13 +53,6 @@ case "$(uname -s)/$(uname -m)" in
         ;;
 esac
 
-# sha256_of <file>: the artifacts' checksums.txt digest, from the portable tool
-# fallback scripts/lib.sh owns. An empty digest is not special-cased here: the
-# installer rejects it as a checksum mismatch, the same verdict as before.
-sha256_of() {
-    dh_sha256_of "$1"
-}
-
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
@@ -69,7 +62,9 @@ name="do-harness-${VERSION}-${target}"
 mkdir -p "$dist" "$tmp/pkg/$name"
 cp "$BIN" "$tmp/pkg/$name/do-harness"
 tar -czf "$dist/${name}.tar.gz" -C "$tmp/pkg" "$name"
-printf '%s  %s\n' "$(sha256_of "$dist/${name}.tar.gz")" "${name}.tar.gz" >"$dist/checksums.txt"
+# The digest comes from scripts/lib.sh's hashing-tool fallback. A missing tool
+# yields an empty digest, which the installer rejects as a checksum mismatch.
+printf '%s  %s\n' "$(dh_sha256_of "$dist/${name}.tar.gz")" "${name}.tar.gz" >"$dist/checksums.txt"
 
 install_ok() {
     local bin_dir="$1" log="$2"
@@ -142,7 +137,7 @@ EOF
     fi
 fi
 if [[ "$win_staged" == "1" ]] && { command -v unzip >/dev/null 2>&1 || command -v 7z >/dev/null 2>&1; }; then
-    printf '%s  %s\n' "$(sha256_of "$windist/${win_name}.zip")" "${win_name}.zip" >"$windist/checksums.txt"
+    printf '%s  %s\n' "$(dh_sha256_of "$windist/${win_name}.zip")" "${win_name}.zip" >"$windist/checksums.txt"
     if ! DO_HARNESS_TARGET="$win_target" bash "$ROOT/scripts/install.sh" --version "$VERSION" --base-url "$winbase" --bin-dir "$tmp/bin-win" >"$tmp/win-install.log" 2>&1; then
         cat "$tmp/win-install.log" >&2
         echo "FAIL: windows installer exited non-zero" >&2

@@ -82,13 +82,6 @@ note() {
     printf 'NOTE\t%s\t%s\n' "$1" "$2"
 }
 
-# digest_of <file>: SHA-256 hex, or empty when no tool is available. The
-# tool fallback is scripts/lib.sh's; the empty-digest verdict stays here
-# (the checksums check is what turns it into a FAIL).
-digest_of() {
-    dh_sha256_of "$1"
-}
-
 # fact <key>: the value of <key> in the facts file, empty when absent.
 fact() {
     local key="$1"
@@ -166,7 +159,9 @@ check_assets() {
             fail checksums "$name is listed in checksums.txt but missing from the Release"
             continue
         fi
-        got="$(digest_of "$DIR/$name")"
+        # scripts/lib.sh owns the hashing-tool fallback; an empty digest is this
+        # check's verdict, not the helper's.
+        got="$(dh_sha256_of "$DIR/$name")"
         if [ -z "$got" ]; then
             fail checksums "cannot compute a digest for $name (no sha256sum or shasum)"
             continue

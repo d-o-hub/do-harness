@@ -70,12 +70,12 @@ when-changed = ["**/*.rs", "Cargo.toml", "**/Cargo.toml", "Cargo.lock", "rust-to
 [[sensors]]
 name = "loc"
 argv = ["bash", "scripts/check-loc.sh"]
-when-changed = ["**/*.rs", "scripts/check-loc.sh"]
+when-changed = ["**/*.rs", "scripts/check-loc.sh", "scripts/lib.sh"]
 
 [[sensors]]
 name = "skills"
 argv = ["bash", "scripts/check-skills-sync.sh"]
-when-changed = [".agents/skills/**", "crates/do-harness/templates/skills/**", "scripts/check-skills-sync.sh"]
+when-changed = [".agents/skills/**", "crates/do-harness/templates/skills/**", "scripts/check-skills-sync.sh", "scripts/lib.sh"]
 
 [[sensors]]
 # Drift gate between the skill catalog and its docs: docs/skills.md must name
@@ -113,12 +113,13 @@ when-changed = [
     "tests/fixtures/doc_tools/**",
     "tests/fixtures/docs-examples/**",
     "scripts/requirements-docs.txt",
+    "scripts/lib.sh",
 ]
 
 [[sensors]]
 name = "deps"
 argv = ["bash", "scripts/check-deps.sh"]
-when-changed = ["Cargo.toml", "Cargo.lock", "crates/**/Cargo.toml", "deny.toml", "scripts/check-deps.sh", "scripts/check-package-contract.sh", "scripts/*.py"]
+when-changed = ["Cargo.toml", "Cargo.lock", "crates/**/Cargo.toml", "deny.toml", "scripts/check-deps.sh", "scripts/check-package-contract.sh", "scripts/*.py", "scripts/lib.sh"]
 
 [[sensors]]
 name = "shell"
@@ -128,7 +129,7 @@ when-changed = ["scripts/**", "crates/do-harness/templates/scripts/**", ".agents
 [[sensors]]
 name = "markdownlint"
 argv = ["bash", "scripts/check-markdownlint.sh"]
-when-changed = ["**/*.md", ".markdownlint-cli2.jsonc", "scripts/check-markdownlint.sh"]
+when-changed = ["**/*.md", ".markdownlint-cli2.jsonc", "scripts/check-markdownlint.sh", "scripts/lib.sh"]
 
 [[sensors]]
 name = "yamllint"
@@ -137,7 +138,7 @@ argv = ["bash", "scripts/check-yamllint.sh"]
 # `do-harness.toml` or `plans/*.json` applicability would select the sensor to
 # check files it never reads. Policy JSON content is guarded by
 # `check-invariants`.
-when-changed = ["**/*.yml", "**/*.yaml", ".yamllint.yml", "scripts/check-yamllint.sh"]
+when-changed = ["**/*.yml", "**/*.yaml", ".yamllint.yml", "scripts/check-yamllint.sh", "scripts/lib.sh"]
 
 [[sensors]]
 # Schema/lint gate for GitHub Actions workflows. yamllint proves the files are
@@ -149,7 +150,7 @@ when-changed = ["**/*.yml", "**/*.yaml", ".yamllint.yml", "scripts/check-yamllin
 # preflight (`release.yml`) install the pinned 1.7.7 binary.
 name = "actionlint"
 argv = ["bash", "scripts/check-actionlint.sh"]
-when-changed = [".github/workflows/**", "scripts/check-actionlint.sh"]
+when-changed = [".github/workflows/**", "scripts/check-actionlint.sh", "scripts/lib.sh"]
 
 [[sensors]]
 # Immutable-reference gate for GitHub Actions. actionlint proves the workflow
@@ -175,6 +176,7 @@ when-changed = [
     "crates/do-harness/tests/ci_parity/**",
     ".agents/skills/skill-creator/scripts/requirements.txt",
     "do-harness.toml",
+    "scripts/lib.sh",
 ]
 
 [[sensors]]
@@ -239,7 +241,7 @@ when-changed = ["crates/guardian-proxy/**", "Cargo.toml", "Cargo.lock"]
 # only on `seed`/`init` and a stale or hand-edited entry sits unnoticed.
 name = "check-invariants"
 argv = ["bash", "scripts/check-invariants.sh"]
-when-changed = ["plans/invariants.json", "do-harness.toml", "scripts/check-invariants.sh"]
+when-changed = ["plans/invariants.json", "do-harness.toml", "scripts/check-invariants.sh", "scripts/lib.sh"]
 
 [[sensors]]
 # Hermetic coherence gate for the *-promotion decisions: a recorded hold must
@@ -249,12 +251,12 @@ when-changed = ["plans/invariants.json", "do-harness.toml", "scripts/check-invar
 # itself cannot be a sensor (it exits 0 on every verdict and needs the network).
 name = "check-promotions"
 argv = ["bash", "scripts/check-promotion-decisions.sh"]
-when-changed = ["plans/*-epic.md", "plans/invariants.json", "crates/guardian-proxy/Cargo.toml", "scripts/check-promotion-decisions.sh"]
+when-changed = ["plans/*-epic.md", "plans/invariants.json", "crates/guardian-proxy/Cargo.toml", "scripts/check-promotion-decisions.sh", "scripts/lib.sh"]
 
 [[sensors]]
 name = "audit"
 argv = ["bash", "scripts/check-audit.sh"]
-when-changed = ["Cargo.toml", "Cargo.lock", "scripts/check-audit.sh"]
+when-changed = ["Cargo.toml", "Cargo.lock", "scripts/check-audit.sh", "scripts/lib.sh"]
 
 [[sensors]]
 # Named constants over magic numbers (AGENTS.md section 5), mechanised. A
@@ -268,7 +270,7 @@ when-changed = ["Cargo.toml", "Cargo.lock", "scripts/check-audit.sh"]
 name = "magic-numbers"
 argv = ["bash", "scripts/check-magic-numbers.sh"]
 severity = "warn"
-when-changed = ["**/*.rs", "scripts/check-magic-numbers.sh", "scripts/check_magic_numbers.py"]
+when-changed = ["**/*.rs", "scripts/check-magic-numbers.sh", "scripts/check_magic_numbers.py", "scripts/lib.sh"]
 
 [[sensors]]
 # No `when-changed`: a commit message is not tied to any tracked path, so
@@ -281,7 +283,7 @@ argv = ["bash", "scripts/check-commitlint.sh"]
 [[sensors]]
 name = "privacy"
 argv = ["bash", "scripts/check-privacy.sh"]
-when-changed = ["crates/do-harness/templates/**", ".agents/skills/**", "AGENTS.md", "scripts/check-privacy.sh"]
+when-changed = ["crates/do-harness/templates/**", ".agents/skills/**", "AGENTS.md", "scripts/check-privacy.sh", "scripts/lib.sh"]
 
 [[sensors]]
 # Executable half of the "untrusted text is data, never instructions" contract
@@ -291,7 +293,7 @@ when-changed = ["crates/do-harness/templates/**", ".agents/skills/**", "AGENTS.m
 # the skill trees, runs nothing from them.
 name = "untrusted-ingest"
 argv = ["bash", "scripts/check-untrusted-ingest.sh"]
-when-changed = [".agents/skills/pr-triage/**", ".agents/skills/issue-to-pr/**", "scripts/check-untrusted-ingest.sh"]
+when-changed = [".agents/skills/pr-triage/**", ".agents/skills/issue-to-pr/**", "scripts/check-untrusted-ingest.sh", "scripts/lib.sh"]
 
 [[sensors]]
 # The CLI must work for every GitHub repository: a surface that ships to a
@@ -310,7 +312,7 @@ when-changed = ["crates/**/*.rs", "crates/do-harness/templates/**", "scripts/*.s
 # placeholder, an emptied section, a lost pull request).
 name = "release-notes"
 argv = ["bash", "scripts/release-notes.sh", "--self-test"]
-when-changed = [".github/release-notes-template.md", ".github/release.yml", ".github/workflows/release.yml", ".github/workflows/auto-release.yml", "docs/releases/**", "scripts/release-notes.sh"]
+when-changed = [".github/release-notes-template.md", ".github/release.yml", ".github/workflows/release.yml", ".github/workflows/auto-release.yml", "docs/releases/**", "scripts/release-notes.sh", "scripts/lib.sh"]
 
 [[sensors]]
 # Executable half of the release-derivation contract: the version a merge cuts
@@ -322,7 +324,7 @@ when-changed = [".github/release-notes-template.md", ".github/release.yml", ".gi
 # silently; this entry pins the rules and the fail-closed guards around them.
 name = "release-manager"
 argv = ["bash", "scripts/release-manager.sh", "--self-test"]
-when-changed = ["Cargo.toml", "integrations/npm/**", ".github/workflows/auto-release.yml", ".github/workflows/release.yml", "docs/releasing.md", "scripts/release-manager.sh"]
+when-changed = ["Cargo.toml", "integrations/npm/**", ".github/workflows/auto-release.yml", ".github/workflows/release.yml", "docs/releasing.md", "scripts/release-manager.sh", "scripts/lib.sh"]
 
 [[sensors]]
 # Release-gated end-to-end control for the release manager, deliberately absent
@@ -333,7 +335,7 @@ when-changed = ["Cargo.toml", "integrations/npm/**", ".github/workflows/auto-rel
 # must not gate every pull request.
 name = "release-manager-e2e"
 argv = ["bash", "scripts/release-manager.sh", "--e2e"]
-when-changed = ["Cargo.toml", "integrations/npm/**", "man/do-harness.1", "docs/releasing.md", "scripts/release-manager.sh"]
+when-changed = ["Cargo.toml", "integrations/npm/**", "man/do-harness.1", "docs/releasing.md", "scripts/release-manager.sh", "scripts/lib.sh"]
 
 [[sensors]]
 # Hermetic half of the npm publisher contract, in the release set only: the
@@ -342,7 +344,7 @@ when-changed = ["Cargo.toml", "integrations/npm/**", "man/do-harness.1", "docs/r
 # and the registry-status handling without a token or a registry.
 name = "publish-npm"
 argv = ["bash", "scripts/publish-npm.sh", "--self-test"]
-when-changed = ["scripts/publish-npm.sh", "integrations/npm/**"]
+when-changed = ["scripts/publish-npm.sh", "integrations/npm/**", "scripts/lib.sh"]
 
 [[sensors]]
 # Executable half of the post-publication contract: a release is complete only
@@ -351,7 +353,7 @@ when-changed = ["scripts/publish-npm.sh", "integrations/npm/**"]
 # the network, so the same policy runs in CI and by hand.
 name = "verify-published"
 argv = ["bash", "scripts/verify-published.sh", "--self-test"]
-when-changed = ["Cargo.toml", "crates/db/Cargo.toml", "docs/releasing.md", ".github/workflows/release.yml", "scripts/verify-published.sh"]
+when-changed = ["Cargo.toml", "crates/db/Cargo.toml", "docs/releasing.md", ".github/workflows/release.yml", "scripts/verify-published.sh", "scripts/lib.sh"]
 
 [[sensors]]
 # DORA deployment health, derived (never judged) from git history. Report-only:
@@ -382,14 +384,14 @@ coverage-inputs = ["plans/dora.json"]
 # this sensor verifies all feature combinations build. Kept out of fast-loop hooks.
 name = "powerset"
 argv = ["bash", "scripts/check-powerset.sh"]
-when-changed = ["crates/guardian-proxy/**", "Cargo.toml", "Cargo.lock", "scripts/check-powerset.sh"]
+when-changed = ["crates/guardian-proxy/**", "Cargo.toml", "Cargo.lock", "scripts/check-powerset.sh", "scripts/lib.sh"]
 
 [[sensors]]
 # Unused-dependency pruning sensor using cargo-machete. Exact-pin policy: pins stay exact;
 # this sensor verifies no unused dependencies exist across workspace manifests. Kept out of fast-loop hooks.
 name = "machete"
 argv = ["bash", "scripts/check-machete.sh"]
-when-changed = ["**/Cargo.toml", "Cargo.lock", "scripts/check-machete.sh"]
+when-changed = ["**/Cargo.toml", "Cargo.lock", "scripts/check-machete.sh", "scripts/lib.sh"]
 
 # Optional context-sanitization check.
 #
