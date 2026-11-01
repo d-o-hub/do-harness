@@ -3,9 +3,8 @@
 
 #[cfg(unix)]
 use std::path::{Path, PathBuf};
-use std::process::Command;
 #[cfg(unix)]
-use std::process::Output;
+use std::process::{Command, Output};
 
 use super::super::*;
 use super::opts;

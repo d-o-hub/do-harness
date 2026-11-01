@@ -33,7 +33,13 @@ pub(crate) fn set_owner_exec(path: &Path) -> Result<()> {
 /// # Errors
 ///
 /// Never returns an error.
+///
+/// The `Result` is deliberate: it keeps this signature interchangeable with the
+/// unix implementation, so callers write one `?` on every platform rather than
+/// a `#[cfg]` at each call site. `clippy::unnecessary_wraps` cannot see the other
+/// arm, so it is allowed here.
 #[cfg(not(unix))]
+#[allow(clippy::unnecessary_wraps)]
 pub(crate) fn set_owner_exec(_path: &Path) -> Result<()> {
     Ok(())
 }
