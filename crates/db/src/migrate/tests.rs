@@ -279,7 +279,7 @@ async fn migrate_adopts_legacy_rows_without_checksums() {
 
 /// Pending migrations snapshot the database to `agent_state.db.bak` first, and
 /// the snapshot must carry committed state that still lives in the WAL sidecar
-/// — the checkpoint inside `backup_state_file` is what makes it complete.
+/// — `VACUUM INTO` inside `backup_state_file` is what makes it complete.
 #[tokio::test(flavor = "current_thread")]
 async fn backup_state_file_is_wal_consistent() {
     let dir = tempfile::tempdir().unwrap();
@@ -304,4 +304,106 @@ async fn backup_state_file_is_wal_consistent() {
         .unwrap();
     let row = rows.next().await.unwrap().expect("row");
     assert_eq!(row.get::<i64>(0).unwrap(), 7);
+}
+
+/// FU-01: a reader holding a snapshot keeps `wal_checkpoint(TRUNCATE)` from
+/// completing, so committed pages stay in the `-wal` sidecar at copy time. The
+/// backup is the recovery path for the destructive migrations (`0006` deletes
+/// rows, `0011` rebuilds tables), so it must still contain those pages rather
+/// than fall back to a snapshot that silently predates them.
+#[tokio::test(flavor = "current_thread")]
+async fn backup_state_file_keeps_committed_pages_under_a_blocked_checkpoint() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("agent_state.db");
+    let writer = connect(&path).await.unwrap();
+    writer
+        .execute("CREATE TABLE t (x INTEGER)", Params::None)
+        .await
+        .unwrap();
+    writer
+        .execute("INSERT INTO t (x) VALUES (1)", Params::None)
+        .await
+        .unwrap();
+
+    // The concurrent `verify --record` reader: its open snapshot predates the
+    // next commit, which pins the WAL and blocks the truncating checkpoint.
+    let reader = connect(&path).await.unwrap();
+    let snapshot = reader.transaction().await.unwrap();
+    let mut held = snapshot
+        .query("SELECT COUNT(*) FROM t", Params::None)
+        .await
+        .unwrap();
+    assert!(
+        held.next().await.unwrap().is_some(),
+        "snapshot must be open"
+    );
+
+    writer
+        .execute("INSERT INTO t (x) VALUES (2)", Params::None)
+        .await
+        .unwrap();
+
+    backup_state_file(&writer, &path).await.unwrap();
+
+    let backup = path.with_extension("db.bak");
+    let restored = connect(&backup).await.unwrap();
+    let mut rows = restored
+        .query("SELECT x FROM t ORDER BY x", Params::None)
+        .await
+        .unwrap();
+    let mut seen = Vec::new();
+    while let Some(row) = rows.next().await.unwrap() {
+        seen.push(row.get::<i64>(0).unwrap());
+    }
+    assert_eq!(
+        seen,
+        vec![1, 2],
+        "backup dropped committed pages that were still in the WAL"
+    );
+
+    let mut integrity = restored
+        .query("PRAGMA integrity_check", Params::None)
+        .await
+        .unwrap();
+    let verdict: String = integrity
+        .next()
+        .await
+        .unwrap()
+        .expect("integrity row")
+        .get(0)
+        .unwrap();
+    assert_eq!(verdict, "ok", "backup failed integrity validation");
+}
+
+/// FU-01: a snapshot that cannot be written must leave the previous backup
+/// untouched. Publishing over the live file would destroy the only recovery
+/// copy at exactly the moment it is needed.
+#[tokio::test(flavor = "current_thread")]
+async fn failed_snapshot_preserves_the_previous_backup() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("agent_state.db");
+    let conn = connect(&path).await.unwrap();
+    conn.execute("CREATE TABLE t (x INTEGER)", Params::None)
+        .await
+        .unwrap();
+
+    backup_state_file(&conn, &path).await.unwrap();
+    let backup = path.with_extension("db.bak");
+    let previous = std::fs::read(&backup).unwrap();
+
+    // Failure injection that does not depend on the effective user id: a
+    // directory where the staging file must go makes the snapshot unwritable.
+    let staging = path.with_extension("db.bak.tmp");
+    std::fs::create_dir(&staging).unwrap();
+
+    let err = backup_state_file(&conn, &path).await.unwrap_err();
+    assert!(
+        matches!(err, DbError::Backup { .. } | DbError::Sql(_)),
+        "unexpected error: {err}"
+    );
+    assert_eq!(
+        std::fs::read(&backup).unwrap(),
+        previous,
+        "a failed snapshot must not clobber the previous backup"
+    );
 }

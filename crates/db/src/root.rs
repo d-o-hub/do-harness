@@ -72,6 +72,7 @@ pub fn validate_state_paths(root: &Path) -> Result<()> {
         root.join(STATE_DIR).join("agent_state.db-wal"),
         root.join(STATE_DIR).join("agent_state.db-shm"),
         root.join(STATE_DIR).join("agent_state.db.bak"),
+        root.join(STATE_DIR).join("agent_state.db.bak.tmp"),
     ];
     for path in paths {
         match std::fs::symlink_metadata(&path) {

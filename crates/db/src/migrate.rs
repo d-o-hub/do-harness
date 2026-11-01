@@ -6,6 +6,10 @@ use crate::error::{DbError, Result};
 use crate::migrate_catalog::{MIGRATIONS, Migration};
 use libsql::{Builder, Connection, params::Params};
 
+mod backup;
+
+use backup::backup_state_file;
+
 /// Opens (creating if necessary) the local libSQL database at `path`.
 ///
 /// Creates missing parent directories, enables foreign-key enforcement for
@@ -221,10 +225,11 @@ const BUSY_RETRY_ATTEMPTS: usize = 5;
 
 /// Connects to the agent-state database under `root` and applies migrations.
 ///
-/// When pending migrations exist, the database file is first copied to
-/// `agent_state.db.bak` (best-effort snapshot) so an interrupted or
-/// destructive migration (`0006` deletes rows, `0011` rebuilds tables) can be
-/// recovered manually.
+/// When pending migrations exist, the database is first snapshotted to
+/// `agent_state.db.bak` so an interrupted or destructive migration (`0006`
+/// deletes rows, `0011` rebuilds tables) can be recovered manually. A snapshot
+/// that cannot be written aborts the migration rather than proceeding without
+/// its recovery copy.
 ///
 /// # Errors
 ///
@@ -291,32 +296,6 @@ async fn migrate_with_retry(conn: &Connection) -> Result<()> {
         }
     }
     Err(last.unwrap_or_else(|| DbError::Invariant("migration retry state lost".to_owned())))
-}
-
-/// Copies the state database beside itself as `<file>.bak`.
-///
-/// The connection runs in WAL mode (see [`connect`]), so committed pages can
-/// still live in the `-wal` sidecar at the moment of the copy; a plain file
-/// copy would then omit them, or capture a torn state mid-write. Checkpoint
-/// first so the snapshot is complete — this backup is the recovery path for
-/// the destructive migrations (`0006` deletes rows, `0011` rebuilds tables).
-/// The checkpoint is best-effort: a concurrent reader can keep it from
-/// completing, and a slightly stale snapshot still beats refusing to migrate.
-async fn backup_state_file(conn: &Connection, path: &Path) -> Result<()> {
-    // A checkpoint returns rows, and `execute` rejects row-returning SQL, so
-    // route it through `query` with drained rows (see the `connect` note).
-    if let Ok(mut rows) = conn
-        .query("PRAGMA wal_checkpoint(TRUNCATE)", Params::None)
-        .await
-    {
-        while rows.next().await.ok().flatten().is_some() {}
-    }
-    let backup = path.with_extension("db.bak");
-    std::fs::copy(path, &backup).map_err(|source| DbError::Backup {
-        path: backup,
-        source,
-    })?;
-    Ok(())
 }
 
 /// Returns the set of migration versions already applied.
