@@ -446,4 +446,5 @@ async fn json_report_includes_case_and_assertion_detail() {
 }
 
 mod issue_383;
+mod issue_419;
 mod lift;

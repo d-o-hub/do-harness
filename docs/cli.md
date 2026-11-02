@@ -645,7 +645,10 @@ Skill structure validation and evaluation benchmark runner.
 
 - Exit codes follow the shared rule: a pre-check discovery problem is usage
   (`2`) — an unknown `--skill` name, or a state database that cannot be opened,
-  so no eval ever ran. A skill whose evals ran and failed is `1`.
+  so no eval ever ran. A skill whose evals ran and failed, whose structure gate
+  failed, or whose `evals/evals.json` does not parse is `1`: a fixture that
+  never loaded graded nothing, so it cannot report a pass. `--bless` refuses
+  such a skill rather than recording a baseline for it.
 - `--skill <SKILL>`: Restrict evaluation to target skill directory.
 - `--bless`: Re-baseline grader hashes and raise the pass-rate floor on a green
   run. Every bless appends an immutable `skill_eval_blesses` row recording the
@@ -681,6 +684,8 @@ Skill structure validation and evaluation benchmark runner.
   emits a single JSON array report across all outcomes (success, warnings,
   strict misses, grader drift, floor misses, and bless runs). Text diagnostics
   are routed to stderr so machine consumers always observe parseable stdout.
+  Each entry carries the `gate_failed` and `evals_invalid` flags, so a wrapper
+  can tell a failed check from a fixture that never parsed.
 
 Failing runs print one `CASE-FAIL:` line per failing assertion in text mode
 (case id, kind, dimension, assertion spec, and the grader reason); `--format
