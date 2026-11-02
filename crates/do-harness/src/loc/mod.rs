@@ -181,12 +181,6 @@ pub fn collect_source_files(dir: &Path, exts: &[String], out: &mut Vec<PathBuf>)
     }
 }
 
-/// Recursively collects `.rs` files under `dir`, skipping `target/`.
-#[allow(dead_code)]
-pub fn collect_rust_files(dir: &Path, out: &mut Vec<PathBuf>) {
-    collect_source_files(dir, &["rs".to_string()], out);
-}
-
 /// Measures source files matching `scope` under `<root>`.
 ///
 /// # Errors
