@@ -21,6 +21,15 @@ is an explicit unlimited opt-out and requires a nonempty
 Retries retain their configured finite count, with the timeout applying to
 each attempt. Fail-fast cancellation stops further retries immediately.
 
+Before spawning, `verify` resolves the path-looking arguments in the sensor's
+`argv` (the program itself is skipped, because a missing executable already
+fails loudly). A missing script or data file fails the sensor as `not_run`
+instead of recording a pass: an interpreter or wrapper can exit 0 while
+ignoring the missing path, which would leave the gate green over an unmeasured
+tree. Flags, values, shell command strings passed to `-c`, URLs and git refs
+are not treated as paths. `doctor` reports the same miss for the effective
+sensors as a warning, or as a failure under `--strict`.
+
 `max-output-bytes` bounds combined raw stdout/stderr at 1 MiB by default,
 with supported values from 1 KiB to 16 MiB. Exceeding it terminates the sensor,
 retains bounded redacted context, and reports `details.reason: output_limit`,

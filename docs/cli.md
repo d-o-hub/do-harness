@@ -609,10 +609,14 @@ Remove an orphan task row that has no workflow events. A task with history is re
 | `--format <FORMAT>` | no | `text` | `text`, `json` | Output format |
 | `--strict` | no | — | — | Strictly enforce warning checks as failures |
 <!-- END GENERATED: cli-contract doctor -->
-Diagnostic health checks covering binary resolution, git hook status, and database migration skew.
+Diagnostic health checks covering binary resolution, git hook status, database migration skew, and the path-looking arguments in each effective sensor's `argv`.
 
 - `--format <Format>`: Output format (`text` or `json`).
 - `--strict`: Elevate warnings (target/ binary, missing hooks) to failures.
+- A sensor whose `argv` names a missing file is reported as a warning, and as
+  a failure under `--strict`. `verify` refuses to run such a sensor and reports
+  it as a failure instead of recording a pass, because the command itself can
+  still exit 0 over an unmeasured tree.
 - Exit codes follow the shared rule: a failure that stops the doctor before any
   check runs — no git repository to inspect — is a usage/discovery problem
   (`2`), matching `hook status` for the same failure. A check that runs and

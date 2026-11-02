@@ -91,6 +91,37 @@ async fn succeeds_when_binary_present_and_database_absent() {
     );
 }
 
+/// A sensor whose `argv` names a missing file is a warning by default and a
+/// failure under `--strict`; the command itself could still exit 0.
+#[tokio::test(flavor = "current_thread")]
+async fn warns_when_sensor_argv_path_is_missing() {
+    let (_temp, root) = fake_repo_with_git();
+    stub_binary(&root);
+    fs::create_dir_all(root.join("scripts")).unwrap();
+    fs::write(
+        root.join("scripts/check-commitlint.sh"),
+        "#!/usr/bin/env bash\n",
+    )
+    .unwrap();
+    fs::write(
+        root.join("do-harness.toml"),
+        "[[sensors]]\nname = \"ghost\"\nargv = [\"bash\", \"scripts/does-not-exist.sh\"]\n",
+    )
+    .unwrap();
+
+    assert!(
+        run_with_status(&root, Format::Text, false, &repo_status(&root))
+            .await
+            .is_ok()
+    );
+
+    let message = run_with_status(&root, Format::Text, true, &repo_status(&root))
+        .await
+        .unwrap_err()
+        .to_string();
+    assert!(message.contains("scripts/does-not-exist.sh"), "{message}");
+}
+
 /// An installed commit-msg hook whose script is missing blocks every commit;
 /// doctor must report that instead of `[OK] commit-msg hook: installed`.
 #[tokio::test(flavor = "current_thread")]

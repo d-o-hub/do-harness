@@ -259,6 +259,10 @@ pub(crate) fn run_sensor(
     cancel: &AtomicBool,
     baselines: &Baselines,
 ) -> SensorResult {
+    if let Some(result) = missing_argv_path_result(spec, root) {
+        return result;
+    }
+
     let max_retries = spec
         .retry
         .unwrap_or(if spec.transient_exit_codes.is_empty() {
@@ -290,6 +294,33 @@ pub(crate) fn run_sensor(
         attempts += 1;
         thread::sleep(Duration::from_millis(50));
     }
+}
+
+/// Builds the pre-execution failure for a sensor whose `argv` names a path
+/// that does not exist.
+///
+/// The command could still exit 0 (an interpreter that ignores a missing
+/// script, a wrapper that swallows the error), so the harness refuses to
+/// record a pass over an unmeasured tree. The result is `NotRun`: no process
+/// was spawned.
+fn missing_argv_path_result(spec: &SensorSpec, root: &Path) -> Option<SensorResult> {
+    let missing = crate::argv_paths::missing_paths(root, spec);
+    if missing.is_empty() {
+        return None;
+    }
+    let mut result = sensor_result(
+        spec,
+        false,
+        None,
+        0,
+        format!(
+            "sensor '{}' argv names missing path(s): {}",
+            spec.name,
+            missing.join(", ")
+        ),
+    );
+    result.execution = crate::report::Execution::NotRun;
+    Some(result)
 }
 
 #[cfg(test)]

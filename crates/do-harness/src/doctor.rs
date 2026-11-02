@@ -5,6 +5,8 @@ use std::path::Path;
 
 use anyhow::Result;
 
+use crate::argv_paths::{self, MissingArgvPath};
+use crate::config;
 use crate::dbcheck;
 use crate::hook_script::BinSource;
 use crate::hooks;
@@ -116,6 +118,21 @@ pub(crate) async fn run_with_status(
         );
     }
 
+    // A sensor whose argv names a missing file can still exit 0, so the gate
+    // goes green over an unmeasured tree.
+    let (sensor_argv_missing, config_error) = check_sensor_argv(root).await;
+    if let Some(err) = config_error {
+        failures.push(format!("sensor config unreadable: {err}"));
+    }
+    if strict {
+        for missing in &sensor_argv_missing {
+            failures.push(format!(
+                "sensor '{}' argv path missing: {}",
+                missing.sensor, missing.arg
+            ));
+        }
+    }
+
     let db_res = dbcheck::probe(root).await;
     let db_ok = match &db_res {
         Ok(health) => !health.is_blocking(),
@@ -208,6 +225,15 @@ pub(crate) async fn run_with_status(
             "event_chain": chain.to_json(),
             "orphan_tasks": orphan_tasks,
             "stale_task_export": stale_export,
+            "sensor_argv": {
+                "missing": sensor_argv_missing
+                    .iter()
+                    .map(|missing| serde_json::json!({
+                        "sensor": missing.sensor,
+                        "path": missing.arg
+                    }))
+                    .collect::<Vec<_>>()
+            },
             "failures": failures
         });
         println!("{json}");
@@ -255,6 +281,14 @@ pub(crate) async fn run_with_status(
             } else {
                 println!("  [WARN] {name} hook: absent");
             }
+        }
+
+        for missing in &sensor_argv_missing {
+            let mark = if strict { "FAIL" } else { "WARN" };
+            println!(
+                "  [{mark}] sensor '{}' argv path missing: {}",
+                missing.sensor, missing.arg
+            );
         }
 
         match &db_res {
@@ -320,6 +354,18 @@ pub(crate) fn describe_binary(source: &BinSource) -> String {
         BinSource::Env(path) => format!("env:{}", path.display()),
         BinSource::Path(path) => format!("path:{}", path.display()),
         BinSource::Repo(path) => format!("repo:{}", path.display()),
+    }
+}
+
+/// Resolves path-looking `argv` arguments for the effective sensors. Returns
+/// the missing ones and a config-load error, if any.
+async fn check_sensor_argv(root: &Path) -> (Vec<MissingArgvPath>, Option<String>) {
+    match config::load_raw(root, None).await {
+        Ok((cfg, _)) => (
+            argv_paths::missing_paths_for(root, cfg.effective_sensors()),
+            None,
+        ),
+        Err(err) => (Vec::new(), Some(format!("{err:#}"))),
     }
 }
 
