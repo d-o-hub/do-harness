@@ -42,7 +42,11 @@ async fn migrate_rejects_database_from_newer_binary() {
     .unwrap();
 
     let err = migrate(&conn).await.unwrap_err();
+    let message = err.to_string();
     assert!(matches!(err, DbError::FutureDatabase { applied: 9999, .. }));
+    assert!(message.contains("9999"), "{message}");
+    assert!(message.contains("upgrade"), "{message}");
+    assert!(message.contains("DO_HARNESS_BIN"), "{message}");
 }
 
 /// A fresh connection has no tracking table, so inspection reports an

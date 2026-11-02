@@ -74,7 +74,8 @@ impl DbHealth {
             DbHealth::Future { applied, known } => (
                 "FAIL",
                 format!(
-                    "newer than this binary ({applied} applied, max {known}); rebuild: cargo build --release -p do-harness"
+                    "newer than this binary ({applied} applied, max {known}); this do-harness v{} is older than the state database — upgrade it (npm install -g do-harness@latest, cargo install do-harness) or set DO_HARNESS_BIN to the newer build, then re-run",
+                    env!("CARGO_PKG_VERSION")
                 ),
             ),
         }
@@ -183,7 +184,8 @@ mod tests {
         .await
         .unwrap();
 
-        match probe(dir.path()).await.unwrap() {
+        let health = probe(dir.path()).await.unwrap();
+        match health {
             DbHealth::Future { applied, known } => {
                 assert_eq!(applied, 9999);
                 // Relationship, not exact value: the catalog grows with every
@@ -192,6 +194,10 @@ mod tests {
             }
             other => panic!("expected Future, got {other:?}"),
         }
+        let (mark, line) = health.render();
+        assert_eq!(mark, "FAIL");
+        assert!(line.contains("upgrade"), "{line}");
+        assert!(line.contains("DO_HARNESS_BIN"), "{line}");
     }
 
     #[tokio::test(flavor = "current_thread")]

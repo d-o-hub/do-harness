@@ -471,5 +471,10 @@ The harness enforces strict fail-closed contract rules across all supported pack
 - Hooks resolve the binary as `$DO_HARNESS_BIN`, then `do-harness` on `PATH`,
   then `<repo>/target/release/do-harness`. Set `DO_HARNESS_BIN` for custom
   locations (e.g. an npx-managed copy or a version manager shim).
+- `state database has migration N, newer than this binary knows (max M)`:
+  the `do-harness` on `PATH` is older than the workspace state. Upgrade it
+  (`npm install -g do-harness@latest`, `cargo install do-harness`) or point
+  `DO_HARNESS_BIN` at the newer build; `do-harness doctor` reports the same
+  skew before a hook blocks a commit.
 - `do-harness doctor --strict` fails when the binary lives under `target/` or
   a managed hook is missing.
