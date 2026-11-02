@@ -43,6 +43,16 @@ pub(crate) fn sensor_result(
 ) -> SensorResult {
     let redactor = crate::redaction::Redactor::from_environment(&spec.redact_env);
     let output = redactor.owned_text(output);
+    // A `test` sensor that ran zero tests is a failed gate, not a pass
+    // (AGENTS.md section 4). The Rust pack gets this from `cargo nextest`; a
+    // delegated `test` sensor is caught from the runner's own total summary.
+    let vacuous = ok && spec.name == "test" && super::vacuous::zero_test_total(&output);
+    let ok = ok && !vacuous;
+    let output = if vacuous {
+        format!("{output}\nFAIL: the test sensor ran zero tests; a green run would be vacuous")
+    } else {
+        output
+    };
     let severity = spec.effective_severity();
     let warned = ok
         && output
