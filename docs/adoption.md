@@ -122,8 +122,11 @@ technical runtime enforcement over tool execution. The run ends with
 `Initial verification: GREEN | INCOMPLETE | RED | VACUOUS`; RED exits non-zero.
 `INCOMPLETE` means every generated sensor passed but a core one (`fmt`,
 `check`, `clippy`, `test`) was omitted for missing tooling — for example
-`test` without `cargo-nextest` — so the pass is not full evidence. Install the
-tool and re-run `init --force` to add the sensor.
+`clippy` without the clippy component — so the pass is not full evidence.
+Install the tool and re-run `init --force` to add the sensor. The `test`
+sensor is never omitted for a missing `cargo-nextest`: it runs
+`scripts/check-test.sh`, which prefers nextest and falls back to `cargo test`
+with its own zero-test guard.
 
 
 ### Refreshing the skill-creator validator
