@@ -1,7 +1,12 @@
-//! Typed contracts for impact-gated feedback and issue proposals (WF-09).
+//! Data contracts for impact-gated feedback and issue proposals (WF-09).
+//!
+//! The flow is function-based: `draft::generate_drafts` produces
+//! [`FeedbackDraft`]s and `submit::submit_draft` returns a
+//! [`SubmissionResult`], with receipts persisted as JSON under
+//! `.do-harness/feedback/`. There is no command/event layer here, so this
+//! module holds only the values that cross those boundaries.
 
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
 
 /// Maximum excerpt length stored in a feedback draft.
 pub const MAX_EXCERPT_BYTES: usize = 2048;
@@ -77,48 +82,4 @@ pub enum SubmissionResult {
         target_repo: String,
         would_create: bool,
     },
-}
-
-#[allow(dead_code)]
-/// Command to generate local feedback drafts.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DraftFeedbackCommand {
-    pub target_repo: String,
-    pub window_days: Option<i64>,
-    pub min_fires: Option<u32>,
-    pub out: Option<PathBuf>,
-}
-
-#[allow(dead_code)]
-/// Command to submit an explicit feedback draft.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SubmitFeedbackCommand {
-    pub draft_path: PathBuf,
-    pub target_repo: Option<String>,
-    pub skip_confirmation: bool,
-    pub dry_run: bool,
-}
-
-#[allow(dead_code)]
-/// Domain event: a candidate was drafted.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct FeedbackCandidateDrafted {
-    pub fingerprint: String,
-    pub target_repo: String,
-    pub title: String,
-    pub fire_count: u32,
-    pub created_at: i64,
-}
-
-#[allow(dead_code)]
-/// Domain event: an issue was submitted.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct FeedbackSubmitted {
-    pub fingerprint: String,
-    pub target_repo: String,
-    pub issue_number: u64,
-    pub issue_url: String,
-    pub submitted_at: i64,
 }
