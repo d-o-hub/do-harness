@@ -2,8 +2,10 @@
 //! AGENTS.md section 4, "a green sensor that executed zero checks is a failed
 //! gate, not evidence".
 //!
-//! The `test` sensor runs `cargo nextest run` without `--no-tests=pass`, so a
-//! suite that shrank to zero fails the gate instead of reporting green.
+//! The generated `test` sensor runs `scripts/check-test.sh`, which prefers
+//! `cargo nextest run` (no `--no-tests=pass`) and falls back to `cargo test`
+//! behind its own zero-test guard, so a suite that shrank to zero fails the
+//! gate instead of reporting green on either path.
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
@@ -25,14 +27,6 @@ fn run(cmd: &mut Command) -> (bool, String, String) {
     )
 }
 
-/// Whether the `test` sensor can run at all on this host.
-fn nextest_available() -> bool {
-    Command::new("cargo")
-        .args(["nextest", "--version"])
-        .output()
-        .is_ok_and(|out| out.status.success())
-}
-
 /// The scaffold ships one unit test, so `verify --only test` is green; deleting
 /// every test must flip it to a failure. Under `--no-tests=pass` the second
 /// half of this proof is green too, which is the vacuous gate this test exists
@@ -49,14 +43,9 @@ fn test_sensor_fails_when_the_workspace_has_no_tests() {
     let (ok, out, err) = run(harness(dir.path()).arg("init"));
     assert!(ok, "init failed:\n{out}\n{err}");
 
-    // A greenfield `do-harness.toml` delegates `test` to the built-in pack, so
-    // the argv itself is pinned in `src/config/tests.rs` — a pin that holds on
-    // hosts without cargo-nextest. What follows is the behaviour it protects.
-    if !nextest_available() {
-        eprintln!("SKIP: the zero-test proof needs cargo-nextest on PATH");
-        return;
-    }
-
+    // The generated `do-harness.toml` points `test` at `scripts/check-test.sh`,
+    // which guards the zero-test case on both the nextest and `cargo test`
+    // paths, so this proof runs on every host with cargo.
     let (green, stdout, stderr) =
         run(harness(dir.path()).args(["verify", "--only", "test", "--format", "json"]));
     assert!(
