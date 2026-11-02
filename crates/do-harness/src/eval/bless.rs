@@ -15,6 +15,12 @@ pub(super) async fn bless_skill(
     if report.gate_failed {
         bail!("cannot bless skill '{name}': structure gate failed; fix it and rerun with --bless");
     }
+    if report.evals_invalid {
+        bail!(
+            "cannot bless skill '{name}': evals/evals.json does not parse; \
+             fix the fixture and rerun with --bless"
+        );
+    }
     match (report.graded, report.passed) {
         (0, _) => {}
         (graded, passed) if passed < graded => {

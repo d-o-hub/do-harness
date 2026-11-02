@@ -57,6 +57,10 @@ pub(super) struct SkillReport {
     /// Execution mode this report was produced in.
     pub(super) mode: EvalMode,
     pub(super) gate_failed: bool,
+    /// The structure gate did not fail, but `evals/evals.json` does not parse.
+    /// A fixture that never loaded is a failed input, not a skill that graded
+    /// nothing, so the run must not report success.
+    pub(super) evals_invalid: bool,
     pub(super) line: String,
     pub(super) pass_rate: Option<f64>,
     pub(super) graded: u32,
@@ -157,6 +161,7 @@ pub(super) async fn gate_and_parse(
         Ok(evals) => Ok(GateOutcome::Ready { structure, evals }),
         Err(err) => {
             let mut report = empty_report();
+            report.evals_invalid = true;
             report.line = format!(
                 "{name}: structure={structure} evals-invalid: {}",
                 fixture_parse_error(&err)
@@ -196,6 +201,7 @@ fn empty_report() -> SkillReport {
     SkillReport {
         mode: EvalMode::Deterministic,
         gate_failed: false,
+        evals_invalid: false,
         line: String::new(),
         pass_rate: None,
         graded: 0,
@@ -288,6 +294,7 @@ pub(super) fn report_from_outcome(
     SkillReport {
         mode: EvalMode::Deterministic,
         gate_failed: false,
+        evals_invalid: false,
         line,
         pass_rate: outcome.pass_rate,
         graded: outcome.graded,
