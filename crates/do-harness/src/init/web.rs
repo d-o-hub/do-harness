@@ -46,6 +46,21 @@ pub(super) fn scaffold_web_scripts(
             "scripts/i18n-audit.mjs",
             include_str!("../../templates/scripts/i18n-audit.mjs"),
         ),
+    ] {
+        write_if_absent(root, relative, body, opts.force, report)?;
+    }
+    scaffold_web_ui_pack(root, opts, report)
+}
+
+/// Writes the bundled web-ui audit library, its tests, and the fixtures the
+/// browser suite navigates to.
+///
+/// Split from [`scaffold_web_scripts`] to keep both under the line ceiling; the
+/// fixture list must stay in step with the suite's `route(fixtureServer…)`
+/// references, which `scaffolded_fixtures_cover_every_fixture_the_browser_suite_uses`
+/// pins.
+fn scaffold_web_ui_pack(root: &Path, opts: &InitOpts, report: &mut InitReport) -> Result<()> {
+    for (relative, body) in [
         (
             "scripts/web-ui/audit.test.mjs",
             include_str!("../../templates/scripts/web-ui/audit.test.mjs"),
@@ -113,6 +128,14 @@ pub(super) fn scaffold_web_scripts(
         (
             "scripts/web-ui/fixtures/app-shell.html",
             include_str!("../../templates/scripts/web-ui/fixtures/app-shell.html"),
+        ),
+        (
+            "scripts/web-ui/fixtures/scheme.html",
+            include_str!("../../templates/scripts/web-ui/fixtures/scheme.html"),
+        ),
+        (
+            "scripts/web-ui/fixtures/locales.html",
+            include_str!("../../templates/scripts/web-ui/fixtures/locales.html"),
         ),
     ] {
         write_if_absent(root, relative, body, opts.force, report)?;
