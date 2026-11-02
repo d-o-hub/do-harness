@@ -128,6 +128,8 @@ The harness is designed to be adopted by any codebase, Rust or not:
    captures prompts, tool arguments, or vault contents. `init` then runs the
    generated contract once and reports `Initial verification: GREEN | RED | VACUOUS`, exiting
    non-zero on RED instead of claiming a verified workspace.
+   Every pack also gets `scripts/check-commitlint.sh`, because the managed
+   `commit-msg` hook runs it and blocks the commit when it is missing.
 
    The generated `AGENTS.md` is a routing/completion contract only. This
    repository's own `AGENTS.md` and `.agents/skills/` describe how to develop
