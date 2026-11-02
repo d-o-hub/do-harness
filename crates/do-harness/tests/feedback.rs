@@ -418,3 +418,71 @@ async fn test_unattended_auto_mode_submits_end_to_end_without_prompts() {
     let argv = fs::read_to_string(fx.root.join("last_created_argv.txt")).unwrap();
     assert!(argv.contains("issue create --repo d-o-hub/do-harness"));
 }
+
+/// The global `--dry-run` promises "no side effects", so `feedback draft` must
+/// not write its output file under it. The subcommand has no `--dry-run` of its
+/// own, so the global flag is the only one a caller can pass — and it used to
+/// be ignored, writing the file anyway.
+#[test]
+fn draft_dry_run_does_not_write_the_output_file() {
+    let fx = fixture();
+    let out_path = fx.root.join("draft.json");
+
+    let out = harness(&fx)
+        .args([
+            "feedback",
+            "draft",
+            "--repo",
+            "d-o-hub/do-harness",
+            "--out",
+            out_path.to_str().unwrap(),
+            "--dry-run",
+        ])
+        .output()
+        .expect("run feedback draft --dry-run");
+    assert!(
+        out.status.success(),
+        "dry run must exit 0: stderr={}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        !out_path.exists(),
+        "a dry run must not write {}",
+        out_path.display()
+    );
+    assert!(
+        String::from_utf8_lossy(&out.stdout).contains("Dry run: would write"),
+        "the dry run must say what it would have written: {}",
+        String::from_utf8_lossy(&out.stdout)
+    );
+}
+
+/// The same command without `--dry-run` still writes, so the guard above is a
+/// real distinction rather than a command that never writes at all.
+#[test]
+fn draft_without_dry_run_writes_the_output_file() {
+    let fx = fixture();
+    let out_path = fx.root.join("draft.json");
+
+    let out = harness(&fx)
+        .args([
+            "feedback",
+            "draft",
+            "--repo",
+            "d-o-hub/do-harness",
+            "--out",
+            out_path.to_str().unwrap(),
+        ])
+        .output()
+        .expect("run feedback draft");
+    assert!(
+        out.status.success(),
+        "draft must exit 0: stderr={}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        out_path.exists(),
+        "a real run must write {}",
+        out_path.display()
+    );
+}

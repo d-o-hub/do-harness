@@ -15,7 +15,11 @@ use crate::report::Format;
 use types::SubmissionResult;
 
 /// Dispatches a feedback action.
-pub async fn run(root: &Path, action: FeedbackAction) -> Result<()> {
+///
+/// `global_dry_run` is the global `--dry-run`. The `submit` and `auto` subcommands
+/// also declare their own `--dry-run`, so the two are combined: a caller that
+/// passes the global flag before the subcommand must not publish either.
+pub async fn run(root: &Path, action: FeedbackAction, global_dry_run: bool) -> Result<()> {
     match action {
         FeedbackAction::Draft {
             repo,
@@ -26,9 +30,17 @@ pub async fn run(root: &Path, action: FeedbackAction) -> Result<()> {
         } => {
             let drafts = draft::generate_drafts(root, &repo, days, min_fires).await?;
             if let Some(out_path) = out {
-                let bytes = serde_json::to_vec_pretty(&drafts).context("serialize drafts")?;
-                fs::write(&out_path, bytes)
-                    .with_context(|| format!("write drafts to {}", out_path.display()))?;
+                if global_dry_run {
+                    println!(
+                        "Dry run: would write {} candidate(s) to {}",
+                        drafts.len(),
+                        out_path.display()
+                    );
+                } else {
+                    let bytes = serde_json::to_vec_pretty(&drafts).context("serialize drafts")?;
+                    fs::write(&out_path, bytes)
+                        .with_context(|| format!("write drafts to {}", out_path.display()))?;
+                }
             }
             match format {
                 Format::Json => {
@@ -53,6 +65,7 @@ pub async fn run(root: &Path, action: FeedbackAction) -> Result<()> {
             yes,
             dry_run,
         } => {
+            let dry_run = dry_run || global_dry_run;
             let bytes =
                 fs::read(&draft).with_context(|| format!("read draft file {}", draft.display()))?;
             let parsed_draft: types::FeedbackDraft =
@@ -89,6 +102,9 @@ pub async fn run(root: &Path, action: FeedbackAction) -> Result<()> {
             min_fires,
             dry_run,
             format,
-        } => auto::run_auto(root, &repo, days, min_fires, dry_run, format).await,
+        } => {
+            let dry_run = dry_run || global_dry_run;
+            auto::run_auto(root, &repo, days, min_fires, dry_run, format).await
+        }
     }
 }
