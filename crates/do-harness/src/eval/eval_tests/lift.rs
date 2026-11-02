@@ -25,6 +25,27 @@ async fn eval_run_with_lift(dir: &Path, skill: Option<&str>) -> Result<()> {
     .await
 }
 
+async fn eval_run_with_bless(dir: &Path, skill: Option<&str>) -> Result<()> {
+    run_eval(
+        dir,
+        EvalOpts {
+            skill,
+            bless: true,
+            list_skills: false,
+            fail_fast: false,
+            dry_run: false,
+            format: Format::Text,
+            approver: Some("test-approver"),
+            no_lift: false,
+            agent_cmd: None,
+            agent_timeout_secs: 600,
+            strict_fixtures: false,
+            trials: 1,
+        },
+    )
+    .await
+}
+
 #[tokio::test(flavor = "current_thread")]
 async fn lift_measures_guidance_dependence_and_persists_dims() {
     let dir = fixture_root(
@@ -159,4 +180,115 @@ async fn lift_at_floor_passes() {
     drop(conn);
 
     eval_run_with_lift(dir.path(), None).await.unwrap();
+}
+
+/// The lift floor belongs to a fixture set, not to a skill forever. A re-bless
+/// after the graders change must start the new set's floor from its own blessed
+/// lift instead of ratcheting against a floor measured on assertions that no
+/// longer exist — otherwise a legitimate fixture change makes the floor
+/// permanently unreachable and `eval --strict-fixtures` can never pass again.
+#[tokio::test(flavor = "current_thread")]
+async fn rebless_after_a_fixture_change_resets_the_lift_floor() {
+    let dir = fixture_root(
+        VALID_SKILL_MD,
+        Some(&single_case_json(&[
+            "contains:.agents/skills/test-skill/SKILL.md|fixture skill",
+            "exists:.",
+        ])),
+    );
+    // First fixture set: with skill 2/2, without skill 1/2, so lift is 0.5.
+    eval_run_with_bless(dir.path(), None).await.unwrap();
+    let conn = do_harness_db::connect_and_migrate(dir.path())
+        .await
+        .unwrap();
+    let floor = do_harness_db::get_lift_floor(
+        &conn,
+        "test-skill",
+        do_harness_types::EvalMode::Deterministic,
+    )
+    .await
+    .unwrap()
+    .expect("blessing must set a lift floor");
+    assert!(
+        (floor - 0.45).abs() < 1e-9,
+        "unexpected first floor {floor}"
+    );
+    drop(conn);
+
+    // The graders change: the skill-dependent assertion is gone, so both runs
+    // score 1.0 and lift is 0.0. That is a legitimate drop, not erosion.
+    fs::write(
+        dir.path()
+            .join(".agents/skills/test-skill/evals/evals.json"),
+        single_case_json(&["exists:."]),
+    )
+    .unwrap();
+    eval_run_with_bless(dir.path(), None).await.unwrap();
+
+    let conn = do_harness_db::connect_and_migrate(dir.path())
+        .await
+        .unwrap();
+    let floor = do_harness_db::get_lift_floor(
+        &conn,
+        "test-skill",
+        do_harness_types::EvalMode::Deterministic,
+    )
+    .await
+    .unwrap()
+    .expect("the new fixture set must have a floor");
+    assert!(
+        floor < 0.0,
+        "the new fixture set's floor must come from its own lift, got {floor}"
+    );
+    drop(conn);
+
+    // And the eval passes instead of failing LIFT-MISS forever.
+    eval_run_with_lift(dir.path(), None).await.unwrap();
+}
+
+/// The fixture-set boundary is the only place the floor may fall. Re-blessing
+/// the *same* graders must keep ratcheting, so guidance erosion is still caught
+/// and the reset above cannot be used as a general escape hatch.
+#[tokio::test(flavor = "current_thread")]
+async fn rebless_with_unchanged_graders_keeps_the_ratchet() {
+    let dir = fixture_root(
+        VALID_SKILL_MD,
+        Some(&single_case_json(&[
+            "contains:.agents/skills/test-skill/SKILL.md|fixture skill",
+            "exists:.",
+        ])),
+    );
+    eval_run_with_bless(dir.path(), None).await.unwrap();
+
+    // Raise the floor above what this fixture set's lift would derive.
+    let conn = do_harness_db::connect_and_migrate(dir.path())
+        .await
+        .unwrap();
+    do_harness_db::raise_lift_floor(
+        &conn,
+        "test-skill",
+        do_harness_types::EvalMode::Deterministic,
+        0.9,
+    )
+    .await
+    .unwrap();
+    drop(conn);
+
+    // Same graders, so the re-bless must not lower the floor back to 0.45.
+    eval_run_with_bless(dir.path(), None).await.unwrap();
+    let conn = do_harness_db::connect_and_migrate(dir.path())
+        .await
+        .unwrap();
+    let floor = do_harness_db::get_lift_floor(
+        &conn,
+        "test-skill",
+        do_harness_types::EvalMode::Deterministic,
+    )
+    .await
+    .unwrap()
+    .expect("floor");
+    assert!(
+        (floor - 0.9).abs() < 1e-9,
+        "an unchanged fixture set must keep its ratchet, got {floor}"
+    );
 }

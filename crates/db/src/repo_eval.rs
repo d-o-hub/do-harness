@@ -9,7 +9,7 @@ mod bars;
 
 pub use bars::{
     bless_grader_baseline, get_grader_baseline, get_lift_floor, get_skill_bar, list_grader_blesses,
-    raise_lift_floor, raise_skill_bar,
+    raise_lift_floor, raise_skill_bar, set_lift_floor,
 };
 
 /// Insert parameters for a new skill-eval run.
@@ -309,5 +309,7 @@ pub async fn max_pass_rate(conn: &Connection, skill_name: &str) -> Result<Option
     }
 }
 
+#[cfg(test)]
+mod floor_tests;
 #[cfg(test)]
 mod tests;

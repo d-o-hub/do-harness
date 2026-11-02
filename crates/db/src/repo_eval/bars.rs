@@ -103,6 +103,39 @@ pub async fn raise_lift_floor(
     Ok(updated > 0)
 }
 
+/// Sets a skill's Skill Lift floor for `mode` to `floor`, lowering it when
+/// `floor` is lower.
+///
+/// This is the fixture-set boundary, not a general escape hatch: a lift floor
+/// is measured against one set of graders, so a re-bless after the graders
+/// change must start the new set's floor from its own lift. Ratcheting across
+/// that boundary makes a legitimate fixture change permanently unreachable.
+/// Within one fixture set [`raise_lift_floor`] still applies.
+///
+/// Returns whether the stored floor changed.
+///
+/// # Errors
+///
+/// Returns an error when the upsert statement fails.
+pub async fn set_lift_floor(
+    conn: &Connection,
+    skill_name: &str,
+    mode: EvalMode,
+    floor: f64,
+) -> Result<bool> {
+    let updated = conn
+        .execute(
+            "INSERT INTO skill_lift_floors (skill_name, mode, floor, updated_at) \
+             VALUES (?1, ?2, ?3, ?4) \
+             ON CONFLICT(skill_name, mode) DO UPDATE SET \
+               floor = excluded.floor, updated_at = excluded.updated_at \
+             WHERE excluded.floor != skill_lift_floors.floor",
+            params!(skill_name, mode.as_str(), floor, unix_now()),
+        )
+        .await?;
+    Ok(updated > 0)
+}
+
 /// Returns a skill's grader baseline, if it has been blessed.
 ///
 /// # Errors

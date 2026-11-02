@@ -22,7 +22,7 @@
 | CG-04 | Workflow preflights | verified | Updated `preflight.sh` in issue-to-pr & pr-triage; updated `start-item.sh` in issue-to-pr to call `latest-main.sh` and removed inline fetch | Hermetic workflow tests in `test_latest_main.py` passed (7/7); dry-run and error refusal verified | Completed |
 | CG-05 | AGENTS/harness/skill instructions | verified | Updated `AGENTS.md`, `harness/SKILL.md`, `heuristics.md`, `htn-planner/SKILL.md`, `issue-to-pr/SKILL.md`, `pr-triage/SKILL.md` | `quick_validate.py` passed on all 4 skills; `check-skills-sync.sh` passed | Completed |
 | CG-06 | Fixture gate/scaffolding/sensor | verified | Removed obsolete `reads_guidance` in `crates/do-harness/src/eval/fixture.rs`; registered template helper in `init/skills.rs`; added `test_latest_main.py` sensor and invariant | `fixture_tests` passed (3/3); `check-invariants` passed (72 headers); `check-skills-sync` passed; adopter smoke passed | Completed |
-| CG-07 | End-to-end verification | blocked | Regression tests and full repository verification ran; eval `--strict-fixtures` remains blocked by `LIFT-MISS` | Current test suite passes; full verify exited 0 with 39 PASS and one advisory WARN; harness and issue-to-pr evals remain below raise-only local floors | Resolve the documented eval-floor blocker without weakening the gate |
+| CG-07 | End-to-end verification | verified | Regression tests and full repository verification ran; the eval-floor blocker is resolved by scoping the Skill Lift floor to the fixture set (FU-05) | Current test suite passes; full verify exited 0 with 39 PASS and one advisory WARN; `eval --strict-fixtures` now exits 0 for `harness` (17/17, lift +0.06) and `issue-to-pr` (47/47, lift +0.00) | None |
 
 ## Changes
 
