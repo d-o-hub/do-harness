@@ -168,7 +168,14 @@ async fn fails_when_state_database_is_future() {
 
     let message = result.unwrap_err().to_string();
     assert!(message.contains("doctor check failed"));
-    assert!(message.contains("rebuild"));
+    assert!(message.contains("upgrade"), "{message}");
+    assert!(message.contains("DO_HARNESS_BIN"), "{message}");
+    // The skew is reported once, not repeated as three "unreadable" checks.
+    assert!(
+        !message.contains("task/event checks unreadable"),
+        "{message}"
+    );
+    assert!(!message.contains("event chain unreadable"), "{message}");
 }
 
 /// Out-of-band writes that leave a task without its `TaskAdded` event are
