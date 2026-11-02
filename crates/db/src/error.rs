@@ -145,15 +145,14 @@ pub enum DbError {
     /// The state database was written by a newer harness; this binary's
     /// migration catalog does not cover it (downgrade guard).
     #[error(
-        "state database has migration {applied}, newer than this binary knows (max {known_max}): this do-harness v{binary_version} is older than the state database; upgrade the binary (npm install -g do-harness@latest, cargo install do-harness) or set DO_HARNESS_BIN to the newer build, then re-run"
+        "state database has migration {applied}, newer than this binary knows (max {known_max}): this do-harness v{} is older than the state database; upgrade the binary (npm install -g do-harness@latest, cargo install do-harness) or set DO_HARNESS_BIN to the newer build, then re-run",
+        env!("CARGO_PKG_VERSION")
     )]
     FutureDatabase {
         /// The applied migration version this binary does not know.
         applied: i64,
         /// The highest version in this binary's embedded catalog.
         known_max: i64,
-        /// Package version of this binary, so the diagnostic names the skew.
-        binary_version: &'static str,
     },
     /// An applied migration's SQL differs from this binary's embedded catalog.
     ///

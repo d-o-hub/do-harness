@@ -198,7 +198,6 @@ pub async fn migrate(conn: &Connection) -> Result<()> {
         return Err(DbError::FutureDatabase {
             applied: *future,
             known_max: newest_catalog,
-            binary_version: env!("CARGO_PKG_VERSION"),
         });
     }
     let stored = applied_checksums(conn).await?;
