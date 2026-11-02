@@ -192,17 +192,7 @@ pub async fn init_workspace(root: &Path, opts: &InitOpts) -> Result<InitReport> 
         opts.force,
         &mut report,
     )?;
-    // Language-agnostic: the drift check reads a status document and `gh`, so
-    // every scaffold gets it (undeclared scripts are inert until a config
-    // declares the `project-check` sensor).
-    write_if_absent(
-        root,
-        "scripts/check-tracker-drift.sh",
-        CHECK_TRACKER_DRIFT,
-        opts.force,
-        &mut report,
-    )?;
-    crate::fs_perm::set_owner_exec(&root.join("scripts/check-tracker-drift.sh"))?;
+    scaffold_shared_scripts(root, opts, &mut report)?;
     // The optional context-sanitization check is language-agnostic and
     // independent of skill scaffolding, so it ships in every pack and under
     // `--minimal`. The sensor itself stays opt-in: the script is inert until
@@ -418,7 +408,6 @@ pub(crate) async fn seed_invariants(root: &Path, prune: bool) -> Result<usize> {
 fn scaffold_scripts(root: &Path, opts: &InitOpts, report: &mut InitReport) -> Result<()> {
     for (relative, body) in [
         ("scripts/check-loc.sh", CHECK_LOC),
-        ("scripts/check-commitlint.sh", CHECK_COMMITLINT),
         ("scripts/check-deps.sh", CHECK_DEPS),
         ("scripts/check-audit.sh", CHECK_AUDIT),
         ("scripts/check-coverage.sh", CHECK_COVERAGE),
@@ -427,6 +416,24 @@ fn scaffold_scripts(root: &Path, opts: &InitOpts, report: &mut InitReport) -> Re
             "scripts/check-release-preflight.sh",
             CHECK_RELEASE_PREFLIGHT,
         ),
+    ] {
+        write_if_absent(root, relative, body, opts.force, report)?;
+        crate::fs_perm::set_owner_exec(&root.join(relative))?;
+    }
+    Ok(())
+}
+
+/// Writes the language-agnostic helper scripts every pack needs and marks them
+/// executable.
+///
+/// The drift check reads a status document and `gh` (undeclared scripts are
+/// inert until a config declares the `project-check` sensor). The commitlint
+/// script is the managed `commit-msg` hook's dependency, so a pack without it
+/// would block every commit after `init` + `hook install`.
+fn scaffold_shared_scripts(root: &Path, opts: &InitOpts, report: &mut InitReport) -> Result<()> {
+    for (relative, body) in [
+        ("scripts/check-tracker-drift.sh", CHECK_TRACKER_DRIFT),
+        ("scripts/check-commitlint.sh", CHECK_COMMITLINT),
     ] {
         write_if_absent(root, relative, body, opts.force, report)?;
         crate::fs_perm::set_owner_exec(&root.join(relative))?;

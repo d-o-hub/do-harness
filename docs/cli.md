@@ -452,6 +452,8 @@ derived from the included subset), writes the portable skill subset
 The generated `AGENTS.md` embeds a pinned installer command so an agent
 landing in the repository can obtain the exact CLI version it was initialized
 with.
+Every pack scaffolds `scripts/check-commitlint.sh`: the managed `commit-msg`
+hook runs it and fails closed when it is absent.
 The Rust pack also scaffolds the release step: `plans/RELEASING.md` (runbook)
 and `scripts/check-release-preflight.sh` (read-only; every version pin must
 agree, and `--release` additionally fails when the target is already
