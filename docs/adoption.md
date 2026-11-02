@@ -252,6 +252,13 @@ pack entirely. Non-empty `pre-commit` and `pre-push` hook selections under
 and any unknown sensor name fails configuration loading before hooks are
 written. An empty hook list defaults to running the full effective suite.
 
+`verify` resolves the path-looking arguments in each sensor's `argv` before it
+spawns the command. A missing script or data file fails the sensor instead of
+recording a pass, because an interpreter or wrapper can exit 0 while ignoring
+the missing path. `doctor` reports the same miss as a warning, or as a failure
+under `--strict`. Flags, values, shell command strings passed to `-c`, URLs and
+git refs are not treated as paths.
+
 Status documents rot silently, so `init` also scaffolds a reference
 `project-check`: `scripts/check-tracker-drift.sh` compares `<n> open PRs` /
 `<n> open issues` claims in a status document with `gh pr list` / `gh issue
