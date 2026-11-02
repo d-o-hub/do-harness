@@ -335,6 +335,34 @@ async fn init_no_seed_skips_seeding() {
     assert!(!dir.path().join(".do-harness/agent_state.db").exists());
 }
 
+/// The generated pack must always ship a real `test` gate. The wrapper prefers
+/// nextest and falls back to `cargo test` behind its own zero-test guard, so a
+/// host without nextest still runs the suite instead of losing the sensor —
+/// which is what made `init` report a green baseline that never ran a test.
+#[tokio::test(flavor = "current_thread")]
+async fn generated_test_sensor_uses_the_fallback_wrapper() {
+    let dir = tempfile::tempdir().unwrap();
+    init_workspace(dir.path(), &opts(Some(Language::Rust)))
+        .await
+        .unwrap();
+    let path = dir.path().join("do-harness.toml");
+    let cfg = crate::config::load(dir.path(), Some(&path)).await.unwrap();
+    let test = cfg
+        .sensors
+        .iter()
+        .find(|spec| spec.name == "test")
+        .expect("the generated pack must ship a test sensor");
+    assert_eq!(
+        test.argv,
+        vec!["bash".to_owned(), "scripts/check-test.sh".to_owned()],
+        "the test sensor must go through the nextest/cargo-test wrapper"
+    );
+    assert!(
+        dir.path().join("scripts/check-test.sh").exists(),
+        "the wrapper the sensor names must be scaffolded"
+    );
+}
+
 /// The generated `feedback` set must name every sensor the generated
 /// `pre-commit` hook runs.
 ///

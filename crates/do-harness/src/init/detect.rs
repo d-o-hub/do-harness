@@ -193,7 +193,20 @@ fn rust_candidates() -> Vec<Candidate> {
         candidate("fmt", cargo_fmt, cargo_fmt, ""),
         candidate("check", cargo, cargo, ""),
         candidate("clippy", cargo_clippy, cargo_clippy, ""),
-        candidate("test", cargo_nextest, cargo_nextest, ""),
+        // The generated `test` sensor is a wrapper that prefers nextest and
+        // falls back to `cargo test` with its own zero-test guard, so the
+        // sensor exists wherever cargo does. nextest's absence is reported as
+        // a degraded detail, not as an omitted sensor.
+        candidate(
+            "test",
+            cargo,
+            cargo,
+            if cargo_nextest {
+                ""
+            } else {
+                "cargo-nextest not installed; the test sensor falls back to cargo test"
+            },
+        ),
         candidate("doctest", cargo, cargo, ""),
         candidate("coverage", cargo_llvm_cov, cargo_llvm_cov, ""),
         candidate("loc", bash, bash, ""),
