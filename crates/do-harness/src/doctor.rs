@@ -16,6 +16,8 @@ use crate::report::Format;
 enum ChainStatus {
     /// No state database is present, so there is nothing to audit.
     Absent,
+    /// The state database is newer than this binary, so the audit cannot run.
+    Skipped,
     /// The chain verified end to end.
     Intact { count: i64 },
     /// The first divergence was found at `seq`.
@@ -28,6 +30,7 @@ impl ChainStatus {
     fn to_json(&self) -> serde_json::Value {
         match self {
             Self::Absent => serde_json::Value::Null,
+            Self::Skipped => serde_json::json!({ "status": "skipped" }),
             Self::Intact { count } => serde_json::json!({ "status": "intact", "count": count }),
             Self::Tampered { seq } => serde_json::json!({ "status": "tampered", "seq": seq }),
             Self::Unreadable => serde_json::json!({ "status": "unreadable" }),
@@ -118,6 +121,10 @@ pub(crate) async fn run_with_status(
         Ok(health) => !health.is_blocking(),
         Err(_) => false,
     };
+    // A database newer than this binary cannot be opened for the task and
+    // chain checks either; running them would report the same skew three
+    // times as "unreadable" and bury the one actionable failure.
+    let db_blocked = matches!(&db_res, Ok(health) if health.is_blocking());
     if let Err(e) = &db_res {
         failures.push(format!("state database unreadable: {e:#}"));
     } else if let Ok(health) = &db_res {
@@ -131,7 +138,9 @@ pub(crate) async fn run_with_status(
     // the append-only workflow log and would otherwise go unnoticed. A read
     // failure must not masquerade as the all-clear: it is recorded as a
     // failure and the counts serialize as null instead of zero.
-    let task_health = if do_harness_db::db_path(root).exists() {
+    let task_health = if db_blocked {
+        None
+    } else if do_harness_db::db_path(root).exists() {
         match read_task_health(root).await {
             Ok(pair) => Some(pair),
             Err(err) => {
@@ -159,7 +168,9 @@ pub(crate) async fn run_with_status(
     // modes: it used to live only in the text branch, so `--format json`
     // assembled and returned its report before the audit ran, reporting
     // `ok: true` on a tampered chain.
-    let chain = if do_harness_db::db_path(root).exists() {
+    let chain = if db_blocked {
+        ChainStatus::Skipped
+    } else if do_harness_db::db_path(root).exists() {
         match crate::audit::audit_chain(root).await {
             Ok(crate::audit::ChainReport::Intact { count }) => ChainStatus::Intact { count },
             Ok(crate::audit::ChainReport::Tampered { seq }) => {
@@ -261,17 +272,26 @@ pub(crate) async fn run_with_status(
             Some(count) => println!(
                 "  [FAIL] event log: {count} task(s) without a TaskAdded event (out-of-band write)"
             ),
+            None if db_blocked => println!(
+                "  [SKIP] event log: not checked (state database is newer than this binary)"
+            ),
             None => println!("  [FAIL] event log: unreadable (see failures)"),
         }
 
         match stale_export {
             Some(true) => println!("  [FAIL] task export: plans/tasks.json lags the database"),
             Some(false) => println!("  [OK] task export: up to date or absent"),
+            None if db_blocked => println!(
+                "  [SKIP] task export: not checked (state database is newer than this binary)"
+            ),
             None => println!("  [FAIL] task export: unreadable (see failures)"),
         }
 
         match &chain {
             ChainStatus::Absent => {}
+            ChainStatus::Skipped => println!(
+                "  [SKIP] event chain: not checked (state database is newer than this binary)"
+            ),
             ChainStatus::Intact { count } => {
                 println!("  [OK] event chain: intact ({count} event(s))");
             }
