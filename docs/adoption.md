@@ -115,7 +115,9 @@ helpers plus `scripts/check-release-preflight.sh` and its `plans/RELEASING.md`
 runbook, `.gitignore` entries, the ignored `.agents/events/` metrics-event
 tree, and the local libSQL state. Scaffolding of `USE_RESTRICTIONS.md` is independent
 from skill scaffolding (it is written even under `--minimal`) and is emitted across
-all language packs (`rust`, `generic`, `web`, `node`). Existing policy files are never overwritten
+all language packs (`rust`, `generic`, `web`, `node`). Every pack also gets
+`scripts/check-commitlint.sh`, because the managed `commit-msg` hook runs it and
+fails closed when it is absent. Existing policy files are never overwritten
 without `--force`, and existing application source is never touched. Note that policy
 prose specifies behavioral expectations and human approval boundaries, but does not claim
 technical runtime enforcement over tool execution. The run ends with

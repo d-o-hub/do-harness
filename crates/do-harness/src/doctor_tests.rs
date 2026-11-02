@@ -77,9 +77,44 @@ async fn fails_when_binary_missing_and_names_the_reason() {
 async fn succeeds_when_binary_present_and_database_absent() {
     let (_temp, root) = fake_repo_with_git();
     stub_binary(&root);
+    fs::create_dir_all(root.join("scripts")).unwrap();
+    fs::write(
+        root.join("scripts/check-commitlint.sh"),
+        "#!/usr/bin/env bash\n",
+    )
+    .unwrap();
 
     assert!(
         run_with_status(&root, Format::Text, false, &repo_status(&root))
+            .await
+            .is_ok()
+    );
+}
+
+/// An installed commit-msg hook whose script is missing blocks every commit;
+/// doctor must report that instead of `[OK] commit-msg hook: installed`.
+#[tokio::test(flavor = "current_thread")]
+async fn fails_when_commit_msg_hook_lacks_its_script() {
+    let (_temp, root) = fake_repo_with_git();
+    stub_binary(&root);
+
+    let message = run_with_status(&root, Format::Text, false, &repo_status(&root))
+        .await
+        .unwrap_err()
+        .to_string();
+    assert!(message.contains("scripts/check-commitlint.sh"), "{message}");
+}
+
+/// Without the managed hook there is no dependency to check.
+#[tokio::test(flavor = "current_thread")]
+async fn missing_commitlint_script_is_fine_without_the_hook() {
+    let (_temp, root) = fake_repo_with_git();
+    stub_binary(&root);
+    let mut status = repo_status(&root);
+    status.commit_msg = false;
+
+    assert!(
+        run_with_status(&root, Format::Text, false, &status)
             .await
             .is_ok()
     );

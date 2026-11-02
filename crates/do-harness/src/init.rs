@@ -193,6 +193,17 @@ pub async fn init_workspace(root: &Path, opts: &InitOpts) -> Result<InitReport> 
         &mut report,
     )?;
     crate::fs_perm::set_owner_exec(&root.join("scripts/check-tracker-drift.sh"))?;
+    // The managed commit-msg hook execs this script in every pack, and the
+    // generic invariants name it, so it cannot be rust-pack-only: a fresh
+    // `init` + `hook install` would otherwise block every commit.
+    write_if_absent(
+        root,
+        "scripts/check-commitlint.sh",
+        CHECK_COMMITLINT,
+        opts.force,
+        &mut report,
+    )?;
+    crate::fs_perm::set_owner_exec(&root.join("scripts/check-commitlint.sh"))?;
     // The optional context-sanitization check is language-agnostic and
     // independent of skill scaffolding, so it ships in every pack and under
     // `--minimal`. The sensor itself stays opt-in: the script is inert until
@@ -408,7 +419,6 @@ pub(crate) async fn seed_invariants(root: &Path, prune: bool) -> Result<usize> {
 fn scaffold_scripts(root: &Path, opts: &InitOpts, report: &mut InitReport) -> Result<()> {
     for (relative, body) in [
         ("scripts/check-loc.sh", CHECK_LOC),
-        ("scripts/check-commitlint.sh", CHECK_COMMITLINT),
         ("scripts/check-deps.sh", CHECK_DEPS),
         ("scripts/check-audit.sh", CHECK_AUDIT),
         ("scripts/check-coverage.sh", CHECK_COVERAGE),
