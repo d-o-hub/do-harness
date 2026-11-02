@@ -103,6 +103,7 @@ const CHECK_COMMITLINT: &str = include_str!("../templates/scripts/check-commitli
 const CHECK_DEPS: &str = include_str!("../templates/scripts/check-deps.sh");
 const CHECK_AUDIT: &str = include_str!("../templates/scripts/check-audit.sh");
 const CHECK_COVERAGE: &str = include_str!("../templates/scripts/check-coverage.sh");
+const CHECK_TEST: &str = include_str!("../templates/scripts/check-test.sh");
 const CHECK_RELEASE_PREFLIGHT: &str =
     include_str!("../templates/scripts/check-release-preflight.sh");
 const NEXTEST_CONFIG: &str = include_str!("../assets/nextest.toml");
@@ -156,7 +157,16 @@ pub async fn init_workspace(root: &Path, opts: &InitOpts) -> Result<InitReport> 
     )?;
     let mut config = match report.language {
         Language::Rust => {
-            let sensors = detect::included_specs(root, report.language, &report.candidates);
+            let mut sensors = detect::included_specs(root, report.language, &report.candidates);
+            // The generated pack always ships a real test gate: the wrapper
+            // prefers nextest and falls back to `cargo test` with its own
+            // zero-test guard, so a host without nextest still runs the suite
+            // instead of losing the sensor entirely.
+            for spec in &mut sensors {
+                if spec.name == "test" {
+                    spec.argv = vec!["bash".to_owned(), "scripts/check-test.sh".to_owned()];
+                }
+            }
             generate_rust_config(&sensors)?
         }
         Language::Node => {
@@ -412,6 +422,7 @@ fn scaffold_scripts(root: &Path, opts: &InitOpts, report: &mut InitReport) -> Re
         ("scripts/check-deps.sh", CHECK_DEPS),
         ("scripts/check-audit.sh", CHECK_AUDIT),
         ("scripts/check-coverage.sh", CHECK_COVERAGE),
+        ("scripts/check-test.sh", CHECK_TEST),
         (
             "scripts/check-release-preflight.sh",
             CHECK_RELEASE_PREFLIGHT,
