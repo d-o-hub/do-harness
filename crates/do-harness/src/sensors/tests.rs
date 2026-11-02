@@ -9,6 +9,7 @@ mod blocked;
 mod filters;
 mod retry;
 mod severity;
+mod vacuous_gate;
 
 fn config_with(specs: &[(&str, &[&str])]) -> Config {
     Config {
