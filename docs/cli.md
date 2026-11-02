@@ -335,6 +335,13 @@ red/stale/missing, 2 on usage/config errors.
   without `--set`).
 - `--evidence <FILE>`: Read evidence from this file instead.
 - `--format <Format>`: Output format (`text` or `json`).
+- Unusable evidence names its remedy: the `no_evidence`,
+  `insufficient_coverage`, and `policy_changed` reasons carry a `recovery`
+  JSON field with the `do-harness verify --set <set> --record` command that
+  re-records evidence, and the text error ends with the same
+  `→ recover:` line. `insufficient_coverage` also lists the unrecorded
+  required sensors in `missing_sensors` and in the text error, so a targeted
+  `--only` re-run can cover the gap.
 
 ### `list`
 <!-- BEGIN GENERATED: cli-contract list -->
