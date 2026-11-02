@@ -103,6 +103,11 @@ fn status(root: &Path, set: &str) -> (Option<i32>, Value) {
     )
 }
 
+/// Runs `status --set <set>` in text mode, returning (exit code, stdout, stderr).
+fn status_text(root: &Path, set: &str) -> (Option<i32>, String, String) {
+    run(harness(root).arg("status").arg("--set").arg(set))
+}
+
 /// The central contract: green -> edit -> stale -> verify -> green.
 #[test]
 fn workspace_edit_cycles_green_stale_green() {
@@ -149,6 +154,17 @@ fn config_change_invalidates_evidence() {
     assert_eq!(code, Some(1));
     assert_eq!(doc["state"], serde_json::json!("stale"));
     assert_eq!(doc["reason"], serde_json::json!("policy_changed"));
+    assert_eq!(
+        doc["recovery"],
+        serde_json::json!("do-harness verify --set verification --record")
+    );
+
+    let (code, _stdout, stderr) = status_text(&root, "verification");
+    assert_eq!(code, Some(1));
+    assert!(
+        stderr.contains("→ recover: do-harness verify --set verification --record"),
+        "stale evidence must name the recovery command: {stderr}"
+    );
 }
 
 /// A relevant untracked file changes the workspace fingerprint.
@@ -192,6 +208,63 @@ fn no_evidence_reports_missing() {
     let (code, doc) = status(&root, "verification");
     assert_eq!(code, Some(1));
     assert_eq!(doc["state"], serde_json::json!("missing"));
+    assert_eq!(doc["reason"], serde_json::json!("no_evidence"));
+    assert_eq!(
+        doc["recovery"],
+        serde_json::json!("do-harness verify --set verification --record")
+    );
+
+    let (code, _stdout, stderr) = status_text(&root, "verification");
+    assert_eq!(code, Some(1));
+    assert!(
+        stderr.contains("→ recover: do-harness verify --set verification --record"),
+        "missing evidence must name the recovery command: {stderr}"
+    );
+}
+
+/// A partial run leaves the set uncovered; status names the missing sensors
+/// alongside the recovery command.
+#[test]
+fn insufficient_coverage_names_missing_sensors() {
+    let (_dir, root) = fixture_repo_with_sensors(
+        &[("a", &["true"] as &[_]), ("b", &["true"] as &[_])],
+        &[("verification", &["a", "b"] as &[_])],
+    );
+
+    let (code, stdout, stderr) = run(harness(&root)
+        .arg("verify")
+        .arg("--set")
+        .arg("verification")
+        .arg("--only")
+        .arg("a")
+        .arg("--format")
+        .arg("json"));
+    assert_eq!(
+        code,
+        Some(0),
+        "partial verify must pass: {stdout}\n{stderr}"
+    );
+
+    let (code, doc) = status(&root, "verification");
+    assert_eq!(code, Some(1));
+    assert_eq!(doc["state"], serde_json::json!("missing"));
+    assert_eq!(doc["reason"], serde_json::json!("insufficient_coverage"));
+    assert_eq!(doc["missing_sensors"], serde_json::json!(["b"]));
+    assert_eq!(
+        doc["recovery"],
+        serde_json::json!("do-harness verify --set verification --record")
+    );
+
+    let (code, _stdout, stderr) = status_text(&root, "verification");
+    assert_eq!(code, Some(1));
+    assert!(
+        stderr.contains("missing sensors: b"),
+        "coverage gap must name the unrecorded sensor: {stderr}"
+    );
+    assert!(
+        stderr.contains("→ recover: do-harness verify --set verification --record"),
+        "coverage gap must name the recovery command: {stderr}"
+    );
 }
 
 /// `status` never executes sensors: a probe-writing sensor must not run.

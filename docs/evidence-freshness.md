@@ -31,8 +31,11 @@ reuse retains its stricter no-symlink rule.
 
 `status` reports green for current passing evidence, red for matching failures,
 stale for drift or unknown provenance, and missing for absent/unreadable
-evidence or insufficient coverage. Pre/post input changes invalidate verify.
-v3/v4 documents remain readable, but need regeneration before reporting green.
+evidence or insufficient coverage. `no_evidence`, `insufficient_coverage`, and
+`policy_changed` carry the concrete recovery command (`verify --set <set>
+--record`), and `insufficient_coverage` names the unrecorded required sensors.
+Pre/post input changes invalidate verify. v3/v4 documents remain readable, but
+need regeneration before reporting green.
 
 Task advance and completion check current required named-sensor input
 identities, task method/index, and the latest task-scoped beat's status, exit

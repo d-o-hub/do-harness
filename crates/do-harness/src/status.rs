@@ -11,6 +11,7 @@
 //!   changed).
 //! - `missing`: no qualifying evidence exists.
 
+use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
 use serde::Serialize;
@@ -81,6 +82,14 @@ pub struct StatusReport {
     pub evidence: Option<EvidenceSide>,
     /// Current fingerprint side.
     pub current: CurrentSide,
+    /// Required sensors the evidence does not cover; empty unless the reason
+    /// is `insufficient_coverage`.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub missing_sensors: Vec<String>,
+    /// Command that re-records the evidence. Absent for states whose remedy
+    /// is not a `verify --record` run (`current`, `failures`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub recovery: Option<String>,
 }
 
 /// Default evidence path for `verify --set <set>` runs.
@@ -184,13 +193,51 @@ fn missing_report(
     } else {
         "no_evidence"
     };
+    report(
+        EvidenceState::Missing,
+        set,
+        reason,
+        None,
+        current,
+        Vec::new(),
+    )
+}
+
+/// Builds a status report, deriving the recovery hint from the reason.
+fn report(
+    state: EvidenceState,
+    set: Option<&str>,
+    reason: &str,
+    evidence: Option<EvidenceSide>,
+    current: CurrentSide,
+    missing_sensors: Vec<String>,
+) -> StatusReport {
     StatusReport {
-        state: EvidenceState::Missing,
+        state,
         set: set.map(ToOwned::to_owned),
         reason: reason.to_owned(),
-        evidence: None,
+        evidence,
         current,
+        missing_sensors,
+        recovery: recovery_hint(reason, set),
     }
+}
+
+/// The `verify` invocation that re-records evidence for the requested set.
+fn recovery_command(set: Option<&str>) -> String {
+    set.map_or_else(
+        || "do-harness verify --record".to_owned(),
+        |set| format!("do-harness verify --set {set} --record"),
+    )
+}
+
+/// Recovery hint for states whose remedy is re-recording the evidence.
+fn recovery_hint(reason: &str, set: Option<&str>) -> Option<String> {
+    matches!(
+        reason,
+        "no_evidence" | "insufficient_coverage" | "policy_changed"
+    )
+    .then(|| recovery_command(set))
 }
 
 /// Name changed or unknown input identities without exposing their values.
@@ -221,39 +268,10 @@ fn current_input_side(facts: &CurrentFacts, document: &EvidenceDocument) -> Curr
 /// the requested contract failed.
 fn decide(set: Option<&str>, facts: &CurrentFacts, document: &EvidenceDocument) -> StatusReport {
     let current_side = current_input_side(facts, document);
-    let evidence = EvidenceSide {
-        signal_set: document.signal_set.clone(),
-        verdict: document.summary.verdict.clone(),
-        workspace_fingerprint: document.workspace_fingerprint.clone(),
-        policy_fingerprint: document.policy_fingerprint.clone(),
-        failed: document
-            .sensors
-            .iter()
-            .filter(|s| s.verdict == "fail")
-            .map(|s| s.name.clone())
-            .collect(),
-    };
-    let passed: Vec<&str> = document
-        .sensors
-        .iter()
-        .filter(|s| s.verdict == "pass")
-        .map(|s| s.name.as_str())
-        .collect();
-    let executed: Vec<&str> = document.sensors.iter().map(|s| s.name.as_str()).collect();
-    // Same-set coverage counts executed sensors (a failing run still
-    // describes its contract); cross-set coverage counts only passed ones.
+    let evidence = evidence_side(document);
+    let (passed, executed) = recorded_sensors(document);
     let same_set = document.signal_set.as_deref() == set;
-    let covers = if same_set {
-        facts
-            .required
-            .iter()
-            .all(|name| executed.iter().any(|p| p == name))
-    } else {
-        facts
-            .required
-            .iter()
-            .all(|name| passed.iter().any(|p| p == name))
-    };
+    let covers = covers(facts, same_set, &executed, &passed);
     let workspace_match = document.workspace_fingerprint == facts.workspace;
     let policy_match = document.policy_fingerprint == facts.policy;
     let config_match = document.config_fingerprint == facts.config;
@@ -273,55 +291,120 @@ fn decide(set: Option<&str>, facts: &CurrentFacts, document: &EvidenceDocument) 
         if let Some(reason) = &document.invalidated_reason {
             let mut current = current_side.clone();
             current.failed.clone_from(&evidence.failed);
-            return StatusReport {
-                state: EvidenceState::Red,
-                set: set.map(ToOwned::to_owned),
-                reason: reason.clone(),
-                evidence: Some(evidence),
+            return report(
+                EvidenceState::Red,
+                set,
+                reason,
+                Some(evidence),
                 current,
-            };
+                Vec::new(),
+            );
         }
         if same_set && document.summary.verdict == "fail" {
             let mut current = current_side.clone();
             current.failed.clone_from(&evidence.failed);
-            return StatusReport {
-                state: EvidenceState::Red,
-                set: set.map(ToOwned::to_owned),
-                reason: "failures".to_owned(),
-                evidence: Some(evidence),
+            return report(
+                EvidenceState::Red,
+                set,
+                "failures",
+                Some(evidence),
                 current,
-            };
+                Vec::new(),
+            );
         }
-        return StatusReport {
-            state: EvidenceState::Green,
-            set: set.map(ToOwned::to_owned),
-            reason: "current".to_owned(),
-            evidence: Some(evidence),
-            current: current_side.clone(),
-        };
+        return report(
+            EvidenceState::Green,
+            set,
+            "current",
+            Some(evidence),
+            current_side,
+            Vec::new(),
+        );
     }
     if !covers {
-        return StatusReport {
-            state: EvidenceState::Missing,
-            set: set.map(ToOwned::to_owned),
-            reason: "insufficient_coverage".to_owned(),
-            evidence: Some(evidence),
-            current: current_side.clone(),
-        };
+        return report(
+            EvidenceState::Missing,
+            set,
+            "insufficient_coverage",
+            Some(evidence),
+            current_side,
+            missing_sensors(facts, same_set, &executed, &passed),
+        );
     }
-    let reason = if workspace_match && policy_ok {
+    report(
+        EvidenceState::Stale,
+        set,
+        stale_reason(workspace_match, policy_ok),
+        Some(evidence),
+        current_side,
+        Vec::new(),
+    )
+}
+
+/// The evidence side of the status comparison.
+fn evidence_side(document: &EvidenceDocument) -> EvidenceSide {
+    EvidenceSide {
+        signal_set: document.signal_set.clone(),
+        verdict: document.summary.verdict.clone(),
+        workspace_fingerprint: document.workspace_fingerprint.clone(),
+        policy_fingerprint: document.policy_fingerprint.clone(),
+        failed: document
+            .sensors
+            .iter()
+            .filter(|s| s.verdict == "fail")
+            .map(|s| s.name.clone())
+            .collect(),
+    }
+}
+
+/// Recorded sensor names: `(passed, executed)`.
+fn recorded_sensors(document: &EvidenceDocument) -> (Vec<&str>, Vec<&str>) {
+    let passed = document
+        .sensors
+        .iter()
+        .filter(|s| s.verdict == "pass")
+        .map(|s| s.name.as_str())
+        .collect();
+    let executed = document.sensors.iter().map(|s| s.name.as_str()).collect();
+    (passed, executed)
+}
+
+/// Whether the recorded sensors cover every required name.
+///
+/// Same-set coverage counts executed sensors (a failing run still describes
+/// its contract); cross-set coverage counts only passed ones.
+fn covers(facts: &CurrentFacts, same_set: bool, executed: &[&str], passed: &[&str]) -> bool {
+    let recorded = if same_set { executed } else { passed };
+    facts
+        .required
+        .iter()
+        .all(|name| recorded.iter().any(|p| p == name))
+}
+
+/// Required sensors the evidence does not record.
+fn missing_sensors(
+    facts: &CurrentFacts,
+    same_set: bool,
+    executed: &[&str],
+    passed: &[&str],
+) -> Vec<String> {
+    let recorded = if same_set { executed } else { passed };
+    facts
+        .required
+        .iter()
+        .filter(|name| !recorded.iter().any(|p| p == *name))
+        .cloned()
+        .collect()
+}
+
+/// Staleness reason when the fingerprints no longer match.
+fn stale_reason(workspace_match: bool, policy_ok: bool) -> &'static str {
+    if workspace_match && policy_ok {
         "inputs_changed_or_unknown"
     } else if workspace_match {
         "policy_changed"
     } else {
         "workspace_changed"
-    };
-    StatusReport {
-        state: EvidenceState::Stale,
-        set: set.map(ToOwned::to_owned),
-        reason: reason.to_owned(),
-        evidence: Some(evidence),
-        current: current_side.clone(),
     }
 }
 
@@ -354,17 +437,31 @@ pub(crate) async fn run(
     match report.state {
         EvidenceState::Green => Ok(()),
         EvidenceState::Red | EvidenceState::Stale | EvidenceState::Missing => {
-            Err(CliError::Verify(anyhow::anyhow!(
-                "evidence is {} ({})",
-                match report.state {
-                    EvidenceState::Red => "red",
-                    EvidenceState::Stale => "stale",
-                    _ => "missing",
-                },
-                report.reason
-            )))
+            Err(CliError::Verify(anyhow::anyhow!(failure_summary(&report))))
         }
     }
+}
+
+/// Failure summary for the error stream, naming unusable sensors and the
+/// command that clears the state.
+fn failure_summary(report: &StatusReport) -> String {
+    let state = match report.state {
+        EvidenceState::Red => "red",
+        EvidenceState::Stale => "stale",
+        _ => "missing",
+    };
+    let mut summary = format!("evidence is {state} ({})", report.reason);
+    if !report.missing_sensors.is_empty() {
+        let _ = write!(
+            summary,
+            "; missing sensors: {}",
+            report.missing_sensors.join(", ")
+        );
+    }
+    if let Some(recovery) = &report.recovery {
+        let _ = write!(summary, "\n  → recover: {recovery}");
+    }
+    summary
 }
 
 /// Prints the human-readable one-line status plus actionable detail.
