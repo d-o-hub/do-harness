@@ -2,16 +2,17 @@
 //!
 //! Status never executes a sensor. It loads the evidence artifact for the
 //! requested signal set, recomputes the current workspace and policy
-//! fingerprints, and reports one of `green`, `red`, `stale`, or `missing`:
+//! fingerprints, and reports one of `green`, `red`, `stale`, `running`, or
+//! `missing`:
 //!
 //! - `green`: passing evidence covers the requested set and matches the
 //!   current workspace and policy.
 //! - `red`: matching evidence exists and contains required failures.
 //! - `stale`: evidence exists but no longer applies (workspace or policy
 //!   changed).
+//! - `running`: a `verify` run is executing now and will replace the evidence.
 //! - `missing`: no qualifying evidence exists.
 
-use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
 use serde::Serialize;
@@ -20,9 +21,13 @@ use crate::evidence::EvidenceDocument;
 use crate::report::Format;
 use crate::{CliError, config};
 
+mod inflight;
 mod locate;
+mod present;
 
+use inflight::running_report;
 use locate::{Coverage, evidence_paths, find_covering_evidence};
+use present::{failure_summary, print_text};
 
 /// Freshness states reported by `status`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -34,6 +39,8 @@ pub enum EvidenceState {
     Red,
     /// Evidence exists but no longer applies to workspace/policy.
     Stale,
+    /// A verify run is executing now for this set.
+    Running,
     /// No qualifying evidence exists.
     Missing,
 }
@@ -82,6 +89,9 @@ pub struct StatusReport {
     pub evidence: Option<EvidenceSide>,
     /// Current fingerprint side.
     pub current: CurrentSide,
+    /// In-flight run that owns the decision; present only for `running`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub running: Option<crate::evidence::running::RunningInfo>,
     /// Required sensors the evidence does not cover; empty unless the reason
     /// is `insufficient_coverage`.
     #[serde(skip_serializing_if = "Vec::is_empty")]
@@ -116,6 +126,11 @@ pub fn status_report(
 ) -> anyhow::Result<StatusReport> {
     let facts = CurrentFacts::compute(root, cfg, config_bytes, set)?;
     let paths = evidence_paths(root, set, evidence_override);
+    for path in &paths {
+        if let Some(running) = crate::evidence::running::inspect(root, path) {
+            return Ok(running_report(set, facts.side, running));
+        }
+    }
     let (document, covering) = find_covering_evidence(&paths, set, &facts.required);
     let Some(document) = document else {
         return Ok(missing_report(set, &paths, covering, facts.side));
@@ -219,6 +234,7 @@ fn report(
         evidence,
         current,
         missing_sensors,
+        running: None,
         recovery: recovery_hint(reason, set),
     }
 }
@@ -436,60 +452,9 @@ pub(crate) async fn run(
     }
     match report.state {
         EvidenceState::Green => Ok(()),
+        EvidenceState::Running => Err(CliError::Running(anyhow::anyhow!(failure_summary(&report)))),
         EvidenceState::Red | EvidenceState::Stale | EvidenceState::Missing => {
             Err(CliError::Verify(anyhow::anyhow!(failure_summary(&report))))
-        }
-    }
-}
-
-/// Failure summary for the error stream, naming unusable sensors and the
-/// command that clears the state.
-fn failure_summary(report: &StatusReport) -> String {
-    let state = match report.state {
-        EvidenceState::Red => "red",
-        EvidenceState::Stale => "stale",
-        _ => "missing",
-    };
-    let mut summary = format!("evidence is {state} ({})", report.reason);
-    if !report.missing_sensors.is_empty() {
-        let _ = write!(
-            summary,
-            "; missing sensors: {}",
-            report.missing_sensors.join(", ")
-        );
-    }
-    if let Some(recovery) = &report.recovery {
-        let _ = write!(summary, "\n  → recover: {recovery}");
-    }
-    summary
-}
-
-/// Prints the human-readable one-line status plus actionable detail.
-fn print_text(report: &StatusReport) {
-    let set = report.set.as_deref().unwrap_or("(default)");
-    match report.state {
-        EvidenceState::Green => {
-            println!("green: signal set '{set}' evidence is current.");
-        }
-        EvidenceState::Red => {
-            let failed = report
-                .evidence
-                .as_ref()
-                .map(|e| e.failed.join(", "))
-                .unwrap_or_default();
-            println!("red: signal set '{set}' evidence has failures: {failed}.");
-        }
-        EvidenceState::Stale => {
-            println!(
-                "stale: signal set '{set}' evidence no longer applies ({}).",
-                report.reason
-            );
-        }
-        EvidenceState::Missing => {
-            println!(
-                "missing: no current evidence for signal set '{set}' ({}).",
-                report.reason
-            );
         }
     }
 }

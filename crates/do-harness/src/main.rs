@@ -85,6 +85,8 @@ pub enum CliError {
     Usage(anyhow::Error),
     /// Sensor verification failed: exit 1.
     Verify(anyhow::Error),
+    /// A verify run owns the evidence and cannot be judged: exit 3.
+    Running(anyhow::Error),
 }
 
 impl CliError {
@@ -94,6 +96,7 @@ impl CliError {
         match self {
             CliError::Usage(_) => 2,
             CliError::Verify(_) => 1,
+            CliError::Running(_) => 3,
         }
     }
 }
@@ -101,7 +104,9 @@ impl CliError {
 impl std::fmt::Display for CliError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            CliError::Usage(err) | CliError::Verify(err) => write!(f, "{err:#}"),
+            CliError::Usage(err) | CliError::Verify(err) | CliError::Running(err) => {
+                write!(f, "{err:#}")
+            }
         }
     }
 }

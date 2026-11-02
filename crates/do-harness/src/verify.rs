@@ -62,6 +62,14 @@ pub(crate) async fn run(root: &Path, mut opts: VerifyOpts) -> std::result::Resul
             "--unchanged=skip requires --record (reuse reads recorded beats)"
         )));
     }
+    // Publish the in-flight marker before any sensor runs so `status` can
+    // distinguish "running now" from "never run". Concurrent runs share it;
+    // the evidence write lock already serializes their artifacts.
+    let _running = evidence_destination(root, &opts)
+        .as_deref()
+        .map(|path| evidence::running::RunningGuard::begin(root, path, opts.set.as_deref()))
+        .transpose()
+        .map_err(CliError::Usage)?;
     opts.baselines = Baselines::load(root).await.map_err(CliError::Usage)?;
     let selection = sensors::resolve_selection(&cfg, root, &opts).map_err(CliError::Usage)?;
 
@@ -316,6 +324,24 @@ fn to_i64(value: u64) -> i64 {
     i64::try_from(value).unwrap_or(i64::MAX)
 }
 
+/// Resolves the evidence artifact the run owns, or `None` when it writes none.
+fn evidence_destination(root: &Path, opts: &VerifyOpts) -> Option<std::path::PathBuf> {
+    opts.evidence
+        .clone()
+        .map(|p| if p.is_relative() { root.join(p) } else { p })
+        .or_else(|| {
+            opts.output
+                .clone()
+                .map(|p| if p.is_relative() { root.join(p) } else { p })
+        })
+        .or_else(|| {
+            opts.set
+                .as_ref()
+                .map(|set| crate::status::default_path_for_set(root, set))
+        })
+        .or_else(|| opts.strict.then(|| root.join(".do-harness/evidence.json")))
+}
+
 /// Writes the evidence artifact for runs that own one.
 ///
 /// Signal-set runs own their evidence file so a feedback run can never
@@ -332,22 +358,7 @@ fn write_evidence(
     selection: &sensors::ResolvedSelection<'_>,
     invalidated_reason: Option<&str>,
 ) -> std::result::Result<(), CliError> {
-    let evidence_path = opts
-        .evidence
-        .clone()
-        .map(|p| if p.is_relative() { root.join(p) } else { p })
-        .or_else(|| {
-            opts.output
-                .clone()
-                .map(|p| if p.is_relative() { root.join(p) } else { p })
-        })
-        .or_else(|| {
-            opts.set
-                .as_ref()
-                .map(|set| crate::status::default_path_for_set(root, set))
-        })
-        .or_else(|| opts.strict.then(|| root.join(".do-harness/evidence.json")));
-    let Some(path) = evidence_path else {
+    let Some(path) = evidence_destination(root, opts) else {
         return Ok(());
     };
     let selected: Vec<String> = selection.specs.iter().map(|s| s.name.clone()).collect();
