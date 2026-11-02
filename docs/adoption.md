@@ -454,7 +454,7 @@ The harness enforces strict fail-closed contract rules across all supported pack
 | `rust` | `Cargo.toml` | `fmt`, `check`, `clippy`, `test`, `doctest`, `loc`, `deps`, `audit`, `commitlint`, `release-preflight` | Fails closed on zero tests, broken doctests, missing manifest, or missing required tools in CI. |
 | `generic` | Greenfield / non-Rust default | None (empty sensor array) | Vacuous pass (`sensor_pack = "generic"`, 0 sensors executed). Never masquerades as strict evidence for a specific language gate. |
 | `node` | `package.json` | `typecheck`, `lint`, `test`, `build` | Preserves `package.json` and `src/`. Probes package scripts, turbo, tsc, eslint, jest, vitest. |
-| `web` | `init --language web` | `viewport-ux`, `a11y`, `console`, `perf`, `visual`, `i18n` | Unconfigured pack emits `SKIP:` (warned verdict). Fails closed under `verify --strict` until `WEB_AUDIT_ROUTES` is set. |
+| `web` | `init --language web` | `web-ui-tests`, `viewport-ux`, `a11y`, `console`, `perf`, `visual`, `i18n` | Unconfigured pack emits `SKIP:` (warned verdict). Fails closed under `verify --strict` until `WEB_AUDIT_ROUTES` is set. `web-ui-tests` runs the bundled audit suite and needs no configuration. |
 
 ### Fail-closed verification rules
 

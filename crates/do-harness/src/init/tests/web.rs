@@ -85,6 +85,8 @@ fn web_ui_templates_match_integrations() {
         "fixtures/overlap-descendant.html",
         "fixtures/contrast.html",
         "fixtures/app-shell.html",
+        "fixtures/scheme.html",
+        "fixtures/locales.html",
     ] {
         let source = workspace.join("integrations/web-ui").join(relative);
         let template = workspace
@@ -97,6 +99,47 @@ fn web_ui_templates_match_integrations() {
         assert_eq!(
             source_body, template_body,
             "template drift: {relative} — copy integrations/web-ui/{relative} over the template"
+        );
+    }
+}
+
+/// Every fixture the scaffolded browser suite navigates to must be scaffolded.
+///
+/// The suite serves `fixtures/*.html` by name, so a fixture the test references
+/// but `init` never writes is a 404 that fails the adopter's `web-ui-tests`
+/// sensor — the drift that shipped `scheme.html` and `locales.html` into the
+/// test without them.
+#[test]
+fn scaffolded_fixtures_cover_every_fixture_the_browser_suite_uses() {
+    let crate_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let workspace = crate_dir
+        .parent()
+        .and_then(|p| p.parent())
+        .expect("crate lives at crates/<name>");
+    let suite = fs::read_to_string(
+        workspace.join("crates/do-harness/templates/scripts/web-ui/audit.browser.test.mjs"),
+    )
+    .expect("scaffolded browser suite");
+    let scaffold = fs::read_to_string(crate_dir.join("src/init/web.rs")).expect("web scaffold");
+
+    let mut referenced: Vec<&str> = suite
+        .match_indices("route(fixtureServer.baseUrl, \"")
+        .map(|(at, marker)| {
+            let rest = &suite[at + marker.len()..];
+            rest.split('"').next().unwrap_or_default()
+        })
+        .collect();
+    referenced.sort_unstable();
+    referenced.dedup();
+    assert!(
+        !referenced.is_empty(),
+        "the browser suite must reference at least one fixture"
+    );
+
+    for fixture in referenced {
+        assert!(
+            scaffold.contains(&format!("fixtures/{fixture}")),
+            "the browser suite navigates to {fixture} but init never scaffolds it"
         );
     }
 }
