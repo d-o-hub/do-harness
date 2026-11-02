@@ -18,6 +18,7 @@ use crate::cli::Cli;
 
 mod applicability;
 mod approver;
+mod argv_paths;
 mod artifacts;
 mod audit;
 mod baselines;
