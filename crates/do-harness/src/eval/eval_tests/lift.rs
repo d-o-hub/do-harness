@@ -137,8 +137,9 @@ async fn unknown_dim_fails_fixture_closed() {
         ),
     );
 
-    // Invalid fixture surfaces evals-invalid without persisting a score.
-    eval_run_with_lift(dir.path(), None).await.unwrap();
+    // An unparsable fixture fails the run and persists no score.
+    let err = eval_run_with_lift(dir.path(), None).await.unwrap_err();
+    assert!(err.to_string().contains("test-skill"), "{err:#}");
     assert_eq!(persisted(dir.path()).await.len(), 0);
 }
 

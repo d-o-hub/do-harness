@@ -312,7 +312,9 @@ pub async fn run_eval(root: &Path, opts: EvalOpts<'_>) -> Result<()> {
             }
         }
 
-        if report.gate_failed && !invalid.contains(&name) {
+        // A fixture that never parsed graded nothing because the input was
+        // broken, so it fails the run the same way a failed gate does.
+        if (report.gate_failed || report.evals_invalid) && !invalid.contains(&name) {
             invalid.push(name.clone());
         }
 
@@ -398,6 +400,7 @@ pub(super) fn report_json(
         "graded": report.graded,
         "passed": report.passed,
         "gate_failed": report.gate_failed,
+        "evals_invalid": report.evals_invalid,
         "lift": report.lift,
         "lift_contaminated": report.lift_contaminated,
         "without_pass_rate": report.without_pass_rate,

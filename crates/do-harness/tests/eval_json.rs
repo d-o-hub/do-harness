@@ -316,3 +316,38 @@ fn eval_json_dry_run_routes_diagnostic_to_stderr_and_stdout_is_valid_json() {
     let array = parsed.as_array().expect("stdout must be a JSON array");
     assert!(array.is_empty(), "expected empty JSON array for dry run");
 }
+
+/// #419: an unparsable fixture is an input failure, so it exits 1 while stdout
+/// stays a parseable report.
+#[test]
+fn eval_json_invalid_fixture_exits_1_and_stdout_is_valid_json() {
+    let fx = fixture("invalid-skill", &["exists:result_ok.txt"]);
+    // The field is `skill_name`; `skill` is rejected by the closed schema.
+    fs::write(
+        fx.root
+            .join(".agents/skills/invalid-skill/evals/evals.json"),
+        r#"{"skill": "invalid-skill", "evals": []}"#,
+    )
+    .expect("write invalid evals.json");
+
+    let (code, stdout, stderr) = run_cmd(harness(&fx.root).args([
+        "eval",
+        "--format",
+        "json",
+        "--no-lift",
+        "--skill",
+        "invalid-skill",
+    ]));
+
+    assert_eq!(
+        code,
+        Some(1),
+        "invalid fixture must fail: stdout={stdout}\nstderr={stderr}"
+    );
+    let parsed: Value = serde_json::from_str(&stdout)
+        .unwrap_or_else(|err| panic!("stdout must parse as JSON: {err}\nstdout: {stdout}"));
+    let array = parsed.as_array().expect("stdout must be a JSON array");
+    assert_eq!(array.len(), 1);
+    assert_eq!(array[0]["name"], "invalid-skill");
+    assert_eq!(array[0]["evals_invalid"], true);
+}
