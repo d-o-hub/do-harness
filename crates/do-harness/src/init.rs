@@ -244,8 +244,27 @@ pub async fn init_workspace(root: &Path, opts: &InitOpts) -> Result<InitReport> 
 /// Returns an error when the config cannot be loaded or executed.
 pub async fn run_baseline(root: &Path, report: &mut InitReport) -> Result<()> {
     let (cfg, _) = crate::config::load_raw(root, None).await?;
-    report.baseline = Some(baseline::run(&cfg, root)?);
+    let omitted = omitted_core_sensors(&report.candidates);
+    report.baseline = Some(baseline::run(&cfg, root, &omitted)?);
     Ok(())
+}
+
+/// Core sensors AGENTS.md section 6 names as the feedback loop. A pack that
+/// omits one of them cannot report a clean green baseline: the omitted sensor
+/// never ran, so the pass is not full evidence (section 4, "No Vacuous Gates").
+const CORE_SENSORS: &[&str] = &["fmt", "check", "clippy", "test"];
+
+/// Core sensors the generated pack left out, in pack order.
+fn omitted_core_sensors(candidates: &[detect::Candidate]) -> Vec<String> {
+    CORE_SENSORS
+        .iter()
+        .filter(|name| {
+            candidates
+                .iter()
+                .any(|candidate| candidate.name == **name && !candidate.included)
+        })
+        .map(|name| (*name).to_owned())
+        .collect()
 }
 
 /// Version pins the release preflight compares; also the generated sensor's

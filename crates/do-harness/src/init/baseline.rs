@@ -21,6 +21,11 @@ const FAILURE_TAIL_LINES: usize = 20;
 pub enum BaselineState {
     /// Every configured sensor passed.
     Green,
+    /// Every configured sensor passed, but a core sensor was omitted because
+    /// its tooling is absent. The pass is real for what ran, yet it is not
+    /// full evidence: the omitted sensor never executed (AGENTS.md section 4,
+    /// "a green sensor that executed zero checks is a failed gate").
+    Incomplete,
     /// At least one required sensor failed.
     Red,
     /// The config has no sensors; the pass carries no evidence.
@@ -43,6 +48,8 @@ pub struct Baseline {
     pub state: BaselineState,
     /// Number of sensors that passed.
     pub passed: usize,
+    /// Core sensors omitted from the generated pack, in pack order.
+    pub omitted: Vec<String>,
     /// Names of failing required sensors, in run order.
     pub failed: Vec<String>,
     /// Bounded output tails for the failing sensors.
@@ -55,11 +62,12 @@ pub struct Baseline {
 ///
 /// Returns an error when sensor selection is invalid (unknown `--only`
 /// names cannot occur here, but config-level selection errors propagate).
-pub fn run(cfg: &Config, root: &Path) -> anyhow::Result<Baseline> {
+pub fn run(cfg: &Config, root: &Path, omitted_core: &[String]) -> anyhow::Result<Baseline> {
     if cfg.effective_sensors().is_empty() {
         return Ok(Baseline {
             state: BaselineState::Vacuous,
             passed: 0,
+            omitted: omitted_core.to_vec(),
             failed: Vec::new(),
             failures: Vec::new(),
         });
@@ -77,12 +85,13 @@ pub fn run(cfg: &Config, root: &Path) -> anyhow::Result<Baseline> {
         .collect();
     let passed = report.sensors.iter().filter(|sensor| sensor.ok).count();
     Ok(Baseline {
-        state: if report.ok {
-            BaselineState::Green
-        } else {
-            BaselineState::Red
+        state: match (report.ok, omitted_core.is_empty()) {
+            (false, _) => BaselineState::Red,
+            (true, true) => BaselineState::Green,
+            (true, false) => BaselineState::Incomplete,
         },
         passed,
+        omitted: omitted_core.to_vec(),
         failed,
         failures,
     })
@@ -141,7 +150,7 @@ mod tests {
     #[test]
     fn zero_sensors_is_vacuous() {
         let dir = tempfile::tempdir().unwrap();
-        let baseline = run(&config(vec![]), dir.path()).unwrap();
+        let baseline = run(&config(vec![]), dir.path(), &[]).unwrap();
         assert_eq!(baseline.state, BaselineState::Vacuous);
     }
 
@@ -149,10 +158,39 @@ mod tests {
     #[test]
     fn passing_sensors_are_green() {
         let dir = tempfile::tempdir().unwrap();
-        let baseline = run(&config(vec![spec("ok", &["true"])]), dir.path()).unwrap();
+        let baseline = run(&config(vec![spec("ok", &["true"])]), dir.path(), &[]).unwrap();
         assert_eq!(baseline.state, BaselineState::Green);
         assert_eq!(baseline.passed, 1);
         assert_eq!(baseline.failed.len(), 0);
+    }
+
+    /// A pack that omitted a core sensor must not report green: the omitted
+    /// sensor never ran, so the pass is not full evidence (AGENTS.md section 4).
+    #[test]
+    fn omitted_core_sensor_is_incomplete_not_green() {
+        let dir = tempfile::tempdir().unwrap();
+        let baseline = run(
+            &config(vec![spec("ok", &["true"])]),
+            dir.path(),
+            &["test".to_owned()],
+        )
+        .unwrap();
+        assert_eq!(baseline.state, BaselineState::Incomplete);
+        assert_eq!(baseline.omitted, vec!["test".to_owned()]);
+        assert_eq!(baseline.passed, 1);
+    }
+
+    /// A failing sensor outranks an omission: red is the stronger verdict.
+    #[test]
+    fn failure_outranks_an_omitted_core_sensor() {
+        let dir = tempfile::tempdir().unwrap();
+        let baseline = run(
+            &config(vec![spec("bad", &["false"])]),
+            dir.path(),
+            &["test".to_owned()],
+        )
+        .unwrap();
+        assert_eq!(baseline.state, BaselineState::Red);
     }
 
     /// Failing sensors report red with a bounded diagnostic tail.
@@ -162,6 +200,7 @@ mod tests {
         let baseline = run(
             &config(vec![spec("bad", &["sh", "-c", "echo boom; exit 1"])]),
             dir.path(),
+            &[],
         )
         .unwrap();
         assert_eq!(baseline.state, BaselineState::Red);
@@ -175,7 +214,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let mut sensor = spec("advisory", &["false"]);
         sensor.allow_failure = true;
-        let baseline = run(&config(vec![sensor]), dir.path()).unwrap();
+        let baseline = run(&config(vec![sensor]), dir.path(), &[]).unwrap();
         assert_eq!(baseline.state, BaselineState::Green);
     }
 }

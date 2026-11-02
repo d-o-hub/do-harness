@@ -59,11 +59,18 @@ pub fn print_report(report: &InitReport, root: &Path, format: crate::report::For
     if let Some(baseline) = &report.baseline {
         let state = match baseline.state {
             BaselineState::Green => "GREEN",
+            BaselineState::Incomplete => "INCOMPLETE (core sensor omitted; not full evidence)",
             BaselineState::Red => "RED",
             BaselineState::Vacuous => "VACUOUS (no sensors; not evidence)",
         };
         println!("Initial verification:");
         println!("  {state}");
+        if !baseline.omitted.is_empty() {
+            println!(
+                "  omitted: {} — install the missing tool and re-run `init --force` to add it",
+                baseline.omitted.join(", ")
+            );
+        }
         if !baseline.failed.is_empty() {
             println!("  failed: {}", baseline.failed.join(", "));
         }

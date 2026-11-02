@@ -433,6 +433,11 @@ derived from the included subset), writes the portable skill subset
 (`harness` plus `skill-creator`), and then runs the effective sensors once:
 
 - `Initial verification: GREEN` — every configured sensor passed.
+- `INCOMPLETE` — every configured sensor passed, but a core sensor (`fmt`,
+  `check`, `clippy`, `test`) was omitted because its tooling is absent. The
+  pass is real for what ran and is not full evidence, so it is never reported
+  as `GREEN`; the omitted names and the install-and-`--force` remedy are
+  printed. This is the vacuous-gate rule applied to a partially generated pack.
 - `RED` — a required check failed; the command exits 1 and prints bounded
   failure output instead of claiming a verified workspace.
 - `VACUOUS` — the generic pack has zero sensors; the pass is explicitly not

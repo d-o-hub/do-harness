@@ -119,7 +119,11 @@ all language packs (`rust`, `generic`, `web`, `node`). Existing policy files are
 without `--force`, and existing application source is never touched. Note that policy
 prose specifies behavioral expectations and human approval boundaries, but does not claim
 technical runtime enforcement over tool execution. The run ends with
-`Initial verification: GREEN | RED | VACUOUS`; RED exits non-zero.
+`Initial verification: GREEN | INCOMPLETE | RED | VACUOUS`; RED exits non-zero.
+`INCOMPLETE` means every generated sensor passed but a core one (`fmt`,
+`check`, `clippy`, `test`) was omitted for missing tooling — for example
+`test` without `cargo-nextest` — so the pass is not full evidence. Install the
+tool and re-run `init --force` to add the sensor.
 
 
 ### Refreshing the skill-creator validator
