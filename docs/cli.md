@@ -1605,6 +1605,8 @@ Manage impact-gated feedback proposals and issue reporting.
 | `--format <FORMAT>` | no | `text` | `text`, `json` | Output format |
 <!-- END GENERATED: cli-contract feedback draft -->
 Generate local-only feedback draft proposals from recurring or severe failure evidence.
+The global `--dry-run` reports what would be written without creating the
+`--out` file.
 
 #### `feedback submit`
 <!-- BEGIN GENERATED: cli-contract feedback submit -->

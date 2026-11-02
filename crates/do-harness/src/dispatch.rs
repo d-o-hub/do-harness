@@ -386,6 +386,8 @@ async fn route(root: &Path, config_path: Option<PathBuf>, cli: Cli) -> Result<()
             overlap::run_overlap(root, threshold, format).map_err(CliError::Usage)
         }
         Command::Skills { action } => skills::run(root, action),
-        Command::Feedback { action } => feedback::run(root, action).await.map_err(exit::classify),
+        Command::Feedback { action } => feedback::run(root, action, cli.dry_run)
+            .await
+            .map_err(exit::classify),
     }
 }
