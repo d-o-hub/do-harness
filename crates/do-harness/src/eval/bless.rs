@@ -24,6 +24,14 @@ pub(super) async fn bless_skill(
         }
         _ => {}
     }
+    // A lift floor is measured against one set of graders, so capture whether
+    // they changed before the baseline below is overwritten. Re-blessing a new
+    // fixture set starts its floor from its own lift; ratcheting across that
+    // boundary would make a legitimate fixture change permanently unreachable.
+    let previous = do_harness_db::get_grader_baseline(conn, name).await?;
+    let fixture_set_changed = previous
+        .as_ref()
+        .is_some_and(|baseline| !hashes.matches_baseline(baseline));
     do_harness_db::bless_grader_baseline(
         conn,
         name,
@@ -51,11 +59,21 @@ pub(super) async fn bless_skill(
             }
         }
         if let Some(floor) = crate::eval_integrity::GraderHashes::lift_floor(report.lift) {
-            if do_harness_db::raise_lift_floor(conn, name, report.mode, floor).await? {
+            let moved = if fixture_set_changed {
+                do_harness_db::set_lift_floor(conn, name, report.mode, floor).await?
+            } else {
+                do_harness_db::raise_lift_floor(conn, name, report.mode, floor).await?
+            };
+            if moved {
+                let verb = if fixture_set_changed {
+                    "reset"
+                } else {
+                    "raised"
+                };
                 super::diag!(
                     format,
-                    "{name}: blessed; {} lift floor raised to {floor:+.2}",
-                    report.mode
+                    "{name}: blessed; {} lift floor {verb} to {floor:+.2}",
+                    report.mode,
                 );
             } else {
                 super::diag!(

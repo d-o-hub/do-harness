@@ -641,10 +641,15 @@ Skill structure validation and evaluation benchmark runner.
   (`2`) — an unknown `--skill` name, or a state database that cannot be opened,
   so no eval ever ran. A skill whose evals ran and failed is `1`.
 - `--skill <SKILL>`: Restrict evaluation to target skill directory.
-- `--bless`: Re-baseline grader hashes and raise pass-rate floor on green run.
-  Every bless appends an immutable `skill_eval_blesses` row recording the
+- `--bless`: Re-baseline grader hashes and raise the pass-rate floor on a green
+  run. Every bless appends an immutable `skill_eval_blesses` row recording the
   approver and timestamp; an approver is required (`--approver`,
   `DO_HARNESS_APPROVER`, or the git user email).
+  The Skill Lift floor is scoped to the fixture set: while the graders are
+  unchanged it only rises, but a bless that changes them starts the new set's
+  floor from its own lift. A lift floor is measured against one set of
+  assertions, so ratcheting across that boundary would make a legitimate
+  fixture change permanently unreachable (`LIFT-MISS` on every later run).
 - `--approver <NAME>`: Identity recorded with `--bless`.
 - `--no-lift`: Skip the without-skill baseline run (no Skill Lift measured).
 - `--agent-cmd <COMMAND>`: Run this shell command once per eval case instead
