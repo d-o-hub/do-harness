@@ -4,6 +4,7 @@
 use super::skills::SKILLS;
 use super::*;
 
+mod commitlint;
 mod context_sanitization;
 mod node;
 mod release;

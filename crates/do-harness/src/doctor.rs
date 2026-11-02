@@ -105,6 +105,17 @@ pub(crate) async fn run_with_status(
         failures.push("one or more managed git hooks absent in strict mode".to_owned());
     }
 
+    // The managed commit-msg hook execs `scripts/check-commitlint.sh` and
+    // blocks the commit when it is absent, so an installed hook without its
+    // script is a broken gate, not a healthy one.
+    let commitlint_missing =
+        status.commit_msg && !root.join("scripts/check-commitlint.sh").is_file();
+    if commitlint_missing {
+        failures.push(
+            "commit-msg hook requires scripts/check-commitlint.sh, which is missing".to_owned(),
+        );
+    }
+
     let db_res = dbcheck::probe(root).await;
     let db_ok = match &db_res {
         Ok(health) => !health.is_blocking(),
@@ -229,7 +240,13 @@ pub(crate) async fn run_with_status(
             ("commit-msg", status.commit_msg, status.commit_msg_shadowed),
         ] {
             if installed {
-                println!("  [OK] {name} hook: installed");
+                if name == "commit-msg" && commitlint_missing {
+                    println!(
+                        "  [FAIL] {name} hook: installed but scripts/check-commitlint.sh is missing"
+                    );
+                } else {
+                    println!("  [OK] {name} hook: installed");
+                }
             } else if shadowed {
                 let cfg = status.core_hooks_path.as_deref().unwrap_or("configured");
                 println!(
