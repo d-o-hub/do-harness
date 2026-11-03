@@ -25,13 +25,28 @@ def check_windows_test_timeout(verify_yml_path: Path) -> list[str]:
         errors.append("verify.yml must contain a windows job running on windows-latest")
         return errors
 
-    match = re.search(r"-\s+name:\s*Test workspace on Windows.*?\n\s+timeout-minutes:\s*(\d+)", content, re.DOTALL)
-    if not match:
+    # Every Windows workspace test step is bounded, not just the first: the
+    # suite is sharded, and a bound on one shard says nothing about the other.
+    steps = re.findall(
+        r"-\s+name:\s*(Test workspace on Windows[^\n]*)\n(.*?)(?=\n\s*-\s+(?:name|uses):|\Z)",
+        content,
+        re.DOTALL,
+    )
+    if not steps:
         errors.append("verify.yml Windows test step 'Test workspace on Windows' missing 'timeout-minutes'")
-    else:
+        return errors
+
+    for name, body in steps:
+        match = re.search(r"timeout-minutes:\s*(\d+)", body)
+        if not match:
+            errors.append(f"verify.yml Windows test step '{name.strip()}' missing 'timeout-minutes'")
+            continue
         timeout = int(match.group(1))
         if timeout > 12:
-            errors.append(f"verify.yml Windows test step timeout-minutes ({timeout}) exceeds maximum allowed 12 minutes")
+            errors.append(
+                f"verify.yml Windows test step '{name.strip()}' timeout-minutes ({timeout}) "
+                "exceeds maximum allowed 12 minutes"
+            )
 
     return errors
 
@@ -161,6 +176,21 @@ def run_self_tests(root_dir: Path):
         mut_errs = run_guardrail_checks(tmp_path)
         assert any("exceeds maximum allowed 12" in e for e in mut_errs), f"Mutation A (timeout > 12) not caught: {mut_errs}"
         (wf_dir / "verify.yml").write_text(v_yml.read_text(encoding="utf-8"))
+
+        # Mutation A2: only a later shard exceeds the bound. Every Windows
+        # workspace step is bounded, so the first one staying legal must not
+        # mask a second step that is not.
+        original = v_yml.read_text(encoding="utf-8")
+        later = original.index("Test workspace on Windows (2/2)")
+        head, tail = original[:later], original[later:]
+        assert "timeout-minutes: 12" in tail, "fixture must find the second shard's bound"
+        mut_v2 = head + tail.replace("timeout-minutes: 12", "timeout-minutes: 60", 1)
+        (wf_dir / "verify.yml").write_text(mut_v2)
+        mut_errs_a2 = run_guardrail_checks(tmp_path)
+        assert any("exceeds maximum allowed 12" in e for e in mut_errs_a2), (
+            f"Mutation A2 (second shard timeout > 12) not caught: {mut_errs_a2}"
+        )
+        (wf_dir / "verify.yml").write_text(original)
 
         # Mutation B: Remove wave reduction
         mut_c = c_rs.read_text(encoding="utf-8").replace("(1, 1)", "(2, 3)")

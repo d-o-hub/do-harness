@@ -23,7 +23,7 @@ To prevent this class of failure across all future runs, the codebase enforces f
    - Location: `.github/workflows/verify.yml`
    - Bound: `timeout-minutes: 12` on each Windows workspace test step.
    - Effect: A hung Windows test fails fast in minutes rather than burning the full job budget.
-   - Sharding: the workspace suite runs as two `--partition count:N/2` steps, because the whole suite no longer fits one 12-minute bound (it reached test 750 of 1125 when the bound expired, and a warm runner needed 11m31s). The bound is the invariant; the work is split, never the timeout raised.
+   - Sharding: the workspace suite runs as two `--partition count:N/2` steps, because the whole suite no longer fits one 12-minute bound (it reached test 750 of 1125 when the bound expired, and a warm runner needed 11m31s). The bound is the invariant; the work is split, never the timeout raised. The checker validates **every** `Test workspace on Windows*` step, so a later shard cannot exceed the bound behind a legal first one.
 
 3. **Coverage Job Separation**
    - Location: `.github/workflows/scheduled.yml`, `.github/workflows/release.yml`
