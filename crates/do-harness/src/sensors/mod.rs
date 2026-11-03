@@ -238,6 +238,8 @@ pub struct ResolvedSelection<'a> {
     pub specs: Vec<&'a SensorSpec>,
     /// Sensors skipped by `--changed` applicability, with reasons.
     pub skipped: Vec<crate::applicability::Skipped>,
+    /// Why change discovery failed, when it did; every candidate was kept.
+    pub discovery_error: Option<String>,
 }
 
 /// Resolves the ordered sensor specs a verify run executes.
@@ -308,6 +310,7 @@ pub fn resolve_selection<'a>(
 
     let applicable: Vec<&SensorSpec> = if opts.changed {
         let changed = crate::changes::discover(root);
+        let discovery_error = changed.discovery_error.clone();
         let selection = crate::applicability::select(&ordered, &changed);
         let names = selection.selected_names();
         let skipped = selection.skipped;
@@ -319,7 +322,11 @@ pub fn resolve_selection<'a>(
                     && !effective_exclude.contains(&spec.name)
             })
             .collect();
-        return Ok(ResolvedSelection { specs, skipped });
+        return Ok(ResolvedSelection {
+            specs,
+            skipped,
+            discovery_error,
+        });
     } else {
         ordered
     };
@@ -334,6 +341,7 @@ pub fn resolve_selection<'a>(
     Ok(ResolvedSelection {
         specs,
         skipped: Vec::new(),
+        discovery_error: None,
     })
 }
 

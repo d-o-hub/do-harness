@@ -19,6 +19,9 @@ pub struct ExplainReport {
     pub set: Option<String>,
     /// Changed repository-relative paths driving selection, sorted.
     pub changed_files: Vec<String>,
+    /// Why change discovery failed, when it did; selection is fail-closed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub discovery_error: Option<String>,
     /// Applicable sensors with reasons, in candidate order.
     pub selected: Vec<Selected>,
     /// Inapplicable sensors with reasons, in candidate order.
@@ -37,10 +40,14 @@ pub fn explain_report(
     changed: bool,
 ) -> std::result::Result<ExplainReport, anyhow::Error> {
     let candidates: Vec<&config::SensorSpec> = crate::signals::candidate_specs(cfg, set)?;
-    let (selection, changed_files) = if changed {
+    let (selection, changed_files, discovery_error) = if changed {
         let changed = crate::changes::discover(root);
         let files = changed.paths().iter().map(ToString::to_string).collect();
-        (crate::applicability::select(&candidates, &changed), files)
+        (
+            crate::applicability::select(&candidates, &changed),
+            files,
+            changed.discovery_error,
+        )
     } else {
         let selected = candidates
             .iter()
@@ -55,11 +62,13 @@ pub fn explain_report(
                 skipped: Vec::new(),
             },
             Vec::new(),
+            None,
         )
     };
     Ok(ExplainReport {
         set: set.map(ToOwned::to_owned),
         changed_files,
+        discovery_error,
         selected: selection.selected,
         skipped: selection.skipped,
     })
@@ -79,13 +88,21 @@ pub(crate) async fn run(
     let report = explain_report(root, &cfg, set.as_deref(), changed).map_err(CliError::Usage)?;
     match format {
         Format::Text => {
-            if !report.changed_files.is_empty() {
+            if let Some(error) = &report.discovery_error {
+                println!("change discovery failed: {error}");
+            } else if changed && report.changed_files.is_empty() {
+                println!("changed files: none");
+            } else if !report.changed_files.is_empty() {
                 println!("changed files:");
                 for file in &report.changed_files {
                     println!("  {file}");
                 }
             }
-            println!("selected:");
+            if report.discovery_error.is_some() {
+                println!("selected (fail-closed):");
+            } else {
+                println!("selected:");
+            }
             for sensor in &report.selected {
                 println!("  {} ({})", sensor.name, sensor.reason);
             }
