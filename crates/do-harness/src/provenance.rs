@@ -227,7 +227,7 @@ fn executable(root: &Path, program: &str) -> Option<PathBuf> {
         .ok()
 }
 
-fn git_revision(root: &Path) -> Option<String> {
+pub(crate) fn git_revision(root: &Path) -> Option<String> {
     let output = crate::changes::git_command(root)
         .args(["rev-parse", "--verify", "HEAD"])
         .output()

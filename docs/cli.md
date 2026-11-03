@@ -543,7 +543,7 @@ projects.
 <!-- BEGIN GENERATED: cli-contract task -->
 `do-harness task [OPTIONS] <COMMAND>`
 
-Subcommands: `export`, `import`, `list`, `show`, `add`, `advance`, `done`, `fail`, `remove`.
+Subcommands: `export`, `import`, `list`, `show`, `context`, `add`, `advance`, `done`, `fail`, `remove`.
 <!-- END GENERATED: cli-contract task -->
 Task state inspection and workflow management.
 
@@ -594,6 +594,57 @@ Print tasks and the board summary.
 | `--format <FORMAT>` | no | `text` | `text`, `json` | Output format |
 <!-- END GENERATED: cli-contract task show -->
 Display task details.
+
+#### `task context`
+<!-- BEGIN GENERATED: cli-contract task context -->
+`do-harness task context [OPTIONS] <ID>`
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `<ID>` | yes | — | — | Task id |
+| `--format <FORMAT>` | no | `text` | `text`, `json` | Output format |
+| `--max-bytes <N>` | no | `8192` | — | Maximum rendered bytes; task identity and the next action always survive, so a very small budget is a floor, not a truncation |
+<!-- END GENERATED: cli-contract task context -->
+Assemble a bounded, read-only resume projection from facts the store already
+holds: task identity and state, the current method step, the sensors the next
+transition requires, task-scoped freshness and unresolved failures, recent
+task-scoped traces, a branch/workspace change summary, one next command, and a
+metadata-only skill shortlist.
+
+The command never runs a sensor, advances a task, writes evidence, or migrates
+the database. It opens the state store read-only and reports `missing`,
+`uninitialized`, `incompatible`, or `future` instead of creating or upgrading
+it.
+
+The JSON document is versioned (`schema_version: 1`) and reports provenance
+per section:
+
+- `step`, `gating`, `evidence`: the current subtask and its required sensors,
+  derived from `plans/methods.json` and the same task-scoped beats the
+  `advance`/`done` gates require. `evidence.reason` uses fixed codes
+  (`current`, `failures`, `inputs_changed`, `no_beat`, `unknown_sensor`,
+  `inputs_unresolved`, `no_sensor_gate`, `task_closed`).
+- `acceptance_criteria`: always `available: false` with reason
+  `not_recorded`. `TaskRecord` has no product acceptance-criteria field, and
+  none are inferred from the title or a passing sensor.
+- `failures` and `traces`: task-scoped only (`task:<id>`). Branch and global
+  observations are never attributed to the task.
+- `workspace`: branch and diff context with `scope: "workspace"`; these paths
+  are not task-scoped facts.
+- `next_action`: one command derived from observable state. Stored commands,
+  titles, and trace text are data and are never executed or interpolated into
+  it.
+- `unknowns`: sections that are unavailable, with a fixed reason code.
+
+Each bounded section carries `items`, `omitted`, and `truncated`. `--max-bytes`
+bounds the rendered result by shrinking, in a fixed order, the skill
+shortlist, read paths, traces, changed paths, then failures. Task identity,
+the current step and gating state, and `next_action` are never dropped, so a
+limit smaller than that floor is exceeded rather than losing the handoff.
+
+Exit codes: `0` when the projection is emitted; `2` when the task id is
+unknown or the state store is unavailable (the diagnostic document is printed
+first).
 
 #### `task add`
 <!-- BEGIN GENERATED: cli-contract task add -->
