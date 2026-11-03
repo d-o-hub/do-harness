@@ -56,6 +56,17 @@ const ROUTE_BOUND_CLAIMS: [&str; 4] = [
 /// Returns an error when the file cannot be read, exceeds `max`, or is not
 /// UTF-8: every one of those makes the document unusable as evidence.
 pub(crate) fn read_bounded(path: &Path, max: usize) -> Result<String> {
+    // Check the size before reading: an oversized document must be refused
+    // without first loading it into memory.
+    let len = std::fs::metadata(path)
+        .with_context(|| format!("cannot stat {}", path.display()))?
+        .len();
+    if len > max as u64 {
+        anyhow::bail!(
+            "{} is {len} bytes, over the {max}-byte limit",
+            path.display()
+        );
+    }
     let bytes = std::fs::read(path).with_context(|| format!("cannot read {}", path.display()))?;
     if bytes.len() > max {
         anyhow::bail!(

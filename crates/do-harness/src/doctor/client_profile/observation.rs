@@ -183,6 +183,14 @@ pub(crate) fn load(path: &Path) -> LoadOutcome<Observations> {
 }
 
 fn decode<T: serde::de::DeserializeOwned>(path: &Path) -> std::result::Result<T, Unusable> {
+    // Refuse an oversized document before reading it, so a hostile or broken
+    // file cannot exhaust memory on the way to being rejected.
+    let Ok(metadata) = std::fs::metadata(path) else {
+        return Err(Unusable::Malformed);
+    };
+    if metadata.len() > MAX_OBSERVATION_BYTES as u64 {
+        return Err(Unusable::Oversized);
+    }
     let Ok(bytes) = std::fs::read(path) else {
         return Err(Unusable::Malformed);
     };
