@@ -398,6 +398,66 @@ jobs:
           CI: ""
         run: cargo test -p guardian-proxy --features agt-governance --locked
 
+  # The workspace suite is sharded so no single Windows step can approach the
+  # job budget: run #41632894179 hit the old 12-minute step timeout with 750 of
+  # 1125 tests done, so the same release-mode suite is split into three disjoint
+  # partitions. Compilation is a separate step from test execution, which makes
+  # the two phases independently timed in the job log.
+  windows-tests:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    strategy:
+      # Every shard must report: a failure in one partition must not cancel the
+      # others before their results are visible.
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    steps:
+      # actions/checkout@v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          # No push/fetch credentials persisted: this workflow never pushes.
+          persist-credentials: false
+      - name: Resolve pinned toolchain
+        id: toolchain
+        shell: bash
+        run: |
+          channel="$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)"
+          echo "channel=$channel" >> "$GITHUB_OUTPUT"
+      # dtolnay/rust-toolchain@master (SHA within master history per action docs)
+      - uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de
+        with:
+          toolchain: ${{ steps.toolchain.outputs.channel }}
+      # Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
+        with:
+          key: windows-tests
+      # taiki-e/install-action@v2
+      - uses: taiki-e/install-action@ba47c86ac325773530516bb756137ac718732518
+        with:
+          tool: cargo-deny,cargo-audit,cargo-nextest
+      - name: Install skill tooling dependencies
+        # The workspace suite validates skill frontmatter, which needs PyYAML.
+        run: python -m pip install --disable-pip-version-check -r .agents/skills/skill-creator/scripts/requirements.txt
+      - name: Install pnpm for the node init tests
+        # `init::tests::init_node_pnpm_turbo_workspace_first_run_is_green`
+        # declares a pnpm workspace, so its baseline can only go Green when
+        # pnpm is the resolved package manager.
+        run: npm install --global pnpm@10
+      - name: Compile workspace test targets (shard ${{ matrix.shard }})
+        # Compilation is its own timed step: the job log then separates build
+        # time from test time, which is what decides whether sharding or
+        # caching is the right lever.
+        timeout-minutes: 12
+        run: cargo nextest run --workspace --release --exclude do-harness-db --no-run
+      - name: Run workspace tests (shard ${{ matrix.shard }} of 3)
+        # `count:M/N` partitions the same filtered test list deterministically,
+        # so the three shards are disjoint and their union is the whole suite.
+        # `--final-status-level slow` names the slowest tests in the summary and
+        # `--no-fail-fast` reports every failure in the shard, not just the first.
+        timeout-minutes: 12
+        run: cargo nextest run --workspace --release --exclude do-harness-db --partition count:${{ matrix.shard }}/3 --final-status-level slow --no-fail-fast
+
   windows:
     runs-on: windows-latest
     timeout-minutes: 30
@@ -426,29 +486,14 @@ jobs:
       - uses: taiki-e/install-action@ba47c86ac325773530516bb756137ac718732518
         with:
           tool: cargo-deny,cargo-audit,cargo-nextest
-      # The full `cargo test --workspace` also runs on ubuntu (verify job);
-      # running it here too is what makes Windows a supported platform rather
-      # than a build-only target. POSIX-only tests are `#[cfg(unix)]`-gated
-      # (eval walkthrough shebangs, hook exit codes, file-mode helpers) and the
-      # runners provide Git Bash, so `sh`/`bash` sensors work as written.
+      # The workspace suite runs in the `windows-tests` shards; this job keeps
+      # the serialized database suite and the platform-level checks (sensors,
+      # dogfood, installer, hooks, npm wrapper) that make Windows a supported
+      # platform rather than a build-only target.
       - name: Install skill tooling dependencies
         # quick_validate.py and action-pins parse YAML frontmatter and need
         # PyYAML. Ubuntu images ship it; windows-latest does not, so install it.
         run: python -m pip install --disable-pip-version-check -r .agents/skills/skill-creator/scripts/requirements.txt
-      - name: Install pnpm for the node init tests
-        # `init::tests::init_node_pnpm_turbo_workspace_first_run_is_green`
-        # declares a pnpm workspace, so its baseline can only go Green when
-        # pnpm is the resolved package manager. windows-latest ships npm/yarn
-        # but not pnpm, so provide it rather than letting the fixture run under
-        # a package manager it does not describe.
-        run: npm install --global pnpm@10
-      - name: Test workspace on Windows
-        # Bounded so a hung test fails in minutes rather than consuming the
-        # job's full 30-minute budget with no output. `nextest` runs each test
-        # in an isolated process to prevent libSQL/SQLite multithreaded teardown
-        # access violations (0xc0000005) on Windows MSVC.
-        timeout-minutes: 12
-        run: cargo nextest run --workspace --release --exclude do-harness-db
       - name: Test do-harness-db on Windows
         # The db tests each open their own temporary libSQL database. On
         # Windows that binary crashed once with STATUS_ACCESS_VIOLATION

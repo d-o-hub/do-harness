@@ -19,10 +19,14 @@ To prevent this class of failure across all future runs, the codebase enforces f
    - Mechanism: Inspects `LLVM_PROFILE_FILE` or `CARGO_LLVM_COV` environment variables.
    - Behavior: Under coverage instrumentation, writer waves reduce from `(2, 3)` to `(1, 1)` to prevent retry storms while continuing to exercise the transactional retry path.
 
-2. **Windows CI Test Step Timeout Bounds**
-   - Location: `.github/workflows/verify.yml`
-   - Bound: `timeout-minutes: 12` on the Windows workspace test step.
-   - Effect: A hung Windows test fails fast in minutes rather than burning the full 30-minute job budget.
+2. **Windows Workspace Suite Sharding & Timeout Bounds**
+   - Location: `.github/workflows/verify.yml` (`windows-tests` job)
+   - Observed: run #41632894179 hit the old 12-minute step timeout with 750 of 1125 tests done (2 aborted, 373 never run), so the suite exceeded the budget rather than hanging.
+   - Structure: three shards (`shard: [1, 2, 3]`) run `cargo nextest run --workspace --release --exclude do-harness-db --partition count:M/3`. `count:M/N` partitions the same filtered test list deterministically, so the shards are disjoint and their union is the whole suite.
+   - Phases: compilation (`--no-run`) and execution are separate named steps, each bounded at `timeout-minutes: 12`, so the job log separates build time from test time.
+   - Diagnostics: `--final-status-level slow` names the slowest tests and `--no-fail-fast` reports every failure in a shard; the step name carries the shard identity.
+   - Effect: a hung or slow shard fails in minutes rather than burning the full 30-minute job budget, and a failure in any shard fails the job.
+   - Database suite: `do-harness-db` keeps its own serialized `cargo test -p do-harness-db --release -- --test-threads=1` step in the `windows` job and is never folded into the shards.
 
 3. **Coverage Job Separation**
    - Location: `.github/workflows/scheduled.yml`, `.github/workflows/release.yml`
@@ -41,13 +45,14 @@ Compliance is verified automatically on every run via the `ci-concurrency-guardr
 
 - **Check Script:** `scripts/check_ci_concurrency_guardrails.py`
 - **Sensor Name:** `ci-concurrency-guardrails` in `do-harness.toml`
-- **Self-Test Controls:** Running `python3 scripts/check_ci_concurrency_guardrails.py --self-test` executes negative mutation controls (verifying that removing timeouts or wave reduction triggers non-zero failures).
+- **Self-Test Controls:** Running `python3 scripts/check_ci_concurrency_guardrails.py --self-test` executes negative mutation controls: an over-budget shard timeout, a dropped shard, a partition denominator that disagrees with the matrix, a missing compile timeout, a removed serialized `do-harness-db` step, a compile step that runs tests, a shard without `--no-fail-fast`, coverage inside the Windows job, and the coverage wave reduction.
 
 ## 4. Architecture Invariants
 
 The strategy is recorded as executable invariants in `plans/invariants.json`:
 
 - `ci.windows_test_timeout_bound`
+- `ci.windows_shard_coverage`
 - `ci.coverage_wave_throttle`
 - `ci.coverage_job_separate`
 - `ci.build_jobs_bounded`
