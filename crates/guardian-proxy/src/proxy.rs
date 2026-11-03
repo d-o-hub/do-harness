@@ -183,9 +183,9 @@ pub fn validate_upstream(config: &ProxyConfig) -> Result<()> {
         ))
     })?;
     let host_lower = normalize_host_literal(&host.to_ascii_lowercase());
-    if is_link_local(&host_lower) {
+    if is_always_denied(&host_lower) {
         return Err(crate::error::GuardianError::Config(format!(
-            "upstream host '{host}' is link-local/metadata and always denied"
+            "upstream host '{host}' is link-local/metadata/shared-address and always denied"
         )));
     }
     if !config.allow_private_upstreams && is_private_or_loopback(&host_lower) {
@@ -299,10 +299,20 @@ fn parse_ipv4_literal(host: &str) -> Option<[u8; 4]> {
     ])
 }
 
-/// Cloud metadata / link-local ranges that are never valid upstreams.
-fn is_link_local(host: &str) -> bool {
-    // IPv4 link-local (169.254.0.0/16) and the cloud metadata aliases.
-    if host.starts_with("169.254.") || host == "metadata.google.internal" {
+/// Ranges that are never valid upstreams, whatever the private opt-in says:
+/// IPv4/IPv6 link-local, the cloud metadata aliases, and IPv4 shared-address
+/// space.
+fn is_always_denied(host: &str) -> bool {
+    // IPv4 link-local (169.254.0.0/16), the cloud metadata aliases, and the
+    // IPv4 shared-address space (100.64.0.0/10, RFC 6598). The shared range is
+    // not publicly routable and Alibaba Cloud serves instance metadata at
+    // 100.100.100.200 inside it, so it belongs with the metadata ranges rather
+    // than behind `allow_private_upstreams` — that flag exists for legitimate
+    // private upstreams, and granting it must not re-open metadata.
+    if host.starts_with("169.254.")
+        || host == "metadata.google.internal"
+        || is_ipv4_shared_address(host)
+    {
         return true;
     }
     // Typed /10 check first: it covers every spelling of a link-local address
@@ -321,6 +331,21 @@ fn is_link_local(host: &str) -> bool {
     host.starts_with("fe80:") || host.starts_with("fec0:") || host.starts_with("fed0:")
 }
 
+/// IPv4 shared-address space, `100.64.0.0/10` (RFC 6598): first octet 100,
+/// second octet 64–127.
+///
+/// Decided on the normalized dotted quad, so the alternate spellings that fold
+/// to one (`0x64400001`) are judged as the range they are actually in.
+fn is_ipv4_shared_address(host: &str) -> bool {
+    let Some(rest) = host.strip_prefix("100.") else {
+        return false;
+    };
+    rest.split('.')
+        .next()
+        .and_then(|second| second.parse::<u8>().ok())
+        .is_some_and(|second| (64..=127).contains(&second))
+}
+
 /// Loopback, private, and unique-local ranges; allowed only with an opt-in.
 fn is_private_or_loopback(host: &str) -> bool {
     if host == "localhost" || host == "::1" || host == "0.0.0.0" {
@@ -337,7 +362,7 @@ fn is_private_or_loopback(host: &str) -> bool {
         return (16..=31).contains(&second);
     }
     // IPv6 unique-local (fc00::/7) and loopback, decided on the parsed address
-    // for the same reason `is_link_local` gives: a prefix match on text only
+    // for the same reason `is_always_denied` gives: a prefix match on text only
     // sees the one spelling the caller happened to write.
     if let Ok(v6) = host.parse::<std::net::Ipv6Addr>() {
         return v6.is_loopback() || v6.is_unique_local();
