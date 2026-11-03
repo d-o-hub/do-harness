@@ -138,6 +138,14 @@ Runs computational sensors defined in `do-harness.toml`.
   the run exits non-zero and writes no beats, evidence, or in-flight marker.
   `--bless` is rejected because a bless cannot be previewed.
 
+Exit codes follow the invocation-level doctrine: `0` when every selected sensor
+passed, `1` when a sensor ran and failed, and `2` when the run could not be
+judged — a usage or config error, or every selected sensor was unrunnable (its
+program could not be spawned, its `argv` was empty, or a declared `argv` path
+was missing). A mixed run stays `1`. The `--format json` report carries a
+top-level `unrunnable` array beside `failed`, so a wrapper can tell "the gate
+never ran" from "the gate is red" without inspecting `sensors[].exit_code`.
+
 A sensor is the execution primitive (one `argv` command). A signal set is a
 development decision composed from sensors: `feedback` for the edit/fix loop,
 `verification` as the mandatory pre-completion gate, `release` for

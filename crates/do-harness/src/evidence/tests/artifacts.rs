@@ -37,6 +37,7 @@ fn artifacts_and_coverage_are_recorded() {
         ok: true,
         root: dir.path().display().to_string(),
         failed: vec![],
+        unrunnable: vec![],
         signal_set: None,
         selection: None,
         sensors: vec![crate::report::SensorResult {
@@ -120,6 +121,7 @@ fn missing_declared_artifact_records_warn() {
         ok: true,
         root: dir.path().display().to_string(),
         failed: vec![],
+        unrunnable: vec![],
         signal_set: None,
         selection: None,
         sensors: vec![crate::report::SensorResult {

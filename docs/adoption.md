@@ -367,6 +367,9 @@ do-harness status --set verification                # evidence freshness (no run
 `verify --format json` emits one JSON object on stdout (failure tails go to
 stderr), so it is safe to parse; its `selection` object names the mode, the
 resolved base/head/merge-base SHAs, the driving paths, and every skip reason.
+Its `unrunnable` array names sensors that never started (an unspawnable
+program, an empty `argv`, or a missing declared `argv` path); when every
+selected sensor is unrunnable the run exits `2` instead of `1`.
 `status --format json` returns
 `green | red | stale | missing` without running sensors; `green` means passing
 evidence still matches the workspace, policy, and selection revisions (a moved

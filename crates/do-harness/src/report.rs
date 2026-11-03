@@ -7,7 +7,8 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum FailureReason {
-    /// The program could not start.
+    /// The program could not be started: a spawn error, an empty `argv`, or a
+    /// missing declared `argv` path.
     Spawn,
     /// Its configured wall-clock budget expired.
     Timeout,
@@ -114,6 +115,16 @@ pub struct SensorResult {
     pub output: String,
 }
 
+impl SensorResult {
+    /// Whether the sensor never started, as opposed to running and failing or
+    /// being skipped by policy. A spawn failure, an empty `argv`, and a missing
+    /// declared `argv` path all carry [`FailureReason::Spawn`].
+    #[must_use]
+    pub fn unrunnable(&self) -> bool {
+        self.details.reason == Some(FailureReason::Spawn)
+    }
+}
+
 /// Aggregate verify report. Serializes to the stable JSON contract.
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct VerifyReport {
@@ -123,6 +134,10 @@ pub struct VerifyReport {
     pub root: String,
     /// Names of failing sensors in run order.
     pub failed: Vec<String>,
+    /// Names of sensors that never started: their program could not be
+    /// spawned, their `argv` was empty, or a declared `argv` path was missing.
+    /// A run where every selected sensor is unrunnable exits 2, not 1.
+    pub unrunnable: Vec<String>,
     /// Per-sensor results in run order.
     pub sensors: Vec<SensorResult>,
     /// Development signal set selected via `--set`; absent for full runs.
@@ -370,6 +385,7 @@ mod tests {
             ok: false,
             root: "/tmp/root".to_owned(),
             failed: vec!["check".to_owned()],
+            unrunnable: vec![],
             sensors: vec![SensorResult {
                 fix: None,
                 name: "check".to_owned(),
@@ -394,6 +410,7 @@ mod tests {
         assert!(value.get("ok").is_some());
         assert!(value.get("root").is_some());
         assert!(value.get("failed").is_some());
+        assert!(value.get("unrunnable").is_some());
         assert!(value["sensors"][0].get("exit_code").is_some());
         assert!(value["sensors"][0].get("warned").is_some());
         assert_eq!(value["sensors"][0]["execution"], "ran");
