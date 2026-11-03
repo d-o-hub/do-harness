@@ -435,10 +435,12 @@ jobs:
       # taiki-e/install-action@v2
       - uses: taiki-e/install-action@ba47c86ac325773530516bb756137ac718732518
         with:
-          # The suite itself needs deny and audit: integration fixtures run
-          # `do-harness init` in a scratch repository, and under `CI=true` its
-          # `deps`/`audit` sensors fail closed when cargo-deny/cargo-audit are
-          # absent (11 fixtures failed in run #41665973711 for exactly that).
+          # The workspace suite is not self-contained: `init`/`dogfood`/`hook`
+          # fixtures scaffold a repository and run `do-harness verify` inside
+          # it, which executes the `audit` and `deps` sensors. Those shell out
+          # to `cargo audit` and `cargo deny`, so the shard needs the same
+          # tools as the `windows` job — without them the fixtures fail with
+          # `initial verification is RED` and only name `audit`.
           tool: cargo-deny,cargo-audit,cargo-nextest
       - name: Install skill tooling dependencies
         # The workspace suite validates skill frontmatter, which needs PyYAML.
