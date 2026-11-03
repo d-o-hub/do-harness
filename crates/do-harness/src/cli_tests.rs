@@ -72,7 +72,7 @@ fn global_options_and_subcommands_parse() {
     assert_eq!(parsed.config.as_deref(), Some(Path::new("/tmp/cfg.toml")));
     assert!(parsed.quiet);
 
-    if let Command::Doctor { format, strict } = parsed.command {
+    if let Command::Doctor { format, strict, .. } = parsed.command {
         assert_eq!(format, Format::Json);
         assert!(strict);
     } else {

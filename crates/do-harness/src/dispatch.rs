@@ -339,9 +339,20 @@ async fn route(root: &Path, config_path: Option<PathBuf>, cli: Cli) -> Result<()
                 .await
                 .map_err(CliError::Usage)
         }
-        Command::Doctor { format, strict } => doctor::run(root, format, strict)
-            .await
-            .map_err(exit::classify),
+        Command::Doctor {
+            format,
+            strict,
+            client_profile,
+            client_probe,
+        } => doctor::run(
+            root,
+            format,
+            strict,
+            client_profile.as_deref(),
+            client_probe,
+        )
+        .await
+        .map_err(exit::classify),
         Command::AuditChain { format } => commands::audit_chain_cmd(root, format)
             .await
             .map_err(CliError::Verify),

@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Client capability observation v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "client",
+    "adapter",
+    "configuration",
+    "generated_at_unix_seconds",
+    "max_age_seconds",
+    "claims"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "client": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version"],
+      "properties": {
+        "id": { "type": "string", "maxLength": 100 },
+        "version": { "type": "string", "maxLength": 100 }
+      }
+    },
+    "adapter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sha256"],
+      "properties": {
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      }
+    },
+    "configuration": { "type": "string", "maxLength": 100 },
+    "generated_at_unix_seconds": { "type": "integer", "minimum": 0 },
+    "max_age_seconds": { "type": "integer", "minimum": 1, "maximum": 604800 },
+    "governance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "route"],
+      "properties": {
+        "mode": { "enum": ["enforced", "stub", "degraded", "unknown"] },
+        "route": { "type": "string", "maxLength": 100 }
+      }
+    },
+    "claims": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": false,
+      "properties": {
+        "guidance_installed": { "$ref": "#/$defs/claim" },
+        "host_boundary": { "$ref": "#/$defs/claim" },
+        "mcp_mediation": { "$ref": "#/$defs/claim" },
+        "governance_enforced": { "$ref": "#/$defs/claim" },
+        "completion_gated": { "$ref": "#/$defs/claim" },
+        "context_sanitization": { "$ref": "#/$defs/claim" },
+        "outbound_mediation": { "$ref": "#/$defs/claim" }
+      }
+    }
+  },
+  "$defs": {
+    "claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["route", "status", "reason"],
+      "properties": {
+        "route": { "type": "string", "maxLength": 100 },
+        "status": { "enum": ["pass", "fail", "unknown"] },
+        "reason": {
+          "enum": [
+            "observed",
+            "not-observed",
+            "guidance-only",
+            "unsupported-client",
+            "conformance-unknown"
+          ]
+        }
+      }
+    }
+  }
+}

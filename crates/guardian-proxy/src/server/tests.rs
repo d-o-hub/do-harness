@@ -36,6 +36,22 @@ async fn test_health_returns_ok() {
 }
 
 #[tokio::test(flavor = "current_thread")]
+async fn test_health_reports_compiled_governance_mode() {
+    let mediator = test_mediator_with_upstream("http://127.0.0.1:9");
+    let router = create_router(mediator);
+    let req = Request::builder()
+        .uri("/health")
+        .body(AxumBody::empty())
+        .expect("request");
+    let resp = router.oneshot(req).await.expect("response");
+    let bytes = axum::body::to_bytes(resp.into_body(), 4096)
+        .await
+        .expect("body");
+    let body: serde_json::Value = serde_json::from_slice(&bytes).expect("json");
+    assert_eq!(body["governance"], crate::governance_mode().as_str());
+}
+
+#[tokio::test(flavor = "current_thread")]
 async fn test_deny_invalid_params_returns_403() {
     let mediator = test_mediator_with_upstream("http://127.0.0.1:9");
     let router = create_router(mediator);
