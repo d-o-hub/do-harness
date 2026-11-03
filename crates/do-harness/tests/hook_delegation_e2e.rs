@@ -65,8 +65,9 @@ fn delegated_pre_commit_hooks_pass_strict_and_survive_install() {
 
     std::fs::write(root.join(".pre-commit-config.yaml"), "repos: []\n").expect("write config");
     for name in ["pre-commit", "pre-push", "commit-msg"] {
-        std::fs::write(root.join(".git/hooks").join(name), PRE_COMMIT_WRAPPER)
-            .expect("write pre-commit wrapper");
+        let path = root.join(".git/hooks").join(name);
+        std::fs::write(&path, PRE_COMMIT_WRAPPER).expect("write pre-commit wrapper");
+        make_executable(&path);
     }
     let bin = strict_harness_binary(root);
 
@@ -123,3 +124,18 @@ fn delegated_pre_commit_hooks_pass_strict_and_survive_install() {
         "{doctor_stdout}"
     );
 }
+
+/// Git runs a hook only when it is executable.
+#[cfg(unix)]
+fn make_executable(path: &Path) {
+    use std::os::unix::fs::PermissionsExt;
+
+    let mut permissions = std::fs::metadata(path)
+        .expect("stat pre-commit wrapper")
+        .permissions();
+    permissions.set_mode(0o755);
+    std::fs::set_permissions(path, permissions).expect("chmod pre-commit wrapper");
+}
+
+#[cfg(not(unix))]
+fn make_executable(_path: &Path) {}

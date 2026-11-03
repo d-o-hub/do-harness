@@ -33,6 +33,7 @@ fn git_repo() -> (tempfile::TempDir, PathBuf) {
 fn hook_file(root: &Path, name: &str, content: &str) -> PathBuf {
     let path = root.join(".git/hooks").join(name);
     fs::write(&path, content).unwrap();
+    crate::fs_perm::set_owner_exec(&path).unwrap();
     path
 }
 
@@ -81,6 +82,8 @@ fn custom_hooks_path_owns_a_foreign_hook() {
     let path = hook_file(&root, "pre-push", FOREIGN);
 
     assert_eq!(classify(&path, false, true), HookOwner::HooksPath);
+    // The configured directory is the more specific owner of a plain script.
+    assert_eq!(classify(&path, true, true), HookOwner::HooksPath);
 }
 
 #[test]
@@ -135,4 +138,47 @@ fn install_force_replaces_a_pre_commit_wrapper() {
     install(&git_dir, temp.path(), &[], &[], true).unwrap();
 
     assert!(fs::read_to_string(&wrapper).unwrap().contains(MARKER));
+}
+
+/// A declared configuration is not a gate on its own: git skips an empty hook,
+/// so attributing one to pre-commit would let strict mode pass with nothing
+/// running.
+#[test]
+fn empty_hook_files_are_not_delegated() {
+    let (_temp, root) = git_repo();
+    let empty = root.join(".git/hooks/pre-commit");
+    fs::write(&empty, "").unwrap();
+    let blank = root.join(".git/hooks/pre-push");
+    fs::write(&blank, " \n").unwrap();
+
+    assert_eq!(classify(&empty, true, false), HookOwner::Foreign);
+    assert_eq!(classify(&blank, true, false), HookOwner::Foreign);
+}
+
+/// Git also skips a hook without an execute bit.
+#[cfg(unix)]
+#[test]
+fn wrapper_without_an_execute_bit_is_not_delegated() {
+    use std::fs::Permissions;
+    use std::os::unix::fs::PermissionsExt;
+
+    let (_temp, root) = git_repo();
+    let path = hook_file(&root, "commit-msg", WRAPPER);
+    fs::set_permissions(&path, Permissions::from_mode(0o644)).unwrap();
+
+    assert_eq!(classify(&path, true, false), HookOwner::Foreign);
+}
+
+/// A file the tool cannot read must not be replaced silently.
+#[test]
+fn install_refuses_to_clobber_an_unreadable_hook() {
+    let (temp, root) = git_repo();
+    let git_dir = root.join(".git");
+    let path = root.join(".git/hooks/pre-commit");
+    fs::write(&path, [0xff, 0xfe, 0x00]).unwrap();
+
+    let err = install(&git_dir, temp.path(), &[], &[], false).unwrap_err();
+
+    assert!(err.to_string().contains("unreadable"), "{err}");
+    assert_eq!(fs::read(&path).unwrap(), [0xff, 0xfe, 0x00]);
 }

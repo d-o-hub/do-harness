@@ -103,7 +103,9 @@ pub(crate) async fn run_with_status(
     }
 
     let hooks_satisfied = status.is_all_satisfied();
-    if strict && !hooks_satisfied {
+    // Shadowing already has its own failure above; a second message claiming
+    // the hooks are neither managed nor delegated would misstate the cause.
+    if strict && !status.ownership.is_satisfied() {
         failures.push(
             "one or more git hooks are neither managed by do-harness nor delegated in strict mode"
                 .to_owned(),
@@ -407,7 +409,7 @@ fn hook_line(
             format!("  [WARN] {name} hook: foreign hook not managed by do-harness")
         }
         HookOwner::Absent if pre_commit_config => format!(
-            "  [WARN] {name} hook: absent (pre-commit config present; run: pre-commit install)"
+            "  [WARN] {name} hook: absent (pre-commit config present; run: pre-commit install --hook-type {name})"
         ),
         HookOwner::Absent => format!("  [WARN] {name} hook: absent"),
     }

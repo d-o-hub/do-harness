@@ -291,7 +291,9 @@ exec pre-commit hook-impl --hook-type=pre-commit\n";
 /// Writes the three hook wrappers and the configuration that declares them.
 fn delegate_hooks_to_pre_commit(root: &Path) {
     for name in ["pre-commit", "pre-push", "commit-msg"] {
-        fs::write(root.join(".git/hooks").join(name), PRE_COMMIT_WRAPPER).unwrap();
+        let path = root.join(".git/hooks").join(name);
+        fs::write(&path, PRE_COMMIT_WRAPPER).unwrap();
+        crate::fs_perm::set_owner_exec(&path).unwrap();
     }
     fs::write(root.join(".pre-commit-config.yaml"), "repos: []\n").unwrap();
 }
@@ -361,6 +363,28 @@ async fn strict_fails_on_an_unowned_foreign_hook() {
     )
     .unwrap();
     quiet_config(&root);
+    let status = status_with_local_binary(&root);
+    assert_eq!(status.ownership.pre_commit, HookOwner::Foreign);
+
+    let message = run_with_status(&root, Format::Text, true, &status)
+        .await
+        .unwrap_err()
+        .to_string();
+    assert!(message.contains("neither managed"), "{message}");
+}
+
+/// A declared configuration over empty hook files runs nothing; strict must
+/// keep failing instead of trusting the declaration.
+#[tokio::test(flavor = "current_thread")]
+async fn strict_fails_when_declared_hooks_are_empty() {
+    let (_temp, root) = fake_repo_with_git();
+    stub_binary(&root);
+    fs::write(root.join(".pre-commit-config.yaml"), "repos: []\n").unwrap();
+    for name in ["pre-commit", "pre-push", "commit-msg"] {
+        fs::write(root.join(".git/hooks").join(name), "").unwrap();
+    }
+    quiet_config(&root);
+
     let status = status_with_local_binary(&root);
     assert_eq!(status.ownership.pre_commit, HookOwner::Foreign);
 

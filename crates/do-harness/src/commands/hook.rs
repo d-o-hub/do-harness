@@ -140,7 +140,7 @@ pub async fn hook(
                     );
                 } else if hooks::ownership::has_pre_commit_config(root) {
                     eprintln!(
-                        "hint: this repository delegates git hooks to the pre-commit framework; run `pre-commit install` to install them"
+                        "hint: this repository delegates git hooks to the pre-commit framework; run `pre-commit install --hook-type pre-commit --hook-type pre-push --hook-type commit-msg` to install them"
                     );
                 } else {
                     eprintln!("hint: run `do-harness hook install` to (re)install managed hooks");

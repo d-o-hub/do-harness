@@ -489,7 +489,9 @@ The harness enforces strict fail-closed contract rules across all supported pack
   `DO_HARNESS_BIN` at the newer build; `do-harness doctor` reports the same
   skew before a hook blocks a commit.
 - `do-harness doctor --strict` fails when the binary lives under `target/` or
-  a hook is missing and not delegated. A hook is delegated when its file is a
-  pre-commit wrapper, when `.pre-commit-config.yaml` declares pre-commit as the
-  owner, or when it is a foreign hook under a configured `core.hooksPath`;
-  `hook install` refuses to overwrite such a wrapper without `--force`.
+  a hook is missing and not delegated. A hook is delegated when its executable
+  file is a pre-commit wrapper, when `.pre-commit-config.yaml` declares
+  pre-commit as the owner, or when it is a foreign hook under a configured
+  `core.hooksPath`; an empty or non-executable file is never delegated, because
+  git does not run it. `hook install` refuses to overwrite such a wrapper
+  without `--force`.

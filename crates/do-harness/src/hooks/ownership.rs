@@ -86,22 +86,32 @@ pub fn has_pre_commit_config(repo_root: &Path) -> bool {
 ///
 /// `pre_commit_config` is [`has_pre_commit_config`] for this repository and
 /// `custom_hooks_path` says whether `core.hooksPath` points away from
-/// `.git/hooks`. A foreign file is attributed to pre-commit when the repository
-/// declares a pre-commit configuration — an installed wrapper can be rewritten
-/// by a version upgrade or wrapped again by another manager, so its exact text
-/// is a weaker signal than the declaration — and to the configured hooks
-/// directory otherwise.
+/// `.git/hooks`. A wrapper's exact text is a weaker signal than the
+/// declaration, since an installed wrapper can be rewritten by a version
+/// upgrade or wrapped again by another manager, so a declared pre-commit
+/// configuration attributes a runnable foreign file to pre-commit; a foreign
+/// file in a configured hooks directory is attributed to that directory.
+///
+/// An empty file, or one git would skip for lack of an execute bit, is
+/// [`HookOwner::Foreign`]: it runs no gate, so it cannot satisfy strict mode
+/// merely because the repository declares a hook configuration.
 #[must_use]
 pub fn classify(path: &Path, pre_commit_config: bool, custom_hooks_path: bool) -> HookOwner {
     let Ok(content) = fs::read_to_string(path) else {
         return HookOwner::Absent;
     };
     if content.contains(MARKER) {
-        HookOwner::Managed
-    } else if content.contains(PRE_COMMIT_WRAPPER_MARKER) || pre_commit_config {
+        return HookOwner::Managed;
+    }
+    if content.trim().is_empty() || !crate::fs_perm::is_owner_exec(path) {
+        return HookOwner::Foreign;
+    }
+    if content.contains(PRE_COMMIT_WRAPPER_MARKER) {
         HookOwner::PreCommit
     } else if custom_hooks_path {
         HookOwner::HooksPath
+    } else if pre_commit_config {
+        HookOwner::PreCommit
     } else {
         HookOwner::Foreign
     }

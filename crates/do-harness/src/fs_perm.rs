@@ -43,3 +43,22 @@ pub(crate) fn set_owner_exec(path: &Path) -> Result<()> {
 pub(crate) fn set_owner_exec(_path: &Path) -> Result<()> {
     Ok(())
 }
+
+/// Whether `path` carries an execute bit, so git will actually run it.
+///
+/// Always true off unix, where git does not consult the file mode.
+#[cfg(unix)]
+#[must_use]
+pub(crate) fn is_owner_exec(path: &Path) -> bool {
+    use std::fs;
+    use std::os::unix::fs::PermissionsExt;
+
+    fs::metadata(path).is_ok_and(|meta| meta.permissions().mode() & OWNER_EXEC_MASK != 0)
+}
+
+/// No-op success on non-unix platforms.
+#[cfg(not(unix))]
+#[must_use]
+pub(crate) fn is_owner_exec(_path: &Path) -> bool {
+    true
+}

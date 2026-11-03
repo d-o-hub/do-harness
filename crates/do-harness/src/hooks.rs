@@ -388,9 +388,8 @@ fn is_managed(path: &Path) -> bool {
 /// Writes `body` to `path`, refusing to clobber a foreign hook unless `force`
 /// is set; hook files carrying the [`MARKER`] are always overwritten.
 fn write_hook_checked(path: &Path, body: &str, force: bool, pre_commit_config: bool) -> Result<()> {
-    if let Ok(existing) = fs::read_to_string(path) {
-        let managed = existing.contains(MARKER);
-        if !managed && !force {
+    match fs::read_to_string(path) {
+        Ok(existing) if !existing.contains(MARKER) && !force => {
             let owner = if pre_commit_config || ownership::is_pre_commit_wrapper(&existing) {
                 "the pre-commit framework"
             } else {
@@ -401,6 +400,14 @@ fn write_hook_checked(path: &Path, body: &str, force: bool, pre_commit_config: b
                 path.display()
             );
         }
+        Ok(_) => {}
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
+        // An unreadable file still exists; clobbering it silently is exactly
+        // the destructive case this refusal exists for.
+        Err(err) => bail!(
+            "refusing to overwrite unreadable hook {}: {err}",
+            path.display()
+        ),
     }
     write_hook(path, body)
 }
