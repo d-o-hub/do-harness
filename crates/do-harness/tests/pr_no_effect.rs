@@ -57,9 +57,15 @@ fn range_mode_reports_effective_change() {
         .expect("spawn do-harness");
     assert!(output.status.success(), "exit must be 0");
     let report: Value = serde_json::from_slice(&output.stdout).expect("json report");
+    assert_eq!(report["schema_version"], serde_json::json!(2));
     assert_eq!(report["effective_change"], serde_json::json!(true));
     assert_eq!(report["method"], serde_json::json!("git"));
     assert_eq!(report["mode"], serde_json::json!("range"));
+    assert_eq!(
+        report["merge_impact"]["verdict"],
+        serde_json::json!("TREE_EFFECT")
+    );
+    assert_eq!(report["closure_recommendation"], serde_json::json!(false));
 }
 
 #[test]
@@ -89,6 +95,58 @@ fn range_mode_reports_no_effect_for_empty_commit() {
     assert!(output.status.success(), "exit must be 0");
     let report: Value = serde_json::from_slice(&output.stdout).expect("json report");
     assert_eq!(report["effective_change"], serde_json::json!(false));
+    assert_eq!(
+        report["merge_impact"]["verdict"],
+        serde_json::json!("NO_TREE_EFFECT")
+    );
+    assert_eq!(report["closure_recommendation"], serde_json::json!(true));
+}
+
+/// The false negative the merge-impact gate exists to catch: an equivalent
+/// patch independently applied to the base leaves a nonempty merge-base diff
+/// while merging changes nothing.
+#[test]
+fn equivalent_patch_reports_no_tree_effect_with_evidence() {
+    let dir = tempfile::tempdir().unwrap();
+    init_repo(dir.path());
+    commit_file(dir.path(), "a.txt", "old\n", "base");
+    git(dir.path(), &["switch", "-q", "-c", "feature"]);
+    commit_file(dir.path(), "a.txt", "new\n", "feature change");
+    git(dir.path(), &["switch", "-q", "main"]);
+    commit_file(dir.path(), "a.txt", "new\n", "same change upstream");
+
+    let output = harness(dir.path())
+        .args([
+            "pr",
+            "no-effect",
+            "--base",
+            "main",
+            "--head",
+            "feature",
+            "--format",
+            "json",
+        ])
+        .output()
+        .expect("spawn do-harness");
+    assert!(output.status.success(), "exit must be 0");
+    let report: Value = serde_json::from_slice(&output.stdout).expect("json report");
+    assert_eq!(
+        report["effective_change"],
+        serde_json::json!(true),
+        "the historical merge-base diff is still nonempty: {report}"
+    );
+    assert_eq!(
+        report["merge_impact"]["verdict"],
+        serde_json::json!("NO_TREE_EFFECT"),
+        "{report}"
+    );
+    assert_eq!(
+        report["merge_impact"]["method"],
+        serde_json::json!("merge-tree")
+    );
+    assert!(report["merge_impact"]["base_sha"].is_string(), "{report}");
+    assert!(report["merge_impact"]["head_sha"].is_string(), "{report}");
+    assert_eq!(report["closure_recommendation"], serde_json::json!(true));
 }
 
 #[test]
