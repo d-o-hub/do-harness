@@ -133,6 +133,10 @@ Runs computational sensors defined in `do-harness.toml`.
   (requires `--record`; a bless never raises a baseline).
 - `--approver <NAME>`: Approver identity recorded with `--bless` (defaults to
   `DO_HARNESS_APPROVER` or the git user email). Requires `--bless`.
+- `--dry-run`: Plan the selected sensors without spawning them. Each sensor
+  reports `PLAN` with `execution = "planned"`, no exit code, and no duration;
+  the run exits non-zero and writes no beats, evidence, or in-flight marker.
+  `--bless` is rejected because a bless cannot be previewed.
 
 A sensor is the execution primitive (one `argv` command). A signal set is a
 development decision composed from sensors: `feedback` for the edit/fix loop,

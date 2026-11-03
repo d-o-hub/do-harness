@@ -65,6 +65,8 @@ pub enum Execution {
     Reused,
     /// The sensor did not execute: blocked, quarantined, or cancelled.
     NotRun,
+    /// A `--dry-run` planned the sensor without spawning it.
+    Planned,
 }
 
 /// Sensor verdict with timing and exit information.
@@ -199,6 +201,7 @@ pub fn print_report(report: &VerifyReport, format: Format, quiet: bool) -> anyho
     for sensor in &report.sensors {
         let verdict = match sensor.execution {
             Execution::Reused => "SKIP",
+            Execution::Planned => "PLAN",
             Execution::Ran | Execution::NotRun => {
                 match (sensor.ok, sensor.warned, sensor.allow_failure) {
                     (true, false, _) => "PASS",
@@ -226,7 +229,7 @@ pub fn print_report(report: &VerifyReport, format: Format, quiet: bool) -> anyho
         } else {
             println!("{line}");
         }
-        if !sensor.ok && sensor.execution != Execution::Reused {
+        if !sensor.ok && matches!(sensor.execution, Execution::Ran | Execution::NotRun) {
             if let Some(fix) = &sensor.fix {
                 eprintln!("      FIX: {fix}");
             }
@@ -257,7 +260,23 @@ pub fn print_report(report: &VerifyReport, format: Format, quiet: bool) -> anyho
                 println!("{footer}");
             }
         }
-    } else {
+    } else if report
+        .sensors
+        .iter()
+        .all(|sensor| sensor.execution == Execution::Planned)
+    {
+        // A plan is not evidence: say so explicitly instead of reporting a
+        // failure count for sensors that were never spawned.
+        let footer = format!(
+            "Dry run: {} sensor(s) planned, 0 executed.",
+            report.sensors.len()
+        );
+        if format == Format::Json {
+            eprintln!("{footer}");
+        } else {
+            println!("{footer}");
+        }
+    } else if !report.failed.is_empty() {
         eprintln!("Failed sensors: {}", report.failed.join(", "));
     }
     if format == Format::Json {

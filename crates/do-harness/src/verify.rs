@@ -62,14 +62,24 @@ pub(crate) async fn run(root: &Path, mut opts: VerifyOpts) -> std::result::Resul
             "--unchanged=skip requires --record (reuse reads recorded beats)"
         )));
     }
+    if opts.bless && opts.dry_run {
+        return Err(CliError::Usage(anyhow::anyhow!(
+            "--bless cannot be combined with --dry-run (a bless writes state)"
+        )));
+    }
     // Publish the in-flight marker before any sensor runs so `status` can
     // distinguish "running now" from "never run". Concurrent runs share it;
     // the evidence write lock already serializes their artifacts.
-    let _running = evidence_destination(root, &opts)
-        .as_deref()
-        .map(|path| evidence::running::RunningGuard::begin(root, path, opts.set.as_deref()))
-        .transpose()
-        .map_err(CliError::Usage)?;
+    // A dry run writes nothing, including the marker.
+    let _running = if opts.dry_run {
+        None
+    } else {
+        evidence_destination(root, &opts)
+            .as_deref()
+            .map(|path| evidence::running::RunningGuard::begin(root, path, opts.set.as_deref()))
+            .transpose()
+            .map_err(CliError::Usage)?
+    };
     opts.baselines = Baselines::load(root).await.map_err(CliError::Usage)?;
     let selection = sensors::resolve_selection(&cfg, root, &opts).map_err(CliError::Usage)?;
     if let Some(error) = &selection.discovery_error {
@@ -85,7 +95,7 @@ pub(crate) async fn run(root: &Path, mut opts: VerifyOpts) -> std::result::Resul
             .filter_map(|(name, digest)| digest.map(|d| (name, d)))
             .collect();
 
-    if opts.record {
+    if opts.record && !opts.dry_run {
         let struck = telemetry::struck_sensors(root, &cfg.sensor_names(), &beat_scope.key())
             .await
             .map_err(CliError::Usage)?;
@@ -138,7 +148,7 @@ pub(crate) async fn run(root: &Path, mut opts: VerifyOpts) -> std::result::Resul
                 })
                 .then(|| "inputs_changed_during_run".to_owned());
 
-            if opts.record {
+            if opts.record && !opts.dry_run {
                 telemetry::record_verify(
                     root,
                     &report,
@@ -151,22 +161,24 @@ pub(crate) async fn run(root: &Path, mut opts: VerifyOpts) -> std::result::Resul
                 .await
                 .map_err(CliError::Usage)?;
             }
-            if opts.bless {
+            if opts.bless && !opts.dry_run {
                 bless_baselines(root, &report, &opts).await?;
             }
 
             report::print_report(&report, opts.format, opts.quiet).map_err(CliError::Verify)?;
 
-            write_evidence(
-                root,
-                &cfg,
-                config_bytes.as_deref(),
-                &report,
-                &opts,
-                started_at,
-                &selection,
-                invalidated_reason.as_deref(),
-            )?;
+            if !opts.dry_run {
+                write_evidence(
+                    root,
+                    &cfg,
+                    config_bytes.as_deref(),
+                    &report,
+                    &opts,
+                    started_at,
+                    &selection,
+                    invalidated_reason.as_deref(),
+                )?;
+            }
 
             if let Some(reason) = invalidated_reason {
                 return Err(CliError::Verify(anyhow::anyhow!(
@@ -174,7 +186,12 @@ pub(crate) async fn run(root: &Path, mut opts: VerifyOpts) -> std::result::Resul
                 )));
             }
 
-            if report.ok {
+            if opts.dry_run {
+                Err(CliError::Verify(anyhow::anyhow!(
+                    "dry run: {} sensor(s) planned, 0 executed",
+                    report.sensors.len()
+                )))
+            } else if report.ok {
                 Ok(())
             } else {
                 Err(CliError::Verify(anyhow::anyhow!(

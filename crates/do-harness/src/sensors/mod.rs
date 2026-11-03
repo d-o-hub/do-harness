@@ -60,6 +60,27 @@ pub(crate) fn sensor_quarantined(spec: &SensorSpec, scope: Option<&str>) -> Sens
     result
 }
 
+/// Builds the plan-only result for a sensor a `--dry-run` will not spawn:
+/// no exit code, no duration, and `Execution::Planned`.
+pub(crate) fn sensor_planned(spec: &SensorSpec) -> SensorResult {
+    SensorResult {
+        details: crate::report::ExecutionDetails::default(),
+        name: spec.name.clone(),
+        ok: false,
+        exit_code: None,
+        duration_ms: 0,
+        severity: spec.effective_severity(),
+        allow_failure: false,
+        warned: false,
+        fix: None,
+        findings: None,
+        baseline: None,
+        execution: crate::report::Execution::Planned,
+        reused_beat_id: None,
+        output: String::new(),
+    }
+}
+
 /// Builds the reused-verdict result for a sensor whose declared inputs are
 /// unchanged since a recorded passing beat: the beat is the evidence, so the
 /// result carries no exit code or duration and never masquerades as a fresh
@@ -107,6 +128,8 @@ pub enum UnchangedMode {
 pub struct VerifyOpts {
     /// Halt at the first failing sensor.
     pub fail_fast: bool,
+    /// Plan the selected sensors without spawning them or writing state.
+    pub dry_run: bool,
     /// Restrict execution to this development signal set; empty = all.
     pub set: Option<String>,
     /// Restrict execution to sensors applicable to the working-tree change.
@@ -193,6 +216,24 @@ pub fn verify_selection<'a>(
     selection: &ResolvedSelection<'a>,
 ) -> Result<VerifyReport> {
     let signal_set = opts.set.clone();
+
+    // A dry run reports the plan and never spawns a sensor: sensors are
+    // arbitrary argv and many mutate what they inspect.
+    if opts.dry_run {
+        let results: Vec<SensorResult> = selection
+            .specs
+            .iter()
+            .map(|spec| sensor_planned(spec))
+            .collect();
+        return Ok(VerifyReport {
+            ok: false,
+            root: root.display().to_string(),
+            failed: vec![],
+            sensors: results,
+            signal_set,
+            selection: selection_report(selection),
+        });
+    }
 
     if selection.specs.is_empty() {
         return Ok(VerifyReport {
