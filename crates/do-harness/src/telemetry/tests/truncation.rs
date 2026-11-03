@@ -61,6 +61,7 @@ async fn record_verify_persists_actionable_nextest_failure_context() {
             output: synthetic_nextest_output(),
         }],
         signal_set: None,
+        selection: None,
     };
     record_verify(
         dir.path(),

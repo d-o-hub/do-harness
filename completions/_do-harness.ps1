@@ -84,6 +84,7 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
         'do-harness;verify' {
             [CompletionResult]::new('--format', '--format', [CompletionResultType]::ParameterName, 'Output format')
             [CompletionResult]::new('--set', '--set', [CompletionResultType]::ParameterName, 'Run only the sensors in this development signal set')
+            [CompletionResult]::new('--since', '--since', [CompletionResultType]::ParameterName, 'Run only sensors applicable to the committed range `merge-base(<REF>, HEAD)..HEAD`; combine with `--changed` to union committed and uncommitted paths')
             [CompletionResult]::new('--only', '--only', [CompletionResultType]::ParameterName, 'Run only the named sensor (repeatable or comma-separated)')
             [CompletionResult]::new('--exclude', '--exclude', [CompletionResultType]::ParameterName, 'Exclude named sensors from the run')
             [CompletionResult]::new('--jobs', '--jobs', [CompletionResultType]::ParameterName, 'Maximum sensors in flight (overrides `jobs` in do-harness.toml)')
@@ -112,6 +113,7 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
         'do-harness;check' {
             [CompletionResult]::new('--format', '--format', [CompletionResultType]::ParameterName, 'Output format')
             [CompletionResult]::new('--set', '--set', [CompletionResultType]::ParameterName, 'Run only the sensors in this development signal set')
+            [CompletionResult]::new('--since', '--since', [CompletionResultType]::ParameterName, 'Run only sensors applicable to the committed range `merge-base(<REF>, HEAD)..HEAD`; combine with `--changed` to union committed and uncommitted paths')
             [CompletionResult]::new('--only', '--only', [CompletionResultType]::ParameterName, 'Run only the named sensor (repeatable or comma-separated)')
             [CompletionResult]::new('--exclude', '--exclude', [CompletionResultType]::ParameterName, 'Exclude named sensors from the run')
             [CompletionResult]::new('--jobs', '--jobs', [CompletionResultType]::ParameterName, 'Maximum sensors in flight (overrides `jobs` in do-harness.toml)')
@@ -169,6 +171,7 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
         }
         'do-harness;explain' {
             [CompletionResult]::new('--set', '--set', [CompletionResultType]::ParameterName, 'Explain this development signal set (default: all sensors)')
+            [CompletionResult]::new('--since', '--since', [CompletionResultType]::ParameterName, 'Select by the committed range `merge-base(<REF>, HEAD)..HEAD`')
             [CompletionResult]::new('--format', '--format', [CompletionResultType]::ParameterName, 'Output format')
             [CompletionResult]::new('--root', '--root', [CompletionResultType]::ParameterName, 'Workspace root override (default: walk up from cwd)')
             [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Explicit path to do-harness.toml')

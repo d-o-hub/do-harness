@@ -231,6 +231,22 @@
           "index": null
         },
         {
+          "id": "since",
+          "kind": "option",
+          "short": null,
+          "long": "since",
+          "value_names": [
+            "REF"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Run only sensors applicable to the committed range `merge-base(<REF>, HEAD)..HEAD`; combine with `--changed` to union committed and uncommitted paths",
+          "index": null
+        },
+        {
           "id": "only",
           "kind": "option",
           "short": null,
@@ -501,6 +517,22 @@
           "default_values": [],
           "possible_values": [],
           "help": "Select by working-tree change instead of listing everything",
+          "index": null
+        },
+        {
+          "id": "since",
+          "kind": "option",
+          "short": null,
+          "long": "since",
+          "value_names": [
+            "REF"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Select by the committed range `merge-base(<REF>, HEAD)..HEAD`",
           "index": null
         },
         {

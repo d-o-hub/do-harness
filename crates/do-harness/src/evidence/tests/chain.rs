@@ -18,6 +18,7 @@ fn seal_and_verify_chain() {
         task_id: None,
         sensor_pack: "rust".into(),
         signal_set: None,
+        selection: None,
         workspace_fingerprint: "sha256:w".into(),
         policy_fingerprint: "sha256:p".into(),
         config_fingerprint: "sha256:c".into(),

@@ -30,6 +30,51 @@ pub struct EvidenceSkipped {
     pub reason: String,
 }
 
+/// Change-aware selection input recorded with the evidence.
+///
+/// Records the revisions that produced the selection so a later `status`
+/// never reuses a passing range result after the head or base moved.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct EvidenceSelection {
+    /// `all` | `working-tree` | `range` | `working-tree+range`.
+    pub mode: String,
+    /// `--since` ref as requested, when range selection was used.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub since: Option<String>,
+    /// Commit the requested ref resolved to.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub base_sha: Option<String>,
+    /// `HEAD` commit the range was compared against.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub head_sha: Option<String>,
+    /// Merge base the range diff started from.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub merge_base_sha: Option<String>,
+    /// Changed repository-relative paths driving selection, sorted.
+    pub changed_files: Vec<String>,
+    /// Why discovery failed closed, when it did.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub discovery_error: Option<String>,
+}
+
+impl EvidenceSelection {
+    /// Builds the recorded selection from a resolved change selection.
+    #[must_use]
+    pub fn from_changes(changes: &crate::changes::ChangeSelection) -> Self {
+        let range = changes.range.as_ref();
+        Self {
+            mode: changes.mode.as_str().to_owned(),
+            since: range.map(|r| r.requested.clone()),
+            base_sha: range.map(|r| r.base_sha.clone()),
+            head_sha: range.map(|r| r.head_sha.clone()),
+            merge_base_sha: range.map(|r| r.merge_base_sha.clone()),
+            changed_files: changes.paths().iter().map(ToString::to_string).collect(),
+            discovery_error: changes.changed.discovery_error.clone(),
+        }
+    }
+}
+
 /// Single sensor result in the evidence artifact.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -96,6 +141,10 @@ pub struct EvidenceDocument {
     pub config_fingerprint: String,
     /// Whether the run used `--changed` selection.
     pub changed: bool,
+    /// Change-aware selection input and resolved revisions; absent for
+    /// unfiltered runs and older artifacts.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub selection: Option<EvidenceSelection>,
     /// Explicit reason if evidence was invalidated during run (e.g. "`inputs_changed_during_run`").
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub invalidated_reason: Option<String>,
@@ -160,6 +209,11 @@ impl EvidenceDocument {
             "coverage": self.coverage,
             "summary": self.summary,
         });
+        // Conditional like `input_manifest`: older artifacts have no selection
+        // block, and adding a null key would break their chain verification.
+        if let Some(selection) = &self.selection {
+            payload["selection"] = serde_json::to_value(selection)?;
+        }
         if let Some(manifest) = &self.input_manifest {
             payload["input_manifest"] = serde_json::to_value(manifest)?;
         }
@@ -301,6 +355,7 @@ impl EvidenceDocument {
             policy_fingerprint: meta.fingerprints.policy.clone(),
             config_fingerprint: meta.fingerprints.config.clone(),
             changed: meta.changed,
+            selection: meta.selection.clone(),
             invalidated_reason: meta.invalidated_reason.clone(),
             sensors,
             skipped: meta.skipped.clone(),
@@ -336,6 +391,8 @@ pub struct RunMeta<'a> {
     pub fingerprints: crate::fingerprint::Fingerprints,
     /// Whether the run used `--changed` selection.
     pub changed: bool,
+    /// Change-aware selection input and resolved revisions, when filtered.
+    pub selection: Option<EvidenceSelection>,
     /// Sensors skipped by change-aware selection, with reasons.
     pub skipped: Vec<EvidenceSkipped>,
     /// Task id scoping persisted beats, when recording.

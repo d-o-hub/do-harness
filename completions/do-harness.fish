@@ -77,6 +77,7 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand version" -s V -l v
 complete -c do-harness -n "__fish_do_harness_using_subcommand verify" -l format -d 'Output format' -r -f -a "text\t'Human-readable text output'
 json\t'Machine-readable JSON output'"
 complete -c do-harness -n "__fish_do_harness_using_subcommand verify" -l set -d 'Run only the sensors in this development signal set' -r
+complete -c do-harness -n "__fish_do_harness_using_subcommand verify" -l since -d 'Run only sensors applicable to the committed range `merge-base(<REF>, HEAD)..HEAD`; combine with `--changed` to union committed and uncommitted paths' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand verify" -l only -d 'Run only the named sensor (repeatable or comma-separated)' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand verify" -l exclude -d 'Exclude named sensors from the run' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand verify" -l jobs -d 'Maximum sensors in flight (overrides `jobs` in do-harness.toml)' -r
@@ -102,6 +103,7 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand verify" -s V -l ve
 complete -c do-harness -n "__fish_do_harness_using_subcommand check" -l format -d 'Output format' -r -f -a "text\t'Human-readable text output'
 json\t'Machine-readable JSON output'"
 complete -c do-harness -n "__fish_do_harness_using_subcommand check" -l set -d 'Run only the sensors in this development signal set' -r
+complete -c do-harness -n "__fish_do_harness_using_subcommand check" -l since -d 'Run only sensors applicable to the committed range `merge-base(<REF>, HEAD)..HEAD`; combine with `--changed` to union committed and uncommitted paths' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand check" -l only -d 'Run only the named sensor (repeatable or comma-separated)' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand check" -l exclude -d 'Exclude named sensors from the run' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand check" -l jobs -d 'Maximum sensors in flight (overrides `jobs` in do-harness.toml)' -r
@@ -145,6 +147,7 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand ls" -l dry-run -d 
 complete -c do-harness -n "__fish_do_harness_using_subcommand ls" -s h -l help -d 'Print help (see more with \'--help\')'
 complete -c do-harness -n "__fish_do_harness_using_subcommand ls" -s V -l version -d 'Print version'
 complete -c do-harness -n "__fish_do_harness_using_subcommand explain" -l set -d 'Explain this development signal set (default: all sensors)' -r
+complete -c do-harness -n "__fish_do_harness_using_subcommand explain" -l since -d 'Select by the committed range `merge-base(<REF>, HEAD)..HEAD`' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand explain" -l format -d 'Output format' -r -f -a "text\t'Human-readable text output'
 json\t'Machine-readable JSON output'"
 complete -c do-harness -n "__fish_do_harness_using_subcommand explain" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"

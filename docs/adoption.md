@@ -245,8 +245,11 @@ when-changed = ["src/**", "test/**"]
 
 A sensor is one `argv` command; a signal set is a decision composed from
 sensor names. `when-changed` globs make a sensor apply only to the current
-change (`verify --changed`), and selection fails closed when git state cannot
-be read. Providing a non-empty `[[sensors]]` list replaces the built-in sensor
+change (`verify --changed` for the working tree, `verify --since <ref>` for the
+committed range `merge-base(<ref>, HEAD)..HEAD`), and selection fails closed
+when git state cannot be read. Path filtering selects which sensors run; it
+does not prove the change is semantically independent, so a matched sensor
+still has to pass. Providing a non-empty `[[sensors]]` list replaces the built-in sensor
 pack entirely. Non-empty `pre-commit` and `pre-push` hook selections under
 `[hooks]` are validated against the effective sensor pack (`effective_sensors`),
 and any unknown sensor name fails configuration loading before hooks are
@@ -357,13 +360,18 @@ Agents (and CI) only need three commands:
 ```bash
 do-harness verify --set feedback --changed          # during edits
 do-harness verify --set verification --changed --strict   # before completion
+do-harness verify --set verification --since origin/main --strict  # clean committed branch
 do-harness status --set verification                # evidence freshness (no run)
 ```
 
 `verify --format json` emits one JSON object on stdout (failure tails go to
-stderr), so it is safe to parse. `status --format json` returns
+stderr), so it is safe to parse; its `selection` object names the mode, the
+resolved base/head/merge-base SHAs, the driving paths, and every skip reason.
+`status --format json` returns
 `green | red | stale | missing` without running sensors; `green` means passing
-evidence still matches the workspace and policy. `verify --set <set>` writes
+evidence still matches the workspace, policy, and selection revisions (a moved
+head or advanced base reports `stale` with reason `selection_changed`).
+`verify --set <set>` writes
 `.do-harness/evidence.<set>.json`, so feedback runs never clobber verification
 evidence.
 
