@@ -208,7 +208,20 @@ fn rust_candidates() -> Vec<Candidate> {
             },
         ),
         candidate("doctest", cargo, cargo, ""),
-        candidate("coverage", cargo_llvm_cov, cargo_llvm_cov, ""),
+        // Omitted rather than degraded: the script prints `SKIP:` without the
+        // tool, and a skip makes `--strict` evidence non-clean, so the sensor
+        // could not stay in the pack. The detail names the remedy instead of
+        // leaving a bare `MISSING (omitted)`.
+        candidate(
+            "coverage",
+            cargo_llvm_cov,
+            cargo_llvm_cov,
+            if cargo_llvm_cov {
+                ""
+            } else {
+                "cargo-llvm-cov not installed; omitted because a SKIP would fail --strict (install it, then re-run init --force)"
+            },
+        ),
         candidate("loc", bash, bash, ""),
         candidate(
             "deps",
