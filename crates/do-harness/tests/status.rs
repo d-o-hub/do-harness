@@ -108,6 +108,24 @@ fn status_text(root: &Path, set: &str) -> (Option<i32>, String, String) {
     run(harness(root).arg("status").arg("--set").arg(set))
 }
 
+/// Waits until `status` reports the set as running, asserting the exit code.
+#[cfg(unix)]
+fn wait_until_running(root: &Path, set: &str) -> Value {
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(20);
+    loop {
+        let (code, doc) = status(root, set);
+        if doc["state"] == serde_json::json!("running") {
+            assert_eq!(code, Some(3), "running status must exit 3: {doc}");
+            return doc;
+        }
+        assert!(
+            std::time::Instant::now() < deadline,
+            "verify never reported as running: {doc}"
+        );
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+}
+
 /// The central contract: green -> edit -> stale -> verify -> green.
 #[test]
 fn workspace_edit_cycles_green_stale_green() {
@@ -219,6 +237,55 @@ fn no_evidence_reports_missing() {
     assert!(
         stderr.contains("→ recover: do-harness verify --set verification --record"),
         "missing evidence must name the recovery command: {stderr}"
+    );
+}
+
+/// An in-flight `verify --record` run is `running`, not `missing`, and the
+/// state clears back to green when it finishes.
+///
+/// Unix-only: the fixture needs a shell to hold the run open.
+#[cfg(unix)]
+#[test]
+fn in_flight_verify_reports_running() {
+    let (_dir, root) = fixture_repo_with_sensors(
+        &[("slow", &["sh", "-c", "sleep 2"] as &[_])],
+        &[("verification", &["slow"])],
+    );
+    let mut child = harness(&root)
+        .args(["verify", "--set", "verification", "--record"])
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .expect("spawn verify");
+
+    let doc = wait_until_running(&root, "verification");
+    assert_eq!(doc["reason"], serde_json::json!("in_progress"));
+    assert!(
+        doc["running"]["pid"].as_u64().is_some(),
+        "running status must name the pid: {doc}"
+    );
+    assert!(
+        doc["running"]["started_at"].as_i64().is_some(),
+        "running status must name the start time: {doc}"
+    );
+
+    let (code, stdout, _stderr) = status_text(&root, "verification");
+    assert_eq!(code, Some(3));
+    assert!(
+        stdout.starts_with("running: verify is in flight"),
+        "text status must name the in-flight run: {stdout}"
+    );
+
+    assert!(
+        child.wait().expect("wait verify").success(),
+        "background verify must pass"
+    );
+    let (code, doc) = status(&root, "verification");
+    assert_eq!(code, Some(0), "completed run must be green: {doc}");
+    assert_eq!(doc["state"], serde_json::json!("green"));
+    assert!(
+        doc.get("running").is_none(),
+        "green status must not carry running: {doc}"
     );
 }
 

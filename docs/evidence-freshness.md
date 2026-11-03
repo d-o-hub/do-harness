@@ -30,12 +30,21 @@ reuse retains its stricter no-symlink rule.
 ## Gates and concurrency
 
 `status` reports green for current passing evidence, red for matching failures,
-stale for drift or unknown provenance, and missing for absent/unreadable
-evidence or insufficient coverage. `no_evidence`, `insufficient_coverage`, and
+stale for drift or unknown provenance, running while a `verify` run is
+executing for the set, and missing for absent/unreadable evidence or
+insufficient coverage. `no_evidence`, `insufficient_coverage`, and
 `policy_changed` carry the concrete recovery command (`verify --set <set>
 --record`), and `insufficient_coverage` names the unrecorded required sensors.
 Pre/post input changes invalidate verify. v3/v4 documents remain readable, but
 need regeneration before reporting green.
+
+Each run locks its own marker file in a sibling `<evidence>.running/`
+directory for its whole duration and publishes its pid and start time there,
+so `status` can tell "running now" from "never run" and exits 3 for `running`.
+The OS releases the lock when the process dies, so a killed run leaves no
+phantom state, and the next run of that artifact prunes the orphan. Per-run
+files rather than one shared file keep concurrent writers legal on Windows,
+which refuses to write a region another handle has locked.
 
 Task advance and completion check current required named-sensor input
 identities, task method/index, and the latest task-scoped beat's status, exit

@@ -12,6 +12,8 @@ use crate::report::VerifyReport;
 mod write;
 pub(crate) use write::write as write_document;
 
+pub(crate) mod running;
+
 pub const EVIDENCE_SCHEMA_VERSION: u32 = 5;
 
 /// Oldest readable fingerprinted schema. v3/v4 parse with defaults, but need

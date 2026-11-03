@@ -325,10 +325,11 @@ line/branch proof from `cargo-llvm-cov nextest`.
 Reports verification evidence freshness for a signal set without executing
 any sensor: `green` (current passing evidence covers the set), `red`
 (matching evidence contains required failures), `stale` (evidence exists but
-the workspace or policy changed), or `missing` (no qualifying evidence).
-Stronger evidence can satisfy a weaker set when it shares the config
-fingerprint and covers every required sensor. Exit 0 on green, 1 on
-red/stale/missing, 2 on usage/config errors.
+the workspace or policy changed), `running` (a `verify` run is executing now
+for the set), or `missing` (no qualifying evidence). Stronger evidence can
+satisfy a weaker set when it shares the config fingerprint and covers every
+required sensor. Exit 0 on green, 1 on red/stale/missing, 2 on usage/config
+errors, 3 while a run is in flight.
 
 - `--set <SET>`: Check evidence for this signal set (default evidence file
   `.do-harness/evidence.<set>.json`; default `.do-harness/evidence.json`
@@ -342,6 +343,12 @@ red/stale/missing, 2 on usage/config errors.
   `→ recover:` line. `insufficient_coverage` also lists the unrecorded
   required sensors in `missing_sensors` and in the text error, so a targeted
   `--only` re-run can cover the gap.
+- An in-flight run reports `running` with `reason: in_progress` and a
+  `running` object naming its pid, start time and set, instead of the
+  indistinguishable `missing`/`no_evidence` state. Each run locks its own
+  marker file in a sibling `<evidence>.running/` directory for its duration,
+  so concurrent runs stay legal and any in-flight run turns `status` into
+  `running`.
 
 ### `list`
 <!-- BEGIN GENERATED: cli-contract list -->
