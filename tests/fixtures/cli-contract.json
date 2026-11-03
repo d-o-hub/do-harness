@@ -2723,6 +2723,38 @@
           "possible_values": [],
           "help": "Strictly enforce warning checks as failures",
           "index": null
+        },
+        {
+          "id": "client_profile",
+          "kind": "option",
+          "short": null,
+          "long": "client-profile",
+          "value_names": [
+            "FILE"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Opt-in client capability profile (JSON). Default diagnostics are unchanged when it is omitted",
+          "index": null
+        },
+        {
+          "id": "client_probe",
+          "kind": "option",
+          "short": null,
+          "long": "client-probe",
+          "value_names": [
+            "CLIENT_PROBE"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": false,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Run the profile's pinned observation adapter instead of reading recorded observations. Requires `--client-profile`",
+          "index": null
         }
       ],
       "subcommands": [],

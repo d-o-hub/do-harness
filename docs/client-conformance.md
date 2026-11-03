@@ -11,6 +11,10 @@ but enables no sensor. An unconfigured or unsupported client produces `unknown`
 and a `SKIP:` marker. `--required` fails closed on unknown. A fixture-only
 result is malformed client evidence and cannot satisfy this gate.
 
+`doctor --client-profile` consumes this report for the `context_sanitization`
+and `outbound_mediation` claims; see
+[client-profile.md](client-profile.md) for the surrounding capability report.
+
 Explicitly add a `client-conformance` sensor invoking the helper with
 `--required`, `--client`, `--client-version`, `--integration`, and finally
 `--adapter` followed by the trusted adapter's argv. Add it to the required

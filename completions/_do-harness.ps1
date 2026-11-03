@@ -988,10 +988,12 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
         }
         'do-harness;doctor' {
             [CompletionResult]::new('--format', '--format', [CompletionResultType]::ParameterName, 'Output format')
+            [CompletionResult]::new('--client-profile', '--client-profile', [CompletionResultType]::ParameterName, 'Opt-in client capability profile (JSON). Default diagnostics are unchanged when it is omitted')
             [CompletionResult]::new('--root', '--root', [CompletionResultType]::ParameterName, 'Workspace root override (default: walk up from cwd)')
             [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Explicit path to do-harness.toml')
             [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)')
             [CompletionResult]::new('--strict', '--strict', [CompletionResultType]::ParameterName, 'Strictly enforce warning checks as failures')
+            [CompletionResult]::new('--client-probe', '--client-probe', [CompletionResultType]::ParameterName, 'Run the profile''s pinned observation adapter instead of reading recorded observations. Requires `--client-profile`')
             [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Suppress PASS/WARN verdict lines and the success footer')
             [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Suppress PASS/WARN verdict lines and the success footer')
             [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Dry run without side effects')

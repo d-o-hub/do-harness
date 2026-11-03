@@ -251,7 +251,7 @@ export PATH="$HOME/.local/bin:$PATH"
 | `hook uninstall [OPTIONS]` | Remove managed hooks, leaving foreign hook files untouched |
 | `hook status [OPTIONS]` | Show whether the managed hooks and release binary are present — flags: `--format <FORMAT>` |
 | `hook diff [OPTIONS]` | Show diff between installed hooks and current templates |
-| `doctor [OPTIONS]` | Run diagnostic checks on binary resolution and git hook health — flags: `--format <FORMAT>`, `--strict` |
+| `doctor [OPTIONS]` | Run diagnostic checks on binary resolution and git hook health — flags: `--format <FORMAT>`, `--strict`, `--client-profile <FILE>`, `--client-probe` |
 | `metrics [OPTIONS] [COMMAND]` | Report harness trends: sensor stats, strikes, eval pass-rate history — flags: `--format <FORMAT>`, `--sensor <SENSOR>`, `--skill <SKILL>`, `--since <UNIX_SECONDS>`, `--scope <SCOPE>`, `--task <ID>`, `--branch <BRANCH>`, `--all` |
 | `metrics pr [OPTIONS] --repo <OWNER/NAME>` | PR-loop measures: time-to-green, pushes per green, waivers, comments, cancelled runs, reruns — flags: `--repo <OWNER/NAME>`, `--since <WINDOW>`, `--limit <N>`, `--recompute`, `--format <FORMAT>` |
 | `learn [OPTIONS] --draft` | Draft skill/guide updates from sensors that keep firing (never applies them) — flags: `--draft`, `--days <DAYS>`, `--min-fires <N>`, `--format <FORMAT>` |
