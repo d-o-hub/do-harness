@@ -362,10 +362,15 @@ async fn past_all_subtasks_derives_done_action() {
     .await
     .unwrap();
     drop(conn);
-    insert_ok_beat(dir.path(), id, "test").await;
-
     let doc = build(dir.path(), id, DEFAULT_MAX_BYTES).await.unwrap();
     assert_eq!(doc.step.as_ref().unwrap().state, "complete");
+    // Past every subtask but without the required passing beats, `task done`
+    // would refuse, so the next action must be the verify run.
+    assert_eq!(doc.next_action.kind, "verify");
+    assert_eq!(doc.next_action.reason, "evidence_missing");
+
+    insert_ok_beat(dir.path(), id, "test").await;
+    let doc = build(dir.path(), id, DEFAULT_MAX_BYTES).await.unwrap();
     assert_eq!(doc.next_action.kind, "done");
     assert_eq!(doc.gating.as_ref().unwrap().state, "green");
 }

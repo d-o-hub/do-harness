@@ -87,10 +87,19 @@ pub(super) fn next_action(
             };
         }
         "complete" => {
+            // Every subtask is consumed, but `task done` still requires fresh
+            // passing beats for each sensor-gated subtask.
+            if matches!(gating.state, "green" | "not_applicable") {
+                return NextAction {
+                    kind: "done",
+                    command: Some(format!("do-harness task done {id}")),
+                    reason: "gates_complete",
+                };
+            }
             return NextAction {
-                kind: "done",
-                command: Some(format!("do-harness task done {id}")),
-                reason: "gates_complete",
+                kind: "verify",
+                command: evidence.recovery.clone(),
+                reason: verify_reason(evidence.state),
             };
         }
         _ => {}
@@ -115,21 +124,25 @@ pub(super) fn next_action(
             command: Some(format!("do-harness task advance {id}")),
             reason: "sensor_passing",
         },
-        "red" => NextAction {
+        "red" | "stale" => NextAction {
             kind: "verify",
             command: evidence.recovery.clone(),
-            reason: "sensor_failed",
-        },
-        "stale" => NextAction {
-            kind: "verify",
-            command: evidence.recovery.clone(),
-            reason: "evidence_stale",
+            reason: verify_reason(evidence.state),
         },
         _ => NextAction {
             kind: "verify",
             command: evidence.recovery.clone(),
             reason: "evidence_missing",
         },
+    }
+}
+
+/// Fixed next-action reason for an unsatisfied evidence state.
+fn verify_reason(state: &str) -> &'static str {
+    match state {
+        "red" => "sensor_failed",
+        "stale" => "evidence_stale",
+        _ => "evidence_missing",
     }
 }
 
