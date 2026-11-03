@@ -40,6 +40,11 @@ pub enum Command {
         /// Run only sensors applicable to the working-tree change.
         #[arg(long)]
         changed: bool,
+        /// Run only sensors applicable to the committed range
+        /// `merge-base(<REF>, HEAD)..HEAD`; combine with `--changed` to union
+        /// committed and uncommitted paths.
+        #[arg(long, value_name = "REF")]
+        since: Option<String>,
         /// Run only the named sensor (repeatable or comma-separated).
         #[arg(long = "only", action = ArgAction::Append, value_name = "SENSOR")]
         only: Vec<String>,
@@ -96,6 +101,9 @@ pub enum Command {
         /// Select by working-tree change instead of listing everything.
         #[arg(long)]
         changed: bool,
+        /// Select by the committed range `merge-base(<REF>, HEAD)..HEAD`.
+        #[arg(long, value_name = "REF")]
+        since: Option<String>,
         /// Output format.
         #[arg(long, value_enum, default_value_t = Format::Text)]
         format: Format,

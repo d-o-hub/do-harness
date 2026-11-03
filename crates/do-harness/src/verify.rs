@@ -378,7 +378,14 @@ fn write_evidence(
     // Fingerprints describe the post-execution workspace: sensors may create
     // files, and status never executes sensors, so the left-behind state is
     // the stable comparison point.
-    let post = crate::changes::discover(root);
+    // Fingerprints must describe the same selection input `status` recomputes:
+    // a range run on a clean checkout has an empty working tree, so hashing
+    // the working-tree change would make its own evidence look stale.
+    let post = if opts.since.is_some() {
+        crate::changes::discover_selection(root, opts.changed, opts.since.as_deref()).changed
+    } else {
+        crate::changes::discover(root)
+    };
     let fingerprints = crate::fingerprint::for_run(
         root,
         cfg,
@@ -398,6 +405,8 @@ fn write_evidence(
         selected: &selected,
         fingerprints,
         changed: opts.changed,
+        selection: (selection.changes.mode != crate::changes::SelectionMode::All)
+            .then(|| evidence::EvidenceSelection::from_changes(&selection.changes)),
         skipped,
         task: opts.task,
         record: opts.record,

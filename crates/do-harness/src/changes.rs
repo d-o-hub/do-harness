@@ -1,4 +1,4 @@
-//! Working-tree change discovery for `--changed` selection.
+//! Change discovery for `--changed` and `--since` selection.
 //!
 //! Changed files are the union of tracked modifications (staged and
 //! unstaged, including deletions and renames) and untracked non-ignored
@@ -6,6 +6,10 @@
 //! determined (not a git checkout, `git` missing, a failing git command, a
 //! non-UTF-8 path), discovery reports the failure and its diagnostic, and
 //! callers must fail closed by selecting every sensor.
+//!
+//! `--since <ref>` selects from the committed range
+//! `merge-base(<ref>, HEAD)..HEAD` instead, so a clean checkout of an
+//! already-committed branch still selects the sensors its commits touch.
 
 use std::path::Path;
 use std::process::{Command, Output};
@@ -56,78 +60,6 @@ impl ChangedFiles {
     pub fn paths(&self) -> Vec<&str> {
         self.files.iter().map(|f| f.path.as_str()).collect()
     }
-}
-
-/// A failed change-discovery probe: the git invocation and its diagnostic.
-///
-/// Carries the cause so fail-closed selection can name it instead of
-/// reporting an unexplained empty change set.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct DiscoveryError {
-    command: String,
-    detail: String,
-}
-
-impl DiscoveryError {
-    fn new(command: impl Into<String>, detail: impl Into<String>) -> Self {
-        Self {
-            command: command.into(),
-            detail: detail.into(),
-        }
-    }
-
-    /// Maps a completed but unsuccessful git invocation to an error.
-    fn from_output(command: &str, output: &Output) -> Self {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        let stderr = stderr.trim();
-        if stderr.is_empty() {
-            Self::new(command, output.status.to_string())
-        } else {
-            Self::new(command, stderr)
-        }
-    }
-}
-
-impl std::fmt::Display for DiscoveryError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} failed: {}", self.command, self.detail)
-    }
-}
-
-/// Discovers changed files under `root`.
-///
-/// Returns an empty change set with `discovery_failed` and `discovery_error`
-/// set when the working tree cannot be inspected: `root` is not inside a git
-/// working tree, `git` cannot run, or any git query fails. A repository
-/// without commits is not a failure: staged index paths are additions and
-/// untracked files are discovered as usual.
-#[must_use]
-pub fn discover(root: &Path) -> ChangedFiles {
-    match discover_inner(root) {
-        Ok(files) => ChangedFiles {
-            files,
-            discovery_failed: false,
-            discovery_error: None,
-        },
-        Err(error) => ChangedFiles {
-            files: Vec::new(),
-            discovery_failed: true,
-            discovery_error: Some(error.to_string()),
-        },
-    }
-}
-
-/// Change discovery that reports the first failing step instead of swallowing it.
-fn discover_inner(root: &Path) -> Result<Vec<ChangedFile>, DiscoveryError> {
-    require_work_tree(root)?;
-    let mut files = match head_state(root)? {
-        HeadState::Born => tracked_changes(root)?,
-        HeadState::Unborn => index_paths(root)?,
-    };
-    files.extend(untracked_files(root)?);
-    files.sort_by(|a, b| a.path.cmp(&b.path));
-    files.dedup_by(|a, b| a.path == b.path);
-    Ok(files)
 }
 
 /// Environment variables through which `git` selects which repository and
@@ -291,17 +223,20 @@ fn index_paths(root: &Path) -> Result<Vec<ChangedFile>, DiscoveryError> {
 /// Tracked staged and unstaged changes versus `HEAD`, NUL-separated.
 fn tracked_changes(root: &Path) -> Result<Vec<ChangedFile>, DiscoveryError> {
     let args = ["diff", "--name-status", "-z", "HEAD"];
-    let command = git_label(&args);
     let output = git_output(root, &args)?;
+    parse_name_status(&output.stdout, &git_label(&args))
+}
+
+/// Parses NUL-separated `git diff --name-status -z` records.
+fn parse_name_status(stdout: &[u8], command: &str) -> Result<Vec<ChangedFile>, DiscoveryError> {
     // NUL-separated records: `<STATUS>\0<path>\0`, renames add the source
     // path (`R100\0<from>\0<to>\0`).
-    let records: Vec<&str> = output
-        .stdout
+    let records: Vec<&str> = stdout
         .split(|byte| *byte == 0)
         .filter(|chunk| !chunk.is_empty())
         .map(|chunk| {
             std::str::from_utf8(chunk).map_err(|_| {
-                DiscoveryError::new(&command, "reported a path that is not valid UTF-8")
+                DiscoveryError::new(command, "reported a path that is not valid UTF-8")
             })
         })
         .collect::<Result<_, _>>()?;
@@ -310,13 +245,13 @@ fn tracked_changes(root: &Path) -> Result<Vec<ChangedFile>, DiscoveryError> {
     while let Some(status) = records.next() {
         let Some(letter) = status.chars().next() else {
             return Err(DiscoveryError::new(
-                &command,
+                command,
                 "reported an empty status record",
             ));
         };
         let mut next_path = |what: &str| -> Result<String, DiscoveryError> {
             records.next().map(normalize).ok_or_else(|| {
-                DiscoveryError::new(&command, format!("missing {what} path after `{status}`"))
+                DiscoveryError::new(command, format!("missing {what} path after `{status}`"))
             })
         };
         match letter {
@@ -399,6 +334,82 @@ pub(crate) fn normalize(path: &str) -> String {
     };
     path.strip_prefix("./").unwrap_or(&path).to_owned()
 }
+
+/// A failed change-discovery probe: the git invocation and its diagnostic.
+///
+/// Carries the cause so fail-closed selection can name it instead of
+/// reporting an unexplained empty change set.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct DiscoveryError {
+    command: String,
+    detail: String,
+}
+
+impl DiscoveryError {
+    fn new(command: impl Into<String>, detail: impl Into<String>) -> Self {
+        Self {
+            command: command.into(),
+            detail: detail.into(),
+        }
+    }
+
+    /// Maps a completed but unsuccessful git invocation to an error.
+    fn from_output(command: &str, output: &Output) -> Self {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let stderr = stderr.trim();
+        if stderr.is_empty() {
+            Self::new(command, output.status.to_string())
+        } else {
+            Self::new(command, stderr)
+        }
+    }
+}
+
+impl std::fmt::Display for DiscoveryError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} failed: {}", self.command, self.detail)
+    }
+}
+
+/// Discovers changed files under `root`.
+///
+/// Returns an empty change set with `discovery_failed` and `discovery_error`
+/// set when the working tree cannot be inspected: `root` is not inside a git
+/// working tree, `git` cannot run, or any git query fails. A repository
+/// without commits is not a failure: staged index paths are additions and
+/// untracked files are discovered as usual.
+#[must_use]
+pub fn discover(root: &Path) -> ChangedFiles {
+    match discover_inner(root) {
+        Ok(files) => ChangedFiles {
+            files,
+            discovery_failed: false,
+            discovery_error: None,
+        },
+        Err(error) => ChangedFiles {
+            files: Vec::new(),
+            discovery_failed: true,
+            discovery_error: Some(error.to_string()),
+        },
+    }
+}
+
+/// Change discovery that reports the first failing step instead of swallowing it.
+fn discover_inner(root: &Path) -> Result<Vec<ChangedFile>, DiscoveryError> {
+    require_work_tree(root)?;
+    let mut files = match head_state(root)? {
+        HeadState::Born => tracked_changes(root)?,
+        HeadState::Unborn => index_paths(root)?,
+    };
+    files.extend(untracked_files(root)?);
+    files.sort_by(|a, b| a.path.cmp(&b.path));
+    files.dedup_by(|a, b| a.path == b.path);
+    Ok(files)
+}
+
+mod range;
+
+pub use range::{ChangeSelection, ResolvedRange, SelectionMode, discover_selection};
 
 #[cfg(test)]
 #[path = "changes_tests.rs"]

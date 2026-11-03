@@ -111,6 +111,9 @@ pub struct VerifyOpts {
     pub set: Option<String>,
     /// Restrict execution to sensors applicable to the working-tree change.
     pub changed: bool,
+    /// Restrict execution to sensors applicable to the committed range
+    /// `merge-base(<ref>, HEAD)..HEAD`.
+    pub since: Option<String>,
     /// Restrict execution to these sensor names; empty = all.
     pub only: Vec<String>,
     /// Exclude these sensor names from execution.
@@ -198,6 +201,7 @@ pub fn verify_selection<'a>(
             failed: vec![],
             sensors: vec![],
             signal_set,
+            selection: selection_report(selection),
         });
     }
 
@@ -227,6 +231,14 @@ pub fn verify_selection<'a>(
         failed,
         sensors: results,
         signal_set,
+        selection: selection_report(selection),
+    })
+}
+
+/// Selection input for the report; `None` when no change filtering ran.
+fn selection_report(selection: &ResolvedSelection<'_>) -> Option<crate::report::SelectionReport> {
+    (selection.changes.mode != crate::changes::SelectionMode::All).then(|| {
+        crate::report::SelectionReport::from_changes(&selection.changes, &selection.skipped)
     })
 }
 
@@ -238,6 +250,8 @@ pub struct ResolvedSelection<'a> {
     pub specs: Vec<&'a SensorSpec>,
     /// Sensors skipped by `--changed` applicability, with reasons.
     pub skipped: Vec<crate::applicability::Skipped>,
+    /// Change input and resolved revisions behind the selection.
+    pub changes: crate::changes::ChangeSelection,
     /// Why change discovery failed, when it did; every candidate was kept.
     pub discovery_error: Option<String>,
 }
@@ -308,10 +322,10 @@ pub fn resolve_selection<'a>(
         }
     }
 
-    let applicable: Vec<&SensorSpec> = if opts.changed {
-        let changed = crate::changes::discover(root);
-        let discovery_error = changed.discovery_error.clone();
-        let selection = crate::applicability::select(&ordered, &changed);
+    let applicable: Vec<&SensorSpec> = if opts.changed || opts.since.is_some() {
+        let changes = crate::changes::discover_selection(root, opts.changed, opts.since.as_deref());
+        let discovery_error = changes.changed.discovery_error.clone();
+        let selection = crate::applicability::select(&ordered, &changes.changed);
         let names = selection.selected_names();
         let skipped = selection.skipped;
         let specs: Vec<&SensorSpec> = ordered
@@ -325,6 +339,7 @@ pub fn resolve_selection<'a>(
         return Ok(ResolvedSelection {
             specs,
             skipped,
+            changes,
             discovery_error,
         });
     } else {
@@ -341,6 +356,7 @@ pub fn resolve_selection<'a>(
     Ok(ResolvedSelection {
         specs,
         skipped: Vec::new(),
+        changes: crate::changes::discover_selection(root, false, None),
         discovery_error: None,
     })
 }

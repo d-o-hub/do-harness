@@ -79,6 +79,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
         &'do-harness;verify'= {
             cand --format 'Output format'
             cand --set 'Run only the sensors in this development signal set'
+            cand --since 'Run only sensors applicable to the committed range `merge-base(<REF>, HEAD)..HEAD`; combine with `--changed` to union committed and uncommitted paths'
             cand --only 'Run only the named sensor (repeatable or comma-separated)'
             cand --exclude 'Exclude named sensors from the run'
             cand --jobs 'Maximum sensors in flight (overrides `jobs` in do-harness.toml)'
@@ -106,6 +107,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
         &'do-harness;check'= {
             cand --format 'Output format'
             cand --set 'Run only the sensors in this development signal set'
+            cand --since 'Run only sensors applicable to the committed range `merge-base(<REF>, HEAD)..HEAD`; combine with `--changed` to union committed and uncommitted paths'
             cand --only 'Run only the named sensor (repeatable or comma-separated)'
             cand --exclude 'Exclude named sensors from the run'
             cand --jobs 'Maximum sensors in flight (overrides `jobs` in do-harness.toml)'
@@ -160,6 +162,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
         }
         &'do-harness;explain'= {
             cand --set 'Explain this development signal set (default: all sensors)'
+            cand --since 'Select by the committed range `merge-base(<REF>, HEAD)..HEAD`'
             cand --format 'Output format'
             cand --root 'Workspace root override (default: walk up from cwd)'
             cand --config 'Explicit path to do-harness.toml'

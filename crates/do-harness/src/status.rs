@@ -24,6 +24,7 @@ use crate::{CliError, config};
 mod inflight;
 mod locate;
 mod present;
+mod selection;
 
 use inflight::running_report;
 use locate::{Coverage, evidence_paths, find_covering_evidence};
@@ -124,8 +125,11 @@ pub fn status_report(
     set: Option<&str>,
     evidence_override: Option<&Path>,
 ) -> anyhow::Result<StatusReport> {
-    let facts = CurrentFacts::compute(root, cfg, config_bytes, set)?;
     let paths = evidence_paths(root, set, evidence_override);
+    // A range-selected artifact must be judged against the same range, not
+    // the (usually empty) working tree of a clean committed checkout.
+    let since = selection::recorded_since(&paths);
+    let facts = CurrentFacts::compute(root, cfg, config_bytes, set, since.as_deref())?;
     for path in &paths {
         if let Some(running) = crate::evidence::running::inspect(root, path) {
             return Ok(running_report(set, facts.side, running));
@@ -150,6 +154,8 @@ struct CurrentFacts {
     policy: String,
     /// Current set-free config fingerprint.
     config: String,
+    /// Current resolved range, when the evidence selected by `--since`.
+    pub(super) range: Option<crate::changes::ResolvedRange>,
     manifest: crate::provenance::InputManifest,
 }
 
@@ -160,9 +166,17 @@ impl CurrentFacts {
         cfg: &config::Config,
         config_bytes: Option<&[u8]>,
         set: Option<&str>,
+        since: Option<&str>,
     ) -> anyhow::Result<Self> {
         let candidates = crate::signals::candidate_specs(cfg, set)?;
-        let changed = crate::changes::discover(root);
+        // Unfiltered evidence fingerprints the working tree, as it always
+        // has; range evidence must be judged against the same range.
+        let (changed, range) = if since.is_some() {
+            let changes = crate::changes::discover_selection(root, false, since);
+            (changes.changed, changes.range)
+        } else {
+            (crate::changes::discover(root), None)
+        };
         let selection = crate::applicability::select(&candidates, &changed);
         let required = selection.selected_names();
         let fingerprints =
@@ -187,6 +201,7 @@ impl CurrentFacts {
             workspace,
             policy,
             config,
+            range,
             manifest,
         })
     }
@@ -251,7 +266,7 @@ fn recovery_command(set: Option<&str>) -> String {
 fn recovery_hint(reason: &str, set: Option<&str>) -> Option<String> {
     matches!(
         reason,
-        "no_evidence" | "insufficient_coverage" | "policy_changed"
+        "no_evidence" | "insufficient_coverage" | "policy_changed" | "selection_changed"
     )
     .then(|| recovery_command(set))
 }
@@ -291,6 +306,7 @@ fn decide(set: Option<&str>, facts: &CurrentFacts, document: &EvidenceDocument) 
     let workspace_match = document.workspace_fingerprint == facts.workspace;
     let policy_match = document.policy_fingerprint == facts.policy;
     let config_match = document.config_fingerprint == facts.config;
+    let selection_match = selection::matches(document, facts);
 
     let provenance_ok = document.input_manifest.as_ref().is_some_and(|manifest| {
         manifest.established()
@@ -303,7 +319,7 @@ fn decide(set: Option<&str>, facts: &CurrentFacts, document: &EvidenceDocument) 
                 .all(|name| manifest.sensors.get(name) == facts.manifest.sensors.get(name))
     }) && document.verify_chain(document.prev_hash.as_deref());
     let policy_ok = if same_set { policy_match } else { config_match };
-    if covers && workspace_match && policy_ok && provenance_ok {
+    if covers && workspace_match && policy_ok && provenance_ok && selection_match {
         if let Some(reason) = &document.invalidated_reason {
             let mut current = current_side.clone();
             current.failed.clone_from(&evidence.failed);
@@ -350,7 +366,7 @@ fn decide(set: Option<&str>, facts: &CurrentFacts, document: &EvidenceDocument) 
     report(
         EvidenceState::Stale,
         set,
-        stale_reason(workspace_match, policy_ok),
+        stale_reason(workspace_match, policy_ok, selection_match),
         Some(evidence),
         current_side,
         Vec::new(),
@@ -414,8 +430,10 @@ fn missing_sensors(
 }
 
 /// Staleness reason when the fingerprints no longer match.
-fn stale_reason(workspace_match: bool, policy_ok: bool) -> &'static str {
-    if workspace_match && policy_ok {
+fn stale_reason(workspace_match: bool, policy_ok: bool, selection_match: bool) -> &'static str {
+    if !selection_match {
+        "selection_changed"
+    } else if workspace_match && policy_ok {
         "inputs_changed_or_unknown"
     } else if workspace_match {
         "policy_changed"

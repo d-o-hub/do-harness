@@ -55,6 +55,7 @@ _arguments "${_arguments_options[@]}" : \
 '--format=[Output format]:FORMAT:((text\:"Human-readable text output"
 json\:"Machine-readable JSON output"))' \
 '--set=[Run only the sensors in this development signal set]:SET:_default' \
+'--since=[Run only sensors applicable to the committed range \`merge-base(<REF>, HEAD)..HEAD\`; combine with \`--changed\` to union committed and uncommitted paths]:REF:_default' \
 '*--only=[Run only the named sensor (repeatable or comma-separated)]:SENSOR:_default' \
 '*--exclude=[Exclude named sensors from the run]:SENSOR:_default' \
 '--jobs=[Maximum sensors in flight (overrides \`jobs\` in do-harness.toml)]:N:_default' \
@@ -87,6 +88,7 @@ _arguments "${_arguments_options[@]}" : \
 '--format=[Output format]:FORMAT:((text\:"Human-readable text output"
 json\:"Machine-readable JSON output"))' \
 '--set=[Run only the sensors in this development signal set]:SET:_default' \
+'--since=[Run only sensors applicable to the committed range \`merge-base(<REF>, HEAD)..HEAD\`; combine with \`--changed\` to union committed and uncommitted paths]:REF:_default' \
 '*--only=[Run only the named sensor (repeatable or comma-separated)]:SENSOR:_default' \
 '*--exclude=[Exclude named sensors from the run]:SENSOR:_default' \
 '--jobs=[Maximum sensors in flight (overrides \`jobs\` in do-harness.toml)]:N:_default' \
@@ -151,6 +153,7 @@ json\:"Machine-readable JSON output"))' \
 (explain)
 _arguments "${_arguments_options[@]}" : \
 '--set=[Explain this development signal set (default\: all sensors)]:SET:_default' \
+'--since=[Select by the committed range \`merge-base(<REF>, HEAD)..HEAD\`]:REF:_default' \
 '--format=[Output format]:FORMAT:((text\:"Human-readable text output"
 json\:"Machine-readable JSON output"))' \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
