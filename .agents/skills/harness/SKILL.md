@@ -60,6 +60,11 @@ and the generic pack starts with no sensors and no sets at all, so
 `do-harness explain --set verification --changed` shows which sensors apply to
 the current change.
 
+For efficient agent loops, prefer `--changed`, `--only`, and the smallest
+affected signal set; reserve the full `main`/`release` sets for their CI gates.
+This keeps repeated feedback fast and avoids spending model context or runner
+time on unrelated sensors.
+
 | Command | Stage |
 |---------|-------|
 | `do-harness verify --set feedback` | the edit loop (fast subset) |
@@ -76,6 +81,18 @@ so `--task <id>` records the beats a task-scoped `task done` gate reads; an
 unscoped run lands in the current branch (or `global` on a detached HEAD).
 
 ## Self-Correction Protocol
+
+### Main CI and release recovery
+
+For a post-merge `main` failure, keep the gate fail-closed. Rerun only when the
+failure is plausibly transient; do not convert a warning, skipped sensor, stale
+evidence artifact, or missing tool into a pass. Automatic repair is limited to
+commands explicitly declared safe by the repository's sensor contract (for
+example generated documentation or formatting), and must be proposed in a pull
+request. Never push an inferred code, test, security, or dependency repair
+directly to `main`. Release automation may consume only a successful aggregate
+main gate for the exact commit it will tag, and a tag is incomplete until the
+corresponding GitHub Release and post-publication checks exist.
 
 When a computational sensor fires:
 1. Read the full error message — it includes a fix hint.

@@ -81,7 +81,7 @@ impl ChangedFiles {
 /// keeps the coverage honest, and the generated scripts
 /// (`templates/scripts/check-*.sh`) and the test fixtures
 /// (`tests/support/mod.rs`) clear the same set.
-pub(crate) const GIT_VIEW_ENV: [&str; 15] = [
+pub(crate) const GIT_VIEW_ENV: [&str; 16] = [
     "GIT_DIR",
     "GIT_WORK_TREE",
     "GIT_IMPLICIT_WORK_TREE",
@@ -97,6 +97,7 @@ pub(crate) const GIT_VIEW_ENV: [&str; 15] = [
     "GIT_GRAFT_FILE",
     "GIT_REPLACE_REF_BASE",
     "GIT_NO_REPLACE_OBJECTS",
+    "GIT_INTERNAL_SUPER_PREFIX",
 ];
 
 /// `GIT_CONFIG*` variables git also publishes as "local", deliberately kept:

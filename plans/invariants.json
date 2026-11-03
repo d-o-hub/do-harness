@@ -324,15 +324,15 @@
     "category": "distribution"
   },
   {
-    "invariant": "On every push to `main`, `auto-release.yml`'s `prepare` refreshes the open release pull request's branch *and body* \u2014 the body carries the derived version, the bump class, the basis tag, and the commit count, so it must not age \u2014 and closes any open automation-owned `release/v<major>.<minor>.<patch>` pull request that no longer matches the current derivation with a comment naming the surviving proposal; the sweep matches that full shape only, so a differently-shaped human branch (`release/v2-docs`) is never touched, while a branch named exactly like a derivation (`release/v1.2.3`) is treated as the workflow's own, because that ref is the one it force-pushes and deletes itself",
+    "invariant": "After a successful exact-SHA main gate, `auto-release.yml`'s `prepare` refreshes the open release pull request's branch *and body* \u2014 the body carries the derived version, the bump class, the basis tag, and the commit count, so it must not age \u2014 and closes any open automation-owned `release/v<major>.<minor>.<patch>` pull request that no longer matches the current derivation with a comment naming the surviving proposal; the sweep matches that full shape only, so a differently-shaped human branch (`release/v2-docs`) is never touched, while a branch named exactly like a derivation (`release/v1.2.3`) is treated as the workflow's own, because that ref is the one it force-pushes and deletes itself",
     "rationale": "A release pull request left open while `main` moves on carries a stale body and a stale bump, and a second derivation over the same range opens a competing proposal, so a reviewer could merge the wrong version. Refreshing the current proposal and retiring the superseded ones keeps one automation-owned proposal alive for the live derivation (the sweep reads a bounded page of open pull requests) and its stated basis true; closing a pull request needs `pull-requests: write`, which is why the `prepare` job holds it.",
     "sensor": ".github/workflows/auto-release.yml prepare job (branch + body refresh, superseded `release/v*` proposals closed, `pull-requests: write`); workflow lint sensor `bash scripts/check-actionlint.sh` and the docs/releasing.md runbook",
     "category": "workflow"
   },
   {
-    "invariant": "`auto-release.yml`'s `ship` job fails closed unless `github.ref == 'refs/heads/main'`: tagging is refused on any other ref, because recovering an already-existing tag is `release.yml`'s job, where the tagged commit is an explicit input",
-    "rationale": "A `workflow_dispatch` of the auto-release workflow can be sent from any branch, and a tag created from an unreviewed ref would claim to release a commit that never passed the `main` gate; the guard makes the workflow's meaning (`main`'s merge is the release) executable rather than a convention, and leaves tag recovery to the path that names the tag as an input.",
-    "sensor": ".github/workflows/auto-release.yml ship job (an 'Assert the ship ref is main' step refusing any ref other than `refs/heads/main`); workflow lint sensor `bash scripts/check-actionlint.sh` and the docs/releasing.md runbook",
+    "invariant": "`auto-release.yml`'s `ship` job tags only the exact current main commit whose `verify` workflow succeeded; manual dispatch is accepted only after the same exact-SHA success is confirmed, and existing tags without a GitHub Release enter `release.yml` recovery",
+    "rationale": "A workflow-run event's default SHA is not the verified head, and a manual dispatch can target an unreviewed ref; comparing the verified head with the live main ref prevents both races and unreviewed tags while leaving immutable-tag recovery to the path that names the tag as an input.",
+    "sensor": ".github/workflows/auto-release.yml ship job (exact-SHA main assertion and tag/release recovery); workflow lint sensor `bash scripts/check-actionlint.sh` and the docs/releasing.md runbook",
     "category": "workflow"
   },
   {
@@ -430,5 +430,29 @@
     "rationale": "Prevents stale baselines and lost upstream commits during agent audit, planning, and task execution",
     "sensor": "python3 scripts/tests/test_latest_main.py",
     "category": "workflow"
+  },
+  {
+    "invariant": "The post-merge main gate is the strict ordinary release authority; expensive coverage and feature-powerset checks remain blocking in the scheduled and final release gates",
+    "rationale": "Every main push gets fast, complete ordinary feedback while the artifact-producing release path still requires the expensive supply-chain and compatibility proof",
+    "sensor": "do-harness verify --set main --strict && do-harness status --set main; release.yml uses verify --set release --strict",
+    "category": "distribution"
+  },
+  {
+    "invariant": "Automatic release preparation waits for at least three release-worthy commits since the last published release unless an explicit manual force is supplied; manual force never bypasses the successful exact-SHA main gate",
+    "rationale": "Small release batches create unnecessary registry and artifact churn while the force path preserves an auditable operator override",
+    "sensor": "bash .github/workflows/auto-release.yml (workflow_run exact-SHA gate and threshold)",
+    "category": "distribution"
+  },
+  {
+    "invariant": "A version tag is incomplete until the corresponding GitHub Release, registry publications, artifacts, and consumer-side post-publication verification all succeed; an existing tag without a Release enters recovery",
+    "rationale": "A tag records release intent but does not prove that consumers can download, install, and verify the published version",
+    "sensor": ".github/workflows/release.yml and scripts/verify-published.sh",
+    "category": "distribution"
+  },
+  {
+    "invariant": "Automatic main repair is limited to declared mechanical transformations and always creates a pull request; code, test, security, dependency, and unknown failures require human repair",
+    "rationale": "Generated-file repair is reviewable and bounded, while inferred code changes could silently alter behavior or weaken a release gate",
+    "sensor": ".github/workflows/main-repair.yml",
+    "category": "governance"
   }
 ]

@@ -12,9 +12,8 @@ name: release
 #     step is idempotent: crates.io and npm versions already published are
 #     skipped, and an existing GitHub Release has its assets replaced.
 #   - untagged `workflow_dispatch`: dry run — build and dogfood every target but
-#     never release. Set `publish` to also publish the workspace version to
-#     crates.io and npm (bootstrap path for a version whose tag predates the
-#     publish job); binaries and the Release still require a tag.
+#     never publish. Registry publication is always coupled to an immutable
+#     version tag and its GitHub Release.
 on:
   push:
     tags: ["v*"]
@@ -25,7 +24,7 @@ on:
         type: string
         default: ""
       publish:
-        description: "Dry run only: also publish the workspace version to crates.io and npm"
+        description: "Deprecated safety switch; publishing still requires tag"
         type: boolean
         default: false
 
@@ -101,6 +100,11 @@ jobs:
             echo "FAIL: tag ${RELEASE_TAG} does not match workspace version ${expected}" >&2
             exit 1
           }
+      - name: Refuse untagged publication
+        if: inputs.publish && !inputs.tag
+        run: |
+          echo "FAIL: registry publication requires an explicit version tag; run a tagged release or tagged recovery dispatch" >&2
+          exit 1
       # dtolnay/rust-toolchain@master (SHA within master history per action docs)
       - uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de
         with:
@@ -113,14 +117,14 @@ jobs:
         with:
           # Every tool the `release` set's sensors invoke: cargo-deny (deps),
           # cargo-audit (audit), cargo-nextest (test), cargo-llvm-cov
-          # (coverage). rustfmt and clippy come from the toolchain components
+          # (coverage), and cargo-hack (powerset). rustfmt and clippy come from the toolchain components
           # above, shellcheck from the runner image, actionlint from the pinned
           # download below, markdownlint/yamllint and the docs tooling's
           # markdown-it-py from the step below. Adding a
           # sensor that needs a new tool means adding
           # it here too: the absence of cargo-nextest failed the v0.1.2 tag
           # preflight with "error: no such command: `nextest`" -> weak evidence.
-          tool: cargo-deny,cargo-audit,cargo-nextest,cargo-llvm-cov,shellcheck,cargo-semver-checks@0.50.0
+          tool: cargo-deny,cargo-audit,cargo-nextest,cargo-llvm-cov,cargo-hack,shellcheck,cargo-semver-checks@0.50.0
       - name: Install actionlint
         # The `release` set includes the `actionlint` sensor and this job runs
         # with `DO_HARNESS_REQUIRE_TOOLS=1`, so a missing tool is a hard failure
@@ -503,10 +507,10 @@ jobs:
     # crates.io versions are immutable, so publishing is gated on the same
     # preconditions as the binary release: a version tag whose commit passed
     # preflight and whose full build matrix (and dogfood) succeeded. The tagged
-    # dispatch path re-runs a release; the untagged `publish` input is the
-    # bootstrap path for a version whose tag predates the publish job.
+    # dispatch path re-runs a release; an untagged dispatch never reaches this
+    # job.
     needs: [preflight, build]
-    if: github.event_name == 'push' || inputs.tag || inputs.publish
+    if: github.event_name == 'push' || inputs.tag
     runs-on: ubuntu-latest
     timeout-minutes: 45
     # Serialized repository-wide: the skip-if-published probe below is
@@ -668,7 +672,7 @@ jobs:
     # so it is gated on the same preconditions. Platform packages publish
     # first, then the meta package whose optionalDependencies pin them.
     needs: [preflight, build, registry-validation]
-    if: github.event_name == 'push' || inputs.tag || inputs.publish
+    if: github.event_name == 'push' || inputs.tag
     runs-on: ubuntu-latest
     timeout-minutes: 20
     # npm versions are immutable too: serialize the platform-then-meta sequence
@@ -736,18 +740,14 @@ jobs:
 
   verify-published:
     # Post-publication proof, from the consumer's side: the Release's own assets,
-    # the installer's result, npm and crates.io. Report-only first — the job runs,
-    # its log carries the verdict, and `continue-on-error` keeps a failure out of
-    # the release gate until the ratchet moves (docs/releasing.md, "Verifying a
-    # published release"). Deleting that line is the next position; passing
-    # `--require-immutable` to the script is the last one.
+    # the installer's result, npm and crates.io. This is a hard gate: an
+    # incomplete or mutable publication must not be reported as released.
     #
     # npm is part of the published surface, so wait for its job before probing:
     # the registry can keep serving the previous `dist-tags` for a few minutes
     # after `npm publish` reports success, and the probe below polls through
     # that window rather than reading propagation as a missing artifact.
     needs: [release, npm-publish]
-    continue-on-error: true
     if: github.event_name == 'push' || inputs.tag
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -846,4 +846,4 @@ jobs:
             echo "immutable=missing" >>"$facts"
           fi
           cat "$facts"
-          bash scripts/verify-published.sh --tag "$TAG" --dir "$work/assets" --facts "$facts"
+          bash scripts/verify-published.sh --tag "$TAG" --dir "$work/assets" --facts "$facts" --require-immutable

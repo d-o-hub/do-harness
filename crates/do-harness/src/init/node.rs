@@ -374,7 +374,7 @@ pub fn generate_node_config(sensors: &[SensorSpec]) -> Result<String> {
         .map(ToString::to_string)
         .collect();
 
-    let verification = ["typecheck", "lint", "test"]
+    let verification: Vec<String> = ["typecheck", "lint", "test"]
         .iter()
         .filter(|name| names.contains(name))
         .map(ToString::to_string)
@@ -384,9 +384,10 @@ pub fn generate_node_config(sensors: &[SensorSpec]) -> Result<String> {
         .iter()
         .filter(|name| names.contains(name))
         .map(ToString::to_string)
-        .collect();
+        .collect::<Vec<_>>();
 
     signal_sets.insert("feedback".to_owned(), feedback);
+    signal_sets.insert("main".to_owned(), verification.clone());
     signal_sets.insert("verification".to_owned(), verification);
     signal_sets.insert("release".to_owned(), release);
 

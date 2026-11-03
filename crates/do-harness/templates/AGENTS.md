@@ -41,6 +41,18 @@ current workspace and policy. `stale` means the workspace or `do-harness.toml`
 changed after verification: re-run the verification set. `red` means required
 checks failed. `missing` means no current evidence exists yet.
 
+## Main CI and release safety
+
+The repository's post-merge `main` gate should run the complete strict signal
+set, including any scheduled or expensive checks that the project treats as
+release-blocking. A release workflow must consume a successful gate for the
+exact commit it will tag; warnings, skipped sensors, missing tools, and stale
+evidence are not release evidence. Automatic repair should be limited to
+commands explicitly declared safe by the repository's sensor contract and must
+open a pull request. Never push an inferred code, test, security, or dependency
+repair directly to `main`. A tag is incomplete until its corresponding GitHub
+Release and post-publication checks exist.
+
 ## Repository knowledge
 
 - Follow the nearest `AGENTS.md` and the project documentation.

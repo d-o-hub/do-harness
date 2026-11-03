@@ -254,6 +254,10 @@ async fn scaffolded_skills_name_only_configured_signal_sets() {
         sets.contains(&"verification".to_owned()),
         "the rust pack configured no `verification` set: {sets:?}"
     );
+    assert!(
+        sets.contains(&"main".to_owned()),
+        "the rust pack configured no post-merge `main` set: {sets:?}"
+    );
     let mut checked = 0;
     for (doc, text) in scaffolded_skill_docs(dir.path()) {
         for span in code_spans(&text) {

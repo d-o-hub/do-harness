@@ -208,9 +208,19 @@ jobs:
           CI: "true"
           # Belt and braces: missing tools fail even if CI=true is dropped.
           DO_HARNESS_REQUIRE_TOOLS: "1"
-        run: ./target/release/do-harness verify --set verification --format json --strict
-      - name: Assert verification evidence is green
-        run: ./target/release/do-harness status --set verification --format json
+        run: |
+          set_name=verification
+          if [ "$GITHUB_REF" = 'refs/heads/main' ]; then
+            set_name=main
+          fi
+          ./target/release/do-harness verify --set "$set_name" --format json --strict
+      - name: Assert selected evidence is green
+        run: |
+          set_name=verification
+          if [ "$GITHUB_REF" = 'refs/heads/main' ]; then
+            set_name=main
+          fi
+          ./target/release/do-harness status --set "$set_name" --format json
       - name: Capture the generated-docs diff
         # `docs-sync` renders every generated block from the Clap definitions and
         # fails on any drift, so the sensor run above has already failed when this
@@ -243,11 +253,6 @@ jobs:
           name: docs-sync-diff
           path: ${{ runner.temp }}/docs-sync.diff
           if-no-files-found: ignore
-      # The `scheduled` set (the feature-powerset builds) runs nightly from
-      # `.github/workflows/scheduled.yml`, where its evidence is asserted the
-      # same way this set's is. Paying a four-build matrix per push and per pull
-      # request was the wrong cadence for work that no diff can invalidate
-      # (P4).
       - name: Record Cargo.lock hash
         run: |
           mkdir -p .do-harness
@@ -303,9 +308,14 @@ jobs:
         run: ./target/release/do-harness eval --strict-fixtures
       - name: Assert evidence integrity
         run: |
-          test -f .do-harness/evidence.verification.json
-          test -n "$(jq -r '.git_sha // empty' .do-harness/evidence.verification.json)"
-          test "$(jq -r '.signal_set' .do-harness/evidence.verification.json)" = "verification"
+          set_name=verification
+          if [ "$GITHUB_REF" = 'refs/heads/main' ]; then
+            set_name=main
+          fi
+          evidence=".do-harness/evidence.${set_name}.json"
+          test -f "$evidence"
+          test -n "$(jq -r '.git_sha // empty' "$evidence")"
+          test "$(jq -r '.signal_set' "$evidence")" = "$set_name"
       # actions/upload-artifact@v7.0.1
       - name: Upload verify evidence
         if: always()
@@ -313,7 +323,7 @@ jobs:
         with:
           name: verify-evidence
           path: |
-            .do-harness/evidence.verification.json
+            .do-harness/evidence.*.json
             .do-harness/Cargo.lock.sha256
           if-no-files-found: error
 

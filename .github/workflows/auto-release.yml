@@ -3,12 +3,12 @@ name: auto-release
 # Automated release preparation and tagging, so a `fix:` or `feat:` merge does
 # not wait on someone remembering to bump and tag.
 #
-#   push to main -> prepare: derive the bump from the conventional commits since
-#                            the last release tag and open (or refresh) a release
-#                            pull request that applies it, retiring any earlier
-#                            proposal that the derivation has superseded.
-#                -> ship:    once that version is on main with no tag, create the
-#                            tag and start the release pipeline.
+#   green main gate -> prepare: after the exact main commit passes the strict
+#                      main signal set, derive the bump from the conventional
+#                      commits since the last release tag and open (or refresh)
+#                      a release pull request once the batch threshold is reached.
+#                   -> ship:    once that version is on main with no tag, create
+#                      the tag and start the release pipeline.
 #
 # A derivation can change while a proposal is open: a breaking change turns a
 # patch proposal into a minor one. The proposed version is in the branch name, so
@@ -32,31 +32,39 @@ name: auto-release
 # docs/releasing.md ("Cutting a release").
 
 on:
-  push:
+  workflow_run:
+    workflows: [verify]
+    types: [completed]
     branches: [main]
   workflow_dispatch:
+    inputs:
+      force:
+        description: "Release the derived version before the normal commit batch threshold"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 concurrency:
-  # One at a time: two overlapping derivations could open competing release pull
-  # requests for the same commit range.
-  group: auto-release
+  # One non-canceling run per verified commit: a manual dispatch for the same
+  # SHA joins its workflow_run, while a newer SHA can fail fast on the current
+  # main-tip assertion instead of queueing behind an obsolete derivation.
+  group: auto-release-${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
   cancel-in-progress: false
 
 jobs:
   prepare:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # A release commit is this workflow's own output: it carries no releasable
-    # change, so the derivation is skipped rather than reported as `none`.
-    # Matched against the *subject* (`startsWith`): a squashed commit message
-    # also carries the pull-request body, so `contains` would skip the
-    # derivation for any pull request that merely documents the release flow.
+    # A release is considered only after the exact main commit completed the
+    # full `verify` workflow successfully. Manual dispatch uses the same
+    # exact-SHA check in the first step below; it cannot bypass CI.
     if: >-
-      github.event_name == 'push' &&
-      !startsWith(github.event.head_commit.message, 'chore(release):')
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == 'main') ||
+      github.event_name == 'workflow_dispatch'
     permissions:
       # `contents` is the release branch (push, force-push, delete on retire);
       # `pull-requests` is the proposal (open, edit its body, close the
@@ -65,13 +73,36 @@ jobs:
       # and OIDC token.
       contents: write
       pull-requests: write
+      actions: read
     steps:
       # actions/checkout@v7.0.1
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           # Full history and tags: the derivation counts the commits since the
           # last release tag.
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
           fetch-depth: 0
+      - name: Assert the verified main commit is still current
+        env:
+          EXPECTED_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+          GH_TOKEN: ${{ github.token }}
+          FORCE_RELEASE: ${{ inputs.force || 'false' }}
+        run: |
+          set -euo pipefail
+          actual="$(git ls-remote origin refs/heads/main | awk '{print $1}')"
+          test -n "$actual"
+          test "$actual" = "$EXPECTED_SHA" || {
+            echo "main advanced after the gate; the newer commit will trigger its own gate" >&2
+            exit 1
+          }
+          if [ "${{ github.event_name }}" = workflow_dispatch ]; then
+            green="$(gh run list --workflow verify.yml --commit "$EXPECTED_SHA" --limit 20 \
+              --json conclusion --jq 'any(.[]; .conclusion == "success")')"
+            test "$green" = true || {
+              echo "no successful verify.yml run exists for $EXPECTED_SHA" >&2
+              exit 1
+            }
+          fi
       - name: Resolve pinned toolchain
         id: toolchain
         run: |
@@ -89,13 +120,14 @@ jobs:
       # Swatinem/rust-cache@v2
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
         with:
-          key: auto-release-prepare
+          key: auto-release-prepare-${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
       - name: Derive the next version
         id: derive
         env:
           # `gh release list` reads the publication state, so this step needs the
           # same token the other `gh` steps use.
           GH_TOKEN: ${{ github.token }}
+          FORCE_RELEASE: ${{ inputs.force || 'false' }}
         run: |
           set -euo pipefail
           # A tag is not a finished release: `ship` creates the tag, and
@@ -110,17 +142,38 @@ jobs:
             --json tagName --jq '[.[].tagName] | join(",")')"
           report="$(bash scripts/release-manager.sh next --published "$published" --format json)"
           printf '%s\n' "$report"
-          for field in bump next current basis commits breaking feature fix; do
+          for field in bump next current basis commits release_worthy breaking feature fix; do
             printf '%s=%s\n' "$field" "$(printf '%s' "$report" | jq -r ".$field")" \
               >> "$GITHUB_OUTPUT"
           done
+          bump="$(printf '%s' "$report" | jq -r '.bump')"
+          release_worthy="$(printf '%s' "$report" | jq -r '.release_worthy')"
+          eligible=false
+          case "$bump" in
+            major | minor | patch)
+              eligibility_args=("$release_worthy" "$bump")
+              if [ "$FORCE_RELEASE" = true ]; then
+                eligibility_args+=(--force)
+              fi
+              eligible="$(bash scripts/release-manager.sh eligible "${eligibility_args[@]}")"
+              ;;
+            none | pending | pending-release)
+              ;;
+            *)
+              echo "unknown release-manager bump: $bump" >&2
+              exit 1
+              ;;
+          esac
+          printf 'eligible=%s\n' "$eligible" >> "$GITHUB_OUTPUT"
+          printf 'release eligibility: %s (release-worthy=%s total-commits=%s force=%s)\n' \
+            "$eligible" "$release_worthy" "$commits" "$FORCE_RELEASE"
       - name: Apply the bump
         # Only a real bump reaches here. `none` has nothing to apply, `pending`
         # waits for `ship` to tag the version already on `main`, and
         # `pending-release` waits for the previous release to finish publishing.
         # An allowlist rather than a list of exclusions so a derivation outcome
         # added later cannot start proposing a version by accident.
-        if: contains(fromJSON('["major","minor","patch"]'), steps.derive.outputs.bump)
+        if: steps.derive.outputs.eligible == 'true'
         run: |
           set -euo pipefail
           bash scripts/release-manager.sh prepare "${{ steps.derive.outputs.next }}"
@@ -140,7 +193,7 @@ jobs:
         # the previous release to finish publishing, and their reconciliation is
         # the retire step below. Written as an allowlist so a derivation outcome
         # added later cannot start proposing a version by accident.
-        if: contains(fromJSON('["major","minor","patch"]'), steps.derive.outputs.bump)
+        if: steps.derive.outputs.eligible == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           # The only derivation output sourced from git refs rather than from the
@@ -171,8 +224,8 @@ jobs:
           {
             printf "Automated release preparation for \`v%s\` (bump: **%s**).\n\n" \
               "$version" "${{ steps.derive.outputs.bump }}"
-            printf "Derived from the %s commits since the last release tag \`%s\`, per " \
-              "${{ steps.derive.outputs.commits }}" "$BASIS"
+            printf "Derived from %s release-worthy commits (%s total) since the last release tag \`%s\`, per " \
+              "${{ steps.derive.outputs.release_worthy }}" "${{ steps.derive.outputs.commits }}" "$BASIS"
             printf "[the version-derivation policy](docs/releasing.md#cutting-a-release).\n\n"
             printf "The version is derived, not hand-picked: edit the version in this pull "
             printf "request to override it, because \`ship\` tags whatever version is on \`main\`.\n"
@@ -222,10 +275,12 @@ jobs:
           # proposed version, so the branch name is the whole identity of a
           # proposal: a PR for another version cannot be the live one.
           winner_branch=""
-          case "$bump" in
-            major | minor | patch) winner_branch="release/v${next}" ;;
-            *) winner_branch="" ;;
-          esac
+          if [ "${{ steps.derive.outputs.eligible }}" = true ]; then
+            case "$bump" in
+              major | minor | patch) winner_branch="release/v${next}" ;;
+              *) winner_branch="" ;;
+            esac
+          fi
           winner_number=""
           if [ -n "$winner_branch" ]; then
             winner_number="$(gh pr list --head "$winner_branch" --state open \
@@ -300,11 +355,13 @@ jobs:
   ship:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    # Only a push to main says "this commit is the release": a manual dispatch is
-    # the same decision made on purpose, so it runs this job without `prepare`.
-    # This condition does not restrict the event's ref, so the assert step below
-    # is what requires a dispatch to have targeted `main`.
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    # A successful main gate is the release decision; a manual dispatch is the
+    # same decision made on purpose after the exact-SHA assertion below.
+    if: >-
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == 'main') ||
+      github.event_name == 'workflow_dispatch'
     permissions:
       contents: write
       # `gh workflow run` needs actions: write to start `release.yml`.
@@ -313,6 +370,7 @@ jobs:
       # actions/checkout@v7.0.1
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
           fetch-depth: 0
       # `git tag "$GITHUB_SHA"` below tags whatever ref the run resolved to, and
       # a `workflow_dispatch` can be sent against any branch or tag, so the ref
@@ -320,29 +378,77 @@ jobs:
       # `release/auto-release` would tag a commit that is not on `main` and
       # release code the required `verify` check never gated on main.
       - name: Assert the ship ref is main
+        env:
+          EXPECTED_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          if [ "$GITHUB_REF" != 'refs/heads/main' ]; then
-            printf 'auto-release: refusing to ship %s; this job tags refs/heads/main only.\n' "$GITHUB_REF" >&2
-            printf 'Recovery for a tag that already exists is a release.yml dispatch, which takes the tagged commit as an explicit input:\n' >&2
-            printf '  gh workflow run release.yml -f tag=vX.Y.Z\n' >&2
+          actual="$(git ls-remote origin refs/heads/main | awk '{print $1}')"
+          if [ "$actual" != "$EXPECTED_SHA" ]; then
+            printf 'auto-release: main advanced after the green gate (%s -> %s); waiting for the newer gate.\n' \
+              "$EXPECTED_SHA" "$actual" >&2
             exit 1
+          fi
+          if [ "${{ github.event_name }}" = workflow_dispatch ]; then
+            green="$(gh run list --workflow verify.yml --commit "$EXPECTED_SHA" --limit 20 \
+              --json conclusion --jq 'any(.[]; .conclusion == "success")')"
+            test "$green" = true || {
+              echo "auto-release: no successful verify.yml run exists for $EXPECTED_SHA" >&2
+              exit 1
+            }
           fi
       - name: Tag an untagged version and start the release
         env:
           GH_TOKEN: ${{ github.token }}
+          EXPECTED_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
         run: |
           set -euo pipefail
-          version="$(sed -n '/^\[workspace.package\]/,/^\[/ s/^version *= *"\(.*\)"/\1/p' Cargo.toml)"
-          test -n "$version"
-          tag="v$version"
-          if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null 2>&1; then
-            echo "$tag is already released; nothing to ship"
+          workspace_version="$(sed -n '/^\[workspace.package\]/,/^\[/ s/^version *= *"\(.*\)"/\1/p' Cargo.toml)"
+          test -n "$workspace_version"
+          existing_tag="v$workspace_version"
+          if git ls-remote --exit-code --tags origin "refs/tags/$existing_tag" >/dev/null 2>&1 &&
+            ! gh release view "$existing_tag" --json tagName >/dev/null 2>&1; then
+            echo "$existing_tag exists without a GitHub Release; dispatching recovery"
+            gh workflow run release.yml -f "tag=$existing_tag"
             exit 0
           fi
-          # The tagged commit is this push's commit, which is on main because
-          # main only accepts merges whose required `verify` check passed.
-          git tag "$tag" "$GITHUB_SHA"
+          published="$(gh release list --exclude-drafts --limit 100 \
+            --json tagName --jq '[.[].tagName] | join(",")')"
+          report="$(bash scripts/release-manager.sh next --published "$published" --format json)"
+          bump="$(printf '%s' "$report" | jq -r '.bump')"
+          version="$(printf '%s' "$report" | jq -r '.current')"
+          basis="$(printf '%s' "$report" | jq -r '.basis')"
+          case "$bump" in
+            pending)
+              ;;
+            pending-release)
+              test -n "$basis" && test "$basis" != none
+              echo "$basis is tagged but has no published release; entering recovery"
+              git ls-remote --exit-code --tags origin "refs/tags/$basis" >/dev/null
+              gh workflow run release.yml -f "tag=$basis"
+              exit 0
+              ;;
+            *)
+              echo "no pending release candidate (bump=$bump); nothing to ship"
+              exit 0
+              ;;
+          esac
+          test -n "$version"
+          test "$EXPECTED_SHA" = "$(git rev-parse HEAD)"
+          tag="v$version"
+          if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null 2>&1; then
+            if gh release view "$tag" --json tagName >/dev/null 2>&1; then
+              echo "$tag already has a GitHub Release; nothing to ship"
+            else
+              echo "$tag exists without a GitHub Release; dispatching recovery"
+              gh workflow run release.yml -f "tag=$tag"
+            fi
+            exit 0
+          fi
+          # The tagged commit is the workflow-run head SHA, not GITHUB_SHA:
+          # workflow_run events use the default branch's SHA for GITHUB_SHA.
+          # The exact head was checked above and is still the current main tip.
+          git tag "$tag" "$EXPECTED_SHA"
           git push origin "refs/tags/$tag"
           # A tag pushed with GITHUB_TOKEN does not trigger a `push` workflow, so
           # start the release explicitly; a dispatch always creates a run.

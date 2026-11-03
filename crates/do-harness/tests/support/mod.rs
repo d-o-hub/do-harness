@@ -24,7 +24,7 @@ use std::process::Command;
 /// repository, or report a rewritten history, instead of the fixture — which
 /// is how a local `git push` once failed on a test unrelated to the diff. The
 /// generated scripts (`templates/scripts/check-*.sh`) clear the same set.
-pub const GIT_VIEW_ENV: [&str; 15] = [
+pub const GIT_VIEW_ENV: [&str; 16] = [
     "GIT_DIR",
     "GIT_WORK_TREE",
     "GIT_IMPLICIT_WORK_TREE",
@@ -40,6 +40,7 @@ pub const GIT_VIEW_ENV: [&str; 15] = [
     "GIT_GRAFT_FILE",
     "GIT_REPLACE_REF_BASE",
     "GIT_NO_REPLACE_OBJECTS",
+    "GIT_INTERNAL_SUPER_PREFIX",
 ];
 
 /// `GIT_CONFIG*` variables git also publishes as "local", deliberately kept:
