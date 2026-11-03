@@ -30,6 +30,11 @@ tree. Flags, values, shell command strings passed to `-c`, URLs and git refs
 are not treated as paths. `doctor` reports the same miss for the effective
 sensors as a warning, or as a failure under `--strict`.
 
+A sensor that never started — a spawn failure, an empty `argv`, or a missing
+declared `argv` path — is reported as `unrunnable` in the JSON summary. When
+every selected sensor is unrunnable, `verify` exits `2` instead of `1`, so a
+wrapper can distinguish a configuration error from a gate that ran and failed.
+
 `max-output-bytes` bounds combined raw stdout/stderr at 1 MiB by default,
 with supported values from 1 KiB to 16 MiB. Exceeding it terminates the sensor,
 retains bounded redacted context, and reports `details.reason: output_limit`,

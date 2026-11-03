@@ -26,6 +26,13 @@ pub enum Command {
         format: Format,
     },
     /// Run computational sensors.
+    ///
+    /// Exit codes: 0 when every selected sensor passed, 1 when a sensor ran and
+    /// failed, and 2 when the run could not be judged — a usage or config
+    /// error, or every selected sensor was unrunnable (its program could not be
+    /// spawned, its argv was empty, or a declared argv path was missing). A
+    /// mixed run stays 1; the JSON report lists unrunnable sensors in a
+    /// top-level `unrunnable` array beside `failed`.
     #[command(visible_alias = "check")]
     Verify {
         /// Halt at the first failing sensor.
