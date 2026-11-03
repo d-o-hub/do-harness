@@ -71,6 +71,39 @@ pub enum ForwardDecision {
     },
 }
 
+/// Governance enforcement mode compiled into this proxy build.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GovernanceMode {
+    /// `agt-governance` is compiled in; decisions go through the mediator.
+    Enforced,
+    /// `agt-governance` is not compiled in; well-formed calls are permitted.
+    Stub,
+}
+
+impl GovernanceMode {
+    /// Stable identifier used in diagnostics and reports.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Enforced => "enforced",
+            Self::Stub => "stub",
+        }
+    }
+}
+
+/// Reports the governance mode this build actually implements.
+///
+/// A default build is a stub: it permits well-formed calls, so no report may
+/// treat it as enforcement.
+#[must_use]
+pub const fn governance_mode() -> GovernanceMode {
+    if cfg!(feature = "agt-governance") {
+        GovernanceMode::Enforced
+    } else {
+        GovernanceMode::Stub
+    }
+}
+
 mod proxy;
 pub use proxy::{McpLikeToolCall, ProxyMediator, validate_upstream};
 
@@ -93,3 +126,22 @@ mod server;
 pub use server::{
     create_router, create_router_degraded, create_router_with_audit, create_router_with_state,
 };
+
+#[cfg(test)]
+mod tests {
+    use super::{GovernanceMode, governance_mode};
+
+    #[cfg(not(feature = "agt-governance"))]
+    #[test]
+    fn default_build_reports_stub_governance() {
+        assert_eq!(governance_mode(), GovernanceMode::Stub);
+        assert_eq!(governance_mode().as_str(), "stub");
+    }
+
+    #[cfg(feature = "agt-governance")]
+    #[test]
+    fn governance_build_reports_enforced() {
+        assert_eq!(governance_mode(), GovernanceMode::Enforced);
+        assert_eq!(governance_mode().as_str(), "enforced");
+    }
+}

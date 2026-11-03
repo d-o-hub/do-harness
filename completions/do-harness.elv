@@ -900,10 +900,12 @@ set edit:completion:arg-completer[do-harness] = {|@words|
         }
         &'do-harness;doctor'= {
             cand --format 'Output format'
+            cand --client-profile 'Opt-in client capability profile (JSON). Default diagnostics are unchanged when it is omitted'
             cand --root 'Workspace root override (default: walk up from cwd)'
             cand --config 'Explicit path to do-harness.toml'
             cand --output 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)'
             cand --strict 'Strictly enforce warning checks as failures'
+            cand --client-probe 'Run the profile''s pinned observation adapter instead of reading recorded observations. Requires `--client-profile`'
             cand -q 'Suppress PASS/WARN verdict lines and the success footer'
             cand --quiet 'Suppress PASS/WARN verdict lines and the success footer'
             cand --dry-run 'Dry run without side effects'

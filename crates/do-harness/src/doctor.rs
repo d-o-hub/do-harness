@@ -12,6 +12,8 @@ use crate::hook_script::BinSource;
 use crate::hooks::{self, HookOwner};
 use crate::report::Format;
 
+mod client_profile;
+
 /// Outcome of the event-chain tamper audit, computed once so both output
 /// formats report it. Before this existed the audit ran only in the text
 /// branch, so `--format json` reported `ok: true` on a tampered chain.
@@ -47,10 +49,16 @@ impl ChainStatus {
 /// run at all, which is the same class as `hook status` reporting it. A check
 /// that runs and fails — including an unreadable state database, which is
 /// itself a doctor finding — stays a verification failure (exit 1).
-pub async fn run(root: &Path, format: Format, strict: bool) -> Result<()> {
+pub async fn run(
+    root: &Path,
+    format: Format,
+    strict: bool,
+    profile: Option<&Path>,
+    client_probe: bool,
+) -> Result<()> {
     let git_dir = hooks::find_git_dir(root).map_err(crate::exit::UsageError::wrap)?;
     let status = hooks::status(&git_dir, root);
-    run_with_status(root, format, strict, &status).await
+    run_with_status(root, format, strict, &status, profile, client_probe).await
 }
 
 /// Reads the task-health counters used by the doctor's event-log checks.
@@ -77,6 +85,8 @@ pub(crate) async fn run_with_status(
     format: Format,
     strict: bool,
     status: &hooks::HookStatus,
+    profile: Option<&Path>,
+    client_probe: bool,
 ) -> Result<()> {
     let mut failures: Vec<String> = Vec::new();
 
@@ -208,6 +218,15 @@ pub(crate) async fn run_with_status(
         ChainStatus::Absent
     };
 
+    // Client capability claims are opt-in: without a profile the report is
+    // unchanged, and a required claim only fails the run under `--strict`.
+    let client_report = client_profile::evaluate_optional(profile, client_probe).await?;
+    if strict {
+        if let Some(report) = &client_report {
+            failures.extend(report.required_failures());
+        }
+    }
+
     if format == Format::Json {
         let json = serde_json::json!({
             "ok": failures.is_empty(),
@@ -234,6 +253,9 @@ pub(crate) async fn run_with_status(
             },
             "database_ok": db_ok,
             "event_chain": chain.to_json(),
+            "client_capability": client_report
+                .as_ref()
+                .map_or(serde_json::Value::Null, client_profile::ClientReport::to_json),
             "orphan_tasks": orphan_tasks,
             "stale_task_export": stale_export,
             "sensor_argv": {
@@ -353,6 +375,12 @@ pub(crate) async fn run_with_status(
             }
             ChainStatus::Unreadable => {
                 println!("  [FAIL] event chain: unreadable (see failures)");
+            }
+        }
+
+        if let Some(report) = &client_report {
+            for line in report.render_text() {
+                println!("{line}");
             }
         }
 
