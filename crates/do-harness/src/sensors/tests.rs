@@ -6,6 +6,7 @@ use crate::config::{Config, HooksConfig, SensorSpec};
 
 mod advisory;
 mod blocked;
+mod dry_run;
 mod filters;
 mod retry;
 mod severity;

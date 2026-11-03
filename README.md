@@ -278,7 +278,11 @@ Global flags: `--root <DIR>`, `--config <FILE>`, `-q, --quiet`, `--output <FILE>
 |------|---------|
 | 0 | All sensors passed |
 | 1 | A sensor failed |
-| 2 | Usage/config/discovery error (e.g. not inside a do-harness workspace, missing git repo for `hook install`) |
+| 2 | Usage/config/discovery error (e.g. not inside a do-harness workspace, missing git repo for `hook install`), or every selected sensor was unrunnable |
+
+A sensor is unrunnable when its program cannot be spawned, its `argv` is empty,
+or a declared `argv` path is missing. A mixed run stays `1`; the JSON report
+names the unrunnable sensors in `unrunnable`.
 
 ## JSON output
 
@@ -290,6 +294,7 @@ Global flags: `--root <DIR>`, `--config <FILE>`, `-q, --quiet`, `--output <FILE>
   "ok": false,
   "root": "/path/to/workspace",
   "failed": ["clippy"],
+  "unrunnable": [],
   "sensors": [
     {"name": "fmt", "ok": true, "exit_code": 0, "duration_ms": 320},
     {"name": "clippy", "ok": false, "exit_code": 1, "duration_ms": 4100}

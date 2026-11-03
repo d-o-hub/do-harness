@@ -390,8 +390,14 @@
     "category": "supply-chain"
   },
   {
-    "invariant": "Windows CI workspace test step has a bounded timeout of <= 12 minutes",
-    "rationale": "A hung test on Windows MSVC fails fast in minutes rather than burning the full 30-minute job budget with no output",
+    "invariant": "Windows CI runs the workspace suite as a bounded shard matrix whose partitions cover every test exactly once, with compilation and execution timed as separate steps",
+    "rationale": "Run #41632894179 hit the old 12-minute step timeout with 750 of 1125 tests done, so the suite exceeded the budget rather than hanging; three deterministic count partitions keep each shard under the ceiling while the union still covers the whole release-mode suite",
+    "sensor": "python3 scripts/check_ci_concurrency_guardrails.py --self-test",
+    "category": "ci"
+  },
+  {
+    "invariant": "The serialized do-harness-db Windows test step stays separate from the workspace shards and keeps its own bounded timeout",
+    "rationale": "The db tests each open their own temporary libSQL database and crashed intermittently with STATUS_ACCESS_VIOLATION on Windows, so serializing that crate is a cheap mitigation that must not be diluted by parallel shards",
     "sensor": "python3 scripts/check_ci_concurrency_guardrails.py --self-test",
     "category": "ci"
   },

@@ -133,6 +133,18 @@ Runs computational sensors defined in `do-harness.toml`.
   (requires `--record`; a bless never raises a baseline).
 - `--approver <NAME>`: Approver identity recorded with `--bless` (defaults to
   `DO_HARNESS_APPROVER` or the git user email). Requires `--bless`.
+- `--dry-run`: Plan the selected sensors without spawning them. Each sensor
+  reports `PLAN` with `execution = "planned"`, no exit code, and no duration;
+  the run exits non-zero and writes no beats, evidence, or in-flight marker.
+  `--bless` is rejected because a bless cannot be previewed.
+
+Exit codes follow the invocation-level doctrine: `0` when every selected sensor
+passed, `1` when a sensor ran and failed, and `2` when the run could not be
+judged — a usage or config error, or every selected sensor was unrunnable (its
+program could not be spawned, its `argv` was empty, or a declared `argv` path
+was missing). A mixed run stays `1`. The `--format json` report carries a
+top-level `unrunnable` array beside `failed`, so a wrapper can tell "the gate
+never ran" from "the gate is red" without inspecting `sensors[].exit_code`.
 
 A sensor is the execution primitive (one `argv` command). A signal set is a
 development decision composed from sensors: `feedback` for the edit/fix loop,
@@ -338,11 +350,11 @@ line/branch proof from `cargo-llvm-cov nextest`.
 Reports verification evidence freshness for a signal set without executing
 any sensor: `green` (current passing evidence covers the set), `red`
 (matching evidence contains required failures), `stale` (evidence exists but
-the workspace or policy changed), `running` (a `verify` run is executing now
-for the set), or `missing` (no qualifying evidence). Stronger evidence can
-satisfy a weaker set when it shares the config fingerprint and covers every
-required sensor. Exit 0 on green, 1 on red/stale/missing, 2 on usage/config
-errors, 3 while a run is in flight.
+the workspace, policy, or recorded selection revisions changed), `running`
+(a `verify` run is executing now for the set), or `missing` (no qualifying
+evidence). Stronger evidence can satisfy a weaker set when it shares the
+config fingerprint and covers every required sensor. Exit 0 on green, 1 on
+red/stale/missing, 2 on usage/config errors, 3 while a run is in flight.
 
 - `--set <SET>`: Check evidence for this signal set (default evidence file
   `.do-harness/evidence.<set>.json`; default `.do-harness/evidence.json`
@@ -350,12 +362,13 @@ errors, 3 while a run is in flight.
 - `--evidence <FILE>`: Read evidence from this file instead.
 - `--format <Format>`: Output format (`text` or `json`).
 - Unusable evidence names its remedy: the `no_evidence`,
-  `insufficient_coverage`, and `policy_changed` reasons carry a `recovery`
-  JSON field with the `do-harness verify --set <set> --record` command that
-  re-records evidence, and the text error ends with the same
-  `→ recover:` line. `insufficient_coverage` also lists the unrecorded
-  required sensors in `missing_sensors` and in the text error, so a targeted
-  `--only` re-run can cover the gap.
+  `insufficient_coverage`, `policy_changed`, and `selection_changed` reasons
+  carry a `recovery` JSON field with the
+  `do-harness verify --set <set> --record` command that re-records evidence,
+  and the text error ends with the same `→ recover:` line.
+  `insufficient_coverage` also lists the unrecorded required sensors in
+  `missing_sensors` and in the text error, so a targeted `--only` re-run can
+  cover the gap.
 - An in-flight run reports `running` with `reason: in_progress` and a
   `running` object naming its pid, start time and set, instead of the
   indistinguishable `missing`/`no_evidence` state. Each run locks its own
