@@ -73,24 +73,30 @@ pub async fn hook(
             let status = hooks::status(&git_dir, root);
             match format {
                 Format::Text => {
-                    let format_hook = |installed: bool, shadowed: bool| -> String {
-                        if installed {
-                            "installed".to_string()
-                        } else if shadowed {
-                            if let Some(ref cfg) = status.core_hooks_path {
-                                format!("installed (shadowed by core.hooksPath={cfg})")
-                            } else {
-                                "installed (shadowed)".to_string()
-                            }
-                        } else {
-                            "absent".to_string()
+                    let format_hook = |owner: hooks::HookOwner, shadowed: bool| -> String {
+                        let cfg = status.core_hooks_path.as_deref();
+                        if shadowed && owner == hooks::HookOwner::Absent {
+                            return cfg.map_or_else(
+                                || "installed (shadowed)".to_string(),
+                                |cfg| format!("installed (shadowed by core.hooksPath={cfg})"),
+                            );
+                        }
+                        match owner {
+                            hooks::HookOwner::Managed => "installed".to_string(),
+                            hooks::HookOwner::PreCommit => "delegated to pre-commit".to_string(),
+                            hooks::HookOwner::HooksPath => cfg.map_or_else(
+                                || "delegated".to_string(),
+                                |cfg| format!("delegated to core.hooksPath={cfg}"),
+                            ),
+                            hooks::HookOwner::Foreign => "foreign".to_string(),
+                            hooks::HookOwner::Absent => "absent".to_string(),
                         }
                     };
                     println!(
                         "pre-commit: {}  pre-push: {}  commit-msg: {}  binary: {} ({})",
-                        format_hook(status.pre_commit, status.pre_commit_shadowed),
-                        format_hook(status.pre_push, status.pre_push_shadowed),
-                        format_hook(status.commit_msg, status.commit_msg_shadowed),
+                        format_hook(status.ownership.pre_commit, status.pre_commit_shadowed),
+                        format_hook(status.ownership.pre_push, status.pre_push_shadowed),
+                        format_hook(status.ownership.commit_msg, status.commit_msg_shadowed),
                         describe_binary(&status.binary),
                         if status.binary.present() {
                             "present"
@@ -107,6 +113,12 @@ pub async fn hook(
                         "pre_commit_shadowed": status.pre_commit_shadowed,
                         "pre_push_shadowed": status.pre_push_shadowed,
                         "commit_msg_shadowed": status.commit_msg_shadowed,
+                        "satisfied": status.is_all_satisfied(),
+                        "ownership": {
+                            "pre_commit": status.ownership.pre_commit.as_str(),
+                            "pre_push": status.ownership.pre_push.as_str(),
+                            "commit_msg": status.ownership.commit_msg.as_str()
+                        },
                         "core_hooks_path": status.core_hooks_path,
                         "hooks_dir": status.hooks_dir.display().to_string(),
                         "binary_present": status.binary.present(),
@@ -121,10 +133,14 @@ pub async fn hook(
                     status.binary.path().display()
                 );
             }
-            if !status.is_all_installed() {
+            if !status.is_all_satisfied() {
                 if status.is_shadowed() {
                     eprintln!(
                         "hint: managed hooks are shadowed by core.hooksPath; run `do-harness hook install` to install into the configured directory or unset core.hooksPath"
+                    );
+                } else if hooks::ownership::has_pre_commit_config(root) {
+                    eprintln!(
+                        "hint: this repository delegates git hooks to the pre-commit framework; run `pre-commit install --hook-type pre-commit --hook-type pre-push --hook-type commit-msg` to install them"
                     );
                 } else {
                     eprintln!("hint: run `do-harness hook install` to (re)install managed hooks");
