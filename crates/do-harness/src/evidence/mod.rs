@@ -203,13 +203,17 @@ impl EvidenceDocument {
             "policy_fingerprint": self.policy_fingerprint,
             "config_fingerprint": self.config_fingerprint,
             "changed": self.changed,
-            "selection": self.selection,
             "invalidated_reason": self.invalidated_reason,
             "sensors": self.sensors,
             "skipped": self.skipped,
             "coverage": self.coverage,
             "summary": self.summary,
         });
+        // Conditional like `input_manifest`: older artifacts have no selection
+        // block, and adding a null key would break their chain verification.
+        if let Some(selection) = &self.selection {
+            payload["selection"] = serde_json::to_value(selection)?;
+        }
         if let Some(manifest) = &self.input_manifest {
             payload["input_manifest"] = serde_json::to_value(manifest)?;
         }
