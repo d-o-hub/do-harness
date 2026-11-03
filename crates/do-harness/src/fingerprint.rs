@@ -314,6 +314,7 @@ mod tests {
                 })
                 .collect(),
             discovery_failed: false,
+            discovery_error: None,
         }
     }
 
@@ -416,6 +417,7 @@ mod tests {
         let failed = ChangedFiles {
             files: Vec::new(),
             discovery_failed: true,
+            discovery_error: None,
         };
         let first = workspace_fingerprint(dir.path(), &failed);
         let second = workspace_fingerprint(dir.path(), &failed);

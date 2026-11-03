@@ -40,6 +40,7 @@ fn changed(paths: &[&str]) -> ChangedFiles {
             })
             .collect(),
         discovery_failed: false,
+        discovery_error: None,
     }
 }
 
@@ -83,6 +84,7 @@ fn deleted_paths_still_match() {
             kind: ChangeKind::Deleted,
         }],
         discovery_failed: false,
+        discovery_error: None,
     };
 
     let selection = select(&candidates, &gone);
@@ -98,6 +100,7 @@ fn discovery_failure_selects_everything() {
     let failed = ChangedFiles {
         files: Vec::new(),
         discovery_failed: true,
+        discovery_error: None,
     };
 
     let selection = select(&candidates, &failed);
@@ -224,6 +227,7 @@ fn renamed_maintained_doc_selects_docs_links() {
             },
         }],
         discovery_failed: false,
+        discovery_error: None,
     };
 
     let (selected, skipped) = select_docs(&renamed);
@@ -244,6 +248,7 @@ fn deleted_maintained_doc_selects_docs_links() {
             kind: ChangeKind::Deleted,
         }],
         discovery_failed: false,
+        discovery_error: None,
     };
 
     let (selected, skipped) = select_docs(&deleted);
@@ -297,6 +302,7 @@ fn single(path: &str, kind: ChangeKind) -> ChangedFiles {
             kind,
         }],
         discovery_failed: false,
+        discovery_error: None,
     }
 }
 
@@ -374,6 +380,7 @@ fn discovery_failure_keeps_the_rust_sensors() {
     let failed = ChangedFiles {
         files: Vec::new(),
         discovery_failed: true,
+        discovery_error: None,
     };
     for sensors in [pack_rust_sensors(), policy_rust_sensors()] {
         let candidates: Vec<&SensorSpec> = sensors.iter().collect();
@@ -387,4 +394,22 @@ fn discovery_failure_keeps_the_rust_sensors() {
             "a discovery failure must record the fail-closed reason"
         );
     }
+}
+
+/// The git diagnostic behind a discovery failure reaches the skip reason, so
+/// a report distinguishes "no changes" from "could not determine changes".
+#[test]
+fn discovery_error_is_named_in_the_fail_closed_reason() {
+    let rs = spec("rs-check", &["**/*.rs"]);
+    let failed = ChangedFiles {
+        files: Vec::new(),
+        discovery_failed: true,
+        discovery_error: Some("git diff --name-status -z HEAD failed: fatal: bad index".to_owned()),
+    };
+
+    let selection = select(&[&rs], &failed);
+    assert_eq!(selection.selected.len(), 1);
+    let reason = &selection.selected[0].reason;
+    assert!(reason.contains(FAIL_CLOSED_REASON), "reason: {reason}");
+    assert!(reason.contains("bad index"), "reason: {reason}");
 }

@@ -55,8 +55,9 @@ pub const UNFILTERED_REASON: &str = "change filtering disabled; always applicabl
 ///
 /// Deleted paths still match patterns (removing a source file must trigger
 /// its checks). When `changed.discovery_failed`, every candidate is selected
-/// with [`FAIL_CLOSED_REASON`] so a required signal can never silently
-/// disappear because repository state could not be read.
+/// with [`FAIL_CLOSED_REASON`] (plus the git diagnostic when known) so a
+/// required signal can never silently disappear because repository state
+/// could not be read.
 #[must_use]
 pub fn select(candidates: &[&SensorSpec], changed: &ChangedFiles) -> Selection {
     let mut selection = Selection {
@@ -64,10 +65,11 @@ pub fn select(candidates: &[&SensorSpec], changed: &ChangedFiles) -> Selection {
         skipped: Vec::new(),
     };
     if changed.discovery_failed {
+        let reason = fail_closed_reason(changed);
         for spec in candidates {
             selection.selected.push(Selected {
                 name: spec.name.clone(),
-                reason: FAIL_CLOSED_REASON.to_owned(),
+                reason: reason.clone(),
             });
         }
         return selection;
@@ -122,6 +124,14 @@ pub fn select(candidates: &[&SensorSpec], changed: &ChangedFiles) -> Selection {
         }
     }
     selection
+}
+
+/// Fail-closed reason for every sensor, naming the git diagnostic when known.
+fn fail_closed_reason(changed: &ChangedFiles) -> String {
+    match &changed.discovery_error {
+        Some(error) => format!("{FAIL_CLOSED_REASON}: {error}"),
+        None => FAIL_CLOSED_REASON.to_owned(),
+    }
 }
 
 #[cfg(test)]
