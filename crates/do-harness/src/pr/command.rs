@@ -11,7 +11,7 @@ use crate::cli::PrAction;
 use crate::report::Format;
 
 use super::gh;
-use super::no_effect::{self, Effect};
+use super::no_effect::{self, Effect, MergeImpactReport};
 use super::review::{self};
 use super::waivers;
 
@@ -29,6 +29,13 @@ pub enum Target {
     },
 }
 
+/// Version of the `pr no-effect` JSON contract.
+///
+/// Version 2 adds the prospective `merge_impact` analysis and the derived
+/// `closure_recommendation`; the historical `effective_change`/`method` pair
+/// keeps its version-1 meaning.
+const NO_EFFECT_SCHEMA_VERSION: u32 = 2;
+
 #[derive(Debug, Serialize)]
 struct Report {
     schema_version: u32,
@@ -36,8 +43,15 @@ struct Report {
     pr: Option<u64>,
     base: String,
     head: String,
+    /// Historical branch-change verdict: merge-base..head tree delta.
     effective_change: bool,
+    /// Method behind `effective_change`: `git` or `compare-api`.
     method: &'static str,
+    /// Prospective merge impact against the current base.
+    merge_impact: MergeImpactReport,
+    /// Whether the evidence supports suggesting closure. Never true for
+    /// `UNKNOWN` or an unverified base.
+    closure_recommendation: bool,
 }
 
 /// Resolves the workspace root for `pr`: harness root first, git work-tree
@@ -169,20 +183,37 @@ fn run_no_effect(root: &Path, target: Target, format: Format) -> Result<()> {
     if matches!(format, Format::Json) {
         println!("{}", serde_json::to_string_pretty(&report)?);
     } else {
-        let verdict = if report.effective_change {
-            "has-effect"
-        } else {
-            "no-effect"
-        };
-        match report.pr {
-            Some(number) => println!(
-                "pr {number}: {verdict} (base {} head {}, {})",
-                report.base, report.head, report.method
-            ),
-            None => println!(
-                "{verdict} (base {} head {}, {})",
-                report.base, report.head, report.method
-            ),
+        let prefix = report
+            .pr
+            .map_or_else(String::new, |number| format!("pr {number}: "));
+        let base = report
+            .merge_impact
+            .base_sha
+            .as_deref()
+            .unwrap_or(&report.base);
+        let head = report
+            .merge_impact
+            .head_sha
+            .as_deref()
+            .unwrap_or(&report.head);
+        println!(
+            "{prefix}merge-impact {} (base {base} head {head}, {}; branch-change {})",
+            report.merge_impact.verdict,
+            report.merge_impact.method,
+            if report.effective_change {
+                "has-effect"
+            } else {
+                "no-effect"
+            }
+        );
+        if let Some(reason) = &report.merge_impact.reason {
+            println!("  reason: {reason}");
+        }
+        if report.closure_recommendation {
+            println!("  redundant: merging would not change the base tree");
+        }
+        for warning in &report.merge_impact.warnings {
+            eprintln!("warning: {warning}");
         }
     }
     Ok(())
@@ -224,14 +255,18 @@ fn analyze(root: &Path, target: Target) -> Result<Report> {
         Target::Range { base, head } => {
             let effect = no_effect::effective_change(root, &base, &head)
                 .with_context(|| format!("cannot compare {base}...{head}"))?;
+            let merge_impact = no_effect::merge_impact(root, &base, &head);
+            let closure_recommendation = closure_recommendation(&merge_impact);
             Ok(Report {
-                schema_version: 1,
+                schema_version: NO_EFFECT_SCHEMA_VERSION,
                 mode: "range",
                 pr: None,
                 base,
                 head,
                 effective_change: effect.has_effect(),
                 method: "git",
+                merge_impact,
+                closure_recommendation,
             })
         }
         Target::Pr(number) => {
@@ -239,30 +274,42 @@ fn analyze(root: &Path, target: Target) -> Result<Report> {
             let number = view.number;
             let base = view.base_ref_name;
             let head = view.head_ref_oid;
+            let merge_impact =
+                no_effect::merge_impact_for_pr(root, &view.base_ref_oid, &base, &head);
+            let closure_recommendation = closure_recommendation(&merge_impact);
             if let Some(effect) = local_effect(root, &base, &head) {
                 return Ok(Report {
-                    schema_version: 1,
+                    schema_version: NO_EFFECT_SCHEMA_VERSION,
                     mode: "pr",
                     pr: Some(number),
                     base,
                     head,
                     effective_change: effect.has_effect(),
                     method: "git",
+                    merge_impact,
+                    closure_recommendation,
                 });
             }
             let changed = gh::compare_file_count(root, &base, &head)
                 .with_context(|| format!("cannot determine effective change for PR {number}"))?;
             Ok(Report {
-                schema_version: 1,
+                schema_version: NO_EFFECT_SCHEMA_VERSION,
                 mode: "pr",
                 pr: Some(number),
                 base,
                 head,
                 effective_change: changed > 0,
                 method: "compare-api",
+                merge_impact,
+                closure_recommendation,
             })
         }
     }
+}
+
+/// Closure is only suggested for a proven, base-verified no-tree-effect merge.
+fn closure_recommendation(impact: &MergeImpactReport) -> bool {
+    impact.verdict.is_no_tree_effect() && impact.base_verified
 }
 
 fn local_effect(root: &Path, base: &str, head: &str) -> Option<Effect> {
