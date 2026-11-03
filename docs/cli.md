@@ -133,6 +133,10 @@ Runs computational sensors defined in `do-harness.toml`.
   (requires `--record`; a bless never raises a baseline).
 - `--approver <NAME>`: Approver identity recorded with `--bless` (defaults to
   `DO_HARNESS_APPROVER` or the git user email). Requires `--bless`.
+- `--dry-run`: Plan the selected sensors without spawning them. Each sensor
+  reports `PLAN` with `execution = "planned"`, no exit code, and no duration;
+  the run exits non-zero and writes no beats, evidence, or in-flight marker.
+  `--bless` is rejected because a bless cannot be previewed.
 
 Exit codes follow the invocation-level doctrine: `0` when every selected sensor
 passed, `1` when a sensor ran and failed, and `2` when the run could not be
