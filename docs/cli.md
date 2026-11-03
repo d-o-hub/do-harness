@@ -345,9 +345,10 @@ errors, 3 while a run is in flight.
   `--only` re-run can cover the gap.
 - An in-flight run reports `running` with `reason: in_progress` and a
   `running` object naming its pid, start time and set, instead of the
-  indistinguishable `missing`/`no_evidence` state. Runs hold a shared lock on
-  their evidence destination for their duration, so concurrent runs stay
-  legal and any in-flight run turns `status` into `running`.
+  indistinguishable `missing`/`no_evidence` state. Each run locks its own
+  marker file in a sibling `<evidence>.running/` directory for its duration,
+  so concurrent runs stay legal and any in-flight run turns `status` into
+  `running`.
 
 ### `list`
 <!-- BEGIN GENERATED: cli-contract list -->

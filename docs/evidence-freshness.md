@@ -38,12 +38,13 @@ insufficient coverage. `no_evidence`, `insufficient_coverage`, and
 Pre/post input changes invalidate verify. v3/v4 documents remain readable, but
 need regeneration before reporting green.
 
-A run holds a shared lock on a sibling `<evidence>.running` marker for its
-whole duration and publishes its pid and start time there, so `status` can
-tell "running now" from "never run" and exits 3 for `running`. The OS releases
-the lock when the process dies, so a killed run leaves no phantom state.
-Concurrent writers remain legal and serialized by the evidence write lock; the
-shared marker just means `status` reports `running` while any of them executes.
+Each run locks its own marker file in a sibling `<evidence>.running/`
+directory for its whole duration and publishes its pid and start time there,
+so `status` can tell "running now" from "never run" and exits 3 for `running`.
+The OS releases the lock when the process dies, so a killed run leaves no
+phantom state, and the next run of that artifact prunes the orphan. Per-run
+files rather than one shared file keep concurrent writers legal on Windows,
+which refuses to write a region another handle has locked.
 
 Task advance and completion check current required named-sensor input
 identities, task method/index, and the latest task-scoped beat's status, exit
