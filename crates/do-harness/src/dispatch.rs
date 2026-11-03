@@ -125,6 +125,7 @@ async fn route(root: &Path, config_path: Option<PathBuf>, cli: Cli) -> Result<()
             format,
             set,
             changed,
+            since,
             only,
             exclude,
             jobs,
@@ -156,6 +157,7 @@ async fn route(root: &Path, config_path: Option<PathBuf>, cli: Cli) -> Result<()
                 fail_fast,
                 set,
                 changed,
+                since,
                 only,
                 exclude,
                 jobs,
@@ -191,8 +193,9 @@ async fn route(root: &Path, config_path: Option<PathBuf>, cli: Cli) -> Result<()
         Command::Explain {
             set,
             changed,
+            since,
             format,
-        } => explain::run(root, config_path.as_deref(), set, changed, format).await,
+        } => explain::run(root, config_path.as_deref(), set, changed, since, format).await,
         Command::Status {
             set,
             evidence,

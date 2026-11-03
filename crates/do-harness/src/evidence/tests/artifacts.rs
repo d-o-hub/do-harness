@@ -38,6 +38,7 @@ fn artifacts_and_coverage_are_recorded() {
         root: dir.path().display().to_string(),
         failed: vec![],
         signal_set: None,
+        selection: None,
         sensors: vec![crate::report::SensorResult {
             fix: None,
             name: "web".into(),
@@ -67,6 +68,7 @@ fn artifacts_and_coverage_are_recorded() {
             config: "sha256:c".into(),
         },
         changed: false,
+        selection: None,
         skipped: Vec::new(),
         task: None,
         record: true,
@@ -119,6 +121,7 @@ fn missing_declared_artifact_records_warn() {
         root: dir.path().display().to_string(),
         failed: vec![],
         signal_set: None,
+        selection: None,
         sensors: vec![crate::report::SensorResult {
             fix: None,
             name: "web".into(),
@@ -148,6 +151,7 @@ fn missing_declared_artifact_records_warn() {
             config: "sha256:c".into(),
         },
         changed: false,
+        selection: None,
         skipped: Vec::new(),
         task: None,
         record: true,

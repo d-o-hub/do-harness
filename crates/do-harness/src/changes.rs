@@ -1,10 +1,14 @@
-//! Working-tree change discovery for `--changed` selection.
+//! Change discovery for `--changed` and `--since` selection.
 //!
 //! Changed files are the union of tracked modifications (staged and
 //! unstaged, including deletions and renames) and untracked non-ignored
 //! files. Discovery shells out to `git`; when repository state cannot be
 //! determined (not a git checkout, `git` missing), discovery reports failure
 //! and callers must fail closed by selecting every sensor.
+//!
+//! `--since <ref>` selects from the committed range
+//! `merge-base(<ref>, HEAD)..HEAD` instead, so a clean checkout of an
+//! already-committed branch still selects the sensors its commits touch.
 
 use std::path::Path;
 use std::process::Command;
@@ -52,6 +56,187 @@ impl ChangedFiles {
     pub fn paths(&self) -> Vec<&str> {
         self.files.iter().map(|f| f.path.as_str()).collect()
     }
+}
+
+/// Which inputs drove change-aware selection.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum SelectionMode {
+    /// No change filtering: every candidate sensor is applicable.
+    #[default]
+    All,
+    /// Working-tree changes versus `HEAD` (`--changed`).
+    WorkingTree,
+    /// Committed range from the merge base with `--since <ref>` to `HEAD`.
+    Range,
+    /// Union of working-tree and committed-range changes.
+    WorkingTreeAndRange,
+}
+
+impl SelectionMode {
+    /// Stable machine-readable spelling used in reports and evidence.
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::All => "all",
+            Self::WorkingTree => "working-tree",
+            Self::Range => "range",
+            Self::WorkingTreeAndRange => "working-tree+range",
+        }
+    }
+}
+
+/// Revisions a `--since` selection resolved to.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResolvedRange {
+    /// Ref exactly as requested on the command line.
+    pub requested: String,
+    /// Commit the requested ref resolved to.
+    pub base_sha: String,
+    /// `HEAD` commit the range was compared against.
+    pub head_sha: String,
+    /// Merge base of `base_sha` and `head_sha`.
+    pub merge_base_sha: String,
+}
+
+/// Change input for one selection, with the revisions that produced it.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ChangeSelection {
+    /// Which inputs drove selection.
+    pub mode: SelectionMode,
+    /// Changed paths, sorted and deduplicated.
+    pub changed: ChangedFiles,
+    /// Resolved revisions for a `--since` selection.
+    pub range: Option<ResolvedRange>,
+    /// Why discovery failed closed, when it did.
+    pub diagnostic: Option<String>,
+}
+
+impl ChangeSelection {
+    /// Repository-relative changed paths, in sorted order.
+    #[must_use]
+    pub fn paths(&self) -> Vec<&str> {
+        self.changed.paths()
+    }
+}
+
+/// Discovers the change input for `--changed` and/or `--since <ref>`.
+///
+/// `--since` compares `merge-base(<ref>, HEAD)` to `HEAD`, so a clean
+/// checkout of a committed branch still selects the sensors its commits
+/// touch. Combining both flags unions the two path sets. Any failure to
+/// resolve the ref, `HEAD`, the merge base, or the diff fails closed with a
+/// diagnostic instead of reporting an empty change set.
+#[must_use]
+pub fn discover_selection(root: &Path, changed: bool, since: Option<&str>) -> ChangeSelection {
+    match (changed, since) {
+        (false, None) => ChangeSelection::default(),
+        (true, None) => ChangeSelection {
+            mode: SelectionMode::WorkingTree,
+            changed: discover(root),
+            ..ChangeSelection::default()
+        },
+        (false, Some(base)) => range_selection(root, base, SelectionMode::Range),
+        (true, Some(base)) => {
+            let mut selection = range_selection(root, base, SelectionMode::WorkingTreeAndRange);
+            let working = discover(root);
+            selection.changed.files.extend(working.files);
+            selection.changed.files.sort_by(|a, b| a.path.cmp(&b.path));
+            selection.changed.files.dedup_by(|a, b| a.path == b.path);
+            if working.discovery_failed {
+                selection.changed.discovery_failed = true;
+                selection
+                    .diagnostic
+                    .get_or_insert_with(|| "working-tree change discovery failed".to_owned());
+            }
+            selection
+        }
+    }
+}
+
+/// Resolves and diffs `merge-base(<base_ref>, HEAD)..HEAD`.
+fn range_selection(root: &Path, base_ref: &str, mode: SelectionMode) -> ChangeSelection {
+    let mut selection = ChangeSelection {
+        mode,
+        ..ChangeSelection::default()
+    };
+    if !is_work_tree(root) {
+        return fail_closed(selection, "not a git working tree".to_owned());
+    }
+    let Some(base_sha) = resolve_commit(root, base_ref) else {
+        return fail_closed(
+            selection,
+            format!("cannot resolve --since ref '{base_ref}' to a commit"),
+        );
+    };
+    let Some(head_sha) = resolve_commit(root, "HEAD") else {
+        return fail_closed(selection, "cannot resolve HEAD to a commit".to_owned());
+    };
+    let Some(merge_base_sha) = merge_base(root, &base_sha, &head_sha) else {
+        return fail_closed(
+            selection,
+            format!("no merge base between '{base_ref}' and HEAD"),
+        );
+    };
+    let Some(files) = diff_range(root, &merge_base_sha, &head_sha) else {
+        return fail_closed(
+            selection,
+            format!("cannot diff {merge_base_sha}..{head_sha}"),
+        );
+    };
+    selection.changed.files = files;
+    selection.range = Some(ResolvedRange {
+        requested: base_ref.to_owned(),
+        base_sha,
+        head_sha,
+        merge_base_sha,
+    });
+    selection
+}
+
+/// Marks a selection as failed closed with a diagnostic.
+fn fail_closed(mut selection: ChangeSelection, diagnostic: String) -> ChangeSelection {
+    selection.changed.discovery_failed = true;
+    selection.diagnostic = Some(diagnostic);
+    selection
+}
+
+/// Resolves `rev` to a full commit SHA, or `None` when it does not exist.
+fn resolve_commit(root: &Path, rev: &str) -> Option<String> {
+    let output = git_command(root)
+        .args(["rev-parse", "--verify", "--quiet", "--end-of-options"])
+        .arg(format!("{rev}^{{commit}}"))
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let sha = String::from_utf8_lossy(&output.stdout).trim().to_owned();
+    (!sha.is_empty()).then_some(sha)
+}
+
+/// Merge base of two resolved commits, or `None` for unrelated histories.
+fn merge_base(root: &Path, base: &str, head: &str) -> Option<String> {
+    let output = git_command(root)
+        .args(["merge-base", base, head])
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let sha = String::from_utf8_lossy(&output.stdout).trim().to_owned();
+    (!sha.is_empty()).then_some(sha)
+}
+
+/// Changed paths between two resolved commits, or `None` on git failure.
+fn diff_range(root: &Path, from: &str, to: &str) -> Option<Vec<ChangedFile>> {
+    let output = git_command(root)
+        .args(["diff", "--name-status", "-z", from, to])
+        .output()
+        .ok()?;
+    output
+        .status
+        .success()
+        .then(|| parse_name_status(&output.stdout))
 }
 
 /// Discovers changed files under `root`.
@@ -181,10 +366,14 @@ fn tracked_changes(root: &Path) -> Vec<ChangedFile> {
     if !output.status.success() {
         return Vec::new();
     }
+    parse_name_status(&output.stdout)
+}
+
+/// Parses NUL-separated `git diff --name-status -z` records.
+fn parse_name_status(bytes: &[u8]) -> Vec<ChangedFile> {
     // NUL-separated records: `<STATUS>\0<path>\0`, renames add the source
     // path (`R100\0<from>\0<to>\0`).
-    let mut records = output
-        .stdout
+    let mut records = bytes
         .split(|b| *b == 0)
         .filter_map(|chunk| {
             let text = std::str::from_utf8(chunk).ok()?;

@@ -28,6 +28,7 @@ async fn record_verify_persists_beats_and_signatures() {
             output: "boom".to_owned(),
         }],
         signal_set: None,
+        selection: None,
     };
 
     record_verify(
@@ -82,6 +83,7 @@ async fn record_verify_skips_signatures_when_all_pass() {
             output: String::new(),
         }],
         signal_set: None,
+        selection: None,
     };
 
     record_verify(
@@ -135,6 +137,7 @@ async fn record_verify_skips_blocked_sensor_signature() {
             output: "halted: ...".to_owned(),
         }],
         signal_set: None,
+        selection: None,
     };
 
     record_verify(
@@ -229,6 +232,7 @@ async fn record_verify_resets_strikes_on_pass() {
             output: String::new(),
         }],
         signal_set: None,
+        selection: None,
     };
     record_verify(
         dir.path(),
@@ -302,6 +306,7 @@ async fn record_verify_scopes_to_task() {
             output: "E0308".to_owned(),
         }],
         signal_set: None,
+        selection: None,
     };
     record_verify(
         dir.path(),
@@ -365,6 +370,7 @@ async fn record_verify_scopes_to_branch() {
             output: String::new(),
         }],
         signal_set: None,
+        selection: None,
     };
 
     let scope = BeatScope::Branch("feat/feature-a".to_string());

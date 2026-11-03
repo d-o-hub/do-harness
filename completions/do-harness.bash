@@ -1313,13 +1313,17 @@ _do__harness() {
             return 0
             ;;
         do__subcmd__harness__subcmd__explain)
-            opts="-q -h -V --set --changed --format --root --config --quiet --output --dry-run --help --version"
+            opts="-q -h -V --set --changed --since --format --root --config --quiet --output --dry-run --help --version"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
             fi
             case "${prev}" in
                 --set)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --since)
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;
@@ -5510,7 +5514,7 @@ _do__harness() {
             return 0
             ;;
         do__subcmd__harness__subcmd__verify)
-            opts="-q -h -V --fail-fast --format --set --changed --only --exclude --jobs --unchanged --record --task --global --evidence --strict --bless --approver --root --config --quiet --output --dry-run --help --version"
+            opts="-q -h -V --fail-fast --format --set --changed --since --only --exclude --jobs --unchanged --record --task --global --evidence --strict --bless --approver --root --config --quiet --output --dry-run --help --version"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -5521,6 +5525,10 @@ _do__harness() {
                     return 0
                     ;;
                 --set)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --since)
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;

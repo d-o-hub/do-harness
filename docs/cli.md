@@ -63,6 +63,7 @@ Aliases: `check`.
 | `--format <FORMAT>` | no | `text` | `text`, `json` | Output format |
 | `--set <SET>` | no | — | — | Run only the sensors in this development signal set |
 | `--changed` | no | — | — | Run only sensors applicable to the working-tree change |
+| `--since <REF>` | no | — | — | Run only sensors applicable to the committed range `merge-base(<REF>, HEAD)..HEAD`; combine with `--changed` to union committed and uncommitted paths |
 | `--only <SENSOR>` (repeatable) | no | — | — | Run only the named sensor (repeatable or comma-separated) |
 | `--exclude <SENSOR>` (repeatable) | no | — | — | Exclude named sensors from the run |
 | `--jobs <N>` | no | — | — | Maximum sensors in flight (overrides `jobs` in do-harness.toml) |
@@ -90,6 +91,15 @@ Runs computational sensors defined in `do-harness.toml`.
   Change discovery covers staged, unstaged, deleted, renamed, and untracked
   files; when repository state cannot be determined, every sensor runs
   (fail-closed, never silently skipped).
+- `--since <REF>`: Run only sensors applicable to the committed range
+  `merge-base(<REF>, HEAD)..HEAD`, so a clean checkout of an already-committed
+  branch still selects the sensors its commits touch. `--changed` alone sees
+  only the working tree and selects nothing after a commit. Combining both
+  flags unions committed and uncommitted paths. An unresolvable ref, `HEAD`,
+  or merge base fails closed with a diagnostic instead of reporting an empty
+  change set, and no local branch is substituted for a missing remote ref.
+  JSON output carries a `"selection"` object with the mode, requested ref,
+  resolved base/head/merge-base SHAs, driving paths, and every skip reason.
 - `--only <SENSOR>`: Run only named sensor(s). Repeatable or comma-separated.
 - `--exclude <SENSOR>`: Exclude named sensor(s). Repeatable or comma-separated.
 - `--jobs <N>`: Run up to `N` sensors concurrently (overrides `jobs` in
@@ -376,6 +386,7 @@ for legacy configs).
 | --- | --- | --- | --- | --- |
 | `--set <SET>` | no | — | — | Explain this development signal set (default: all sensors) |
 | `--changed` | no | — | — | Select by working-tree change instead of listing everything |
+| `--since <REF>` | no | — | — | Select by the committed range `merge-base(<REF>, HEAD)..HEAD` |
 | `--format <FORMAT>` | no | `text` | `text`, `json` | Output format |
 <!-- END GENERATED: cli-contract explain -->
 Explains which sensors the current change selects and why, without executing
@@ -384,6 +395,9 @@ matching pattern or constraint reason) and every skipped sensor.
 
 - `--set <SET>`: Explain this development signal set (default: all sensors).
 - `--changed`: Select by working-tree change instead of listing everything.
+- `--since <REF>`: Select by the committed range `merge-base(<REF>, HEAD)..HEAD`
+  without executing sensors. JSON output carries `selection_mode`, `since`,
+  `base_sha`, `head_sha`, and `merge_base_sha`.
 - `--format <Format>`: Output format (`text` or `json`).
 
 ### `init-db`

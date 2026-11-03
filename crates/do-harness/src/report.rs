@@ -126,6 +126,60 @@ pub struct VerifyReport {
     /// Development signal set selected via `--set`; absent for full runs.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub signal_set: Option<String>,
+    /// Change-aware selection input and revisions; absent for unfiltered runs.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub selection: Option<SelectionReport>,
+}
+
+/// Machine-readable change-aware selection input.
+///
+/// States which revisions drove selection and why each candidate sensor ran
+/// or was skipped, so a consumer never has to infer the input from the
+/// sensor list alone.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct SelectionReport {
+    /// `all` | `working-tree` | `range` | `working-tree+range`.
+    pub mode: String,
+    /// `--since` ref as requested, when range selection was used.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub since: Option<String>,
+    /// Commit the requested ref resolved to.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub base_sha: Option<String>,
+    /// `HEAD` commit the range was compared against.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub head_sha: Option<String>,
+    /// Merge base the range diff started from.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub merge_base_sha: Option<String>,
+    /// Changed repository-relative paths driving selection, sorted.
+    pub changed_files: Vec<String>,
+    /// Why discovery failed closed, when it did.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub diagnostic: Option<String>,
+    /// Sensors skipped by applicability, with reasons.
+    pub skipped: Vec<crate::applicability::Skipped>,
+}
+
+impl SelectionReport {
+    /// Builds the report from a resolved change selection and skip reasons.
+    #[must_use]
+    pub fn from_changes(
+        changes: &crate::changes::ChangeSelection,
+        skipped: &[crate::applicability::Skipped],
+    ) -> Self {
+        let range = changes.range.as_ref();
+        Self {
+            mode: changes.mode.as_str().to_owned(),
+            since: range.map(|r| r.requested.clone()),
+            base_sha: range.map(|r| r.base_sha.clone()),
+            head_sha: range.map(|r| r.head_sha.clone()),
+            merge_base_sha: range.map(|r| r.merge_base_sha.clone()),
+            changed_files: changes.paths().iter().map(ToString::to_string).collect(),
+            diagnostic: changes.diagnostic.clone(),
+            skipped: skipped.to_vec(),
+        }
+    }
 }
 
 /// Lines of failing-sensor output shown on stderr.
@@ -314,6 +368,7 @@ mod tests {
                 output: "hidden".to_owned(),
             }],
             signal_set: None,
+            selection: None,
         };
         let json = serde_json::to_string(&report).expect("serialize");
         let value: serde_json::Value = serde_json::from_str(&json).expect("parse");

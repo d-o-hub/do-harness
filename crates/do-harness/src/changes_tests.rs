@@ -152,3 +152,118 @@ fn git(root: &Path, args: &[&str]) {
         .unwrap();
     assert!(status.success());
 }
+
+/// Resolves `spec` to a full SHA inside `root`.
+fn rev(root: &Path, spec: &str) -> String {
+    let output = git_command(root)
+        .args(["rev-parse", spec])
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "git rev-parse {spec} failed");
+    String::from_utf8_lossy(&output.stdout).trim().to_owned()
+}
+
+/// A clean checkout of a committed branch still reports the committed range.
+#[test]
+fn discover_selection_reports_committed_range_on_clean_checkout() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    git(root, &["init", "-q"]);
+    std::fs::write(root.join("main.rs"), "v1\n").unwrap();
+    git(root, &["add", "-A"]);
+    git(root, &["commit", "-qm", "test: base"]);
+    let base = rev(root, "HEAD");
+    std::fs::write(root.join("main.rs"), "v2\n").unwrap();
+    std::fs::write(root.join("docs.md"), "docs\n").unwrap();
+    git(root, &["add", "-A"]);
+    git(root, &["commit", "-qm", "test: change"]);
+
+    assert!(
+        discover(root).files.is_empty(),
+        "the checkout must be clean for this fixture"
+    );
+
+    let selection = discover_selection(root, false, Some(&base));
+    assert_eq!(selection.mode, SelectionMode::Range);
+    assert!(!selection.changed.discovery_failed);
+    assert_eq!(selection.paths(), vec!["docs.md", "main.rs"]);
+    let range = selection.range.expect("resolved range");
+    assert_eq!(range.requested, base);
+    assert_eq!(range.base_sha, base);
+    assert_eq!(range.head_sha, rev(root, "HEAD"));
+    assert_eq!(range.merge_base_sha, base);
+}
+
+/// `--changed` and `--since` union committed and uncommitted paths.
+#[test]
+fn discover_selection_unions_range_and_working_tree() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    git(root, &["init", "-q"]);
+    std::fs::write(root.join("main.rs"), "v1\n").unwrap();
+    git(root, &["add", "-A"]);
+    git(root, &["commit", "-qm", "test: base"]);
+    let base = rev(root, "HEAD");
+    std::fs::write(root.join("main.rs"), "v2\n").unwrap();
+    git(root, &["commit", "-qam", "test: committed"]);
+    std::fs::write(root.join("notes.md"), "untracked\n").unwrap();
+
+    let selection = discover_selection(root, true, Some(&base));
+    assert_eq!(selection.mode, SelectionMode::WorkingTreeAndRange);
+    assert!(!selection.changed.discovery_failed);
+    assert_eq!(selection.paths(), vec!["main.rs", "notes.md"]);
+}
+
+/// An unresolvable base fails closed with a diagnostic instead of an empty set.
+#[test]
+fn discover_selection_fails_closed_for_missing_base() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    git(root, &["init", "-q"]);
+    std::fs::write(root.join("main.rs"), "v1\n").unwrap();
+    git(root, &["add", "-A"]);
+    git(root, &["commit", "-qm", "test: base"]);
+
+    let selection = discover_selection(root, false, Some("origin/does-not-exist"));
+    assert!(selection.changed.discovery_failed);
+    assert!(selection.range.is_none());
+    assert!(
+        selection
+            .diagnostic
+            .as_deref()
+            .is_some_and(|d| d.contains("origin/does-not-exist")),
+        "diagnostic must name the unresolvable ref: {:?}",
+        selection.diagnostic
+    );
+}
+
+/// A rename in the committed range reports both ends.
+#[test]
+fn discover_selection_reports_renames_in_range() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    git(root, &["init", "-q"]);
+    std::fs::write(root.join("old.rs"), "v1\n").unwrap();
+    git(root, &["add", "-A"]);
+    git(root, &["commit", "-qm", "test: base"]);
+    let base = rev(root, "HEAD");
+    git(root, &["mv", "old.rs", "new.rs"]);
+    git(root, &["commit", "-qm", "test: rename"]);
+
+    let selection = discover_selection(root, false, Some(&base));
+    assert_eq!(selection.paths(), vec!["new.rs", "old.rs"]);
+}
+
+/// A repository without commits cannot resolve a range and fails closed.
+#[test]
+fn discover_selection_fails_closed_without_commits() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    git(root, &["init", "-q"]);
+    std::fs::write(root.join("main.rs"), "v1\n").unwrap();
+    git(root, &["add", "-A"]);
+
+    let selection = discover_selection(root, false, Some("HEAD"));
+    assert!(selection.changed.discovery_failed);
+    assert!(selection.range.is_none());
+}
