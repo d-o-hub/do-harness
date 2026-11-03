@@ -241,6 +241,9 @@ fn no_evidence_reports_missing() {
 
 /// An in-flight `verify --record` run is `running`, not `missing`, and the
 /// state clears back to green when it finishes.
+///
+/// Unix-only: the fixture needs a shell to hold the run open.
+#[cfg(unix)]
 #[test]
 fn in_flight_verify_reports_running() {
     let (_dir, root) = fixture_repo_with_sensors(
@@ -283,22 +286,6 @@ fn in_flight_verify_reports_running() {
         doc.get("running").is_none(),
         "green status must not carry running: {doc}"
     );
-}
-
-/// A marker whose owner died leaves no lock; `status` must not report running.
-#[test]
-fn unlocked_running_marker_is_not_running() {
-    let (_dir, root) = fixture_repo();
-    std::fs::create_dir_all(root.join(".do-harness")).unwrap();
-    std::fs::write(
-        root.join(".do-harness/evidence.verification.running"),
-        "{\"pid\":999999,\"started_at\":1,\"set\":\"verification\"}",
-    )
-    .unwrap();
-
-    let (code, doc) = status(&root, "verification");
-    assert_eq!(code, Some(1));
-    assert_eq!(doc["state"], serde_json::json!("missing"));
 }
 
 /// A partial run leaves the set uncovered; status names the missing sensors

@@ -1,14 +1,18 @@
 //! In-flight verify markers.
 //!
 //! A run that owns an evidence artifact holds a shared lock on a sibling
-//! `<artifact>.running` file for its whole duration. `status` probes that lock
+//! `<artifact>.running.lock` for its whole duration and publishes its pid,
+//! start time and set in `<artifact>.running`. `status` probes the lock
 //! exclusively to tell "a run is executing now" from "nobody has ever run this
-//! set"; the OS drops the lock when the process dies, so a killed run leaves
-//! no phantom running state. Shared locks keep concurrent evidence writers
-//! legal, which the write-side chain/atomic-replace lock already supports.
+//! set"; the OS drops the lock when the process dies, so a killed run leaves no
+//! phantom running state. Shared locks keep concurrent evidence writers legal,
+//! which the write-side chain/atomic-replace lock already supports.
+//!
+//! Liveness and metadata are separate files on purpose: Windows refuses to
+//! truncate or write a region another handle has byte-range locked (os error
+//! 33), so the file that carries the lock is never written after locking.
 
 use std::fmt::Write as _;
-use std::io::Write as _;
 use std::path::{Path, PathBuf};
 
 use anyhow::Result;
@@ -25,6 +29,13 @@ const PROBE_DELAY: std::time::Duration = std::time::Duration::from_millis(5);
 /// Sibling marker of an evidence artifact.
 pub(crate) fn marker_path(evidence_path: &Path) -> PathBuf {
     evidence_path.with_extension("running")
+}
+
+/// Lock file that records a run's liveness for the same artifact.
+fn lock_path(evidence_path: &Path) -> PathBuf {
+    let mut path = marker_path(evidence_path).into_os_string();
+    path.push(".lock");
+    PathBuf::from(path)
 }
 
 /// Published metadata of an in-flight run.
@@ -45,9 +56,10 @@ pub(crate) struct RunningInfo {
     pub set: Option<String>,
 }
 
-/// Shared lock held for the duration of a run. The marker file persists (like
-/// the evidence write lock) and an unlocked marker is simply ignored.
+/// Shared lock held for the duration of a run. The lock file persists (like
+/// the evidence write lock) and an unlocked one is simply ignored.
 pub(crate) struct RunningGuard {
+    info_path: PathBuf,
     file: std::fs::File,
 }
 
@@ -62,32 +74,36 @@ impl RunningGuard {
     /// An I/O or containment error, including a marker path that crosses a
     /// symlink or a lock that stays contended after the retry budget.
     pub(crate) fn begin(root: &Path, evidence_path: &Path, set: Option<&str>) -> Result<Self> {
-        let path = crate::managed_path::evidence_path(root, &marker_path(evidence_path))?;
-        if let Some(parent) = path.parent() {
+        let lock = crate::managed_path::evidence_path(root, &lock_path(evidence_path))?;
+        let info_path = crate::managed_path::evidence_path(root, &marker_path(evidence_path))?;
+        if let Some(parent) = lock.parent() {
             std::fs::create_dir_all(parent)?;
         }
-        let mut file = std::fs::OpenOptions::new()
-            .create(true)
-            .truncate(false)
-            .read(true)
-            .write(true)
-            .open(&path)?;
-        acquire_shared(&file)?;
         let info = RunningInfo {
             pid: Some(std::process::id()),
             started_at: Some(unix_now()),
             set: set.map(ToOwned::to_owned),
         };
-        file.set_len(0)?;
-        file.write_all(&serde_json::to_vec(&info)?)?;
-        file.flush()?;
-        Ok(Self { file })
+        // Published before the lock so a probe that observes the lock can
+        // always read the metadata, and never rewritten while locked.
+        crate::managed_path::write_atomic(&info_path, &serde_json::to_vec(&info)?)?;
+        let file = std::fs::OpenOptions::new()
+            .create(true)
+            .truncate(false)
+            .read(true)
+            .write(true)
+            .open(&lock)?;
+        acquire_shared(&file)?;
+        Ok(Self { info_path, file })
     }
 }
 
 impl Drop for RunningGuard {
     fn drop(&mut self) {
         let _ = fs2::FileExt::unlock(&self.file);
+        // A concurrent run shares the info file; a failed removal only leaves
+        // metadata that no live lock vouches for.
+        let _ = std::fs::remove_file(&self.info_path);
     }
 }
 
@@ -96,8 +112,14 @@ impl Drop for RunningGuard {
 /// `Some` means a run holds the shared lock. A marker with no lock belongs to
 /// a run that died and is ignored (the OS already released its lock).
 pub(crate) fn inspect(root: &Path, evidence_path: &Path) -> Option<RunningInfo> {
-    let path = crate::managed_path::evidence_path(root, &marker_path(evidence_path)).ok()?;
-    let file = std::fs::File::open(&path).ok()?;
+    let lock = crate::managed_path::evidence_path(root, &lock_path(evidence_path)).ok()?;
+    // Read+write: `LockFileEx` requires a handle with data access.
+    let file = std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(lock)
+        .ok()?;
+    let info_path = crate::managed_path::evidence_path(root, &marker_path(evidence_path)).ok()?;
     let mut attempts = 0;
     loop {
         match fs2::FileExt::try_lock_exclusive(&file) {
@@ -105,12 +127,12 @@ pub(crate) fn inspect(root: &Path, evidence_path: &Path) -> Option<RunningInfo> 
                 let _ = fs2::FileExt::unlock(&file);
                 return None;
             }
-            Err(err) if err.kind() == std::io::ErrorKind::WouldBlock => {
+            Err(err) if is_contended(&err) => {
                 if attempts < PROBE_ATTEMPTS {
                     attempts += 1;
                     std::thread::sleep(PROBE_DELAY);
                 } else {
-                    return Some(read_info(&path));
+                    return Some(read_info(&info_path));
                 }
             }
             Err(_) => return None,
@@ -149,7 +171,7 @@ fn acquire_shared(file: &std::fs::File) -> Result<()> {
     loop {
         match fs2::FileExt::try_lock_shared(file) {
             Ok(()) => return Ok(()),
-            Err(err) if err.kind() == std::io::ErrorKind::WouldBlock => {
+            Err(err) if is_contended(&err) => {
                 if attempts < LOCK_RETRY_ATTEMPTS {
                     attempts += 1;
                     std::thread::sleep(LOCK_RETRY_DELAY);
@@ -160,6 +182,15 @@ fn acquire_shared(file: &std::fs::File) -> Result<()> {
             Err(err) => return Err(err.into()),
         }
     }
+}
+
+/// Whether `err` means "another handle holds the lock".
+///
+/// Windows reports contention as a raw `ERROR_LOCK_VIOLATION` with no standard
+/// `ErrorKind`, so the platform's contended error from fs2 is compared too.
+fn is_contended(err: &std::io::Error) -> bool {
+    err.kind() == std::io::ErrorKind::WouldBlock
+        || err.raw_os_error() == fs2::lock_contended_error().raw_os_error()
 }
 
 /// Tolerant read: an unparsable marker is still a running run.
