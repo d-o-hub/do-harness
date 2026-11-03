@@ -82,8 +82,8 @@ pub struct StatusReport {
     /// Requested signal set; `None` means the legacy default artifact.
     pub set: Option<String>,
     /// Machine-readable reason (`current`, `failures`, `workspace_changed`,
-    /// `policy_changed`, `insufficient_coverage`, `no_evidence`,
-    /// `legacy_schema`, `set_mismatch`, `unreadable`).
+    /// `policy_changed`, `selection_changed`, `insufficient_coverage`,
+    /// `no_evidence`, `legacy_schema`, `set_mismatch`, `unreadable`).
     pub reason: String,
     /// Evidence side; absent when no qualifying artifact exists.
     #[serde(skip_serializing_if = "Option::is_none")]
