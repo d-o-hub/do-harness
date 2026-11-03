@@ -9,7 +9,7 @@ use crate::argv_paths::{self, MissingArgvPath};
 use crate::config;
 use crate::dbcheck;
 use crate::hook_script::BinSource;
-use crate::hooks;
+use crate::hooks::{self, HookOwner};
 use crate::report::Format;
 
 /// Outcome of the event-chain tamper audit, computed once so both output
@@ -102,9 +102,14 @@ pub(crate) async fn run_with_status(
         ));
     }
 
-    let hooks_installed = status.pre_commit && status.pre_push && status.commit_msg;
-    if strict && !hooks_installed {
-        failures.push("one or more managed git hooks absent in strict mode".to_owned());
+    let hooks_satisfied = status.is_all_satisfied();
+    // Shadowing already has its own failure above; a second message claiming
+    // the hooks are neither managed nor delegated would misstate the cause.
+    if strict && !status.ownership.is_satisfied() {
+        failures.push(
+            "one or more git hooks are neither managed by do-harness nor delegated in strict mode"
+                .to_owned(),
+        );
     }
 
     // The managed commit-msg hook execs `scripts/check-commitlint.sh` and
@@ -219,7 +224,13 @@ pub(crate) async fn run_with_status(
                 "pre_commit_shadowed": status.pre_commit_shadowed,
                 "pre_push_shadowed": status.pre_push_shadowed,
                 "commit_msg_shadowed": status.commit_msg_shadowed,
-                "shadowed": status.is_shadowed()
+                "shadowed": status.is_shadowed(),
+                "satisfied": hooks_satisfied,
+                "ownership": {
+                    "pre_commit": status.ownership.pre_commit.as_str(),
+                    "pre_push": status.ownership.pre_push.as_str(),
+                    "commit_msg": status.ownership.commit_msg.as_str()
+                }
             },
             "database_ok": db_ok,
             "event_chain": chain.to_json(),
@@ -260,27 +271,35 @@ pub(crate) async fn run_with_status(
             );
         }
 
-        for (name, installed, shadowed) in [
-            ("pre-commit", status.pre_commit, status.pre_commit_shadowed),
-            ("pre-push", status.pre_push, status.pre_push_shadowed),
-            ("commit-msg", status.commit_msg, status.commit_msg_shadowed),
+        let pre_commit_config = hooks::ownership::has_pre_commit_config(root);
+        for (name, owner, shadowed) in [
+            (
+                "pre-commit",
+                status.ownership.pre_commit,
+                status.pre_commit_shadowed,
+            ),
+            (
+                "pre-push",
+                status.ownership.pre_push,
+                status.pre_push_shadowed,
+            ),
+            (
+                "commit-msg",
+                status.ownership.commit_msg,
+                status.commit_msg_shadowed,
+            ),
         ] {
-            if installed {
-                if name == "commit-msg" && commitlint_missing {
-                    println!(
-                        "  [FAIL] {name} hook: installed but scripts/check-commitlint.sh is missing"
-                    );
-                } else {
-                    println!("  [OK] {name} hook: installed");
-                }
-            } else if shadowed {
-                let cfg = status.core_hooks_path.as_deref().unwrap_or("configured");
-                println!(
-                    "  [FAIL] {name} hook: installed in .git/hooks but shadowed by core.hooksPath={cfg}"
-                );
-            } else {
-                println!("  [WARN] {name} hook: absent");
-            }
+            println!(
+                "{}",
+                hook_line(
+                    name,
+                    owner,
+                    shadowed,
+                    status.core_hooks_path.as_deref(),
+                    commitlint_missing,
+                    pre_commit_config,
+                )
+            );
         }
 
         for missing in &sensor_argv_missing {
@@ -354,6 +373,45 @@ pub(crate) fn describe_binary(source: &BinSource) -> String {
         BinSource::Env(path) => format!("env:{}", path.display()),
         BinSource::Path(path) => format!("path:{}", path.display()),
         BinSource::Repo(path) => format!("repo:{}", path.display()),
+    }
+}
+
+/// Renders one `[OK]`/`[WARN]`/`[FAIL]` line for a hook path.
+///
+/// A delegated hook is healthy: the pre-commit framework, or the hook manager
+/// behind `core.hooksPath`, owns the gate and `doctor --strict` must not call it
+/// missing. An absent hook that a pre-commit configuration was meant to own
+/// carries the command that installs it.
+fn hook_line(
+    name: &str,
+    owner: HookOwner,
+    shadowed: bool,
+    core_hooks_path: Option<&str>,
+    commitlint_missing: bool,
+    pre_commit_config: bool,
+) -> String {
+    let configured = core_hooks_path.unwrap_or("configured");
+    if shadowed && owner == HookOwner::Absent {
+        return format!(
+            "  [FAIL] {name} hook: installed in .git/hooks but shadowed by core.hooksPath={configured}"
+        );
+    }
+    match owner {
+        HookOwner::Managed if name == "commit-msg" && commitlint_missing => {
+            format!("  [FAIL] {name} hook: installed but scripts/check-commitlint.sh is missing")
+        }
+        HookOwner::Managed => format!("  [OK] {name} hook: installed"),
+        HookOwner::PreCommit => format!("  [OK] {name} hook: delegated to pre-commit"),
+        HookOwner::HooksPath => {
+            format!("  [OK] {name} hook: delegated to core.hooksPath={configured}")
+        }
+        HookOwner::Foreign => {
+            format!("  [WARN] {name} hook: foreign hook not managed by do-harness")
+        }
+        HookOwner::Absent if pre_commit_config => format!(
+            "  [WARN] {name} hook: absent (pre-commit config present; run: pre-commit install --hook-type {name})"
+        ),
+        HookOwner::Absent => format!("  [WARN] {name} hook: absent"),
     }
 }
 
