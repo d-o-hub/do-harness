@@ -2299,7 +2299,7 @@ _do-harness__subcmd__help__subcmd__overlap_commands() {
 (( $+functions[_do-harness__subcmd__help__subcmd__pr_commands] )) ||
 _do-harness__subcmd__help__subcmd__pr_commands() {
     local commands; commands=(
-'no-effect:Report whether a PR or revision range introduces any effective change' \
+'no-effect:Report the prospective merge impact of a PR or revision range' \
 'review:Emit the semantic residual\: changed units evidence could not prove' \
 'ready:Check whether a pull request is ready to merge\: merge state, CI checks, and review conversations' \
 'waivers:Classify patch-coverage residue\: waivable classes and lines needing tests' \
@@ -2600,7 +2600,7 @@ _do-harness__subcmd__overlap_commands() {
 (( $+functions[_do-harness__subcmd__pr_commands] )) ||
 _do-harness__subcmd__pr_commands() {
     local commands; commands=(
-'no-effect:Report whether a PR or revision range introduces any effective change' \
+'no-effect:Report the prospective merge impact of a PR or revision range' \
 'review:Emit the semantic residual\: changed units evidence could not prove' \
 'ready:Check whether a pull request is ready to merge\: merge state, CI checks, and review conversations' \
 'readiness:Check whether a pull request is ready to merge\: merge state, CI checks, and review conversations' \
@@ -2613,7 +2613,7 @@ _do-harness__subcmd__pr_commands() {
 (( $+functions[_do-harness__subcmd__pr__subcmd__help_commands] )) ||
 _do-harness__subcmd__pr__subcmd__help_commands() {
     local commands; commands=(
-'no-effect:Report whether a PR or revision range introduces any effective change' \
+'no-effect:Report the prospective merge impact of a PR or revision range' \
 'review:Emit the semantic residual\: changed units evidence could not prove' \
 'ready:Check whether a pull request is ready to merge\: merge state, CI checks, and review conversations' \
 'waivers:Classify patch-coverage residue\: waivable classes and lines needing tests' \

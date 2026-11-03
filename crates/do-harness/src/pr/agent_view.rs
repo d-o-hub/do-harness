@@ -9,6 +9,7 @@ use std::fmt::Write as _;
 use serde::{Deserialize, Serialize};
 
 use super::diff::{Change, Unit};
+use super::no_effect::MergeImpactReport;
 use super::review::{FalseProven, ReviewReport};
 
 /// Representation format for review-required content.
@@ -100,6 +101,8 @@ pub struct AgentReviewEnvelope {
     pub head: String,
     /// Resolved merge base.
     pub merge_base: String,
+    /// Prospective merge-impact classification against the current base.
+    pub merge_impact: MergeImpactReport,
     /// Merge-base policy digest or "none".
     pub policy_digest: String,
     /// Chosen content representation.
@@ -192,11 +195,16 @@ fn calc_ratio(emitted: usize, audit: usize) -> f64 {
 pub fn build_agent_envelope(report: &ReviewReport) -> AgentReviewEnvelope {
     let audit_bytes = serde_json::to_string_pretty(report).map_or(0, |s| s.len());
     let policy_digest = report.policy.sha256.clone();
-    let review_required_units: Vec<String> = report.residual.iter().map(|u| u.id.clone()).collect();
-    let markers: Vec<ReviewMarker> = report.residual.iter().filter_map(unit_marker).collect();
+    // A proven no-tree-effect merge cannot change the base, so its residual is
+    // omitted from model input; the verdict and SHA evidence stay traceable.
+    let proven =
+        report.merge_impact.verdict.is_no_tree_effect() && report.merge_impact.base_verified;
+    let payload: &[Unit] = if proven { &[] } else { &report.residual };
+    let review_required_units: Vec<String> = payload.iter().map(|u| u.id.clone()).collect();
+    let markers: Vec<ReviewMarker> = payload.iter().filter_map(unit_marker).collect();
     let exempt_units: Vec<AuditUnitRef> = report.exempt.iter().map(to_ref).collect();
     let skipped_units: Vec<AuditUnitRef> = report.skipped.iter().map(to_ref).collect();
-    let raw_diff_str = render_raw_diff(&report.residual);
+    let raw_diff_str = render_raw_diff(payload);
 
     let create_candidate = |rep: Representation,
                             units: Option<Vec<Unit>>,
@@ -209,6 +217,7 @@ pub fn build_agent_envelope(report: &ReviewReport) -> AgentReviewEnvelope {
             base: report.base.clone(),
             head: report.head.clone(),
             merge_base: report.merge_base.clone(),
+            merge_impact: report.merge_impact.clone(),
             policy_digest: policy_digest.clone(),
             representation: rep,
             review_required_units: review_required_units.clone(),
@@ -235,11 +244,8 @@ pub fn build_agent_envelope(report: &ReviewReport) -> AgentReviewEnvelope {
         }
     };
 
-    let mut cand_residual = create_candidate(
-        Representation::Residual,
-        Some(report.residual.clone()),
-        None,
-    );
+    let mut cand_residual =
+        create_candidate(Representation::Residual, Some(payload.to_vec()), None);
     let bytes_res = serde_json::to_string_pretty(&cand_residual).map_or(usize::MAX, |s| s.len());
     cand_residual.measurement.emitted_bytes = bytes_res;
     cand_residual.measurement.ratio = calc_ratio(bytes_res, audit_bytes);

@@ -15,7 +15,9 @@ use super::proof::{self, GatePolicy, ProofRules};
 use crate::changes::git_command;
 
 /// Stable review report schema version.
-pub const SCHEMA_VERSION: u32 = 4;
+///
+/// Version 5 adds the prospective merge-impact gate.
+pub const SCHEMA_VERSION: u32 = 5;
 
 /// Where the gate policy was read from and whether it parsed.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -86,6 +88,10 @@ pub struct ReviewReport {
     pub head: String,
     /// Merge-base commit, or the base ref when none could be resolved.
     pub merge_base: String,
+    /// Prospective merge impact against the current base; `UNKNOWN` or an
+    /// unverified base never permits an agent view to drop review-required
+    /// content.
+    pub merge_impact: no_effect::MergeImpactReport,
     /// Whether the report came from the local cache.
     pub cached: bool,
     /// Gate policy probe result.
@@ -112,104 +118,127 @@ pub struct ReviewReport {
 /// command treats that as "cannot review", never as "nothing to review".
 pub fn analyze(root: &Path, target: &Target, recompute: bool) -> Result<ReviewReport> {
     match target {
-        Target::Range { base, head } => {
-            let merge_base = no_effect::merge_base(root, base, head)
-                .with_context(|| format!("cannot compare {base}...{head}"))?;
-            let head_sha = no_effect::commit_sha(root, head)?;
-            let (policy, warning) = probe_policy(root, &merge_base);
-            let key = CacheKey {
-                schema_version: SCHEMA_VERSION,
-                merge_base: merge_base.clone(),
-                head_sha: head_sha.clone(),
-                policy_sha256: policy.sha256.clone(),
-            };
-            if !recompute {
-                if let Some(cached) = cached_report(root, &key, "range", None, base, head) {
-                    return Ok(cached);
-                }
-            }
-            let text = local_diff(root, &merge_base, head)?;
-            Ok(assemble(
-                Inputs {
-                    root,
-                    mode: "range",
-                    pr: None,
-                    base,
-                    head,
-                    merge_base: &merge_base,
-                    diff: text,
-                    policy,
-                    warnings: warning.into_iter().collect(),
-                    cacheable: true,
-                },
-                &key,
-            ))
-        }
-        Target::Pr(number) => {
-            let view = gh::view(root, *number)?;
-            if let Some((merge_base, head_sha)) = local_pr_refs(root, &view) {
-                let (policy, warning) = probe_policy(root, &merge_base);
-                let key = CacheKey {
-                    schema_version: SCHEMA_VERSION,
-                    merge_base: merge_base.clone(),
-                    head_sha: head_sha.clone(),
-                    policy_sha256: policy.sha256.clone(),
-                };
-                if !recompute {
-                    if let Some(cached) = cached_report(
-                        root,
-                        &key,
-                        "pr",
-                        Some(*number),
-                        &view.base_ref_name,
-                        &view.head_ref_oid,
-                    ) {
-                        return Ok(cached);
-                    }
-                }
-                let text = local_diff(root, &merge_base, &view.head_ref_oid)?;
-                return Ok(assemble(
-                    Inputs {
-                        root,
-                        mode: "pr",
-                        pr: Some(*number),
-                        base: &view.base_ref_name,
-                        head: &view.head_ref_oid,
-                        merge_base: &merge_base,
-                        diff: text,
-                        policy,
-                        warnings: warning.into_iter().collect(),
-                        cacheable: true,
-                    },
-                    &key,
-                ));
-            }
-            let warning =
-                "merge base unavailable locally; using gh pr diff (policy not read)".to_owned();
-            let text = gh::diff(root, *number)?;
-            let key = CacheKey {
-                schema_version: SCHEMA_VERSION,
-                merge_base: view.base_ref_name.clone(),
-                head_sha: view.head_ref_oid.clone(),
-                policy_sha256: "none".to_owned(),
-            };
-            Ok(assemble(
-                Inputs {
-                    root,
-                    mode: "pr",
-                    pr: Some(*number),
-                    base: &view.base_ref_name,
-                    head: &view.head_ref_oid,
-                    merge_base: &view.base_ref_name,
-                    diff: text,
-                    policy: absent_policy(None),
-                    warnings: vec![warning],
-                    cacheable: false,
-                },
-                &key,
-            ))
+        Target::Range { base, head } => analyze_range(root, base, head, recompute),
+        Target::Pr(number) => analyze_pr(root, *number, recompute),
+    }
+}
+
+fn analyze_range(root: &Path, base: &str, head: &str, recompute: bool) -> Result<ReviewReport> {
+    let merge_base = no_effect::merge_base(root, base, head)
+        .with_context(|| format!("cannot compare {base}...{head}"))?;
+    let base_sha =
+        no_effect::commit_sha(root, base).with_context(|| format!("cannot resolve base {base}"))?;
+    let head_sha = no_effect::commit_sha(root, head)?;
+    let (policy, warning) = probe_policy(root, &merge_base);
+    let key = CacheKey {
+        schema_version: SCHEMA_VERSION,
+        merge_base: merge_base.clone(),
+        base_sha,
+        head_sha: head_sha.clone(),
+        policy_sha256: policy.sha256.clone(),
+    };
+    if !recompute {
+        if let Some(cached) = cached_report(root, &key, "range", None, base, head) {
+            return Ok(cached);
         }
     }
+    let merge_impact = no_effect::merge_impact(root, base, head);
+    let text = local_diff(root, &merge_base, head)?;
+    Ok(assemble(
+        Inputs {
+            root,
+            mode: "range",
+            pr: None,
+            base,
+            head,
+            merge_base: &merge_base,
+            merge_impact,
+            diff: text,
+            policy,
+            warnings: warning.into_iter().collect(),
+            cacheable: true,
+        },
+        &key,
+    ))
+}
+
+fn analyze_pr(root: &Path, number: u64, recompute: bool) -> Result<ReviewReport> {
+    let view = gh::view(root, number)?;
+    if let Some((merge_base, base_sha, head_sha)) = local_pr_refs(root, &view) {
+        let (policy, warning) = probe_policy(root, &merge_base);
+        let key = CacheKey {
+            schema_version: SCHEMA_VERSION,
+            merge_base: merge_base.clone(),
+            base_sha,
+            head_sha: head_sha.clone(),
+            policy_sha256: policy.sha256.clone(),
+        };
+        if !recompute {
+            if let Some(cached) = cached_report(
+                root,
+                &key,
+                "pr",
+                Some(number),
+                &view.base_ref_name,
+                &view.head_ref_oid,
+            ) {
+                return Ok(cached);
+            }
+        }
+        let merge_impact = no_effect::merge_impact_for_pr(
+            root,
+            &view.base_ref_oid,
+            &view.base_ref_name,
+            &view.head_ref_oid,
+        );
+        let text = local_diff(root, &merge_base, &view.head_ref_oid)?;
+        return Ok(assemble(
+            Inputs {
+                root,
+                mode: "pr",
+                pr: Some(number),
+                base: &view.base_ref_name,
+                head: &view.head_ref_oid,
+                merge_base: &merge_base,
+                merge_impact,
+                diff: text,
+                policy,
+                warnings: warning.into_iter().collect(),
+                cacheable: true,
+            },
+            &key,
+        ));
+    }
+    let warning = "merge base unavailable locally; using gh pr diff (policy not read)".to_owned();
+    let text = gh::diff(root, number)?;
+    let key = CacheKey {
+        schema_version: SCHEMA_VERSION,
+        merge_base: view.base_ref_name.clone(),
+        base_sha: String::new(),
+        head_sha: view.head_ref_oid.clone(),
+        policy_sha256: "none".to_owned(),
+    };
+    let merge_impact = no_effect::MergeImpactReport::unknown(
+        &view.base_ref_name,
+        &view.head_ref_oid,
+        "merge base unavailable locally; using gh pr diff",
+    );
+    Ok(assemble(
+        Inputs {
+            root,
+            mode: "pr",
+            pr: Some(number),
+            base: &view.base_ref_name,
+            head: &view.head_ref_oid,
+            merge_base: &view.base_ref_name,
+            merge_impact,
+            diff: text,
+            policy: absent_policy(None),
+            warnings: vec![warning],
+            cacheable: false,
+        },
+        &key,
+    ))
 }
 
 /// Bundled report inputs; keeps the assembly signature small.
@@ -220,6 +249,7 @@ struct Inputs<'a> {
     base: &'a str,
     head: &'a str,
     merge_base: &'a str,
+    merge_impact: no_effect::MergeImpactReport,
     diff: String,
     policy: Policy,
     warnings: Vec<String>,
@@ -262,6 +292,7 @@ fn assemble(inputs: Inputs<'_>, key: &CacheKey) -> ReviewReport {
         base: inputs.base.to_owned(),
         head: inputs.head.to_owned(),
         merge_base: inputs.merge_base.to_owned(),
+        merge_impact: inputs.merge_impact,
         cached: false,
         policy: inputs.policy,
         residual,
@@ -293,6 +324,7 @@ fn cached_report(
     let mut cached = cache::load::<ReviewReport>(root, key)?;
     if cached.schema_version == key.schema_version
         && cached.merge_base == key.merge_base
+        && cached.merge_impact.base_sha.as_deref() == Some(key.base_sha.as_str())
         && cached.policy.sha256 == key.policy_sha256
     {
         mode.clone_into(&mut cached.mode);
@@ -306,8 +338,9 @@ fn cached_report(
     }
 }
 
-/// Resolves merge base and head for a PR from the local clone, when present.
-fn local_pr_refs(root: &Path, view: &gh::PrView) -> Option<(String, String)> {
+/// Resolves merge base, current base tip, and head for a PR from the local
+/// clone, when present.
+fn local_pr_refs(root: &Path, view: &gh::PrView) -> Option<(String, String, String)> {
     if !no_effect::rev_exists(root, &view.head_ref_oid) {
         return None;
     }
@@ -316,7 +349,9 @@ fn local_pr_refs(root: &Path, view: &gh::PrView) -> Option<(String, String)> {
             continue;
         }
         if let Ok(merge_base) = no_effect::merge_base(root, &candidate, &view.head_ref_oid) {
-            return Some((merge_base, view.head_ref_oid.clone()));
+            if let Ok(base_sha) = no_effect::commit_sha(root, &candidate) {
+                return Some((merge_base, base_sha, view.head_ref_oid.clone()));
+            }
         }
     }
     None

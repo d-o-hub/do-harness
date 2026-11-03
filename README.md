@@ -219,7 +219,7 @@ export PATH="$HOME/.local/bin:$PATH"
 | `list [OPTIONS]` | List sensor names (alias: `ls`) — flags: `--sets`, `--format <FORMAT>` |
 | `explain [OPTIONS]` | Explain which sensors the current change selects, without running them — flags: `--set <SET>`, `--changed`, `--since <REF>`, `--format <FORMAT>` |
 | `status [OPTIONS]` | Report verification evidence freshness without running sensors — flags: `--set <SET>`, `--evidence <FILE>`, `--format <FORMAT>` |
-| `pr no-effect [OPTIONS] [PR]` | Report whether a PR or revision range introduces any effective change — flags: `--base <REV>`, `--head <REV>`, `--format <FORMAT>` |
+| `pr no-effect [OPTIONS] [PR]` | Report the prospective merge impact of a PR or revision range — flags: `--base <REV>`, `--head <REV>`, `--format <FORMAT>` |
 | `pr review [OPTIONS] [PR]` | Emit the semantic residual: changed units evidence could not prove — flags: `--base <REV>`, `--head <REV>`, `--recompute`, `--view <VIEW>`, `--format <FORMAT>` |
 | `pr ready [OPTIONS] <PR>` | Check whether a pull request is ready to merge: merge state, CI checks, and review conversations (aliases: `readiness`, `check`) — flags: `--format <FORMAT>` |
 | `pr waivers [OPTIONS] --lcov <PATH> [PR]` | Classify patch-coverage residue: waivable classes and lines needing tests — flags: `--base <REV>`, `--head <REV>`, `--patch <PATH>`, `--lcov <PATH>`, `--since <PATH>`, `--strip-prefix <PREFIX>`, `--format <FORMAT>` |
