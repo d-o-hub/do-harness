@@ -10,6 +10,10 @@ use crate::hook_script::{
     BinSource, MARKER, commit_msg_body, only_args, resolve_binary, script_body,
 };
 
+pub mod ownership;
+
+pub use ownership::{HookOwner, HookOwnership};
+
 /// Finds the `.git` directory (or git-dir) for the repository containing `cwd`.
 ///
 /// Walks up from `cwd`, returning the first directory that contains an entry
@@ -175,7 +179,9 @@ fn expand_tilde_and_resolve(path_str: &str, repo_root: &Path, git_dir: &Path) ->
 /// full suite (no `--only` flags). The `commit-msg` hook needs no sensor
 /// arguments and runs the commitlint script against each prepared message. A
 /// hook file that already exists without the [`MARKER`] is refused unless
-/// `force` is `true`; files carrying the [`MARKER`] are always overwritten.
+/// `force` is `true`, and the refusal names the pre-commit framework when the
+/// repository delegates its hooks to it; files carrying the [`MARKER`] are
+/// always overwritten.
 ///
 /// Returns the path where the hooks were installed.
 ///
@@ -192,6 +198,7 @@ pub fn install(
     force: bool,
 ) -> Result<PathBuf> {
     let (hooks_dir, core_hooks_path) = get_effective_hooks_dir(git_dir, repo_root);
+    let pre_commit_config = ownership::has_pre_commit_config(repo_root);
     if !hooks_dir.is_dir() {
         if let Some(cfg) = core_hooks_path {
             bail!(
@@ -210,13 +217,20 @@ pub fn install(
         &hooks_dir.join("pre-commit"),
         &script_body(&only_args(pre_commit)),
         force,
+        pre_commit_config,
     )?;
     write_hook_checked(
         &hooks_dir.join("pre-push"),
         &script_body(&only_args(pre_push)),
         force,
+        pre_commit_config,
     )?;
-    write_hook_checked(&hooks_dir.join("commit-msg"), &commit_msg_body(), force)?;
+    write_hook_checked(
+        &hooks_dir.join("commit-msg"),
+        &commit_msg_body(),
+        force,
+        pre_commit_config,
+    )?;
 
     // If core.hooksPath points away from standard git_dir/hooks, clean up any
     // managed hooks in git_dir/hooks so they don't linger as shadowed artifacts.
@@ -291,6 +305,8 @@ pub struct HookStatus {
     pub pre_push_shadowed: bool,
     /// Whether commit-msg is present in default `.git/hooks` but shadowed by `core.hooksPath`.
     pub commit_msg_shadowed: bool,
+    /// Who owns each hook path: do-harness, a delegate, or nobody.
+    pub ownership: HookOwnership,
     /// Where the `do-harness` binary resolves from.
     pub binary: BinSource,
     /// Raw `core.hooksPath` git config value if set.
@@ -306,10 +322,10 @@ impl HookStatus {
         self.pre_commit_shadowed || self.pre_push_shadowed || self.commit_msg_shadowed
     }
 
-    /// Whether all managed hooks are installed and active in the effective hooks directory.
+    /// Whether every hook is managed by do-harness or delegated to a known owner.
     #[must_use]
-    pub fn is_all_installed(&self) -> bool {
-        self.pre_commit && self.pre_push && self.commit_msg && !self.is_shadowed()
+    pub fn is_all_satisfied(&self) -> bool {
+        self.ownership.is_satisfied() && !self.is_shadowed()
     }
 }
 
@@ -320,10 +336,28 @@ pub fn status(git_dir: &Path, repo_root: &Path) -> HookStatus {
     let default_hooks_dir = git_dir.join("hooks");
 
     let is_custom_path = core_hooks_path.is_some() && hooks_dir != default_hooks_dir;
+    let pre_commit_config = ownership::has_pre_commit_config(repo_root);
 
-    let pre_commit = is_managed(&hooks_dir.join("pre-commit"));
-    let pre_push = is_managed(&hooks_dir.join("pre-push"));
-    let commit_msg = is_managed(&hooks_dir.join("commit-msg"));
+    let ownership = HookOwnership {
+        pre_commit: ownership::classify(
+            &hooks_dir.join("pre-commit"),
+            pre_commit_config,
+            is_custom_path,
+        ),
+        pre_push: ownership::classify(
+            &hooks_dir.join("pre-push"),
+            pre_commit_config,
+            is_custom_path,
+        ),
+        commit_msg: ownership::classify(
+            &hooks_dir.join("commit-msg"),
+            pre_commit_config,
+            is_custom_path,
+        ),
+    };
+    let pre_commit = ownership.pre_commit == HookOwner::Managed;
+    let pre_push = ownership.pre_push == HookOwner::Managed;
+    let commit_msg = ownership.commit_msg == HookOwner::Managed;
 
     let pre_commit_shadowed =
         is_custom_path && !pre_commit && is_managed(&default_hooks_dir.join("pre-commit"));
@@ -339,6 +373,7 @@ pub fn status(git_dir: &Path, repo_root: &Path) -> HookStatus {
         pre_commit_shadowed,
         pre_push_shadowed,
         commit_msg_shadowed,
+        ownership,
         binary: resolve_binary(repo_root),
         core_hooks_path,
         hooks_dir,
@@ -352,12 +387,17 @@ fn is_managed(path: &Path) -> bool {
 
 /// Writes `body` to `path`, refusing to clobber a foreign hook unless `force`
 /// is set; hook files carrying the [`MARKER`] are always overwritten.
-fn write_hook_checked(path: &Path, body: &str, force: bool) -> Result<()> {
+fn write_hook_checked(path: &Path, body: &str, force: bool, pre_commit_config: bool) -> Result<()> {
     if let Ok(existing) = fs::read_to_string(path) {
         let managed = existing.contains(MARKER);
         if !managed && !force {
+            let owner = if pre_commit_config || ownership::is_pre_commit_wrapper(&existing) {
+                "the pre-commit framework"
+            } else {
+                "another tool"
+            };
             bail!(
-                "refusing to overwrite foreign hook {} (re-run with --force to replace it)",
+                "refusing to overwrite foreign hook {} owned by {owner} (re-run with --force to replace it)",
                 path.display()
             );
         }

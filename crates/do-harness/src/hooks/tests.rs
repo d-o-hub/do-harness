@@ -221,12 +221,12 @@ fn linked_worktree_hook_lifecycle_operates_on_shared_hooks() {
 
     // Status from linked worktree side
     let state_linked = status(&git_dir, &linked);
-    assert!(state_linked.is_all_installed());
+    assert!(state_linked.is_all_satisfied());
 
     // Status from parent side
     let parent_git_dir = find_git_dir(&parent).unwrap();
     let state_parent = status(&parent_git_dir, &parent);
-    assert!(state_parent.is_all_installed());
+    assert!(state_parent.is_all_satisfied());
 
     // Uninstall from linked worktree side
     uninstall(&git_dir, &linked).unwrap();
@@ -339,7 +339,7 @@ fn assert_install_preserves_default_hooks_alias(root: &Path, git_dir: &Path, ali
                 read(&hook_path(git_dir, name))
             );
         }
-        assert!(status(git_dir, root).is_all_installed());
+        assert!(status(git_dir, root).is_all_satisfied());
     }
 }
 
@@ -380,7 +380,7 @@ fn install_cleans_distinct_default_managed_hooks_and_keeps_foreign() {
     for name in ["pre-commit", "pre-push", "commit-msg"] {
         assert!(read(&custom_hooks.join(name)).contains(MARKER));
     }
-    assert!(status(&git_dir, root).is_all_installed());
+    assert!(status(&git_dir, root).is_all_satisfied());
 }
 
 #[test]
