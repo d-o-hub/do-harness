@@ -400,7 +400,7 @@ jobs:
 
   windows:
     runs-on: windows-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       # actions/checkout@v7.0.1
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -442,13 +442,24 @@ jobs:
         # but not pnpm, so provide it rather than letting the fixture run under
         # a package manager it does not describe.
         run: npm install --global pnpm@10
-      - name: Test workspace on Windows
+      - name: Test workspace on Windows (1/2)
         # Bounded so a hung test fails in minutes rather than consuming the
-        # job's full 30-minute budget with no output. `nextest` runs each test
-        # in an isolated process to prevent libSQL/SQLite multithreaded teardown
+        # job's full budget with no output. `nextest` runs each test in an
+        # isolated process to prevent libSQL/SQLite multithreaded teardown
         # access violations (0xc0000005) on Windows MSVC.
+        #
+        # The suite outgrew one 12-minute step: it reached test 750 of 1125
+        # when the bound expired, and a warm runner finished the whole run in
+        # 11m31s, so the margin is gone. The bound itself is the committed
+        # invariant `ci.windows_test_timeout_bound`, so the work is split into
+        # two count partitions instead of raising it.
         timeout-minutes: 12
-        run: cargo nextest run --workspace --release --exclude do-harness-db
+        run: cargo nextest run --workspace --release --exclude do-harness-db --partition count:1/2
+      - name: Test workspace on Windows (2/2)
+        # Second half of the same partition pair; together the two steps cover
+        # every test exactly once.
+        timeout-minutes: 12
+        run: cargo nextest run --workspace --release --exclude do-harness-db --partition count:2/2
       - name: Test do-harness-db on Windows
         # The db tests each open their own temporary libSQL database. On
         # Windows that binary crashed once with STATUS_ACCESS_VIOLATION
