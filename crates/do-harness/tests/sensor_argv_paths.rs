@@ -33,11 +33,14 @@ fn verify_fails_a_sensor_whose_argv_path_is_missing() {
     let (code, stdout, stderr) =
         run(harness(&root).args(["verify", "--set", "feedback", "--format", "json"]));
 
-    assert_eq!(code, Some(1), "stdout={stdout}\nstderr={stderr}");
+    // The sensor never started, so the run could not be judged: exit 2, not 1.
+    assert_eq!(code, Some(2), "stdout={stdout}\nstderr={stderr}");
     let report: Value = serde_json::from_str(&stdout).expect("verify JSON");
     assert_eq!(report["ok"], false);
+    assert_eq!(report["unrunnable"], serde_json::json!(["ghost"]));
     assert_eq!(report["sensors"][0]["ok"], false);
     assert_eq!(report["sensors"][0]["execution"], "not_run");
+    assert_eq!(report["sensors"][0]["details"]["reason"], "spawn");
     assert!(
         stderr.contains("scripts/does-not-exist.sh"),
         "stderr must name the missing path: {stderr}"

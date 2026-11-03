@@ -199,6 +199,7 @@ pub fn verify_selection<'a>(
             ok: true,
             root: root.display().to_string(),
             failed: vec![],
+            unrunnable: vec![],
             sensors: vec![],
             signal_set,
             selection: selection_report(selection),
@@ -225,10 +226,16 @@ pub fn verify_selection<'a>(
         .filter(|r| !r.ok && !r.allow_failure)
         .map(|r| r.name.clone())
         .collect();
+    let unrunnable: Vec<String> = results
+        .iter()
+        .filter(|r| r.unrunnable())
+        .map(|r| r.name.clone())
+        .collect();
     Ok(VerifyReport {
         ok: failed.is_empty(),
         root: root.display().to_string(),
         failed,
+        unrunnable,
         sensors: results,
         signal_set,
         selection: selection_report(selection),
