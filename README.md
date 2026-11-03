@@ -233,6 +233,7 @@ export PATH="$HOME/.local/bin:$PATH"
 | `task import [OPTIONS]` | Validate plans/tasks.json against the state database — flags: `--file <FILE>`, `--check` |
 | `task list [OPTIONS]` | Print tasks from the state database — flags: `--status <STATUS>`, `--method <METHOD>`, `--parent <ID>`, `--format <FORMAT>` |
 | `task show [OPTIONS] <ID>` | Show details for a specific task — flags: `--format <FORMAT>` |
+| `task context [OPTIONS] <ID>` | Assemble a bounded, read-only resume context for a task — flags: `--format <FORMAT>`, `--max-bytes <N>` |
 | `task add [OPTIONS] <TITLE>` | Add a task in `pending` state — flags: `--method <METHOD>`, `--parent <ID>`, `--precondition <PRECONDITION>` |
 | `task advance [OPTIONS] <ID>` | Advance the task's subtask pointer |
 | `task done [OPTIONS] <ID>` | Mark a task done once its sensor-gated subtasks have passed |
@@ -320,6 +321,12 @@ underlying issue is resolved (strikes do not grow while halted). `task list` rea
 from the same store (`--format text|json`); `task export` writes
 `plans/tasks.json` as an agent-readable snapshot — libSQL remains the
 source of truth.
+
+On session start or resume, `task context <ID>` projects the current step,
+required sensors, task-scoped freshness and failures, recent traces, and one
+next command into a bounded, read-only result (`--format json` is versioned).
+It never runs a sensor or writes state, and a context packet is not proof that
+the task is complete: the sensor gates still decide.
 
 ## Hooks
 

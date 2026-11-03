@@ -57,6 +57,59 @@ pub async fn list_traces(conn: &Connection, session_id: &str) -> Result<Vec<Trac
     list_traces_page(conn, session_id, None, 0).await
 }
 
+/// Lists the most recent traces owned by `task_id`, newest first.
+///
+/// A trace belongs to a task only through `traces.task_id`; session-scoped
+/// traces that merely mention the task are deliberately not included.
+///
+/// # Errors
+///
+/// Returns an error when the query fails.
+pub async fn list_traces_for_task(
+    conn: &Connection,
+    task_id: i64,
+    limit: Option<u32>,
+) -> Result<Vec<Trace>> {
+    let mut rows = conn
+        .query(
+            "SELECT id, task_id, session_id, command, error_diff, resolution_steps, created_at \
+             FROM traces WHERE task_id = ?1 ORDER BY id DESC LIMIT ?2",
+            params!(task_id, crate::bind_limit(limit)),
+        )
+        .await?;
+    let mut traces = Vec::new();
+    while let Some(row) = rows.next().await? {
+        traces.push(Trace {
+            id: row.get(0)?,
+            task_id: row.get(1)?,
+            session_id: row.get(2)?,
+            command: row.get(3)?,
+            error_diff: row.get(4)?,
+            resolution_steps: row.get(5)?,
+            created_at: row.get(6)?,
+        });
+    }
+    Ok(traces)
+}
+
+/// Counts traces owned by `task_id`.
+///
+/// # Errors
+///
+/// Returns an error when the query fails.
+pub async fn count_traces_for_task(conn: &Connection, task_id: i64) -> Result<i64> {
+    let mut rows = conn
+        .query(
+            "SELECT COUNT(*) FROM traces WHERE task_id = ?1",
+            params!(task_id),
+        )
+        .await?;
+    match rows.next().await? {
+        Some(row) => Ok(row.get(0)?),
+        None => Ok(0),
+    }
+}
+
 /// Lists traces for a session with `LIMIT`/`OFFSET` paging (`limit: None`
 /// returns every row).
 ///

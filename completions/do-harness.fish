@@ -333,23 +333,24 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand init" -s q -l quie
 complete -c do-harness -n "__fish_do_harness_using_subcommand init" -l dry-run -d 'Dry run without side effects'
 complete -c do-harness -n "__fish_do_harness_using_subcommand init" -s h -l help -d 'Print help (see more with \'--help\')'
 complete -c do-harness -n "__fish_do_harness_using_subcommand init" -s V -l version -d 'Print version'
-complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export import list show add advance done fail remove help" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
-complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export import list show add advance done fail remove help" -l config -d 'Explicit path to do-harness.toml' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export import list show add advance done fail remove help" -l output -d 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export import list show add advance done fail remove help" -s q -l quiet -d 'Suppress PASS/WARN verdict lines and the success footer'
-complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export import list show add advance done fail remove help" -l dry-run -d 'Dry run without side effects'
-complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export import list show add advance done fail remove help" -s h -l help -d 'Print help'
-complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export import list show add advance done fail remove help" -s V -l version -d 'Print version'
-complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export import list show add advance done fail remove help" -f -a "export" -d 'Write the task list to plans/tasks.json or specified output'
-complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export import list show add advance done fail remove help" -f -a "import" -d 'Validate plans/tasks.json against the state database'
-complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export import list show add advance done fail remove help" -f -a "list" -d 'Print tasks from the state database'
-complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export import list show add advance done fail remove help" -f -a "show" -d 'Show details for a specific task'
-complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export import list show add advance done fail remove help" -f -a "add" -d 'Add a task in `pending` state'
-complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export import list show add advance done fail remove help" -f -a "advance" -d 'Advance the task\'s subtask pointer'
-complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export import list show add advance done fail remove help" -f -a "done" -d 'Mark a task done once its sensor-gated subtasks have passed'
-complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export import list show add advance done fail remove help" -f -a "fail" -d 'Mark a task failed'
-complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export import list show add advance done fail remove help" -f -a "remove" -d 'Remove or cancel a task'
-complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export import list show add advance done fail remove help" -f -a "help" -d 'Print this message or the help of the given subcommand(s)'
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export import list show context add advance done fail remove help" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export import list show context add advance done fail remove help" -l config -d 'Explicit path to do-harness.toml' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export import list show context add advance done fail remove help" -l output -d 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export import list show context add advance done fail remove help" -s q -l quiet -d 'Suppress PASS/WARN verdict lines and the success footer'
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export import list show context add advance done fail remove help" -l dry-run -d 'Dry run without side effects'
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export import list show context add advance done fail remove help" -s h -l help -d 'Print help'
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export import list show context add advance done fail remove help" -s V -l version -d 'Print version'
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export import list show context add advance done fail remove help" -f -a "export" -d 'Write the task list to plans/tasks.json or specified output'
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export import list show context add advance done fail remove help" -f -a "import" -d 'Validate plans/tasks.json against the state database'
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export import list show context add advance done fail remove help" -f -a "list" -d 'Print tasks from the state database'
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export import list show context add advance done fail remove help" -f -a "show" -d 'Show details for a specific task'
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export import list show context add advance done fail remove help" -f -a "context" -d 'Assemble a bounded, read-only resume context for a task'
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export import list show context add advance done fail remove help" -f -a "add" -d 'Add a task in `pending` state'
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export import list show context add advance done fail remove help" -f -a "advance" -d 'Advance the task\'s subtask pointer'
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export import list show context add advance done fail remove help" -f -a "done" -d 'Mark a task done once its sensor-gated subtasks have passed'
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export import list show context add advance done fail remove help" -f -a "fail" -d 'Mark a task failed'
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export import list show context add advance done fail remove help" -f -a "remove" -d 'Remove or cancel a task'
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and not __fish_seen_subcommand_from export import list show context add advance done fail remove help" -f -a "help" -d 'Print this message or the help of the given subcommand(s)'
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from export" -s o -l output -d 'Output file path or - for stdout' -r -F
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from export" -l format -d 'Output format (json/text)' -r -f -a "text\t'Human-readable text output'
 json\t'Machine-readable JSON output'"
@@ -390,6 +391,16 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_s
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from show" -l dry-run -d 'Dry run without side effects'
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from show" -s h -l help -d 'Print help (see more with \'--help\')'
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from show" -s V -l version -d 'Print version'
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from context" -l format -d 'Output format' -r -f -a "text\t'Human-readable text output'
+json\t'Machine-readable JSON output'"
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from context" -l max-bytes -d 'Maximum rendered bytes; task identity and the next action always survive, so a very small budget is a floor, not a truncation' -r
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from context" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from context" -l config -d 'Explicit path to do-harness.toml' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from context" -l output -d 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from context" -s q -l quiet -d 'Suppress PASS/WARN verdict lines and the success footer'
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from context" -l dry-run -d 'Dry run without side effects'
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from context" -s h -l help -d 'Print help (see more with \'--help\')'
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from context" -s V -l version -d 'Print version'
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from add" -l method -d 'Name of HTN method defined in plans/methods.json' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from add" -l parent -d 'Parent task id' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from add" -l precondition -d 'Recorded precondition guard' -r
@@ -432,6 +443,7 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_s
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from help" -f -a "import" -d 'Validate plans/tasks.json against the state database'
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from help" -f -a "list" -d 'Print tasks from the state database'
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from help" -f -a "show" -d 'Show details for a specific task'
+complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from help" -f -a "context" -d 'Assemble a bounded, read-only resume context for a task'
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from help" -f -a "add" -d 'Add a task in `pending` state'
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from help" -f -a "advance" -d 'Advance the task\'s subtask pointer'
 complete -c do-harness -n "__fish_do_harness_using_subcommand task; and __fish_seen_subcommand_from help" -f -a "done" -d 'Mark a task done once its sensor-gated subtasks have passed'
@@ -854,6 +866,7 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand help; and __fish_s
 complete -c do-harness -n "__fish_do_harness_using_subcommand help; and __fish_seen_subcommand_from task" -f -a "import" -d 'Validate plans/tasks.json against the state database'
 complete -c do-harness -n "__fish_do_harness_using_subcommand help; and __fish_seen_subcommand_from task" -f -a "list" -d 'Print tasks from the state database'
 complete -c do-harness -n "__fish_do_harness_using_subcommand help; and __fish_seen_subcommand_from task" -f -a "show" -d 'Show details for a specific task'
+complete -c do-harness -n "__fish_do_harness_using_subcommand help; and __fish_seen_subcommand_from task" -f -a "context" -d 'Assemble a bounded, read-only resume context for a task'
 complete -c do-harness -n "__fish_do_harness_using_subcommand help; and __fish_seen_subcommand_from task" -f -a "add" -d 'Add a task in `pending` state'
 complete -c do-harness -n "__fish_do_harness_using_subcommand help; and __fish_seen_subcommand_from task" -f -a "advance" -d 'Advance the task\'s subtask pointer'
 complete -c do-harness -n "__fish_do_harness_using_subcommand help; and __fish_seen_subcommand_from task" -f -a "done" -d 'Mark a task done once its sensor-gated subtasks have passed'
