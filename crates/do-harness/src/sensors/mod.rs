@@ -229,6 +229,7 @@ pub fn verify_selection<'a>(
             ok: false,
             root: root.display().to_string(),
             failed: vec![],
+            unrunnable: vec![],
             sensors: results,
             signal_set,
             selection: selection_report(selection),
