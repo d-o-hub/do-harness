@@ -300,3 +300,52 @@ fn test_tiny_diff_prefers_raw_form() {
     assert_eq!(req.len(), 1);
     assert!(req[0].as_str().unwrap().starts_with("README.md"));
 }
+
+/// A proven no-tree-effect merge keeps its classification but sends no diff to
+/// the agent view: there is nothing a review could change.
+#[test]
+fn test_proven_no_tree_effect_omits_the_payload() {
+    let dir = tempfile::tempdir().unwrap();
+    init_repo(dir.path());
+    commit_file(dir.path(), "a.txt", "old\n", "base");
+    git(dir.path(), &["switch", "-q", "-c", "feature"]);
+    commit_file(dir.path(), "a.txt", "new\n", "feature change");
+    git(dir.path(), &["switch", "-q", "main"]);
+    commit_file(dir.path(), "a.txt", "new\n", "same change upstream");
+
+    let envelope = review_agent(dir.path(), &[]);
+    assert_eq!(
+        envelope["merge_impact"]["verdict"],
+        serde_json::json!("NO_TREE_EFFECT"),
+        "{envelope}"
+    );
+    assert!(
+        envelope["merge_impact"]["base_sha"].is_string(),
+        "{envelope}"
+    );
+    assert_eq!(
+        envelope["review_required_units"],
+        serde_json::json!([]),
+        "a no-tree-effect merge must not send residual content: {envelope}"
+    );
+    let units_empty = envelope
+        .get("units")
+        .and_then(Value::as_array)
+        .is_none_or(Vec::is_empty);
+    let diff_empty = envelope
+        .get("raw_diff")
+        .and_then(Value::as_str)
+        .is_none_or(str::is_empty);
+    assert!(
+        units_empty && diff_empty,
+        "payload was not omitted: {envelope}"
+    );
+    // Deterministic input reduction: the empty payload is smaller than the
+    // audit report that still carries the merge-base diff.
+    let measurement = &envelope["measurement"];
+    assert!(
+        measurement["emitted_bytes"].as_u64().unwrap()
+            < measurement["audit_bytes"].as_u64().unwrap(),
+        "no-tree-effect payload did not reduce review input: {measurement}"
+    );
+}

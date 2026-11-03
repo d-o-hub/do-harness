@@ -1215,25 +1215,47 @@ Deterministic, read-only PR analysis: every subcommand works in any git reposito
 | `--head <REV>` | no | — | — | Head revision (local mode; requires --base) |
 | `--format <FORMAT>` | no | `text` | `text`, `json` | Output format |
 <!-- END GENERATED: cli-contract pr no-effect -->
-Report whether a pull request or revision range introduces any effective change,
-using the merge-base tree delta. Read-only; works in any git repository without
-harness initialization.
+Report two distinct measurements for a pull request or revision range. Read-only;
+works in any git repository without harness initialization.
+
+- `effective_change` (historical branch change, `method: "git"`): whether the
+  merge-base..head diff is nonempty. This is what the branch changed since it
+  forked; it is not proof that merging would change the target.
+- `merge_impact` (prospective): the verdict from `git merge-tree --write-tree`,
+  which models the clean merge of the head into the *current* base without
+  touching the worktree, index, branches, or checkout. `NO_TREE_EFFECT` means
+  the merge result tree equals the base tree, `TREE_EFFECT` means it differs,
+  and `UNKNOWN` means no clean merge could be modelled (conflict, unresolved
+  revision, Git older than 2.38). The report carries the resolved `base_sha`
+  and `head_sha`, `result_tree`, `evidence`, `method`, warnings, and a `reason`
+  for `UNKNOWN`.
+
+`closure_recommendation` is `true` only for `NO_TREE_EFFECT` on a verified
+base. `UNKNOWN`, an unverified base, and an API file-count of zero without merge
+proof never recommend closure; an unverifiable PR base is downgraded to
+`UNKNOWN` rather than reported as `NO_TREE_EFFECT`. The command itself never closes,
+comments on, or merges a pull request; that remains a separately authorized
+action. Tree no-effect is also not semantic equivalence and not proof that a
+PR discussion or audit trail lacks value.
 
 - `<PR>`: Pull request number; base and head are resolved through `gh`.
 - `--base <REV> --head <REV>`: Local mode without GitHub.
 - `--format <Format>`: Output format (`text` or `json`).
 
-In PR mode the base is the *remote* branch, so `origin/<base>` is preferred
-whenever that ref exists and a same-named local branch is only the fallback: a
-local `main` that lags behind the remote would otherwise report already-merged
-upstream commits as this PR's change. The verdict is the tree delta between
-`merge-base(origin/<base>, <head>)` and `<head>`; when the clone cannot resolve
-those revisions it falls back to the compare API and reports
-`"method": "compare-api"` instead of `"git"`.
+In PR mode the current base is verified against GitHub's `baseRefOid`. When that
+commit is known but absent locally, the verdict is `UNKNOWN` with a
+`git fetch origin <base>` remediation; a stale `origin/<base>` is never
+substituted for a known current base, and it is used only as a labelled fallback
+when GitHub supplies no OID (`base_verified: false`). The clone must also
+resolve the head for merge-impact analysis; the older compare-API file count
+only feeds the historical `effective_change` field with
+`"method": "compare-api"` and can never recommend closure.
 
-Exit `0` when the verdict is determined (whether `no-effect` or `has-effect`),
-`1` when it cannot be determined, and `2` for invalid arguments. An analysis
-error is never reported as `no-effect`.
+The JSON contract is `schema_version: 2`; version 1 carried only
+`effective_change` and `method`, which keep their original meaning. Exit `0`
+when an analysis was produced (including an `UNKNOWN` merge-impact verdict),
+`1` when the analysis itself cannot run, and `2` for invalid arguments. An
+analysis error is never reported as `no-effect`.
 
 ### `pr review`
 <!-- BEGIN GENERATED: cli-contract pr review -->
@@ -1253,6 +1275,14 @@ hunks (units) that evidence could not prove or exempt, with minimal context,
 plus the audit list of policy-exempt units (`exempt`), proven units (`skipped`),
 and any untrusted `false_proven` claims. Works in any git repository without
 harness initialization.
+
+The report also carries `merge_impact`, computed against the current base with
+`git merge-tree --write-tree` (report schema version 5). It is a pre-model gate,
+never a model call: when the verdict is `NO_TREE_EFFECT`, the agent view omits
+the residual payload entirely while keeping the verdict, base/head SHAs, method,
+and evidence in the envelope, so a proven redundant PR costs no review tokens.
+`UNKNOWN` never omits content. The gate does not change policy-exempt or
+review-required semantics and never closes a pull request.
 
 Proof and exemption rules are driven by `.github/pr-gate.toml`, read **at the
 merge-base revision only** (never the PR head):
@@ -1287,7 +1317,9 @@ nothing and adds a warning.
   view, JSON output emits a compact envelope that carries review-required units
   and exemption identities while omitting full lines for exempt and skipped
   changes; it compares the structured residual with an equivalently enveloped
-  raw-diff representation and selects the smaller complete payload.
+  raw-diff representation and selects the smaller complete payload. A
+  `NO_TREE_EFFECT` merge emits an empty review-required payload with the
+  classification retained.
 - `--format <Format>`: Output format (`text` or `json`).
 
 Exit `0` when a report is produced (even with a full residual), `1` when the

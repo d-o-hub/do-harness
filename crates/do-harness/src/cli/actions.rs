@@ -105,7 +105,7 @@ pub enum TaskAction {
 /// Available deterministic PR analysis actions.
 #[derive(Debug, Subcommand)]
 pub enum PrAction {
-    /// Report whether a PR or revision range introduces any effective change.
+    /// Report the prospective merge impact of a PR or revision range.
     NoEffect {
         /// Pull request number; resolves base and head through `gh`.
         #[arg(value_name = "PR", conflicts_with_all = ["base", "head"])]

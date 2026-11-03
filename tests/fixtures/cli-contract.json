@@ -639,7 +639,7 @@
     },
     {
       "path": "pr no-effect",
-      "about": "Report whether a PR or revision range introduces any effective change",
+      "about": "Report the prospective merge impact of a PR or revision range",
       "usage": "do-harness pr no-effect [OPTIONS] [PR]",
       "aliases": [],
       "args": [

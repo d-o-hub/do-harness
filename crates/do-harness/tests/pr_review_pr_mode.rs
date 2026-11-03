@@ -57,19 +57,20 @@ fn json(output: &std::process::Output) -> Value {
     serde_json::from_slice(&output.stdout).expect("json report")
 }
 
-/// Writes a fake `gh` that reports `head` as PR 7's head and `main` as its base.
+/// Writes a fake `gh` that reports `head`/`base_oid` as PR 7's head/base and
+/// `main` as its base branch.
 ///
 /// Returns the directory to prepend to `PATH`; nothing in these fixtures talks
 /// to `GitHub`.
 #[cfg(unix)]
-fn fake_gh(dir: &Path, head: &str) -> std::path::PathBuf {
+fn fake_gh(dir: &Path, head: &str, base_oid: &str) -> std::path::PathBuf {
     let bin = dir.join("bin");
     std::fs::create_dir_all(&bin).unwrap();
     let script = bin.join("gh");
     std::fs::write(
         &script,
         format!(
-            "#!/bin/sh\nprintf '%s' '{{\"number\":7,\"baseRefName\":\"main\",\"headRefOid\":\"{head}\"}}'\n"
+            "#!/bin/sh\nprintf '%s' '{{\"number\":7,\"baseRefName\":\"main\",\"baseRefOid\":\"{base_oid}\",\"headRefOid\":\"{head}\"}}'\n"
         ),
     )
     .unwrap();
@@ -132,7 +133,7 @@ fn pr_mode_prefers_the_remote_base_over_a_stale_local_branch() {
     let head = rev(root, "HEAD");
     // `HEAD~2` is the commit *before* the already-merged one.
     git(root, &["branch", "-q", "-f", "main", "HEAD~2"]);
-    let bin = fake_gh(root, &head);
+    let bin = fake_gh(root, &head, &remote_sha);
 
     let report = json(&pr_mode(
         root,
@@ -158,6 +159,15 @@ fn pr_mode_prefers_the_remote_base_over_a_stale_local_branch() {
             .any(|unit| unit["path"] == serde_json::json!("feature.txt")),
         "the PR's own change must stay in the review: {residual:?}"
     );
+    assert_eq!(
+        report["merge_impact"]["verdict"],
+        serde_json::json!("TREE_EFFECT"),
+        "the PR adds a file the current base lacks: {report}"
+    );
+    assert_eq!(
+        report["merge_impact"]["base_verified"],
+        serde_json::json!(true)
+    );
 }
 
 /// The same base resolution feeds the no-effect gate: a PR whose head already is
@@ -178,7 +188,7 @@ fn pr_mode_no_effect_uses_the_remote_base() {
         &["update-ref", "refs/remotes/origin/main", &remote_sha],
     );
     git(root, &["reset", "-q", "--hard", "HEAD~1"]);
-    let bin = fake_gh(root, &remote_sha);
+    let bin = fake_gh(root, &remote_sha, &remote_sha);
 
     let report = json(&pr_mode(
         root,
@@ -190,4 +200,10 @@ fn pr_mode_no_effect_uses_the_remote_base() {
         serde_json::json!(false),
         "head already equals the remote base: {report}"
     );
+    assert_eq!(
+        report["merge_impact"]["verdict"],
+        serde_json::json!("NO_TREE_EFFECT"),
+        "{report}"
+    );
+    assert_eq!(report["closure_recommendation"], serde_json::json!(true));
 }
