@@ -324,7 +324,9 @@ source of truth.
 - **commit-msg**: runs `scripts/check-commitlint.sh --message` against the prepared message (fail-closed: blocks the commit when the repo or script is missing)
 - **pre-push**: runs the full `verify` suite
 
-Managed hooks carry a marker identifying them as do-harness-owned; re-running `hook install` overwrites them, and `--force` overwrites any pre-existing hook at the same path. `hook uninstall` removes only managed hooks. `hook status` reports which hooks are present and whether they are managed.
+Managed hooks carry a marker identifying them as do-harness-owned; re-running `hook install` overwrites them, and `--force` overwrites any pre-existing hook at the same path. `hook uninstall` removes only managed hooks. `hook status` reports which hooks are present and who owns them.
+
+A repository that delegates its hooks is reported, not warned about: when an executable hook file carries the pre-commit wrapper, or `.pre-commit-config.yaml` declares pre-commit as the owner, `doctor` and `hook status` report `delegated to pre-commit`, and `doctor --strict` accepts the delegation. A foreign hook under a configured `core.hooksPath` is reported as delegated to that directory. Absent hooks, and foreign hooks with no owner to attribute them to — including an empty or non-executable hook file, which git never runs — still fail `--strict`. Without `--force`, `hook install` refuses to overwrite a delegated wrapper and names the manager it would replace.
 
 Alternative for users of the pre-commit framework: this repo ships
 `.pre-commit-config.yaml` with a `local` hook (`language: system`) that builds
