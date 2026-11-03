@@ -65,7 +65,8 @@ test('stale, red, and missing steer with computational messages', async () => {
   assert.match(agent.steered[2].content[0].text, /No current verification evidence/)
   for (const message of agent.steered) {
     assert.equal(message.role, 'user')
-    assert.equal(message.source.kind, 'plugin')
+    // Session format v4 refuses the retired `plugin` wrapper.
+    assert.equal(message.source.kind, 'do-harness')
   }
 })
 

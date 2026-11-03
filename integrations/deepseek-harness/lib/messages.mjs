@@ -5,14 +5,21 @@
 
 let sequence = 0
 
-/** Builds a plugin-sourced user message carried by `agent.steer`. */
+/**
+ * Builds a producer-owned user message carried by `agent.steer`.
+ *
+ * Session format v4 refuses the retired `{ kind: 'plugin', plugin: ... }`
+ * wrapper, so the gate must name its own producer kind directly: on a real
+ * host the old shape made every steer throw and turned the stop boundary into
+ * an agent error.
+ */
 export function userMessage(text) {
   sequence += 1
   return {
     id: `do-harness-${Date.now()}-${sequence}`,
     role: 'user',
     content: [{ type: 'text', text }],
-    source: { kind: 'plugin', plugin: 'do-harness' },
+    source: { kind: 'do-harness' },
   }
 }
 
