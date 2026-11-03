@@ -11,7 +11,8 @@ pub(super) fn print_agent_review(report: &ReviewReport, envelope: &AgentReviewEn
         Representation::RawDiff => "raw_diff",
     };
     println!(
-        "view agent ({rep}): review_required={} exempt={} skipped={} ({} bytes, ratio {:.3})",
+        "view agent ({rep}): merge-impact {} review_required={} exempt={} skipped={} ({} bytes, ratio {:.3})",
+        report.merge_impact.verdict,
         envelope.review_required_units.len(),
         envelope.exempt_count,
         envelope.skipped_count,
@@ -35,6 +36,16 @@ pub(super) fn print_review(report: &ReviewReport) {
         ),
     }
     println!("merge-base {} head {}", report.merge_base, report.head);
+    println!(
+        "merge-impact {} (base {} head {}, {})",
+        report.merge_impact.verdict,
+        report.merge_impact.base_sha.as_deref().unwrap_or("-"),
+        report.merge_impact.head_sha.as_deref().unwrap_or("-"),
+        report.merge_impact.method
+    );
+    if let Some(reason) = &report.merge_impact.reason {
+        println!("  merge-impact reason: {reason}");
+    }
     println!(
         "residual: {} unit(s), exempt: {} unit(s), skipped: {} unit(s)",
         report.residual.len(),

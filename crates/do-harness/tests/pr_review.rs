@@ -72,6 +72,10 @@ fn range_review_lists_residual_units_and_serves_cache() {
     let report = json(&review(dir.path(), &["--format", "json"]));
     assert_eq!(report["mode"], serde_json::json!("range"));
     assert_eq!(report["cached"], serde_json::json!(false));
+    assert_eq!(
+        report["merge_impact"]["verdict"],
+        serde_json::json!("TREE_EFFECT")
+    );
     assert_eq!(report["policy"]["present"], serde_json::json!(false));
     assert_eq!(report["exempt"].as_array().unwrap().len(), 0);
     assert_eq!(report["skipped"].as_array().unwrap().len(), 0);
@@ -112,6 +116,10 @@ fn no_effect_range_reports_empty_residual() {
     let report = json(&review(dir.path(), &["--format", "json"]));
     assert_eq!(report["residual"].as_array().unwrap().len(), 0);
     assert_eq!(report["warnings"].as_array().unwrap().len(), 0);
+    assert_eq!(
+        report["merge_impact"]["verdict"],
+        serde_json::json!("NO_TREE_EFFECT")
+    );
 }
 
 #[test]

@@ -213,7 +213,7 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
             [CompletionResult]::new('-V', '-V ', [CompletionResultType]::ParameterName, 'Print version')
             [CompletionResult]::new('--version', '--version', [CompletionResultType]::ParameterName, 'Print version')
-            [CompletionResult]::new('no-effect', 'no-effect', [CompletionResultType]::ParameterValue, 'Report whether a PR or revision range introduces any effective change')
+            [CompletionResult]::new('no-effect', 'no-effect', [CompletionResultType]::ParameterValue, 'Report the prospective merge impact of a PR or revision range')
             [CompletionResult]::new('review', 'review', [CompletionResultType]::ParameterValue, 'Emit the semantic residual: changed units evidence could not prove')
             [CompletionResult]::new('ready', 'ready', [CompletionResultType]::ParameterValue, 'Check whether a pull request is ready to merge: merge state, CI checks, and review conversations')
             [CompletionResult]::new('readiness', 'readiness', [CompletionResultType]::ParameterValue, 'Check whether a pull request is ready to merge: merge state, CI checks, and review conversations')
@@ -319,7 +319,7 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             break
         }
         'do-harness;pr;help' {
-            [CompletionResult]::new('no-effect', 'no-effect', [CompletionResultType]::ParameterValue, 'Report whether a PR or revision range introduces any effective change')
+            [CompletionResult]::new('no-effect', 'no-effect', [CompletionResultType]::ParameterValue, 'Report the prospective merge impact of a PR or revision range')
             [CompletionResult]::new('review', 'review', [CompletionResultType]::ParameterValue, 'Emit the semantic residual: changed units evidence could not prove')
             [CompletionResult]::new('ready', 'ready', [CompletionResultType]::ParameterValue, 'Check whether a pull request is ready to merge: merge state, CI checks, and review conversations')
             [CompletionResult]::new('waivers', 'waivers', [CompletionResultType]::ParameterValue, 'Classify patch-coverage residue: waivable classes and lines needing tests')
@@ -1340,7 +1340,7 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             break
         }
         'do-harness;help;pr' {
-            [CompletionResult]::new('no-effect', 'no-effect', [CompletionResultType]::ParameterValue, 'Report whether a PR or revision range introduces any effective change')
+            [CompletionResult]::new('no-effect', 'no-effect', [CompletionResultType]::ParameterValue, 'Report the prospective merge impact of a PR or revision range')
             [CompletionResult]::new('review', 'review', [CompletionResultType]::ParameterValue, 'Emit the semantic residual: changed units evidence could not prove')
             [CompletionResult]::new('ready', 'ready', [CompletionResultType]::ParameterValue, 'Check whether a pull request is ready to merge: merge state, CI checks, and review conversations')
             [CompletionResult]::new('waivers', 'waivers', [CompletionResultType]::ParameterValue, 'Classify patch-coverage residue: waivable classes and lines needing tests')

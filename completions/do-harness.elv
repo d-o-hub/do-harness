@@ -202,7 +202,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand --help 'Print help'
             cand -V 'Print version'
             cand --version 'Print version'
-            cand no-effect 'Report whether a PR or revision range introduces any effective change'
+            cand no-effect 'Report the prospective merge impact of a PR or revision range'
             cand review 'Emit the semantic residual: changed units evidence could not prove'
             cand ready 'Check whether a pull request is ready to merge: merge state, CI checks, and review conversations'
             cand readiness 'Check whether a pull request is ready to merge: merge state, CI checks, and review conversations'
@@ -301,7 +301,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand --version 'Print version'
         }
         &'do-harness;pr;help'= {
-            cand no-effect 'Report whether a PR or revision range introduces any effective change'
+            cand no-effect 'Report the prospective merge impact of a PR or revision range'
             cand review 'Emit the semantic residual: changed units evidence could not prove'
             cand ready 'Check whether a pull request is ready to merge: merge state, CI checks, and review conversations'
             cand waivers 'Classify patch-coverage residue: waivable classes and lines needing tests'
@@ -1221,7 +1221,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
         &'do-harness;help;status'= {
         }
         &'do-harness;help;pr'= {
-            cand no-effect 'Report whether a PR or revision range introduces any effective change'
+            cand no-effect 'Report the prospective merge impact of a PR or revision range'
             cand review 'Emit the semantic residual: changed units evidence could not prove'
             cand ready 'Check whether a pull request is ready to merge: merge state, CI checks, and review conversations'
             cand waivers 'Classify patch-coverage residue: waivable classes and lines needing tests'

@@ -20,6 +20,8 @@ pub struct CacheKey {
     pub schema_version: u32,
     /// Merge-base commit, or the base ref when no merge base is available.
     pub merge_base: String,
+    /// Current base tip commit; merge impact changes when it moves.
+    pub base_sha: String,
     /// Resolved head commit.
     pub head_sha: String,
     /// Policy fingerprint (hex sha256); `none` when the policy is absent.
@@ -55,8 +57,8 @@ pub fn store<T: Serialize>(root: &Path, key: &CacheKey, value: &T) -> Result<()>
 fn entry_path(root: &Path, key: &CacheKey) -> Result<PathBuf> {
     let dir = git_dir(root)?.join("do-harness").join("pr-review");
     Ok(dir.join(format!(
-        "v{}-{}-{}-{}.json",
-        key.schema_version, key.merge_base, key.head_sha, key.policy_sha256
+        "v{}-{}-{}-{}-{}.json",
+        key.schema_version, key.merge_base, key.base_sha, key.head_sha, key.policy_sha256
     )))
 }
 
@@ -86,6 +88,7 @@ mod tests {
         CacheKey {
             schema_version: 1,
             merge_base: "mb".to_owned(),
+            base_sha: "bs".to_owned(),
             head_sha: head.to_owned(),
             policy_sha256: "none".to_owned(),
         }

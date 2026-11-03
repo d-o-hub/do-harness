@@ -18,6 +18,9 @@ pub struct PrView {
     /// Base branch name.
     #[serde(rename = "baseRefName")]
     pub base_ref_name: String,
+    /// Current base branch commit SHA, when `GitHub` reports one.
+    #[serde(rename = "baseRefOid", default)]
+    pub base_ref_oid: String,
     /// Current head commit SHA.
     #[serde(rename = "headRefOid")]
     pub head_ref_oid: String,
@@ -38,7 +41,7 @@ pub fn view(root: &Path, number: u64) -> Result<PrView> {
             "view",
             &number_arg,
             "--json",
-            "number,baseRefName,headRefOid",
+            "number,baseRefName,baseRefOid,headRefOid",
         ],
         &format!("pr view {number}"),
     )
