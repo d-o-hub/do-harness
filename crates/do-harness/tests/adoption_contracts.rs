@@ -282,9 +282,10 @@ argv = ["definitely_nonexistent_tool_12345"]
     // Local advisory run (execfail is caught as an error signature)
     let (code, stdout, stderr) =
         run(harness(root).args(["verify", "--set", "verification", "--format", "json"]));
+    // The sensor never started, so the run could not be judged: exit 2, not 1.
     assert_eq!(
         code,
-        Some(1),
+        Some(2),
         "non-existent tool must fail verify: stdout={stdout} stderr={stderr}"
     );
 
@@ -295,7 +296,7 @@ argv = ["definitely_nonexistent_tool_12345"]
     let (code, stdout, stderr) = run(&mut cmd);
     assert_eq!(
         code,
-        Some(1),
+        Some(2),
         "missing tool under DO_HARNESS_REQUIRE_TOOLS=1 must fail: stdout={stdout} stderr={stderr}"
     );
 }

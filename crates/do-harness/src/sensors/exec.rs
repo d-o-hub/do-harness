@@ -208,13 +208,16 @@ pub(crate) fn run_sensor_attempt(
 ) -> SensorResult {
     let start = Instant::now();
     let Some((program, rest)) = spec.argv.split_first() else {
-        return sensor_result(
+        let mut result = sensor_result(
             spec,
             false,
             None,
             0,
             format!("sensor '{}' has an empty argv", spec.name),
         );
+        result.execution = crate::report::Execution::NotRun;
+        result.details.reason = Some(crate::report::FailureReason::Spawn);
+        return result;
     };
     let child = match spawn_sensor(spec, root, program, rest, start) {
         Ok(child) => child,
@@ -301,8 +304,8 @@ pub(crate) fn run_sensor(
 ///
 /// The command could still exit 0 (an interpreter that ignores a missing
 /// script, a wrapper that swallows the error), so the harness refuses to
-/// record a pass over an unmeasured tree. The result is `NotRun`: no process
-/// was spawned.
+/// record a pass over an unmeasured tree. The result is `NotRun` with
+/// [`crate::report::FailureReason::Spawn`]: no process was spawned.
 fn missing_argv_path_result(spec: &SensorSpec, root: &Path) -> Option<SensorResult> {
     let missing = crate::argv_paths::missing_paths(root, spec);
     if missing.is_empty() {
@@ -320,6 +323,7 @@ fn missing_argv_path_result(spec: &SensorSpec, root: &Path) -> Option<SensorResu
         ),
     );
     result.execution = crate::report::Execution::NotRun;
+    result.details.reason = Some(crate::report::FailureReason::Spawn);
     Some(result)
 }
 
