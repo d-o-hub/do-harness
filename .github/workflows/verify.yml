@@ -400,7 +400,7 @@ jobs:
 
   windows:
     runs-on: windows-latest
-    timeout-minutes: 40
+    timeout-minutes: 30
     steps:
       # actions/checkout@v7.0.1
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -447,12 +447,7 @@ jobs:
         # job's full 30-minute budget with no output. `nextest` runs each test
         # in an isolated process to prevent libSQL/SQLite multithreaded teardown
         # access violations (0xc0000005) on Windows MSVC.
-        #
-        # The bound is a hang detector, not a performance target: the suite
-        # reached test 750 of 1125 when 12 minutes expired, so the budget now
-        # covers the whole run with headroom for a slow runner. The job budget
-        # rises with it so the remaining steps still have room.
-        timeout-minutes: 20
+        timeout-minutes: 12
         run: cargo nextest run --workspace --release --exclude do-harness-db
       - name: Test do-harness-db on Windows
         # The db tests each open their own temporary libSQL database. On
