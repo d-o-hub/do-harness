@@ -109,6 +109,7 @@ fn status_text(root: &Path, set: &str) -> (Option<i32>, String, String) {
 }
 
 /// Waits until `status` reports the set as running, asserting the exit code.
+#[cfg(unix)]
 fn wait_until_running(root: &Path, set: &str) -> Value {
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(20);
     loop {
