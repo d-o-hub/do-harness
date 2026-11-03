@@ -24,7 +24,7 @@ mediates tool calls. This model covers its HTTP surface and audit log.
 
 | Threat | Mitigation | Evidence |
 |---|---|---|
-| SSRF to cloud metadata | Link-local/metadata hosts are always rejected; loopback/private need `allow_private_upstreams`; optional exact-host allowlist | `validate_upstream` in `crates/guardian-proxy/src/proxy.rs` |
+| SSRF to cloud metadata | Link-local, cloud-metadata aliases, and RFC 6598 shared-address space (`100.64.0.0/10`, which hosts Alibaba Cloud metadata at `100.100.100.200`) are always rejected, whatever the opt-in; loopback/private need `allow_private_upstreams`; optional exact-host allowlist | `is_always_denied` in `crates/guardian-proxy/src/proxy.rs` |
 | Fail-open on mediation error | Only an explicit `Allow` is forwarded; policy/runtime errors map to 403 | `tool_call_handler`, `ProxyMediator::decide` |
 | Unauthenticated ingress (any local process, or a port-forwarded client) | Optional `ingress_token` bearer check applied by one layer to the mediation routes before mediation, audit, and the `rmcp` transport | `require_ingress_auth`, `AppState::ingress_authorized`, `server/tests/auth.rs` |
 | Governance unavailability hidden | Mediator init failure serves a degraded router: `/health` 503, all calls denied | `AppState::degraded`, `create_router_degraded` |

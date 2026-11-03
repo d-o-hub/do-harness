@@ -58,6 +58,52 @@ fn test_ssrf_denies_ipv4_mapped_ipv6_metadata() {
     assert!(err.contains("link-local"), "{err}");
 }
 
+/// RFC 6598 shared-address space (`100.64.0.0/10`) is not publicly routable and
+/// Alibaba Cloud serves instance metadata at `100.100.100.200` inside it, so it
+/// must be denied unconditionally — not left to the private opt-in.
+#[test]
+fn test_ssrf_denies_shared_address_metadata_always() {
+    let mut cfg = test_config();
+    cfg.upstream = "http://100.100.100.200/latest/meta-data".into();
+    // The strongest opt-in must not re-open it.
+    cfg.allow_private_upstreams = true;
+    cfg.upstream_allowlist = vec!["100.100.100.200".into()];
+    let err = validate_upstream(&cfg).unwrap_err().to_string();
+    assert!(err.contains("always denied"), "{err}");
+}
+
+/// The whole `100.64.0.0/10` block is denied, and its neighbours are not: the
+/// check is the /10 boundary, not a `100.` prefix.
+#[test]
+fn test_ssrf_shared_address_range_boundaries() {
+    for denied in ["100.64.0.1", "100.100.100.200", "100.127.255.254"] {
+        let mut cfg = test_config();
+        cfg.upstream = format!("http://{denied}/");
+        assert!(
+            validate_upstream(&cfg).is_err(),
+            "{denied} is inside 100.64.0.0/10 and must be denied"
+        );
+    }
+    for allowed in ["100.63.255.255", "100.128.0.1"] {
+        let mut cfg = test_config();
+        cfg.upstream = format!("http://{allowed}/");
+        assert!(
+            validate_upstream(&cfg).is_ok(),
+            "{allowed} is outside 100.64.0.0/10 and must stay usable"
+        );
+    }
+}
+
+/// The WHATWG IPv4 spellings fold to a dotted quad before the range check, so a
+/// hex-encoded shared address cannot slip past a textual test.
+#[test]
+fn test_ssrf_denies_hex_encoded_shared_address() {
+    let mut cfg = test_config();
+    cfg.upstream = "http://0x64400001/".into();
+    let err = validate_upstream(&cfg).unwrap_err().to_string();
+    assert!(err.contains("always denied"), "{err}");
+}
+
 #[test]
 fn test_ssrf_requires_opt_in_for_ipv4_mapped_loopback() {
     let mut cfg = test_config();
