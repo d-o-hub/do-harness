@@ -60,7 +60,9 @@ fn held_marker_lock_reports_running() {
         .write(true)
         .open(&lock)
         .unwrap();
-    held.lock_shared().unwrap();
+    // Fully qualified: `File::lock_shared` is newer than the MSRV, and the
+    // inherent method would shadow the fs2 trait.
+    fs2::FileExt::lock_shared(&held).unwrap();
 
     let (code, doc) = status(&root);
     assert_eq!(code, Some(3), "a held marker must be running: {doc}");
@@ -73,7 +75,7 @@ fn held_marker_lock_reports_running() {
         "running metadata must name the set: {doc}"
     );
 
-    held.unlock().unwrap();
+    fs2::FileExt::unlock(&held).unwrap();
 }
 
 /// A marker left by a run that died holds no lock; status must not report
