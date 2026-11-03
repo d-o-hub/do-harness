@@ -1,0 +1,185 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Completion integration conformance v1",
+  "description": "Result of driving the completion-gating lifecycle through one version-pinned real client and observing what the host actually did.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "claim",
+    "test_suite_version",
+    "client",
+    "adapter",
+    "harness",
+    "environment",
+    "scenarios",
+    "terminal_result",
+    "verdict",
+    "coverage_limitations",
+    "timestamp"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "claim": {
+      "const": "completion-gating"
+    },
+    "test_suite_version": {
+      "const": "1"
+    },
+    "client": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "version": {
+          "type": "string",
+          "maxLength": 100
+        }
+      }
+    },
+    "adapter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version", "content_digest"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "version": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "content_digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      }
+    },
+    "harness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "evidence_schema"],
+      "properties": {
+        "version": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "evidence_schema": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["node", "turns", "model"],
+      "properties": {
+        "node": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "turns": {
+          "const": "scripted"
+        },
+        "model": {
+          "const": "synthetic"
+        }
+      }
+    },
+    "scenarios": {
+      "type": "array",
+      "minItems": 9,
+      "maxItems": 9,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "expected_terminal",
+          "observed_terminal",
+          "continuations",
+          "evidence_green_at_close",
+          "outcome",
+          "reason"
+        ],
+        "properties": {
+          "id": {
+            "enum": [
+              "fresh-pass",
+              "green-then-edit",
+              "repair-and-reverify",
+              "failing-sensor",
+              "missing-or-malformed-evidence",
+              "infrastructure-error",
+              "retry-exhaustion",
+              "plugin-load-failure",
+              "user-cancellation"
+            ]
+          },
+          "expected_terminal": {
+            "enum": ["verified", "blocked", "cancelled", "unsupported"]
+          },
+          "observed_terminal": {
+            "enum": ["verified", "blocked", "cancelled", "unsupported"]
+          },
+          "continuations": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "evidence_green_at_close": {
+            "type": "boolean"
+          },
+          "outcome": {
+            "enum": ["pass", "fail", "unknown"]
+          },
+          "reason": {
+            "enum": [
+              "completion-accepted",
+              "completion-withheld",
+              "blocked-outcome-absent",
+              "continuation-exhausted",
+              "stale-evidence",
+              "red-evidence",
+              "missing-evidence",
+              "malformed-evidence",
+              "infrastructure-error",
+              "plugin-load-failure",
+              "stop-integration-missing",
+              "user-cancelled",
+              "unsupported-host",
+              "adapter-failed",
+              "timeout",
+              "not-exercised"
+            ]
+          }
+        }
+      }
+    },
+    "terminal_result": {
+      "enum": ["verified", "blocked", "cancelled", "unsupported"]
+    },
+    "verdict": {
+      "enum": ["pass", "fail", "unknown"]
+    },
+    "coverage_limitations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "maxLength": 300
+      }
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

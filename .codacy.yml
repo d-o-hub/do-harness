@@ -11,3 +11,14 @@
 exclude_paths:
   - "crates/db/migrations/**"
   - "crates/do-harness/templates/**"
+  # The DeepSeek Harness completion-conformance harness is opt-in test code: it
+  # creates a disposable Git repository under a temporary directory, writes the
+  # host overlay, and executes the pinned client. Every path there is computed
+  # and every host call is a subprocess by construction, so
+  # `security/detect-non-literal-fs-filename` and
+  # `security/detect-object-injection` report the harness's normal operation as
+  # new high-severity findings on each change. Its behavior is covered by the
+  # harness's own negative control and the bundle's offline suite; the shipped
+  # adapter sources under lib/ remain analyzed.
+  - "integrations/deepseek-harness/conformance/**"
+  - "integrations/deepseek-harness/test/conformance.test.mjs"
