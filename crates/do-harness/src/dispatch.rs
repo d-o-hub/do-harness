@@ -155,6 +155,7 @@ async fn route(root: &Path, config_path: Option<PathBuf>, cli: Cli) -> Result<()
             let explicit_global = global || raw_task.as_deref() == Some("global");
             let opts = sensors::VerifyOpts {
                 fail_fast,
+                dry_run: cli.dry_run,
                 set,
                 changed,
                 since,
