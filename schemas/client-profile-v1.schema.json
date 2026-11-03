@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Client capability profile v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "client", "configuration", "claims"],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "client": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version"],
+      "properties": {
+        "id": { "type": "string", "maxLength": 100 },
+        "version": { "type": "string", "maxLength": 100 }
+      }
+    },
+    "configuration": { "type": "string", "maxLength": 100 },
+    "adapter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["argv", "sha256"],
+      "properties": {
+        "argv": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 16,
+          "items": { "type": "string", "minLength": 1, "maxLength": 200 }
+        },
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      }
+    },
+    "observations": { "type": "string", "maxLength": 4096 },
+    "conformance_report": { "type": "string", "maxLength": 4096 },
+    "claims": {
+      "type": "object",
+      "minProperties": 1,
+      "maxProperties": 7,
+      "additionalProperties": false,
+      "properties": {
+        "guidance_installed": { "$ref": "#/$defs/claim" },
+        "host_boundary": { "$ref": "#/$defs/claim" },
+        "mcp_mediation": { "$ref": "#/$defs/claim" },
+        "governance_enforced": { "$ref": "#/$defs/claim" },
+        "completion_gated": { "$ref": "#/$defs/claim" },
+        "context_sanitization": { "$ref": "#/$defs/claim" },
+        "outbound_mediation": { "$ref": "#/$defs/claim" }
+      }
+    }
+  },
+  "$defs": {
+    "claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["required"],
+      "properties": {
+        "required": { "type": "boolean" },
+        "route": { "type": "string", "maxLength": 100 }
+      }
+    }
+  }
+}

@@ -320,6 +320,14 @@ pub enum Command {
         /// Strictly enforce warning checks as failures.
         #[arg(long)]
         strict: bool,
+        /// Opt-in client capability profile (JSON). Default diagnostics are
+        /// unchanged when it is omitted.
+        #[arg(long, value_name = "FILE")]
+        client_profile: Option<PathBuf>,
+        /// Run the profile's pinned observation adapter instead of reading
+        /// recorded observations. Requires `--client-profile`.
+        #[arg(long, requires = "client_profile")]
+        client_probe: bool,
     },
     /// Report harness trends: sensor stats, strikes, eval pass-rate history.
     Metrics {

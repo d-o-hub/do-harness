@@ -637,10 +637,12 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand hook; and __fish_s
 complete -c do-harness -n "__fish_do_harness_using_subcommand hook; and __fish_seen_subcommand_from help" -f -a "help" -d 'Print this message or the help of the given subcommand(s)'
 complete -c do-harness -n "__fish_do_harness_using_subcommand doctor" -l format -d 'Output format' -r -f -a "text\t'Human-readable text output'
 json\t'Machine-readable JSON output'"
+complete -c do-harness -n "__fish_do_harness_using_subcommand doctor" -l client-profile -d 'Opt-in client capability profile (JSON). Default diagnostics are unchanged when it is omitted' -r -F
 complete -c do-harness -n "__fish_do_harness_using_subcommand doctor" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
 complete -c do-harness -n "__fish_do_harness_using_subcommand doctor" -l config -d 'Explicit path to do-harness.toml' -r -F
 complete -c do-harness -n "__fish_do_harness_using_subcommand doctor" -l output -d 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)' -r -F
 complete -c do-harness -n "__fish_do_harness_using_subcommand doctor" -l strict -d 'Strictly enforce warning checks as failures'
+complete -c do-harness -n "__fish_do_harness_using_subcommand doctor" -l client-probe -d 'Run the profile\'s pinned observation adapter instead of reading recorded observations. Requires `--client-profile`'
 complete -c do-harness -n "__fish_do_harness_using_subcommand doctor" -s q -l quiet -d 'Suppress PASS/WARN verdict lines and the success footer'
 complete -c do-harness -n "__fish_do_harness_using_subcommand doctor" -l dry-run -d 'Dry run without side effects'
 complete -c do-harness -n "__fish_do_harness_using_subcommand doctor" -s h -l help -d 'Print help (see more with \'--help\')'

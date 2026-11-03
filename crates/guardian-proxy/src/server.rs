@@ -122,13 +122,24 @@ fn unauthorized_response(message: &str) -> Response {
 }
 
 async fn health_handler(State(state): State<AppState>) -> Response {
+    // The compiled governance mode is reported on both paths: a stub build
+    // permits well-formed calls, so a probe must be able to see that.
+    let governance = crate::governance_mode().as_str();
     match &state.init_error {
         Some(error) => (
             StatusCode::SERVICE_UNAVAILABLE,
-            Json(serde_json::json!({"status":"degraded","error":error})),
+            Json(serde_json::json!({
+                "status": "degraded",
+                "governance": governance,
+                "error": error,
+            })),
         )
             .into_response(),
-        None => Json(serde_json::json!({"status":"ok"})).into_response(),
+        None => Json(serde_json::json!({
+            "status": "ok",
+            "governance": governance,
+        }))
+        .into_response(),
     }
 }
 
@@ -220,11 +231,7 @@ async fn tool_call_handler(
 
 /// Tags a legacy tool-call response with governance mode and deprecation.
 fn tag_response(mut response: Response) -> Response {
-    let mode = if cfg!(feature = "agt-governance") {
-        "enforced"
-    } else {
-        "stub"
-    };
+    let mode = crate::governance_mode().as_str();
     response
         .headers_mut()
         .insert(GOVERNANCE_HEADER, HeaderValue::from_static(mode));

@@ -61,7 +61,7 @@ async fn fails_when_hooks_are_shadowed() {
     status.pre_commit_shadowed = true;
     status.core_hooks_path = Some(".githooks".to_string());
 
-    let result = run_with_status(&root, Format::Text, false, &status).await;
+    let result = run_with_status(&root, Format::Text, false, &status, None, false).await;
 
     let message = result.unwrap_err().to_string();
     assert!(message.contains("doctor check failed"));
@@ -72,7 +72,8 @@ async fn fails_when_hooks_are_shadowed() {
 async fn fails_when_binary_missing_and_names_the_reason() {
     let (_temp, root) = fake_repo_with_git();
 
-    let result = run_with_status(&root, Format::Text, false, &repo_status(&root)).await;
+    let result =
+        run_with_status(&root, Format::Text, false, &repo_status(&root), None, false).await;
 
     let message = result.unwrap_err().to_string();
     assert!(message.contains("doctor check failed"));
@@ -91,7 +92,7 @@ async fn succeeds_when_binary_present_and_database_absent() {
     .unwrap();
 
     assert!(
-        run_with_status(&root, Format::Text, false, &repo_status(&root))
+        run_with_status(&root, Format::Text, false, &repo_status(&root), None, false)
             .await
             .is_ok()
     );
@@ -116,12 +117,12 @@ async fn warns_when_sensor_argv_path_is_missing() {
     .unwrap();
 
     assert!(
-        run_with_status(&root, Format::Text, false, &repo_status(&root))
+        run_with_status(&root, Format::Text, false, &repo_status(&root), None, false)
             .await
             .is_ok()
     );
 
-    let message = run_with_status(&root, Format::Text, true, &repo_status(&root))
+    let message = run_with_status(&root, Format::Text, true, &repo_status(&root), None, false)
         .await
         .unwrap_err()
         .to_string();
@@ -135,7 +136,7 @@ async fn fails_when_commit_msg_hook_lacks_its_script() {
     let (_temp, root) = fake_repo_with_git();
     stub_binary(&root);
 
-    let message = run_with_status(&root, Format::Text, false, &repo_status(&root))
+    let message = run_with_status(&root, Format::Text, false, &repo_status(&root), None, false)
         .await
         .unwrap_err()
         .to_string();
@@ -152,7 +153,7 @@ async fn missing_commitlint_script_is_fine_without_the_hook() {
     status.ownership.commit_msg = HookOwner::Absent;
 
     assert!(
-        run_with_status(&root, Format::Text, false, &status)
+        run_with_status(&root, Format::Text, false, &status, None, false)
             .await
             .is_ok()
     );
@@ -171,7 +172,8 @@ async fn fails_when_state_database_is_future() {
     .unwrap();
     drop(conn);
 
-    let result = run_with_status(&root, Format::Text, false, &repo_status(&root)).await;
+    let result =
+        run_with_status(&root, Format::Text, false, &repo_status(&root), None, false).await;
 
     let message = result.unwrap_err().to_string();
     assert!(message.contains("doctor check failed"));
@@ -209,7 +211,7 @@ async fn fails_on_orphan_task_without_added_event() {
         .unwrap();
     drop(conn);
 
-    let message = run_with_status(&root, Format::Text, false, &repo_status(&root))
+    let message = run_with_status(&root, Format::Text, false, &repo_status(&root), None, false)
         .await
         .unwrap_err()
         .to_string();
@@ -243,7 +245,7 @@ async fn fails_on_stale_task_export() {
         )
         .unwrap();
 
-    let message = run_with_status(&root, Format::Text, false, &repo_status(&root))
+    let message = run_with_status(&root, Format::Text, false, &repo_status(&root), None, false)
         .await
         .unwrap_err()
         .to_string();
@@ -276,7 +278,7 @@ async fn fails_on_tampered_event_chain() {
     .unwrap();
     drop(conn);
 
-    let message = run_with_status(&root, Format::Text, false, &repo_status(&root))
+    let message = run_with_status(&root, Format::Text, false, &repo_status(&root), None, false)
         .await
         .unwrap_err()
         .to_string();
@@ -329,7 +331,7 @@ async fn strict_passes_when_hooks_are_delegated_to_pre_commit() {
     assert_eq!(status.ownership.pre_commit, HookOwner::PreCommit);
     assert_eq!(status.ownership.commit_msg, HookOwner::PreCommit);
     assert!(
-        run_with_status(&root, Format::Text, true, &status)
+        run_with_status(&root, Format::Text, true, &status, None, false)
             .await
             .is_ok()
     );
@@ -345,7 +347,7 @@ async fn strict_fails_when_pre_commit_hooks_are_not_installed() {
     let status = status_with_local_binary(&root);
     assert_eq!(status.ownership.pre_commit, HookOwner::Absent);
 
-    let message = run_with_status(&root, Format::Text, true, &status)
+    let message = run_with_status(&root, Format::Text, true, &status, None, false)
         .await
         .unwrap_err()
         .to_string();
@@ -366,7 +368,7 @@ async fn strict_fails_on_an_unowned_foreign_hook() {
     let status = status_with_local_binary(&root);
     assert_eq!(status.ownership.pre_commit, HookOwner::Foreign);
 
-    let message = run_with_status(&root, Format::Text, true, &status)
+    let message = run_with_status(&root, Format::Text, true, &status, None, false)
         .await
         .unwrap_err()
         .to_string();
@@ -388,7 +390,7 @@ async fn strict_fails_when_declared_hooks_are_empty() {
     let status = status_with_local_binary(&root);
     assert_eq!(status.ownership.pre_commit, HookOwner::Foreign);
 
-    let message = run_with_status(&root, Format::Text, true, &status)
+    let message = run_with_status(&root, Format::Text, true, &status, None, false)
         .await
         .unwrap_err()
         .to_string();
@@ -452,7 +454,7 @@ async fn fails_on_tampered_event_chain_json() {
     .unwrap();
     drop(conn);
 
-    let message = run_with_status(&root, Format::Json, false, &repo_status(&root))
+    let message = run_with_status(&root, Format::Json, false, &repo_status(&root), None, false)
         .await
         .unwrap_err()
         .to_string();

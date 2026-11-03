@@ -892,7 +892,7 @@ _do__harness() {
             return 0
             ;;
         do__subcmd__harness__subcmd__doctor)
-            opts="-q -h -V --format --strict --root --config --quiet --output --dry-run --help --version"
+            opts="-q -h -V --format --strict --client-profile --client-probe --root --config --quiet --output --dry-run --help --version"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -900,6 +900,10 @@ _do__harness() {
             case "${prev}" in
                 --format)
                     COMPREPLY=($(compgen -W "text json" -- "${cur}"))
+                    return 0
+                    ;;
+                --client-profile)
+                    COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;
                 --root)

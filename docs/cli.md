@@ -707,6 +707,8 @@ Remove an orphan task row that has no workflow events. A task with history is re
 | --- | --- | --- | --- | --- |
 | `--format <FORMAT>` | no | `text` | `text`, `json` | Output format |
 | `--strict` | no | — | — | Strictly enforce warning checks as failures |
+| `--client-profile <FILE>` | no | — | — | Opt-in client capability profile (JSON). Default diagnostics are unchanged when it is omitted |
+| `--client-probe` | no | — | — | Run the profile's pinned observation adapter instead of reading recorded observations. Requires `--client-profile` |
 <!-- END GENERATED: cli-contract doctor -->
 Diagnostic health checks covering binary resolution, git hook status, database migration skew, and the path-looking arguments in each effective sensor's `argv`.
 
