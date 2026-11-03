@@ -11,6 +11,7 @@ async fn record_verify_persists_beats_and_signatures() {
         ok: false,
         root: dir.path().display().to_string(),
         failed: vec!["fail".to_owned()],
+        unrunnable: vec![],
         sensors: vec![SensorResult {
             fix: None,
             name: "fail".to_owned(),
@@ -66,6 +67,7 @@ async fn record_verify_skips_signatures_when_all_pass() {
         ok: true,
         root: dir.path().display().to_string(),
         failed: vec![],
+        unrunnable: vec![],
         sensors: vec![SensorResult {
             fix: None,
             name: "fmt".to_owned(),
@@ -120,6 +122,7 @@ async fn record_verify_skips_blocked_sensor_signature() {
         ok: false,
         root: dir.path().display().to_string(),
         failed: vec!["halted".to_owned()],
+        unrunnable: vec![],
         sensors: vec![SensorResult {
             fix: None,
             name: "halted".to_owned(),
@@ -215,6 +218,7 @@ async fn record_verify_resets_strikes_on_pass() {
         ok: true,
         root: dir.path().display().to_string(),
         failed: vec![],
+        unrunnable: vec![],
         sensors: vec![SensorResult {
             fix: None,
             name: "fmt".to_owned(),
@@ -289,6 +293,7 @@ async fn record_verify_scopes_to_task() {
         ok: false,
         root: dir.path().display().to_string(),
         failed: vec!["check".to_owned()],
+        unrunnable: vec![],
         sensors: vec![SensorResult {
             fix: None,
             name: "check".to_owned(),
@@ -353,6 +358,7 @@ async fn record_verify_scopes_to_branch() {
         ok: true,
         root: dir.path().display().to_string(),
         failed: Vec::new(),
+        unrunnable: vec![],
         sensors: vec![SensorResult {
             fix: None,
             name: "fmt".to_owned(),

@@ -27,6 +27,22 @@ fn warn_unscoped_record(
     record && scope == &telemetry::BeatScope::Global && !explicit_global && hook_marker.is_none()
 }
 
+/// Whether the run measured nothing because every selected sensor was
+/// unrunnable (its program could not be spawned).
+fn all_unrunnable(report: &report::VerifyReport) -> bool {
+    !report.unrunnable.is_empty() && report.unrunnable.len() == report.sensors.len()
+}
+
+/// The exit-2 error for a run in which no sensor could start: a config error,
+/// not a red gate.
+fn unrunnable_error(report: &report::VerifyReport) -> CliError {
+    CliError::Usage(anyhow::anyhow!(
+        "no sensor could run: {} unrunnable ({})",
+        report.unrunnable.len(),
+        report.unrunnable.join(", ")
+    ))
+}
+
 /// Runs the `verify` subcommand: sensors, optional beat recording, report.
 #[allow(clippy::too_many_lines)]
 pub(crate) async fn run(root: &Path, mut opts: VerifyOpts) -> std::result::Result<(), CliError> {
@@ -176,6 +192,8 @@ pub(crate) async fn run(root: &Path, mut opts: VerifyOpts) -> std::result::Resul
 
             if report.ok {
                 Ok(())
+            } else if all_unrunnable(&report) {
+                Err(unrunnable_error(&report))
             } else {
                 Err(CliError::Verify(anyhow::anyhow!(
                     "{} sensor(s) failed",
@@ -423,6 +441,9 @@ fn write_evidence(
             "strict evidence check failed; artifact at {}",
             path.display()
         );
+        if all_unrunnable(report) {
+            return Err(unrunnable_error(report));
+        }
         return Err(CliError::Verify(anyhow::anyhow!("weak evidence")));
     }
     Ok(())
