@@ -153,12 +153,15 @@ def check_windows_shard_structure(verify_yml_path: Path) -> list[str]:
             errors.append(
                 "verify.yml Windows shard test step must not include do-harness-db; it has its own serialized step"
             )
+        # `slice:` is nextest's recommended mode: it deals every test across all
+        # binaries round-robin, so shards are disjoint, complete and even.
+        # `count:` is deprecated upstream and `hash:` can be uneven.
         partition = re.search(
-            r"--partition\s+count:\$\{\{\s*matrix\.shard\s*\}\}/(\d+)", run
+            r"--partition\s+slice:\$\{\{\s*matrix\.shard\s*\}\}/(\d+)", run
         )
         if not partition:
             errors.append(
-                "verify.yml Windows test step must partition with `--partition count:${{ matrix.shard }}/<shard-count>`"
+                "verify.yml Windows test step must partition with `--partition slice:${{ matrix.shard }}/<shard-count>`"
             )
         elif shards and int(partition.group(1)) != len(shards):
             errors.append(
@@ -381,7 +384,7 @@ def run_self_tests(root_dir: Path):
 
         # Mutation F: partition denominator disagrees with the shard count.
         expect(
-            verify_text.replace("count:${{ matrix.shard }}/3", "count:${{ matrix.shard }}/4"),
+            verify_text.replace("slice:${{ matrix.shard }}/3", "slice:${{ matrix.shard }}/4"),
             "partition denominator",
             "Mutation F (partition denominator)",
         )
@@ -423,6 +426,13 @@ def run_self_tests(root_dir: Path):
             verify_text.replace(" --no-fail-fast", ""),
             "must report every failure",
             "Mutation J (no-fail-fast removed)",
+        )
+
+        # Mutation K: the shard falls back to nextest's deprecated `count:` mode.
+        expect(
+            verify_text.replace("slice:${{ matrix.shard }}", "count:${{ matrix.shard }}"),
+            "must partition with `--partition slice:",
+            "Mutation K (deprecated count partition)",
         )
 
     print("Self-tests passed successfully!")

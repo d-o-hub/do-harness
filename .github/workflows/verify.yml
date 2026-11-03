@@ -451,12 +451,14 @@ jobs:
         timeout-minutes: 12
         run: cargo nextest run --workspace --release --exclude do-harness-db --no-run
       - name: Run workspace tests (shard ${{ matrix.shard }} of 3)
-        # `count:M/N` partitions the same filtered test list deterministically,
-        # so the three shards are disjoint and their union is the whole suite.
+        # `slice:M/N` is nextest's recommended partition mode: it lists every
+        # test across all binaries and deals them round-robin, so the shards are
+        # disjoint, their union is the whole suite, and their sizes stay even.
+        # (`count:` is deprecated upstream for being neither even nor stable.)
         # `--final-status-level slow` names the slowest tests in the summary and
         # `--no-fail-fast` reports every failure in the shard, not just the first.
         timeout-minutes: 12
-        run: cargo nextest run --workspace --release --exclude do-harness-db --partition count:${{ matrix.shard }}/3 --final-status-level slow --no-fail-fast
+        run: cargo nextest run --workspace --release --exclude do-harness-db --partition slice:${{ matrix.shard }}/3 --final-status-level slow --no-fail-fast
 
   windows:
     runs-on: windows-latest
@@ -485,7 +487,7 @@ jobs:
       # taiki-e/install-action@v2
       - uses: taiki-e/install-action@ba47c86ac325773530516bb756137ac718732518
         with:
-          tool: cargo-deny,cargo-audit,cargo-nextest
+          tool: cargo-deny,cargo-audit
       # The workspace suite runs in the `windows-tests` shards; this job keeps
       # the serialized database suite and the platform-level checks (sensors,
       # dogfood, installer, hooks, npm wrapper) that make Windows a supported
