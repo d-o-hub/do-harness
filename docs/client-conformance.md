@@ -15,9 +15,16 @@ Explicitly add a `client-conformance` sensor invoking the helper with
 `--required`, `--client`, `--client-version`, `--integration`, and finally
 `--adapter` followed by the trusted adapter's argv. Add it to the required
 signal set. Allow at least 45 seconds for the four ten-second cases.
+
 The helper prints one JSON result; advisory unknown adds a `SKIP:` line.
 The result follows [client-conformance v1](../schemas/client-conformance-v1.schema.json).
 CI must run the helper for each gate, rather than trust a replayed result.
+
+This claim covers the privacy boundary only. Completion-gating behavior is a
+separate claim with its own versioned result,
+[completion-integration v1](../schemas/completion-integration-v1.schema.json),
+produced by the DeepSeek Harness real-host runner. Sanitization evidence never
+substitutes for completion evidence, and vice versa.
 
 ## Adapter contract
 

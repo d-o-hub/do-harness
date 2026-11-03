@@ -138,7 +138,9 @@ test('strictCompletion registers the gate and gates on cheap status only', async
   assert.equal(agent.steered.length, 1)
   assert.match(agent.steered[0].content[0].text, /stale/)
   assert.match(agent.steered[0].content[0].text, /workspace changed/)
-  assert.equal(agent.steered[0].source.kind, 'plugin')
+  // Session format v4 refuses the retired `plugin` wrapper; the steer must name
+  // a producer-owned kind or the real host rejects it.
+  assert.equal(agent.steered[0].source.kind, 'do-harness')
   // The gate must not execute sensors: only the probe + status were spawned.
   assert.equal(ctx.spawnedArgv.length, 2)
 })

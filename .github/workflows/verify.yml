@@ -188,7 +188,7 @@ jobs:
         env:
           DO_HARNESS_BIN: ${{ github.workspace }}/target/release/do-harness
         run: |
-          node --check integrations/deepseek-harness/index.js integrations/deepseek-harness/lib/*.mjs
+          node --check integrations/deepseek-harness/index.js integrations/deepseek-harness/lib/*.mjs integrations/deepseek-harness/conformance/*.mjs
           node --test integrations/deepseek-harness/test/*.test.mjs
       # The adjacent crate is covered by the sensors below: `check` compiles it
       # with default features, the `test` sensor's workspace run runs its
