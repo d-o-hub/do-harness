@@ -3,12 +3,14 @@
 check_ci_concurrency_guardrails.py — CI Concurrency & Timeout Guardrails Verification
 
 Enforces the prevention pattern across workflows and concurrency tests:
-1. Windows CI test step timeout <= 12 minutes.
-2. Coverage job separation from normal Windows test jobs.
-3. Concurrency test wave reduction under coverage instrumentation ((1,1) under coverage vs (2,3)).
-4. CARGO_BUILD_JOBS <= 2 and CARGO_INCREMENTAL = 0 in CI workflows running Rust tasks.
-5. All CI test/coverage steps or jobs carry bounded timeout-minutes.
-6. Self-test mode (`--self-test`) validates negative mutation controls.
+1. The Windows workspace suite runs as a bounded shard matrix whose partitions
+   cover every test exactly once, with compilation and execution timed apart.
+2. The serialized do-harness-db Windows step stays separate from the shards.
+3. Coverage job separation from normal Windows test jobs.
+4. Concurrency test wave reduction under coverage instrumentation ((1,1) under coverage vs (2,3)).
+5. CARGO_BUILD_JOBS <= 2 and CARGO_INCREMENTAL = 0 in CI workflows running Rust tasks.
+6. All CI test/coverage steps or jobs carry bounded timeout-minutes.
+7. Self-test mode (`--self-test`) validates negative mutation controls.
 """
 
 import sys
@@ -17,35 +19,205 @@ import argparse
 import tempfile
 from pathlib import Path
 
-def check_windows_test_timeout(verify_yml_path: Path) -> list[str]:
-    errors = []
-    content = verify_yml_path.read_text(encoding="utf-8")
+WINDOWS_TEST_STEP_MAX_MINUTES = 12
+WINDOWS_SHARD_JOB = "windows-tests"
+WINDOWS_DB_STEP_NAME = "Test do-harness-db on Windows"
+WINDOWS_WORKSPACE_EXCLUDES = "do-harness-db"
 
-    if "runs-on: windows-latest" not in content and "windows:" not in content:
-        errors.append("verify.yml must contain a windows job running on windows-latest")
-        return errors
 
-    # Every Windows workspace test step is bounded, not just the first: the
-    # suite is sharded, and a bound on one shard says nothing about the other.
-    steps = re.findall(
-        r"-\s+name:\s*(Test workspace on Windows[^\n]*)\n(.*?)(?=\n\s*-\s+(?:name|uses):|\Z)",
+def _job_body(content: str, job_name: str) -> str | None:
+    """Return the text of a top-level job, or None when it is absent."""
+    match = re.search(
+        rf"\n  {re.escape(job_name)}:\n(.*?)(?=\n  [A-Za-z0-9_-]+:\n|\Z)",
         content,
         re.DOTALL,
     )
-    if not steps:
-        errors.append("verify.yml Windows test step 'Test workspace on Windows' missing 'timeout-minutes'")
+    return match.group(1) if match else None
+
+
+def _steps(job_body: str) -> list[str]:
+    return re.split(r"\n      - ", job_body)[1:]
+
+
+def _step_name(step: str) -> str:
+    match = re.search(r"^\s*name:\s*(.+)$", step, re.MULTILINE)
+    return match.group(1).strip() if match else ""
+
+
+def _step_timeout(step: str) -> int | None:
+    match = re.search(r"^\s*timeout-minutes:\s*(\d+)\s*$", step, re.MULTILINE)
+    return int(match.group(1)) if match else None
+
+
+def _step_run(step: str) -> str:
+    """Flatten a step's `run:` scalar, whether inline or a block."""
+    match = re.search(r"^\s*run:\s*(.*)$", step, re.MULTILINE)
+    if not match:
+        return ""
+    first = match.group(1).strip()
+    if first and first not in ("|", ">", "|-", ">-", "|+", ">+"):
+        return first
+    lines = []
+    for line in step[match.end():].splitlines():
+        if not line.strip():
+            continue
+        if len(line) - len(line.lstrip()) <= 8:
+            break
+        lines.append(line.strip())
+    return " ".join(lines)
+
+
+def check_windows_shard_structure(verify_yml_path: Path) -> list[str]:
+    errors = []
+    content = verify_yml_path.read_text(encoding="utf-8")
+
+    shard_body = _job_body(content, WINDOWS_SHARD_JOB)
+    if shard_body is None:
+        errors.append(
+            f"verify.yml must define a `{WINDOWS_SHARD_JOB}` job for the sharded Windows workspace suite"
+        )
         return errors
 
-    for name, body in steps:
-        match = re.search(r"timeout-minutes:\s*(\d+)", body)
-        if not match:
-            errors.append(f"verify.yml Windows test step '{name.strip()}' missing 'timeout-minutes'")
-            continue
-        timeout = int(match.group(1))
-        if timeout > 12:
+    if "runs-on: windows-latest" not in shard_body:
+        errors.append(f"verify.yml `{WINDOWS_SHARD_JOB}` job must run on windows-latest")
+
+    if re.search(r"^\s*continue-on-error:\s*true", shard_body, re.MULTILINE):
+        errors.append(
+            f"verify.yml `{WINDOWS_SHARD_JOB}` job must not set continue-on-error: every shard is required"
+        )
+
+    shard_match = re.search(r"^\s*shard:\s*\[([0-9,\s]+)\]", shard_body, re.MULTILINE)
+    if not shard_match:
+        errors.append(
+            f"verify.yml `{WINDOWS_SHARD_JOB}` job must declare an explicit `shard: [1, 2, ...]` matrix"
+        )
+        shards: list[int] = []
+    else:
+        shards = [int(value) for value in shard_match.group(1).split(",") if value.strip()]
+        if shards != list(range(1, len(shards) + 1)):
             errors.append(
-                f"verify.yml Windows test step '{name.strip()}' timeout-minutes ({timeout}) "
-                "exceeds maximum allowed 12 minutes"
+                f"verify.yml `{WINDOWS_SHARD_JOB}` shard matrix must be contiguous from 1, got {shards}"
+            )
+
+    steps = _steps(shard_body)
+    compile_steps = [step for step in steps if "compile" in _step_name(step).lower()]
+    test_steps = [step for step in steps if "run workspace tests" in _step_name(step).lower()]
+
+    if len(compile_steps) != 1:
+        errors.append(
+            f"verify.yml `{WINDOWS_SHARD_JOB}` must have exactly one named compile step, found {len(compile_steps)}"
+        )
+    if len(test_steps) != 1:
+        errors.append(
+            f"verify.yml `{WINDOWS_SHARD_JOB}` must have exactly one named test step, found {len(test_steps)}"
+        )
+
+    for label, step in (
+        ("compile", compile_steps[0] if compile_steps else None),
+        ("test", test_steps[0] if test_steps else None),
+    ):
+        if step is None:
+            continue
+        timeout = _step_timeout(step)
+        if timeout is None:
+            errors.append(f"verify.yml Windows {label} step is missing timeout-minutes")
+        elif timeout > WINDOWS_TEST_STEP_MAX_MINUTES:
+            errors.append(
+                f"verify.yml Windows {label} step timeout-minutes ({timeout}) exceeds maximum allowed "
+                f"{WINDOWS_TEST_STEP_MAX_MINUTES} minutes"
+            )
+
+    if compile_steps:
+        run = _step_run(compile_steps[0])
+        if "--no-run" not in run:
+            errors.append("verify.yml Windows compile step must use `cargo nextest run --no-run`")
+        if "--release" not in run:
+            errors.append("verify.yml Windows compile step must build in release mode")
+        if f"--exclude {WINDOWS_WORKSPACE_EXCLUDES}" not in run:
+            errors.append(
+                f"verify.yml Windows compile step must exclude {WINDOWS_WORKSPACE_EXCLUDES}"
+            )
+
+    if test_steps:
+        step = test_steps[0]
+        run = _step_run(step)
+        if "matrix.shard" not in _step_name(step):
+            errors.append("verify.yml Windows test step name must identify the shard")
+        if "--release" not in run:
+            errors.append("verify.yml Windows test step must run in release mode")
+        if f"--exclude {WINDOWS_WORKSPACE_EXCLUDES}" not in run:
+            errors.append(
+                f"verify.yml Windows test step must exclude {WINDOWS_WORKSPACE_EXCLUDES}"
+            )
+        if "-p do-harness-db" in run:
+            errors.append(
+                "verify.yml Windows shard test step must not include do-harness-db; it has its own serialized step"
+            )
+        # `slice:` is nextest's recommended mode: it deals every test across all
+        # binaries round-robin, so shards are disjoint, complete and even.
+        # `count:` is deprecated upstream and `hash:` can be uneven.
+        partition = re.search(
+            r"--partition\s+slice:\$\{\{\s*matrix\.shard\s*\}\}/(\d+)", run
+        )
+        if not partition:
+            errors.append(
+                "verify.yml Windows test step must partition with `--partition slice:${{ matrix.shard }}/<shard-count>`"
+            )
+        elif shards and int(partition.group(1)) != len(shards):
+            errors.append(
+                f"verify.yml Windows test partition denominator ({partition.group(1)}) must equal "
+                f"the shard matrix size ({len(shards)})"
+            )
+        if "--final-status-level" not in run:
+            errors.append(
+                "verify.yml Windows test step must surface slow tests with `--final-status-level`"
+            )
+        if "--no-fail-fast" not in run:
+            errors.append(
+                "verify.yml Windows test step must report every failure with `--no-fail-fast`"
+            )
+
+    return errors
+
+
+def check_windows_job(verify_yml_path: Path) -> list[str]:
+    errors = []
+    content = verify_yml_path.read_text(encoding="utf-8")
+
+    body = _job_body(content, "windows")
+    if body is None:
+        errors.append("verify.yml must define a `windows` job")
+        return errors
+
+    if "cargo llvm-cov run" in body or "cargo llvm-cov nextest" in body:
+        errors.append("verify.yml windows job must not run memory-heavy coverage suite")
+
+    steps = _steps(body)
+    db_steps = [step for step in steps if WINDOWS_DB_STEP_NAME in _step_name(step)]
+    if len(db_steps) != 1:
+        errors.append(
+            f"verify.yml windows job must keep exactly one serialized `{WINDOWS_DB_STEP_NAME}` step, "
+            f"found {len(db_steps)}"
+        )
+    else:
+        step = db_steps[0]
+        if _step_timeout(step) is None:
+            errors.append(f"verify.yml `{WINDOWS_DB_STEP_NAME}` step is missing timeout-minutes")
+        run = _step_run(step)
+        if "-p do-harness-db" not in run:
+            errors.append(
+                f"verify.yml `{WINDOWS_DB_STEP_NAME}` step must target -p do-harness-db"
+            )
+        if "--test-threads=1" not in run:
+            errors.append(
+                f"verify.yml `{WINDOWS_DB_STEP_NAME}` step must stay serialized with --test-threads=1"
+            )
+
+    for step in steps:
+        if "cargo nextest run --workspace" in _step_run(step):
+            errors.append(
+                "verify.yml windows job must not run the unsharded workspace suite; it belongs to the "
+                f"`{WINDOWS_SHARD_JOB}` shards"
             )
 
     return errors
@@ -105,18 +277,6 @@ def check_test_coverage_timeouts(workflow_paths: list[Path]) -> list[str]:
 
     return errors
 
-def check_coverage_separation(verify_yml_path: Path) -> list[str]:
-    errors = []
-    content = verify_yml_path.read_text(encoding="utf-8")
-
-    windows_job_match = re.search(r"\n  windows:\n(.*?)(?=\n  \w+:|\Z)", content, re.DOTALL)
-    if windows_job_match:
-        windows_body = windows_job_match.group(1)
-        if "cargo llvm-cov run" in windows_body or "cargo llvm-cov nextest" in windows_body:
-            errors.append("verify.yml windows job must not run memory-heavy coverage suite")
-
-    return errors
-
 def run_guardrail_checks(root_dir: Path) -> list[str]:
     errors = []
     verify_yml = root_dir / ".github" / "workflows" / "verify.yml"
@@ -131,8 +291,8 @@ def run_guardrail_checks(root_dir: Path) -> list[str]:
     if not verify_yml.exists():
         errors.append(f"Missing {verify_yml}")
     else:
-        errors.extend(check_windows_test_timeout(verify_yml))
-        errors.extend(check_coverage_separation(verify_yml))
+        errors.extend(check_windows_shard_structure(verify_yml))
+        errors.extend(check_windows_job(verify_yml))
 
     if not concurrency_rs.exists():
         errors.append(f"Missing {concurrency_rs}")
@@ -162,59 +322,118 @@ def run_self_tests(root_dir: Path):
         r_yml = root_dir / ".github" / "workflows" / "release.yml"
         c_rs = root_dir / "crates" / "do-harness" / "tests" / "concurrency.rs"
 
-        (wf_dir / "verify.yml").write_text(v_yml.read_text(encoding="utf-8"))
-        (wf_dir / "scheduled.yml").write_text(s_yml.read_text(encoding="utf-8"))
-        (wf_dir / "release.yml").write_text(r_yml.read_text(encoding="utf-8"))
-        (tests_dir / "concurrency.rs").write_text(c_rs.read_text(encoding="utf-8"))
+        verify_text = v_yml.read_text(encoding="utf-8")
+        concurrency_text = c_rs.read_text(encoding="utf-8")
+
+        (wf_dir / "verify.yml").write_text(verify_text, encoding="utf-8")
+        (wf_dir / "scheduled.yml").write_text(s_yml.read_text(encoding="utf-8"), encoding="utf-8")
+        (wf_dir / "release.yml").write_text(r_yml.read_text(encoding="utf-8"), encoding="utf-8")
+        (tests_dir / "concurrency.rs").write_text(concurrency_text, encoding="utf-8")
 
         base_errs = run_guardrail_checks(tmp_path)
         assert not base_errs, f"Base temp copy failed: {base_errs}"
 
-        # Mutation A: Timeout > 12
-        mut_v = v_yml.read_text(encoding="utf-8").replace("timeout-minutes: 12", "timeout-minutes: 30")
-        (wf_dir / "verify.yml").write_text(mut_v)
-        mut_errs = run_guardrail_checks(tmp_path)
-        assert any("exceeds maximum allowed 12" in e for e in mut_errs), f"Mutation A (timeout > 12) not caught: {mut_errs}"
-        (wf_dir / "verify.yml").write_text(v_yml.read_text(encoding="utf-8"))
+        def expect(mutated_verify: str, needle: str, label: str, mutated_concurrency: str | None = None):
+            (wf_dir / "verify.yml").write_text(mutated_verify, encoding="utf-8")
+            (tests_dir / "concurrency.rs").write_text(
+                mutated_concurrency if mutated_concurrency is not None else concurrency_text,
+                encoding="utf-8",
+            )
+            errs = run_guardrail_checks(tmp_path)
+            assert any(needle in e for e in errs), f"{label} not caught: {errs}"
 
-        # Mutation A2: only a later shard exceeds the bound. Every Windows
-        # workspace step is bounded, so the first one staying legal must not
-        # mask a second step that is not.
-        original = v_yml.read_text(encoding="utf-8")
-        later = original.index("Test workspace on Windows (2/2)")
-        head, tail = original[:later], original[later:]
-        assert "timeout-minutes: 12" in tail, "fixture must find the second shard's bound"
-        mut_v2 = head + tail.replace("timeout-minutes: 12", "timeout-minutes: 60", 1)
-        (wf_dir / "verify.yml").write_text(mut_v2)
-        mut_errs_a2 = run_guardrail_checks(tmp_path)
-        assert any("exceeds maximum allowed 12" in e for e in mut_errs_a2), (
-            f"Mutation A2 (second shard timeout > 12) not caught: {mut_errs_a2}"
+        # Mutation A: a Windows shard step timeout above the ceiling.
+        expect(
+            verify_text.replace("timeout-minutes: 12", "timeout-minutes: 30"),
+            "exceeds maximum allowed 12",
+            "Mutation A (timeout > 12)",
         )
-        (wf_dir / "verify.yml").write_text(original)
 
-        # Mutation B: Remove wave reduction
-        mut_c = c_rs.read_text(encoding="utf-8").replace("(1, 1)", "(2, 3)")
-        (tests_dir / "concurrency.rs").write_text(mut_c)
-        mut_errs_b = run_guardrail_checks(tmp_path)
-        assert any("reduce waves to (1, 1)" in e for e in mut_errs_b), f"Mutation B (wave reduction) not caught: {mut_errs_b}"
-        (tests_dir / "concurrency.rs").write_text(c_rs.read_text(encoding="utf-8"))
-
-        # Mutation C: CARGO_BUILD_JOBS > 2
-        mut_env = v_yml.read_text(encoding="utf-8").replace('CARGO_BUILD_JOBS: "2"', 'CARGO_BUILD_JOBS: "8"')
-        (wf_dir / "verify.yml").write_text(mut_env)
-        mut_errs_c = run_guardrail_checks(tmp_path)
-        assert any("CARGO_BUILD_JOBS=8" in e or "CARGO_BUILD_JOBS" in e for e in mut_errs_c), f"Mutation C (CARGO_BUILD_JOBS > 2) not caught: {mut_errs_c}"
-        (wf_dir / "verify.yml").write_text(v_yml.read_text(encoding="utf-8"))
-
-        # Mutation D: Coverage in Windows job
-        windows_coverage = v_yml.read_text(encoding="utf-8").replace(
-            "run: cargo nextest run --workspace --release --exclude do-harness-db",
-            "run: cargo llvm-cov nextest run --workspace --release --exclude do-harness-db"
+        # Mutation B: remove the coverage wave reduction.
+        expect(
+            verify_text,
+            "reduce waves to (1, 1)",
+            "Mutation B (wave reduction)",
+            mutated_concurrency=concurrency_text.replace("(1, 1)", "(2, 3)"),
         )
-        (wf_dir / "verify.yml").write_text(windows_coverage)
-        mut_errs_d = run_guardrail_checks(tmp_path)
-        assert any("must not run memory-heavy coverage" in e for e in mut_errs_d), f"Mutation D (windows coverage) not caught: {mut_errs_d}"
-        (wf_dir / "verify.yml").write_text(v_yml.read_text(encoding="utf-8"))
+
+        # Mutation C: CARGO_BUILD_JOBS above the ceiling.
+        expect(
+            verify_text.replace('CARGO_BUILD_JOBS: "2"', 'CARGO_BUILD_JOBS: "8"'),
+            "CARGO_BUILD_JOBS",
+            "Mutation C (CARGO_BUILD_JOBS > 2)",
+        )
+
+        # Mutation D: coverage inside the Windows job.
+        expect(
+            verify_text.replace(
+                "run: cargo test -p do-harness-db --release -- --test-threads=1",
+                "run: cargo llvm-cov nextest run -p do-harness-db --release -- --test-threads=1",
+            ),
+            "must not run memory-heavy coverage",
+            "Mutation D (windows coverage)",
+        )
+
+        # Mutation E: a shard dropped from the matrix while the partition still
+        # divides by three, so the union no longer covers the suite.
+        expect(
+            verify_text.replace("shard: [1, 2, 3]", "shard: [1, 2]"),
+            "must equal the shard matrix size",
+            "Mutation E (incomplete shard matrix)",
+        )
+
+        # Mutation F: partition denominator disagrees with the shard count.
+        expect(
+            verify_text.replace("slice:${{ matrix.shard }}/3", "slice:${{ matrix.shard }}/4"),
+            "partition denominator",
+            "Mutation F (partition denominator)",
+        )
+
+        # Mutation G: the compile step loses its bounded timeout.
+        expect(
+            re.sub(
+                r"        timeout-minutes: 12\n        run: cargo nextest run --workspace --release --exclude do-harness-db --no-run",
+                "        run: cargo nextest run --workspace --release --exclude do-harness-db --no-run",
+                verify_text,
+            ),
+            "Windows compile step is missing timeout-minutes",
+            "Mutation G (compile timeout removed)",
+        )
+
+        # Mutation H: the serialized do-harness-db step is folded away.
+        expect(
+            re.sub(
+                r"      - name: Test do-harness-db on Windows\n(?:.*\n)*?(?=      - name: |\Z)",
+                "",
+                verify_text,
+            ),
+            "must keep exactly one serialized",
+            "Mutation H (db step removed)",
+        )
+
+        # Mutation I: the compile step stops being a compile-only step.
+        expect(
+            verify_text.replace(
+                "run: cargo nextest run --workspace --release --exclude do-harness-db --no-run",
+                "run: cargo nextest run --workspace --release --exclude do-harness-db",
+            ),
+            "must use `cargo nextest run --no-run`",
+            "Mutation I (compile step runs tests)",
+        )
+
+        # Mutation J: the shard stops reporting every failure.
+        expect(
+            verify_text.replace(" --no-fail-fast", ""),
+            "must report every failure",
+            "Mutation J (no-fail-fast removed)",
+        )
+
+        # Mutation K: the shard falls back to nextest's deprecated `count:` mode.
+        expect(
+            verify_text.replace("slice:${{ matrix.shard }}", "count:${{ matrix.shard }}"),
+            "must partition with `--partition slice:",
+            "Mutation K (deprecated count partition)",
+        )
 
     print("Self-tests passed successfully!")
 
