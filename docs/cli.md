@@ -89,8 +89,11 @@ Runs computational sensors defined in `do-harness.toml`.
   sensor's `when-changed` globs (repository-relative, `**` supported) select
   it when a changed file matches; sensors without `when-changed` always run.
   Change discovery covers staged, unstaged, deleted, renamed, and untracked
-  files; when repository state cannot be determined, every sensor runs
-  (fail-closed, never silently skipped).
+  files, including a repository with no commit yet (staged index paths count
+  as additions). When repository state cannot be determined — no work tree, a
+  failing git query, or a path that is not valid UTF-8 — every sensor runs
+  (fail-closed, never silently skipped) and a warning names the failing
+  command and its diagnostic on stderr.
 - `--since <REF>`: Run only sensors applicable to the committed range
   `merge-base(<REF>, HEAD)..HEAD`, so a clean checkout of an already-committed
   branch still selects the sensors its commits touch. `--changed` alone sees
@@ -391,7 +394,11 @@ for legacy configs).
 <!-- END GENERATED: cli-contract explain -->
 Explains which sensors the current change selects and why, without executing
 any sensor. Reports the changed files plus every selected sensor (with its
-matching pattern or constraint reason) and every skipped sensor.
+matching pattern or constraint reason) and every skipped sensor. An empty
+change set prints `changed files: none`; a failed discovery prints
+`change discovery failed: <diagnostic>` and marks the selection fail-closed,
+so the two states are never confused. JSON output carries the same distinction
+in `changed_files` and `discovery_error`.
 
 - `--set <SET>`: Explain this development signal set (default: all sensors).
 - `--changed`: Select by working-tree change instead of listing everything.

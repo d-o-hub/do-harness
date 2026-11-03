@@ -72,6 +72,9 @@ pub(crate) async fn run(root: &Path, mut opts: VerifyOpts) -> std::result::Resul
         .map_err(CliError::Usage)?;
     opts.baselines = Baselines::load(root).await.map_err(CliError::Usage)?;
     let selection = sensors::resolve_selection(&cfg, root, &opts).map_err(CliError::Usage)?;
+    if let Some(error) = &selection.discovery_error {
+        eprintln!("warning: change discovery failed ({error}); selecting every candidate sensor");
+    }
 
     // Compute pre-execution input digests for all selected sensors so mid-run
     // mutations can be detected for every run, including non---record runs.

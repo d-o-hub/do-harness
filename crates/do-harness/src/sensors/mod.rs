@@ -252,6 +252,8 @@ pub struct ResolvedSelection<'a> {
     pub skipped: Vec<crate::applicability::Skipped>,
     /// Change input and resolved revisions behind the selection.
     pub changes: crate::changes::ChangeSelection,
+    /// Why change discovery failed, when it did; every candidate was kept.
+    pub discovery_error: Option<String>,
 }
 
 /// Resolves the ordered sensor specs a verify run executes.
@@ -320,8 +322,9 @@ pub fn resolve_selection<'a>(
         }
     }
 
-    let changes = crate::changes::discover_selection(root, opts.changed, opts.since.as_deref());
     let applicable: Vec<&SensorSpec> = if opts.changed || opts.since.is_some() {
+        let changes = crate::changes::discover_selection(root, opts.changed, opts.since.as_deref());
+        let discovery_error = changes.changed.discovery_error.clone();
         let selection = crate::applicability::select(&ordered, &changes.changed);
         let names = selection.selected_names();
         let skipped = selection.skipped;
@@ -337,6 +340,7 @@ pub fn resolve_selection<'a>(
             specs,
             skipped,
             changes,
+            discovery_error,
         });
     } else {
         ordered
@@ -352,7 +356,8 @@ pub fn resolve_selection<'a>(
     Ok(ResolvedSelection {
         specs,
         skipped: Vec::new(),
-        changes,
+        changes: crate::changes::discover_selection(root, false, None),
+        discovery_error: None,
     })
 }
 

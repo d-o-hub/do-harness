@@ -156,7 +156,7 @@ pub struct SelectionReport {
     pub changed_files: Vec<String>,
     /// Why discovery failed closed, when it did.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub diagnostic: Option<String>,
+    pub discovery_error: Option<String>,
     /// Sensors skipped by applicability, with reasons.
     pub skipped: Vec<crate::applicability::Skipped>,
 }
@@ -176,7 +176,7 @@ impl SelectionReport {
             head_sha: range.map(|r| r.head_sha.clone()),
             merge_base_sha: range.map(|r| r.merge_base_sha.clone()),
             changed_files: changes.paths().iter().map(ToString::to_string).collect(),
-            diagnostic: changes.diagnostic.clone(),
+            discovery_error: changes.changed.discovery_error.clone(),
             skipped: skipped.to_vec(),
         }
     }

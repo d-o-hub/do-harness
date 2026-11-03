@@ -31,11 +31,11 @@ pub struct ExplainReport {
     /// Merge base the range diff started from.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub merge_base_sha: Option<String>,
-    /// Why discovery failed closed, when it did.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub diagnostic: Option<String>,
     /// Changed repository-relative paths driving selection, sorted.
     pub changed_files: Vec<String>,
+    /// Why change discovery failed, when it did; selection is fail-closed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub discovery_error: Option<String>,
     /// Applicable sensors with reasons, in candidate order.
     pub selected: Vec<Selected>,
     /// Inapplicable sensors with reasons, in candidate order.
@@ -56,7 +56,7 @@ pub fn explain_report(
 ) -> std::result::Result<ExplainReport, anyhow::Error> {
     let candidates: Vec<&config::SensorSpec> = crate::signals::candidate_specs(cfg, set)?;
     let selection_input = crate::changes::discover_selection(root, changed, since);
-    let (selection, changed_files) = if changed || since.is_some() {
+    let (selection, changed_files, discovery_error) = if changed || since.is_some() {
         let files = selection_input
             .paths()
             .iter()
@@ -65,6 +65,7 @@ pub fn explain_report(
         (
             crate::applicability::select(&candidates, &selection_input.changed),
             files,
+            selection_input.changed.discovery_error.clone(),
         )
     } else {
         let selected = candidates
@@ -80,6 +81,7 @@ pub fn explain_report(
                 skipped: Vec::new(),
             },
             Vec::new(),
+            None,
         )
     };
     let range = selection_input.range.as_ref();
@@ -90,8 +92,8 @@ pub fn explain_report(
         base_sha: range.map(|r| r.base_sha.clone()),
         head_sha: range.map(|r| r.head_sha.clone()),
         merge_base_sha: range.map(|r| r.merge_base_sha.clone()),
-        diagnostic: selection_input.diagnostic.clone(),
         changed_files,
+        discovery_error,
         selected: selection.selected,
         skipped: selection.skipped,
     })
@@ -126,16 +128,21 @@ pub(crate) async fn run(
             if let Some(merge_base) = &report.merge_base_sha {
                 println!("merge-base: {merge_base}");
             }
-            if let Some(diagnostic) = &report.diagnostic {
-                println!("selection failed closed: {diagnostic}");
-            }
-            if !report.changed_files.is_empty() {
+            if let Some(error) = &report.discovery_error {
+                println!("change discovery failed: {error}");
+            } else if report.selection_mode != "all" && report.changed_files.is_empty() {
+                println!("changed files: none");
+            } else if !report.changed_files.is_empty() {
                 println!("changed files:");
                 for file in &report.changed_files {
                     println!("  {file}");
                 }
             }
-            println!("selected:");
+            if report.discovery_error.is_some() {
+                println!("selected (fail-closed):");
+            } else {
+                println!("selected:");
+            }
             for sensor in &report.selected {
                 println!("  {} ({})", sensor.name, sensor.reason);
             }

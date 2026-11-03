@@ -63,6 +63,108 @@ fn discover_fails_closed_outside_git() {
     let changed = discover(dir.path());
     assert!(changed.discovery_failed);
     assert_eq!(changed.files.len(), 0);
+    let error = changed.discovery_error.expect("diagnostic");
+    assert!(error.contains("git rev-parse"), "{error}");
+}
+
+/// A repository with no commit yet reports staged and untracked files.
+#[test]
+fn discover_unborn_head_reports_staged_and_untracked() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    git(root, &["init", "-q"]);
+    std::fs::create_dir_all(root.join("src")).unwrap();
+    std::fs::write(root.join("src/lib.rs"), "pub fn f() {}\n").unwrap();
+    git(root, &["add", "src/lib.rs"]);
+    std::fs::write(root.join("notes.md"), "notes\n").unwrap();
+
+    let changed = discover(root);
+    assert!(!changed.discovery_failed, "{:?}", changed.discovery_error);
+    assert_eq!(
+        changed.files,
+        vec![
+            ChangedFile {
+                path: "notes.md".to_owned(),
+                kind: ChangeKind::Untracked,
+            },
+            ChangedFile {
+                path: "src/lib.rs".to_owned(),
+                kind: ChangeKind::Added,
+            },
+        ]
+    );
+}
+
+/// Intent-to-add entries are index paths and must be discovered.
+#[test]
+fn discover_unborn_head_includes_intent_to_add() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    git(root, &["init", "-q"]);
+    std::fs::write(root.join("intent.rs"), "fn main() {}\n").unwrap();
+    git(root, &["add", "-N", "intent.rs"]);
+
+    let changed = discover(root);
+    assert!(!changed.discovery_failed, "{:?}", changed.discovery_error);
+    assert!(
+        changed.files.iter().any(|file| file.path == "intent.rs"),
+        "intent-to-add path missing: {:?}",
+        changed.files
+    );
+}
+
+/// A clean committed tree is a successful empty change set, not a failure.
+#[test]
+fn discover_clean_tree_is_empty_and_successful() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    git(root, &["init", "-q"]);
+    std::fs::write(root.join("main.rs"), "fn main() {}\n").unwrap();
+    git(root, &["add", "-A"]);
+    git(root, &["commit", "-qm", "test: base"]);
+
+    let changed = discover(root);
+    assert!(!changed.discovery_failed);
+    assert_eq!(changed.files.len(), 0);
+    assert_eq!(changed.discovery_error, None);
+}
+
+/// A failing git query fails closed with the git diagnostic, never an empty set.
+#[test]
+fn discover_fails_closed_when_git_diff_fails() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    git(root, &["init", "-q"]);
+    std::fs::write(root.join("main.rs"), "fn main() {}\n").unwrap();
+    git(root, &["add", "-A"]);
+    git(root, &["commit", "-qm", "test: base"]);
+    std::fs::write(root.join(".git/index"), "corrupt").unwrap();
+
+    let changed = discover(root);
+    assert!(changed.discovery_failed);
+    assert_eq!(changed.files.len(), 0);
+    let error = changed.discovery_error.expect("diagnostic");
+    assert!(error.contains("git diff --name-status -z HEAD"), "{error}");
+    assert!(error.contains("index"), "{error}");
+}
+
+/// A non-UTF-8 path cannot be matched against globs, so discovery fails closed.
+#[cfg(unix)]
+#[test]
+fn discover_fails_closed_on_non_utf8_paths() {
+    use std::os::unix::ffi::OsStrExt;
+
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    git(root, &["init", "-q"]);
+    std::fs::write(root.join("ok.rs"), "fn main() {}\n").unwrap();
+    let name = std::ffi::OsStr::from_bytes(b"bad\xff.rs");
+    std::fs::write(root.join(name), "x\n").unwrap();
+
+    let changed = discover(root);
+    assert!(changed.discovery_failed);
+    let error = changed.discovery_error.expect("diagnostic");
+    assert!(error.contains("UTF-8"), "{error}");
 }
 
 /// A committed repo reports staged, unstaged, deleted, and untracked files.
@@ -229,11 +331,12 @@ fn discover_selection_fails_closed_for_missing_base() {
     assert!(selection.range.is_none());
     assert!(
         selection
-            .diagnostic
+            .changed
+            .discovery_error
             .as_deref()
             .is_some_and(|d| d.contains("origin/does-not-exist")),
         "diagnostic must name the unresolvable ref: {:?}",
-        selection.diagnostic
+        selection.changed.discovery_error
     );
 }
 
