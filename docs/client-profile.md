@@ -21,6 +21,9 @@ claims are never collapsed into a single "safe" boolean.
 
 ## Profile
 
+The document is described by
+[`schemas/client-profile-v1.schema.json`](../schemas/client-profile-v1.schema.json).
+
 <!-- example: id=client-profile classification=parser-check-only reason="Bounded profile document; parsed by the client-profile unit tests." -->
 ```json
 {
@@ -47,6 +50,9 @@ digest differs. `host_boundary`, `mcp_mediation`, `governance_enforced`, and
 `completion_gated` must name the route they were tested on.
 
 ## Observations
+
+The document is described by
+[`schemas/client-observation-v1.schema.json`](../schemas/client-observation-v1.schema.json).
 
 <!-- example: id=client-observation classification=parser-check-only reason="Bounded observation document; parsed by the client-profile unit tests." -->
 ```json
