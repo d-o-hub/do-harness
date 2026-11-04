@@ -118,6 +118,18 @@ _do__harness() {
             do__harness,version)
                 cmd="do__harness__subcmd__version"
                 ;;
+            do__harness__subcmd__doctor,help)
+                cmd="do__harness__subcmd__doctor__subcmd__help"
+                ;;
+            do__harness__subcmd__doctor,pr-policy)
+                cmd="do__harness__subcmd__doctor__subcmd__pr__subcmd__policy"
+                ;;
+            do__harness__subcmd__doctor__subcmd__help,help)
+                cmd="do__harness__subcmd__doctor__subcmd__help__subcmd__help"
+                ;;
+            do__harness__subcmd__doctor__subcmd__help,pr-policy)
+                cmd="do__harness__subcmd__doctor__subcmd__help__subcmd__pr__subcmd__policy"
+                ;;
             do__harness__subcmd__errors,clear)
                 cmd="do__harness__subcmd__errors__subcmd__clear"
                 ;;
@@ -252,6 +264,9 @@ _do__harness() {
                 ;;
             do__harness__subcmd__help,version)
                 cmd="do__harness__subcmd__help__subcmd__version"
+                ;;
+            do__harness__subcmd__help__subcmd__doctor,pr-policy)
+                cmd="do__harness__subcmd__help__subcmd__doctor__subcmd__pr__subcmd__policy"
                 ;;
             do__harness__subcmd__help__subcmd__errors,clear)
                 cmd="do__harness__subcmd__help__subcmd__errors__subcmd__clear"
@@ -901,7 +916,7 @@ _do__harness() {
             return 0
             ;;
         do__subcmd__harness__subcmd__doctor)
-            opts="-q -h -V --format --strict --client-profile --client-probe --root --config --quiet --output --dry-run --help --version"
+            opts="-q -h -V --format --strict --client-profile --client-probe --root --config --quiet --output --dry-run --help --version pr-policy help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -913,6 +928,103 @@ _do__harness() {
                     ;;
                 --client-profile)
                     COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --root)
+                    COMPREPLY=()
+                    if [[ "${BASH_VERSINFO[0]}" -ge 4 ]]; then
+                        compopt -o plusdirs
+                    fi
+                    return 0
+                    ;;
+                --config)
+                    local oldifs
+                    if [ -n "${IFS+x}" ]; then
+                        oldifs="$IFS"
+                    fi
+                    IFS=$'\n'
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    if [ -n "${oldifs+x}" ]; then
+                        IFS="$oldifs"
+                    fi
+                    if [[ "${BASH_VERSINFO[0]}" -ge 4 ]]; then
+                        compopt -o filenames
+                    fi
+                    return 0
+                    ;;
+                --output)
+                    local oldifs
+                    if [ -n "${IFS+x}" ]; then
+                        oldifs="$IFS"
+                    fi
+                    IFS=$'\n'
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    if [ -n "${oldifs+x}" ]; then
+                        IFS="$oldifs"
+                    fi
+                    if [[ "${BASH_VERSINFO[0]}" -ge 4 ]]; then
+                        compopt -o filenames
+                    fi
+                    return 0
+                    ;;
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        do__subcmd__harness__subcmd__doctor__subcmd__help)
+            opts="pr-policy help"
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        do__subcmd__harness__subcmd__doctor__subcmd__help__subcmd__help)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        do__subcmd__harness__subcmd__doctor__subcmd__help__subcmd__pr__subcmd__policy)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        do__subcmd__harness__subcmd__doctor__subcmd__pr__subcmd__policy)
+            opts="-q -h -V --format --root --config --quiet --output --dry-run --help --version"
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                --format)
+                    COMPREPLY=($(compgen -W "text json" -- "${cur}"))
                     return 0
                     ;;
                 --root)
@@ -1822,8 +1934,22 @@ _do__harness() {
             return 0
             ;;
         do__subcmd__harness__subcmd__help__subcmd__doctor)
-            opts=""
+            opts="pr-policy"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        do__subcmd__harness__subcmd__help__subcmd__doctor__subcmd__pr__subcmd__policy)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
             fi

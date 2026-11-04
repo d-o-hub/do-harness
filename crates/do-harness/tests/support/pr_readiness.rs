@@ -41,6 +41,15 @@ fi
 # gh api ... — the endpoint is an argument, not `$2`: `--paginate` and
 # `--jq` flags may precede it.
 if [ "$1" = "api" ]; then
+    # Assert GET-only behaviour: no mutation flags permitted.
+    for arg in "$@"; do
+        case "$arg" in
+            -XPOST|-XPUT|-XPATCH|-XDELETE|--method=POST|--method=PUT|--method=PATCH|--method=DELETE)
+                echo "mutation forbidden in GET-only api mock: $arg" >&2
+                exit 2
+                ;;
+        esac
+    done
     endpoint=""
     for arg in "$@"; do
         case "$arg" in
@@ -101,6 +110,43 @@ if [ "$1" = "api" ]; then
         *comments*)
             if [ -f "$MOCK_DIR/comments.json" ]; then
                 cat "$MOCK_DIR/comments.json"
+            else
+                printf '%s' '[]'
+            fi
+            exit 0
+            ;;
+        *rulesets/*)
+            if [ -f "$MOCK_DIR/fail_ruleset_detail" ]; then
+                echo "HTTP 403: permission denied" >&2
+                exit 1
+            fi
+            if [ -f "$MOCK_DIR/ruleset_detail.json" ]; then
+                cat "$MOCK_DIR/ruleset_detail.json"
+            else
+                echo "HTTP 404: Not Found" >&2
+                exit 1
+            fi
+            exit 0
+            ;;
+        *rulesets*)
+            if [ -f "$MOCK_DIR/fail_rulesets" ]; then
+                echo "HTTP 403: permission denied" >&2
+                exit 1
+            fi
+            if [ -f "$MOCK_DIR/rulesets.json" ]; then
+                cat "$MOCK_DIR/rulesets.json"
+            else
+                printf '%s' '[]'
+            fi
+            exit 0
+            ;;
+        *rules/branches/*)
+            if [ -f "$MOCK_DIR/fail_branch_rules" ]; then
+                echo "HTTP 403: permission denied" >&2
+                exit 1
+            fi
+            if [ -f "$MOCK_DIR/branch_rules.json" ]; then
+                cat "$MOCK_DIR/branch_rules.json"
             else
                 printf '%s' '[]'
             fi

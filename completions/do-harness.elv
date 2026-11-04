@@ -948,6 +948,29 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand --help 'Print help (see more with ''--help'')'
             cand -V 'Print version'
             cand --version 'Print version'
+            cand pr-policy 'Check repository PR merge policy against configured expectations'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'do-harness;doctor;pr-policy'= {
+            cand --format 'Output format'
+            cand --root 'Workspace root override (default: walk up from cwd)'
+            cand --config 'Explicit path to do-harness.toml'
+            cand --output 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)'
+            cand -q 'Suppress PASS/WARN verdict lines and the success footer'
+            cand --quiet 'Suppress PASS/WARN verdict lines and the success footer'
+            cand --dry-run 'Dry run without side effects'
+            cand -h 'Print help (see more with ''--help'')'
+            cand --help 'Print help (see more with ''--help'')'
+            cand -V 'Print version'
+            cand --version 'Print version'
+        }
+        &'do-harness;doctor;help'= {
+            cand pr-policy 'Check repository PR merge policy against configured expectations'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'do-harness;doctor;help;pr-policy'= {
+        }
+        &'do-harness;doctor;help;help'= {
         }
         &'do-harness;metrics'= {
             cand --format 'Output format'
@@ -1363,6 +1386,9 @@ set edit:completion:arg-completer[do-harness] = {|@words|
         &'do-harness;help;hook;diff'= {
         }
         &'do-harness;help;doctor'= {
+            cand pr-policy 'Check repository PR merge policy against configured expectations'
+        }
+        &'do-harness;help;doctor;pr-policy'= {
         }
         &'do-harness;help;metrics'= {
             cand pr 'PR-loop measures: time-to-green, pushes per green, waivers, comments, cancelled runs, reruns'

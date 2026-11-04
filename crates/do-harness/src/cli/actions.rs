@@ -410,3 +410,14 @@ pub enum FeedbackAction {
         format: Format,
     },
 }
+
+/// Available doctor actions.
+#[derive(Debug, Subcommand)]
+pub enum DoctorAction {
+    /// Check repository PR merge policy against configured expectations.
+    PrPolicy {
+        /// Output format.
+        #[arg(long, value_enum)]
+        format: Option<Format>,
+    },
+}

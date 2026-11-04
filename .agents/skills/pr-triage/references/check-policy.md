@@ -127,6 +127,17 @@ that never reports is `UNKNOWN`; do not merge around it.
 refuses anything but `PASS`. An unavailable binary, an unreadable API, a
 pending check, or an unknown state is a hard stop.
 
+
+## Server ruleset protection
+
+Client-side checks are backed by repository ruleset enforcement on the GitHub
+server. The server requires:
+- Review thread resolution (`required_review_thread_resolution: true`).
+- Required status checks: `pr-required` and `semver` (integration ID `15368`).
+- Strict status check policy (up-to-date base before merge).
+- No bypass actors (`bypass_actors: []`, `current_user_can_bypass: "never"`).
+
+Check drift against `plans/pr-merge-policy.toml` using `do-harness doctor pr-policy`.
 ## Sources
 
 - REST: check runs and check-run annotations

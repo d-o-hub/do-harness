@@ -2798,7 +2798,7 @@
     {
       "path": "doctor",
       "about": "Run diagnostic checks on binary resolution and git hook health",
-      "usage": "do-harness doctor [OPTIONS]",
+      "usage": "do-harness doctor [OPTIONS] [COMMAND]",
       "aliases": [],
       "args": [
         {
@@ -2868,6 +2868,37 @@
           "default_values": [],
           "possible_values": [],
           "help": "Run the profile's pinned observation adapter instead of reading recorded observations. Requires `--client-profile`",
+          "index": null
+        }
+      ],
+      "subcommands": [
+        "pr-policy"
+      ],
+      "invocable": true
+    },
+    {
+      "path": "doctor pr-policy",
+      "about": "Check repository PR merge policy against configured expectations",
+      "usage": "do-harness doctor pr-policy [OPTIONS]",
+      "aliases": [],
+      "args": [
+        {
+          "id": "format",
+          "kind": "option",
+          "short": null,
+          "long": "format",
+          "value_names": [
+            "FORMAT"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [
+            "text",
+            "json"
+          ],
+          "help": "Output format",
           "index": null
         }
       ],

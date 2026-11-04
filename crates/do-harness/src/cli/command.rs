@@ -12,8 +12,8 @@ use crate::report::Format;
 
 use super::LearnArgs;
 use super::actions::{
-    ErrorsAction, FeedbackAction, HookAction, MetricsAction, PrAction, SkillsAction, TaskAction,
-    TraceAction,
+    DoctorAction, ErrorsAction, FeedbackAction, HookAction, MetricsAction, PrAction, SkillsAction,
+    TaskAction, TraceAction,
 };
 
 /// Available subcommands.
@@ -314,6 +314,9 @@ pub enum Command {
     },
     /// Run diagnostic checks on binary resolution and git hook health.
     Doctor {
+        /// Optional doctor diagnostic action (`pr-policy`).
+        #[command(subcommand)]
+        action: Option<DoctorAction>,
         /// Output format.
         #[arg(long, value_enum, default_value_t = Format::Text)]
         format: Format,

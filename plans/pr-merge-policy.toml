@@ -1,0 +1,40 @@
+schema_version = 1
+ruleset_id = 22012548
+name = "main"
+target = "branch"
+source_type = "Repository"
+source = "d-o-hub/do-harness"
+enforcement = "active"
+include_refs = ["~DEFAULT_BRANCH"]
+exclude_refs = []
+bypass_actors = []
+current_user_can_bypass = "never"
+
+[required_status_checks]
+strict_required_status_checks_policy = true
+do_not_enforce_on_create = true
+required = [
+  { context = "pr-required", integration_id = 15368 },
+  { context = "semver", integration_id = 15368 },
+]
+
+[pull_request]
+required_approving_review_count = 0
+required_review_thread_resolution = true
+dismiss_stale_reviews_on_push = false
+required_reviewers = []
+require_code_owner_review = false
+require_last_push_approval = false
+require_extra_approval_for_unattributed_changes = false
+allowed_merge_methods = ["merge", "squash", "rebase"]
+
+[[code_scanning_tools]]
+tool = "CodeQL"
+security_alerts_threshold = "high_or_higher"
+alerts_threshold = "errors_and_warnings"
+
+[code_quality]
+severity = "errors"
+
+[other_rules]
+deletion = true

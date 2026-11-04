@@ -701,7 +701,7 @@ Remove an orphan task row that has no workflow events. A task with history is re
 
 ### `doctor`
 <!-- BEGIN GENERATED: cli-contract doctor -->
-`do-harness doctor [OPTIONS]`
+`do-harness doctor [OPTIONS] [COMMAND]`
 
 | Argument | Required | Default | Possible values | Description |
 | --- | --- | --- | --- | --- |
@@ -709,6 +709,9 @@ Remove an orphan task row that has no workflow events. A task with history is re
 | `--strict` | no | — | — | Strictly enforce warning checks as failures |
 | `--client-profile <FILE>` | no | — | — | Opt-in client capability profile (JSON). Default diagnostics are unchanged when it is omitted |
 | `--client-probe` | no | — | — | Run the profile's pinned observation adapter instead of reading recorded observations. Requires `--client-profile` |
+
+
+Subcommands: `pr-policy`.
 <!-- END GENERATED: cli-contract doctor -->
 Diagnostic health checks covering binary resolution, git hook status, database migration skew, and the path-looking arguments in each effective sensor's `argv`.
 
@@ -723,6 +726,16 @@ Diagnostic health checks covering binary resolution, git hook status, database m
   (`2`), matching `hook status` for the same failure. A check that runs and
   fails (`1`) includes an unreadable state database, since diagnosing it is the
   doctor's job.
+
+#### `doctor pr-policy`
+<!-- BEGIN GENERATED: cli-contract doctor pr-policy -->
+`do-harness doctor pr-policy [OPTIONS]`
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `--format <FORMAT>` | no | — | `text`, `json` | Output format |
+<!-- END GENERATED: cli-contract doctor pr-policy -->
+Check repository PR merge policy and active server rulesets against `plans/pr-merge-policy.toml`.
 
 ### `eval`
 <!-- BEGIN GENERATED: cli-contract eval -->
