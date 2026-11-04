@@ -26,6 +26,11 @@ to prevent the fire. See `docs/cli.md` for the command reference
 
 | Skill | Purpose |
 |-------|---------|
+| `codacy-analysis-cli` | Run local static analysis with the Codacy Analysis CLI |
+| `codacy-cloud-cli` | Query Codacy Cloud issues, findings, PRs, tools, and patterns |
+| `codacy-code-review` | Enrich pull request reviews with Codacy quality and coverage data |
+| `configure-codacy` | Tune Codacy configuration to a project and cut noise |
+| `configure-codacy-cloud` | Tune an existing Codacy Cloud repository configuration |
 | `crates-io-name-check` | Verify crates.io name availability before publishing |
 | `event-modeler` | Type-safe event-sourced slices (commands, events, projections) |
 | `fail-closed-proxy` | Fail-closed tool-call mediation with audit and metrics |
@@ -36,10 +41,35 @@ to prevent the fire. See `docs/cli.md` for the command reference
 | `nested-build-isolation` | Keep nested cargo/coverage builds from interfering |
 | `npm-github-publish` | Publish npm packages via GitHub OIDC Trusted Publishers |
 | `pr-triage` | End-to-end GitHub PR triage, review, and merge |
+| `setup-coverage` | Set up coverage reporting and upload it to Codacy |
 | `skill-creator` | Scaffold, validate, and evaluate new skills |
 | `skill-distiller` | Compress verified traces and fixes into reusable skills |
 | `spike-runner` | Isolated de-risking spikes for uncertain APIs or integrations |
 | `tokio-performance` | Workload-aware async rules and review flags |
+
+### Vendored Codacy skills
+
+The six `codacy-*`, `configure-codacy*`, and `setup-coverage` skills are
+vendored from [`codacy/codacy-skills`](https://github.com/codacy/codacy-skills)
+at commit `caa5d6f7f1f7261e469b2de7951707c553b23ee4`. Their shared glossary
+lives at `.agents/references/glossary.md`, which is where the upstream
+`../../references/glossary.md` links resolve from a skill directory. Each skill
+is pinned in `.agents/skills-manifest.toml`; `do-harness skills drift` reports
+any local edit as drift instead of updating silently.
+
+Two local adaptations keep the vendored trees inside this repository's gates,
+and both are recorded in the manifest header:
+
+- `configure-codacy`'s body exceeded the skill structure gate's
+  progressive-disclosure limit, so Steps 0/4/6 and the per-tool tips moved
+  verbatim into that skill's `references/`. `SKILL.md` keeps a condensed
+  summary plus a pointer for each.
+- A `**Field reference**` paragraph in `configure-codacy-cloud` became a
+  heading so `markdownlint` (MD036) passes.
+
+Re-vendoring a newer upstream commit means copying the six directories again,
+re-applying those two adaptations, refreshing the `content_sha256` pins with
+`do-harness skills drift --format json`, and updating the commit recorded here.
 
 ## Progressive disclosure
 

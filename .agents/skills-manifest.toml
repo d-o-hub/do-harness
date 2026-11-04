@@ -1,0 +1,66 @@
+# Pinned upstream skills.
+#
+# The six Codacy skills are vendored from `codacy/codacy-skills` at the commit
+# below. `content_sha256` describes the local tree as committed here: the
+# `configure-codacy` body was split into `references/` (move-only) so it satisfies
+# the skill structure gate's progressive-disclosure limit, and a heading in
+# `configure-codacy-cloud` was promoted so markdownlint passes. Everything else is
+# byte-identical to upstream.
+#
+# Check with `do-harness skills drift` (offline, check-only): exit 0 when every
+# managed tree still matches its pin, 1 on drift or a missing tree, 2 on an
+# unusable manifest.
+
+[[skills]]
+name = "codacy-analysis-cli"
+path = ".agents/skills/codacy-analysis-cli"
+upstream = "codacy/codacy-skills"
+upstream_path = "skills/codacy-analysis-cli"
+version = "1.5.0"
+commit = "caa5d6f7f1f7261e469b2de7951707c553b23ee4"
+content_sha256 = "322217fee60bf73b87e7e4e681abd625fe532e678424e7376e1e076c49d5dccd"
+
+[[skills]]
+name = "codacy-cloud-cli"
+path = ".agents/skills/codacy-cloud-cli"
+upstream = "codacy/codacy-skills"
+upstream_path = "skills/codacy-cloud-cli"
+version = "1.6.1"
+commit = "caa5d6f7f1f7261e469b2de7951707c553b23ee4"
+content_sha256 = "ab7125b7728340d509151cc186f0c614cae57bdc773ba605f0b0f7fd6d85536d"
+
+[[skills]]
+name = "codacy-code-review"
+path = ".agents/skills/codacy-code-review"
+upstream = "codacy/codacy-skills"
+upstream_path = "skills/codacy-code-review"
+version = "1.5.0"
+commit = "caa5d6f7f1f7261e469b2de7951707c553b23ee4"
+content_sha256 = "4654eeeabbc0ba715387ff3c0ba7a496935c989bd6e6991b665994b1c5e0090f"
+
+[[skills]]
+name = "configure-codacy"
+path = ".agents/skills/configure-codacy"
+upstream = "codacy/codacy-skills"
+upstream_path = "skills/configure-codacy"
+version = "4.3.0"
+commit = "caa5d6f7f1f7261e469b2de7951707c553b23ee4"
+content_sha256 = "d1c1d9a5940d6ea9721c71e025007b6c34baf4cd75caf631a14b9f78f63f5f5c"
+
+[[skills]]
+name = "configure-codacy-cloud"
+path = ".agents/skills/configure-codacy-cloud"
+upstream = "codacy/codacy-skills"
+upstream_path = "skills/configure-codacy-cloud"
+version = "1.1.0"
+commit = "caa5d6f7f1f7261e469b2de7951707c553b23ee4"
+content_sha256 = "7501a9e7f1dda621e3329f838d52c77f9231c434efe6c5cedc36083f95f816a4"
+
+[[skills]]
+name = "setup-coverage"
+path = ".agents/skills/setup-coverage"
+upstream = "codacy/codacy-skills"
+upstream_path = "skills/setup-coverage"
+version = "1.2.0"
+commit = "caa5d6f7f1f7261e469b2de7951707c553b23ee4"
+content_sha256 = "3c5c5e8f09d1f200f4de04c519988e15ac1214816d55ffc505a85f8b59807c39"
