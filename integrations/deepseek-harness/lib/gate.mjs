@@ -26,7 +26,7 @@ export function installCompletionGate({ ctx, settings, runner, logger }) {
   // alone lets the loop close the turn as `completed`.
   const blockedAgents = new WeakSet()
 
-  const block = (agent, attempts, reason) => {
+  function block(agent, attempts, reason) {
     blockedAgents.add(agent)
     logger?.warn?.(
       `do-harness completion gate blocked the turn after ${attempts} attempts with ${reason}`,
