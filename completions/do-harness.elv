@@ -450,6 +450,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand import 'Validate plans/tasks.json against the state database'
             cand list 'Print tasks from the state database'
             cand show 'Show details for a specific task'
+            cand context 'Assemble a bounded, read-only resume context for a task'
             cand add 'Add a task in `pending` state'
             cand advance 'Advance the task''s subtask pointer'
             cand done 'Mark a task done once its sensor-gated subtasks have passed'
@@ -504,6 +505,20 @@ set edit:completion:arg-completer[do-harness] = {|@words|
         }
         &'do-harness;task;show'= {
             cand --format 'Output format'
+            cand --root 'Workspace root override (default: walk up from cwd)'
+            cand --config 'Explicit path to do-harness.toml'
+            cand --output 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)'
+            cand -q 'Suppress PASS/WARN verdict lines and the success footer'
+            cand --quiet 'Suppress PASS/WARN verdict lines and the success footer'
+            cand --dry-run 'Dry run without side effects'
+            cand -h 'Print help (see more with ''--help'')'
+            cand --help 'Print help (see more with ''--help'')'
+            cand -V 'Print version'
+            cand --version 'Print version'
+        }
+        &'do-harness;task;context'= {
+            cand --format 'Output format'
+            cand --max-bytes 'Maximum rendered bytes; task identity and the next action always survive, so a very small budget is a floor, not a truncation'
             cand --root 'Workspace root override (default: walk up from cwd)'
             cand --config 'Explicit path to do-harness.toml'
             cand --output 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)'
@@ -583,6 +598,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand import 'Validate plans/tasks.json against the state database'
             cand list 'Print tasks from the state database'
             cand show 'Show details for a specific task'
+            cand context 'Assemble a bounded, read-only resume context for a task'
             cand add 'Add a task in `pending` state'
             cand advance 'Advance the task''s subtask pointer'
             cand done 'Mark a task done once its sensor-gated subtasks have passed'
@@ -597,6 +613,8 @@ set edit:completion:arg-completer[do-harness] = {|@words|
         &'do-harness;task;help;list'= {
         }
         &'do-harness;task;help;show'= {
+        }
+        &'do-harness;task;help;context'= {
         }
         &'do-harness;task;help;add'= {
         }
@@ -1256,6 +1274,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand import 'Validate plans/tasks.json against the state database'
             cand list 'Print tasks from the state database'
             cand show 'Show details for a specific task'
+            cand context 'Assemble a bounded, read-only resume context for a task'
             cand add 'Add a task in `pending` state'
             cand advance 'Advance the task''s subtask pointer'
             cand done 'Mark a task done once its sensor-gated subtasks have passed'
@@ -1269,6 +1288,8 @@ set edit:completion:arg-completer[do-harness] = {|@words|
         &'do-harness;help;task;list'= {
         }
         &'do-harness;help;task;show'= {
+        }
+        &'do-harness;help;task;context'= {
         }
         &'do-harness;help;task;add'= {
         }

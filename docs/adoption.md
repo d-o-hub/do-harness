@@ -362,6 +362,7 @@ do-harness verify --set feedback --changed          # during edits
 do-harness verify --set verification --changed --strict   # before completion
 do-harness verify --set verification --since origin/main --strict  # clean committed branch
 do-harness status --set verification                # evidence freshness (no run)
+do-harness task context <ID> --format json          # bounded resume handoff (read-only)
 ```
 
 `verify --format json` emits one JSON object on stdout (failure tails go to
@@ -377,6 +378,14 @@ head or advanced base reports `stale` with reason `selection_changed`).
 `verify --set <set>` writes
 `.do-harness/evidence.<set>.json`, so feedback runs never clobber verification
 evidence.
+
+On session start or resume, `task context <ID>` assembles the current step,
+required sensors, task-scoped freshness and failures, recent traces, and one
+next command into a single bounded result. It is a projection of recorded
+facts, not a memory service: it cannot supply product acceptance criteria the
+task record does not carry, and a complete-looking context packet is never
+evidence that the task is done. Completion still requires the sensor gates
+(`task done`) or an explicit human decision.
 
 ## CI snippets
 

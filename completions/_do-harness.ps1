@@ -486,6 +486,7 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('import', 'import', [CompletionResultType]::ParameterValue, 'Validate plans/tasks.json against the state database')
             [CompletionResult]::new('list', 'list', [CompletionResultType]::ParameterValue, 'Print tasks from the state database')
             [CompletionResult]::new('show', 'show', [CompletionResultType]::ParameterValue, 'Show details for a specific task')
+            [CompletionResult]::new('context', 'context', [CompletionResultType]::ParameterValue, 'Assemble a bounded, read-only resume context for a task')
             [CompletionResult]::new('add', 'add', [CompletionResultType]::ParameterValue, 'Add a task in `pending` state')
             [CompletionResult]::new('advance', 'advance', [CompletionResultType]::ParameterValue, 'Advance the task''s subtask pointer')
             [CompletionResult]::new('done', 'done', [CompletionResultType]::ParameterValue, 'Mark a task done once its sensor-gated subtasks have passed')
@@ -544,6 +545,21 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
         }
         'do-harness;task;show' {
             [CompletionResult]::new('--format', '--format', [CompletionResultType]::ParameterName, 'Output format')
+            [CompletionResult]::new('--root', '--root', [CompletionResultType]::ParameterName, 'Workspace root override (default: walk up from cwd)')
+            [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Explicit path to do-harness.toml')
+            [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)')
+            [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Suppress PASS/WARN verdict lines and the success footer')
+            [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Suppress PASS/WARN verdict lines and the success footer')
+            [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Dry run without side effects')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            [CompletionResult]::new('-V', '-V ', [CompletionResultType]::ParameterName, 'Print version')
+            [CompletionResult]::new('--version', '--version', [CompletionResultType]::ParameterName, 'Print version')
+            break
+        }
+        'do-harness;task;context' {
+            [CompletionResult]::new('--format', '--format', [CompletionResultType]::ParameterName, 'Output format')
+            [CompletionResult]::new('--max-bytes', '--max-bytes', [CompletionResultType]::ParameterName, 'Maximum rendered bytes; task identity and the next action always survive, so a very small budget is a floor, not a truncation')
             [CompletionResult]::new('--root', '--root', [CompletionResultType]::ParameterName, 'Workspace root override (default: walk up from cwd)')
             [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Explicit path to do-harness.toml')
             [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)')
@@ -629,6 +645,7 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('import', 'import', [CompletionResultType]::ParameterValue, 'Validate plans/tasks.json against the state database')
             [CompletionResult]::new('list', 'list', [CompletionResultType]::ParameterValue, 'Print tasks from the state database')
             [CompletionResult]::new('show', 'show', [CompletionResultType]::ParameterValue, 'Show details for a specific task')
+            [CompletionResult]::new('context', 'context', [CompletionResultType]::ParameterValue, 'Assemble a bounded, read-only resume context for a task')
             [CompletionResult]::new('add', 'add', [CompletionResultType]::ParameterValue, 'Add a task in `pending` state')
             [CompletionResult]::new('advance', 'advance', [CompletionResultType]::ParameterValue, 'Advance the task''s subtask pointer')
             [CompletionResult]::new('done', 'done', [CompletionResultType]::ParameterValue, 'Mark a task done once its sensor-gated subtasks have passed')
@@ -647,6 +664,9 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             break
         }
         'do-harness;task;help;show' {
+            break
+        }
+        'do-harness;task;help;context' {
             break
         }
         'do-harness;task;help;add' {
@@ -1387,6 +1407,7 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('import', 'import', [CompletionResultType]::ParameterValue, 'Validate plans/tasks.json against the state database')
             [CompletionResult]::new('list', 'list', [CompletionResultType]::ParameterValue, 'Print tasks from the state database')
             [CompletionResult]::new('show', 'show', [CompletionResultType]::ParameterValue, 'Show details for a specific task')
+            [CompletionResult]::new('context', 'context', [CompletionResultType]::ParameterValue, 'Assemble a bounded, read-only resume context for a task')
             [CompletionResult]::new('add', 'add', [CompletionResultType]::ParameterValue, 'Add a task in `pending` state')
             [CompletionResult]::new('advance', 'advance', [CompletionResultType]::ParameterValue, 'Advance the task''s subtask pointer')
             [CompletionResult]::new('done', 'done', [CompletionResultType]::ParameterValue, 'Mark a task done once its sensor-gated subtasks have passed')
@@ -1404,6 +1425,9 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             break
         }
         'do-harness;help;task;show' {
+            break
+        }
+        'do-harness;help;task;context' {
             break
         }
         'do-harness;help;task;add' {
