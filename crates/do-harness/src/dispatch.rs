@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 
 use clap::CommandFactory;
 
-use crate::cli::{Cli, Command};
+use crate::cli::{Cli, Command, DoctorAction};
 use crate::{
     CliError, ci_explain, commands, config, distill, distill_strikes, doctor, dora, eval, exit,
     explain, feedback, init, learn, loc, man, metrics, overlap, pr, report, sensors, skills, split,
@@ -340,19 +340,25 @@ async fn route(root: &Path, config_path: Option<PathBuf>, cli: Cli) -> Result<()
                 .map_err(CliError::Usage)
         }
         Command::Doctor {
+            action,
             format,
             strict,
             client_profile,
             client_probe,
-        } => doctor::run(
-            root,
-            format,
-            strict,
-            client_profile.as_deref(),
-            client_probe,
-        )
-        .await
-        .map_err(exit::classify),
+        } => match action {
+            Some(DoctorAction::PrPolicy { format: sub_format }) => {
+                pr::policy::run(root, sub_format.unwrap_or(format))
+            }
+            None => doctor::run(
+                root,
+                format,
+                strict,
+                client_profile.as_deref(),
+                client_probe,
+            )
+            .await
+            .map_err(exit::classify),
+        },
         Command::AuditChain { format } => commands::audit_chain_cmd(root, format)
             .await
             .map_err(CliError::Verify),

@@ -646,18 +646,31 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand hook; and __fish_s
 complete -c do-harness -n "__fish_do_harness_using_subcommand hook; and __fish_seen_subcommand_from help" -f -a "status" -d 'Show whether the managed hooks and release binary are present'
 complete -c do-harness -n "__fish_do_harness_using_subcommand hook; and __fish_seen_subcommand_from help" -f -a "diff" -d 'Show diff between installed hooks and current templates'
 complete -c do-harness -n "__fish_do_harness_using_subcommand hook; and __fish_seen_subcommand_from help" -f -a "help" -d 'Print this message or the help of the given subcommand(s)'
-complete -c do-harness -n "__fish_do_harness_using_subcommand doctor" -l format -d 'Output format' -r -f -a "text\t'Human-readable text output'
+complete -c do-harness -n "__fish_do_harness_using_subcommand doctor; and not __fish_seen_subcommand_from pr-policy help" -l format -d 'Output format' -r -f -a "text\t'Human-readable text output'
 json\t'Machine-readable JSON output'"
-complete -c do-harness -n "__fish_do_harness_using_subcommand doctor" -l client-profile -d 'Opt-in client capability profile (JSON). Default diagnostics are unchanged when it is omitted' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand doctor" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
-complete -c do-harness -n "__fish_do_harness_using_subcommand doctor" -l config -d 'Explicit path to do-harness.toml' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand doctor" -l output -d 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand doctor" -l strict -d 'Strictly enforce warning checks as failures'
-complete -c do-harness -n "__fish_do_harness_using_subcommand doctor" -l client-probe -d 'Run the profile\'s pinned observation adapter instead of reading recorded observations. Requires `--client-profile`'
-complete -c do-harness -n "__fish_do_harness_using_subcommand doctor" -s q -l quiet -d 'Suppress PASS/WARN verdict lines and the success footer'
-complete -c do-harness -n "__fish_do_harness_using_subcommand doctor" -l dry-run -d 'Dry run without side effects'
-complete -c do-harness -n "__fish_do_harness_using_subcommand doctor" -s h -l help -d 'Print help (see more with \'--help\')'
-complete -c do-harness -n "__fish_do_harness_using_subcommand doctor" -s V -l version -d 'Print version'
+complete -c do-harness -n "__fish_do_harness_using_subcommand doctor; and not __fish_seen_subcommand_from pr-policy help" -l client-profile -d 'Opt-in client capability profile (JSON). Default diagnostics are unchanged when it is omitted' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand doctor; and not __fish_seen_subcommand_from pr-policy help" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
+complete -c do-harness -n "__fish_do_harness_using_subcommand doctor; and not __fish_seen_subcommand_from pr-policy help" -l config -d 'Explicit path to do-harness.toml' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand doctor; and not __fish_seen_subcommand_from pr-policy help" -l output -d 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand doctor; and not __fish_seen_subcommand_from pr-policy help" -l strict -d 'Strictly enforce warning checks as failures'
+complete -c do-harness -n "__fish_do_harness_using_subcommand doctor; and not __fish_seen_subcommand_from pr-policy help" -l client-probe -d 'Run the profile\'s pinned observation adapter instead of reading recorded observations. Requires `--client-profile`'
+complete -c do-harness -n "__fish_do_harness_using_subcommand doctor; and not __fish_seen_subcommand_from pr-policy help" -s q -l quiet -d 'Suppress PASS/WARN verdict lines and the success footer'
+complete -c do-harness -n "__fish_do_harness_using_subcommand doctor; and not __fish_seen_subcommand_from pr-policy help" -l dry-run -d 'Dry run without side effects'
+complete -c do-harness -n "__fish_do_harness_using_subcommand doctor; and not __fish_seen_subcommand_from pr-policy help" -s h -l help -d 'Print help (see more with \'--help\')'
+complete -c do-harness -n "__fish_do_harness_using_subcommand doctor; and not __fish_seen_subcommand_from pr-policy help" -s V -l version -d 'Print version'
+complete -c do-harness -n "__fish_do_harness_using_subcommand doctor; and not __fish_seen_subcommand_from pr-policy help" -f -a "pr-policy" -d 'Check repository PR merge policy against configured expectations'
+complete -c do-harness -n "__fish_do_harness_using_subcommand doctor; and not __fish_seen_subcommand_from pr-policy help" -f -a "help" -d 'Print this message or the help of the given subcommand(s)'
+complete -c do-harness -n "__fish_do_harness_using_subcommand doctor; and __fish_seen_subcommand_from pr-policy" -l format -d 'Output format' -r -f -a "text\t'Human-readable text output'
+json\t'Machine-readable JSON output'"
+complete -c do-harness -n "__fish_do_harness_using_subcommand doctor; and __fish_seen_subcommand_from pr-policy" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
+complete -c do-harness -n "__fish_do_harness_using_subcommand doctor; and __fish_seen_subcommand_from pr-policy" -l config -d 'Explicit path to do-harness.toml' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand doctor; and __fish_seen_subcommand_from pr-policy" -l output -d 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand doctor; and __fish_seen_subcommand_from pr-policy" -s q -l quiet -d 'Suppress PASS/WARN verdict lines and the success footer'
+complete -c do-harness -n "__fish_do_harness_using_subcommand doctor; and __fish_seen_subcommand_from pr-policy" -l dry-run -d 'Dry run without side effects'
+complete -c do-harness -n "__fish_do_harness_using_subcommand doctor; and __fish_seen_subcommand_from pr-policy" -s h -l help -d 'Print help (see more with \'--help\')'
+complete -c do-harness -n "__fish_do_harness_using_subcommand doctor; and __fish_seen_subcommand_from pr-policy" -s V -l version -d 'Print version'
+complete -c do-harness -n "__fish_do_harness_using_subcommand doctor; and __fish_seen_subcommand_from help" -f -a "pr-policy" -d 'Check repository PR merge policy against configured expectations'
+complete -c do-harness -n "__fish_do_harness_using_subcommand doctor; and __fish_seen_subcommand_from help" -f -a "help" -d 'Print this message or the help of the given subcommand(s)'
 complete -c do-harness -n "__fish_do_harness_using_subcommand metrics; and not __fish_seen_subcommand_from pr help" -l format -d 'Output format' -r -f -a "text\t'Human-readable text output'
 json\t'Machine-readable JSON output'"
 complete -c do-harness -n "__fish_do_harness_using_subcommand metrics; and not __fish_seen_subcommand_from pr help" -l sensor -d 'Filter by sensor name' -r
@@ -895,6 +908,7 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand help; and __fish_s
 complete -c do-harness -n "__fish_do_harness_using_subcommand help; and __fish_seen_subcommand_from hook" -f -a "uninstall" -d 'Remove managed hooks, leaving foreign hook files untouched'
 complete -c do-harness -n "__fish_do_harness_using_subcommand help; and __fish_seen_subcommand_from hook" -f -a "status" -d 'Show whether the managed hooks and release binary are present'
 complete -c do-harness -n "__fish_do_harness_using_subcommand help; and __fish_seen_subcommand_from hook" -f -a "diff" -d 'Show diff between installed hooks and current templates'
+complete -c do-harness -n "__fish_do_harness_using_subcommand help; and __fish_seen_subcommand_from doctor" -f -a "pr-policy" -d 'Check repository PR merge policy against configured expectations'
 complete -c do-harness -n "__fish_do_harness_using_subcommand help; and __fish_seen_subcommand_from metrics" -f -a "pr" -d 'PR-loop measures: time-to-green, pushes per green, waivers, comments, cancelled runs, reruns'
 complete -c do-harness -n "__fish_do_harness_using_subcommand help; and __fish_seen_subcommand_from feedback" -f -a "draft" -d 'Generate a local feedback draft from recurring or severe failure evidence'
 complete -c do-harness -n "__fish_do_harness_using_subcommand help; and __fish_seen_subcommand_from feedback" -f -a "submit" -d 'Explicitly submit a feedback draft'

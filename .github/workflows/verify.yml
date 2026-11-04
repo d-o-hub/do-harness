@@ -578,3 +578,40 @@ jobs:
           node --check integrations/npm/bin/do-harness.js
           node --check integrations/npm/lib/platform.js
           node --test integrations/npm/test/*.test.mjs
+
+  pr-required:
+    name: pr-required
+    runs-on: ubuntu-latest
+    if: always()
+    timeout-minutes: 5
+    needs:
+      - source-distribution
+      - verify
+      - msrv
+      - windows-tests
+      - windows
+    steps:
+      - name: Verify all required dependencies succeeded
+        shell: bash
+        env:
+          SOURCE_DISTRIBUTION_RESULT: ${{ needs.source-distribution.result }}
+          VERIFY_RESULT: ${{ needs.verify.result }}
+          MSRV_RESULT: ${{ needs.msrv.result }}
+          WINDOWS_TESTS_RESULT: ${{ needs.windows-tests.result }}
+          WINDOWS_RESULT: ${{ needs.windows.result }}
+        run: |
+          for name in \
+            "source-distribution:$SOURCE_DISTRIBUTION_RESULT" \
+            "verify:$VERIFY_RESULT" \
+            "msrv:$MSRV_RESULT" \
+            "windows-tests:$WINDOWS_TESTS_RESULT" \
+            "windows:$WINDOWS_RESULT"
+          do
+            job="${name%%:*}"
+            res="${name#*:}"
+            if [ "$res" != "success" ]; then
+              echo "Required job '$job' did not succeed: $res" >&2
+              exit 1
+            fi
+            echo "Required job '$job' succeeded"
+          done

@@ -10,8 +10,8 @@ mod actions;
 mod command;
 mod learn;
 pub use actions::{
-    ErrorsAction, FeedbackAction, HookAction, MetricsAction, PrAction, SkillsAction, TaskAction,
-    TraceAction,
+    DoctorAction, ErrorsAction, FeedbackAction, HookAction, MetricsAction, PrAction, SkillsAction,
+    TaskAction, TraceAction,
 };
 pub use command::Command;
 pub use learn::LearnArgs;
