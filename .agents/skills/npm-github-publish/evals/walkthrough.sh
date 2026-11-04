@@ -104,6 +104,17 @@ with zipfile.ZipFile(out, "w") as archive:
             archive.write(path, os.path.relpath(path, os.path.dirname(src)))
 PY
 
+# The publisher sources scripts/lib.sh from its own directory. The eval sandbox
+# mirrors only repo paths this skill names, so name it here and fail loudly when
+# the mirror is incomplete: publish-npm.sh sends that error to the captured log,
+# which used to surface only as a nameless 0/48 walkthrough failure.
+for dependency in scripts/publish-npm.sh scripts/lib.sh; do
+    [[ -f "$root/$dependency" ]] || {
+        echo "sandbox is missing $dependency" >&2
+        exit 1
+    }
+done
+
 NPM_CONFIG_REGISTRY="http://127.0.0.1:${stub_port}" \
     bash "$root/scripts/publish-npm.sh" \
     --dist "$stub_root/dist" --version "$version" --dry-run \

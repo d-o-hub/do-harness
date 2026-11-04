@@ -325,6 +325,11 @@ jobs:
           path: |
             .do-harness/evidence.*.json
             .do-harness/Cargo.lock.sha256
+          # The evidence lives under a dot-directory, and upload-artifact
+          # excludes hidden paths when a glob expands (`evidence.*.json`
+          # matches nothing otherwise). An exact single path is not enough
+          # here: a run may record more than one signal set.
+          include-hidden-files: true
           if-no-files-found: error
 
   msrv:

@@ -27,9 +27,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
+      # No `ref:` here on purpose. A `workflow_run` job runs with write
+      # permissions, so checking out any event-supplied ref is the pwn-request
+      # shape scanners reject; the implicit ref is the default branch (this
+      # workflow's own trusted code), and the failed commit is only detached to
+      # after it is proven to be an ancestor of `origin/main` below.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: main
           fetch-depth: 0
       - name: Verify the failed commit belongs to main
         env:
