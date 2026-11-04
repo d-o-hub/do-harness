@@ -29,8 +29,23 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: main
           fetch-depth: 0
+      - name: Verify the failed commit belongs to main
+        env:
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "invalid failed run commit SHA" >&2
+            exit 1
+          fi
+          git fetch --no-tags origin refs/heads/main:refs/remotes/origin/main
+          if ! git merge-base --is-ancestor "$HEAD_SHA" refs/remotes/origin/main; then
+            echo "refusing to repair a commit outside main history" >&2
+            exit 1
+          fi
+          git checkout --detach "$HEAD_SHA"
       - name: Resolve pinned toolchain
         id: toolchain
         run: |
