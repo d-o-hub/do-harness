@@ -37,7 +37,7 @@ import argparse
 import json
 import os
 import shutil
-import subprocess
+import subprocess  # nosec B404 - fixed binaries, argv lists only, never a shell
 import sys
 import tempfile
 from pathlib import Path
@@ -64,7 +64,7 @@ def missing_tool(name: str) -> int:
 def discover(root: Path) -> list[Path]:
     """Workflow files, including ones not yet staged (as check-actionlint.sh does)."""
     try:
-        listing = subprocess.run(
+        listing = subprocess.run(  # nosec B603 B607 - fixed git argv, no shell
             [
                 "git",
                 "-C",
@@ -135,7 +135,7 @@ def shellcheck_script(names: list[str], script: str) -> list[dict]:
         handle.write(prelude + script)
         path = handle.name
     try:
-        completed = subprocess.run(
+        completed = subprocess.run(  # nosec B603 B607 - shellcheck over a file we wrote
             ["shellcheck", "--shell=bash", "--format=json", path],
             capture_output=True,
             text=True,
