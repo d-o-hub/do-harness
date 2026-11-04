@@ -91,10 +91,18 @@ if [ -z "$harness_bin" ]; then
     fi
   done
 fi
-if [ -n "$harness_bin" ] && "$harness_bin" pr review --help >/dev/null 2>&1; then
-  ok "do-harness pr review available ($harness_bin)"
+# CI classification is a hard dependency: `checks.sh` and the pre-merge gate
+# call `do-harness pr checks` and refuse to merge without it. Fail here, before
+# any review work, instead of stopping mid-sweep at the check step.
+if [ -n "$harness_bin" ] && "$harness_bin" pr checks --help >/dev/null 2>&1; then
+  ok "do-harness pr checks available ($harness_bin)"
+  if "$harness_bin" pr review --help >/dev/null 2>&1; then
+    ok "do-harness pr review available (optional token reducer)"
+  else
+    warn "do-harness pr review unavailable; review falls back to the full diff"
+  fi
 else
-  warn "do-harness not available; falling back to full-diff review"
+  bad "do-harness pr checks not found; CI cannot be classified and the sweep must not merge (install do-harness or set DO_HARNESS_BIN)"
 fi
 
 # Webhook fast path (warn-only): the wait scripts work without it, polling.
