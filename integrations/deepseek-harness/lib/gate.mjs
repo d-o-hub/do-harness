@@ -2,47 +2,56 @@
 //
 // On `agent/turn-stopping` (serial, awaited) the gate performs only the cheap
 // `status` operation. Green evidence permits the stop; stale/red/missing
-// evidence steers the agent with a computational, specific reason. Repeated
-// identical failures and infrastructure errors are bounded so the gate can
-// never create an infinite continuation loop.
+// evidence steers the agent with a computational, specific reason. Every
+// non-green evaluation counts against one bounded budget, so alternating
+// outcomes cannot extend the loop. When the budget is spent the gate rejects
+// the next step: the host then closes the turn as `blocked` instead of
+// reporting a successful completion the evidence does not support.
 
 import {
   completionMessage,
+  exhaustedInfrastructureMessage,
   exhaustedMessage,
   infrastructureMessage,
 } from './messages.mjs'
 
-/** Registers the gate listener; returns the disposer from ctx.on. */
+/** Registers the gate listeners; returns a disposer for both. */
 export function installCompletionGate({ ctx, settings, runner, logger }) {
   if (!settings.strictCompletion) {
     return () => false
   }
   const attemptsByAgent = new Map()
-  return ctx.on('agent/turn-stopping', async (payload) => {
+  // A blocked agent is rejected once at the next step boundary. The host's
+  // only blocked outcome is a rejected `agent/pre-step`; stopping the steer
+  // alone lets the loop close the turn as `completed`.
+  const blockedAgents = new WeakSet()
+
+  const block = (agent, attempts, reason) => {
+    blockedAgents.add(agent)
+    logger?.warn?.(
+      `do-harness completion gate blocked the turn after ${attempts} attempts with ${reason}`,
+    )
+  }
+
+  const disposeStopping = ctx.on('agent/turn-stopping', async (payload) => {
     const agent = payload && payload.agent
     if (!agent || typeof agent.steer !== 'function') {
       return
     }
-    const key = agentKey(agent)
-    const entry = attemptsByAgent.get(key) ?? {
-      count: 0,
-      signature: null,
-      disabled: false,
-    }
-    if (entry.disabled) {
+    if (blockedAgents.has(agent)) {
       return
     }
+    const key = agentKey(agent)
+    const entry = attemptsByAgent.get(key) ?? { count: 0 }
     let document
     try {
       document = await runner.status({ set: settings.completionSignalSet, signal: payload.signal })
     } catch (error) {
-      attemptsByAgent.set(key, recordAttempt(entry, `error:${error.message}`))
-      if (attemptsByAgent.get(key).count > settings.maxContinuations) {
-        attemptsByAgent.get(key).disabled = true
-        logger?.warn?.(
-          `do-harness completion gate disabled after repeated infrastructure errors: ${error.message}`,
-        )
-        agent.steer(infrastructureMessage(error))
+      const attempts = entry.count + 1
+      attemptsByAgent.set(key, { count: attempts })
+      if (attempts > settings.maxContinuations) {
+        block(agent, attempts, `repeated infrastructure errors: ${error.message}`)
+        agent.steer(exhaustedInfrastructureMessage(error, attempts))
         return
       }
       agent.steer(infrastructureMessage(error))
@@ -52,31 +61,32 @@ export function installCompletionGate({ ctx, settings, runner, logger }) {
       attemptsByAgent.delete(key)
       return
     }
-    const signature = [
-      document.state,
-      document.reason,
-      ...(document.evidence?.failed ?? []),
-    ].join(':')
-    const next = recordAttempt(entry, signature)
-    attemptsByAgent.set(key, next)
-    if (next.count > settings.maxContinuations) {
-      next.disabled = true
-      logger?.warn?.(
-        `do-harness completion gate disabled after ${next.count} unchanged ${document.state} results`,
-      )
-      agent.steer(exhaustedMessage(document, next.count))
+    const attempts = entry.count + 1
+    attemptsByAgent.set(key, { count: attempts })
+    if (attempts > settings.maxContinuations) {
+      block(agent, attempts, `non-green ${document.state} results`)
+      agent.steer(exhaustedMessage(document, attempts))
       return
     }
     agent.steer(completionMessage(document))
   })
-}
 
-/** Tracks consecutive identical outcomes for one agent. */
-function recordAttempt(entry, signature) {
-  if (entry.signature === signature) {
-    return { ...entry, count: entry.count + 1 }
+  const disposePreStep = ctx.on('agent/pre-step', async (payload, next) => {
+    if (!payload || !payload.agent || !blockedAgents.has(payload.agent)) {
+      return next()
+    }
+    // One rejected step ends this turn; a later turn starts with a fresh
+    // budget instead of leaving the agent permanently unable to run.
+    blockedAgents.delete(payload.agent)
+    attemptsByAgent.delete(agentKey(payload.agent))
+    return { kind: 'reject' }
+  })
+
+  return () => {
+    disposeStopping()
+    disposePreStep()
+    return true
   }
-  return { ...entry, signature, count: 1 }
 }
 
 /** Stable per-agent key without requiring a specific Agent shape. */
