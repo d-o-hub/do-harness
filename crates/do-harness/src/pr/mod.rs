@@ -7,6 +7,7 @@ pub mod agent_view;
 pub use agent_view::ReviewView;
 
 pub mod cache;
+pub mod checks;
 pub mod command;
 pub mod diff;
 pub mod gh;

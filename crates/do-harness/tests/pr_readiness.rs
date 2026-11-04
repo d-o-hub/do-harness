@@ -38,11 +38,13 @@ fn cancelled_check_fails_readiness_and_provides_rerun_command() {
     )
     .unwrap();
 
-    // `gh api --paginate --jq '.check_runs[]'` streams one object per line.
+    // `gh api --paginate --slurp` returns one array of page documents.
     std::fs::write(
         root.join("check_runs.json"),
-        r#"{"id": 1, "name": "Storage Matrix (redis)", "status": "completed", "conclusion": "cancelled", "html_url": "https://github.com/d-o-hub/rust-self-learning-memory/actions/runs/35885635041/job/987654321"}
-{"id": 2, "name": "test", "status": "completed", "conclusion": "success", "html_url": "https://github.com/d-o-hub/rust-self-learning-memory/actions/runs/35885635041/job/111111111"}"#,
+        r#"{"total_count": 2, "check_runs": [
+            {"id": 1, "name": "Storage Matrix (redis)", "status": "completed", "conclusion": "cancelled", "html_url": "https://github.com/d-o-hub/rust-self-learning-memory/actions/runs/35885635041/job/987654321"},
+            {"id": 2, "name": "test", "status": "completed", "conclusion": "success", "html_url": "https://github.com/d-o-hub/rust-self-learning-memory/actions/runs/35885635041/job/111111111"}
+        ]}"#,
     )
     .unwrap();
 
@@ -55,7 +57,7 @@ fn cancelled_check_fails_readiness_and_provides_rerun_command() {
             "CANCELLED: Storage Matrix (redis) -> gh run rerun 35885635041 --job 987654321"
         )
     );
-    assert!(stdout.contains("check 'Storage Matrix (redis)' was CANCELLED; rerun with: gh run rerun 35885635041 --job 987654321"));
+    assert!(stdout.contains("check 'Storage Matrix (redis)' failed (cancelled)"));
     assert!(stderr.contains("not ready to merge"));
 
     // 2. Direct invocation `do-harness pr 1041 --format json`:
@@ -135,8 +137,10 @@ fn conflicting_pull_request_reports_its_check_set_as_incomplete() {
     .unwrap();
     std::fs::write(
         root.join("check_runs.json"),
-        r#"{"id": 1, "name": "Codacy Static Code Analysis", "status": "completed", "conclusion": "success"}
-{"id": 2, "name": "Analyze (rust)", "status": "completed", "conclusion": "success"}"#,
+        r#"{"total_count": 2, "check_runs": [
+            {"id": 1, "name": "Codacy Static Code Analysis", "status": "completed", "conclusion": "success"},
+            {"id": 2, "name": "Analyze (rust)", "status": "completed", "conclusion": "success"}
+        ]}"#,
     )
     .unwrap();
 
@@ -184,7 +188,7 @@ fn a_clean_pull_request_does_not_flag_its_checks_as_incomplete() {
     .unwrap();
     std::fs::write(
         root.join("check_runs.json"),
-        r#"{"id": 1, "name": "verify", "status": "completed", "conclusion": "success"}"#,
+        r#"{"total_count": 1, "check_runs": [{"id": 1, "name": "verify", "status": "completed", "conclusion": "success"}]}"#,
     )
     .unwrap();
 

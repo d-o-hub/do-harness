@@ -85,6 +85,34 @@ if [ "$merge_state" = "BEHIND" ]; then
   exit 1
 fi
 
+# CI gate: the merge is authorized only by a PASS verdict from the single
+# typed classifier. An unavailable binary, an unreadable API, a pending check,
+# or an unknown state is a hard stop, never a silent pass.
+harness_bin="${DO_HARNESS_BIN:-}"
+if [ -z "$harness_bin" ] && command -v do-harness >/dev/null 2>&1; then
+  harness_bin="$(command -v do-harness)"
+fi
+if [ -z "$harness_bin" ]; then
+  repo_root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+  for candidate in "$repo_root/target/release/do-harness" \
+    "$repo_root/target/release/do-harness.exe"; do
+    [ -x "$candidate" ] && harness_bin="$candidate" && break
+  done
+fi
+if [ -z "$harness_bin" ] || ! "$harness_bin" pr checks --help >/dev/null 2>&1; then
+  printf 'CI-UNKNOWN\thard stop: do-harness is required to verify CI; refusing to merge blind\n'
+  printf 'summary\tCI-UNKNOWN\n'
+  exit 2
+fi
+checks_json=$("$harness_bin" pr checks "$pr" --format json 2>/dev/null) || true
+verdict=$(printf '%s' "$checks_json" | jq -r '.verdict // "UNKNOWN"' 2>/dev/null || echo UNKNOWN)
+if [ "$verdict" != "PASS" ]; then
+  printf 'CI-%s\thard stop: CI verdict is %s; never merge on unknown or failing checks\n' \
+    "$verdict" "$verdict"
+  printf 'summary\tCI-%s\n' "$verdict"
+  exit 1
+fi
+
 printf 'MERGEABLE\t-\n'
 printf 'summary\tMERGEABLE\n'
 exit 0

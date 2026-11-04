@@ -109,12 +109,23 @@ pub struct CheckRun {
     pub status: String,
     pub conclusion: Option<String>,
     pub html_url: Option<String>,
+    /// The app that created the check run, when `GitHub` reports one.
+    #[serde(default)]
+    pub app: Option<CheckApp>,
     /// ISO-8601 start timestamp, when the payload carries one.
     #[serde(default)]
     pub started_at: Option<String>,
     /// ISO-8601 completion timestamp, when the payload carries one.
     #[serde(default)]
     pub completed_at: Option<String>,
+}
+
+/// The app that owns a check run.
+#[derive(Debug, Clone, Deserialize)]
+pub struct CheckApp {
+    /// App slug, e.g. `github-actions` or `dependabot`.
+    #[serde(default)]
+    pub slug: Option<String>,
 }
 
 impl CheckRun {
@@ -153,6 +164,24 @@ pub struct CommitStatus {
     pub target_url: Option<String>,
 }
 
+/// One page of the check-runs API, including the total the API claims.
+#[derive(Debug, Clone, Deserialize)]
+pub struct CheckRunsPage {
+    #[serde(default)]
+    pub total_count: u64,
+    #[serde(default)]
+    pub check_runs: Vec<CheckRun>,
+}
+
+/// One page of the commit-status API, including the total the API claims.
+#[derive(Debug, Clone, Deserialize)]
+pub struct StatusPage {
+    #[serde(default)]
+    pub total_count: u64,
+    #[serde(default)]
+    pub statuses: Vec<CommitStatus>,
+}
+
 /// A comment on an issue or PR.
 #[derive(Debug, Clone, Deserialize)]
 #[allow(dead_code)]
@@ -174,16 +203,34 @@ pub struct CommentAuthor {
 }
 
 #[derive(Deserialize)]
-struct CommitStatusesResponse {
-    #[serde(default)]
-    statuses: Vec<CommitStatus>,
-}
-
-#[derive(Deserialize)]
 struct PermissionResponse {
     permission: Option<String>,
     #[serde(rename = "role_name")]
     role_name: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct HeadView {
+    #[serde(rename = "headRefOid")]
+    head_ref_oid: String,
+}
+
+/// Reads the current head SHA of a PR.
+///
+/// # Errors
+///
+/// Returns an error when `gh` fails or reports an empty head SHA.
+pub fn head_sha(root: &Path, number: u64) -> Result<String> {
+    let number_arg = number.to_string();
+    let view: HeadView = crate::gh::json(
+        root,
+        &["pr", "view", &number_arg, "--json", "headRefOid"],
+        &format!("pr view {number}"),
+    )?;
+    if view.head_ref_oid.trim().is_empty() {
+        bail!("PR {number} reported an empty head SHA");
+    }
+    Ok(view.head_ref_oid)
 }
 
 /// Reads PR view metadata including merge state.
@@ -206,39 +253,58 @@ pub fn readiness_view(root: &Path, number: u64) -> Result<PrReadinessView> {
     )
 }
 
-/// Reads all check runs for a commit.
+/// Reads every check-run page for a commit and the API's claimed total.
+///
+/// `--paginate --slurp` returns one array of page documents, so the caller can
+/// compare the collected runs with `total_count` instead of trusting a
+/// truncated first page.
 ///
 /// # Errors
 ///
-/// Returns an error when `gh api` fails.
-pub fn check_runs(root: &Path, head: &str) -> Result<Vec<CheckRun>> {
+/// Returns an error when `gh api` fails or the payload is malformed.
+pub fn check_runs_page(root: &Path, head: &str) -> Result<CheckRunsPage> {
     let endpoint = format!("repos/{{owner}}/{{repo}}/commits/{head}/check-runs?per_page=100");
-    // `--jq` streams one object per line so every page is read: a commit can
-    // carry more than the 100 runs of the first page.
     let output = crate::gh::output(
         root,
-        &["api", "--paginate", "--jq", ".check_runs[]", &endpoint],
+        &["api", "--paginate", "--slurp", &endpoint],
         "api check-runs",
     )?;
-    crate::gh::json_lines(&output.stdout, "check-runs")
+    let pages: Vec<CheckRunsPage> =
+        serde_json::from_slice(&output.stdout).context("unexpected check-runs JSON")?;
+    let total_count = pages.first().map_or(0, |page| page.total_count);
+    let mut check_runs = Vec::new();
+    for page in pages {
+        check_runs.extend(page.check_runs);
+    }
+    Ok(CheckRunsPage {
+        total_count,
+        check_runs,
+    })
 }
 
-/// Reads commit statuses for a commit.
+/// Reads every commit-status page for a commit and the API's claimed total.
 ///
 /// # Errors
 ///
-/// Returns an error when `gh api` fails.
-pub fn commit_statuses(root: &Path, head: &str) -> Result<Vec<CommitStatus>> {
+/// Returns an error when `gh api` fails or the payload is malformed.
+pub fn commit_statuses_page(root: &Path, head: &str) -> Result<StatusPage> {
     let endpoint = format!("repos/{{owner}}/{{repo}}/commits/{head}/status?per_page=100");
-    let output = crate::gh::output(root, &["api", "--paginate", &endpoint], "api status")?;
-    // `--paginate` concatenates one page document per page.
-    let pages =
-        serde_json::Deserializer::from_slice(&output.stdout).into_iter::<CommitStatusesResponse>();
+    let output = crate::gh::output(
+        root,
+        &["api", "--paginate", "--slurp", &endpoint],
+        "api status",
+    )?;
+    let pages: Vec<StatusPage> =
+        serde_json::from_slice(&output.stdout).context("unexpected commit status JSON")?;
+    let total_count = pages.first().map_or(0, |page| page.total_count);
     let mut statuses = Vec::new();
     for page in pages {
-        statuses.extend(page.context("unexpected commit status JSON")?.statuses);
+        statuses.extend(page.statuses);
     }
-    Ok(statuses)
+    Ok(StatusPage {
+        total_count,
+        statuses,
+    })
 }
 
 /// Reads top-level issue comments for a PR.

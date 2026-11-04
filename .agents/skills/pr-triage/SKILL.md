@@ -112,8 +112,10 @@ Run these steps in order. Stop the sweep on any escalation and report it.
     (push invalidates previous route decision as head SHA changed). Cap at three
     fix cycles, then escalate.
 11. **Merge.** Re-read the head SHA and run `scripts/premerge.sh PR` on it; a
-    refusal (draft, hold label, not open, `mergeable` not `MERGEABLE`, or a branch
-    that is `BEHIND`) is a hard stop to report, not a flag to clear. Then merge directly, never with `--auto`:
+    refusal (draft, hold label, not open, `mergeable` not `MERGEABLE`, a branch
+    that is `BEHIND`, or a CI verdict other than `PASS`) is a hard stop to
+    report, not a flag to clear. The script re-runs the typed classifier, so an
+    unknown or unreadable check state can never reach the merge. Then merge directly, never with `--auto`:
     `gh pr merge PR --squash --match-head-commit HEAD_SHA`
     where `HEAD_SHA` is the head you validated. After a merge, run the per-PR
     loop in [references/merge-order.md](references/merge-order.md) (rebase the

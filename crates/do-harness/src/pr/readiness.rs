@@ -11,8 +11,8 @@ use std::path::Path;
 
 use anyhow::{Context, Result};
 
+use super::checks;
 use super::gh;
-use super::gh::{CheckRun, CommitStatus};
 use super::waiver_comment::first_line;
 #[allow(unused_imports)]
 pub use super::waiver_comment::{CodecovStatus, CodecovSummary, WaiverAuditRecord};
@@ -78,7 +78,7 @@ pub fn evaluate(root: &Path, number: u64) -> Result<ReadinessReport> {
         };
 
         // 2. Checks & Statuses
-        let checks = evaluate_checks(root, &initial_head, conflicts, &mut blockers)?;
+        let checks = evaluate_checks(root, number, &initial_head, conflicts, &mut blockers)?;
 
         // 3. Review Threads & Issue Comments
         let (conversations, codecov) =
@@ -98,7 +98,7 @@ pub fn evaluate(root: &Path, number: u64) -> Result<ReadinessReport> {
             );
         }
 
-        let ready = blockers.is_empty();
+        let ready = blockers.is_empty() && checks.verdict == "PASS";
         return Ok(ReadinessReport {
             pr: number,
             head_ref_oid: initial_head,
@@ -117,100 +117,54 @@ pub fn evaluate(root: &Path, number: u64) -> Result<ReadinessReport> {
 
 fn evaluate_checks(
     root: &Path,
+    pr: u64,
     head_ref_oid: &str,
     conflicts: bool,
     blockers: &mut Vec<String>,
 ) -> Result<CheckSummary> {
     // Fail closed: a `gh` failure means the check state is unknown, not empty.
-    let check_runs = gh::check_runs(root, head_ref_oid).context("could not read check runs")?;
-    let statuses =
-        gh::commit_statuses(root, head_ref_oid).context("could not read commit statuses")?;
-
-    Ok(summarize_checks(check_runs, statuses, conflicts, blockers))
+    let report = checks::evaluate_for_head(root, pr, head_ref_oid, conflicts)?;
+    for blocker in &report.blockers {
+        blockers.push(blocker.message.clone());
+    }
+    Ok(summarize_report(report))
 }
 
-/// Classifies check runs and commit statuses into a merge-gating summary.
-///
-/// Pure over its inputs, so the classification that decides whether a pull
-/// request may merge is covered on every supported platform, not only where a
-/// fake `gh` executable can be put on `PATH`.
-fn summarize_checks(
-    check_runs: Vec<CheckRun>,
-    statuses: Vec<CommitStatus>,
-    conflicts: bool,
-    blockers: &mut Vec<String>,
-) -> CheckSummary {
+/// Projects the typed CI report into the readiness summary shape.
+fn summarize_report(report: checks::ChecksReport) -> CheckSummary {
     let mut passed = 0;
     let mut skipped = 0;
     let mut pending = Vec::new();
     let mut failed = Vec::new();
     let mut cancelled = Vec::new();
-
-    for run in check_runs {
-        if run.status != "completed" {
-            blockers.push(format!(
-                "check '{}' is still pending ({})",
-                run.name, run.status
-            ));
-            pending.push(run.name);
-            continue;
-        }
-        match run.conclusion.as_deref() {
-            Some("success") => passed += 1,
-            Some("skipped" | "neutral") => skipped += 1,
-            Some("cancelled") => {
-                let rerun_command = run.rerun_command();
-                blockers.push(format!(
-                    "check '{}' was CANCELLED; rerun with: {rerun_command}",
-                    run.name
-                ));
-                cancelled.push(CancelledCheck {
-                    name: run.name,
-                    rerun_command,
-                    url: run.html_url,
-                });
+    let mut unknown = Vec::new();
+    for entry in &report.checks {
+        match entry.verdict {
+            checks::Verdict::Pass => passed += 1,
+            checks::Verdict::Skip => skipped += 1,
+            checks::Verdict::Pending => pending.push(entry.name.clone()),
+            checks::Verdict::Fail => {
+                if entry.conclusion.as_deref() == Some("cancelled") {
+                    cancelled.push(CancelledCheck {
+                        name: entry.name.clone(),
+                        rerun_command: entry.rerun_command.clone().unwrap_or_default(),
+                        url: entry.url.clone(),
+                    });
+                } else {
+                    failed.push(FailedCheck {
+                        name: entry.name.clone(),
+                        url: entry.url.clone(),
+                    });
+                }
             }
-            Some(other) => {
-                blockers.push(format!("check '{}' failed ({other})", run.name));
-                failed.push(FailedCheck {
-                    name: run.name,
-                    url: run.html_url,
-                });
-            }
-            None => {
-                blockers.push(format!("check '{}' completed without conclusion", run.name));
-                failed.push(FailedCheck {
-                    name: run.name,
-                    url: run.html_url,
-                });
-            }
+            checks::Verdict::Unknown => unknown.push(entry.name.clone()),
         }
     }
-
-    for status in statuses {
-        match status.state.as_str() {
-            "success" => passed += 1,
-            "pending" => {
-                blockers.push(format!("status '{}' is pending", status.context));
-                pending.push(status.context);
-            }
-            other => {
-                blockers.push(format!("status '{}' failed ({other})", status.context));
-                failed.push(FailedCheck {
-                    name: status.context,
-                    url: status.target_url,
-                });
-            }
-        }
-    }
-
-    let total = passed + skipped + pending.len() + failed.len() + cancelled.len();
-    let incomplete = conflicts && total > 0;
-    if incomplete {
-        blockers.push(format!(
-            "checks are incomplete: merge conflicts stop workflow checks from being scheduled ({total} check run(s) reported)"
-        ));
-    }
+    let total = report.checks.len();
+    let incomplete = report
+        .blockers
+        .iter()
+        .any(|blocker| blocker.code == "checks_incomplete");
     CheckSummary {
         total,
         passed,
@@ -219,6 +173,11 @@ fn summarize_checks(
         pending,
         skipped,
         incomplete,
+        verdict: report.verdict.as_str().to_owned(),
+        head_sha: report.head_sha,
+        unknown,
+        entries: report.checks,
+        blockers: report.blockers,
     }
 }
 
@@ -336,6 +295,7 @@ fn print_text(report: &ReadinessReport) {
         report.checks.pending.len(),
         report.checks.skipped,
     );
+    println!("  checks verdict: {}", report.checks.verdict);
     if report.checks.incomplete {
         println!(
             "  checks are INCOMPLETE: merge conflicts stop workflow checks from being scheduled"
@@ -349,6 +309,9 @@ fn print_text(report: &ReadinessReport) {
     }
     for p in &report.checks.pending {
         println!("    PENDING: {p}");
+    }
+    for u in &report.checks.unknown {
+        println!("    UNKNOWN: {u}");
     }
 
     println!(

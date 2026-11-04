@@ -1258,7 +1258,7 @@ be resolved. A collector that cannot read git history never reads as healthy.
 <!-- BEGIN GENERATED: cli-contract pr -->
 `do-harness pr [OPTIONS] <COMMAND>`
 
-Subcommands: `no-effect`, `review`, `ready`, `waivers`.
+Subcommands: `no-effect`, `review`, `ready`, `checks`, `waivers`.
 <!-- END GENERATED: cli-contract pr -->
 Deterministic, read-only PR analysis: every subcommand works in any git repository without harness initialization. Pick the subcommand that answers your question.
 
@@ -1433,6 +1433,35 @@ the permission lookup fails, the waiver is rejected rather than trusted. Every
 evaluated candidate is recorded in `codecov.audit_waivers` with its
 authorization and staleness verdict, so a rejected waiver is visible instead of
 silently ignored.
+
+### `pr checks`
+<!-- BEGIN GENERATED: cli-contract pr checks -->
+`do-harness pr checks [OPTIONS] <PR>`
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `<PR>` | yes | — | — | Pull request number |
+| `--format <FORMAT>` | no | `text` | `text`, `json` | Output format |
+<!-- END GENERATED: cli-contract pr checks -->
+Classify a pull request's CI checks and legacy commit statuses as the single
+merge-authorizing source of truth. The verdict is bound to the current head
+SHA, every page of both APIs is read, and the API's `total_count` is verified
+against the collected rows.
+
+- `<PR>`: Pull request number.
+- `--format <Format>`: Output format (`text` or `json`).
+
+Exit `0` only for `PASS`, `1` for `FAIL`/`PENDING`/`UNKNOWN`, and `3` when the
+state cannot be read. An unreadable or truncated response, an empty check set
+without an explicit `allow_no_ci` policy, a missing required check, or a head
+that moved during inspection is `UNKNOWN`, never a pass. The JSON report
+carries the checked head SHA, each check's name, source, completion state,
+verdict, and an explicit blocker list.
+
+Policy lives in `.git/pr-triage/checks-policy.toml` (`allow_no_ci`,
+`required`, `allow_skips`); `.git/pr-triage/checks-allow.txt` remains a
+one-name-per-line skip allowlist. `cancelled`, `action_required`, and
+unallowlisted `skipped`/`neutral` checks are blockers.
 
 ### `pr waivers`
 <!-- BEGIN GENERATED: cli-contract pr waivers -->

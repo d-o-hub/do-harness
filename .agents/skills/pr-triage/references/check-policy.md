@@ -2,15 +2,16 @@
 
 ## Sources and binding
 
-- `gh pr checks PR --json name,state,bucket,workflow,link` classifies the PR's
-  current checks into `pass`, `fail`, `pending`, `skipping`, or `cancel`.
-- This output is not bound to a commit. Always read the current
-  `headRefOid` and classify check runs for that SHA:
-  `gh api repos/{owner}/{repo}/commits/HEAD_SHA/check-runs`.
-- Also read legacy commit statuses:
-  `gh api repos/{owner}/{repo}/commits/HEAD_SHA/status`.
-- `scripts/checks.sh` performs both calls and reports `PASS`, `FAIL`,
-  `PENDING`, or `SKIP` per check, plus a summary verdict.
+- `do-harness pr checks PR --format json` is the single, typed source of CI
+  truth. It binds the verdict to the current `headRefOid`, reads every page of
+  check runs and legacy commit statuses, verifies the API's `total_count`, and
+  re-reads the head after collection. A head that moved is re-fetched; an
+  unstable head is `UNKNOWN`.
+- `scripts/checks.sh` is a thin wrapper over that command. It only paces the
+  bounded wait and renders the legacy TSV rows; it keeps no second parser.
+- `gh pr checks PR` is not bound to a commit and is never the merge authority.
+- The report includes the checked head SHA, each check's name, source (app
+  slug or `status`), completion state, verdict, and an explicit blocker list.
 
 ## CI truth: annotations, not badges
 
@@ -79,22 +80,34 @@ escalate), never a merge around the check.
 | `PASS` | Conclusion `success` or status `success` | Continue |
 | `PENDING` | `status` not `completed`, or status `pending` | Wait and re-run; never merge |
 | `FAIL` | Conclusion `failure`, `timed_out`, `action_required`, `startup_failure`, or status `failure`/`error` | Fix the PR or escalate; never merge |
-| `SKIP` | Conclusion `skipped`, `neutral`, or cancelled, or status `neutral` | Allowed only per the allowlist below |
-| `UNKNOWN` | Anything else | Treat as `PENDING`; escalate if it persists |
+| `SKIP` | Conclusion `skipped`/`neutral`, or status `neutral`, and the name is allowlisted | Continue; the skip is recorded with its reason |
+| `UNKNOWN` | Anything else, including an unreadable/truncated API, an empty check set without policy, or a missing required check | Never merge; escalate |
 
 Bot checks are not special: Dependabot, CodeQL, secret scanning, and every other
 app are classified the same way. "All checks pass including bots" means every
 non-allowed `FAIL`/`PENDING`/`UNKNOWN` blocks the merge.
 
-## Skip allowlist
+`cancelled` is always `FAIL` (rerun it; never "fix" code for it). An
+unallowlisted `skipped`/`neutral` is `FAIL`, not a silent pass.
 
-A `SKIP` verdict is acceptable only when one of these holds:
+## Policy
 
-1. The check name appears in `.git/pr-triage/checks-allow.txt` (one name per
-   line, `#` comments). The user owns this list.
-2. The workflow is a known path-filtered job and the PR does not touch the paths
-   the job guards (for example a docs job on a code-only PR, or Dependabot's
-   no-change status).
+The policy is auditable and lives under `.git/pr-triage/`:
+
+```toml
+# .git/pr-triage/checks-policy.toml
+allow_no_ci = false          # true: an empty check set is a pass (explicit opt-in)
+required = ["verify"]        # names that must be present and passing
+allow_skips = ["docs"]       # names whose skipped/neutral conclusion is acceptable
+```
+
+`checks-allow.txt` (one name per line, `#` comments) is still honoured as an
+additional skip allowlist. A missing policy is the strict default: CI is
+expected, no check is required by name, and no skip is allowed. A malformed
+policy is an error, never a permissive fallback.
+
+An empty check set is `UNKNOWN` unless `allow_no_ci = true`. A repository with
+intentionally no CI must opt in explicitly; the opt-in is the audit trail.
 
 Anything else, including cancelled checks and `action_required`, is not a skip
 and must be fixed or escalated. Never invent a skip reason.
@@ -109,6 +122,10 @@ Poll `scripts/checks.sh` while the verdict is `PENDING`. Use a bounded wait
 (default 300 seconds, `PR_TRIAGE_EVENT_CHUNK`) re-classifies even without
 events. Missing deliveries must degrade to polling, never to done. A check
 that never reports is `UNKNOWN`; do not merge around it.
+
+`scripts/premerge.sh` re-runs the classifier immediately before the merge and
+refuses anything but `PASS`. An unavailable binary, an unreadable API, a
+pending check, or an unknown state is a hard stop.
 
 ## Sources
 

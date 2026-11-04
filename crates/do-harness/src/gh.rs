@@ -49,39 +49,3 @@ pub fn json<T: serde::de::DeserializeOwned>(root: &Path, args: &[&str], what: &s
     let output = output(root, args, what)?;
     serde_json::from_slice(&output.stdout).with_context(|| format!("unexpected gh {what} JSON"))
 }
-
-/// Parses newline-delimited JSON objects, the shape `gh api --jq` streams.
-///
-/// # Errors
-///
-/// Returns an error naming `what` when a line does not parse.
-pub fn json_lines<T: serde::de::DeserializeOwned>(bytes: &[u8], what: &str) -> Result<Vec<T>> {
-    let text = String::from_utf8_lossy(bytes);
-    let mut items = Vec::new();
-    for line in text.lines().filter(|line| !line.trim().is_empty()) {
-        items.push(serde_json::from_str(line).with_context(|| format!("unexpected {what} JSON"))?);
-    }
-    Ok(items)
-}
-
-#[cfg(test)]
-mod tests {
-    #![allow(clippy::unwrap_used, clippy::expect_used)]
-
-    use super::*;
-
-    #[test]
-    fn json_lines_skips_blank_lines_and_parses_each_object() {
-        let items: Vec<u32> = json_lines(b"1\n\n2\n", "row").unwrap();
-        assert_eq!(items, vec![1, 2]);
-    }
-
-    #[test]
-    fn json_lines_names_the_payload_on_a_bad_line() {
-        let err = json_lines::<u32>(b"1\nnope\n", "check run").unwrap_err();
-        assert!(
-            format!("{err:#}").contains("unexpected check run JSON"),
-            "unexpected error: {err:#}"
-        );
-    }
-}

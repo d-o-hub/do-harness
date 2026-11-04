@@ -119,6 +119,7 @@ pub fn run(root: &Path, action: PrAction) -> Result<(), CliError> {
             run_review(root, &target, recompute, format, view).map_err(CliError::Verify)
         }
         PrAction::Ready { pr, format } => super::readiness::run(root, pr, format),
+        PrAction::Checks { pr, format } => super::checks::run(root, pr, format),
         PrAction::Waivers {
             pr,
             base,
