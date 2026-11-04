@@ -53,11 +53,26 @@ if [ "$1" = "api" ]; then
                 echo "HTTP 403: rate limit exceeded" >&2
                 exit 1
             fi
-            if [ -f "$MOCK_DIR/check_runs.json" ]; then
+            # Record the pagination flags so a test can prove the CLI asks for
+            # every page instead of trusting a single response.
+            for arg in "$@"; do
+                case "$arg" in
+                    --paginate|--slurp) printf '%s\n' "$arg" >> "$MOCK_DIR/check_runs_flags" ;;
+                esac
+            done
+            if [ -f "$MOCK_DIR/empty_checks" ]; then
+                printf '%s' '[{{"total_count":0,"check_runs":[]}}]'
+            elif [ -f "$MOCK_DIR/check_runs_pages.json" ]; then
+                # Already the full `--paginate --slurp` array of page documents.
+                cat "$MOCK_DIR/check_runs_pages.json"
+            elif [ -f "$MOCK_DIR/check_runs.json" ]; then
+                printf '['
                 cat "$MOCK_DIR/check_runs.json"
+                printf ']'
             else
-                # `--jq '.check_runs[]'` prints nothing when there are no runs.
-                printf '%s' ''
+                # Default fixture: a green suite, so tests about conversations
+                # or waivers do not have to restate CI.
+                printf '%s' '[{{"total_count":1,"check_runs":[{{"id":1,"name":"verify","status":"completed","conclusion":"success","app":{{"slug":"github-actions"}}}}]}}]'
             fi
             exit 0
             ;;
@@ -75,9 +90,11 @@ if [ "$1" = "api" ]; then
             ;;
         *status*)
             if [ -f "$MOCK_DIR/status.json" ]; then
+                printf '['
                 cat "$MOCK_DIR/status.json"
+                printf ']'
             else
-                printf '%s' '{{"statuses":[]}}'
+                printf '%s' '[{{"total_count":0,"statuses":[]}}]'
             fi
             exit 0
             ;;

@@ -409,7 +409,7 @@ fn required_check_failures_remain_blockers_independently() {
 
     std::fs::write(
         root.join("check_runs.json"),
-        r#"{"id": 1, "name": "build", "status": "completed", "conclusion": "failure", "html_url": "https://github.com/d-o-hub/repo/actions/runs/1"}"#,
+        r#"{"total_count": 1, "check_runs": [{"id": 1, "name": "build", "status": "completed", "conclusion": "failure", "html_url": "https://github.com/d-o-hub/repo/actions/runs/1"}]}"#,
     )
     .unwrap();
 

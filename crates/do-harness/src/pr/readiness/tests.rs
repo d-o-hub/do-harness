@@ -8,6 +8,8 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use super::*;
+use crate::pr::checks;
+use crate::pr::gh::{CheckRun, CommitStatus};
 
 fn run(name: &str, status: &str, conclusion: Option<&str>) -> CheckRun {
     CheckRun {
@@ -16,6 +18,7 @@ fn run(name: &str, status: &str, conclusion: Option<&str>) -> CheckRun {
         status: status.to_owned(),
         conclusion: conclusion.map(str::to_owned),
         html_url: None,
+        app: None,
         started_at: None,
         completed_at: None,
     }
@@ -34,9 +37,22 @@ fn summarize(
     statuses: Vec<CommitStatus>,
     conflicts: bool,
 ) -> (CheckSummary, Vec<String>) {
-    let mut blockers = Vec::new();
-    let summary = summarize_checks(runs, statuses, conflicts, &mut blockers);
-    (summary, blockers)
+    summarize_with(runs, statuses, conflicts, &checks::ChecksPolicy::default())
+}
+
+fn summarize_with(
+    runs: Vec<CheckRun>,
+    statuses: Vec<CommitStatus>,
+    conflicts: bool,
+    policy: &checks::ChecksPolicy,
+) -> (CheckSummary, Vec<String>) {
+    let report = checks::classify(1, "head", runs, statuses, policy, conflicts);
+    let blockers = report
+        .blockers
+        .iter()
+        .map(|blocker| blocker.message.clone())
+        .collect();
+    (summarize_report(report), blockers)
 }
 
 #[test]
@@ -44,7 +60,7 @@ fn a_pending_run_blocks_and_is_counted() {
     let (summary, blockers) = summarize(vec![run("build", "in_progress", None)], vec![], false);
     assert_eq!(summary.total, 1);
     assert_eq!(summary.pending, vec!["build".to_owned()]);
-    assert!(blockers.iter().any(|b| b.contains("still pending")));
+    assert!(blockers.iter().any(|b| b.contains("is pending")));
     assert!(!summary.incomplete);
 }
 
@@ -73,12 +89,15 @@ fn a_cancelled_run_carries_a_rerun_command() {
             .rerun_command
             .starts_with("gh run rerun")
     );
-    assert!(blockers.iter().any(|b| b.contains("CANCELLED")));
+    assert!(blockers.iter().any(|b| b.contains("cancelled")));
 }
 
 #[test]
 fn success_and_neutral_runs_do_not_block() {
-    let (summary, blockers) = summarize(
+    let mut policy = checks::ChecksPolicy::default();
+    policy.allow_skips.insert("docs".to_owned());
+    policy.allow_skips.insert("lint".to_owned());
+    let (summary, blockers) = summarize_with(
         vec![
             run("build", "completed", Some("success")),
             run("docs", "completed", Some("skipped")),
@@ -86,6 +105,7 @@ fn success_and_neutral_runs_do_not_block() {
         ],
         vec![],
         false,
+        &policy,
     );
     assert_eq!(summary.passed, 1);
     assert_eq!(summary.skipped, 2);
@@ -93,9 +113,23 @@ fn success_and_neutral_runs_do_not_block() {
 }
 
 #[test]
+fn an_unallowlisted_skip_blocks() {
+    let (summary, blockers) = summarize(
+        vec![run("docs", "completed", Some("skipped"))],
+        vec![],
+        false,
+    );
+    assert_eq!(summary.verdict, "FAIL");
+    assert!(
+        blockers.iter().any(|b| b.contains("unallowlisted skip")),
+        "unexpected blockers: {blockers:?}"
+    );
+}
+
+#[test]
 fn a_completed_run_without_conclusion_blocks() {
     let (summary, blockers) = summarize(vec![run("test", "completed", None)], vec![], false);
-    assert_eq!(summary.failed.len(), 1);
+    assert_eq!(summary.unknown.len(), 1);
     assert!(blockers.iter().any(|b| b.contains("without conclusion")));
 }
 
@@ -133,7 +167,11 @@ fn conflicts_mark_a_non_empty_run_set_incomplete() {
 
 #[test]
 fn conflicts_with_no_reported_checks_do_not_claim_incompleteness() {
-    let (summary, blockers) = summarize(vec![], vec![], true);
+    let policy = checks::ChecksPolicy {
+        allow_no_ci: true,
+        ..checks::ChecksPolicy::default()
+    };
+    let (summary, blockers) = summarize_with(vec![], vec![], true, &policy);
     assert!(!summary.incomplete);
     assert!(blockers.is_empty(), "unexpected blockers: {blockers:?}");
 }

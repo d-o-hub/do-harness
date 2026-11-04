@@ -94,7 +94,14 @@ case "$cmd" in
             ;;
           *mergeCommit*) printf '%s\n' "$sha" ;;
           *baseRefName*) printf 'main\t%s\n' "$sha" ;;
-          *headRefOid*) printf '%s\n' "$sha" ;;
+          *headRefOid*)
+            # The Rust classifier reads JSON; older shell callers pass --jq.
+            if jq_arg "$@" >/dev/null 2>&1; then
+              printf '%s\n' "$sha"
+            else
+              printf '{"headRefOid":"%s"}\n' "$sha"
+            fi
+            ;;
           *isDraft*)
             # Pre-merge stop fixtures: a walkthrough flips the draft flag, the
             # state, or the label list per call.
@@ -156,9 +163,21 @@ case "$cmd" in
     ;;
 
   api)
-    endpoint="${1:-}"
-    shift || true
-    expr=$(jq_arg "$@") || { echo "fake gh: api requires --jq" >&2; exit 1; }
+    endpoint=""
+    for arg in "$@"; do
+      case "$arg" in
+        repos/*|graphql) endpoint="$arg" ;;
+      esac
+    done
+    slurp=0
+    for arg in "$@"; do
+      [ "$arg" = "--slurp" ] && slurp=1
+    done
+    expr=$(jq_arg "$@") || expr=""
+    if [ "$slurp" -eq 0 ] && [ -z "$expr" ]; then
+      echo "fake gh: api requires --jq" >&2
+      exit 1
+    fi
     case "$endpoint" in
       graphql)
         query=$(kv_value query "$@") || query=""
@@ -181,10 +200,24 @@ case "$cmd" in
             printf '%s\n' "$((step + 1))" > "$seq_file"
           fi
         fi
-        jq -r "$expr" "$fixtures/check-runs-$mode.json"
+        if [ "$slurp" -eq 1 ]; then
+          printf '['
+          jq -c '.' "$fixtures/check-runs-$mode.json"
+          printf ']'
+        else
+          jq -r "$expr" "$fixtures/check-runs-$mode.json"
+        fi
         ;;
       *"/status"*)
-        jq -r "$expr" "$fixtures/statuses.json"
+        if [ "${FAKE_GH_CHECKS:-}" = "empty" ]; then
+          printf '%s' '[{"total_count":0,"statuses":[]}]'
+        elif [ "$slurp" -eq 1 ]; then
+          printf '['
+          jq -c '.' "$fixtures/statuses.json"
+          printf ']'
+        else
+          jq -r "$expr" "$fixtures/statuses.json"
+        fi
         ;;
       *"/compare/"*)
         refs="${endpoint#*/compare/}"

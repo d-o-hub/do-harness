@@ -1,6 +1,6 @@
 ---
 name: pr-triage
-description: Triage GitHub pull requests with gh and git. Use after opening a PR, or when asked to review, roast, clean up, update, resolve comments on, or merge open PRs. Reviews and roasts changes, closes PRs with no effective diff, applies roast fixes, answers and resolves review conversations, updates branches to the latest base, verifies every check including bots, and merges directly with --match-head-commit. Optionally uses do-harness to cut review tokens to the unresolved residual; semantic routing to adapt review depth is optional and experimental (a measured no-go on cost).
+description: Triage GitHub pull requests with gh and git. Use after opening a PR, or when asked to review, roast, clean up, update, resolve comments on, or merge open PRs. Reviews and roasts changes, closes PRs with no effective diff, applies roast fixes, answers and resolves review conversations, updates branches to the latest base, verifies every check including bots, and merges directly with --match-head-commit. Requires do-harness for CI classification (fail closed without it); optionally uses it to cut review tokens to the unresolved residual, and semantic routing to adapt review depth is optional and experimental (a measured no-go on cost).
 license: MIT
 metadata:
   short-description: Triage open GitHub PRs end to end
@@ -13,6 +13,13 @@ See references/heuristics.md for distilled heuristics.
 Triage every open GitHub PR, one at a time, in merge order. Review and roast the
 change, close no-effect PRs, fix findings, resolve conversations, keep the branch
 current, and merge directly when all gates pass. Never use auto-merge.
+
+**Prerequisites.** `gh`, `git`, and `jq` are required. `do-harness` is required
+for CI classification: `scripts/checks.sh` and the pre-merge CI gate call
+`do-harness pr checks`, and without the binary they report `UNKNOWN` and refuse
+to merge rather than degrading to a shell parser. Install it (or set
+`DO_HARNESS_BIN`) before a sweep; a missing binary stops the sweep, it does not
+silently pass.
 
 Read [references/merge-order.md](references/merge-order.md) before merging
 stacks, [references/check-policy.md](references/check-policy.md) before judging
@@ -112,8 +119,10 @@ Run these steps in order. Stop the sweep on any escalation and report it.
     (push invalidates previous route decision as head SHA changed). Cap at three
     fix cycles, then escalate.
 11. **Merge.** Re-read the head SHA and run `scripts/premerge.sh PR` on it; a
-    refusal (draft, hold label, not open, `mergeable` not `MERGEABLE`, or a branch
-    that is `BEHIND`) is a hard stop to report, not a flag to clear. Then merge directly, never with `--auto`:
+    refusal (draft, hold label, not open, `mergeable` not `MERGEABLE`, a branch
+    that is `BEHIND`, or a CI verdict other than `PASS`) is a hard stop to
+    report, not a flag to clear. The script re-runs the typed classifier, so an
+    unknown or unreadable check state can never reach the merge. Then merge directly, never with `--auto`:
     `gh pr merge PR --squash --match-head-commit HEAD_SHA`
     where `HEAD_SHA` is the head you validated. After a merge, run the per-PR
     loop in [references/merge-order.md](references/merge-order.md) (rebase the

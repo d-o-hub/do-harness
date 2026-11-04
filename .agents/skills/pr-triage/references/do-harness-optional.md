@@ -1,6 +1,10 @@
 # do-harness (optional)
 
-`do-harness` is an optional token reducer. The skill must work without it.
+`do-harness` is an optional token reducer for review and no-effect analysis.
+CI classification is the exception: `scripts/checks.sh` and the pre-merge CI
+gate call `do-harness pr checks`, and refuse to merge (exit 3 / `CI-UNKNOWN`)
+when the binary is unavailable. There is no shell fallback parser, because a
+second classifier is exactly the merge-authorization gap this contract closes.
 
 ## Probe
 
@@ -34,6 +38,7 @@ performs the same probe and reports which binary it found; substitute
 | No effect | `do-harness pr no-effect PR --format json` | `scripts/no-effect.sh PR` |
 | Review input | `do-harness pr review PR --format json` | `gh pr diff PR` |
 | Recompute | `do-harness pr review PR --recompute` | n/a |
+| CI truth | `do-harness pr checks PR --format json` | none: fail closed |
 | Documentation impact | `python3 scripts/docs.py impact --base BASE --head HEAD --format json` | `gh pr diff PR` |
 
 Use the documentation packet only when all freshness and size gates pass:

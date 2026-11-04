@@ -207,6 +207,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand ready 'Check whether a pull request is ready to merge: merge state, CI checks, and review conversations'
             cand readiness 'Check whether a pull request is ready to merge: merge state, CI checks, and review conversations'
             cand check 'Check whether a pull request is ready to merge: merge state, CI checks, and review conversations'
+            cand checks 'Classify a pull request''s CI checks and commit statuses; fail closed on unknown'
             cand waivers 'Classify patch-coverage residue: waivable classes and lines needing tests'
             cand help 'Print this message or the help of the given subcommand(s)'
         }
@@ -281,6 +282,19 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand -V 'Print version'
             cand --version 'Print version'
         }
+        &'do-harness;pr;checks'= {
+            cand --format 'Output format'
+            cand --root 'Workspace root override (default: walk up from cwd)'
+            cand --config 'Explicit path to do-harness.toml'
+            cand --output 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)'
+            cand -q 'Suppress PASS/WARN verdict lines and the success footer'
+            cand --quiet 'Suppress PASS/WARN verdict lines and the success footer'
+            cand --dry-run 'Dry run without side effects'
+            cand -h 'Print help (see more with ''--help'')'
+            cand --help 'Print help (see more with ''--help'')'
+            cand -V 'Print version'
+            cand --version 'Print version'
+        }
         &'do-harness;pr;waivers'= {
             cand --base 'Base revision (local mode; requires --head)'
             cand --head 'Head revision (local mode; requires --base)'
@@ -304,6 +318,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand no-effect 'Report the prospective merge impact of a PR or revision range'
             cand review 'Emit the semantic residual: changed units evidence could not prove'
             cand ready 'Check whether a pull request is ready to merge: merge state, CI checks, and review conversations'
+            cand checks 'Classify a pull request''s CI checks and commit statuses; fail closed on unknown'
             cand waivers 'Classify patch-coverage residue: waivable classes and lines needing tests'
             cand help 'Print this message or the help of the given subcommand(s)'
         }
@@ -312,6 +327,8 @@ set edit:completion:arg-completer[do-harness] = {|@words|
         &'do-harness;pr;help;review'= {
         }
         &'do-harness;pr;help;ready'= {
+        }
+        &'do-harness;pr;help;checks'= {
         }
         &'do-harness;pr;help;waivers'= {
         }
@@ -1242,6 +1259,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand no-effect 'Report the prospective merge impact of a PR or revision range'
             cand review 'Emit the semantic residual: changed units evidence could not prove'
             cand ready 'Check whether a pull request is ready to merge: merge state, CI checks, and review conversations'
+            cand checks 'Classify a pull request''s CI checks and commit statuses; fail closed on unknown'
             cand waivers 'Classify patch-coverage residue: waivable classes and lines needing tests'
         }
         &'do-harness;help;pr;no-effect'= {
@@ -1249,6 +1267,8 @@ set edit:completion:arg-completer[do-harness] = {|@words|
         &'do-harness;help;pr;review'= {
         }
         &'do-harness;help;pr;ready'= {
+        }
+        &'do-harness;help;pr;checks'= {
         }
         &'do-harness;help;pr;waivers'= {
         }

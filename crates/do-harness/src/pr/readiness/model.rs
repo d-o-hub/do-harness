@@ -3,6 +3,7 @@
 use serde::{Deserialize, Serialize};
 
 use super::CodecovSummary;
+use crate::pr::checks::{CheckBlocker, CheckEntry};
 
 fn default_true() -> bool {
     true
@@ -49,6 +50,21 @@ pub struct CheckSummary {
     /// while the verification never ran.
     #[serde(default)]
     pub incomplete: bool,
+    /// Folded CI verdict: `PASS`, `FAIL`, `PENDING`, or `UNKNOWN`.
+    #[serde(default)]
+    pub verdict: String,
+    /// Head SHA the verdict is bound to.
+    #[serde(rename = "headSha", default)]
+    pub head_sha: String,
+    /// Checks whose state could not be proven.
+    #[serde(default)]
+    pub unknown: Vec<String>,
+    /// Every classified check and status, with identity and source.
+    #[serde(default)]
+    pub entries: Vec<CheckEntry>,
+    /// Explicit machine-readable blockers.
+    #[serde(default)]
+    pub blockers: Vec<CheckBlocker>,
 }
 
 /// A failed check run or commit status.

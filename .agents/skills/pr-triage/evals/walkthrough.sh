@@ -42,6 +42,10 @@ git switch -q -c empty main
 git commit -q --allow-empty -m empty
 git update-ref refs/pull/8/head empty
 
+# CI policy: the pass fixture's docs job is an allowlisted skip.
+mkdir -p "$repo/.git/pr-triage"
+printf 'allow_skips = ["docs"]\n' > "$repo/.git/pr-triage/checks-policy.toml"
+
 # 1. Merge ordering: stacks first, oldest-first, drafts and hold excluded.
 "$skill/scripts/list-prs.sh" > "$root/pr_list.tsv"
 python3 - "$root/pr_list.tsv" "$root/pr_list_order.txt" <<'PY'
@@ -67,9 +71,11 @@ FAKE_GH_CHECKS=fail "$skill/scripts/checks.sh" 9 > "$root/checks_fail.out"
 fail_exit=$?
 FAKE_GH_CHECKS=pending "$skill/scripts/checks.sh" 9 > "$root/checks_pending.out"
 pending_exit=$?
+FAKE_GH_CHECKS=empty "$skill/scripts/checks.sh" 9 > "$root/checks_unknown.out"
+unknown_exit=$?
 set -e
-printf 'pass_exit=%s\nfail_exit=%s\npending_exit=%s\n' \
-  "$pass_exit" "$fail_exit" "$pending_exit" > "$root/checks_summary.txt"
+printf 'pass_exit=%s\nfail_exit=%s\npending_exit=%s\nunknown_exit=%s\n' \
+  "$pass_exit" "$fail_exit" "$pending_exit" "$unknown_exit" > "$root/checks_summary.txt"
 
 # 4. Conversations: list unresolved threads and resolve one.
 "$skill/scripts/threads.sh" list 9 > "$root/threads.tsv"
@@ -175,6 +181,12 @@ export FAKE_GH_PR_STATE=OPEN
 set +e
 "$skill/scripts/premerge.sh" 9 > "$root/premerge_ok.out" 2>&1
 premerge_ok_exit=$?
+export FAKE_GH_CHECKS=empty
+set +e
+"$skill/scripts/premerge.sh" 9 > "$root/premerge_unknown_ci.out" 2>&1
+premerge_unknown_ci_exit=$?
+set -e
+unset FAKE_GH_CHECKS
 unset FAKE_GH_PR_DRAFT FAKE_GH_PR_LABELS FAKE_GH_PR_STATE
 # A response without the draft field is not a "no": the fail-closed branch is
 # exercised by swapping the fake for a stub that omits the field.
@@ -204,9 +216,9 @@ set +e
 premerge_behind_exit=$?
 set -e
 unset FAKE_GH_PR_MERGEABLE FAKE_GH_PR_MERGE_STATE
-printf 'draft_exit=%s\nhold_exit=%s\nclosed_exit=%s\nok_exit=%s\nmissing_field_exit=%s\nunmergeable_exit=%s\nbehind_exit=%s\n' \
+printf 'draft_exit=%s\nhold_exit=%s\nclosed_exit=%s\nok_exit=%s\nunknown_ci_exit=%s\nmissing_field_exit=%s\nunmergeable_exit=%s\nbehind_exit=%s\n' \
   "$premerge_draft_exit" "$premerge_hold_exit" "$premerge_closed_exit" \
-  "$premerge_ok_exit" "$premerge_missing_exit" "$premerge_unmergeable_exit" \
+  "$premerge_ok_exit" "$premerge_unknown_ci_exit" "$premerge_missing_exit" "$premerge_unmergeable_exit" \
   "$premerge_behind_exit" > "$root/premerge_summary.txt"
 
 # 5f. Webhook fast path: a real receiver answers /health, persists signed

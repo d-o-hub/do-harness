@@ -222,6 +222,7 @@ export PATH="$HOME/.local/bin:$PATH"
 | `pr no-effect [OPTIONS] [PR]` | Report the prospective merge impact of a PR or revision range — flags: `--base <REV>`, `--head <REV>`, `--format <FORMAT>` |
 | `pr review [OPTIONS] [PR]` | Emit the semantic residual: changed units evidence could not prove — flags: `--base <REV>`, `--head <REV>`, `--recompute`, `--view <VIEW>`, `--format <FORMAT>` |
 | `pr ready [OPTIONS] <PR>` | Check whether a pull request is ready to merge: merge state, CI checks, and review conversations (aliases: `readiness`, `check`) — flags: `--format <FORMAT>` |
+| `pr checks [OPTIONS] <PR>` | Classify a pull request's CI checks and commit statuses; fail closed on unknown — flags: `--format <FORMAT>` |
 | `pr waivers [OPTIONS] --lcov <PATH> [PR]` | Classify patch-coverage residue: waivable classes and lines needing tests — flags: `--base <REV>`, `--head <REV>`, `--patch <PATH>`, `--lcov <PATH>`, `--since <PATH>`, `--strip-prefix <PREFIX>`, `--format <FORMAT>` |
 | `skills suggest [OPTIONS] --query <TEXT>` | Rank skills by relevance to a query using metadata only — flags: `--query <TEXT>`, `--limit <N>`, `--format <FORMAT>` |
 | `skills drift [OPTIONS]` | Check manifest-managed shared skills against their pinned digests — flags: `--manifest <FILE>`, `--format <FORMAT>` |

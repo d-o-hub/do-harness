@@ -168,6 +168,15 @@ pub enum PrAction {
         #[arg(long, value_enum, default_value_t = Format::Text)]
         format: Format,
     },
+    /// Classify a pull request's CI checks and commit statuses; fail closed on unknown.
+    Checks {
+        /// Pull request number.
+        #[arg(value_name = "PR")]
+        pr: u64,
+        /// Output format.
+        #[arg(long, value_enum, default_value_t = Format::Text)]
+        format: Format,
+    },
     /// Classify patch-coverage residue: waivable classes and lines needing tests.
     Waivers {
         /// Pull request number; resolves base and head through `gh`.
