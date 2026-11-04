@@ -142,11 +142,20 @@ jobs:
             --json tagName --jq '[.[].tagName] | join(",")')"
           report="$(bash scripts/release-manager.sh next --published "$published" --format json)"
           printf '%s\n' "$report"
+          # `$GITHUB_OUTPUT` is not a shell variable: a field written there is
+          # readable by later steps and *not* by this one. The first version of
+          # this step published the whole list and re-read only `bump` and
+          # `release_worthy` by hand, so the summary line below referenced
+          # `$commits` — published, never bound — and `set -u` killed the run
+          # one statement before it could propose anything. Every field this
+          # step reads is therefore bound here from the same report, next to the
+          # write that hands it on.
           for field in bump next current basis commits release_worthy breaking feature fix; do
-            printf '%s=%s\n' "$field" "$(printf '%s' "$report" | jq -r ".$field")" \
+            printf '%s=%s\n' "$field" "$(printf '%s' "$report" | jq -r --arg key "$field" '.[$key]')" \
               >> "$GITHUB_OUTPUT"
           done
           bump="$(printf '%s' "$report" | jq -r '.bump')"
+          commits="$(printf '%s' "$report" | jq -r '.commits')"
           release_worthy="$(printf '%s' "$report" | jq -r '.release_worthy')"
           eligible=false
           case "$bump" in
