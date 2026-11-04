@@ -289,6 +289,7 @@ pub async fn show_task(root: &Path, id: i64, format: Format) -> Result<()> {
     Ok(())
 }
 
+pub mod context;
 mod freshness;
 mod mutations;
 

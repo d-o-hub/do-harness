@@ -310,6 +310,9 @@ _do__harness() {
             do__harness__subcmd__help__subcmd__task,advance)
                 cmd="do__harness__subcmd__help__subcmd__task__subcmd__advance"
                 ;;
+            do__harness__subcmd__help__subcmd__task,context)
+                cmd="do__harness__subcmd__help__subcmd__task__subcmd__context"
+                ;;
             do__harness__subcmd__help__subcmd__task,done)
                 cmd="do__harness__subcmd__help__subcmd__task__subcmd__done"
                 ;;
@@ -448,6 +451,9 @@ _do__harness() {
             do__harness__subcmd__task,advance)
                 cmd="do__harness__subcmd__task__subcmd__advance"
                 ;;
+            do__harness__subcmd__task,context)
+                cmd="do__harness__subcmd__task__subcmd__context"
+                ;;
             do__harness__subcmd__task,done)
                 cmd="do__harness__subcmd__task__subcmd__done"
                 ;;
@@ -477,6 +483,9 @@ _do__harness() {
                 ;;
             do__harness__subcmd__task__subcmd__help,advance)
                 cmd="do__harness__subcmd__task__subcmd__help__subcmd__advance"
+                ;;
+            do__harness__subcmd__task__subcmd__help,context)
+                cmd="do__harness__subcmd__task__subcmd__help__subcmd__context"
                 ;;
             do__harness__subcmd__task__subcmd__help,done)
                 cmd="do__harness__subcmd__task__subcmd__help__subcmd__done"
@@ -2350,7 +2359,7 @@ _do__harness() {
             return 0
             ;;
         do__subcmd__harness__subcmd__help__subcmd__task)
-            opts="export import list show add advance done fail remove"
+            opts="export import list show context add advance done fail remove"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -2378,6 +2387,20 @@ _do__harness() {
             return 0
             ;;
         do__subcmd__harness__subcmd__help__subcmd__task__subcmd__advance)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        do__subcmd__harness__subcmd__help__subcmd__task__subcmd__context)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -4482,7 +4505,7 @@ _do__harness() {
             return 0
             ;;
         do__subcmd__harness__subcmd__task)
-            opts="-q -h -V --root --config --quiet --output --dry-run --help --version export import list show add advance done fail remove help"
+            opts="-q -h -V --root --config --quiet --output --dry-run --help --version export import list show context add advance done fail remove help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -4602,6 +4625,65 @@ _do__harness() {
                 return 0
             fi
             case "${prev}" in
+                --root)
+                    COMPREPLY=()
+                    if [[ "${BASH_VERSINFO[0]}" -ge 4 ]]; then
+                        compopt -o plusdirs
+                    fi
+                    return 0
+                    ;;
+                --config)
+                    local oldifs
+                    if [ -n "${IFS+x}" ]; then
+                        oldifs="$IFS"
+                    fi
+                    IFS=$'\n'
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    if [ -n "${oldifs+x}" ]; then
+                        IFS="$oldifs"
+                    fi
+                    if [[ "${BASH_VERSINFO[0]}" -ge 4 ]]; then
+                        compopt -o filenames
+                    fi
+                    return 0
+                    ;;
+                --output)
+                    local oldifs
+                    if [ -n "${IFS+x}" ]; then
+                        oldifs="$IFS"
+                    fi
+                    IFS=$'\n'
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    if [ -n "${oldifs+x}" ]; then
+                        IFS="$oldifs"
+                    fi
+                    if [[ "${BASH_VERSINFO[0]}" -ge 4 ]]; then
+                        compopt -o filenames
+                    fi
+                    return 0
+                    ;;
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        do__subcmd__harness__subcmd__task__subcmd__context)
+            opts="-q -h -V --format --max-bytes --root --config --quiet --output --dry-run --help --version"
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                --format)
+                    COMPREPLY=($(compgen -W "text json" -- "${cur}"))
+                    return 0
+                    ;;
+                --max-bytes)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
                 --root)
                     COMPREPLY=()
                     if [[ "${BASH_VERSINFO[0]}" -ge 4 ]]; then
@@ -4819,7 +4901,7 @@ _do__harness() {
             return 0
             ;;
         do__subcmd__harness__subcmd__task__subcmd__help)
-            opts="export import list show add advance done fail remove help"
+            opts="export import list show context add advance done fail remove help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -4847,6 +4929,20 @@ _do__harness() {
             return 0
             ;;
         do__subcmd__harness__subcmd__task__subcmd__help__subcmd__advance)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        do__subcmd__harness__subcmd__task__subcmd__help__subcmd__context)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )

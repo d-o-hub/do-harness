@@ -60,6 +60,23 @@ pub struct Catalog {
 ///
 /// Returns an error only when the skill root exists but cannot be listed.
 pub fn scan(root: &Path) -> Result<Catalog> {
+    scan_inner(root, true)
+}
+
+/// Scans the catalog without writing the metadata cache.
+///
+/// Read-only callers (for example `task context`) must not create
+/// `.do-harness/cache/skills-v1.json`, so this shares the scan and ranking
+/// metadata but skips the cache write.
+///
+/// # Errors
+///
+/// Returns an error only when the skill root exists but cannot be listed.
+pub fn scan_read_only(root: &Path) -> Result<Catalog> {
+    scan_inner(root, false)
+}
+
+fn scan_inner(root: &Path, persist_cache: bool) -> Result<Catalog> {
     let skills_root = root.join(SKILL_ROOT);
     let mut warnings = Vec::new();
     if !skills_root.is_dir() {
@@ -101,7 +118,9 @@ pub fn scan(root: &Path) -> Result<Catalog> {
         }
     }
 
-    cache.store(root, &skills, &mut warnings);
+    if persist_cache {
+        cache.store(root, &skills, &mut warnings);
+    }
     Ok(Catalog { skills, warnings })
 }
 
