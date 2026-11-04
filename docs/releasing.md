@@ -6,7 +6,7 @@ preflight fails otherwise. In the ordinary case the tag is created *for* you —
 `auto-release.yml` derives the next version from the conventional commits, opens a
 release pull request, and tags it once that pull request is merged (see "Cutting a
 release"). Nothing publishes unless the tagged commit passes the full release set
-(verification plus `coverage`) and every build target dogfoods green.
+(verification plus `coverage` and `powerset`) and every build target dogfoods green.
 
 ## One-time setup
 
@@ -126,9 +126,15 @@ release"). Nothing publishes unless the tagged commit passes the full release se
 
 ## Cutting a release
 
-The ordinary path is automatic. On every push to `main`, `auto-release.yml`
-derives the next version from the conventional commits since the last release tag
-and opens — or refreshes — a `chore(release): vX.Y.Z` pull request that applies it.
+The ordinary path is automatic. A push to `main` first runs the strict ordinary
+`main` signal set; the scheduled and final release gates add coverage and the
+feature-powerset checks. Only the successful workflow run for the exact current
+`main` commit can start `auto-release.yml`.
+After at least three release-worthy commits since the last published release,
+it derives the next version from the conventional commits and opens — or refreshes — a
+`chore(release): vX.Y.Z` pull request that applies it. A maintainer may dispatch
+the workflow with `force=true` to release a smaller batch, but the exact main
+commit must still have a successful main gate.
 Refreshing means the branch *and the body* are brought up to date (the body carries
 the derived version, the bump class, the basis tag, and the commit count, so it must
 not age), and any open automation-owned `release/v<major>.<minor>.<patch>` pull
@@ -137,9 +143,9 @@ naming the surviving proposal. The sweep matches that full shape only, so a
 differently-shaped human branch (`release/v2-docs`) is never touched; a branch named
 exactly like a derivation (`release/v1.2.3`) is treated as the workflow's own,
 because that ref is the one it force-pushes and deletes itself. Merging that pull
-request tags the version and starts the release. Two paths stay deliberate: the
-override, when the derived version is not the one you want, and the recovery, when a
-release fails halfway.
+request tags the version and starts the release after the next successful main
+gate. Two paths stay deliberate: the override, when the derived version is not
+the one you want, and the recovery, when a release fails halfway.
 
 `scripts/release-manager.sh` is the single source of truth for the derivation and
 the bump. `status` reports it, `next` emits it as JSON, and `prepare <version>`
@@ -207,22 +213,25 @@ edit, so merge an overridden proposal before new commits land.
   `v0.3.2` came to be proposed while `v0.3.1` had no npm package and no Release. Otherwise it
   applies the version with `release-manager.sh prepare`, pushes `release/vX.Y.Z`,
   and opens the pull request with the derived basis in its body. The branch and the
-  body are refreshed on every push to `main`, and a still-open automation-owned
-  `release/v*` pull request whose version no longer matches the current derivation
-  is closed with a comment naming the surviving proposal.
-- `ship` tags that version at the merged commit and starts the pipeline with
-  `gh workflow run release.yml -f tag=vX.Y.Z`. It fails closed unless
-  `github.ref == 'refs/heads/main'`: a manual dispatch of the workflow can be sent
-  from any branch, and a tag created from an unreviewed ref would claim to release a
-  commit that never passed the `main` gate. Recovering a tag that already exists
-  stays `release.yml`'s job, where the tagged commit is an explicit input. A tag
-  pushed with `GITHUB_TOKEN` triggers no push workflow of its own, and
+  body are refreshed after each successful main gate, and a still-open
+  automation-owned `release/v*` pull request whose version no longer matches the
+  current derivation is closed with a comment naming the surviving proposal.
+- `ship` tags that version at the verified main commit and starts the pipeline with
+  `gh workflow run release.yml -f tag=vX.Y.Z`. It verifies that main has not
+  advanced since the green gate, and manual dispatch also looks up a successful
+  `verify.yml` run for the exact SHA. If the tag already exists without a GitHub
+  Release, it dispatches the tagged recovery path instead of declaring success.
+  A tag pushed with `GITHUB_TOKEN` triggers no push workflow of its own, and
   `workflow_dispatch` is the one event that always creates a run when it is sent
   with `GITHUB_TOKEN`.
 - A maintainer merges the release pull request. A pull request opened with
   `GITHUB_TOKEN` starts its checks in an **approval required** state, so that click
   is the one step the automation cannot take for itself; give the workflow a
   fine-grained PAT or a GitHub App installation token and it becomes zero-touch.
+- A failed main gate starts `main-repair.yml`. It may open a PR containing only
+  formatting or generated-document repairs. If those commands fail or make no
+  change, it opens one diagnostic issue for the exact SHA instead; it never
+  guesses at a code, test, security, or dependency repair.
 - The release pipeline serializes per tag. `release.yml`'s
   workflow-level concurrency group is `release-${{ inputs.tag || github.ref_name }}`
   — keyed to the tag being released rather than to the triggering ref — because a
@@ -240,6 +249,21 @@ branch and `pull-requests: write` to close a superseded proposal, and `ship` tak
 `contents: write` and `actions: write` to tag and dispatch.
 
 ### Releasing by hand
+
+For the normal manual override, dispatch `auto-release.yml` on `main` with
+`force=true`; it still requires a successful `verify.yml` run for that exact
+commit and opens the same reviewed release PR. For an incomplete existing tag,
+dispatch the fixed release workflow against the tag:
+
+<!-- example: id=releasing_manual_dispatch classification=illustrative reason="Manual release and recovery dispatch commands" -->
+```bash
+gh workflow run auto-release.yml --ref main -f force=true
+gh workflow run release.yml --ref main -f tag=vX.Y.Z
+```
+
+An untagged `release.yml` dispatch is a build-and-dogfood dry run. It never
+publishes crates or npm packages, so registry versions cannot get ahead of their
+GitHub Release.
 
 Regenerate the checked-in CLI artifacts before tagging: `cargo run -q -p
 do-harness --bin do-harness -- completions <shell>` for each shell in
@@ -269,8 +293,9 @@ completions change when the CLI surface does, and `prepare` regenerates the page
      known empty API of the v0.1.2 binary-only `do-harness` baseline), checks
      package contents with `scripts/check-package-contract.sh`, and runs
      `verify --set release --format json --strict` on the tagged commit.
-     The release set is verification plus `coverage`, so the 70% line
-     threshold gates the tag; it includes `crates/do-harness/tests/release_contract.rs`.
+     The release set is verification plus `coverage` and `powerset`, so the 70%
+     line threshold and feature combinations gate the tag; it includes
+     `crates/do-harness/tests/release_contract.rs`.
    - `build` — Linux static-musl (x86_64/aarch64) and macOS (x86_64/arm64)
      tarballs plus a Windows x86_64 zip, each dogfooded with `init && verify`
      and each attested for build provenance in the job that produced it.
@@ -347,11 +372,10 @@ it; the binary that `scripts/install.sh --version <tag>` installs reports it; an
 the archive verifies against its build provenance
 (`gh attestation verify`).
 
-Two checks are advisory. `gh release verify` — immutable releases — fails on every
-tag cut before the repository enables the setting, so requiring it early would fail
-every release for a switch only a human can flip; `--require-immutable` promotes
-it once that is done. `dist-tags.latest` is advisory because a backfill
-deliberately keeps `latest` ahead of the version being published.
+`gh release verify` is required by the release workflow, so a mutable or
+unattested GitHub Release cannot be called complete. `dist-tags.latest` remains
+advisory because a backfill deliberately keeps `latest` ahead of the version
+being published.
 
 The script is hermetic: the job gathers the facts (GitHub Release, crates.io, the
 installer and the attestations answer once; npm is polled for up to five minutes
@@ -362,11 +386,9 @@ reproduces the whole policy without a release or a network. An absent fact is
 `missing`, never "fine", and every digest comparison rejects an empty value first —
 two empty strings compare equal, which is how a gate like this passes vacuously.
 
-The job runs with `continue-on-error: true`: the first ratchet position, where the
-verdict is in the log and a failure is visible but does not redden the release.
-Deleting that line makes the job blocking; `--require-immutable` adds the last
-check. `--report-only` is the same position for a run by hand: the summary says
-`REPORTED` and the exit code stays 0.
+The job is blocking and passes `--require-immutable`; a missing fact or failed
+consumer check reddens the release. `--report-only` remains available for a
+diagnostic run by hand, but it is not used by the release workflow.
 
 ### Release notes
 

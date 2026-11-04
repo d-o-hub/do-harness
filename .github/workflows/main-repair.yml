@@ -1,0 +1,135 @@
+name: main-repair
+
+# Main CI remains fail-closed. This workflow only prepares a reviewable PR for
+# declared mechanical repairs; it never writes to main and never invents a code
+# fix for a failing test, lint, security, or dependency sensor.
+on:
+  workflow_run:
+    workflows: [verify]
+    types: [completed]
+    branches: [main]
+
+concurrency:
+  group: main-repair-${{ github.event.workflow_run.head_sha }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  repair:
+    if: >-
+      github.event.workflow_run.conclusion == 'failure' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      # No `ref:` here on purpose. A `workflow_run` job runs with write
+      # permissions, so checking out any event-supplied ref is the pwn-request
+      # shape scanners reject; the implicit ref is the default branch (this
+      # workflow's own trusted code), and the failed commit is only detached to
+      # after it is proven to be an ancestor of `origin/main` below.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+      - name: Verify the failed commit belongs to main
+        env:
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "invalid failed run commit SHA" >&2
+            exit 1
+          fi
+          git fetch --no-tags origin refs/heads/main:refs/remotes/origin/main
+          if ! git merge-base --is-ancestor "$HEAD_SHA" refs/remotes/origin/main; then
+            echo "refusing to repair a commit outside main history" >&2
+            exit 1
+          fi
+          git checkout --detach "$HEAD_SHA"
+      - name: Resolve pinned toolchain
+        id: toolchain
+        run: |
+          channel="$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)"
+          echo "channel=$channel" >> "$GITHUB_OUTPUT"
+      - uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de
+        with:
+          toolchain: ${{ steps.toolchain.outputs.channel }}
+          components: rustfmt
+      - name: Install documentation tooling
+        run: python3 -m pip install --disable-pip-version-check -r scripts/requirements-docs.txt
+      - name: Apply declared mechanical repairs
+        id: repair
+        env:
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          # docs.py intentionally refuses writes under CI; this trusted
+          # post-merge repair job is the explicitly declared exception and
+          # still publishes the result through a pull request.
+          CI: ""
+        run: |
+          set -uo pipefail
+          log="$RUNNER_TEMP/main-repair.log"
+          : > "$log"
+          status=0
+          cargo fmt --all >>"$log" 2>&1 || status=1
+          python3 scripts/docs.py sync --write >>"$log" 2>&1 || status=1
+          while IFS= read -r path; do
+            case "$path" in
+              *.rs|README.md|docs/cli.md|tests/fixtures/cli-contract.json) ;;
+              *)
+                echo "refusing an out-of-contract repair path: $path" >>"$log"
+                status=1
+                ;;
+            esac
+          done < <(git diff --name-only)
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          cat "$log"
+      - name: Open a repair pull request or diagnostic issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
+          REPAIR_STATUS: ${{ steps.repair.outputs.status }}
+        run: |
+          set -euo pipefail
+          short="${HEAD_SHA:0:12}"
+          branch="ci/auto-repair/$short"
+          if [ "$REPAIR_STATUS" != 0 ]; then
+            title="main CI needs manual repair ($short)"
+            existing="$(gh issue list --state open --search "$title in:title" --json number --jq '.[0].number // empty')"
+            if [ -z "$existing" ]; then
+              gh issue create --title "$title" --body "Main CI failed for [$HEAD_SHA]($RUN_URL). The bounded mechanical repair set could not complete. Inspect the failed workflow and repair the code or configuration in a normal pull request."
+            fi
+            exit 0
+          fi
+          if git diff --quiet; then
+            title="main CI needs manual repair ($short)"
+            existing="$(gh issue list --state open --search "$title in:title" --json number --jq '.[0].number // empty')"
+            if [ -z "$existing" ]; then
+              gh issue create --title "$title" --body "Main CI failed for [$HEAD_SHA]($RUN_URL), and no declared mechanical repair changed the checkout. This is intentionally not auto-fixed. Inspect the failed workflow and repair the code or configuration in a normal pull request."
+            fi
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          if git ls-remote --exit-code --heads origin "refs/heads/$branch" >/dev/null 2>&1; then
+            git fetch origin "$branch"
+            # Rebase the bounded repair on the exact failed main SHA; an older
+            # repair branch must not become the source of a later PR.
+            git checkout -B "$branch" "$HEAD_SHA"
+          else
+            git checkout -B "$branch" "$HEAD_SHA"
+          fi
+          git add --all
+          git commit -m 'ci: repair generated main-ci files'
+          if gh pr list --head "$branch" --state open --json number --jq '.[0].number' | grep -q .; then
+            git push --force-with-lease origin "HEAD:refs/heads/$branch"
+          else
+            git push origin "HEAD:refs/heads/$branch"
+            gh pr create --base main --head "$branch" \
+              --title 'ci: repair generated main-ci files' \
+              --body "This PR contains only declared mechanical repairs for the failed main CI run [$short]($RUN_URL). It must pass the normal main gate before merge."
+          fi

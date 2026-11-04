@@ -20,6 +20,7 @@ pre-push = []
 [signal-sets]
 feedback = ["web-ui-tests"]
 verification = ["web-ui-tests", "viewport-ux", "a11y", "console", "perf", "visual", "i18n"]
+main = ["web-ui-tests", "viewport-ux", "a11y", "console", "perf", "visual", "i18n"]
 
 [[sensors]]
 name = "web-ui-tests"

@@ -22,7 +22,7 @@ fn builtin_rust_pack_test_sensor_fails_on_zero_tests() {
     );
 }
 
-/// The built-in default ships feedback/verification/release signal sets.
+/// The built-in default ships feedback/verification/main/release signal sets.
 #[test]
 fn rust_default_ships_signal_sets() {
     let cfg = rust_default();
@@ -35,6 +35,11 @@ fn rust_default_ships_signal_sets() {
         ])
     );
     assert_eq!(cfg.signal_sets.get("verification").unwrap().len(), 9);
+    assert_eq!(
+        cfg.signal_sets.get("main"),
+        cfg.signal_sets.get("verification"),
+        "main must remain the fast strict release-authority surface"
+    );
     assert_eq!(cfg.signal_sets.get("release").unwrap().len(), 10);
     cfg.validate().expect("built-in default must validate");
 }

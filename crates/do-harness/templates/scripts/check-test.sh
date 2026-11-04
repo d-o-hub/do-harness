@@ -5,7 +5,8 @@
 # to `cargo test` when nextest is absent, and applies the same zero-test guard
 # itself: `cargo test` exits 0 when a workspace has no tests, so the fallback
 # would otherwise be a green gate that executed nothing (AGENTS.md section 4,
-# "No Vacuous Gates").
+# "No Vacuous Gates"). Keep doctests out of this sensor: `doctest` owns those
+# examples, and overlapping them makes the fast fallback do duplicate work.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -17,7 +18,7 @@ fi
 
 # `--list` enumerates the tests without running them. A compile failure must
 # surface as itself rather than as "zero tests", so its status is checked first.
-if ! listing="$(cargo test --workspace -- --list 2>&1)"; then
+if ! listing="$(cargo test --workspace --lib --bins --tests -- --list 2>&1)"; then
     printf '%s\n' "$listing"
     echo "FAIL: cargo test --list failed; the suite could not be enumerated"
     exit 1
@@ -28,4 +29,4 @@ if [ "${count:-0}" -eq 0 ]; then
     exit 1
 fi
 
-cargo test --workspace
+cargo test --workspace --lib --bins --tests

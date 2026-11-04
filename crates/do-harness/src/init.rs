@@ -312,8 +312,9 @@ fn release_preflight_spec() -> crate::config::SensorSpec {
 /// Renders the Rust `do-harness.toml` for the included sensors.
 ///
 /// Signal sets are derived from the pack: feedback is the fast subset,
-/// verification/release cover every included sensor (`release-preflight`
-/// included — it is offline — while `coverage` stays out of verification).
+/// verification covers every ordinary sensor except `coverage`, `main` is the
+/// strict post-merge ordinary gate, and release covers every included sensor
+/// (`release-preflight` included — it is offline).
 /// Hooks are filtered to included sensors too, so a missing tool cannot make a
 /// hook fail.
 fn generate_rust_config(sensors: &[crate::config::SensorSpec]) -> Result<String> {
@@ -336,13 +337,14 @@ fn generate_rust_config(sensors: &[crate::config::SensorSpec]) -> Result<String>
         .filter(|name| names.contains(name))
         .map(ToString::to_string)
         .collect();
-    let verification = names
+    let verification: Vec<String> = names
         .iter()
         .filter(|name| **name != "coverage")
         .map(ToString::to_string)
         .collect();
     let full = names.iter().map(ToString::to_string).collect::<Vec<_>>();
     signal_sets.insert("feedback".to_owned(), feedback);
+    signal_sets.insert("main".to_owned(), verification.clone());
     signal_sets.insert("verification".to_owned(), verification);
     signal_sets.insert("release".to_owned(), full);
     let pre_commit = ["fmt", "loc"]

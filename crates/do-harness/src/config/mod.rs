@@ -16,7 +16,7 @@ pub struct Config {
     #[serde(default)]
     pub hooks: HooksConfig,
     /// Named development signal sets: each maps a decision name (e.g.
-    /// `feedback`, `verification`, `release`) to the ordered sensor names
+    /// `feedback`, `verification`, `main`, `release`) to the ordered sensor names
     /// that provide evidence for it. Sets refer to sensors; they never
     /// contain command lines.
     #[serde(default, rename = "signal-sets")]
@@ -200,7 +200,7 @@ pub async fn load_raw(root: &Path, explicit: Option<&Path>) -> Result<(Config, O
 mod validate;
 
 /// Returns the built-in Rust configuration with the full sensor pack and the
-/// feedback/verification/release signal sets.
+/// feedback/verification/main/release signal sets.
 pub fn rust_default() -> Config {
     let sensors = RUST_SENSORS.to_vec();
     let names: Vec<String> = sensors.iter().map(|s| s.name.clone()).collect();
@@ -211,7 +211,8 @@ pub fn rust_default() -> Config {
     );
     let verification_names: Vec<String> =
         names.iter().filter(|n| *n != "coverage").cloned().collect();
-    signal_sets.insert("verification".to_owned(), verification_names);
+    signal_sets.insert("verification".to_owned(), verification_names.clone());
+    signal_sets.insert("main".to_owned(), verification_names);
     signal_sets.insert("release".to_owned(), names);
     Config {
         language: None,

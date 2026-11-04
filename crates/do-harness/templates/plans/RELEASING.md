@@ -6,6 +6,13 @@ tags, pushes, or publishes.
 **Sensor**: `release-preflight` runs the offline half of the preflight
 (version pins) in the `verification` and `release` signal sets.
 
+The post-merge `main` gate should run the complete strict release-blocking set
+for the exact commit that will be tagged; warnings, skipped sensors, missing
+tools, and stale evidence are not release evidence. Automatic repair belongs in
+a reviewable pull request and is limited to commands the repository explicitly
+declares mechanical. Never push an inferred code, test, security, or dependency
+repair directly to `main`.
+
 ## Golden path
 
 1. **Bump every version pin in one PR.** `VERSION` (when the repository has

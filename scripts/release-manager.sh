@@ -12,6 +12,12 @@
 #                            step is a tag, not another bump
 #         none               nothing releasable landed
 #
+#   eligible <release-worthy-count> <bump> [--force]
+#       Print `true` when a derived release is eligible for preparation. The
+#       normal batch threshold is three release-worthy commits; `--force` is an
+#       explicit manual override. A force never changes the successful main-gate
+#       requirement enforced by the workflow.
+#
 #   prepare <version> [--no-lock] [--no-man]
 #       Apply <version> to every managed manifest: `[workspace.package].version`
 #       in Cargo.toml, the intra-workspace requirement pins in the member
@@ -84,6 +90,8 @@ REF="HEAD"
 FORMAT="plain"
 DO_LOCK=true
 DO_MAN=true
+FORCE_RELEASE=false
+readonly MIN_RELEASE_COMMITS=3
 
 # The tags that have a *published* release, as a comma-separated list, and
 # whether the caller supplied one at all. An empty list and an absent flag are
@@ -94,10 +102,10 @@ DO_MAN=true
 PUBLISHED=""
 PUBLISHED_KNOWN=false
 
-# Set by derive(): CURRENT, BASIS, COMMITS, BREAKING, FEATURE, FIX,
-# NONCONVENTIONAL, BUMP, NEXT.
+# Set by derive(): CURRENT, BASIS, COMMITS, RELEASE_WORTHY, BREAKING, FEATURE,
+# FIX, NONCONVENTIONAL, BUMP, NEXT.
 CURRENT="" BASIS="" COMMITS=0 BREAKING=false FEATURE=false FIX=false
-NONCONVENTIONAL=false BUMP="" NEXT=""
+RELEASE_WORTHY=0 NONCONVENTIONAL=false BUMP="" NEXT=""
 
 # The self-test's sandbox. A global, because the EXIT trap runs after that
 # function has returned and a `local` would already be out of scope.
@@ -119,6 +127,7 @@ usage: release-manager.sh <command> [options]
 
   status                     version, newest tag, commits since it, derived bump
   next                       the same, as key=value or --format json
+  eligible <count> <bump>    true when the release-worthy batch threshold is met
   prepare <version>          apply <version> to every managed manifest
   --self-test                hermetic controls for the derivation and the bump
   --e2e [<version>]          real prepare in a scratch worktree (needs cargo)
@@ -133,6 +142,7 @@ options:
                              which leaves the derivation as it was
   --no-lock                  skip the Cargo.lock refresh in `prepare`
   --no-man                   skip regenerating man/do-harness.1 in `prepare`
+  --force                    allow `eligible` to bypass the batch threshold
 EOF
 }
 
@@ -158,6 +168,19 @@ require_version() {
     if [[ ! "$version" =~ $RE_VERSION ]]; then
         die "'$version' is not a MAJOR.MINOR.PATCH version (from $origin)"
     fi
+}
+
+# The workflow calls this pure policy function after deriving a bump. Keeping
+# the threshold here makes the batch rule hermetic and testable instead of
+# hiding it in YAML shell interpolation.
+release_eligible() {
+    local count="$1" bump="$2" force="${3:-false}"
+    [[ "$count" =~ ^[0-9]+$ ]] || return 2
+    case "$bump" in
+        major | minor | patch) : ;;
+        *) return 1 ;;
+    esac
+    [ "$force" = true ] || [ "$count" -ge "$MIN_RELEASE_COMMITS" ]
 }
 
 workspace_version() {
@@ -211,37 +234,51 @@ readonly RE_FEAT='^feat(\([^)]*\))?:'                # feat(cli):
 readonly RE_FIX='^(fix|perf)(\([^)]*\))?:'           # fix(cli):, perf(core):
 readonly RE_CONVENTIONAL='^[a-zA-Z]+(\([^)]*\))?!?:' # any conventional type
 classify() {
-    local range="$1" subject lowered line subjects bodies
+    local range="$1" record subject body lowered line records release_worthy
     BREAKING=false
     FEATURE=false
     FIX=false
+    RELEASE_WORTHY=0
     NONCONVENTIONAL=false
-    if ! subjects="$(git -C "$ROOT" log --no-merges --format=%s "$range")"; then
-        die "cannot read commit subjects in range '$range' in $ROOT"
+    if ! records="$(git -C "$ROOT" log --no-merges --format='%s%x1f%b%x1e' "$range")"; then
+        die "cannot read commit subjects and bodies in range '$range' in $ROOT"
     fi
-    if ! bodies="$(git -C "$ROOT" log --no-merges --format=%b "$range")"; then
-        die "cannot read commit bodies in range '$range' in $ROOT"
-    fi
-    while IFS= read -r subject; do
-        [ -n "$subject" ] || continue
+    while IFS= read -r -d $'\x1e' record; do
+        # `git log --format` appends its normal newline after the record
+        # separator; it becomes the first byte of every record after the first.
+        record="${record#$'\n'}"
+        [ -n "$record" ] || continue
+        subject="${record%%$'\x1f'*}"
+        body="${record#*$'\x1f'}"
+        release_worthy=false
         # §15: the type is case-insensitive (the footer token below is not).
         lowered="$(printf '%s' "$subject" | tr '[:upper:]' '[:lower:]')"
         if [[ "$lowered" =~ $RE_BREAKING ]]; then
             BREAKING=true
+            release_worthy=true
         elif [[ "$lowered" =~ $RE_FEAT ]]; then
             FEATURE=true
+            release_worthy=true
         elif [[ "$lowered" =~ $RE_FIX ]]; then
             FIX=true
+            release_worthy=true
         fi
         if [[ ! "$lowered" =~ $RE_CONVENTIONAL ]]; then
             NONCONVENTIONAL=true
+            release_worthy=true
         fi
-    done <<<"$subjects"
-    while IFS= read -r line; do
-        case "$line" in
-            'BREAKING CHANGE:'* | 'BREAKING-CHANGE:'*) BREAKING=true ;;
-        esac
-    done <<<"$bodies"
+        while IFS= read -r line; do
+            case "$line" in
+                'BREAKING CHANGE:'* | 'BREAKING-CHANGE:'*)
+                    BREAKING=true
+                    release_worthy=true
+                    ;;
+            esac
+        done <<<"$body"
+        if [ "$release_worthy" = true ]; then
+            RELEASE_WORTHY=$((RELEASE_WORTHY + 1))
+        fi
+    done <<<"$records"
 }
 
 decide_bump() {
@@ -384,14 +421,14 @@ derive() {
 }
 
 print_plain() {
-    printf 'current=%s\nbasis=%s\ncommits=%s\nbreaking=%s\nfeature=%s\nfix=%s\nnonconventional=%s\nbump=%s\nnext=%s\n' \
-        "$CURRENT" "${BASIS:-none}" "$COMMITS" "$BREAKING" "$FEATURE" "$FIX" \
+    printf 'current=%s\nbasis=%s\ncommits=%s\nrelease_worthy=%s\nbreaking=%s\nfeature=%s\nfix=%s\nnonconventional=%s\nbump=%s\nnext=%s\n' \
+        "$CURRENT" "${BASIS:-none}" "$COMMITS" "$RELEASE_WORTHY" "$BREAKING" "$FEATURE" "$FIX" \
         "$NONCONVENTIONAL" "$BUMP" "$NEXT"
 }
 
 print_json() {
-    printf '{"current":"%s","basis":"%s","commits":%s,"breaking":%s,"feature":%s,"fix":%s,"nonconventional":%s,"bump":"%s","next":"%s"}\n' \
-        "$CURRENT" "${BASIS:-none}" "$COMMITS" "$BREAKING" "$FEATURE" "$FIX" \
+    printf '{"current":"%s","basis":"%s","commits":%s,"release_worthy":%s,"breaking":%s,"feature":%s,"fix":%s,"nonconventional":%s,"bump":"%s","next":"%s"}\n' \
+        "$CURRENT" "${BASIS:-none}" "$COMMITS" "$RELEASE_WORTHY" "$BREAKING" "$FEATURE" "$FIX" \
         "$NONCONVENTIONAL" "$BUMP" "$NEXT"
 }
 
@@ -665,6 +702,25 @@ self_test() {
     repo="$WORK/repo"
     trap 'rm -rf "$WORK"' EXIT
 
+    expect_eligible() {
+        local expected="$1" commits="$2" bump="$3" force="${4:-false}" actual
+        actual=false
+        if release_eligible "$commits" "$bump" "$force"; then
+            actual=true
+        fi
+        if [ "$actual" = "$expected" ]; then
+            printf 'ok   %s (eligible=%s)\n' "$5" "$actual"
+        else
+            printf 'FAIL %s (eligible=%s, expected=%s)\n' "$5" "$actual" "$expected" >&2
+            failures=$((failures + 1))
+        fi
+    }
+
+    expect_eligible false 2 patch false 'a two-commit batch waits'
+    expect_eligible true 3 patch false 'a three-commit batch is eligible'
+    expect_eligible true 1 minor true 'force bypasses the batch threshold'
+    expect_eligible false 4 none false 'a non-release bump stays ineligible'
+
     mkdir -p "$repo/integrations/npm/platforms"
     cat >"$repo/Cargo.toml" <<'EOF'
 [workspace]
@@ -762,6 +818,21 @@ EOF
             failures=$((failures + 1))
         fi
     }
+    expect_derived_batch() { # expect_derived_batch <expected> <description>
+        local expected="$1" description="$2" actual=false
+        derive "$REF"
+        if release_eligible "$RELEASE_WORTHY" "$BUMP"; then
+            actual=true
+        fi
+        if [ "$actual" = "$expected" ]; then
+            printf 'ok   %s (release-worthy=%s total=%s)\n' \
+                "$description" "$RELEASE_WORTHY" "$COMMITS"
+        else
+            printf 'FAIL %s: expected eligible=%s, got eligible=%s (release-worthy=%s total=%s)\n' \
+                "$description" "$expected" "$actual" "$RELEASE_WORTHY" "$COMMITS" >&2
+            failures=$((failures + 1))
+        fi
+    }
     # expect_die <message-fragment> <description> <command...>: the command must
     # fail *for the stated reason*. "It exited non-zero somehow" would also be
     # satisfied by an unrelated crash, and the guards here exist to make a bad
@@ -792,6 +863,7 @@ EOF
     commit 'test(cli): cover the new flag'
     commit 'refactor(core): simplify the payload decoder'
     expect none 0.3.0 'docs, tests and refactors alone cut no release'
+    expect_derived_batch false 'non-release commits do not satisfy the batch threshold'
 
     commit 'fix(db): close the write lock'
     expect patch 0.3.1 'a fix cuts a patch'
@@ -1025,7 +1097,7 @@ EOF
     expect_die 'cannot count commits in range' \
         'a bogus range fails closed on the commit count' \
         commit_count 'v0.3.0..no-such-ref'
-    expect_die 'cannot read commit subjects in range' \
+    expect_die 'cannot read commit subjects and bodies in range' \
         'a bogus range fails closed in the log parsing' \
         classify 'v0.3.0..no-such-ref'
 
@@ -1062,7 +1134,7 @@ main() {
     require_arg() {
         [ $# -ge 2 ] || die "$1 requires a value"
     }
-    local command="${1:-}" version=""
+    local command="${1:-}" version="" eligible_bump=""
     if [ $# -gt 0 ]; then
         shift
     fi
@@ -1100,6 +1172,10 @@ main() {
                 DO_MAN=false
                 shift
                 ;;
+            --force)
+                FORCE_RELEASE=true
+                shift
+                ;;
             -h | --help)
                 usage
                 exit 0
@@ -1108,8 +1184,13 @@ main() {
                 die "unknown option: $1"
                 ;;
             *)
-                [ -z "$version" ] || die "unexpected argument: $1"
-                version="$1"
+                if [ -z "$version" ]; then
+                    version="$1"
+                elif [ "$command" = eligible ] && [ -z "$eligible_bump" ]; then
+                    eligible_bump="$1"
+                else
+                    die "unexpected argument: $1"
+                fi
                 shift
                 ;;
         esac
@@ -1127,6 +1208,20 @@ main() {
             if [ "$command" = next ] && [ "$FORMAT" = json ]; then
                 print_json
             fi
+            ;;
+        eligible)
+            [ -n "$version" ] || die "eligible requires a commit count"
+            [ -n "$eligible_bump" ] || die "eligible requires a bump"
+            [[ "$version" =~ ^[0-9]+$ ]] || die "eligible commit count must be numeric"
+            case "$eligible_bump" in
+                major | minor | patch) : ;;
+                *) die "eligible bump must be major, minor, or patch" ;;
+            esac
+            result=false
+            if release_eligible "$version" "$eligible_bump" "$FORCE_RELEASE"; then
+                result=true
+            fi
+            printf '%s\n' "$result"
             ;;
         prepare)
             cmd_prepare "$version"

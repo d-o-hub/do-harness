@@ -1,10 +1,8 @@
 name: scheduled
 
-# The `scheduled` signal set is work that is real but too expensive to charge to
-# every push and pull request: `powerset` builds guardian-proxy across its
-# feature combinations. It used to run inside the `verify` workflow, so a
-# four-build matrix was paid per push; it now runs nightly, and its evidence is
-# asserted the same way the `verification` set's is.
+# The `scheduled` signal set runs the expensive coverage and feature-powerset
+# checks nightly. The run is an independent drift and infrastructure-health
+# recheck; it is not release evidence for another commit.
 
 on:
   schedule:
