@@ -56,6 +56,23 @@ pub enum TaskAction {
         #[arg(long, value_enum, default_value_t = Format::Text)]
         format: Format,
     },
+    /// Assemble a bounded, read-only resume context for a task.
+    Context {
+        /// Task id.
+        #[arg(value_name = "ID")]
+        id: i64,
+        /// Output format.
+        #[arg(long, value_enum, default_value_t = Format::Text)]
+        format: Format,
+        /// Maximum rendered bytes; task identity and the next action always
+        /// survive, so a very small budget is a floor, not a truncation.
+        #[arg(
+            long,
+            default_value_t = crate::task::context::DEFAULT_MAX_BYTES,
+            value_name = "N"
+        )]
+        max_bytes: usize,
+    },
     /// Add a task in `pending` state.
     Add {
         /// Human-readable task title.

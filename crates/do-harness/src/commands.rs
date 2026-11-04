@@ -135,6 +135,11 @@ pub async fn task_cmd(root: &Path, action: TaskAction, dry_run: bool) -> Result<
             format,
         } => task::list_tasks(root, format, status.as_deref(), method.as_deref(), parent).await,
         TaskAction::Show { id, format } => task::show_task(root, id, format).await,
+        TaskAction::Context {
+            id,
+            format,
+            max_bytes,
+        } => task::context::run(root, id, max_bytes, format).await,
         TaskAction::Add {
             title,
             method,

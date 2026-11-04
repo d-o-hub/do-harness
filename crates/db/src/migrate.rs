@@ -4,7 +4,7 @@ use std::path::Path;
 
 use crate::error::{DbError, Result};
 use crate::migrate_catalog::{MIGRATIONS, Migration};
-use libsql::{Builder, Connection, params::Params};
+use libsql::{Builder, Connection, OpenFlags, params::Params};
 
 mod backup;
 
@@ -57,6 +57,38 @@ pub async fn connect(path: impl AsRef<Path>) -> Result<Connection> {
         "PRAGMA journal_mode = WAL",
         "PRAGMA synchronous = NORMAL",
     ] {
+        let mut rows = conn.query(pragma, Params::None).await?;
+        while rows.next().await?.is_some() {}
+    }
+    Ok(conn)
+}
+
+/// Opens an existing local libSQL database read-only.
+///
+/// Unlike [`connect`], this never creates the file, never changes the journal
+/// mode, and sets `query_only` so a projection cannot mutate state by reading
+/// it. A missing database is an error; callers decide how to report it.
+///
+/// # Errors
+///
+/// Returns an error when the database cannot be opened read-only or the
+/// read-only session cannot be configured.
+pub async fn connect_read_only(path: impl AsRef<Path>) -> Result<Connection> {
+    let path = path.as_ref();
+    let db = Builder::new_local(path)
+        .flags(OpenFlags::SQLITE_OPEN_READ_ONLY)
+        .build()
+        .await
+        .map_err(|source| DbError::Connect {
+            path: path.to_path_buf(),
+            source,
+        })?;
+    let conn = db.connect().map_err(|source| DbError::Connect {
+        path: path.to_path_buf(),
+        source,
+    })?;
+    // Both pragmas are connection-local: no journal-mode change, no write.
+    for pragma in ["PRAGMA busy_timeout = 10000", "PRAGMA query_only = ON"] {
         let mut rows = conn.query(pragma, Params::None).await?;
         while rows.next().await?.is_some() {}
     }

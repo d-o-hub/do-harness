@@ -43,8 +43,8 @@ pub use error::{DbError, Result, retry_on_busy};
 pub use libsql::Connection;
 
 pub use migrate::{
-    MigrationSkew, connect, connect_and_migrate, count_migrations, inspect_migrations, migrate,
-    unix_now,
+    MigrationSkew, connect, connect_and_migrate, connect_read_only, count_migrations,
+    inspect_migrations, migrate, unix_now,
 };
 pub use query::count_where;
 pub use repo::{NewTask, get_task, latest_task_update, list_tasks, seed_invariants};
@@ -71,7 +71,10 @@ pub use repo_sensors::{
 pub use repo_skill_eval::{
     NewSkillEval, insert_skill_eval, list_all_skill_evals, list_skill_evals,
 };
-pub use repo_trace::{NewTrace, get_trace, insert_trace, list_traces, list_traces_page};
+pub use repo_trace::{
+    NewTrace, count_traces_for_task, get_trace, insert_trace, list_traces, list_traces_for_task,
+    list_traces_page,
+};
 pub use repo_workflow::{
     FreshTaskInputs, FreshTransition, OBSERVATION_ONLY_PREFIX, WorkflowEventRow,
     advance_subtask_with_event, canonical_payload, chain_hash, count_tasks_without_added_event,

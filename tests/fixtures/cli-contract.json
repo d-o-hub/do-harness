@@ -1370,6 +1370,7 @@
         "import",
         "list",
         "show",
+        "context",
         "add",
         "advance",
         "done",
@@ -1587,6 +1588,71 @@
             "json"
           ],
           "help": "Output format",
+          "index": null
+        }
+      ],
+      "subcommands": [],
+      "invocable": true
+    },
+    {
+      "path": "task context",
+      "about": "Assemble a bounded, read-only resume context for a task",
+      "usage": "do-harness task context [OPTIONS] <ID>",
+      "aliases": [],
+      "args": [
+        {
+          "id": "id",
+          "kind": "positional",
+          "short": null,
+          "long": null,
+          "value_names": [
+            "ID"
+          ],
+          "required": true,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Task id",
+          "index": 1
+        },
+        {
+          "id": "format",
+          "kind": "option",
+          "short": null,
+          "long": "format",
+          "value_names": [
+            "FORMAT"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [
+            "text"
+          ],
+          "possible_values": [
+            "text",
+            "json"
+          ],
+          "help": "Output format",
+          "index": null
+        },
+        {
+          "id": "max_bytes",
+          "kind": "option",
+          "short": null,
+          "long": "max-bytes",
+          "value_names": [
+            "N"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [
+            "8192"
+          ],
+          "possible_values": [],
+          "help": "Maximum rendered bytes; task identity and the next action always survive, so a very small budget is a floor, not a truncation",
           "index": null
         }
       ],
