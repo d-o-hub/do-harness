@@ -266,3 +266,58 @@ fn a_truncated_response_is_unknown() {
     assert_eq!(report["verdict"], "UNKNOWN");
     assert_eq!(report["blockers"][0]["code"], "check_runs_truncated");
 }
+
+/// The 101st check lives on a second page. This proves the CLI asks `gh` for
+/// every page (`--paginate --slurp`) and folds both pages into one verdict,
+/// rather than reading a single 100-row response.
+#[cfg(unix)]
+#[test]
+fn a_failure_on_the_second_page_is_collected() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    let bin = fake_gh_router(root);
+    write_view(root, 2008);
+
+    let first_page: Vec<Value> = (0..100)
+        .map(|i| {
+            json!({
+                "id": i,
+                "name": format!("check-{i}"),
+                "status": "completed",
+                "conclusion": "success",
+                "app": {"slug": "github-actions"}
+            })
+        })
+        .collect();
+    let pages = json!([
+        {"total_count": 101, "check_runs": first_page},
+        {"total_count": 101, "check_runs": [{
+            "id": 101,
+            "name": "check-101",
+            "status": "completed",
+            "conclusion": "failure",
+            "app": {"slug": "github-actions"}
+        }]}
+    ]);
+    std::fs::write(root.join("check_runs_pages.json"), pages.to_string()).unwrap();
+
+    let (code, stdout, stderr) = run_pr(root, &bin, &["pr", "checks", "2008", "--format", "json"]);
+    assert_eq!(code, Some(1), "a second-page failure must fail: {stderr}");
+    let report: Value = serde_json::from_str(&stdout).expect("JSON report");
+    assert_eq!(report["verdict"], "FAIL");
+    assert_eq!(report["checks"].as_array().unwrap().len(), 101);
+    assert!(
+        report["checks"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|c| c["name"] == "check-101" && c["verdict"] == "FAIL")
+    );
+
+    let flags = std::fs::read_to_string(root.join("check_runs_flags")).unwrap();
+    assert!(
+        flags.contains("--paginate"),
+        "must request pagination: {flags}"
+    );
+    assert!(flags.contains("--slurp"), "must slurp every page: {flags}");
+}

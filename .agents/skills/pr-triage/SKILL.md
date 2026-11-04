@@ -1,6 +1,6 @@
 ---
 name: pr-triage
-description: Triage GitHub pull requests with gh and git. Use after opening a PR, or when asked to review, roast, clean up, update, resolve comments on, or merge open PRs. Reviews and roasts changes, closes PRs with no effective diff, applies roast fixes, answers and resolves review conversations, updates branches to the latest base, verifies every check including bots, and merges directly with --match-head-commit. Optionally uses do-harness to cut review tokens to the unresolved residual; semantic routing to adapt review depth is optional and experimental (a measured no-go on cost).
+description: Triage GitHub pull requests with gh and git. Use after opening a PR, or when asked to review, roast, clean up, update, resolve comments on, or merge open PRs. Reviews and roasts changes, closes PRs with no effective diff, applies roast fixes, answers and resolves review conversations, updates branches to the latest base, verifies every check including bots, and merges directly with --match-head-commit. Requires do-harness for CI classification (fail closed without it); optionally uses it to cut review tokens to the unresolved residual, and semantic routing to adapt review depth is optional and experimental (a measured no-go on cost).
 license: MIT
 metadata:
   short-description: Triage open GitHub PRs end to end
@@ -13,6 +13,13 @@ See references/heuristics.md for distilled heuristics.
 Triage every open GitHub PR, one at a time, in merge order. Review and roast the
 change, close no-effect PRs, fix findings, resolve conversations, keep the branch
 current, and merge directly when all gates pass. Never use auto-merge.
+
+**Prerequisites.** `gh`, `git`, and `jq` are required. `do-harness` is required
+for CI classification: `scripts/checks.sh` and the pre-merge CI gate call
+`do-harness pr checks`, and without the binary they report `UNKNOWN` and refuse
+to merge rather than degrading to a shell parser. Install it (or set
+`DO_HARNESS_BIN`) before a sweep; a missing binary stops the sweep, it does not
+silently pass.
 
 Read [references/merge-order.md](references/merge-order.md) before merging
 stacks, [references/check-policy.md](references/check-policy.md) before judging

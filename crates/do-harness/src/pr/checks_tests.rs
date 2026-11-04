@@ -230,6 +230,27 @@ fn a_conflicting_pr_marks_its_check_set_incomplete() {
     );
 }
 
+/// A conflicted head with no reported checks is still `UNKNOWN`, but the
+/// blocker names the empty suite rather than incompleteness: there is nothing
+/// to call incomplete. Downstream code keys on the code, so pin it.
+#[test]
+fn a_conflicting_pr_with_no_checks_reports_the_empty_suite() {
+    let report = classify(7, "abc123", vec![], vec![], &ChecksPolicy::default(), true);
+    assert_eq!(report.verdict, Verdict::Unknown);
+    assert!(
+        report
+            .blockers
+            .iter()
+            .any(|b| b.code == "no_checks_reported")
+    );
+    assert!(
+        !report
+            .blockers
+            .iter()
+            .any(|b| b.code == "checks_incomplete")
+    );
+}
+
 #[test]
 fn a_malformed_policy_is_an_error_not_a_permissive_default() {
     let dir = tempfile::tempdir().unwrap();

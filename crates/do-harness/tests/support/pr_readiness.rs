@@ -53,8 +53,18 @@ if [ "$1" = "api" ]; then
                 echo "HTTP 403: rate limit exceeded" >&2
                 exit 1
             fi
+            # Record the pagination flags so a test can prove the CLI asks for
+            # every page instead of trusting a single response.
+            for arg in "$@"; do
+                case "$arg" in
+                    --paginate|--slurp) printf '%s\n' "$arg" >> "$MOCK_DIR/check_runs_flags" ;;
+                esac
+            done
             if [ -f "$MOCK_DIR/empty_checks" ]; then
                 printf '%s' '[{{"total_count":0,"check_runs":[]}}]'
+            elif [ -f "$MOCK_DIR/check_runs_pages.json" ]; then
+                # Already the full `--paginate --slurp` array of page documents.
+                cat "$MOCK_DIR/check_runs_pages.json"
             elif [ -f "$MOCK_DIR/check_runs.json" ]; then
                 printf '['
                 cat "$MOCK_DIR/check_runs.json"
