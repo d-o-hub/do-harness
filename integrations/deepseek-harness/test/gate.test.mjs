@@ -89,10 +89,54 @@ test('unchanged failures stop the loop after maxContinuations', async () => {
     await stop(ctx, agent)
   }
   assert.equal(agent.steered.length, 4, 'three continuations plus one exhaustion notice')
-  assert.match(agent.steered[3].content[0].text, /disabled for this agent/)
+  assert.match(agent.steered[3].content[0].text, /blocked this turn/)
   assert.ok(
-    ctx.warnings.some((warning) => warning.includes('disabled')),
-    'the exhaustion must be logged',
+    ctx.warnings.some((warning) => warning.includes('blocked the turn')),
+    'the blocked turn must be logged',
+  )
+})
+
+test('alternating outcomes cannot extend the budget', async () => {
+  const documents = [
+    { state: 'red', reason: 'failures', set: 'verification', evidence: { failed: ['test'] } },
+    { state: 'stale', reason: 'workspace_changed', set: 'verification' },
+    { state: 'red', reason: 'failures', set: 'verification', evidence: { failed: ['clippy'] } },
+    { state: 'stale', reason: 'policy_changed', set: 'verification' },
+  ]
+  const ctx = createFakeCtx()
+  installCompletionGate({
+    ctx,
+    settings: { ...SETTINGS, maxContinuations: 2 },
+    runner: statusRunner(documents),
+    logger: ctx.logger,
+  })
+  const agent = { id: 'a', steered: [], steer(message) { this.steered.push(message) } }
+  for (let i = 0; i < 4; i += 1) {
+    await stop(ctx, agent)
+  }
+  assert.equal(agent.steered.length, 3, 'two continuations plus one exhaustion notice')
+  assert.match(agent.steered[2].content[0].text, /blocked this turn after 3 attempts/)
+})
+
+test('an exhausted gate rejects the next step, which is the host blocked outcome', async () => {
+  const ctx = createFakeCtx()
+  installCompletionGate({
+    ctx,
+    settings: { ...SETTINGS, maxContinuations: 1 },
+    runner: statusRunner([
+      { state: 'missing', reason: 'no_evidence', set: 'verification' },
+      { state: 'missing', reason: 'no_evidence', set: 'verification' },
+    ]),
+    logger: ctx.logger,
+  })
+  const agent = { id: 'a', steered: [], steer(message) { this.steered.push(message) } }
+  await stop(ctx, agent)
+  await stop(ctx, agent)
+  assert.deepEqual(await ctx.waterfall('agent/pre-step', { agent }), { kind: 'reject' })
+  assert.deepEqual(
+    await ctx.waterfall('agent/pre-step', { agent }),
+    { kind: 'enter' },
+    'the block applies to one turn, not every later turn',
   )
 })
 
@@ -110,6 +154,7 @@ test('infrastructure errors steer actionably and then stop', async () => {
   assert.equal(agent.steered.length, 2)
   assert.match(agent.steered[0].content[0].text, /could not evaluate verification evidence/)
   assert.match(agent.steered[1].content[0].text, /binary not found/)
+  assert.match(agent.steered[1].content[0].text, /blocked this turn/)
 })
 
 test('disabled strict mode registers no listener', () => {
@@ -138,6 +183,7 @@ test('the returned disposer removes the listener', async () => {
   dispose()
   await stop(ctx, agent)
   assert.equal(agent.steered.length, 1, 'a disposed gate must not steer again')
+  assert.equal(ctx.listeners.get('agent/pre-step').size, 0, 'the pre-step gate is disposed too')
 })
 
 test('distinct agents track loops independently', async () => {

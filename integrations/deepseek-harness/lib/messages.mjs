@@ -63,14 +63,23 @@ export function infrastructureMessage(error) {
   )
 }
 
-/** Builds the final notice before the gate stops enforcing for one agent. */
+/** Builds the final notice before the gate blocks the turn. */
 export function exhaustedMessage(document, attempts) {
   const set = document?.set ?? 'verification'
   const failed = (document?.evidence?.failed ?? []).join(', ')
   return userMessage(
-    `The do-harness completion gate is disabled for this agent after ${attempts} attempts with ` +
-      `unchanged evidence for signal set "${set}"` +
+    `The do-harness completion gate blocked this turn after ${attempts} attempts with ` +
+      `non-green evidence for signal set "${set}"` +
       (failed ? ` (failed: ${failed})` : '') +
-      '. Resolve the underlying failure manually; completion is not verified.',
+      '. Completion is not verified; resolve the failure and start a new turn.',
+  )
+}
+
+/** Builds the final notice when the gate could not evaluate evidence at all. */
+export function exhaustedInfrastructureMessage(error, attempts) {
+  return userMessage(
+    `The do-harness completion gate blocked this turn after ${attempts} attempts because it ` +
+      `could not evaluate verification evidence: ${error.message} ` +
+      'Fix the do-harness configuration or binary resolution, then run verification.',
   )
 }

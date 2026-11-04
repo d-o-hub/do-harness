@@ -23,7 +23,9 @@ validates the JSON it receives.
 - **Strict completion gate** (opt-in) — on `agent/turn-stopping` the bundle
   runs only the cheap `status` operation. `green` permits the stop; `stale`,
   `red`, or `missing` steers the agent with a computational, specific reason
-  and the exact next command, then lets the loop continue.
+  and the exact next command, then lets the loop continue. When the bounded
+  repair budget is spent, the gate rejects the next step so the host ends the
+  turn as `blocked` instead of reporting a successful completion.
 
 The model never passes raw CLI argv: the tool schema exposes only
 `action`, `set`, and `changed`.
@@ -84,13 +86,18 @@ installs Rust binaries.
 
 ## Loop safety
 
-The completion gate tracks consecutive identical outcomes per agent:
+The completion gate counts every non-green evaluation against one budget per
+agent, so alternating states, reasons, or failed-sensor lists cannot extend the
+loop:
 
-- A different state/signature resets the counter.
-- After `maxContinuations` unchanged refusals, the gate disables itself for
-  that agent, logs the reason, and steers one final message naming the
-  underlying failure. It cannot create an infinite stop/continue loop, and it
-  does not silently allow completion.
+- While the budget remains, the gate steers a computational message naming the
+  next command and lets the loop continue.
+- When the budget is spent, the gate steers one final message naming the
+  underlying failure and rejects the next `agent/pre-step`. The host records
+  the turn as `blocked` and the headless runner exits non-zero; the gate never
+  reports a successful completion the evidence does not support.
+- The rejection applies to that turn only. A later turn starts with a fresh
+  budget, so a blocked agent is not permanently unable to run.
 - Infrastructure or configuration errors (missing binary, unknown signal set,
   unreadable evidence) are surfaced with the underlying message and bounded
   the same way.
@@ -188,19 +195,19 @@ Adapter-level checks, validated against DeepSeek Harness `0.1.5-rc.1`
   registered; Cordis contains the plugin error and the host keeps running.
 
 Real-host completion conformance against DeepSeek Harness `0.1.7-rc.2`
-(2026-11-03): four scenarios pass — `fresh-pass`, `repair-and-reverify`,
-`plugin-load-failure`, and `user-cancellation`. Five fail with
-`blocked-outcome-absent` (plus `infrastructure-error` for its own scenario):
-the gate steers and the turn continues, but once the continuation budget is
-spent the host closes the session as a successful completion while evidence is
-stale, red, missing, or unavailable. The result is therefore
-`terminal_result: blocked`, `verdict: fail`.
+(2026-11-03): all nine scenarios pass. `fresh-pass` and
+`repair-and-reverify` end `verified`; `green-then-edit`, `failing-sensor`,
+`missing-or-malformed-evidence`, `infrastructure-error`, and
+`retry-exhaustion` end `blocked` with non-zero exit; `plugin-load-failure`
+ends `unsupported`; and `user-cancellation` ends `cancelled`. The result is
+`terminal_result: verified`, `verdict: pass`, and `--required` exits 0.
+`green-then-edit` changes a source file and `repair-and-reverify` changes the
+policy file, so both evidence fingerprints are exercised.
 
-That is the honest state of the pinned client: it has no blocked terminal
-distinction yet. Emitting one (a cancelled/aborted session instead of a
-completed one) is tracked by
-[#454](https://github.com/d-o-hub/do-harness/issues/454); this runner turns
-green only when the client reports the blocked outcome it observes. The
-adapter-level e2e tests remain fast, offline, and labeled separately from these
-real-host observations.
+The blocked outcomes come from the host's own `agent/pre-step` rejection, not
+from a cancelled or aborted session: the client records the turn as `blocked`
+and the headless runner exits 1. The `--negative` control still detects a run
+without the stop integration (`terminal=verified`, `continuations=0`), so the
+suite cannot pass by omitting the gate. The adapter-level e2e tests remain
+fast, offline, and labeled separately from these real-host observations.
 
