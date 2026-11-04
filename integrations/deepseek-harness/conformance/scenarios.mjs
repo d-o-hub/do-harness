@@ -31,8 +31,10 @@ export const SCENARIO_RUNNERS = [
       writeConfig(repo, SUCCEEDING_SENSOR)
       await recordEvidence(repo, harness)
     },
+    // A policy edit exercises the policy fingerprint; `green-then-edit`
+    // covers the source-file fingerprint.
     script: [
-      { tool: { name: 'conformance_probe', arguments: { action: 'edit-source' } } },
+      { tool: { name: 'conformance_probe', arguments: { action: 'edit-policy' } } },
       { tool: { name: 'development_signals', arguments: { action: 'run', set: 'verification' } } },
       { finish: 'done' },
     ],
@@ -153,6 +155,7 @@ async function summarize({ scenario, session, harness, repo }) {
       evidenceGreenAtClose,
       error: session.timedOut ? 'timeout' : null,
       infrastructure,
+      reason: infrastructure ? 'infrastructure-error' : null,
     },
     detail: {
       exitCode: session.exitCode,

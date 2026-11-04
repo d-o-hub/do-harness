@@ -50,6 +50,21 @@ export function createFakeCtx({ responses = [], realSpawn = false } = {}) {
       await listener(payload)
     }
   }
+  // Waterfall form used by `agent/pre-step`: each listener may short-circuit
+  // with a decision or defer to the next one.
+  ctx.waterfall = async (event, payload) => {
+    const chain = [...(listeners.get(event) ?? [])]
+    let index = 0
+    async function next() {
+      if (index >= chain.length) {
+        return { kind: 'enter' }
+      }
+      const listener = chain[index]
+      index += 1
+      return listener(payload, next)
+    }
+    return next()
+  }
   ctx.disposeAll = () => {
     for (const set of listeners.values()) {
       set.clear()
