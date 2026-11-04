@@ -460,5 +460,11 @@
     "rationale": "Generated-file repair is reviewable and bounded, while inferred code changes could silently alter behavior or weaken a release gate",
     "sensor": ".github/workflows/main-repair.yml",
     "category": "governance"
+  },
+  {
+    "invariant": "A workflow `run:` step binds every value it reads as a shell variable; writing a field to `$GITHUB_OUTPUT` publishes it to later steps and does not define it in the step that wrote it",
+    "rationale": "`$GITHUB_OUTPUT` is a file the runner reads, not a shell variable, so a step that publishes `commits=<n>` and then prints `$commits` fails under `set -u` — run 41814288853 died that way one statement after a correct derivation — and `actionlint` excludes shellcheck's SC2154 for embedded scripts, so no other workflow sensor could see it",
+    "sensor": "scripts/check-workflow-shell.py: SC2154 over every `run:` block after declaring its workflow-, job- and step-level `env:` keys, with `--self-test` proving both directions",
+    "category": "ci"
   }
 ]
