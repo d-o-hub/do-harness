@@ -5,6 +5,8 @@ CI classification is the exception: `scripts/checks.sh` and the pre-merge CI
 gate call `do-harness pr checks`, and refuse to merge (exit 3 / `CI-UNKNOWN`)
 when the binary is unavailable. There is no shell fallback parser, because a
 second classifier is exactly the merge-authorization gap this contract closes.
+`scripts/preflight.sh` fails the sweep when `pr checks` is unavailable, so the
+missing dependency surfaces before any review work rather than at the check step.
 
 ## Probe
 

@@ -17,8 +17,9 @@ current, and merge directly when all gates pass. Never use auto-merge.
 **Prerequisites.** `gh`, `git`, and `jq` are required. `do-harness` is required
 for CI classification: `scripts/checks.sh` and the pre-merge CI gate call
 `do-harness pr checks`, and without the binary they report `UNKNOWN` and refuse
-to merge rather than degrading to a shell parser. Install it (or set
-`DO_HARNESS_BIN`) before a sweep; a missing binary stops the sweep, it does not
+to merge rather than degrading to a shell parser. `scripts/preflight.sh` fails
+the sweep up front when the binary is missing, so install it (or set
+`DO_HARNESS_BIN`) before starting; a missing binary stops the sweep, it does not
 silently pass.
 
 Read [references/merge-order.md](references/merge-order.md) before merging
