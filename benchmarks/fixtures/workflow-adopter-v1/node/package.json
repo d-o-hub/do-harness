@@ -1,0 +1,14 @@
+{
+  "name": "buildlog-filter",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Offline multi-file build-log CLI fixture for the adopter workflow corpus.",
+  "type": "module",
+  "scripts": {
+    "build": "node --check cli.js && node --check parser.js && node --check filter.js && node --check summary.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

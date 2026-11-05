@@ -1,0 +1,11 @@
+language = "rust"
+
+[[sensors]]
+name = "build"
+argv = ["cargo", "build", "--offline", "--locked", "--manifest-path", "Cargo.toml"]
+when-changed = ["**/*.rs", "Cargo.toml", "Cargo.lock"]
+
+[[sensors]]
+name = "test"
+argv = ["cargo", "test", "--offline", "--locked", "--manifest-path", "Cargo.toml"]
+when-changed = ["**/*.rs", "Cargo.toml", "Cargo.lock"]

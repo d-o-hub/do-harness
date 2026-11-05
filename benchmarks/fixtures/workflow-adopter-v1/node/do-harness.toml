@@ -1,0 +1,11 @@
+language = "node"
+
+[[sensors]]
+name = "build"
+argv = ["node", "--check", "cli.js", "parser.js", "filter.js", "summary.js"]
+when-changed = ["**/*.js", "package.json"]
+
+[[sensors]]
+name = "test"
+argv = ["node", "--test"]
+when-changed = ["**/*.js", "package.json"]
