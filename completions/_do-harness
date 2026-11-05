@@ -252,6 +252,7 @@ json\:"Machine-readable JSON output"))' \
 ;;
 (ready)
 _arguments "${_arguments_options[@]}" : \
+'--expected-receipt=[Re-validate a previously issued authorization receipt (the full \`pr ready --format json\` report file). The snapshot is recomputed]:FILE:_files' \
 '--format=[Output format]:FORMAT:((text\:"Human-readable text output"
 json\:"Machine-readable JSON output"))' \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
@@ -269,6 +270,7 @@ json\:"Machine-readable JSON output"))' \
 ;;
 (readiness)
 _arguments "${_arguments_options[@]}" : \
+'--expected-receipt=[Re-validate a previously issued authorization receipt (the full \`pr ready --format json\` report file). The snapshot is recomputed]:FILE:_files' \
 '--format=[Output format]:FORMAT:((text\:"Human-readable text output"
 json\:"Machine-readable JSON output"))' \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
@@ -286,6 +288,7 @@ json\:"Machine-readable JSON output"))' \
 ;;
 (check)
 _arguments "${_arguments_options[@]}" : \
+'--expected-receipt=[Re-validate a previously issued authorization receipt (the full \`pr ready --format json\` report file). The snapshot is recomputed]:FILE:_files' \
 '--format=[Output format]:FORMAT:((text\:"Human-readable text output"
 json\:"Machine-readable JSON output"))' \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
