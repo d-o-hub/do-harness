@@ -67,6 +67,11 @@ The `[findings]` table declares how CI findings are tracked:
 Changing a threshold never clears a finding: a critical security finding is a
 blocker whatever the configured severity floor is.
 
+Workflow-level notices that `GitHub` reports against the workflow directory
+rather than a source file (a deprecated action runtime, a runner-image
+migration notice) are recorded as infrastructure signals and never gate a
+merge: they describe the platform, not a defect the change introduced.
+
 ## Operator Remediation
 
 When `do-harness doctor pr-policy` reports `DRIFT`, the JSON or text output
