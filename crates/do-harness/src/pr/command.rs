@@ -118,7 +118,11 @@ pub fn run(root: &Path, action: PrAction, dry_run: bool) -> Result<(), CliError>
             let target = target_from(pr, base, head)?;
             run_review(root, &target, recompute, format, view).map_err(CliError::Verify)
         }
-        PrAction::Ready { pr, format } => super::readiness::run(root, pr, format),
+        PrAction::Ready {
+            pr,
+            expected_receipt,
+            format,
+        } => super::readiness::run(root, pr, expected_receipt.as_deref(), format),
         PrAction::Checks { pr, format } => super::checks::run(root, pr, format),
         PrAction::Waivers {
             pr,
@@ -175,7 +179,7 @@ pub fn run(root: &Path, action: PrAction, dry_run: bool) -> Result<(), CliError>
                     } else {
                         Format::Text
                     };
-                    return super::readiness::run(root, pr, format);
+                    return super::readiness::run(root, pr, None, format);
                 }
             }
             Err(CliError::Usage(anyhow::anyhow!(

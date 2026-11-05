@@ -403,7 +403,7 @@ fn bot_finding_needs_triage_until_authorized_disposition() {
     std::fs::write(
         root.join("view.json"),
         format!(
-            r#"{{"number": 1052, "baseRefName": "main", "baseRefOid": "base0000base0000base0000base0000base0000", "headRefOid": "{head}", "mergeStateStatus": "CLEAN", "mergeable": "MERGEABLE"}}"#
+            r#"{{"number": 1052, "baseRefName": "main", "baseRefOid": "1111111111111111111111111111111111111111", "headRefOid": "{head}", "mergeStateStatus": "CLEAN", "mergeable": "MERGEABLE"}}"#
         ),
     )
     .unwrap();
@@ -435,7 +435,7 @@ fn bot_finding_needs_triage_until_authorized_disposition() {
         r#"{{
             "id": 402,
             "user": {{ "login": "maintainer" }},
-            "body": "<!-- do-harness-disposition:v1\n{{\n  \"schema_version\": 1,\n  \"item_ref\": \"issue-comment:401\",\n  \"decision\": \"NON_ACTIONABLE\",\n  \"head_sha\": \"{head}\",\n  \"base_sha\": \"base0000base0000base0000base0000base0000\",\n  \"item_sha256\": \"{item_sha}\",\n  \"policy_sha256\": \"\",\n  \"reason\": \"False positive verified bounded in test loop\"\n}}\n-->\nDisposition recorded."
+            "body": "<!-- do-harness-disposition:v1\n{{\n  \"schema_version\": 1,\n  \"item_ref\": \"issue-comment:401\",\n  \"decision\": \"NON_ACTIONABLE\",\n  \"head_sha\": \"{head}\",\n  \"base_sha\": \"1111111111111111111111111111111111111111\",\n  \"item_sha256\": \"{item_sha}\",\n  \"policy_sha256\": \"\",\n  \"reason\": \"False positive verified bounded in test loop\"\n}}\n-->\nDisposition recorded."
         }}"#
     );
     std::fs::write(
