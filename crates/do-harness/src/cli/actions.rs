@@ -323,6 +323,30 @@ pub enum FeedbackAction {
         #[arg(long, value_enum, default_value_t = Format::Text)]
         format: Format,
     },
+    /// File a defect report against the tool's own repository.
+    Report {
+        /// Target repository override (default: the tool's own repository).
+        #[arg(long, value_name = "OWNER/REPO")]
+        repo: Option<String>,
+        /// Failure message to report.
+        #[arg(long, value_name = "TEXT")]
+        error: String,
+        /// Log file whose tail is attached to the report.
+        #[arg(long, value_hint = ValueHint::FilePath, value_name = "FILE")]
+        log: Option<PathBuf>,
+        /// Classify the report as a warning rather than an error.
+        #[arg(long)]
+        warning: bool,
+        /// Skip interactive confirmation (unattended mode).
+        #[arg(long)]
+        yes: bool,
+        /// Perform search and preview without creating an issue.
+        #[arg(long)]
+        dry_run: bool,
+        /// Output format.
+        #[arg(long, value_enum, default_value_t = Format::Text)]
+        format: Format,
+    },
 }
 
 /// Available doctor actions.
