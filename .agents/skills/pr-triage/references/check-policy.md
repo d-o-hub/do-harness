@@ -123,9 +123,11 @@ Poll `scripts/checks.sh` while the verdict is `PENDING`. Use a bounded wait
 events. Missing deliveries must degrade to polling, never to done. A check
 that never reports is `UNKNOWN`; do not merge around it.
 
-`scripts/premerge.sh` re-runs the classifier immediately before the merge and
-refuses anything but `PASS`. An unavailable binary, an unreadable API, a
-pending check, or an unknown state is a hard stop.
+The merge boundary is `scripts/merge.sh PR REPORT`: it re-runs the whole
+authorization snapshot (`pr ready --expected-receipt`) immediately before the
+merge and refuses anything but `MERGE_ALLOWED`. An unavailable binary, an
+unreadable API, a pending check, an unknown state, or a receipt whose snapshot
+no longer matches is a hard stop.
 
 
 ## Server ruleset protection

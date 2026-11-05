@@ -1414,6 +1414,7 @@ Aliases: `readiness`, `check`.
 | Argument | Required | Default | Possible values | Description |
 | --- | --- | --- | --- | --- |
 | `<PR>` | yes | — | — | Pull request number |
+| `--expected-receipt <FILE>` | no | — | — | Re-validate a previously issued authorization receipt (the full `pr ready --format json` report file). The snapshot is recomputed |
 | `--format <FORMAT>` | no | `text` | `text`, `json` | Output format |
 <!-- END GENERATED: cli-contract pr ready -->
 Inspect a pull request's end-to-end merge readiness:
@@ -1425,12 +1426,34 @@ Inspect a pull request's end-to-end merge readiness:
    and unanswered actionable comments (including Codecov patch coverage gaps).
 
 - `<PR>`: Pull request number.
+- `--expected-receipt <FILE>`: re-validate a previously issued receipt. `FILE`
+  is the complete `pr ready --format json` report that authorized the head.
 - `--format <Format>`: Output format (`text` or `json`). Can also be invoked
   directly as `do-harness pr <n>` with `--json`.
 
-Exit `0` when the PR is ready to merge, `1` when any blocker exists (non-`CLEAN`
-merge state, cancelled or failed check, unresolved thread, unanswered Codecov
-gap), and `2` when `gh` fails.
+The merge authority is `authorization`, not `ready`. `authorization.decision` is
+`MERGE_ALLOWED`, `BLOCKED` (a known condition prevents the merge) or `UNKNOWN`
+(proof needed to allow it could not be collected); only `MERGE_ALLOWED` carries
+a `receipt`. Reason codes are stable: `draft`, `held`, `state_not_open`,
+`auto_merge_armed`, `merge_state_dirty`, `checks_failed`, `checks_pending`,
+`checks_unknown`, `review_changes_requested`, `conversation_unresolved`,
+`conversation_needs_triage`, `policy_drift`, `policy_unavailable`,
+`findings_untracked`, `findings_unverified_baseline`, `api_incomplete`,
+`ancestry_diverged`, `ancestry_unknown`, `snapshot_moved`, `receipt_invalid`,
+`receipt_expired`, `receipt_changed`.
+
+A known blocker settles the verdict even when other proof is also missing: the
+merge cannot proceed regardless. Exit `0` only for `MERGE_ALLOWED`, `1` for
+`BLOCKED`, and `2` for `UNKNOWN` — including a receipt that is expired,
+malformed, standalone (not a full report), issued for another PR, or superseded
+by a snapshot that moved.
+
+The receipt is recomputed, never trusted. It records the schema version, PR
+number, UTC epoch `issued_at_unix`/`expires_at_unix` (exactly 60 seconds), a
+canonical `snapshot_sha256`, base and head ref names and OIDs, PR state,
+draft flag, sorted labels, mergeability, merge state, auto-merge flag, review
+decision, digests of the check set, conversation inventory and findings, the
+policy revision, and the ancestry verdict with the compared OIDs.
 
 The report pins the head SHA it evaluated (`headRefOid`) and rechecks it before
 returning: if the head moves during collection the command retries, and fails

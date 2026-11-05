@@ -7,6 +7,7 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
+use super::collect::summarize_report_for_tests as summarize_report;
 use super::*;
 use crate::pr::checks;
 use crate::pr::gh::{CheckRun, CommitStatus};

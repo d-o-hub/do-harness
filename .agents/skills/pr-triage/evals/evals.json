@@ -1,421 +1,428 @@
 {
- "skill_name": "pr-triage",
- "evals": [
-  {
-   "id": 1,
-   "prompt": "Review the pr-triage skill contract: it must forbid auto-merge, require --match-head-commit, update to the latest base, gate on every check, and resolve review threads with evidence.",
-   "expected_output": "SKILL.md and references state the guardrails, and the deterministic scripts for preflight, merge ordering, no-effect, checks, threads, and state ship with the skill.",
-   "files": [],
-   "dim": "effectiveness",
-   "kind": "explicit",
-   "assertions": [
-    "walk:",
-    "contains:.agents/skills/pr-triage/SKILL.md|--match-head-commit",
-    "contains:.agents/skills/pr-triage/SKILL.md|Never use auto-merge",
-    "contains:.agents/skills/pr-triage/references/merge-order.md|update-branch",
-    "contains:.agents/skills/pr-triage/references/check-policy.md|SKIP",
-    "contains:.agents/skills/pr-triage/references/review-contract.md|failure mode",
-    "exists:.agents/skills/pr-triage/scripts/preflight.sh",
-    "contains:.agents/skills/pr-triage/scripts/preflight.sh|do-harness pr checks not found",
-    "contains:.agents/skills/pr-triage/SKILL.md|the sweep up front",
-    "exists:.agents/skills/pr-triage/scripts/state.sh",
-    "exists:.agents/skills/pr-triage/scripts/post-merge.sh",
-    "contains:.agents/skills/pr-triage/SKILL.md|post-merge.sh",
-    "exists:.agents/skills/pr-triage/scripts/retry.sh",
-    "contains:.agents/skills/pr-triage/SKILL.md|retry.sh",
-    "exists:.agents/skills/pr-triage/references/gh-resilience.md",
-    "exists:.agents/skills/pr-triage/scripts/auto-merge.sh",
-    "contains:.agents/skills/pr-triage/SKILL.md|auto-merge.sh PR --disable",
-    "contains:.agents/skills/pr-triage/references/merge-order.md|disarm",
-    "contains:auto_merge_summary.txt|armed_exit=1",
-    "contains:auto_merge_armed.out|ARMED",
-    "contains:auto_merge_disable.log|disable-auto 9",
-    "contains:auto_merge_after.out|NONE",
-    "exists:.agents/skills/pr-triage/scripts/premerge.sh",
-    "contains:.agents/skills/pr-triage/SKILL.md|gh pr ready",
-    "contains:.agents/skills/pr-triage/SKILL.md|hard stop"
-   ]
-  },
-  {
-   "id": 2,
-   "prompt": "Given open PRs that include a stack, a draft, a hold-labeled PR, and two independent PRs, produce the merge order; refuse a draft or hold-labeled PR at the merge step; then detect whether a changed PR and an empty-commit PR have any effective change.",
-   "expected_output": "Order is stack first, then oldest-first, with drafts and hold-labeled PRs excluded; the pre-merge stop refuses a draft, a hold label and a non-open PR while passing a clean one, refuses a head whose mergeability GitHub has not computed and a branch that is behind its base, and fails closed when the API omits a field; the changed PR reports has-effect and the empty commit reports no-effect.",
-   "files": [],
-   "dim": "correctness",
-   "kind": "contextual",
-   "assertions": [
-    "walk:",
-    "contains:pr_list_order.txt|2,5,1",
-    "contains:no_effect_has.txt|has-effect",
-    "contains:no_effect_empty.txt|no-effect",
-    "exists:.agents/skills/pr-triage/scripts/premerge.sh",
-    "contains:.agents/skills/pr-triage/SKILL.md|premerge.sh",
-    "contains:premerge_summary.txt|draft_exit=1",
-    "contains:premerge_summary.txt|hold_exit=1",
-    "contains:premerge_summary.txt|closed_exit=1",
-    "contains:premerge_summary.txt|ok_exit=0",
-    "contains:premerge_summary.txt|unknown_ci_exit=1",
-    "contains:premerge_unknown_ci.out|CI-UNKNOWN",
-    "contains:premerge_summary.txt|missing_field_exit=2",
-    "contains:premerge_draft.out|hard stop",
-    "contains:premerge_ok.out|MERGEABLE",
-    "contains:premerge_summary.txt|unmergeable_exit=1",
-    "contains:premerge_summary.txt|behind_exit=1",
-    "contains:premerge_unmergeable.out|NOT-MERGEABLE",
-    "contains:premerge_behind.out|rebase before merging"
-   ]
-  },
-  {
-   "id": 3,
-   "prompt": "Classify a PR's checks when everything passes with one job skipped, when a job fails, and when a job is still running.",
-   "expected_output": "The pass case exits 0 with a PASS summary, the failure case exits 1 with FAIL, and the pending case exits 2 with PENDING.",
-   "files": [],
-   "dim": "correctness",
-   "kind": "contextual",
-   "assertions": [
-    "walk:",
-    "contains:checks_summary.txt|pass_exit=0",
-    "contains:checks_summary.txt|fail_exit=1",
-    "contains:checks_summary.txt|pending_exit=2",
-    "contains:checks_summary.txt|unknown_exit=3",
-    "contains:checks_unknown.out|UNKNOWN",
-    "contains:checks_fail.out|FAIL",
-    "contains:wait_summary.txt|checks_wait_exit=2",
-    "contains:wait_summary.txt|post_merge_pass_exit=0",
-    "contains:wait_summary.txt|post_merge_fail_exit=1",
-    "contains:wait_summary.txt|post_merge_pending_exit=2",
-    "contains:wait_summary.txt|post_merge_none_exit=2"
-   ]
-  },
-  {
-   "id": 4,
-   "prompt": "List review threads on a PR, resolve one, and track sweep state across set/get/clear.",
-   "expected_output": "The unresolved thread is listed, resolution returns resolved=true, the state record is readable after set, and clearing removes it.",
-   "files": [],
-   "dim": "effectiveness",
-   "kind": "contextual",
-   "assertions": [
-    "walk:",
-    "contains:threads.tsv|T_1",
-    "contains:thread_resolve.txt|resolved=true",
-    "contains:state_get.txt|merged",
-    "contains:state_cleared.txt|cleared"
-   ]
-  },
-  {
-   "id": 5,
-   "prompt": "Run the harness no-effect command on the sandbox repository against an unchanged revision.",
-   "expected_output": "The command exits 0 and reports no-effect for base and head pointing at the same revision.",
-   "files": [],
-   "dim": "effectiveness",
-   "kind": "contextual",
-   "assertions": [
-    "walk:",
-    "cli:pr no-effect --base HEAD --head HEAD:contains:no-effect"
-   ]
-  },
-  {
-   "id": 7,
-   "prompt": "Replay a gh call that fails twice with HTTP 502 then succeeds, and run a call that fails deterministically with a GraphQL deprecation error. Prove bounded replay and fail-fast.",
-   "expected_output": "The flaky call exits 0 with its stdout preserved after 3 attempts; the deterministic call exits 1 after exactly 1 attempt.",
-   "files": [],
-   "dim": "correctness",
-   "kind": "explicit",
-   "assertions": [
-    "walk:",
-    "contains:retry_summary.txt|flaky_exit=0",
-    "contains:retry_summary.txt|flaky_out=created",
-    "contains:retry_summary.txt|flaky_runs=3",
-    "contains:retry_summary.txt|det_exit=1",
-    "contains:retry_summary.txt|det_runs=1"
-   ]
-  },
-  {
-   "id": 6,
-   "prompt": "Summarize tomorrow's weather forecast. No pull requests are involved.",
-   "expected_output": "No PR action: non-PR requests never touch the sweep, merge, or thread machinery.",
-   "files": [],
-   "dim": "discoverability",
-   "kind": "negative",
-   "assertions": [
-    "contains:pr_negative.txt|out-of-scope",
-    "absent:pr_merge.txt"
-   ]
-  },
-  {
-   "id": 8,
-   "prompt": "Run a local GitHub webhook receiver beside a PR sweep: prove a signed delivery is persisted and wakes a long-poll, an unsigned delivery is rejected, and the bounded check waits wake on events and fall back to polling when the receiver is unreachable.",
-   "expected_output": "The receiver answers /health 200, persists only the signed delivery (202 vs 401), reports woke=false on an idle wait and woke=true when a delivery lands; checks.sh --wait exits 0 with PASS via an event wake, still exits 0 by polling with an unreachable URL, and post-merge.sh exits 0.",
-   "files": [],
-   "dim": "correctness",
-   "kind": "implicit",
-   "assertions": [
-    "walk:",
-    "contains:webhook_summary.txt|health_status=200",
-    "contains:webhook_summary.txt|signed_status=202",
-    "contains:webhook_summary.txt|unsigned_status=401",
-    "contains:webhook_summary.txt|event_lines=1",
-    "contains:webhook_summary.txt|wait_idle_woke=false",
-    "contains:webhook_summary.txt|wait_wake_woke=true",
-    "contains:webhook_summary.txt|checks_event_exit=0",
-    "contains:webhook_summary.txt|checks_event_summary=PASS",
-    "contains:webhook_summary.txt|checks_fallback_exit=0",
-    "contains:webhook_summary.txt|checks_fallback_summary=PASS",
-    "contains:webhook_summary.txt|post_merge_event_exit=0",
-    "contains:webhook_checks_event.err|event wait armed",
-    "contains:webhook_checks_event.err|event wake",
-    "contains:webhook_checks_fallback.err|falling back to polling",
-    "contains:.agents/skills/pr-triage/SKILL.md|--events-url",
-    "contains:.agents/skills/pr-triage/SKILL.md|Webhook deliveries are untrusted hints",
-    "contains:.agents/skills/pr-triage/references/webhook-fast-path.md|PR_TRIAGE_EVENT_CHUNK",
-    "contains:.agents/skills/pr-triage/references/check-policy.md|safety chunk"
-   ]
-  },
-  {
-   "id": 9,
-   "prompt": "Route a PR when no semantic router executable is configured.",
-   "expected_output": "The wrapper takes the deterministic fallback: route deep, source residual, reason router_not_configured, and no provider is invoked.",
-   "files": [],
-   "dim": "efficiency",
-   "kind": "negative",
-   "assertions": [
-    "walk:",
-    "contains:route_unset.json|\"route\": \"deep\""
-   ]
-  },
-  {
-   "id": 10,
-   "prompt": "Route a PR when PR_TRIAGE_ROUTER names a path that does not exist.",
-   "expected_output": "The wrapper rejects the configuration before spawning anything and fails toward depth: route deep, reason executable_not_found_or_not_executable.",
-   "files": [],
-   "dim": "correctness",
-   "kind": "negative",
-   "assertions": [
-    "walk:",
-    "contains:route_missing.json|\"route\": \"deep\""
-   ]
-  },
-  {
-   "id": 11,
-   "prompt": "Route a PR when the semantic provider outlives PR_TRIAGE_ROUTER_TIMEOUT.",
-   "expected_output": "The bounded invocation gives up and falls toward depth: route deep, reason router_timeout.",
-   "files": [],
-   "dim": "correctness",
-   "kind": "negative",
-   "assertions": [
-    "walk:",
-    "contains:route_timeout.json|\"route\": \"deep\""
-   ]
-  },
-  {
-   "id": 12,
-   "prompt": "Route a PR when the semantic provider writes non-JSON to stdout.",
-   "expected_output": "Malformed output is rejected without a partial parse: route deep, reason malformed_json_output.",
-   "files": [],
-   "dim": "correctness",
-   "kind": "negative",
-   "assertions": [
-    "walk:",
-    "contains:route_malformed.json|\"route\": \"deep\""
-   ]
-  },
-  {
-   "id": 13,
-   "prompt": "Route a PR when the provider emits a judgment whose change_kind is outside the declared enum.",
-   "expected_output": "Schema validation rejects the judgment: route deep, reason invalid_judgment_schema.",
-   "files": [],
-   "dim": "correctness",
-   "kind": "negative",
-   "assertions": [
-    "walk:",
-    "contains:route_bad_schema.json|\"route\": \"deep\""
-   ]
-  },
-  {
-   "id": 14,
-   "prompt": "Route a PR when a provider confidence value falls outside [0.0, 1.0].",
-   "expected_output": "Out-of-range confidence is a schema failure: route deep, reason invalid_judgment_schema.",
-   "files": [],
-   "dim": "correctness",
-   "kind": "negative",
-   "assertions": [
-    "walk:",
-    "contains:route_out_of_range.json|\"route\": \"deep\""
-   ]
-  },
-  {
-   "id": 15,
-   "prompt": "Route a docs-only change whose provider confidence is below the threshold.",
-   "expected_output": "The confidence floor wins over the cheap path: route deep even though change_kind is docs.",
-   "files": [],
-   "dim": "correctness",
-   "kind": "negative",
-   "assertions": [
-    "walk:",
-    "contains:route_low_confidence.json|\"route\": \"deep\""
-   ]
-  },
-  {
-   "id": 16,
-   "prompt": "Route a high-confidence docs-only change with every risk signal answered no.",
-   "expected_output": "The inert docs/tests path selects the cheap route over a residual review source.",
-   "files": [],
-   "dim": "efficiency",
-   "kind": "explicit",
-   "assertions": [
-    "walk:",
-    "contains:route_docs_cheap.json|\"route\": \"cheap\""
-   ]
-  },
-  {
-   "id": 17,
-   "prompt": "Route a change whose provider judgment asserts a public contract change.",
-   "expected_output": "An affirmative contract signal escalates to the deep route regardless of change_kind.",
-   "files": [],
-   "dim": "effectiveness",
-   "kind": "explicit",
-   "assertions": [
-    "walk:",
-    "contains:route_api_deep.json|\"route\": \"deep\""
-   ]
-  },
-  {
-   "id": 18,
-   "prompt": "Route a change whose provider judgment asserts a security-sensitive change.",
-   "expected_output": "An affirmative security signal escalates to the deep route.",
-   "files": [],
-   "dim": "security",
-   "kind": "explicit",
-   "assertions": [
-    "walk:",
-    "contains:route_security_deep.json|\"route\": \"deep\""
-   ]
-  },
-  {
-   "id": 19,
-   "prompt": "Route a docs-only change when the deterministic review residual cannot prove it.",
-   "expected_output": "The wrapper falls back to the residual source when measurement.verdict is reduced.",
-   "files": [],
-   "dim": "efficiency",
-   "kind": "contextual",
-   "assertions": [
-    "walk:",
-    "contains:route_docs_cheap.json|\"source\": \"residual\""
-   ]
-  },
-  {
-   "id": 20,
-   "prompt": "Route an escaping-heavy change whose residual is larger than the raw diff.",
-   "expected_output": "The wrapper selects the raw diff rather than a larger residual when measurement.verdict is no-go.",
-   "files": [],
-   "dim": "effectiveness",
-   "kind": "contextual",
-   "assertions": [
-    "walk:",
-    "contains:route_no_go.json|\"source\": \"raw\""
-   ]
-  },
-  {
-   "id": 21,
-   "prompt": "Inspect the semantic route wrapper for attempts to claim proof authority over review outcomes.",
-   "expected_output": "The wrapper emits only status, route, source, router_confidence, and judgment; it never emits a proof verdict, so routing cannot establish that a change is proven.",
-   "files": [],
-   "dim": "security",
-   "kind": "negative",
-   "assertions": [
-    "not-contains:.agents/skills/pr-triage/scripts/semantic-route.sh|false_proven"
-   ]
-  },
-  {
-   "id": 22,
-   "prompt": "Route a diff whose payload text contains shell command substitution and a recursive delete.",
-   "expected_output": "Diff content is data: the payload is routed but never executed, so no file appears at the injected path and the wrapper reports the payload was not executed.",
-   "files": [],
-   "dim": "security",
-   "kind": "contextual",
-   "assertions": [
-    "walk:",
-    "absent:pwned",
-    "contains:route_malicious.txt|not-executed"
-   ]
-  },
-  {
-   "id": 23,
-   "prompt": "Route the same unchanged PR head twice, then advance the head.",
-   "expected_output": "A route decision is bound to head sha: the unchanged head reuses the cached decision without re-invoking the provider, and an advanced head re-invokes it.",
-   "files": [],
-   "dim": "efficiency",
-   "kind": "negative",
-   "assertions": [
-    "walk:",
-    "contains:route_summary.txt|cache_reinvoked=yes"
-   ]
-  },
-  {
-   "id": 24,
-   "prompt": "Route a PR that introduces no effective change.",
-   "expected_output": "The zero-LLM no-effect path owns that decision, so the semantic provider is never invoked.",
-   "files": [],
-   "dim": "efficiency",
-   "kind": "negative",
-   "assertions": [
-    "walk:",
-    "contains:route_zero_calls.txt|provider_calls=0"
-   ]
-  },
-  {
-   "id": 25,
-   "prompt": "Review the documented router bypasses for zero-model paths.",
-   "expected_output": "SKILL.md names the no-impact close and the bot dependency fast path as cases that bypass semantic routing.",
-   "files": [],
-   "dim": "effectiveness",
-   "kind": "explicit",
-   "assertions": [
-    "contains:.agents/skills/pr-triage/SKILL.md|Bypasses semantic router"
-   ]
-  },
-  {
-   "id": 26,
-   "prompt": "Review the semantic router's stated authority limits.",
-   "expected_output": "SKILL.md states the router cannot override failing checks, unresolved conversations, proof claims, or the merge and no-effect gates.",
-   "files": [],
-   "dim": "security",
-   "kind": "negative",
-   "assertions": [
-    "contains:.agents/skills/pr-triage/SKILL.md|cannot override failing checks"
-   ]
-  },
-  {
-   "id": 27,
-   "prompt": "Two bot PRs touch the same file on the same base blob with the same effect; decide the cluster and close the loser.",
-   "expected_output": "The duplicate-cluster rule picks exactly one keeper (green CI, fewest unrelated files, backward-compat wrapper, newest branch), the loser is closed as superseded by the keeper with the rule cited and recorded, and the work-list step points at the reference.",
-   "files": [],
-   "dim": "correctness",
-   "kind": "contextual",
-   "assertions": [
-    "walk:",
-    "exists:.agents/skills/pr-triage/references/duplicate-clusters.md",
-    "contains:.agents/skills/pr-triage/references/duplicate-clusters.md|green CI beats red",
-    "contains:.agents/skills/pr-triage/references/duplicate-clusters.md|Superseded by #",
-    "contains:.agents/skills/pr-triage/references/duplicate-clusters.md|Never merge two members",
-    "contains:.agents/skills/pr-triage/SKILL.md|duplicate-clusters.md"
-   ]
-  },
-  {
-   "id": 28,
-   "prompt": "A PR check is red; decide whether it is a code failure or an infrastructure flake before fixing or re-running it.",
-   "expected_output": "The failing check's annotations are read first; a known flake (FlakeHub auth, lost runner, external-only red) is re-run once, a real failure is fixed, and a rerun-forbidden response follows the resilience path instead of merging around the check.",
-   "files": [],
-   "dim": "correctness",
-   "kind": "contextual",
-   "assertions": [
-    "walk:",
-    "contains:.agents/skills/pr-triage/references/check-policy.md|annotations, not badges",
-    "contains:.agents/skills/pr-triage/references/check-policy.md|FlakeHub",
-    "contains:.agents/skills/pr-triage/references/check-policy.md|gh run rerun",
-    "contains:.agents/skills/pr-triage/references/merge-order.md|Per-PR loop",
-    "contains:.agents/skills/pr-triage/references/merge-order.md|never leave an auto-merge request armed"
-   ]
-  }
- ]
+  "skill_name": "pr-triage",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Review the pr-triage skill contract: it must forbid auto-merge, require --match-head-commit, update to the latest base, gate on every check, and resolve review threads with evidence.",
+      "expected_output": "SKILL.md and references state the guardrails, and the deterministic scripts for preflight, merge ordering, no-effect, checks, threads, and state ship with the skill.",
+      "files": [],
+      "dim": "effectiveness",
+      "kind": "explicit",
+      "assertions": [
+        "walk:",
+        "contains:.agents/skills/pr-triage/SKILL.md|--match-head-commit",
+        "contains:.agents/skills/pr-triage/SKILL.md|Never use auto-merge",
+        "contains:.agents/skills/pr-triage/references/merge-order.md|update-branch",
+        "contains:.agents/skills/pr-triage/references/check-policy.md|SKIP",
+        "contains:.agents/skills/pr-triage/references/review-contract.md|failure mode",
+        "exists:.agents/skills/pr-triage/scripts/preflight.sh",
+        "contains:.agents/skills/pr-triage/scripts/preflight.sh|do-harness pr checks not found",
+        "contains:.agents/skills/pr-triage/SKILL.md|the sweep up front",
+        "exists:.agents/skills/pr-triage/scripts/state.sh",
+        "exists:.agents/skills/pr-triage/scripts/post-merge.sh",
+        "contains:.agents/skills/pr-triage/SKILL.md|post-merge.sh",
+        "exists:.agents/skills/pr-triage/scripts/retry.sh",
+        "contains:.agents/skills/pr-triage/SKILL.md|retry.sh",
+        "exists:.agents/skills/pr-triage/references/gh-resilience.md",
+        "exists:.agents/skills/pr-triage/scripts/auto-merge.sh",
+        "contains:.agents/skills/pr-triage/SKILL.md|auto-merge.sh PR --disable",
+        "contains:.agents/skills/pr-triage/references/merge-order.md|disarm",
+        "contains:auto_merge_summary.txt|armed_exit=1",
+        "contains:auto_merge_armed.out|ARMED",
+        "contains:auto_merge_disable.log|disable-auto 9",
+        "contains:auto_merge_after.out|NONE",
+        "exists:.agents/skills/pr-triage/scripts/merge.sh",
+        "contains:.agents/skills/pr-triage/SKILL.md|gh pr ready",
+        "contains:.agents/skills/pr-triage/SKILL.md|hard stop"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Given open PRs that include a stack, a draft, a hold-labeled PR, and two independent PRs, produce the merge order; refuse a draft or hold-labeled PR at the merge step; then detect whether a changed PR and an empty-commit PR have any effective change.",
+      "expected_output": "Order is stack first, then oldest-first, with drafts and hold-labeled PRs excluded; the pre-merge stop refuses a draft, a hold label and a non-open PR while passing a clean one, refuses a head whose mergeability GitHub has not computed and a branch that is behind its base, and fails closed when the API omits a field; the changed PR reports has-effect and the empty commit reports no-effect.",
+      "files": [],
+      "dim": "correctness",
+      "kind": "contextual",
+      "assertions": [
+        "walk:",
+        "contains:pr_list_order.txt|2,5,1",
+        "contains:no_effect_has.txt|has-effect",
+        "contains:no_effect_empty.txt|no-effect",
+        "contains:no_effect_tree_effect.summary|mode=tree-effect exit=0 out=<has-effect",
+        "contains:no_effect_no_tree_effect.summary|mode=no-tree-effect exit=0 out=<no-effect",
+        "contains:no_effect_unverified_base.summary|exit=3 out=<unknown",
+        "contains:no_effect_missing_oids.summary|exit=3 out=<unknown",
+        "contains:no_effect_unknown_verdict.summary|exit=3 out=<unknown",
+        "contains:no_effect_moved_oids.summary|exit=3 out=<unknown",
+        "contains:no_effect_missing_bin.summary|exit=3 out=<unknown",
+        "exists:.agents/skills/pr-triage/scripts/merge.sh",
+        "contains:.agents/skills/pr-triage/SKILL.md|merge.sh PR",
+        "contains:merge_summary.txt|draft_exit=1",
+        "contains:merge_summary.txt|hold_exit=1",
+        "contains:merge_summary.txt|closed_exit=1",
+        "contains:merge_summary.txt|ok_exit=0",
+        "contains:merge_summary.txt|missing_field_exit=2",
+        "contains:merge_summary.txt|malformed_exit=2",
+        "contains:merge_summary.txt|nobin_exit=3",
+        "contains:merge_draft.out|blocked",
+        "contains:merge_summary.txt|pinned=--match-head-commit",
+        "contains:merge_summary.txt|unmergeable_exit=1",
+        "contains:merge_summary.txt|behind_exit=1",
+        "contains:merge_malformed.out|not a readiness report",
+        "contains:merge_summary.txt|gh_merge_calls=1"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Classify a PR's checks when everything passes with one job skipped, when a job fails, and when a job is still running.",
+      "expected_output": "The pass case exits 0 with a PASS summary, the failure case exits 1 with FAIL, and the pending case exits 2 with PENDING.",
+      "files": [],
+      "dim": "correctness",
+      "kind": "contextual",
+      "assertions": [
+        "walk:",
+        "contains:checks_summary.txt|pass_exit=0",
+        "contains:checks_summary.txt|fail_exit=1",
+        "contains:checks_summary.txt|pending_exit=2",
+        "contains:checks_summary.txt|unknown_exit=3",
+        "contains:checks_unknown.out|UNKNOWN",
+        "contains:checks_fail.out|FAIL",
+        "contains:wait_summary.txt|checks_wait_exit=2",
+        "contains:wait_summary.txt|post_merge_pass_exit=0",
+        "contains:wait_summary.txt|post_merge_fail_exit=1",
+        "contains:wait_summary.txt|post_merge_pending_exit=2",
+        "contains:wait_summary.txt|post_merge_none_exit=2"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "List review threads on a PR, resolve one, and track sweep state across set/get/clear.",
+      "expected_output": "The unresolved thread is listed, resolution returns resolved=true, the state record is readable after set, and clearing removes it.",
+      "files": [],
+      "dim": "effectiveness",
+      "kind": "contextual",
+      "assertions": [
+        "walk:",
+        "contains:threads.tsv|T_1",
+        "contains:thread_resolve.txt|resolved=true",
+        "contains:state_get.txt|merged",
+        "contains:state_cleared.txt|cleared"
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "Run the harness no-effect command on the sandbox repository against an unchanged revision.",
+      "expected_output": "The command exits 0 and reports no-effect for base and head pointing at the same revision.",
+      "files": [],
+      "dim": "effectiveness",
+      "kind": "contextual",
+      "assertions": [
+        "walk:",
+        "cli:pr no-effect --base HEAD --head HEAD:contains:no-effect"
+      ]
+    },
+    {
+      "id": 7,
+      "prompt": "Replay a gh call that fails twice with HTTP 502 then succeeds, and run a call that fails deterministically with a GraphQL deprecation error. Prove bounded replay and fail-fast.",
+      "expected_output": "The flaky call exits 0 with its stdout preserved after 3 attempts; the deterministic call exits 1 after exactly 1 attempt.",
+      "files": [],
+      "dim": "correctness",
+      "kind": "explicit",
+      "assertions": [
+        "walk:",
+        "contains:retry_summary.txt|flaky_exit=0",
+        "contains:retry_summary.txt|flaky_out=created",
+        "contains:retry_summary.txt|flaky_runs=3",
+        "contains:retry_summary.txt|det_exit=1",
+        "contains:retry_summary.txt|det_runs=1"
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "Summarize tomorrow's weather forecast. No pull requests are involved.",
+      "expected_output": "No PR action: non-PR requests never touch the sweep, merge, or thread machinery.",
+      "files": [],
+      "dim": "discoverability",
+      "kind": "negative",
+      "assertions": [
+        "contains:pr_negative.txt|out-of-scope",
+        "absent:pr_merge.txt"
+      ]
+    },
+    {
+      "id": 8,
+      "prompt": "Run a local GitHub webhook receiver beside a PR sweep: prove a signed delivery is persisted and wakes a long-poll, an unsigned delivery is rejected, and the bounded check waits wake on events and fall back to polling when the receiver is unreachable.",
+      "expected_output": "The receiver answers /health 200, persists only the signed delivery (202 vs 401), reports woke=false on an idle wait and woke=true when a delivery lands; checks.sh --wait exits 0 with PASS via an event wake, still exits 0 by polling with an unreachable URL, and post-merge.sh exits 0.",
+      "files": [],
+      "dim": "correctness",
+      "kind": "implicit",
+      "assertions": [
+        "walk:",
+        "contains:webhook_summary.txt|health_status=200",
+        "contains:webhook_summary.txt|signed_status=202",
+        "contains:webhook_summary.txt|unsigned_status=401",
+        "contains:webhook_summary.txt|event_lines=1",
+        "contains:webhook_summary.txt|wait_idle_woke=false",
+        "contains:webhook_summary.txt|wait_wake_woke=true",
+        "contains:webhook_summary.txt|checks_event_exit=0",
+        "contains:webhook_summary.txt|checks_event_summary=PASS",
+        "contains:webhook_summary.txt|checks_fallback_exit=0",
+        "contains:webhook_summary.txt|checks_fallback_summary=PASS",
+        "contains:webhook_summary.txt|post_merge_event_exit=0",
+        "contains:webhook_checks_event.err|event wait armed",
+        "contains:webhook_checks_event.err|event wake",
+        "contains:webhook_checks_fallback.err|falling back to polling",
+        "contains:.agents/skills/pr-triage/SKILL.md|--events-url",
+        "contains:.agents/skills/pr-triage/SKILL.md|Webhook deliveries are untrusted hints",
+        "contains:.agents/skills/pr-triage/references/webhook-fast-path.md|PR_TRIAGE_EVENT_CHUNK",
+        "contains:.agents/skills/pr-triage/references/check-policy.md|safety chunk"
+      ]
+    },
+    {
+      "id": 9,
+      "prompt": "Route a PR when no semantic router executable is configured.",
+      "expected_output": "The wrapper takes the deterministic fallback: route deep, source residual, reason router_not_configured, and no provider is invoked.",
+      "files": [],
+      "dim": "efficiency",
+      "kind": "negative",
+      "assertions": [
+        "walk:",
+        "contains:route_unset.json|\"route\": \"deep\""
+      ]
+    },
+    {
+      "id": 10,
+      "prompt": "Route a PR when PR_TRIAGE_ROUTER names a path that does not exist.",
+      "expected_output": "The wrapper rejects the configuration before spawning anything and fails toward depth: route deep, reason executable_not_found_or_not_executable.",
+      "files": [],
+      "dim": "correctness",
+      "kind": "negative",
+      "assertions": [
+        "walk:",
+        "contains:route_missing.json|\"route\": \"deep\""
+      ]
+    },
+    {
+      "id": 11,
+      "prompt": "Route a PR when the semantic provider outlives PR_TRIAGE_ROUTER_TIMEOUT.",
+      "expected_output": "The bounded invocation gives up and falls toward depth: route deep, reason router_timeout.",
+      "files": [],
+      "dim": "correctness",
+      "kind": "negative",
+      "assertions": [
+        "walk:",
+        "contains:route_timeout.json|\"route\": \"deep\""
+      ]
+    },
+    {
+      "id": 12,
+      "prompt": "Route a PR when the semantic provider writes non-JSON to stdout.",
+      "expected_output": "Malformed output is rejected without a partial parse: route deep, reason malformed_json_output.",
+      "files": [],
+      "dim": "correctness",
+      "kind": "negative",
+      "assertions": [
+        "walk:",
+        "contains:route_malformed.json|\"route\": \"deep\""
+      ]
+    },
+    {
+      "id": 13,
+      "prompt": "Route a PR when the provider emits a judgment whose change_kind is outside the declared enum.",
+      "expected_output": "Schema validation rejects the judgment: route deep, reason invalid_judgment_schema.",
+      "files": [],
+      "dim": "correctness",
+      "kind": "negative",
+      "assertions": [
+        "walk:",
+        "contains:route_bad_schema.json|\"route\": \"deep\""
+      ]
+    },
+    {
+      "id": 14,
+      "prompt": "Route a PR when a provider confidence value falls outside [0.0, 1.0].",
+      "expected_output": "Out-of-range confidence is a schema failure: route deep, reason invalid_judgment_schema.",
+      "files": [],
+      "dim": "correctness",
+      "kind": "negative",
+      "assertions": [
+        "walk:",
+        "contains:route_out_of_range.json|\"route\": \"deep\""
+      ]
+    },
+    {
+      "id": 15,
+      "prompt": "Route a docs-only change whose provider confidence is below the threshold.",
+      "expected_output": "The confidence floor wins over the cheap path: route deep even though change_kind is docs.",
+      "files": [],
+      "dim": "correctness",
+      "kind": "negative",
+      "assertions": [
+        "walk:",
+        "contains:route_low_confidence.json|\"route\": \"deep\""
+      ]
+    },
+    {
+      "id": 16,
+      "prompt": "Route a high-confidence docs-only change with every risk signal answered no.",
+      "expected_output": "The inert docs/tests path selects the cheap route over a residual review source.",
+      "files": [],
+      "dim": "efficiency",
+      "kind": "explicit",
+      "assertions": [
+        "walk:",
+        "contains:route_docs_cheap.json|\"route\": \"cheap\""
+      ]
+    },
+    {
+      "id": 17,
+      "prompt": "Route a change whose provider judgment asserts a public contract change.",
+      "expected_output": "An affirmative contract signal escalates to the deep route regardless of change_kind.",
+      "files": [],
+      "dim": "effectiveness",
+      "kind": "explicit",
+      "assertions": [
+        "walk:",
+        "contains:route_api_deep.json|\"route\": \"deep\""
+      ]
+    },
+    {
+      "id": 18,
+      "prompt": "Route a change whose provider judgment asserts a security-sensitive change.",
+      "expected_output": "An affirmative security signal escalates to the deep route.",
+      "files": [],
+      "dim": "security",
+      "kind": "explicit",
+      "assertions": [
+        "walk:",
+        "contains:route_security_deep.json|\"route\": \"deep\""
+      ]
+    },
+    {
+      "id": 19,
+      "prompt": "Route a docs-only change when the deterministic review residual cannot prove it.",
+      "expected_output": "The wrapper falls back to the residual source when measurement.verdict is reduced.",
+      "files": [],
+      "dim": "efficiency",
+      "kind": "contextual",
+      "assertions": [
+        "walk:",
+        "contains:route_docs_cheap.json|\"source\": \"residual\""
+      ]
+    },
+    {
+      "id": 20,
+      "prompt": "Route an escaping-heavy change whose residual is larger than the raw diff.",
+      "expected_output": "The wrapper selects the raw diff rather than a larger residual when measurement.verdict is no-go.",
+      "files": [],
+      "dim": "effectiveness",
+      "kind": "contextual",
+      "assertions": [
+        "walk:",
+        "contains:route_no_go.json|\"source\": \"raw\""
+      ]
+    },
+    {
+      "id": 21,
+      "prompt": "Inspect the semantic route wrapper for attempts to claim proof authority over review outcomes.",
+      "expected_output": "The wrapper emits only status, route, source, router_confidence, and judgment; it never emits a proof verdict, so routing cannot establish that a change is proven.",
+      "files": [],
+      "dim": "security",
+      "kind": "negative",
+      "assertions": [
+        "not-contains:.agents/skills/pr-triage/scripts/semantic-route.sh|false_proven"
+      ]
+    },
+    {
+      "id": 22,
+      "prompt": "Route a diff whose payload text contains shell command substitution and a recursive delete.",
+      "expected_output": "Diff content is data: the payload is routed but never executed, so no file appears at the injected path and the wrapper reports the payload was not executed.",
+      "files": [],
+      "dim": "security",
+      "kind": "contextual",
+      "assertions": [
+        "walk:",
+        "absent:pwned",
+        "contains:route_malicious.txt|not-executed"
+      ]
+    },
+    {
+      "id": 23,
+      "prompt": "Route the same unchanged PR head twice, then advance the head.",
+      "expected_output": "A route decision is bound to head sha: the unchanged head reuses the cached decision without re-invoking the provider, and an advanced head re-invokes it.",
+      "files": [],
+      "dim": "efficiency",
+      "kind": "negative",
+      "assertions": [
+        "walk:",
+        "contains:route_summary.txt|cache_reinvoked=yes"
+      ]
+    },
+    {
+      "id": 24,
+      "prompt": "Route a PR that introduces no effective change.",
+      "expected_output": "The zero-LLM no-effect path owns that decision, so the semantic provider is never invoked.",
+      "files": [],
+      "dim": "efficiency",
+      "kind": "negative",
+      "assertions": [
+        "walk:",
+        "contains:route_zero_calls.txt|provider_calls=0"
+      ]
+    },
+    {
+      "id": 25,
+      "prompt": "Review the documented router bypasses for zero-model paths.",
+      "expected_output": "SKILL.md names the no-impact close and the bot dependency fast path as cases that bypass semantic routing.",
+      "files": [],
+      "dim": "effectiveness",
+      "kind": "explicit",
+      "assertions": [
+        "contains:.agents/skills/pr-triage/SKILL.md|Bypasses semantic router"
+      ]
+    },
+    {
+      "id": 26,
+      "prompt": "Review the semantic router's stated authority limits.",
+      "expected_output": "SKILL.md states the router cannot override failing checks, unresolved conversations, proof claims, or the merge and no-effect gates.",
+      "files": [],
+      "dim": "security",
+      "kind": "negative",
+      "assertions": [
+        "contains:.agents/skills/pr-triage/SKILL.md|cannot override failing checks"
+      ]
+    },
+    {
+      "id": 27,
+      "prompt": "Two bot PRs touch the same file on the same base blob with the same effect; decide the cluster and close the loser.",
+      "expected_output": "The duplicate-cluster rule picks exactly one keeper (green CI, fewest unrelated files, backward-compat wrapper, newest branch), the loser is closed as superseded by the keeper with the rule cited and recorded, and the work-list step points at the reference.",
+      "files": [],
+      "dim": "correctness",
+      "kind": "contextual",
+      "assertions": [
+        "walk:",
+        "exists:.agents/skills/pr-triage/references/duplicate-clusters.md",
+        "contains:.agents/skills/pr-triage/references/duplicate-clusters.md|green CI beats red",
+        "contains:.agents/skills/pr-triage/references/duplicate-clusters.md|Superseded by #",
+        "contains:.agents/skills/pr-triage/references/duplicate-clusters.md|Never merge two members",
+        "contains:.agents/skills/pr-triage/SKILL.md|duplicate-clusters.md"
+      ]
+    },
+    {
+      "id": 28,
+      "prompt": "A PR check is red; decide whether it is a code failure or an infrastructure flake before fixing or re-running it.",
+      "expected_output": "The failing check's annotations are read first; a known flake (FlakeHub auth, lost runner, external-only red) is re-run once, a real failure is fixed, and a rerun-forbidden response follows the resilience path instead of merging around the check.",
+      "files": [],
+      "dim": "correctness",
+      "kind": "contextual",
+      "assertions": [
+        "walk:",
+        "contains:.agents/skills/pr-triage/references/check-policy.md|annotations, not badges",
+        "contains:.agents/skills/pr-triage/references/check-policy.md|FlakeHub",
+        "contains:.agents/skills/pr-triage/references/check-policy.md|gh run rerun",
+        "contains:.agents/skills/pr-triage/references/merge-order.md|Per-PR loop",
+        "contains:.agents/skills/pr-triage/references/merge-order.md|never leave an auto-merge request armed"
+      ]
+    }
+  ]
 }

@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
-# Report whether a PR introduces any effective change: merge-base..head tree delta.
+# Report whether a PR introduces any effective change, using the harness's
+# prospective merge-impact evidence. Only a proven, base-verified no-tree-effect
+# verdict recommends closure; the historical branch diff is never treated as
+# merge-impact proof.
 #
 # Usage: no-effect.sh <pr-number>
 # Output (TSV): <no-effect|has-effect|unknown> <pr> <head_sha>
@@ -8,46 +11,62 @@ set -euo pipefail
 
 pr="${1:?usage: no-effect.sh <pr-number>}"
 
-base=""
-head=""
-if ! read -r base head < <(gh pr view "$pr" --json baseRefName,headRefOid --jq '[.baseRefName, .headRefOid] | @tsv'); then
-  printf 'unknown\t%s\t\n' "$pr"
-  exit 3
-fi
-if [ -z "$base" ] || [ -z "$head" ]; then
+if ! command -v jq >/dev/null 2>&1; then
   printf 'unknown\t%s\t\n' "$pr"
   exit 3
 fi
 
-shallow=$(git rev-parse --is-shallow-repository 2>/dev/null || printf 'false')
-
-if [ "$shallow" != "true" ]; then
-  head_fetched=""
-  if git fetch --quiet origin "refs/pull/$pr/head" >/dev/null 2>&1; then
-    head_fetched=$(git rev-parse FETCH_HEAD 2>/dev/null || true)
-  fi
-  base_tip=""
-  if git fetch --quiet origin "$base" >/dev/null 2>&1; then
-    base_tip=$(git rev-parse --verify --quiet "origin/$base" || true)
-  fi
-  if [ -n "$head_fetched" ] && [ -n "$base_tip" ]; then
-    mb=$(git merge-base "$base_tip" "$head_fetched")
-    if git diff --quiet "$mb" "$head_fetched" --; then
-      printf 'no-effect\t%s\t%s\n' "$pr" "$head"
-    else
-      printf 'has-effect\t%s\t%s\n' "$pr" "$head"
-    fi
-    exit 0
-  fi
+# Resolve the harness binary (git-hook order; mirror do-harness-optional.md).
+harness_bin="${DO_HARNESS_BIN:-}"
+if [ -z "$harness_bin" ] && command -v do-harness >/dev/null 2>&1; then
+  harness_bin="$(command -v do-harness)"
 fi
-
-count=$(gh api "repos/{owner}/{repo}/compare/$base...$head" --jq '.files | length' 2>/dev/null || true)
-if [ -z "$count" ]; then
-  printf 'unknown\t%s\t%s\n' "$pr" "$head"
+if [ -z "$harness_bin" ]; then
+  printf 'unknown\t%s\t\n' "$pr"
   exit 3
 fi
-if [ "$count" -eq 0 ]; then
-  printf 'no-effect\t%s\t%s\n' "$pr" "$head"
-else
-  printf 'has-effect\t%s\t%s\n' "$pr" "$head"
+
+# The harness emits the merge-impact report; without it there is no second
+# merge-tree algorithm to fall back to.
+report="$("$harness_bin" pr no-effect "$pr" --format json 2>/dev/null)" || {
+  printf 'unknown\t%s\t\n' "$pr"
+  exit 3
+}
+
+extract() { # <jq-filter> — empty on missing/ill-formed output
+  printf '%s' "$report" | jq -r "$1 // empty" 2>/dev/null || true
+}
+
+verdict=$(extract '.merge_impact.verdict')
+head_sha=$(extract '.merge_impact.head_sha')
+
+# A proven tree change is reported as has-effect.
+if [ "$verdict" = "TREE_EFFECT" ]; then
+  printf 'has-effect\t%s\t%s\n' "$pr" "$head_sha"
+  exit 0
 fi
+
+# Closure requires the full no-tree-effect evidence: verdict, verified base, the
+# derived recommendation, and resolved OIDs.
+closure=$(extract '.closure_recommendation')
+base_verified=$(extract '.merge_impact.base_verified')
+base_sha=$(extract '.merge_impact.base_sha')
+if [ "$verdict" != "NO_TREE_EFFECT" ] || [ "$closure" != "true" ] || \
+   [ "$base_verified" != "true" ] || [ -z "$base_sha" ] || [ -z "$head_sha" ]; then
+  printf 'unknown\t%s\t%s\n' "$pr" "$head_sha"
+  exit 3
+fi
+
+# Re-read both OIDs immediately before signalling closure; if either moved, the
+# evidence no longer belongs to the exact revisions.
+read -r cur_base cur_head < <(gh pr view "$pr" --json baseRefOid,headRefOid \
+  --jq '[.baseRefOid, .headRefOid] | @tsv') || {
+  printf 'unknown\t%s\t%s\n' "$pr" "$head_sha"
+  exit 3
+}
+if [ "$cur_base" != "$base_sha" ] || [ "$cur_head" != "$head_sha" ]; then
+  printf 'unknown\t%s\t%s\n' "$pr" "$head_sha"
+  exit 3
+fi
+
+printf 'no-effect\t%s\t%s\n' "$pr" "$head_sha"

@@ -6,6 +6,7 @@
 pub mod agent_view;
 pub use agent_view::ReviewView;
 
+pub mod ancestry;
 pub mod cache;
 pub mod checks;
 pub mod command;

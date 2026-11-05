@@ -80,6 +80,14 @@ case "$cmd" in
         fields=$(opt_value --json "$@") || fields=""
         sha=$(git rev-parse "refs/pull/$pr/head")
         case "$fields" in
+          *isDraft*)
+            # Multi-field view used by the merge boundary: `merge.sh` asks for
+            # headRefOid, state and isDraft together and parses it with jq.
+            printf '{"headRefOid":"%s","state":"%s","isDraft":%s,"labels":%s,"mergeable":"%s","mergeStateStatus":"%s"}\n' \
+              "$sha" "${FAKE_GH_PR_STATE:-OPEN}" "${FAKE_GH_PR_DRAFT:-false}" \
+              "${FAKE_GH_PR_LABELS:-[]}" "${FAKE_GH_PR_MERGEABLE:-MERGEABLE}" \
+              "${FAKE_GH_PR_MERGE_STATE:-CLEAN}"
+            ;;
           *autoMergeRequest*)
             mode="${FAKE_GH_AUTO_MERGE:-none}"
             log="${FAKE_GH_AUTO_MERGE_LOG:-}"
@@ -96,19 +104,19 @@ case "$cmd" in
           *baseRefName*) printf 'main\t%s\n' "$sha" ;;
           *headRefOid*)
             # The Rust classifier reads JSON; older shell callers pass --jq.
+            # no-effect.sh re-reads both OIDs as one TSV query.
             if jq_arg "$@" >/dev/null 2>&1; then
-              printf '%s\n' "$sha"
+              expr=$(jq_arg "$@")
+              case "$expr" in
+                *baseRefOid*)
+                  base_sha=$(git rev-parse "refs/heads/${FAKE_GH_BASE:-main}")
+                  printf '%s\t%s\n' "$base_sha" "$sha"
+                  ;;
+                *) printf '%s\n' "$sha" ;;
+              esac
             else
               printf '{"headRefOid":"%s"}\n' "$sha"
             fi
-            ;;
-          *isDraft*)
-            # Pre-merge stop fixtures: a walkthrough flips the draft flag, the
-            # state, or the label list per call.
-            printf '{"isDraft":%s,"state":"%s","labels":%s,"mergeable":"%s","mergeStateStatus":"%s"}\n' \
-              "${FAKE_GH_PR_DRAFT:-false}" "${FAKE_GH_PR_STATE:-OPEN}" \
-              "${FAKE_GH_PR_LABELS:-[]}" "${FAKE_GH_PR_MERGEABLE:-MERGEABLE}" \
-              "${FAKE_GH_PR_MERGE_STATE:-CLEAN}"
             ;;
           *) printf '{"number":%s,"baseRefName":"main","headRefOid":"%s"}\n' "$pr" "$sha" ;;
         esac
@@ -116,8 +124,16 @@ case "$cmd" in
       merge)
         pr="${1:-}"
         shift || true
+        if [ "${1:-}" = "--squash" ]; then
+          # The direct merge boundary: record the exact argv, never merge.
+          if [ -n "${FAKE_GH_MERGE_LOG:-}" ]; then
+            printf 'pr merge %s %s\n' "$pr" "$*" >> "$FAKE_GH_MERGE_LOG"
+          fi
+          printf 'Squashed and merged pull request #%s\n' "$pr"
+          exit 0
+        fi
         if [ "${1:-}" != "--disable-auto" ]; then
-          echo "fake gh: only 'pr merge <n> --disable-auto' is supported" >&2
+          echo "fake gh: unsupported 'pr merge' invocation: $*" >&2
           exit 1
         fi
         if [ -n "${FAKE_GH_AUTO_MERGE_LOG:-}" ]; then
