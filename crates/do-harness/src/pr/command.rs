@@ -161,6 +161,9 @@ pub fn run(root: &Path, action: PrAction, dry_run: bool) -> Result<(), CliError>
             format,
             dry_run,
         ),
+        PrAction::Findings { pr, issues, format } => {
+            super::findings::run(root, pr, issues, format, dry_run)
+        }
         PrAction::External(args) => {
             if let Some(first) = args.first() {
                 if let Ok(pr) = first.parse::<u64>() {

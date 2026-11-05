@@ -22,7 +22,35 @@ pub struct ReadinessReport {
     pub checks: CheckSummary,
     pub conversations: ConversationSummary,
     pub codecov: Option<CodecovSummary>,
+    #[serde(default)]
+    pub findings: FindingsSummary,
     pub blockers: Vec<String>,
+}
+
+/// Counts from the findings provenance evaluation (#470).
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct FindingsSummary {
+    /// Total classified findings on the head SHA.
+    #[serde(default)]
+    pub total: usize,
+    /// Findings classified `INTRODUCED`.
+    #[serde(default)]
+    pub introduced: usize,
+    /// Findings classified `REGRESSED`.
+    #[serde(default)]
+    pub regressed: usize,
+    /// Findings classified `PRE_EXISTING`.
+    #[serde(default)]
+    pub pre_existing: usize,
+    /// Findings with no linked issue and no disposition.
+    #[serde(default)]
+    pub untracked: usize,
+    /// Whether the base baseline could be verified.
+    #[serde(default)]
+    pub base_verified: bool,
+    /// Canonical digest over the classified findings.
+    #[serde(default)]
+    pub digest: String,
 }
 
 /// PR mergeability state from `GitHub`.

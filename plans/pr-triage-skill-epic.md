@@ -1,6 +1,6 @@
 # Epic: pr-triage Agent Skill
 
-> **Status:** phases 1–7 complete (skill + evals; `pr no-effect` + `pr review` with cache; proof skipping + `false_proven`; measurement + benchmark; semantic routing cost/safety benchmark with a recorded `no-go` verdict; realistic large-diff corpus + route-aware cost model; cheap-metadata input investigated and **rejected** as strictly worse than the proof gate; fine-tuned Kev router rejected structurally without a training run)
+> **Status:** phases 1–8 complete (skill + evals; `pr no-effect` + `pr review` with cache; proof skipping + `false_proven`; measurement + benchmark; semantic routing cost/safety benchmark with a recorded `no-go` verdict; realistic large-diff corpus + route-aware cost model; cheap-metadata input investigated and **rejected** as strictly worse than the proof gate; fine-tuned Kev router rejected structurally without a training run)
 > **Related:** Agent Skills open standard, GitHub PR lifecycle, optional `do-harness` token reduction
 > **Created:** 2026-09-11
 
@@ -349,6 +349,16 @@ PR #302 (preview-fidelity and stale-binary lessons), PR #303/#304 (grounded skil
 citations), PR #310 (prose subjects fail range lint; squash-reword own/bot branches). Evals as of 2026-10-14: `do-harness eval --skill pr-triage`
 114/114, pass_rate 1.00, bar 0.95. Next: keep distilling per sweep; open a new
 phase only for a capability change (new forge, new command).
+
+## Role split
+
+- **CLI checks are authoritative** after #474: CI classification runs through
+  `do-harness pr checks` and fails closed without the binary; the skill's
+  shell scripts never fall back to a best-effort parser.
+- The deterministic CLI sweep (`do-harness pr sweep`) is the orchestrator of
+  PR lifecycle execution; this skill and its scripts remain human/agent repair
+  guidance for what the sweep does not cover, not a second implementation of
+  the same state machine.
 
 ## Task tracking note
 

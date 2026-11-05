@@ -11,6 +11,7 @@ pub mod checks;
 pub mod command;
 pub mod conversations;
 pub mod diff;
+pub mod findings;
 pub mod gh;
 pub mod lcov;
 pub mod loop_fetch;

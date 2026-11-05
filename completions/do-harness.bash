@@ -304,6 +304,9 @@ _do__harness() {
             do__harness__subcmd__help__subcmd__pr,disposition)
                 cmd="do__harness__subcmd__help__subcmd__pr__subcmd__disposition"
                 ;;
+            do__harness__subcmd__help__subcmd__pr,findings)
+                cmd="do__harness__subcmd__help__subcmd__pr__subcmd__findings"
+                ;;
             do__harness__subcmd__help__subcmd__pr,no-effect)
                 cmd="do__harness__subcmd__help__subcmd__pr__subcmd__no__subcmd__effect"
                 ;;
@@ -415,6 +418,9 @@ _do__harness() {
             do__harness__subcmd__pr,disposition)
                 cmd="do__harness__subcmd__pr__subcmd__disposition"
                 ;;
+            do__harness__subcmd__pr,findings)
+                cmd="do__harness__subcmd__pr__subcmd__findings"
+                ;;
             do__harness__subcmd__pr,help)
                 cmd="do__harness__subcmd__pr__subcmd__help"
                 ;;
@@ -438,6 +444,9 @@ _do__harness() {
                 ;;
             do__harness__subcmd__pr__subcmd__help,disposition)
                 cmd="do__harness__subcmd__pr__subcmd__help__subcmd__disposition"
+                ;;
+            do__harness__subcmd__pr__subcmd__help,findings)
+                cmd="do__harness__subcmd__pr__subcmd__help__subcmd__findings"
                 ;;
             do__harness__subcmd__pr__subcmd__help,help)
                 cmd="do__harness__subcmd__pr__subcmd__help__subcmd__help"
@@ -2335,7 +2344,7 @@ _do__harness() {
             return 0
             ;;
         do__subcmd__harness__subcmd__help__subcmd__pr)
-            opts="no-effect review ready checks waivers disposition"
+            opts="no-effect review ready checks waivers disposition findings"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -2363,6 +2372,20 @@ _do__harness() {
             return 0
             ;;
         do__subcmd__harness__subcmd__help__subcmd__pr__subcmd__disposition)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        do__subcmd__harness__subcmd__help__subcmd__pr__subcmd__findings)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -3760,7 +3783,7 @@ _do__harness() {
             return 0
             ;;
         do__subcmd__harness__subcmd__pr)
-            opts="-q -h -V --root --config --quiet --output --dry-run --help --version no-effect review ready readiness check checks waivers disposition help"
+            opts="-q -h -V --root --config --quiet --output --dry-run --help --version no-effect review ready readiness check checks waivers disposition findings help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -3936,8 +3959,67 @@ _do__harness() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
+        do__subcmd__harness__subcmd__pr__subcmd__findings)
+            opts="-q -h -V --issues --format --root --config --quiet --output --dry-run --help --version"
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                --issues)
+                    COMPREPLY=($(compgen -W "plan create" -- "${cur}"))
+                    return 0
+                    ;;
+                --format)
+                    COMPREPLY=($(compgen -W "text json" -- "${cur}"))
+                    return 0
+                    ;;
+                --root)
+                    COMPREPLY=()
+                    if [[ "${BASH_VERSINFO[0]}" -ge 4 ]]; then
+                        compopt -o plusdirs
+                    fi
+                    return 0
+                    ;;
+                --config)
+                    local oldifs
+                    if [ -n "${IFS+x}" ]; then
+                        oldifs="$IFS"
+                    fi
+                    IFS=$'\n'
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    if [ -n "${oldifs+x}" ]; then
+                        IFS="$oldifs"
+                    fi
+                    if [[ "${BASH_VERSINFO[0]}" -ge 4 ]]; then
+                        compopt -o filenames
+                    fi
+                    return 0
+                    ;;
+                --output)
+                    local oldifs
+                    if [ -n "${IFS+x}" ]; then
+                        oldifs="$IFS"
+                    fi
+                    IFS=$'\n'
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    if [ -n "${oldifs+x}" ]; then
+                        IFS="$oldifs"
+                    fi
+                    if [[ "${BASH_VERSINFO[0]}" -ge 4 ]]; then
+                        compopt -o filenames
+                    fi
+                    return 0
+                    ;;
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
         do__subcmd__harness__subcmd__pr__subcmd__help)
-            opts="no-effect review ready checks waivers disposition help"
+            opts="no-effect review ready checks waivers disposition findings help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -3965,6 +4047,20 @@ _do__harness() {
             return 0
             ;;
         do__subcmd__harness__subcmd__pr__subcmd__help__subcmd__disposition)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        do__subcmd__harness__subcmd__pr__subcmd__help__subcmd__findings)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )

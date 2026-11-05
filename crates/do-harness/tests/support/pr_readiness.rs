@@ -17,6 +17,7 @@ fn harness(root: &Path) -> Command {
 
 /// Creates a fake `gh` script that dispatches API and view queries based on
 /// mock JSON data written in `mock_dir`.
+#[allow(clippy::too_many_lines)]
 pub fn fake_gh_router(mock_dir: &Path) -> PathBuf {
     let bin = mock_dir.join("bin");
     std::fs::create_dir_all(&bin).unwrap();
@@ -41,15 +42,19 @@ fi
 # gh api ... — the endpoint is an argument, not `$2`: `--paginate` and
 # `--jq` flags may precede it.
 if [ "$1" = "api" ]; then
-    # Assert GET-only behaviour: no mutation flags permitted.
+    is_mutation=0
     for arg in "$@"; do
         case "$arg" in
-            -XPOST|-XPUT|-XPATCH|-XDELETE|--method=POST|--method=PUT|--method=PATCH|--method=DELETE)
-                echo "mutation forbidden in GET-only api mock: $arg" >&2
-                exit 2
-                ;;
+            -XPOST|-XPUT|-XPATCH|-XDELETE|POST|PUT|PATCH|DELETE) is_mutation=1 ;;
         esac
     done
+    if [ "$is_mutation" -eq 1 ]; then
+        if [ -f "$MOCK_DIR/assert_get_only" ]; then
+            echo "mutation forbidden in GET-only api mock: $@" >&2
+            exit 2
+        fi
+        printf '%s\n' "$*" >> "$MOCK_DIR/mutations.txt"
+    fi
     endpoint=""
     for arg in "$@"; do
         case "$arg" in
@@ -57,6 +62,28 @@ if [ "$1" = "api" ]; then
         esac
     done
     case "$endpoint" in
+        *annotations*)
+            if [ -f "$MOCK_DIR/fail_annotations" ]; then
+                echo "HTTP 403: permission denied" >&2
+                exit 1
+            fi
+            if [ -f "$MOCK_DIR/annotations.json" ]; then
+                cat "$MOCK_DIR/annotations.json"
+            else
+                printf '%s' '[]'
+            fi
+            exit 0
+            ;;
+        *commits/*base*/check-runs*)
+            if [ -f "$MOCK_DIR/check_runs_base.json" ]; then
+                printf '['
+                cat "$MOCK_DIR/check_runs_base.json"
+                printf ']'
+            else
+                printf '%s' '[{{"total_count":0,"check_runs":[]}}]'
+            fi
+            exit 0
+            ;;
         *check-runs*)
             if [ -f "$MOCK_DIR/fail_api" ]; then
                 echo "HTTP 403: rate limit exceeded" >&2
@@ -110,6 +137,31 @@ if [ "$1" = "api" ]; then
         *comments*)
             if [ -f "$MOCK_DIR/comments.json" ]; then
                 cat "$MOCK_DIR/comments.json"
+            else
+                printf '%s' '[]'
+            fi
+            exit 0
+            ;;
+        *code-scanning/alerts*)
+            if [ -f "$MOCK_DIR/code_scanning_alerts.json" ]; then
+                cat "$MOCK_DIR/code_scanning_alerts.json"
+            else
+                printf '%s' '[]'
+            fi
+            exit 0
+            ;;
+        *issues*)
+            if [ "$is_mutation" -eq 1 ]; then
+                count=101
+                if [ -f "$MOCK_DIR/created_issues_count.txt" ]; then
+                    count=$(cat "$MOCK_DIR/created_issues_count.txt")
+                    count=$((count + 1))
+                fi
+                echo "$count" > "$MOCK_DIR/created_issues_count.txt"
+                printf '{{"number": %s, "html_url": "https://github.com/acme/widget/issues/%s"}}' "$count" "$count"
+                exit 0
+            elif [ -f "$MOCK_DIR/issues_all.json" ]; then
+                cat "$MOCK_DIR/issues_all.json"
             else
                 printf '%s' '[]'
             fi
