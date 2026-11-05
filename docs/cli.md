@@ -1271,7 +1271,7 @@ be resolved. A collector that cannot read git history never reads as healthy.
 <!-- BEGIN GENERATED: cli-contract pr -->
 `do-harness pr [OPTIONS] <COMMAND>`
 
-Subcommands: `no-effect`, `review`, `ready`, `checks`, `waivers`, `disposition`.
+Subcommands: `no-effect`, `review`, `ready`, `checks`, `waivers`, `disposition`, `findings`.
 <!-- END GENERATED: cli-contract pr -->
 Deterministic, read-only PR analysis: every subcommand works in any git repository without harness initialization. Pick the subcommand that answers your question.
 
@@ -1521,6 +1521,11 @@ request, with per-class evidence and per-file counts:
   one covers are reported as **covered since**.
 - `--format <Format>`: `text` (the paste-ready comment) or `json`.
 
+Read-only and offline: a PR target reads the diff through `gh`, everything else
+is local. Exit `2` when an input file is unreadable or the arguments conflict,
+`1` when the patch set cannot be computed, and `0` when the analysis completes —
+the verdict lives in the report, where `counts.missing` is the number of changed
+lines a test still has to cover.
 
 ### `pr disposition`
 <!-- BEGIN GENERATED: cli-contract pr disposition -->
@@ -1536,12 +1541,47 @@ request, with per-class evidence and per-file counts:
 | `--evidence <EVIDENCE>` | no | — | — | Optional evidence SHA (required if decision is fixed) |
 | `--format <FORMAT>` | no | `text` | `text`, `json` | Output format |
 <!-- END GENERATED: cli-contract pr disposition -->
-Record a structured disposition for a review, thread, comment, or finding on a pull request.
-Read-only and offline: a PR target reads the diff through `gh`, everything else
-is local. Exit `2` when an input file is unreadable or the arguments conflict,
-`1` when the patch set cannot be computed, and `0` when the analysis completes —
-the verdict lives in the report, where `counts.missing` is the number of changed
-lines a test still has to cover.
+Record a durable disposition for one review, review thread, review comment,
+issue comment or finding. The record is posted as a PR issue comment carrying a
+`<!-- do-harness-disposition:v1 … -->` block, so it lives on `GitHub` rather
+than in local state.
+
+- The author's repository permission is re-queried from `GitHub`; only
+  `admin`, `write`, `maintain` or `owner` can clear an item. Marker text never
+  authorizes itself.
+- The record is bound to the full head SHA, the base SHA, the item content hash
+  and the policy hash. A new push, an edited item or a changed policy invalidates
+  it, and the item blocks again.
+- `--decision fixed` requires `--evidence` equal to the current head SHA.
+- An item reference that is not on the PR is refused; nothing is posted.
+- The global `--dry-run` prints the record and posts nothing.
+
+### `pr findings`
+<!-- BEGIN GENERATED: cli-contract pr findings -->
+`do-harness pr findings [OPTIONS] <PR>`
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `<PR>` | yes | — | — | Pull request number |
+| `--issues <ISSUES>` | no | `plan` | `plan`, `create` | Issue creation mode: `plan` (preview only) or `create` |
+| `--format <FORMAT>` | no | `json` | `text`, `json` | Output format |
+<!-- END GENERATED: cli-contract pr findings -->
+Collect the CI findings for a PR head, classify each one against the verified
+base baseline, and plan or create one deduplicated issue per underlying defect.
+
+Classification is `INTRODUCED`, `REGRESSED`, `PRE_EXISTING`, `RESOLVED` or
+`UNKNOWN`. A missing base SHA, an unreadable source or an unknown tool version
+is `UNKNOWN` — never a clean result. Findings are grouped by a SHA-256
+fingerprint over repository, tool, rule/advisory id and normalized
+location/signature, so twenty matrix legs collapse to one finding that keeps
+every occurrence.
+
+`--issues plan` (the default) reports what would be created and mutates nothing;
+`--issues create` searches every issue state for the
+`<!-- do-harness:finding:v1 sha256=… -->` marker before creating anything, and
+caps new issues at `max_new_issues_per_run` from
+[`plans/pr-merge-policy.toml`](../plans/pr-merge-policy.toml) (20 at most).
+
 
 ### `skills`
 <!-- BEGIN GENERATED: cli-contract skills -->

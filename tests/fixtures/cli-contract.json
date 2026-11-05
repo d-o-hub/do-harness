@@ -635,7 +635,8 @@
         "ready",
         "checks",
         "waivers",
-        "disposition"
+        "disposition",
+        "findings"
       ],
       "invocable": false
     },
@@ -1193,6 +1194,74 @@
           "takes_value": true,
           "default_values": [
             "text"
+          ],
+          "possible_values": [
+            "text",
+            "json"
+          ],
+          "help": "Output format",
+          "index": null
+        }
+      ],
+      "subcommands": [],
+      "invocable": true
+    },
+    {
+      "path": "pr findings",
+      "about": "Collect and classify findings (annotations, code scanning, artifacts) and track issues",
+      "usage": "do-harness pr findings [OPTIONS] <PR>",
+      "aliases": [],
+      "args": [
+        {
+          "id": "pr",
+          "kind": "positional",
+          "short": null,
+          "long": null,
+          "value_names": [
+            "PR"
+          ],
+          "required": true,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Pull request number",
+          "index": 1
+        },
+        {
+          "id": "issues",
+          "kind": "option",
+          "short": null,
+          "long": "issues",
+          "value_names": [
+            "ISSUES"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [
+            "plan"
+          ],
+          "possible_values": [
+            "plan",
+            "create"
+          ],
+          "help": "Issue creation mode: `plan` (preview only) or `create`",
+          "index": null
+        },
+        {
+          "id": "format",
+          "kind": "option",
+          "short": null,
+          "long": "format",
+          "value_names": [
+            "FORMAT"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [
+            "json"
           ],
           "possible_values": [
             "text",

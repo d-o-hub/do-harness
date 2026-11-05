@@ -38,3 +38,19 @@ severity = "errors"
 
 [other_rules]
 deletion = true
+
+[findings]
+policy = "managed-backlog"
+max_new_issues_per_run = 20
+
+[[findings.sources]]
+id = "github-check-run-annotations"
+kind = "check-run-annotations"
+required = true
+
+[[findings.sources]]
+id = "github-code-scanning"
+kind = "code-scanning-alerts"
+tool = "CodeQL"
+version_source = "analysis.tool.version"
+required = true

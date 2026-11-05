@@ -38,8 +38,8 @@ mod tests;
 
 mod model;
 pub use model::{
-    ActionableComment, CancelledCheck, CheckSummary, ConversationSummary, FailedCheck, MergeState,
-    ReadinessReport, UnresolvedThread,
+    ActionableComment, CancelledCheck, CheckSummary, ConversationSummary, FailedCheck,
+    FindingsSummary, MergeState, ReadinessReport, UnresolvedThread,
 };
 
 /// Evaluates merge readiness for PR `number`.
@@ -91,7 +91,10 @@ pub fn evaluate(root: &Path, number: u64) -> Result<ReadinessReport> {
         // 4. Review Threads, Comments & Dispositions
         let (conversations, codecov) = evaluate_conversations(root, number, &view, &mut blockers)?;
 
-        // 4. Recheck head SHA after collection
+        // 5. Findings provenance against the verified base baseline
+        let findings = evaluate_findings_block(root, &view, &mut blockers);
+
+        // 6. Recheck head SHA after collection
         let recheck_view = gh::readiness_view(root, number)
             .context("failed to recheck head SHA after metadata collection")?;
 
@@ -115,11 +118,88 @@ pub fn evaluate(root: &Path, number: u64) -> Result<ReadinessReport> {
             checks,
             conversations,
             codecov,
+            findings,
             blockers,
         });
     }
 
     anyhow::bail!("failed to obtain a stable head SHA snapshot after {MAX_HEAD_RETRIES} attempts")
+}
+
+/// Evaluates findings provenance and records merge blockers.
+///
+/// Introduced and regressed findings always block. A critical finding blocks
+/// until it is linked to a tracked issue or carries an authorized disposition.
+/// A failed collection blocks too: an unreadable finding set is not a clean one.
+fn evaluate_findings_block(
+    root: &Path,
+    view: &gh::PrReadinessView,
+    blockers: &mut Vec<String>,
+) -> FindingsSummary {
+    use super::findings::{FindingClassification, FindingSeverity};
+
+    let collected = super::findings::collect_and_classify(
+        root,
+        &view.head_ref_oid,
+        &view.base_ref_oid,
+        "repository",
+    );
+
+    let (findings, base_verified) = match collected {
+        Ok(pair) => pair,
+        Err(err) => {
+            blockers.push(format!("findings collection failed: {err:#}"));
+            return FindingsSummary::default();
+        }
+    };
+
+    let mut summary = FindingsSummary {
+        total: findings.len(),
+        base_verified,
+        digest: super::findings::compute_findings_digest(&findings),
+        ..FindingsSummary::default()
+    };
+
+    for finding in &findings {
+        let location = match finding.start_line {
+            Some(line) => format!("{}:{}", finding.path, line),
+            None => finding.path.clone(),
+        };
+        match finding.classification {
+            FindingClassification::Introduced => {
+                summary.introduced += 1;
+                blockers.push(format!(
+                    "introduced {} finding '{}' at {location}: {}",
+                    finding.severity.as_str(),
+                    finding.rule_id,
+                    finding.message
+                ));
+            }
+            FindingClassification::Regressed => {
+                summary.regressed += 1;
+                blockers.push(format!(
+                    "regressed {} finding '{}' at {location}: {}",
+                    finding.severity.as_str(),
+                    finding.rule_id,
+                    finding.message
+                ));
+            }
+            FindingClassification::PreExisting => summary.pre_existing += 1,
+            FindingClassification::Resolved | FindingClassification::Unknown => {}
+        }
+
+        if finding.issue_url.is_none() && finding.disposition.is_none() {
+            summary.untracked += 1;
+            if finding.severity == FindingSeverity::Critical {
+                blockers.push(format!(
+                    "critical finding '{}' at {location} is untracked (no linked issue, no disposition)",
+                    finding.rule_id
+                ));
+            }
+        }
+    }
+
+    summary
 }
 
 fn evaluate_checks(
