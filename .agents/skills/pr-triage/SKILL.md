@@ -68,10 +68,15 @@ Run these steps in order. Stop the sweep on any escalation and report it.
    record exists for the same head and base, and `scripts/checks.sh` reports
    pass and `scripts/threads.sh list` has no unresolved threads, skip to the
    next PR.
-5. **No impact.** Run `scripts/no-effect.sh PR`. On `no-effect`, re-read the head
-   SHA and confirm it is unchanged, then close:
-   `gh pr close PR --comment "Closed automatically: no effective change remains."`
-   Record it with `scripts/state.sh set PR HEAD_SHA BASE_SHA closed-no-effect`.
+5. **No impact.** Run `scripts/no-effect.sh PR`. It delegates to
+   `do-harness pr no-effect PR --format json` and reports `no-effect` only when
+   the merge-impact verdict is `NO_TREE_EFFECT` with a verified base and the
+   derived `closure_recommendation`, then re-reads both base and head OIDs
+   before signalling closure, so stale evidence closes nothing. The verdict
+   proves merging the PR would not change the base tree — call it **no tree
+   effect**, never "no semantic impact". On `no-effect`, record it with
+   `scripts/state.sh set PR HEAD_SHA BASE_SHA closed-no-effect`, then close:
+   `gh pr close PR --comment "Closed automatically: no tree effect remains."`
    Continue to the next PR. (Bypasses semantic router).
 6. **Machine fast path.** For a known bot author with a dependency-only diff
    (lockfile or manifest only) and `scripts/checks.sh` pass and no unresolved
