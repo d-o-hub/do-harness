@@ -37,11 +37,19 @@ performs the same probe and reports which binary it found; substitute
 
 | Step | Command | Fallback |
 |------|---------|----------|
-| No effect | `do-harness pr no-effect PR --format json` | `scripts/no-effect.sh PR` |
+| No effect | `do-harness pr no-effect PR --format json` | `scripts/no-effect.sh PR` (delegates to this command; `unknown` exit 3 without the binary) |
 | Review input | `do-harness pr review PR --format json` | `gh pr diff PR` |
 | Recompute | `do-harness pr review PR --recompute` | n/a |
 | CI truth | `do-harness pr checks PR --format json` | none: fail closed |
 | Documentation impact | `python3 scripts/docs.py impact --base BASE --head HEAD --format json` | `gh pr diff PR` |
+
+The `scripts/no-effect.sh` wrapper consumes this command's JSON and reports
+`no-effect` only when the merge-impact verdict is `NO_TREE_EFFECT` with a
+verified base and a derived `closure_recommendation`, then re-reads both base and
+head OIDs before signalling closure. This proves merging the PR would not change
+the base tree — a **no tree effect** verdict, not an absence of incidental
+meaning; never describe it as "no semantic impact". Without a usable binary the
+wrapper prints `unknown` and exits 3 and never degrades to a shell branch diff.
 
 Use the documentation packet only when all freshness and size gates pass:
 `revisions.base` equals the current PR base SHA, `revisions.head` equals the PR
