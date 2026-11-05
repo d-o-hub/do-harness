@@ -19,6 +19,11 @@ cp "$skill/evals/fake_gh.sh" "$root/bin/gh"
 chmod +x "$root/bin/gh"
 export PATH="$root/bin:$PATH"
 export FAKE_GH_FIXTURES="$skill/evals/fixtures"
+# Fake do-harness on PATH; the no-effect wrapper delegates to it. Pin
+# DO_HARNESS_BIN to the fake only for the no-effect runs below so the harness
+# merge-impact report stays hermetic; later sections keep the real binary.
+cp "$skill/evals/fake_do_harness.sh" "$root/bin/do-harness"
+chmod +x "$root/bin/do-harness"
 
 # Fixture repository with a change branch and an empty branch.
 repo="$root/repo"
@@ -59,9 +64,40 @@ assert bases == ["feature-a", "main", "main"], f"bases: {bases}"
 open(sys.argv[2], "w").write(",".join(order))
 PY
 
-# 2. No-effect: real change vs empty commit.
-"$skill/scripts/no-effect.sh" 7 > "$root/no_effect_has.txt"
-"$skill/scripts/no-effect.sh" 8 > "$root/no_effect_empty.txt"
+# 2. No-effect: the wrapper delegates to the harness merge-impact report. PR 7
+# is a real tree change (has-effect); PR 8 is an empty commit with a verified
+# base (no-effect). The fake harness is pinned via DO_HARNESS_BIN.
+DO_HARNESS_BIN="$root/bin/do-harness" "$skill/scripts/no-effect.sh" 7 > "$root/no_effect_has.txt"
+DO_HARNESS_BIN="$root/bin/do-harness" "$skill/scripts/no-effect.sh" 8 > "$root/no_effect_empty.txt"
+
+# 2b. No-effect branch proof: every decision is driven by fake harness JSON.
+# Each run records its TSV line and exit code; the missing-binary case runs in
+# a clean PATH without the shim and proves no shell fallback remains.
+no_effect_case() { # <mode> <pr> <residue>
+  local mode="$1" pr="$2" residue="$3"
+  set +e
+  DO_HARNESS_BIN="$root/bin/do-harness" FAKE_DO_HARNESS_MODE="$mode" \
+    "$skill/scripts/no-effect.sh" "$pr" \
+    > "$root/$residue.out" 2> "$root/$residue.err"
+  local code=$?
+  set -e
+  printf 'mode=%s exit=%s out=<%s>\n' "$mode" "$code" "$(tr -d '\n' < "$root/$residue.out")" \
+    > "$root/$residue.summary"
+}
+no_effect_case tree-effect 7 no_effect_tree_effect
+no_effect_case no-tree-effect 8 no_effect_no_tree_effect
+no_effect_case unverified-base 7 no_effect_unverified_base
+no_effect_case missing-oids 7 no_effect_missing_oids
+no_effect_case unknown-verdict 7 no_effect_unknown_verdict
+no_effect_case moved-head 7 no_effect_moved_oids
+set +e
+env -i PATH="/usr/bin:/bin" HOME="$HOME" "$skill/scripts/no-effect.sh" 7 \
+  > "$root/no_effect_missing_bin.out" 2> "$root/no_effect_missing_bin.err"
+no_effect_missing_bin_exit=$?
+set -e
+printf 'exit=%s out=<%s>\n' "$no_effect_missing_bin_exit" \
+  "$(tr -d '\n' < "$root/no_effect_missing_bin.out")" \
+  > "$root/no_effect_missing_bin.summary"
 
 # 3. Check classification exits 0/1/2 for pass/fail/pending.
 set +e
