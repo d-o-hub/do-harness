@@ -3,6 +3,7 @@
 use serde::{Deserialize, Serialize};
 
 use super::CodecovSummary;
+use super::authorization::Authorization;
 use crate::pr::checks::{CheckBlocker, CheckEntry};
 
 fn default_true() -> bool {
@@ -24,7 +25,21 @@ pub struct ReadinessReport {
     pub codecov: Option<CodecovSummary>,
     #[serde(default)]
     pub findings: FindingsSummary,
+    /// The merge authorizing object; `ready` mirrors it.
+    #[serde(default = "default_authorization")]
+    pub authorization: Authorization,
     pub blockers: Vec<String>,
+}
+
+/// A report parsed without an authorization block (older artifacts) must not
+/// read as allowed, so the default is `UNKNOWN`.
+fn default_authorization() -> Authorization {
+    Authorization {
+        schema_version: 1,
+        decision: super::AuthorizationDecision::Unknown,
+        reasons: Vec::new(),
+        receipt: None,
+    }
 }
 
 /// Counts from the findings provenance evaluation (#470).
@@ -123,6 +138,9 @@ pub struct ConversationSummary {
     pub items_count: usize,
     #[serde(default)]
     pub needs_triage: Vec<crate::pr::conversations::NeedsTriageItem>,
+    /// Submitted reviews currently requesting changes.
+    #[serde(default)]
+    pub changes_requested_reviews: usize,
     #[serde(default = "default_true")]
     pub complete: bool,
 }

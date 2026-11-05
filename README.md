@@ -221,7 +221,7 @@ export PATH="$HOME/.local/bin:$PATH"
 | `status [OPTIONS]` | Report verification evidence freshness without running sensors — flags: `--set <SET>`, `--evidence <FILE>`, `--format <FORMAT>` |
 | `pr no-effect [OPTIONS] [PR]` | Report the prospective merge impact of a PR or revision range — flags: `--base <REV>`, `--head <REV>`, `--format <FORMAT>` |
 | `pr review [OPTIONS] [PR]` | Emit the semantic residual: changed units evidence could not prove — flags: `--base <REV>`, `--head <REV>`, `--recompute`, `--view <VIEW>`, `--format <FORMAT>` |
-| `pr ready [OPTIONS] <PR>` | Check whether a pull request is ready to merge: merge state, CI checks, and review conversations (aliases: `readiness`, `check`) — flags: `--format <FORMAT>` |
+| `pr ready [OPTIONS] <PR>` | Check whether a pull request is ready to merge: merge state, CI checks, and review conversations (aliases: `readiness`, `check`) — flags: `--expected-receipt <FILE>`, `--format <FORMAT>` |
 | `pr checks [OPTIONS] <PR>` | Classify a pull request's CI checks and commit statuses; fail closed on unknown — flags: `--format <FORMAT>` |
 | `pr waivers [OPTIONS] --lcov <PATH> [PR]` | Classify patch-coverage residue: waivable classes and lines needing tests — flags: `--base <REV>`, `--head <REV>`, `--patch <PATH>`, `--lcov <PATH>`, `--since <PATH>`, `--strip-prefix <PREFIX>`, `--format <FORMAT>` |
 | `pr disposition [OPTIONS] --decision <DECISION> --head <HEAD> --reason <REASON> <PR> <ITEM_REF>` | Record a structured disposition for a review, thread, comment, or finding — flags: `--decision <DECISION>`, `--head <HEAD>`, `--reason <REASON>`, `--evidence <EVIDENCE>`, `--format <FORMAT>` |

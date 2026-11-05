@@ -157,69 +157,103 @@ set -e
 printf 'armed_exit=%s\n' "$auto_merge_armed_exit" > "$root/auto_merge_summary.txt"
 unset FAKE_GH_AUTO_MERGE FAKE_GH_AUTO_MERGE_LOG
 
-# 5e. Pre-merge stop: a draft, a hold label and a closed PR each refuse the
-# merge (exit 1), a clean open PR passes (exit 0), and unusable API output fails
-# closed (exit 2) instead of reading as mergeable.
-export FAKE_GH_PR_DRAFT=true
-set +e
-"$skill/scripts/premerge.sh" 9 > "$root/premerge_draft.out" 2>&1
-premerge_draft_exit=$?
-set -e
-export FAKE_GH_PR_DRAFT=false
-export FAKE_GH_PR_LABELS='[{"name":"hold"}]'
-set +e
-"$skill/scripts/premerge.sh" 9 > "$root/premerge_hold.out" 2>&1
-premerge_hold_exit=$?
-set -e
-export FAKE_GH_PR_LABELS='[]'
-export FAKE_GH_PR_STATE=CLOSED
-set +e
-"$skill/scripts/premerge.sh" 9 > "$root/premerge_closed.out" 2>&1
-premerge_closed_exit=$?
-set -e
-export FAKE_GH_PR_STATE=OPEN
-set +e
-"$skill/scripts/premerge.sh" 9 > "$root/premerge_ok.out" 2>&1
-premerge_ok_exit=$?
-export FAKE_GH_CHECKS=empty
-set +e
-"$skill/scripts/premerge.sh" 9 > "$root/premerge_unknown_ci.out" 2>&1
-premerge_unknown_ci_exit=$?
-set -e
-unset FAKE_GH_CHECKS
-unset FAKE_GH_PR_DRAFT FAKE_GH_PR_LABELS FAKE_GH_PR_STATE
-# A response without the draft field is not a "no": the fail-closed branch is
-# exercised by swapping the fake for a stub that omits the field.
-cp "$root/bin/gh" "$root/bin/gh.real"
-cat > "$root/bin/gh" <<'BARE'
+# 5e. Merge boundary: `merge.sh PR REPORT` consumes the typed authorization
+# receipt. A fake `do-harness` emits the report, so each branch is exercised
+# hermetically; the merge itself is recorded, never performed.
+mkdir -p "$root/fake-bin"
+cat > "$root/fake-bin/do-harness" <<'FAKE_DH'
 #!/usr/bin/env bash
-printf '{"number":9,"baseRefName":"main"}\n'
-BARE
-chmod +x "$root/bin/gh"
+printf '%s\n' "$*" >> "${FAKE_DH_LOG:?}"
+cat "${FAKE_DH_REPORT:?}"
+exit "${FAKE_DH_EXIT:-0}"
+FAKE_DH
+chmod +x "$root/fake-bin/do-harness"
+
+write_report() { # $1=path $2=decision $3=head
+  head="${3:-$(git -C "$repo" rev-parse refs/pull/9/head)}"
+  jq -n --arg decision "$2" --arg head "$head" '
+    {schema_version: 1, collectionComplete: true, ready: ($decision == "MERGE_ALLOWED"),
+     merge_state: {status: "CLEAN", mergeable: "MERGEABLE", auto_merge: false},
+     checks: {total: 1, passed: 1, failed: [], cancelled: [], pending: [], skipped: 0,
+              incomplete: false, verdict: "PASS", headSha: $head, unknown: [], entries: [], blockers: []},
+     conversations: {unresolved_threads: [], actionable_comments: [], needs_triage: [], complete: true},
+     codecov: null, findings: {total: 0},
+     blockers: [],
+     authorization: {schema_version: 1, decision: $decision, reasons: [{code: "test", message: "fixture"}],
+       receipt: (if $decision == "MERGE_ALLOWED" then
+         {schema_version: 1, pr: 9, issued_at_unix: 0, expires_at_unix: 0, snapshot_sha256: "x",
+          base_ref_name: "main", base_ref_oid: "1111111111111111111111111111111111111111",
+          head_ref_name: "feature", head_ref_oid: $head, state: "OPEN", is_draft: false, labels: [],
+          mergeable: "MERGEABLE", merge_state_status: "CLEAN", auto_merge: false, review_decision: null,
+          checks_sha256: "x", conversations_sha256: "x", findings_sha256: "x", policy_revision: "x",
+          ancestry: "ahead", ancestry_base_commit: "1111111111111111111111111111111111111111",
+          ancestry_merge_base: "1111111111111111111111111111111111111111"}
+       else null end)}}' > "$1"
+}
+
+real_dh="${DO_HARNESS_BIN:-}"
+export DO_HARNESS_BIN="$root/fake-bin/do-harness"
+export FAKE_DH_LOG="$root/merge_calls.log"
+: > "$FAKE_DH_LOG"
+export FAKE_GH_MERGE_LOG="$root/merge_gh.log"
+: > "$FAKE_GH_MERGE_LOG"
+
+blocked_case() { # $1=name $2=decision
+  write_report "$root/receipt_$1.json" "$2"
+  export FAKE_DH_REPORT="$root/receipt_$1.json"
+  set +e
+  "$skill/scripts/merge.sh" 9 "$root/receipt_$1.json" > "$root/merge_$1.out" 2>&1
+  eval "merge_${1}_exit=$?"
+  set -e
+}
+
+blocked_case draft BLOCKED
+blocked_case hold BLOCKED
+blocked_case closed BLOCKED
+blocked_case unmergeable BLOCKED
+blocked_case behind BLOCKED
+
+# Unjudgeable: the binary exits 2, and a malformed report is rejected locally.
+write_report "$root/receipt_unknown.json" UNKNOWN
+export FAKE_DH_REPORT="$root/receipt_unknown.json"
+export FAKE_DH_EXIT=2
 set +e
-"$skill/scripts/premerge.sh" 9 > "$root/premerge_missing.out" 2>&1
-premerge_missing_exit=$?
+"$skill/scripts/merge.sh" 9 "$root/receipt_unknown.json" > "$root/merge_missing_field.out" 2>&1
+merge_missing_field_exit=$?
 set -e
-cp "$root/bin/gh.real" "$root/bin/gh"
-chmod +x "$root/bin/gh"
-rm -f "$root/bin/gh.real"
-export FAKE_GH_PR_MERGEABLE=UNKNOWN
-export FAKE_GH_PR_MERGE_STATE=UNKNOWN
+unset FAKE_DH_EXIT
+
+printf 'not a report
+' > "$root/receipt_malformed.json"
+export FAKE_DH_REPORT="$root/receipt_malformed.json"
 set +e
-"$skill/scripts/premerge.sh" 9 > "$root/premerge_unmergeable.out" 2>&1
-premerge_unmergeable_exit=$?
+"$skill/scripts/merge.sh" 9 "$root/receipt_malformed.json" > "$root/merge_malformed.out" 2>&1
+merge_malformed_exit=$?
 set -e
-export FAKE_GH_PR_MERGEABLE=MERGEABLE
-export FAKE_GH_PR_MERGE_STATE=BEHIND
+
+# No binary at all is exit 3, never a merge.
 set +e
-"$skill/scripts/premerge.sh" 9 > "$root/premerge_behind.out" 2>&1
-premerge_behind_exit=$?
+DO_HARNESS_BIN=/nonexistent/do-harness PATH=/usr/bin:/bin \
+  "$skill/scripts/merge.sh" 9 "$root/receipt_draft.json" > "$root/merge_nobin.out" 2>&1
+merge_nobin_exit=$?
 set -e
-unset FAKE_GH_PR_MERGEABLE FAKE_GH_PR_MERGE_STATE
-printf 'draft_exit=%s\nhold_exit=%s\nclosed_exit=%s\nok_exit=%s\nunknown_ci_exit=%s\nmissing_field_exit=%s\nunmergeable_exit=%s\nbehind_exit=%s\n' \
-  "$premerge_draft_exit" "$premerge_hold_exit" "$premerge_closed_exit" \
-  "$premerge_ok_exit" "$premerge_unknown_ci_exit" "$premerge_missing_exit" "$premerge_unmergeable_exit" \
-  "$premerge_behind_exit" > "$root/premerge_summary.txt"
+
+# The valid case is the only one that issues the pinned merge.
+write_report "$root/receipt_ok.json" MERGE_ALLOWED
+export FAKE_DH_REPORT="$root/receipt_ok.json"
+set +e
+"$skill/scripts/merge.sh" 9 "$root/receipt_ok.json" > "$root/merge_ok.out" 2>&1
+merge_ok_exit=$?
+set -e
+
+printf 'draft_exit=%s\nhold_exit=%s\nclosed_exit=%s\nunmergeable_exit=%s\nbehind_exit=%s\nmissing_field_exit=%s\nmalformed_exit=%s\nnobin_exit=%s\nok_exit=%s\n' \
+  "$merge_draft_exit" "$merge_hold_exit" "$merge_closed_exit" "$merge_unmergeable_exit" \
+  "$merge_behind_exit" "$merge_missing_field_exit" "$merge_malformed_exit" "$merge_nobin_exit" \
+  "$merge_ok_exit" > "$root/merge_summary.txt"
+printf 'gh_merge_calls=%s\n' "$(grep -c 'pr merge' "$FAKE_GH_MERGE_LOG" || true)" >> "$root/merge_summary.txt"
+printf 'pinned=%s\n' "$(grep -o -- '--match-head-commit [0-9a-f]*' "$FAKE_GH_MERGE_LOG" | head -1 || true)" >> "$root/merge_summary.txt"
+unset FAKE_DH_REPORT FAKE_DH_LOG
+export DO_HARNESS_BIN="$real_dh"
 
 # 5f. Webhook fast path: a real receiver answers /health, persists signed
 # deliveries (rejecting unsigned ones), wakes long-polls, and drives the wait

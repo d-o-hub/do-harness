@@ -246,6 +246,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand --version 'Print version'
         }
         &'do-harness;pr;ready'= {
+            cand --expected-receipt 'Re-validate a previously issued authorization receipt (the full `pr ready --format json` report file). The snapshot is recomputed'
             cand --format 'Output format'
             cand --root 'Workspace root override (default: walk up from cwd)'
             cand --config 'Explicit path to do-harness.toml'
@@ -259,6 +260,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand --version 'Print version'
         }
         &'do-harness;pr;readiness'= {
+            cand --expected-receipt 'Re-validate a previously issued authorization receipt (the full `pr ready --format json` report file). The snapshot is recomputed'
             cand --format 'Output format'
             cand --root 'Workspace root override (default: walk up from cwd)'
             cand --config 'Explicit path to do-harness.toml'
@@ -272,6 +274,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand --version 'Print version'
         }
         &'do-harness;pr;check'= {
+            cand --expected-receipt 'Re-validate a previously issued authorization receipt (the full `pr ready --format json` report file). The snapshot is recomputed'
             cand --format 'Output format'
             cand --root 'Workspace root override (default: walk up from cwd)'
             cand --config 'Explicit path to do-harness.toml'

@@ -91,6 +91,8 @@ pub struct PrReadinessView {
     pub base_ref_name: String,
     #[serde(rename = "baseRefOid", default)]
     pub base_ref_oid: String,
+    #[serde(rename = "headRefName", default)]
+    pub head_ref_name: String,
     #[serde(rename = "headRefOid", default)]
     pub head_ref_oid: String,
     #[serde(rename = "mergeStateStatus", default)]
@@ -101,6 +103,30 @@ pub struct PrReadinessView {
     pub auto_merge_request: Option<serde_json::Value>,
     #[serde(rename = "reviewDecision", default)]
     pub review_decision: Option<String>,
+    /// `OPEN`, `CLOSED` or `MERGED`.
+    #[serde(default)]
+    pub state: String,
+    #[serde(rename = "isDraft", default)]
+    pub is_draft: bool,
+    #[serde(default)]
+    pub labels: Vec<PrLabel>,
+    #[serde(rename = "headRepository", default)]
+    pub head_repository: Option<PrRepositoryRef>,
+}
+
+/// One label on a pull request.
+#[derive(Debug, Clone, Deserialize)]
+pub struct PrLabel {
+    #[serde(default)]
+    pub name: String,
+}
+
+/// Repository identity for a PR head.
+#[derive(Debug, Clone, Deserialize)]
+#[allow(dead_code)]
+pub struct PrRepositoryRef {
+    #[serde(rename = "nameWithOwner", default)]
+    pub name_with_owner: String,
 }
 
 /// A check run returned by `GitHub`'s check-runs API.
@@ -251,7 +277,7 @@ pub fn readiness_view(root: &Path, number: u64) -> Result<PrReadinessView> {
             "view",
             &number_arg,
             "--json",
-            "number,baseRefName,baseRefOid,headRefOid,mergeStateStatus,mergeable,autoMergeRequest,reviewDecision",
+            "number,baseRefName,baseRefOid,headRefName,headRefOid,mergeStateStatus,mergeable,autoMergeRequest,reviewDecision,state,isDraft,labels,headRepository",
         ],
         &format!("pr view {number}"),
     )
