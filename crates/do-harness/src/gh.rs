@@ -49,3 +49,22 @@ pub fn json<T: serde::de::DeserializeOwned>(root: &Path, args: &[&str], what: &s
     let output = output(root, args, what)?;
     serde_json::from_slice(&output.stdout).with_context(|| format!("unexpected gh {what} JSON"))
 }
+
+/// Runs `gh` with `args`, returning the captured output and its stderr even
+/// when the command exits non-zero.
+///
+/// The caller inspects [`Output::status`] and the stderr text to distinguish
+/// HTTP failures (e.g. `403`/`422`) from other errors, so per-command retry
+/// policy stays with the command rather than the transport.
+///
+/// # Errors
+///
+/// Returns an error only when `gh` cannot be spawned.
+pub fn try_output(root: &Path, args: &[&str], what: &str) -> Result<(Output, String)> {
+    let output = command(root)
+        .args(args)
+        .output()
+        .with_context(|| format!("failed to run gh {what} (is the GitHub CLI installed?)"))?;
+    let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
+    Ok((output, stderr))
+}
