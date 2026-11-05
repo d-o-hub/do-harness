@@ -198,20 +198,19 @@ export FAKE_DH_LOG="$root/merge_calls.log"
 export FAKE_GH_MERGE_LOG="$root/merge_gh.log"
 : > "$FAKE_GH_MERGE_LOG"
 
+declare -A merge_exit=()
 blocked_case() { # $1=name $2=decision
   write_report "$root/receipt_$1.json" "$2"
   export FAKE_DH_REPORT="$root/receipt_$1.json"
   set +e
   "$skill/scripts/merge.sh" 9 "$root/receipt_$1.json" > "$root/merge_$1.out" 2>&1
-  eval "merge_${1}_exit=$?"
+  merge_exit[$1]=$?
   set -e
 }
 
-blocked_case draft BLOCKED
-blocked_case hold BLOCKED
-blocked_case closed BLOCKED
-blocked_case unmergeable BLOCKED
-blocked_case behind BLOCKED
+for blocked_name in draft hold closed unmergeable behind; do
+  blocked_case "$blocked_name" BLOCKED
+done
 
 # Unjudgeable: the binary exits 2, and a malformed report is rejected locally.
 write_report "$root/receipt_unknown.json" UNKNOWN
@@ -247,8 +246,9 @@ merge_ok_exit=$?
 set -e
 
 printf 'draft_exit=%s\nhold_exit=%s\nclosed_exit=%s\nunmergeable_exit=%s\nbehind_exit=%s\nmissing_field_exit=%s\nmalformed_exit=%s\nnobin_exit=%s\nok_exit=%s\n' \
-  "$merge_draft_exit" "$merge_hold_exit" "$merge_closed_exit" "$merge_unmergeable_exit" \
-  "$merge_behind_exit" "$merge_missing_field_exit" "$merge_malformed_exit" "$merge_nobin_exit" \
+  "${merge_exit[draft]}" "${merge_exit[hold]}" "${merge_exit[closed]}" \
+  "${merge_exit[unmergeable]}" "${merge_exit[behind]}" \
+  "$merge_missing_field_exit" "$merge_malformed_exit" "$merge_nobin_exit" \
   "$merge_ok_exit" > "$root/merge_summary.txt"
 printf 'gh_merge_calls=%s\n' "$(grep -c 'pr merge' "$FAKE_GH_MERGE_LOG" || true)" >> "$root/merge_summary.txt"
 printf 'pinned=%s\n' "$(grep -o -- '--match-head-commit [0-9a-f]*' "$FAKE_GH_MERGE_LOG" | head -1 || true)" >> "$root/merge_summary.txt"
