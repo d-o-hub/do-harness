@@ -436,7 +436,7 @@ pub fn install_panic_hook() {
         );
         let backtrace = std::backtrace::Backtrace::force_capture();
         let error_text = format!("panic at {location}: {message}\n\n{backtrace}");
-        let argv: Vec<String> = std::env::args().collect();
+        let argv = diag::argv();
         let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             file_failure(
                 None,

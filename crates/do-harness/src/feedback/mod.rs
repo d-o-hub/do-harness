@@ -32,7 +32,7 @@ fn run_report(root: &Path, request: ReportRequest) -> Result<()> {
         None => String::new(),
     };
     let kind = if request.warning { "warning" } else { "error" };
-    let argv: Vec<String> = std::env::args().collect();
+    let argv = crate::diag::argv();
     let result = report::file_explicit(
         root,
         request.repo.as_deref(),
