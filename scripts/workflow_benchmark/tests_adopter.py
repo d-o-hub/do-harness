@@ -5,7 +5,6 @@ import json
 import os
 from pathlib import Path
 import shutil
-import sys
 import tempfile
 import unittest
 
@@ -15,7 +14,6 @@ from . import adopter
 
 def _graded(case_id, overlay):
     """Copy the rust fixture, apply one overlay dict, run the trusted grader."""
-    import subprocess
     from .grade import grade
     with tempfile.TemporaryDirectory(prefix="adopter-grader-") as directory:
         root = Path(directory)

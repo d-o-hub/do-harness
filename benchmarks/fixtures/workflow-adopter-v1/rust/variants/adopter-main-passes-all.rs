@@ -10,6 +10,9 @@ mod summary;
 use std::process::ExitCode;
 
 fn main() -> ExitCode {
+    // This fixture CLI reads only local log paths from the pinned corpus
+    // commands; argv is never spliced into a shell or a security operation.
+    // nosemgrep: rust.lang.security.args.args
     let options = match cli::Options::parse(std::env::args().skip(1)) {
         Ok(options) => options,
         Err(message) => {

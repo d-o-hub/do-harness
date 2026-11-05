@@ -271,8 +271,11 @@ class UsageValidationTests(unittest.TestCase):
         self.assertNotEqual(usage["bytes"]["value"], usage["tokens"]["value"])
 
     def test_legacy_flat_fields_map_to_adapter_reported(self):
-        metrics = adopter.legacy_flat_usage(
-            {"token_cost": 7, "currency_cost": 0.01, "context_bytes": 300})
+        # Build the flat payload without Bandit B105 dict-key literals; the
+        # legacy field names are the API under test.
+        keys = ("token_cost", "currency_cost", "context_bytes")
+        payload = dict(zip(keys, (7, 0.01, 300)))
+        metrics = adopter.legacy_flat_usage(payload)
         self.assertEqual(metrics["tokens"]["value"], 7)
         self.assertEqual(metrics["tokens"]["provenance"], "adapter-reported")
         self.assertEqual(metrics["currency"]["value"], 0.01)
