@@ -46,6 +46,9 @@ ALLOWED=(
   # Provenance note in a module doc comment: names where the waiver classes were
   # measured. The string is never emitted and never stands in for a repository.
   "crates/do-harness/src/pr/waivers.rs"
+  # The tool's own issue tracker is its identity surface: a CLI defect is filed
+  # here, and `DO_HARNESS_REPO` overrides the default.
+  "crates/do-harness/src/feedback/report.rs"
   # Self-test fixture changelogs: synthetic pull-request bullets for the
   # composer, not an assumption about the caller's repository.
   "scripts/release-notes.sh"

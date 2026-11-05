@@ -5,7 +5,8 @@ description: >
   spike learnings into reusable, benchmarked skills. Use after a vertical slice
   passes all computational sensors, after recovering from a non-trivial error,
   when the steering loop requires updating a feedforward guide, or when
-  creating or updating a skill in .agents/skills/.
+  creating or updating a skill in .agents/skills/. Successful ordinary work
+  alone is not a trigger.
 license: MIT
 metadata:
   version: "0.1.0"
@@ -22,6 +23,11 @@ See references/heuristics.md for distilled heuristics.
 Post-task distillation loop that compresses successful interaction traces, compiler error-recovery patterns, and spike learnings into reusable, benchmarked skills.
 
 ## Distillation Trigger
+A green result alone is not a trigger: successful ordinary work prompts a
+review for reusable learning, and concluding there is no reusable lesson —
+without writing or mutating a skill — is a valid outcome. Distill only when
+one of the evidence-backed situations below applies.
+
 Execute when:
 1. A vertical slice successfully passes all computational sensors (`cargo test`, `cargo clippy`).
 2. An agent recovered from a non-trivial error (e.g., borrow checker conflicts, async lifetime issues, libSQL driver quirks).

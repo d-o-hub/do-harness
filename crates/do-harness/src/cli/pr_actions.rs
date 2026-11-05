@@ -115,6 +115,18 @@ pub enum PrAction {
         #[arg(long, value_enum, default_value_t = Format::Text)]
         format: Format,
     },
+    /// Collect and classify findings (annotations, code scanning, artifacts) and track issues.
+    Findings {
+        /// Pull request number.
+        #[arg(value_name = "PR")]
+        pr: u64,
+        /// Issue creation mode: `plan` (preview only) or `create`.
+        #[arg(long, value_enum, default_value_t = crate::pr::findings::IssuesMode::Plan)]
+        issues: crate::pr::findings::IssuesMode,
+        /// Output format.
+        #[arg(long, value_enum, default_value_t = Format::Json)]
+        format: Format,
+    },
     /// Direct PR number invocation (e.g. `do-harness pr 240`).
     #[command(external_subcommand)]
     External(Vec<String>),

@@ -210,6 +210,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand checks 'Classify a pull request''s CI checks and commit statuses; fail closed on unknown'
             cand waivers 'Classify patch-coverage residue: waivable classes and lines needing tests'
             cand disposition 'Record a structured disposition for a review, thread, comment, or finding'
+            cand findings 'Collect and classify findings (annotations, code scanning, artifacts) and track issues'
             cand help 'Print this message or the help of the given subcommand(s)'
         }
         &'do-harness;pr;no-effect'= {
@@ -332,6 +333,20 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand -V 'Print version'
             cand --version 'Print version'
         }
+        &'do-harness;pr;findings'= {
+            cand --issues 'Issue creation mode: `plan` (preview only) or `create`'
+            cand --format 'Output format'
+            cand --root 'Workspace root override (default: walk up from cwd)'
+            cand --config 'Explicit path to do-harness.toml'
+            cand --output 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)'
+            cand -q 'Suppress PASS/WARN verdict lines and the success footer'
+            cand --quiet 'Suppress PASS/WARN verdict lines and the success footer'
+            cand --dry-run 'Dry run without side effects'
+            cand -h 'Print help (see more with ''--help'')'
+            cand --help 'Print help (see more with ''--help'')'
+            cand -V 'Print version'
+            cand --version 'Print version'
+        }
         &'do-harness;pr;help'= {
             cand no-effect 'Report the prospective merge impact of a PR or revision range'
             cand review 'Emit the semantic residual: changed units evidence could not prove'
@@ -339,6 +354,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand checks 'Classify a pull request''s CI checks and commit statuses; fail closed on unknown'
             cand waivers 'Classify patch-coverage residue: waivable classes and lines needing tests'
             cand disposition 'Record a structured disposition for a review, thread, comment, or finding'
+            cand findings 'Collect and classify findings (annotations, code scanning, artifacts) and track issues'
             cand help 'Print this message or the help of the given subcommand(s)'
         }
         &'do-harness;pr;help;no-effect'= {
@@ -352,6 +368,8 @@ set edit:completion:arg-completer[do-harness] = {|@words|
         &'do-harness;pr;help;waivers'= {
         }
         &'do-harness;pr;help;disposition'= {
+        }
+        &'do-harness;pr;help;findings'= {
         }
         &'do-harness;pr;help;help'= {
         }
@@ -1192,6 +1210,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand draft 'Generate a local feedback draft from recurring or severe failure evidence'
             cand submit 'Explicitly submit a feedback draft'
             cand auto 'Fully automated end-to-end feedback generation, deduplication, and submission'
+            cand report 'File a defect report against the tool''s own repository'
             cand help 'Print this message or the help of the given subcommand(s)'
         }
         &'do-harness;feedback;draft'= {
@@ -1242,10 +1261,29 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand -V 'Print version'
             cand --version 'Print version'
         }
+        &'do-harness;feedback;report'= {
+            cand --repo 'Target repository override (default: the tool''s own repository)'
+            cand --error 'Failure message to report'
+            cand --log 'Log file whose tail is attached to the report'
+            cand --format 'Output format'
+            cand --root 'Workspace root override (default: walk up from cwd)'
+            cand --config 'Explicit path to do-harness.toml'
+            cand --output 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)'
+            cand --warning 'Classify the report as a warning rather than an error'
+            cand --yes 'Skip interactive confirmation (unattended mode)'
+            cand --dry-run 'Perform search and preview without creating an issue'
+            cand -q 'Suppress PASS/WARN verdict lines and the success footer'
+            cand --quiet 'Suppress PASS/WARN verdict lines and the success footer'
+            cand -h 'Print help (see more with ''--help'')'
+            cand --help 'Print help (see more with ''--help'')'
+            cand -V 'Print version'
+            cand --version 'Print version'
+        }
         &'do-harness;feedback;help'= {
             cand draft 'Generate a local feedback draft from recurring or severe failure evidence'
             cand submit 'Explicitly submit a feedback draft'
             cand auto 'Fully automated end-to-end feedback generation, deduplication, and submission'
+            cand report 'File a defect report against the tool''s own repository'
             cand help 'Print this message or the help of the given subcommand(s)'
         }
         &'do-harness;feedback;help;draft'= {
@@ -1253,6 +1291,8 @@ set edit:completion:arg-completer[do-harness] = {|@words|
         &'do-harness;feedback;help;submit'= {
         }
         &'do-harness;feedback;help;auto'= {
+        }
+        &'do-harness;feedback;help;report'= {
         }
         &'do-harness;feedback;help;help'= {
         }
@@ -1306,6 +1346,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand checks 'Classify a pull request''s CI checks and commit statuses; fail closed on unknown'
             cand waivers 'Classify patch-coverage residue: waivable classes and lines needing tests'
             cand disposition 'Record a structured disposition for a review, thread, comment, or finding'
+            cand findings 'Collect and classify findings (annotations, code scanning, artifacts) and track issues'
         }
         &'do-harness;help;pr;no-effect'= {
         }
@@ -1318,6 +1359,8 @@ set edit:completion:arg-completer[do-harness] = {|@words|
         &'do-harness;help;pr;waivers'= {
         }
         &'do-harness;help;pr;disposition'= {
+        }
+        &'do-harness;help;pr;findings'= {
         }
         &'do-harness;help;skills'= {
             cand suggest 'Rank skills by relevance to a query using metadata only'
@@ -1441,12 +1484,15 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand draft 'Generate a local feedback draft from recurring or severe failure evidence'
             cand submit 'Explicitly submit a feedback draft'
             cand auto 'Fully automated end-to-end feedback generation, deduplication, and submission'
+            cand report 'File a defect report against the tool''s own repository'
         }
         &'do-harness;help;feedback;draft'= {
         }
         &'do-harness;help;feedback;submit'= {
         }
         &'do-harness;help;feedback;auto'= {
+        }
+        &'do-harness;help;feedback;report'= {
         }
         &'do-harness;help;help'= {
         }

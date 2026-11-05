@@ -16,6 +16,12 @@ metadata:
 
 ## Purpose
 Design deterministic, type-safe event-sourced slices following Event Modeling paradigms (Commands, Events, Projections) with a hard constraint of 500 LOC per file.
+Apply this skill only when the change introduces or modifies durable domain
+state transitions and projections. Stateless, mechanical, or prose changes do
+not need an event schema; model the behavior directly. Completing a modeled
+slice does not itself require updating this skill — review the outcome for
+reusable learning, and distill only when evidence justifies it (see
+`.agents/skills/skill-distiller`).
 
 ## Schema Guidelines
 

@@ -225,6 +225,7 @@ export PATH="$HOME/.local/bin:$PATH"
 | `pr checks [OPTIONS] <PR>` | Classify a pull request's CI checks and commit statuses; fail closed on unknown — flags: `--format <FORMAT>` |
 | `pr waivers [OPTIONS] --lcov <PATH> [PR]` | Classify patch-coverage residue: waivable classes and lines needing tests — flags: `--base <REV>`, `--head <REV>`, `--patch <PATH>`, `--lcov <PATH>`, `--since <PATH>`, `--strip-prefix <PREFIX>`, `--format <FORMAT>` |
 | `pr disposition [OPTIONS] --decision <DECISION> --head <HEAD> --reason <REASON> <PR> <ITEM_REF>` | Record a structured disposition for a review, thread, comment, or finding — flags: `--decision <DECISION>`, `--head <HEAD>`, `--reason <REASON>`, `--evidence <EVIDENCE>`, `--format <FORMAT>` |
+| `pr findings [OPTIONS] <PR>` | Collect and classify findings (annotations, code scanning, artifacts) and track issues — flags: `--issues <ISSUES>`, `--format <FORMAT>` |
 | `skills suggest [OPTIONS] --query <TEXT>` | Rank skills by relevance to a query using metadata only — flags: `--query <TEXT>`, `--limit <N>`, `--format <FORMAT>` |
 | `skills drift [OPTIONS]` | Check manifest-managed shared skills against their pinned digests — flags: `--manifest <FILE>`, `--format <FORMAT>` |
 | `skills refresh-validator [OPTIONS]` | Replace only the installed skill-creator structure validator |
@@ -270,6 +271,7 @@ export PATH="$HOME/.local/bin:$PATH"
 | `feedback draft [OPTIONS] --repo <OWNER/REPO>` | Generate a local feedback draft from recurring or severe failure evidence — flags: `--repo <OWNER/REPO>`, `--days <DAYS>`, `--min-fires <N>`, `--out <FILE>`, `--format <FORMAT>` |
 | `feedback submit [OPTIONS] --draft <FILE>` | Explicitly submit a feedback draft — flags: `--draft <FILE>`, `--repo <OWNER/REPO>`, `--yes` |
 | `feedback auto [OPTIONS] --repo <OWNER/REPO>` | Fully automated end-to-end feedback generation, deduplication, and submission — flags: `--repo <OWNER/REPO>`, `--days <DAYS>`, `--min-fires <N>`, `--format <FORMAT>` |
+| `feedback report [OPTIONS] --error <TEXT>` | File a defect report against the tool's own repository — flags: `--repo <OWNER/REPO>`, `--error <TEXT>`, `--log <FILE>`, `--warning`, `--yes`, `--format <FORMAT>` |
 
 Global flags: `--root <DIR>`, `--config <FILE>`, `-q, --quiet`, `--output <FILE>`, `--dry-run`.
 <!-- END GENERATED: cli-commands -->
