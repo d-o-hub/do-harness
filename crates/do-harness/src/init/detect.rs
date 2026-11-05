@@ -438,12 +438,12 @@ mod tests {
         write_pkg(dir.path(), SUPPORTED_PKG);
         let detection = inspect(dir.path(), None, None);
         assert_eq!(detection.language, Language::Node);
-        assert!(
-            detection
-                .candidates
-                .iter()
-                .any(|c| c.name == "test" && c.included)
-        );
+        // Detection owns the language resolution and the manifest-derived
+        // candidates: the test signal is proven by the manifest regardless of
+        // tool availability. Inclusion is the probe's call (it depends on a
+        // runnable package manager) and is asserted in init_node_auto.
+        assert_eq!(detection.candidates.len(), 4);
+        assert!(detection.candidates.iter().any(|c| c.name == "test"));
     }
 
     /// A malformed package.json stays Generic and emits a diagnostic.
