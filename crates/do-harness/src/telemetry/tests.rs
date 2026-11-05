@@ -40,6 +40,7 @@ async fn record_verify_persists_beats_and_signatures() {
         &crate::config::rust_default(),
         None,
         &std::collections::BTreeMap::new(),
+        None,
     )
     .await
     .unwrap();
@@ -96,6 +97,7 @@ async fn record_verify_skips_signatures_when_all_pass() {
         &crate::config::rust_default(),
         None,
         &std::collections::BTreeMap::new(),
+        None,
     )
     .await
     .unwrap();
@@ -151,6 +153,7 @@ async fn record_verify_skips_blocked_sensor_signature() {
         &crate::config::rust_default(),
         None,
         &std::collections::BTreeMap::new(),
+        None,
     )
     .await
     .unwrap();
@@ -246,6 +249,7 @@ async fn record_verify_resets_strikes_on_pass() {
         &crate::config::rust_default(),
         None,
         &std::collections::BTreeMap::new(),
+        None,
     )
     .await
     .unwrap();
@@ -321,6 +325,7 @@ async fn record_verify_scopes_to_task() {
         &crate::config::rust_default(),
         None,
         &std::collections::BTreeMap::new(),
+        None,
     )
     .await
     .unwrap();
@@ -388,6 +393,7 @@ async fn record_verify_scopes_to_branch() {
         &crate::config::rust_default(),
         None,
         &std::collections::BTreeMap::new(),
+        None,
     )
     .await
     .unwrap();

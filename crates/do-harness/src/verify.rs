@@ -102,15 +102,18 @@ pub(crate) async fn run(root: &Path, mut opts: VerifyOpts) -> std::result::Resul
         eprintln!("warning: change discovery failed ({error}); selecting every candidate sensor");
     }
 
-    // Compute pre-execution input digests for all selected sensors so mid-run
-    // mutations can be detected for every run, including non---record runs.
+    // Pre-execution input digests detect mid-run input mutations.
     let pre_digests: std::collections::BTreeMap<String, String> =
-        crate::provenance::InputManifest::capture(root, &selection.specs, config_bytes.as_deref())
-            .sensors
-            .into_iter()
-            .filter_map(|(name, digest)| digest.map(|d| (name, d)))
-            .collect();
-
+        crate::provenance::InputManifest::capture(
+            root,
+            &selection.specs,
+            config_bytes.as_deref(),
+            Some(&selection.changes),
+        )
+        .sensors
+        .into_iter()
+        .filter_map(|(name, digest)| digest.map(|d| (name, d)))
+        .collect();
     if opts.record && !opts.dry_run {
         let struck = telemetry::struck_sensors(root, &cfg.sensor_names(), &beat_scope.key())
             .await
@@ -140,17 +143,15 @@ pub(crate) async fn run(root: &Path, mut opts: VerifyOpts) -> std::result::Resul
                 .chain(&opts.quarantined)
                 .cloned()
                 .collect();
-            // Compare pre-execution and post-execution input identities
-            // immediately after the sensors: a change here (source modified by
-            // a sensor or concurrent writer) invalidates the evidence. The
-            // comparison runs before this run's own bookkeeping — beat
-            // recording and a baseline bless — because those are deliberate
-            // harness writes, not input drift, and the blessed baseline file
-            // is itself part of the digest being compared.
+            // Compare pre/post input identities immediately after the sensors:
+            // a change here (source modified by a sensor or concurrent writer)
+            // invalidates the evidence; the blessed baseline file is itself
+            // part of the digest being compared.
             let post = crate::provenance::InputManifest::capture(
                 root,
                 &selection.specs,
                 config_bytes.as_deref(),
+                Some(&selection.changes),
             );
             let invalidated_reason = selection
                 .specs
@@ -173,6 +174,7 @@ pub(crate) async fn run(root: &Path, mut opts: VerifyOpts) -> std::result::Resul
                     &cfg,
                     config_bytes.as_deref(),
                     &opts.pre_digests,
+                    Some(&selection.changes),
                 )
                 .await
                 .map_err(CliError::Usage)?;
@@ -440,8 +442,11 @@ fn write_evidence(
         selected: &selected,
         fingerprints,
         changed: opts.changed,
-        selection: (selection.changes.mode != crate::changes::SelectionMode::All)
-            .then(|| evidence::EvidenceSelection::from_changes(&selection.changes)),
+        changes: (selection.changes.mode != crate::changes::SelectionMode::All)
+            .then_some(&selection.changes),
+        selection: (selection.changes.mode != crate::changes::SelectionMode::All).then(|| {
+            evidence::EvidenceSelection::from_changes(&selection.changes, &selection.selected)
+        }),
         skipped,
         task: opts.task,
         record: opts.record,

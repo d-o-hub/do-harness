@@ -579,6 +579,32 @@ jobs:
           node --check integrations/npm/lib/platform.js
           node --test integrations/npm/test/*.test.mjs
 
+  selection-portability:
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      # actions/checkout@v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          # No push/fetch credentials persisted: this workflow never pushes.
+          persist-credentials: false
+      - name: Resolve pinned toolchain
+        id: toolchain
+        shell: bash
+        run: |
+          channel="$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)"
+          echo "channel=$channel" >> "$GITHUB_OUTPUT"
+      # dtolnay/rust-toolchain@master (SHA within master history per action docs)
+      - uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de
+        with:
+          toolchain: ${{ steps.toolchain.outputs.channel }}
+      # Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
+        with:
+          key: selection-portability
+      - name: Run committed-range selection acceptance
+        run: cargo test --locked -p do-harness --test changes_since --test changes_since_selection
+
   pr-required:
     name: pr-required
     runs-on: ubuntu-latest
@@ -590,6 +616,7 @@ jobs:
       - msrv
       - windows-tests
       - windows
+      - selection-portability
     steps:
       - name: Verify all required dependencies succeeded
         shell: bash
@@ -599,13 +626,15 @@ jobs:
           MSRV_RESULT: ${{ needs.msrv.result }}
           WINDOWS_TESTS_RESULT: ${{ needs.windows-tests.result }}
           WINDOWS_RESULT: ${{ needs.windows.result }}
+          SELECTION_PORTABILITY_RESULT: ${{ needs.selection-portability.result }}
         run: |
           for name in \
             "source-distribution:$SOURCE_DISTRIBUTION_RESULT" \
             "verify:$VERIFY_RESULT" \
             "msrv:$MSRV_RESULT" \
             "windows-tests:$WINDOWS_TESTS_RESULT" \
-            "windows:$WINDOWS_RESULT"
+            "windows:$WINDOWS_RESULT" \
+            "selection-portability:$SELECTION_PORTABILITY_RESULT"
           do
             job="${name%%:*}"
             res="${name#*:}"

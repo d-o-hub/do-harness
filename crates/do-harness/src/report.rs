@@ -176,6 +176,8 @@ pub struct SelectionReport {
     /// Why discovery failed closed, when it did.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub discovery_error: Option<String>,
+    /// Sensors selected by applicability, with reasons.
+    pub selected: Vec<crate::applicability::Selected>,
     /// Sensors skipped by applicability, with reasons.
     pub skipped: Vec<crate::applicability::Skipped>,
 }
@@ -185,6 +187,7 @@ impl SelectionReport {
     #[must_use]
     pub fn from_changes(
         changes: &crate::changes::ChangeSelection,
+        selected: &[crate::applicability::Selected],
         skipped: &[crate::applicability::Skipped],
     ) -> Self {
         let range = changes.range.as_ref();
@@ -196,6 +199,7 @@ impl SelectionReport {
             merge_base_sha: range.map(|r| r.merge_base_sha.clone()),
             changed_files: changes.paths().iter().map(ToString::to_string).collect(),
             discovery_error: changes.changed.discovery_error.clone(),
+            selected: selected.to_vec(),
             skipped: skipped.to_vec(),
         }
     }

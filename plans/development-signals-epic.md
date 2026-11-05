@@ -90,6 +90,18 @@ signals a first-class, runtime-neutral completion contract.
   `--ignore-filename-regex` for tests plus a PR/scheduled coverage run and a
   minimum-test-count guard. See `plans/analysis-followups.md` (T1/T2/T7).
 
+- Committed-range selection benchmark (2026-11-05, #441): `scripts/benchmark-selection-range.py`
+  times read-only `explain --set all` with and without `--since origin/main`
+  (median of 5) on two synthetic fixtures it creates (Rust `Cargo.toml` +
+  `src/main.rs`; Node `package.json` + `index.js`; both with a bare
+  `origin/main` and a committed change), then runs one real verify pair.
+  Observed: rust-fixture explain 0.0203 s with `--since` vs 0.0048 s
+  without (selected/total 1/2 vs 2/2); node-fixture 0.0299 s vs 0.0071 s
+  (1/2 vs 2/2). Verify with `--since` executed 1 sensor, unfiltered 2
+  (0 reused/0 skipped; no recorded beats). Observation only — no timing
+  improvement is claimed; the range path resolves refs and diffs, so its raw
+  wall time is higher than unfiltered selection.
+
 ## Non-goals
 
 - No DeepSeek-specific logic in the Rust core.

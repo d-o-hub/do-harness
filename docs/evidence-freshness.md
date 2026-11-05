@@ -1,10 +1,13 @@
 # Canonical evidence freshness
 
 Evidence schema v5 adds `input_manifest`, identified by
-`sha256-canonical-inputs-v1`. Verify, status, input reuse and task transitions
+`sha256-canonical-inputs-v2`. Verify, status, input reuse and task transitions
 share the identity. Manifests name selected sensors, declarations, digests,
-revision and branch. The envelope retains results, signal set, timestamps,
-harness build identity and artifacts. Unknown provenance is never fresh.
+revision and branch. A resolved `--since` selection (mode, requested ref, and
+base/head/merge-base OIDs) is part of every per-sensor identity, so a passing
+beat recorded under a different range is never reused. The envelope retains
+results, signal set, timestamps, harness build identity and artifacts. Unknown
+provenance is never fresh.
 
 Canonical inputs include source content and mode from the index and
 nonignored untracked files (or explicit sensor `inputs`/`coverage-inputs`),

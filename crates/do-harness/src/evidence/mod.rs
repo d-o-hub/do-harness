@@ -56,12 +56,19 @@ pub struct EvidenceSelection {
     /// Why discovery failed closed, when it did.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub discovery_error: Option<String>,
+    /// Sensors selected by applicability, with reasons; empty when the
+    /// artifact predates reason recording.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub selected: Vec<crate::applicability::Selected>,
 }
 
 impl EvidenceSelection {
     /// Builds the recorded selection from a resolved change selection.
     #[must_use]
-    pub fn from_changes(changes: &crate::changes::ChangeSelection) -> Self {
+    pub fn from_changes(
+        changes: &crate::changes::ChangeSelection,
+        selected: &[crate::applicability::Selected],
+    ) -> Self {
         let range = changes.range.as_ref();
         Self {
             mode: changes.mode.as_str().to_owned(),
@@ -71,6 +78,7 @@ impl EvidenceSelection {
             merge_base_sha: range.map(|r| r.merge_base_sha.clone()),
             changed_files: changes.paths().iter().map(ToString::to_string).collect(),
             discovery_error: changes.changed.discovery_error.clone(),
+            selected: selected.to_vec(),
         }
     }
 }
@@ -341,6 +349,7 @@ impl EvidenceDocument {
                 meta.root,
                 &selected_specs,
                 meta.config_bytes,
+                meta.changes,
             )),
             tool: "do-harness".to_owned(),
             harness_version: env!("CARGO_PKG_VERSION").to_owned(),
@@ -393,6 +402,8 @@ pub struct RunMeta<'a> {
     pub changed: bool,
     /// Change-aware selection input and resolved revisions, when filtered.
     pub selection: Option<EvidenceSelection>,
+    /// The resolved change selection behind the input manifest, when filtered.
+    pub changes: Option<&'a crate::changes::ChangeSelection>,
     /// Sensors skipped by change-aware selection, with reasons.
     pub skipped: Vec<EvidenceSkipped>,
     /// Task id scoping persisted beats, when recording.
