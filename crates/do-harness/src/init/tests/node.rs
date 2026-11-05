@@ -33,14 +33,35 @@ async fn init_node_pnpm_turbo_workspace_first_run_is_green() {
     assert_eq!(report.language, Language::Node);
     let config = fs::read_to_string(dir.path().join("do-harness.toml")).unwrap();
     assert!(config.contains("language = \"node\""));
-    assert!(config.contains("typecheck"));
-    assert!(config.contains("lint"));
-    assert!(config.contains("test"));
-    assert!(config.contains("build"));
+    // The report decides which candidates the CLI could actually prove; the
+    // generated contract must mirror exactly that set and never invent a sensor
+    // it omitted. A missing package manager is reported, not silently green.
+    let included: Vec<&str> = report
+        .candidates
+        .iter()
+        .filter(|c| c.included)
+        .map(|c| c.name.as_str())
+        .collect();
+    for expected in ["typecheck", "lint", "test", "build"] {
+        let configured = config.contains(&format!("name = \"{expected}\""));
+        assert_eq!(
+            configured,
+            included.contains(&expected),
+            "sensor '{expected}' configured={configured} but included={included:?}"
+        );
+    }
+    if included.is_empty() {
+        assert!(
+            report
+                .diagnostics
+                .iter()
+                .any(|d| d.code == "missing_package_manager"),
+            "an empty contract must be reported, not silently green: {:?}",
+            report.diagnostics
+        );
+        return;
+    }
     assert!(config.contains("**/*.ts"));
-    assert!(config.contains("feedback = [\"typecheck\", \"lint\"]"));
-    assert!(config.contains("verification = [\"typecheck\", \"lint\", \"test\"]"));
-    assert!(config.contains("release = [\"typecheck\", \"lint\", \"test\", \"build\"]"));
 
     run_baseline(dir.path(), &mut report).await.unwrap();
     assert_eq!(
@@ -64,11 +85,25 @@ async fn init_node_probes_only_proven_signals() {
 
     assert_eq!(report.language, Language::Node);
     let config = fs::read_to_string(dir.path().join("do-harness.toml")).unwrap();
-    assert!(config.contains("name = \"typecheck\""));
+    // Only the declared script is ever a candidate, and only a candidate the CLI
+    // could prove may be configured: a host without a package manager omits it
+    // and says so instead of configuring a sensor that cannot run.
     assert!(!config.contains("name = \"lint\""));
     assert!(!config.contains("name = \"test\""));
     assert!(!config.contains("name = \"build\""));
-    assert!(config.contains("feedback = [\"typecheck\"]"));
-    assert!(config.contains("verification = [\"typecheck\"]"));
-    assert!(config.contains("release = [\"typecheck\"]"));
+    if report.candidates.iter().any(|c| c.included) {
+        assert!(config.contains("name = \"typecheck\""));
+        assert!(config.contains("feedback = [\"typecheck\"]"));
+        assert!(config.contains("verification = [\"typecheck\"]"));
+        assert!(config.contains("release = [\"typecheck\"]"));
+    } else {
+        assert!(
+            report
+                .diagnostics
+                .iter()
+                .any(|d| d.code == "missing_package_manager"),
+            "an omitted signal must be reported: {:?}",
+            report.diagnostics
+        );
+    }
 }

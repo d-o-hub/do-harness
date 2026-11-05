@@ -29,12 +29,14 @@ fn node_pack_initialization_preserves_sources_and_verifies() {
     std::fs::create_dir_all(root.join("src")).unwrap();
     std::fs::write(root.join("src/index.js"), "console.log('hello');\n").unwrap();
 
-    let (code, stdout, stderr) = run(harness(root).args(["init", "--language", "node"]));
+    let (code, stdout, stderr) =
+        run(harness(root).args(["init", "--language", "node", "--format", "json"]));
     assert_eq!(
         code,
         Some(0),
         "node init must succeed: stdout={stdout} stderr={stderr}"
     );
+    let init_report: Value = serde_json::from_str(&stdout).expect("valid init JSON report");
 
     assert_eq!(
         std::fs::read_to_string(root.join("package.json")).unwrap(),
@@ -53,45 +55,72 @@ fn node_pack_initialization_preserves_sources_and_verifies() {
         "config must select node pack"
     );
 
-    // Verification set runs typecheck, lint, test
-    let (code, stdout, stderr) = run(harness(root).args([
-        "verify",
-        "--set",
-        "verification",
-        "--format",
-        "json",
-        "--strict",
-    ]));
-    assert_eq!(
-        code,
-        Some(0),
-        "strict verify on node verification set must pass: stdout={stdout} stderr={stderr}"
-    );
-    let report: Value = serde_json::from_str(&stdout).expect("valid JSON report");
-    assert_eq!(report["ok"], Value::Bool(true));
-
-    // Release set runs typecheck, lint, test, build
-    let (code, stdout, stderr) =
-        run(harness(root).args(["verify", "--set", "release", "--format", "json", "--strict"]));
-    assert_eq!(
-        code,
-        Some(0),
-        "strict verify on node release set must pass: stdout={stdout} stderr={stderr}"
-    );
-    let report: Value = serde_json::from_str(&stdout).expect("valid JSON report");
-    assert_eq!(report["ok"], Value::Bool(true));
-
-    let sensor_names: Vec<&str> = report["sensors"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|s| s["name"].as_str().unwrap())
-        .collect();
-    for expected in ["typecheck", "lint", "test", "build"] {
-        assert!(
-            sensor_names.contains(&expected),
-            "missing sensor {expected} in {sensor_names:?}"
+    // The node pack is selected regardless of tool availability; whether the
+    // four proven sensors are configured depends on a runnable package
+    // manager. With one, the generated contract must configure and verify
+    // every proven signal; without one, the baseline is INCOMPLETE with a
+    // missing_package_manager diagnostic, never a claimed green.
+    let baseline_state = init_report["baseline"]["state"].as_str().unwrap_or("");
+    if baseline_state == "green" {
+        // Verification set runs typecheck, lint, test
+        let (code, stdout, stderr) = run(harness(root).args([
+            "verify",
+            "--set",
+            "verification",
+            "--format",
+            "json",
+            "--strict",
+        ]));
+        assert_eq!(
+            code,
+            Some(0),
+            "strict verify on node verification set must pass: stdout={stdout} stderr={stderr}"
         );
+        let report: Value = serde_json::from_str(&stdout).expect("valid JSON report");
+        assert_eq!(report["ok"], Value::Bool(true));
+
+        // Release set runs typecheck, lint, test, build
+        let (code, stdout, stderr) =
+            run(harness(root).args(["verify", "--set", "release", "--format", "json", "--strict"]));
+        assert_eq!(
+            code,
+            Some(0),
+            "strict verify on node release set must pass: stdout={stdout} stderr={stderr}"
+        );
+        let report: Value = serde_json::from_str(&stdout).expect("valid JSON report");
+        assert_eq!(report["ok"], Value::Bool(true));
+
+        let sensor_names: Vec<&str> = report["sensors"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|s| s["name"].as_str().unwrap())
+            .collect();
+        for expected in ["typecheck", "lint", "test", "build"] {
+            assert!(
+                sensor_names.contains(&expected),
+                "missing sensor {expected} in {sensor_names:?}"
+            );
+        }
+    } else {
+        assert_eq!(
+            baseline_state, "incomplete",
+            "unexpected baseline for node pack: {init_report}"
+        );
+        let diagnostics = init_report["diagnostics"].as_array().expect("diagnostics");
+        assert!(
+            diagnostics
+                .iter()
+                .any(|d| d["code"] == "missing_package_manager"),
+            "expected a missing_package_manager diagnostic: {diagnostics:?}"
+        );
+        for candidate in init_report["candidates"].as_array().expect("candidates") {
+            assert_eq!(
+                candidate["included"],
+                Value::Bool(false),
+                "without a package manager no candidate may be configured: {candidate:?}"
+            );
+        }
     }
 }
 
