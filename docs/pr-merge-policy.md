@@ -50,6 +50,23 @@ Mandatory approval count is not fabricated through bot reviews or synthetic acco
 instead, server enforcement guarantees conversation resolution and required CI checks
 pass before any merge can complete.
 
+## Findings Policy (`[findings]`)
+
+The `[findings]` table declares how CI findings are tracked:
+
+- `policy = "managed-backlog"` (default): introduced and regressed findings
+  block, and critical findings stay blocked until they carry a linked issue or
+  an authorized disposition. Pre-existing findings outside the changed code are
+  tracked with a linked issue instead of silently expanding every PR's scope.
+- `policy = "strict-zero-baseline"` (opt-in): every actionable finding blocks,
+  including the pre-existing backlog. Choose it when the repository wants no
+  merge until the backlog is gone.
+- `max_new_issues_per_run` (default 20, hard-capped at 20) bounds issue creation
+  so a noisy pipeline cannot flood the tracker.
+
+Changing a threshold never clears a finding: a critical security finding is a
+blocker whatever the configured severity floor is.
+
 ## Operator Remediation
 
 When `do-harness doctor pr-policy` reports `DRIFT`, the JSON or text output
