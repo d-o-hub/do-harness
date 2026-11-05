@@ -81,6 +81,33 @@ fn normalization_strips_volatile_tokens() {
 }
 
 #[test]
+fn normalization_collapses_absolute_paths() {
+    assert_eq!(
+        normalize("cannot read /tmp/tmp.JBwSNhLDdQ/do-harness.toml"),
+        "cannot read <path>"
+    );
+    assert_eq!(
+        normalize("do-harness --root /home/a/proj verify"),
+        "do-harness --root <path> verify"
+    );
+    // A slash inside a word is not a path.
+    assert_eq!(normalize("and/or"), "and/or");
+}
+
+#[test]
+fn fingerprint_ignores_the_checkout_path() {
+    let a = fingerprint(
+        "do-harness --root /home/alice/proj verify",
+        "cannot read /home/alice/proj/do-harness.toml",
+    );
+    let b = fingerprint(
+        "do-harness --root /home/bob/work verify",
+        "cannot read /home/bob/work/do-harness.toml",
+    );
+    assert_eq!(a, b);
+}
+
+#[test]
 fn draft_is_implementation_ready() {
     let redactor = Redactor::synthetic(&[]);
     let argv = vec!["do-harness".to_owned(), "verify".to_owned()];

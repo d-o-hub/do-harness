@@ -166,7 +166,35 @@ const MIN_HEX_TOKEN: usize = 7;
 /// Pids, timestamps, line numbers, counts, and commit hashes all differ between
 /// runs of the same defect. Left in the fingerprint they file a new issue on
 /// every occurrence, which is exactly the noise this path must not create.
+/// Absolute paths are collapsed too: the same defect in two checkouts differs
+/// only by where it was found.
 fn normalize(text: &str) -> String {
+    /// Collapses absolute paths, which vary per checkout and temp directory.
+    ///
+    /// A `/` only starts a path at a word boundary, so `and/or` is left alone.
+    fn strip_paths(text: &str) -> String {
+        let mut out = String::with_capacity(text.len());
+        let mut chars = text.chars().peekable();
+        let mut previous_alphanumeric = false;
+        while let Some(ch) = chars.next() {
+            if ch == '/' && !previous_alphanumeric {
+                while let Some(&next) = chars.peek() {
+                    if next.is_ascii_alphanumeric() || matches!(next, '.' | '_' | '-' | '/') {
+                        chars.next();
+                    } else {
+                        break;
+                    }
+                }
+                out.push_str("<path>");
+                previous_alphanumeric = false;
+                continue;
+            }
+            out.push(ch);
+            previous_alphanumeric = ch.is_ascii_alphanumeric();
+        }
+        out
+    }
+
     fn flush(token: &mut String, out: &mut String) {
         if token.is_empty() {
             return;
@@ -181,9 +209,10 @@ fn normalize(text: &str) -> String {
         token.clear();
     }
 
-    let mut out = String::with_capacity(text.len());
+    let stripped = strip_paths(text);
+    let mut out = String::with_capacity(stripped.len());
     let mut token = String::new();
-    for ch in text.chars() {
+    for ch in stripped.chars() {
         if ch.is_ascii_alphanumeric() {
             token.push(ch);
         } else {
