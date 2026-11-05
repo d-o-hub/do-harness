@@ -1271,7 +1271,7 @@ be resolved. A collector that cannot read git history never reads as healthy.
 <!-- BEGIN GENERATED: cli-contract pr -->
 `do-harness pr [OPTIONS] <COMMAND>`
 
-Subcommands: `no-effect`, `review`, `ready`, `checks`, `waivers`, `disposition`, `findings`.
+Subcommands: `no-effect`, `review`, `ready`, `checks`, `waivers`, `disposition`, `findings`, `update-base`.
 <!-- END GENERATED: cli-contract pr -->
 Deterministic, read-only PR analysis: every subcommand works in any git repository without harness initialization. Pick the subcommand that answers your question.
 
@@ -1469,6 +1469,55 @@ the permission lookup fails, the waiver is rejected rather than trusted. Every
 evaluated candidate is recorded in `codecov.audit_waivers` with its
 authorization and staleness verdict, so a rejected waiver is visible instead of
 silently ignored.
+
+
+### `pr update-base`
+<!-- BEGIN GENERATED: cli-contract pr update-base -->
+`do-harness pr update-base [OPTIONS] <PR>`
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `<PR>` | yes | — | — | Pull request number |
+| `--execute` | no | — | — | Execute the update (default is a read-only report) |
+| `--format <FORMAT>` | no | `text` | `text`, `json` | Output format |
+<!-- END GENERATED: cli-contract pr update-base -->
+Report whether an open PR's head contains its current base and, on `--execute`,
+update an eligible own/known-bot head without overwriting author work. The
+verdict is driven by the read-only ancestry proof: `UP_TO_DATE` when the head
+contains the base, `UPDATE_REQUIRED` when it does not (even if GitHub reports a
+`CLEAN` merge state), `BLOCKED` when a confirmed condition forbids the update,
+and `UNKNOWN` when the proof cannot be collected.
+
+- `<PR>`: Pull request number.
+- `--execute`: perform the update. Default (and the global `--dry-run`) is
+  read-only: nothing is ever written without `--execute`.
+- `--format <Format>`: Output format (`text` or `json`).
+
+`--execute` acts only on an eligible head: a branch of this repository (never a
+fork whose permissions are unknown) whose author is the authenticated user or a
+known bot, with the authenticated user holding a write/admin/maintain/owner
+role. The update uses `gh pr update-branch --expected-head-sha <SHA>`, so a
+concurrent author push is rejected by the server (`422`) rather than
+overwritten, and a `403`/`422` blocks without retry. After an accepted update
+the new head is observed immediately, then after 3 s, 10 s, and every 30 s up
+to a 1200 s deadline; a moved base, a stray head, or a timeout is `UNKNOWN`,
+never a success. After the update every gate must be re-run from scratch: the
+report emits `revalidate_required` and the new head OID, and never reuses the
+pre-update snapshot.
+
+For a **stacked** PR (whose base is another PR's head) the parent merges first:
+while an open parent owns the base the verdict is `BLOCKED` (`stack_parent_first`).
+After the parent merges, `--execute` rebases the child onto the default branch
+using the recorded parent head and force-pushes only the authorized branch,
+stopping on conflict; the rebased head is verified to apply none of the parent's
+changes before it is pushed. If the parent branch reference is gone, the child
+is `BLOCKED` (`stack_parent_gone`) until its old head is recovered.
+
+Exit `0` for `UP_TO_DATE`/`UPDATE_REQUIRED`, `1` for `BLOCKED`, and `2` for
+`UNKNOWN`. Reason codes include `fork_head`, `unauthorized`, `identity_unknown`,
+`permission_unknown`, `stack_parent_first`, `stack_parent_gone`,
+`stack_conflict`, `update_rejected_403`, `update_rejected_422`, `base_moved`,
+`poll_timeout`, and `revalidate_required`.
 
 ### `pr checks`
 <!-- BEGIN GENERATED: cli-contract pr checks -->
