@@ -90,6 +90,13 @@ pub fn collect_annotations(root: &Path, head_sha: &str, repo_slug: &str) -> Resu
             .unwrap_or(&run.name);
 
         for ann in annotations {
+            // Workflow-level notices (deprecated runtime of an action, runner
+            // image migration) are reported against the workflow directory, not
+            // a source file. They are infrastructure signals, not defects this
+            // change introduced, so they never gate a merge.
+            if ann.path == ".github" || ann.path.is_empty() {
+                continue;
+            }
             let rule_id = ann
                 .title
                 .clone()
