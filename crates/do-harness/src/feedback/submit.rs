@@ -1,32 +1,104 @@
 //! Issue submission, deduplication search, and receipt recording (WF-09).
 
 use std::fs;
-use std::io::Write;
+use std::io::{Read, Write};
 use std::path::Path;
-use std::process::{Command, Stdio};
+use std::process::{Child, Command, ExitStatus, Output, Stdio};
+use std::time::{Duration, Instant};
 
 use anyhow::{Context, Result, bail};
 
 use super::draft::validate_repo;
 use super::types::{FeedbackDraft, SubmissionReceipt, SubmissionResult};
+use crate::shell;
+
+/// Wall-clock budget for one `gh` invocation.
+const GH_TIMEOUT: Duration = Duration::from_secs(10);
+/// Poll interval while waiting for `gh`.
+const GH_POLL: Duration = Duration::from_millis(20);
+
+/// Reads a child pipe to EOF on its own thread.
+///
+/// The reader must not block the wait loop: a child that fills a pipe would
+/// otherwise never exit, and the timeout would fire on a healthy process.
+fn read_pipe(pipe: Option<impl Read + Send + 'static>) -> std::thread::JoinHandle<Vec<u8>> {
+    std::thread::spawn(move || {
+        let mut buffer = Vec::new();
+        if let Some(mut pipe) = pipe {
+            let _ = pipe.read_to_end(&mut buffer);
+        }
+        buffer
+    })
+}
+
+/// Waits for `child`, killing its process tree once [`GH_TIMEOUT`] elapses.
+fn wait_bounded(child: &mut Child) -> Result<ExitStatus> {
+    let deadline = Instant::now() + GH_TIMEOUT;
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) => return Ok(status),
+            Ok(None) if Instant::now() >= deadline => {
+                shell::kill_tree(child);
+                bail!("gh exceeded {GH_TIMEOUT:?}");
+            }
+            Ok(None) => std::thread::sleep(GH_POLL),
+            Err(error) => bail!("wait for gh failed: {error}"),
+        }
+    }
+}
+
+/// Runs `gh` in a private process group with a bounded wall clock.
+///
+/// A hung `gh` must not hang a CLI that has already failed, so the child and
+/// its descendants are killed when the budget expires.
+fn run_gh(mut command: Command, body: Option<&str>) -> Result<Output> {
+    shell::configure_process_group(&mut command);
+    command
+        .stdin(if body.is_some() {
+            Stdio::piped()
+        } else {
+            Stdio::null()
+        })
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    let mut child = command.spawn().context("spawn gh")?;
+    // Drain the output pipes before writing the body: a child that fills a pipe
+    // while we are still writing stdin would deadlock both sides.
+    let stdout = read_pipe(child.stdout.take());
+    let stderr = read_pipe(child.stderr.take());
+    if let Some(body) = body {
+        if let Some(mut stdin) = child.stdin.take() {
+            if let Err(error) = stdin.write_all(body.as_bytes()) {
+                shell::kill_tree(&mut child);
+                return Err(error).context("write gh stdin");
+            }
+        }
+    }
+    let status = wait_bounded(&mut child)?;
+    Ok(Output {
+        status,
+        stdout: stdout.join().unwrap_or_default(),
+        stderr: stderr.join().unwrap_or_default(),
+    })
+}
 
 /// Searches for an existing issue with the exact fingerprint marker.
 fn find_existing_issue(repo: &str, fingerprint: &str) -> Result<Option<(u64, String)>> {
-    let output = Command::new("gh")
-        .args([
-            "issue",
-            "list",
-            "--repo",
-            repo,
-            "--state",
-            "all",
-            "--search",
-            fingerprint,
-            "--json",
-            "number,url,state,title,body",
-        ])
-        .output()
-        .context("failed to execute gh issue list for deduplication")?;
+    let mut command = Command::new("gh");
+    command.args([
+        "issue",
+        "list",
+        "--repo",
+        repo,
+        "--state",
+        "all",
+        "--search",
+        fingerprint,
+        "--json",
+        "number,url,state,title,body",
+    ]);
+    let output =
+        run_gh(command, None).context("failed to execute gh issue list for deduplication")?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
@@ -138,32 +210,18 @@ pub fn submit_draft(
     }
 
     // Issue creation with fixed argv and stdin body
-    let mut child = Command::new("gh")
-        .args([
-            "issue",
-            "create",
-            "--repo",
-            repo,
-            "--title",
-            &draft.title,
-            "--body-file",
-            "-",
-        ])
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .context("spawn gh issue create")?;
-
-    if let Some(mut stdin) = child.stdin.take() {
-        stdin
-            .write_all(draft.body.as_bytes())
-            .context("write issue body to gh stdin")?;
-    }
-
-    let output = child
-        .wait_with_output()
-        .context("wait for gh issue create")?;
+    let mut command = Command::new("gh");
+    command.args([
+        "issue",
+        "create",
+        "--repo",
+        repo,
+        "--title",
+        &draft.title,
+        "--body-file",
+        "-",
+    ]);
+    let output = run_gh(command, Some(&draft.body)).context("spawn gh issue create")?;
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         bail!("gh issue create failed: {stderr}");

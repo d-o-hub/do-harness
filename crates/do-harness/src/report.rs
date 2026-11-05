@@ -3,6 +3,8 @@
 use clap::ValueEnum;
 use serde::{Deserialize, Serialize};
 
+use crate::diag;
+
 /// Structured process failure, distinct from a sensor's ordinary exit status.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -245,13 +247,18 @@ pub fn print_report(report: &VerifyReport, format: Format, quiet: bool) -> anyho
             println!("{line}");
         }
         if !sensor.ok && matches!(sensor.execution, Execution::Ran | Execution::NotRun) {
+            // Mirrored into the defect-report capture: a report without the
+            // failing sensor's own output is not actionable.
+            diag::record(&line);
             if let Some(fix) = &sensor.fix {
                 eprintln!("      FIX: {fix}");
+                diag::record(&format!("      FIX: {fix}"));
             }
             let lines: Vec<&str> = sensor.output.lines().collect();
             let start = lines.len().saturating_sub(OUTPUT_TAIL_LINES);
             for line in &lines[start..] {
                 eprintln!("      {line}");
+                diag::record(&format!("      {line}"));
             }
         }
     }
@@ -292,7 +299,9 @@ pub fn print_report(report: &VerifyReport, format: Format, quiet: bool) -> anyho
             println!("{footer}");
         }
     } else if !report.failed.is_empty() {
-        eprintln!("Failed sensors: {}", report.failed.join(", "));
+        let footer = format!("Failed sensors: {}", report.failed.join(", "));
+        eprintln!("{footer}");
+        diag::record(&footer);
     }
     if format == Format::Json {
         println!("{}", json_pretty(report)?);

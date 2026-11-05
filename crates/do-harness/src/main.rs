@@ -29,6 +29,7 @@ mod cli;
 mod commands;
 mod config;
 mod dbcheck;
+mod diag;
 mod dispatch;
 mod distill;
 mod distill_strikes;
@@ -113,12 +114,27 @@ impl std::fmt::Display for CliError {
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> ExitCode {
+    // Diagnostic context only: the arguments are reported, never used for
+    // authorization.
+    // nosemgrep: rust.lang.security.args.args
+    diag::set_argv(std::env::args().collect());
+    feedback::report::install_panic_hook();
     let cli = Cli::parse();
+    let root = cli.root.clone();
     match dispatch::run(cli).await {
         Ok(()) => ExitCode::SUCCESS,
         Err(err) => {
-            eprintln!("error: {err:#}");
-            ExitCode::from(err.exit_code())
+            let code = err.exit_code();
+            let class = match &err {
+                CliError::Usage(_) => feedback::report::FailureClass::Usage,
+                CliError::Verify(_) => feedback::report::FailureClass::Verify,
+                CliError::Running(_) => feedback::report::FailureClass::Running,
+            };
+            let message = format!("{err:#}");
+            diag::record(&format!("error: {message}"));
+            feedback::report::file_failure(root.as_deref(), class, &message, &diag::argv(), code);
+            eprintln!("error: {message}");
+            ExitCode::from(code)
         }
     }
 }

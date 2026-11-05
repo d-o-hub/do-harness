@@ -100,6 +100,8 @@ pub fn harness(root: &Path) -> Command {
     let mut command = Command::new(env!("CARGO_BIN_EXE_do-harness"));
     isolate_command(&mut command);
     command.arg("--root").arg(root);
+    // Fixtures must never file real issues against the tool's own tracker.
+    command.env("DO_HARNESS_AUTO_REPORT", "off");
     command
 }
 

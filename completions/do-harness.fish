@@ -830,17 +830,18 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand man" -s q -l quiet
 complete -c do-harness -n "__fish_do_harness_using_subcommand man" -l dry-run -d 'Dry run without side effects'
 complete -c do-harness -n "__fish_do_harness_using_subcommand man" -s h -l help -d 'Print help'
 complete -c do-harness -n "__fish_do_harness_using_subcommand man" -s V -l version -d 'Print version'
-complete -c do-harness -n "__fish_do_harness_using_subcommand feedback; and not __fish_seen_subcommand_from draft submit auto help" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
-complete -c do-harness -n "__fish_do_harness_using_subcommand feedback; and not __fish_seen_subcommand_from draft submit auto help" -l config -d 'Explicit path to do-harness.toml' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand feedback; and not __fish_seen_subcommand_from draft submit auto help" -l output -d 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)' -r -F
-complete -c do-harness -n "__fish_do_harness_using_subcommand feedback; and not __fish_seen_subcommand_from draft submit auto help" -s q -l quiet -d 'Suppress PASS/WARN verdict lines and the success footer'
-complete -c do-harness -n "__fish_do_harness_using_subcommand feedback; and not __fish_seen_subcommand_from draft submit auto help" -l dry-run -d 'Dry run without side effects'
-complete -c do-harness -n "__fish_do_harness_using_subcommand feedback; and not __fish_seen_subcommand_from draft submit auto help" -s h -l help -d 'Print help'
-complete -c do-harness -n "__fish_do_harness_using_subcommand feedback; and not __fish_seen_subcommand_from draft submit auto help" -s V -l version -d 'Print version'
-complete -c do-harness -n "__fish_do_harness_using_subcommand feedback; and not __fish_seen_subcommand_from draft submit auto help" -f -a "draft" -d 'Generate a local feedback draft from recurring or severe failure evidence'
-complete -c do-harness -n "__fish_do_harness_using_subcommand feedback; and not __fish_seen_subcommand_from draft submit auto help" -f -a "submit" -d 'Explicitly submit a feedback draft'
-complete -c do-harness -n "__fish_do_harness_using_subcommand feedback; and not __fish_seen_subcommand_from draft submit auto help" -f -a "auto" -d 'Fully automated end-to-end feedback generation, deduplication, and submission'
-complete -c do-harness -n "__fish_do_harness_using_subcommand feedback; and not __fish_seen_subcommand_from draft submit auto help" -f -a "help" -d 'Print this message or the help of the given subcommand(s)'
+complete -c do-harness -n "__fish_do_harness_using_subcommand feedback; and not __fish_seen_subcommand_from draft submit auto report help" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
+complete -c do-harness -n "__fish_do_harness_using_subcommand feedback; and not __fish_seen_subcommand_from draft submit auto report help" -l config -d 'Explicit path to do-harness.toml' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand feedback; and not __fish_seen_subcommand_from draft submit auto report help" -l output -d 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand feedback; and not __fish_seen_subcommand_from draft submit auto report help" -s q -l quiet -d 'Suppress PASS/WARN verdict lines and the success footer'
+complete -c do-harness -n "__fish_do_harness_using_subcommand feedback; and not __fish_seen_subcommand_from draft submit auto report help" -l dry-run -d 'Dry run without side effects'
+complete -c do-harness -n "__fish_do_harness_using_subcommand feedback; and not __fish_seen_subcommand_from draft submit auto report help" -s h -l help -d 'Print help'
+complete -c do-harness -n "__fish_do_harness_using_subcommand feedback; and not __fish_seen_subcommand_from draft submit auto report help" -s V -l version -d 'Print version'
+complete -c do-harness -n "__fish_do_harness_using_subcommand feedback; and not __fish_seen_subcommand_from draft submit auto report help" -f -a "draft" -d 'Generate a local feedback draft from recurring or severe failure evidence'
+complete -c do-harness -n "__fish_do_harness_using_subcommand feedback; and not __fish_seen_subcommand_from draft submit auto report help" -f -a "submit" -d 'Explicitly submit a feedback draft'
+complete -c do-harness -n "__fish_do_harness_using_subcommand feedback; and not __fish_seen_subcommand_from draft submit auto report help" -f -a "auto" -d 'Fully automated end-to-end feedback generation, deduplication, and submission'
+complete -c do-harness -n "__fish_do_harness_using_subcommand feedback; and not __fish_seen_subcommand_from draft submit auto report help" -f -a "report" -d 'File a defect report against the tool\'s own repository'
+complete -c do-harness -n "__fish_do_harness_using_subcommand feedback; and not __fish_seen_subcommand_from draft submit auto report help" -f -a "help" -d 'Print this message or the help of the given subcommand(s)'
 complete -c do-harness -n "__fish_do_harness_using_subcommand feedback; and __fish_seen_subcommand_from draft" -l repo -d 'Target repository (`OWNER/REPO`)' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand feedback; and __fish_seen_subcommand_from draft" -l days -d 'Historical search window in days (default: 30)' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand feedback; and __fish_seen_subcommand_from draft" -l min-fires -d 'Minimum independent attributable fires required (default: 3)' -r
@@ -876,9 +877,24 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand feedback; and __fi
 complete -c do-harness -n "__fish_do_harness_using_subcommand feedback; and __fish_seen_subcommand_from auto" -s q -l quiet -d 'Suppress PASS/WARN verdict lines and the success footer'
 complete -c do-harness -n "__fish_do_harness_using_subcommand feedback; and __fish_seen_subcommand_from auto" -s h -l help -d 'Print help (see more with \'--help\')'
 complete -c do-harness -n "__fish_do_harness_using_subcommand feedback; and __fish_seen_subcommand_from auto" -s V -l version -d 'Print version'
+complete -c do-harness -n "__fish_do_harness_using_subcommand feedback; and __fish_seen_subcommand_from report" -l repo -d 'Target repository override (default: the tool\'s own repository)' -r
+complete -c do-harness -n "__fish_do_harness_using_subcommand feedback; and __fish_seen_subcommand_from report" -l error -d 'Failure message to report' -r
+complete -c do-harness -n "__fish_do_harness_using_subcommand feedback; and __fish_seen_subcommand_from report" -l log -d 'Log file whose tail is attached to the report' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand feedback; and __fish_seen_subcommand_from report" -l format -d 'Output format' -r -f -a "text\t'Human-readable text output'
+json\t'Machine-readable JSON output'"
+complete -c do-harness -n "__fish_do_harness_using_subcommand feedback; and __fish_seen_subcommand_from report" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
+complete -c do-harness -n "__fish_do_harness_using_subcommand feedback; and __fish_seen_subcommand_from report" -l config -d 'Explicit path to do-harness.toml' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand feedback; and __fish_seen_subcommand_from report" -l output -d 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand feedback; and __fish_seen_subcommand_from report" -l warning -d 'Classify the report as a warning rather than an error'
+complete -c do-harness -n "__fish_do_harness_using_subcommand feedback; and __fish_seen_subcommand_from report" -l yes -d 'Skip interactive confirmation (unattended mode)'
+complete -c do-harness -n "__fish_do_harness_using_subcommand feedback; and __fish_seen_subcommand_from report" -l dry-run -d 'Perform search and preview without creating an issue'
+complete -c do-harness -n "__fish_do_harness_using_subcommand feedback; and __fish_seen_subcommand_from report" -s q -l quiet -d 'Suppress PASS/WARN verdict lines and the success footer'
+complete -c do-harness -n "__fish_do_harness_using_subcommand feedback; and __fish_seen_subcommand_from report" -s h -l help -d 'Print help (see more with \'--help\')'
+complete -c do-harness -n "__fish_do_harness_using_subcommand feedback; and __fish_seen_subcommand_from report" -s V -l version -d 'Print version'
 complete -c do-harness -n "__fish_do_harness_using_subcommand feedback; and __fish_seen_subcommand_from help" -f -a "draft" -d 'Generate a local feedback draft from recurring or severe failure evidence'
 complete -c do-harness -n "__fish_do_harness_using_subcommand feedback; and __fish_seen_subcommand_from help" -f -a "submit" -d 'Explicitly submit a feedback draft'
 complete -c do-harness -n "__fish_do_harness_using_subcommand feedback; and __fish_seen_subcommand_from help" -f -a "auto" -d 'Fully automated end-to-end feedback generation, deduplication, and submission'
+complete -c do-harness -n "__fish_do_harness_using_subcommand feedback; and __fish_seen_subcommand_from help" -f -a "report" -d 'File a defect report against the tool\'s own repository'
 complete -c do-harness -n "__fish_do_harness_using_subcommand feedback; and __fish_seen_subcommand_from help" -f -a "help" -d 'Print this message or the help of the given subcommand(s)'
 complete -c do-harness -n "__fish_do_harness_using_subcommand help; and not __fish_seen_subcommand_from version verify list explain status pr skills init-db seed init task trace distill errors loc split eval hook doctor metrics learn overlap maintenance compliance audit-chain dora ci-explain completions man feedback help" -f -a "version" -d 'Print CLI version information'
 complete -c do-harness -n "__fish_do_harness_using_subcommand help; and not __fish_seen_subcommand_from version verify list explain status pr skills init-db seed init task trace distill errors loc split eval hook doctor metrics learn overlap maintenance compliance audit-chain dora ci-explain completions man feedback help" -f -a "verify" -d 'Run computational sensors'
@@ -945,3 +961,4 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand help; and __fish_s
 complete -c do-harness -n "__fish_do_harness_using_subcommand help; and __fish_seen_subcommand_from feedback" -f -a "draft" -d 'Generate a local feedback draft from recurring or severe failure evidence'
 complete -c do-harness -n "__fish_do_harness_using_subcommand help; and __fish_seen_subcommand_from feedback" -f -a "submit" -d 'Explicitly submit a feedback draft'
 complete -c do-harness -n "__fish_do_harness_using_subcommand help; and __fish_seen_subcommand_from feedback" -f -a "auto" -d 'Fully automated end-to-end feedback generation, deduplication, and submission'
+complete -c do-harness -n "__fish_do_harness_using_subcommand help; and __fish_seen_subcommand_from feedback" -f -a "report" -d 'File a defect report against the tool\'s own repository'
