@@ -384,6 +384,24 @@ json\:"Machine-readable JSON output"))' \
 ':pr -- Pull request number:_default' \
 && ret=0
 ;;
+(update-base)
+_arguments "${_arguments_options[@]}" : \
+'--format=[Output format]:FORMAT:((text\:"Human-readable text output"
+json\:"Machine-readable JSON output"))' \
+'--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
+'--config=[Explicit path to do-harness.toml]:FILE:_files' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
+'--execute[Execute the update (default is a read-only report)]' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
+'--dry-run[Dry run without side effects]' \
+'-h[Print help (see more with '\''--help'\'')]' \
+'--help[Print help (see more with '\''--help'\'')]' \
+'-V[Print version]' \
+'--version[Print version]' \
+':pr -- Pull request number:_default' \
+&& ret=0
+;;
 (help)
 _arguments "${_arguments_options[@]}" : \
 ":: :_do-harness__subcmd__pr__subcmd__help_commands" \
@@ -421,6 +439,10 @@ _arguments "${_arguments_options[@]}" : \
 && ret=0
 ;;
 (findings)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(update-base)
 _arguments "${_arguments_options[@]}" : \
 && ret=0
 ;;
@@ -1790,6 +1812,10 @@ _arguments "${_arguments_options[@]}" : \
 _arguments "${_arguments_options[@]}" : \
 && ret=0
 ;;
+(update-base)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
         esac
     ;;
 esac
@@ -2566,6 +2592,7 @@ _do-harness__subcmd__help__subcmd__pr_commands() {
 'waivers:Classify patch-coverage residue\: waivable classes and lines needing tests' \
 'disposition:Record a structured disposition for a review, thread, comment, or finding' \
 'findings:Collect and classify findings (annotations, code scanning, artifacts) and track issues' \
+'update-base:Update a pull request'\''s branch to the latest base without overwriting author work (default is read-only; \`--execute\` acts only on an authorized own/known-bot head)' \
     )
     _describe -t commands 'do-harness help pr commands' commands "$@"
 }
@@ -2598,6 +2625,11 @@ _do-harness__subcmd__help__subcmd__pr__subcmd__ready_commands() {
 _do-harness__subcmd__help__subcmd__pr__subcmd__review_commands() {
     local commands; commands=()
     _describe -t commands 'do-harness help pr review commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__help__subcmd__pr__subcmd__update-base_commands] )) ||
+_do-harness__subcmd__help__subcmd__pr__subcmd__update-base_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness help pr update-base commands' commands "$@"
 }
 (( $+functions[_do-harness__subcmd__help__subcmd__pr__subcmd__waivers_commands] )) ||
 _do-harness__subcmd__help__subcmd__pr__subcmd__waivers_commands() {
@@ -2893,6 +2925,7 @@ _do-harness__subcmd__pr_commands() {
 'waivers:Classify patch-coverage residue\: waivable classes and lines needing tests' \
 'disposition:Record a structured disposition for a review, thread, comment, or finding' \
 'findings:Collect and classify findings (annotations, code scanning, artifacts) and track issues' \
+'update-base:Update a pull request'\''s branch to the latest base without overwriting author work (default is read-only; \`--execute\` acts only on an authorized own/known-bot head)' \
 'help:Print this message or the help of the given subcommand(s)' \
     )
     _describe -t commands 'do-harness pr commands' commands "$@"
@@ -2922,6 +2955,7 @@ _do-harness__subcmd__pr__subcmd__help_commands() {
 'waivers:Classify patch-coverage residue\: waivable classes and lines needing tests' \
 'disposition:Record a structured disposition for a review, thread, comment, or finding' \
 'findings:Collect and classify findings (annotations, code scanning, artifacts) and track issues' \
+'update-base:Update a pull request'\''s branch to the latest base without overwriting author work (default is read-only; \`--execute\` acts only on an authorized own/known-bot head)' \
 'help:Print this message or the help of the given subcommand(s)' \
     )
     _describe -t commands 'do-harness pr help commands' commands "$@"
@@ -2961,6 +2995,11 @@ _do-harness__subcmd__pr__subcmd__help__subcmd__review_commands() {
     local commands; commands=()
     _describe -t commands 'do-harness pr help review commands' commands "$@"
 }
+(( $+functions[_do-harness__subcmd__pr__subcmd__help__subcmd__update-base_commands] )) ||
+_do-harness__subcmd__pr__subcmd__help__subcmd__update-base_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness pr help update-base commands' commands "$@"
+}
 (( $+functions[_do-harness__subcmd__pr__subcmd__help__subcmd__waivers_commands] )) ||
 _do-harness__subcmd__pr__subcmd__help__subcmd__waivers_commands() {
     local commands; commands=()
@@ -2980,6 +3019,11 @@ _do-harness__subcmd__pr__subcmd__ready_commands() {
 _do-harness__subcmd__pr__subcmd__review_commands() {
     local commands; commands=()
     _describe -t commands 'do-harness pr review commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__pr__subcmd__update-base_commands] )) ||
+_do-harness__subcmd__pr__subcmd__update-base_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness pr update-base commands' commands "$@"
 }
 (( $+functions[_do-harness__subcmd__pr__subcmd__waivers_commands] )) ||
 _do-harness__subcmd__pr__subcmd__waivers_commands() {
