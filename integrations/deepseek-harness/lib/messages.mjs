@@ -28,6 +28,13 @@ export function completionMessage(document) {
   const set = document.set ?? 'verification'
   const reason = document.reason ? ` (${document.reason})` : ''
   switch (document.state) {
+    case 'running': {
+      return userMessage(
+        `Verification for signal set "${set}" is currently running. ` +
+          `Run development_signals(action="status", set="${set}") to check whether the ` +
+          'completed evidence is green.',
+      )
+    }
     case 'stale': {
       const cause =
         document.reason === 'policy_changed'

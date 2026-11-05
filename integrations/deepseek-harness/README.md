@@ -12,23 +12,56 @@ validates the JSON it receives.
 
 ## What it provides
 
-- **`development_signals` tool** — one capability with three actions:
+- **`development_signals` tool** — one capability with four actions:
   - `run`: execute a signal set (`verify --set <set> [--changed]`), returning
     `{ state, set, failed, passed, duration_ms, vacuous }`.
   - `status`: cheap evidence freshness check
     (`status --set <set>`), returning the CLI's
-    `green | red | stale | missing` document. Never runs sensors.
+    `green | red | stale | missing | running` document. Never runs sensors.
   - `explain`: change-aware selection report
-    (`explain --set <set> [--changed]`). Never runs sensors.
+    (`explain --set <set> [--changed] [--since <ref>]`). Never runs sensors.
+  - `context`: bounded resume context for a task
+    (`task context <task> --max-bytes 8192`). An unavailable outcome is
+    preserved as `state: "unavailable"`, never reported as success.
+- **`run` options**:
+  - `since: "<ref>"` (run/explain) restricts to the committed range
+    `merge-base(<ref>, HEAD)..HEAD`.
+  - `task: <id>` (run) scopes recorded beats (`--record --task <id>`);
+    required for `context`.
+  - `reuse: true` (run, task-scoped only) maps to `--unchanged=skip`:
+    recorded passing beats for unchanged declared inputs are reused and
+    reported visibly (`execution: "reused"`, `reused_beat_id`), never as a
+    fresh process pass. Source, policy, or declared-environment changes
+    invalidate reuse; unresolved identity forces execution. The completion
+    set rejects `changed`/`since`/`reuse`.
 - **Strict completion gate** (opt-in) — on `agent/turn-stopping` the bundle
   runs only the cheap `status` operation. `green` permits the stop; `stale`,
-  `red`, or `missing` steers the agent with a computational, specific reason
-  and the exact next command, then lets the loop continue. When the bounded
-  repair budget is spent, the gate rejects the next step so the host ends the
-  turn as `blocked` instead of reporting a successful completion.
+  `red`, `running`, or `missing` steers the agent with a computational, specific
+  reason and the exact next command (a `running` state asks for `status`, never
+  a second overlapping verification launch), then lets the loop continue. When
+  the bounded repair budget is spent, the gate rejects the next step so the host
+  ends the turn as `blocked` instead of reporting a successful completion. For
+  the completion set, `run` executes `verify --strict --record --unchanged=run`
+  followed by `status`; only current green, non-vacuous evidence is `complete`.
 
 The model never passes raw CLI argv: the tool schema exposes only
-`action`, `set`, and `changed`.
+`action`, `set`, `changed`, `since`, `task`, and `reuse`.
+
+## Supported agent sequence
+
+1. During edits: `development_signals(action="explain", set="feedback",
+   changed=true)` to see which sensors apply, then `action="run"` to execute
+   them. Pass `task: <id>` (+ `reuse: true`) for task-scoped recorded beats.
+2. Resume: `development_signals(action="context", task=<id>)` for bounded
+   context; full diagnostics remain available through the local
+   `do-harness` CLI.
+3. Before completion: `development_signals(action="run", set="verification")`
+   (strict, non-reused) then `action="status"`. The completion gate enforces
+   the same evidence at the stop boundary.
+
+Compatibility/version assumptions: the bundle pins the conformance client to
+`@deepseek-ai/dsh@0.1.7-rc.2`; other client versions are unverified. Node
+`>=22.19` is required.
 
 ## Install
 

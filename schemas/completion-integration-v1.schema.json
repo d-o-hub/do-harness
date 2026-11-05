@@ -96,8 +96,8 @@
     },
     "scenarios": {
       "type": "array",
-      "minItems": 9,
-      "maxItems": 9,
+      "minItems": 14,
+      "maxItems": 14,
       "items": {
         "type": "object",
         "additionalProperties": false,
@@ -121,7 +121,12 @@
               "infrastructure-error",
               "retry-exhaustion",
               "plugin-load-failure",
-              "user-cancellation"
+              "user-cancellation",
+              "edit-explain-run-same-scope",
+              "eligible-reuse",
+              "missing-dependency-forces-execution",
+              "bounded-resume-context",
+              "strict-completion-then-status"
             ]
           },
           "expected_terminal": {
