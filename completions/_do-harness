@@ -1657,6 +1657,27 @@ json\:"Machine-readable JSON output"))' \
 '--version[Print version]' \
 && ret=0
 ;;
+(report)
+_arguments "${_arguments_options[@]}" : \
+'--repo=[Target repository override (default\: the tool'\''s own repository)]:OWNER/REPO:_default' \
+'--error=[Failure message to report]:TEXT:_default' \
+'--log=[Log file whose tail is attached to the report]:FILE:_files' \
+'--format=[Output format]:FORMAT:((text\:"Human-readable text output"
+json\:"Machine-readable JSON output"))' \
+'--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
+'--config=[Explicit path to do-harness.toml]:FILE:_files' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
+'--warning[Classify the report as a warning rather than an error]' \
+'--yes[Skip interactive confirmation (unattended mode)]' \
+'--dry-run[Perform search and preview without creating an issue]' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
+'-h[Print help (see more with '\''--help'\'')]' \
+'--help[Print help (see more with '\''--help'\'')]' \
+'-V[Print version]' \
+'--version[Print version]' \
+&& ret=0
+;;
 (help)
 _arguments "${_arguments_options[@]}" : \
 ":: :_do-harness__subcmd__feedback__subcmd__help_commands" \
@@ -1678,6 +1699,10 @@ _arguments "${_arguments_options[@]}" : \
 && ret=0
 ;;
 (auto)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(report)
 _arguments "${_arguments_options[@]}" : \
 && ret=0
 ;;
@@ -2065,6 +2090,10 @@ _arguments "${_arguments_options[@]}" : \
 _arguments "${_arguments_options[@]}" : \
 && ret=0
 ;;
+(report)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
         esac
     ;;
 esac
@@ -2242,6 +2271,7 @@ _do-harness__subcmd__feedback_commands() {
 'draft:Generate a local feedback draft from recurring or severe failure evidence' \
 'submit:Explicitly submit a feedback draft' \
 'auto:Fully automated end-to-end feedback generation, deduplication, and submission' \
+'report:File a defect report against the tool'\''s own repository' \
 'help:Print this message or the help of the given subcommand(s)' \
     )
     _describe -t commands 'do-harness feedback commands' commands "$@"
@@ -2262,6 +2292,7 @@ _do-harness__subcmd__feedback__subcmd__help_commands() {
 'draft:Generate a local feedback draft from recurring or severe failure evidence' \
 'submit:Explicitly submit a feedback draft' \
 'auto:Fully automated end-to-end feedback generation, deduplication, and submission' \
+'report:File a defect report against the tool'\''s own repository' \
 'help:Print this message or the help of the given subcommand(s)' \
     )
     _describe -t commands 'do-harness feedback help commands' commands "$@"
@@ -2281,10 +2312,20 @@ _do-harness__subcmd__feedback__subcmd__help__subcmd__help_commands() {
     local commands; commands=()
     _describe -t commands 'do-harness feedback help help commands' commands "$@"
 }
+(( $+functions[_do-harness__subcmd__feedback__subcmd__help__subcmd__report_commands] )) ||
+_do-harness__subcmd__feedback__subcmd__help__subcmd__report_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness feedback help report commands' commands "$@"
+}
 (( $+functions[_do-harness__subcmd__feedback__subcmd__help__subcmd__submit_commands] )) ||
 _do-harness__subcmd__feedback__subcmd__help__subcmd__submit_commands() {
     local commands; commands=()
     _describe -t commands 'do-harness feedback help submit commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__feedback__subcmd__report_commands] )) ||
+_do-harness__subcmd__feedback__subcmd__report_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness feedback report commands' commands "$@"
 }
 (( $+functions[_do-harness__subcmd__feedback__subcmd__submit_commands] )) ||
 _do-harness__subcmd__feedback__subcmd__submit_commands() {
@@ -2404,6 +2445,7 @@ _do-harness__subcmd__help__subcmd__feedback_commands() {
 'draft:Generate a local feedback draft from recurring or severe failure evidence' \
 'submit:Explicitly submit a feedback draft' \
 'auto:Fully automated end-to-end feedback generation, deduplication, and submission' \
+'report:File a defect report against the tool'\''s own repository' \
     )
     _describe -t commands 'do-harness help feedback commands' commands "$@"
 }
@@ -2416,6 +2458,11 @@ _do-harness__subcmd__help__subcmd__feedback__subcmd__auto_commands() {
 _do-harness__subcmd__help__subcmd__feedback__subcmd__draft_commands() {
     local commands; commands=()
     _describe -t commands 'do-harness help feedback draft commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__help__subcmd__feedback__subcmd__report_commands] )) ||
+_do-harness__subcmd__help__subcmd__feedback__subcmd__report_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness help feedback report commands' commands "$@"
 }
 (( $+functions[_do-harness__subcmd__help__subcmd__feedback__subcmd__submit_commands] )) ||
 _do-harness__subcmd__help__subcmd__feedback__subcmd__submit_commands() {

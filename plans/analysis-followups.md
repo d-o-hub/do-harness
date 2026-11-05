@@ -1,6 +1,6 @@
 # Codebase analysis follow-ups (2026-10-15 swarm)
 
-> **Status:** analysis complete; findings verified against source, fixes not yet implemented
+> **Status:** analysis and follow-up implementation complete; progress recorded through 2026-11-01. This record is not pending-unimplemented-fixes: the implementation-progress tables below are done, and the remaining open items were closed on 2026-11-01 (see the backlog-closure table).
 > **Related:** release distribution, persistence/db invariants, guardian-proxy threat model, sensors/CI policy, test coverage
 > **Created:** 2026-10-15
 
