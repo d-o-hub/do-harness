@@ -861,6 +861,22 @@
           "index": 1
         },
         {
+          "id": "expected_receipt",
+          "kind": "option",
+          "short": null,
+          "long": "expected-receipt",
+          "value_names": [
+            "FILE"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Re-validate a previously issued authorization receipt (the full `pr ready --format json` report file). The snapshot is recomputed",
+          "index": null
+        },
+        {
           "id": "format",
           "kind": "option",
           "short": null,

@@ -4323,12 +4323,27 @@ _do__harness() {
             return 0
             ;;
         do__subcmd__harness__subcmd__pr__subcmd__ready)
-            opts="-q -h -V --format --root --config --quiet --output --dry-run --help --version"
+            opts="-q -h -V --expected-receipt --format --root --config --quiet --output --dry-run --help --version"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
             fi
             case "${prev}" in
+                --expected-receipt)
+                    local oldifs
+                    if [ -n "${IFS+x}" ]; then
+                        oldifs="$IFS"
+                    fi
+                    IFS=$'\n'
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    if [ -n "${oldifs+x}" ]; then
+                        IFS="$oldifs"
+                    fi
+                    if [[ "${BASH_VERSINFO[0]}" -ge 4 ]]; then
+                        compopt -o filenames
+                    fi
+                    return 0
+                    ;;
                 --format)
                     COMPREPLY=($(compgen -W "text json" -- "${cur}"))
                     return 0

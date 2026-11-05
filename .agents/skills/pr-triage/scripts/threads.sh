@@ -51,11 +51,16 @@ case "$cmd" in
       bin="do-harness"
     fi
     if [ -n "$bin" ]; then
-      "$bin" pr ready "$pr" --format json 2>/dev/null | jq -r '
-        .conversations.unresolved_threads[]? |
-        [.id, "false", (.isOutdated|tostring), (.path // ""), (.line // 0 | tostring), .author, .excerpt] |
-        @tsv'
-      exit 0
+      # `pr ready` exits 1 for a blocked PR — exactly when the list is needed —
+      # so its status is ignored and only a parseable inventory is trusted.
+      json="$("$bin" pr ready "$pr" --format json 2>/dev/null || true)"
+      if [ -n "$json" ] && printf '%s' "$json" | jq -e '.conversations.unresolved_threads' >/dev/null 2>&1; then
+        printf '%s' "$json" | jq -r '
+          .conversations.unresolved_threads[]? |
+          [.id, "false", (.isOutdated|tostring), (.path // ""), (.line // 0 | tostring), .author, .excerpt] |
+          @tsv'
+        exit 0
+      fi
     fi
     owner=$(gh repo view --json owner --jq .owner.login)
     name=$(gh repo view --json name --jq .name)

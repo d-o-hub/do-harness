@@ -124,16 +124,23 @@ Run these steps in order. Stop the sweep on any escalation and report it.
     and smallest fix. Apply blocking fixes, commit, push, then return to step 7
     (push invalidates previous route decision as head SHA changed). Cap at three
     fix cycles, then escalate.
-11. **Merge.** Re-read the head SHA and run `scripts/premerge.sh PR` on it; a
-    refusal (draft, hold label, not open, `mergeable` not `MERGEABLE`, a branch
-    that is `BEHIND`, or a CI verdict other than `PASS`) is a hard stop to
-    report, not a flag to clear. The script re-runs the typed classifier, so an
-    unknown or unreadable check state can never reach the merge. Then merge directly, never with `--auto`:
-    `gh pr merge PR --squash --match-head-commit HEAD_SHA`
-    where `HEAD_SHA` is the head you validated. After a merge, run the per-PR
-    loop in [references/merge-order.md](references/merge-order.md) (rebase the
-    next PR, re-run its checks, re-read `mergeStateStatus`/`mergeable`, then
-    merge on the re-validated head). Do not delete branches during triage.
+11. **Merge.** Produce the authorizing report for the current head and merge
+    through its receipt:
+    `"$DO_HARNESS_BIN" pr ready PR --format json > "$receipt_file"`
+    then `scripts/merge.sh PR "$receipt_file"`. The script re-runs
+    `pr ready --expected-receipt`, which recomputes the whole snapshot and
+    accepts the file only when nothing moved and its 60-second lifetime has not
+    elapsed; it then requires `MERGE_ALLOWED` and issues exactly
+    `gh pr merge PR --squash --match-head-commit HEAD_SHA`.
+    Exit `1` is a known blocker (draft, hold label, not open, `CHANGES_REQUESTED`,
+    unresolved thread, needs-triage item, merge state not `CLEAN`/`MERGEABLE`, a
+    failed required check, policy drift, an introduced finding) — a hard stop to
+    report, never a flag to clear. Exit `2` is indeterminate: an unreadable API,
+    an unverified baseline, unprovable ancestry, or a stale/expired/forged
+    receipt. Exit `3` means no usable `do-harness` binary. After a merge, run the
+    per-PR loop in [references/merge-order.md](references/merge-order.md) (rebase
+    the next PR, produce a fresh receipt, re-read `mergeStateStatus`/`mergeable`,
+    then merge on the re-validated head). Do not delete branches during triage.
 12. **Post-merge.** Run `scripts/post-merge.sh PR` (add `--events-url` when the
     fast path is armed, as in step 8). The script bounds the wait
     (default 900 seconds) and treats an empty run list as not yet registered,
@@ -153,10 +160,11 @@ Run these steps in order. Stop the sweep on any escalation and report it.
   **hard stop**: report it and move on. Never un-draft a pull request
   (`gh pr ready`) to make a merge possible, and never merge one without explicit
   human approval recorded in this session — un-drafting is the author's
-  decision. `scripts/premerge.sh PR` enforces the stop immediately before the
-  merge and refuses a draft, a hold label, a non-open PR, a head whose mergeability
-  GitHub has not computed (`mergeable=UNKNOWN` after a force-push), and a branch
-  that is `BEHIND` its base.
+  decision. `scripts/merge.sh PR REPORT` enforces the stop immediately before
+  the merge: it refuses a draft, a hold label, a non-open PR, an armed
+  auto-merge request, a head whose mergeability GitHub has not computed, a
+  branch that is `BEHIND` its base, and any receipt that no longer matches the
+  recomputed snapshot.
 - No auto-merge; `--match-head-commit` always; re-read the head SHA immediately
   before any merge or close. A pre-armed request is disarmed
   (`scripts/auto-merge.sh PR --disable`) before the head is validated: an armed

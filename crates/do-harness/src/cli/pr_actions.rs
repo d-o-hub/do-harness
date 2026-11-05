@@ -51,6 +51,10 @@ pub enum PrAction {
         /// Pull request number.
         #[arg(value_name = "PR")]
         pr: u64,
+        /// Re-validate a previously issued authorization receipt (the full
+        /// `pr ready --format json` report file). The snapshot is recomputed.
+        #[arg(long, value_hint = ValueHint::FilePath, value_name = "FILE")]
+        expected_receipt: Option<PathBuf>,
         /// Output format.
         #[arg(long, value_enum, default_value_t = Format::Text)]
         format: Format,
