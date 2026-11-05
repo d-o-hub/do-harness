@@ -3820,7 +3820,8 @@
       "subcommands": [
         "draft",
         "submit",
-        "auto"
+        "auto",
+        "report"
       ],
       "invocable": false
     },
@@ -4029,6 +4030,117 @@
           "default_values": [],
           "possible_values": [],
           "help": "Minimum independent attributable fires required (default: 3)",
+          "index": null
+        },
+        {
+          "id": "format",
+          "kind": "option",
+          "short": null,
+          "long": "format",
+          "value_names": [
+            "FORMAT"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [
+            "text"
+          ],
+          "possible_values": [
+            "text",
+            "json"
+          ],
+          "help": "Output format",
+          "index": null
+        }
+      ],
+      "subcommands": [],
+      "invocable": true
+    },
+    {
+      "path": "feedback report",
+      "about": "File a defect report against the tool's own repository",
+      "usage": "do-harness feedback report [OPTIONS] --error <TEXT>",
+      "aliases": [],
+      "args": [
+        {
+          "id": "repo",
+          "kind": "option",
+          "short": null,
+          "long": "repo",
+          "value_names": [
+            "OWNER/REPO"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Target repository override (default: the tool's own repository)",
+          "index": null
+        },
+        {
+          "id": "error",
+          "kind": "option",
+          "short": null,
+          "long": "error",
+          "value_names": [
+            "TEXT"
+          ],
+          "required": true,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Failure message to report",
+          "index": null
+        },
+        {
+          "id": "log",
+          "kind": "option",
+          "short": null,
+          "long": "log",
+          "value_names": [
+            "FILE"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Log file whose tail is attached to the report",
+          "index": null
+        },
+        {
+          "id": "warning",
+          "kind": "option",
+          "short": null,
+          "long": "warning",
+          "value_names": [
+            "WARNING"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": false,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Classify the report as a warning rather than an error",
+          "index": null
+        },
+        {
+          "id": "yes",
+          "kind": "option",
+          "short": null,
+          "long": "yes",
+          "value_names": [
+            "YES"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": false,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Skip interactive confirmation (unattended mode)",
           "index": null
         },
         {

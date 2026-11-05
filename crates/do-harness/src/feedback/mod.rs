@@ -7,12 +7,109 @@ use anyhow::{Context, Result};
 
 pub mod auto;
 pub mod draft;
+pub mod report;
 pub mod submit;
 pub mod types;
 
 use crate::cli::FeedbackAction;
 use crate::report::Format;
 use types::SubmissionResult;
+
+/// Inputs for an explicit defect report.
+struct ReportRequest {
+    repo: Option<String>,
+    error: String,
+    log: Option<std::path::PathBuf>,
+    warning: bool,
+    yes: bool,
+    dry_run: bool,
+    format: Format,
+}
+
+fn run_report(root: &Path, request: ReportRequest) -> Result<()> {
+    let log_tail = match request.log {
+        Some(path) => report::read_log_tail(&path)?,
+        None => String::new(),
+    };
+    let kind = if request.warning { "warning" } else { "error" };
+    let argv: Vec<String> = std::env::args().collect();
+    let result = report::file_explicit(
+        root,
+        request.repo.as_deref(),
+        kind,
+        &request.error,
+        &argv,
+        &log_tail,
+        request.yes,
+        request.dry_run,
+    )?;
+    match request.format {
+        Format::Json => {
+            println!("{}", serde_json::to_string_pretty(&result)?);
+        }
+        Format::Text => match result {
+            SubmissionResult::Created {
+                issue_number,
+                issue_url,
+            } => {
+                println!("Created issue #{issue_number}: {issue_url}");
+            }
+            SubmissionResult::LinkedExisting {
+                issue_number,
+                issue_url,
+            } => {
+                println!("Linked existing issue #{issue_number}: {issue_url}");
+            }
+            SubmissionResult::DryRun {
+                title,
+                target_repo,
+                would_create,
+            } => {
+                println!(
+                    "Dry run: would create issue in {target_repo} with title '{title}' (would_create={would_create})"
+                );
+            }
+        },
+    }
+    Ok(())
+}
+
+fn run_submit(
+    root: &Path,
+    draft: &std::path::Path,
+    repo: Option<&str>,
+    yes: bool,
+    dry_run: bool,
+) -> Result<()> {
+    let bytes = fs::read(draft).with_context(|| format!("read draft file {}", draft.display()))?;
+    let parsed_draft: types::FeedbackDraft =
+        serde_json::from_slice(&bytes).context("parse draft JSON")?;
+    let res = submit::submit_draft(root, &parsed_draft, repo, yes, dry_run)?;
+    match res {
+        SubmissionResult::Created {
+            issue_number,
+            issue_url,
+        } => {
+            println!("Created issue #{issue_number}: {issue_url}");
+        }
+        SubmissionResult::LinkedExisting {
+            issue_number,
+            issue_url,
+        } => {
+            println!("Linked existing issue #{issue_number}: {issue_url}");
+        }
+        SubmissionResult::DryRun {
+            title,
+            target_repo,
+            would_create,
+        } => {
+            println!(
+                "Dry run: would create issue in {target_repo} with title '{title}' (would_create={would_create})"
+            );
+        }
+    }
+    Ok(())
+}
 
 /// Dispatches a feedback action.
 ///
@@ -64,38 +161,13 @@ pub async fn run(root: &Path, action: FeedbackAction, global_dry_run: bool) -> R
             repo,
             yes,
             dry_run,
-        } => {
-            let dry_run = dry_run || global_dry_run;
-            let bytes =
-                fs::read(&draft).with_context(|| format!("read draft file {}", draft.display()))?;
-            let parsed_draft: types::FeedbackDraft =
-                serde_json::from_slice(&bytes).context("parse draft JSON")?;
-            let res = submit::submit_draft(root, &parsed_draft, repo.as_deref(), yes, dry_run)?;
-            match res {
-                SubmissionResult::Created {
-                    issue_number,
-                    issue_url,
-                } => {
-                    println!("Created issue #{issue_number}: {issue_url}");
-                }
-                SubmissionResult::LinkedExisting {
-                    issue_number,
-                    issue_url,
-                } => {
-                    println!("Linked existing issue #{issue_number}: {issue_url}");
-                }
-                SubmissionResult::DryRun {
-                    title,
-                    target_repo,
-                    would_create,
-                } => {
-                    println!(
-                        "Dry run: would create issue in {target_repo} with title '{title}' (would_create={would_create})"
-                    );
-                }
-            }
-            Ok(())
-        }
+        } => run_submit(
+            root,
+            &draft,
+            repo.as_deref(),
+            yes,
+            dry_run || global_dry_run,
+        ),
         FeedbackAction::Auto {
             repo,
             days,
@@ -106,5 +178,25 @@ pub async fn run(root: &Path, action: FeedbackAction, global_dry_run: bool) -> R
             let dry_run = dry_run || global_dry_run;
             auto::run_auto(root, &repo, days, min_fires, dry_run, format).await
         }
+        FeedbackAction::Report {
+            repo,
+            error,
+            log,
+            warning,
+            yes,
+            dry_run,
+            format,
+        } => run_report(
+            root,
+            ReportRequest {
+                repo,
+                error,
+                log,
+                warning,
+                yes,
+                dry_run: dry_run || global_dry_run,
+                format,
+            },
+        ),
     }
 }
