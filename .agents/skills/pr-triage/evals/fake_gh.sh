@@ -104,8 +104,16 @@ case "$cmd" in
           *baseRefName*) printf 'main\t%s\n' "$sha" ;;
           *headRefOid*)
             # The Rust classifier reads JSON; older shell callers pass --jq.
+            # no-effect.sh re-reads both OIDs as one TSV query.
             if jq_arg "$@" >/dev/null 2>&1; then
-              printf '%s\n' "$sha"
+              expr=$(jq_arg "$@")
+              case "$expr" in
+                *baseRefOid*)
+                  base_sha=$(git rev-parse "refs/heads/${FAKE_GH_BASE:-main}")
+                  printf '%s\t%s\n' "$base_sha" "$sha"
+                  ;;
+                *) printf '%s\n' "$sha" ;;
+              esac
             else
               printf '{"headRefOid":"%s"}\n' "$sha"
             fi

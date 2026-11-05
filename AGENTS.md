@@ -10,7 +10,7 @@
 
 ---
 
-## 2. Hierarchical Execution Pipeline (HTN + Event Slices)
+## 2. Ordinary Working Route (Proportional)
 
 ```
 [ Objective / User Request ]
@@ -19,63 +19,41 @@
 [ 0. Baseline Freshness (.agents/skills/harness/scripts/latest-main.sh) ]
              │
              ▼
-[ 1. HTN Task Decomposition (.agents/skills/htn-planner) ]
+[ 1. Inspect Relevant Context ]
              │
-             ├── Requires Uncertainty Spike? ──> [.agents/skills/spike-runner]
-             │                                          │ (libSQL trace)
-             │                                          ▼
-             └──> [ 2. Event Model Schema Definition (.agents/skills/event-modeler) ]
-                               │
-                               ▼
-                  [ 3. ATDD Red Phase: Write Failing Fixtures ]
-                               │
-                               ▼
-                  [ 4. TDD Green Phase: Minimal Implementation ]
-                               │
-                               ▼
-                  [ 5. Computational Harness Verification (Sensors) ]
-                               │
-                               ▼
-                  [ 6. Dreaming & Skill Distillation (.agents/skills/skill-distiller) ]
+             ▼
+[ 2. Scoped Change (apply only the methods the change needs) ]
+             │
+             ▼
+[ 3. Applicable Deterministic Checks (sensors for what changed) ]
+             │
+             ▼
+[ 4. Required Current Completion Evidence (verify + status) ]
 ```
+
+The ordinary route is proportional to the change. It does not prescribe a
+fixed ceremony: decomposition, event modeling, spikes, and distillation are
+tools applied when a specific change justifies them, not phases every change
+must pass through. The completion gates below remain mandatory however small
+or mechanical the change is.
 
 ---
 
-## 3. The 6-Phase Coding Workflow
+## 3. The Ordinary Workflow
 
-### Phase 0: Baseline Freshness (Latest-main First)
+### Step 0: Baseline Freshness (Latest-main First)
 - At the boundary of every new top-level repository work request, execute `bash .agents/skills/harness/scripts/latest-main.sh [--root DIR] [--read-only]`.
 - Clean `main` fast-forwards via `git merge --ff-only origin/main`. For new work, branch from the refreshed tip; dirty or active feature branches are never reset, auto-stashed, or automatically rebased.
 - Read-only planning runs with `--read-only` and inspects pinned upstream source if the object is not local. Remote failure fails closed.
 
-### Phase 1: HTN Planning & Decomposition
-- Break compound requests into primitive tasks stored in `plans/tasks.json` or `.do-harness/agent_state.db`.
-- Check preconditions before invoking any action.
+### Step 1: Inspect Relevant Context
+- Read the affected code and docs before editing, and load only the skill whose contract matches the task: run `do-harness skills suggest --query "<task>" --limit 5`, inspect the candidate metadata, and read only the selected `SKILL.md` and its references.
 
-### Phase 2: Spike Execution (If Ambiguity Exists)
-- If third-party APIs, performance boundaries, or novel crate integrations are uncertain, isolate them in `tests/spikes/` or a temporary branch.
-- Record findings directly to the local database and clean up scratch code.
+### Step 2: Scoped Change
+- Implement the minimal change the request calls for, using the project's conventions. Specialized methods are applied only when the change actually needs them (see "Choosing Methods Proportionately"): a typo fix does not need HTN decomposition or an event schema, and a green PR does not compel a skill update.
 
-### Phase 3: Event Modeling (Given-When-Then Contracts)
-- Split domain behavior into two discrete slice types:
-  1. **State Change**: `Command -> Handler -> Event(s)`
-  2. **State View**: `Event(s) -> Projection / Read Model -> Query`
-- Define Rust structs, enums, and typed errors before implementation.
-
-### Phase 4: Acceptance Test-Driven Development (ATDD)
-- Author end-to-end integration fixtures verifying:
-  - `Given`: Initial event history loaded into libSQL/memory.
-  - `When`: Command is dispatched.
-  - `Then`: Specific domain events emitted and read models updated.
-- Verify that the test fails for the expected reason (`Red`).
-
-### Phase 5: Implementation & Computational Sensors (Green & Refactor)
-- Implement the minimal handler logic to satisfy the test (`Green`).
-- Run the full verification suite via the unified entrypoint (`do-harness verify` runs every configured sensor — see `[[sensors]]` in `do-harness.toml`):
-  <!-- example: id=agents_verify classification=illustrative reason="Self-correction verify command" -->
-  ```bash
-  do-harness verify
-  ```
+### Step 3: Applicable Deterministic Checks
+- Run the sensors applicable to what changed (`do-harness verify --set verification --changed`, or the targeted individual checks below). Computational sensors strictly supersede LLM self-assessment.
 - For targeted re-runs after a specific sensor fires (self-correction protocol), invoke the individual command:
   <!-- example: id=agents_targeted_reruns classification=illustrative reason="Targeted cargo re-runs" -->
   ```bash
@@ -83,12 +61,22 @@
   cargo nextest run --workspace
   cargo clippy --workspace --all-targets -- -D warnings
   ```
-- Refactor if necessary while respecting the 500 LOC ceiling.
+- Refactor if necessary while respecting the 500 LOC ceiling. Run the full suite via the unified entrypoint (`do-harness verify` runs every configured sensor — see `[[sensors]]` in `do-harness.toml`):
+  <!-- example: id=agents_verify classification=illustrative reason="Self-correction verify command" -->
+  ```bash
+  do-harness verify
+  ```
 
-### Phase 6: Dreaming & Skill Distillation Loop
-- Extract successful diffs and error-recovery patterns from the interaction trace.
-- Update matching skills in `.agents/skills/` or create new evaluated skills.
-- Run skill evaluation fixtures to benchmark token efficiency and test pass rates.
+### Step 4: Required Current Completion Evidence
+- A change is complete only when its verification evidence is current and non-vacuous: run `do-harness verify --set verification --strict` (or the verify gate the change targets), then confirm `do-harness status --set verification` is green. Stale evidence — workspace or policy changed since verification — is red, not a pass; a sensor that ran zero checks is a failed gate (see §4).
+
+### Choosing Methods Proportionately
+- **Trivial or mechanical changes** (e.g., a docs typo, a rename, a formatting fix): inspect, make the scoped edit, run the applicable checks, confirm completion evidence. No HTN plan, event schema, or distillation artifacts are produced.
+- **Localized behavioral bugs**: keep a failing regression test for the defect (red), implement the fix (green), then run the applicable sensors. Prose and mechanical changes do not require a ceremonial red/green fixture.
+- **Compound dependent work**: use `.agents/skills/htn-planner` to decompose genuinely multi-step or dependent requests into ordered subtasks; persist the plan only when tracking the work needs it.
+- **Durable state transitions/projections**: use `.agents/skills/event-modeler` (Commands → Events → Projections) when the change introduces or modifies domain state transitions that justify Given-When-Then contracts.
+- **Concrete external uncertainty**: isolate an uncertain API, performance boundary, or novel integration in a spike via `.agents/skills/spike-runner`; record findings, then clean up scratch code.
+- **Distillation**: extract reusable lessons with `.agents/skills/skill-distiller` only when a repeated or consequential failure (or a resolved spike constraint) supplies evidence worth generalizing. Successful work prompts a review for reusable learning; concluding there is no reusable lesson without touching a skill is a valid outcome.
 
 ---
 

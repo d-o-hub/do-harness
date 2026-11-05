@@ -1851,9 +1851,23 @@ Generate man page documentation into specified directory.
 <!-- BEGIN GENERATED: cli-contract feedback -->
 `do-harness feedback [OPTIONS] <COMMAND>`
 
-Subcommands: `draft`, `submit`, `auto`.
+Subcommands: `draft`, `submit`, `auto`, `report`.
 <!-- END GENERATED: cli-contract feedback -->
 Manage impact-gated feedback proposals and issue reporting.
+
+`feedback report` files a defect against the tool's own repository
+(`d-o-hub/do-harness`, overridable with `DO_HARNESS_REPO`). Automatic reporting
+is on by default for internal failures and panics, which are always defects in
+the tool; set `DO_HARNESS_AUTO_REPORT=all` to report every failure exit (1 and
+2), or `off` to disable it. Exit 3 (a verify run owns the evidence) is an
+expected state and is never reported. An automatic report carries the CLI's own
+failure diagnostics, including failing-sensor output.
+
+Reports are deduplicated by a fingerprint that ignores volatile tokens (pids,
+timestamps, counts, commit hashes) and the tool version, so one defect links to
+one issue across runs and releases. The body carries the command, environment,
+expected and actual behavior, diagnostics, and acceptance criteria. Reporting is
+best-effort, bounded by a timeout, and never changes the command's exit code.
 
 #### `feedback draft`
 <!-- BEGIN GENERATED: cli-contract feedback draft -->
@@ -1895,6 +1909,25 @@ Explicitly submit a prepared feedback draft to GitHub with deduplication.
 | `--format <FORMAT>` | no | `text` | `text`, `json` | Output format |
 <!-- END GENERATED: cli-contract feedback auto -->
 Fully automated unattended feedback candidate generation, deduplication search, and submission.
+
+#### `feedback report`
+<!-- BEGIN GENERATED: cli-contract feedback report -->
+`do-harness feedback report [OPTIONS] --error <TEXT>`
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `--repo <OWNER/REPO>` | no | — | — | Target repository override (default: the tool's own repository) |
+| `--error <TEXT>` | yes | — | — | Failure message to report |
+| `--log <FILE>` | no | — | — | Log file whose tail is attached to the report |
+| `--warning` | no | — | — | Classify the report as a warning rather than an error |
+| `--yes` | no | — | — | Skip interactive confirmation (unattended mode) |
+| `--format <FORMAT>` | no | `text` | `text`, `json` | Output format |
+<!-- END GENERATED: cli-contract feedback report -->
+File a defect report against the tool's own repository, with the error text and
+an optional log tail. The report is deduplicated by fingerprint, so a repeated
+failure links the existing issue instead of creating another. `--warning`
+classifies the report as a warning rather than an error, and `--dry-run`
+performs the deduplication search and preview without creating an issue.
 
 ## Exit Codes
 

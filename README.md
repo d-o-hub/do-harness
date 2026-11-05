@@ -271,6 +271,7 @@ export PATH="$HOME/.local/bin:$PATH"
 | `feedback draft [OPTIONS] --repo <OWNER/REPO>` | Generate a local feedback draft from recurring or severe failure evidence — flags: `--repo <OWNER/REPO>`, `--days <DAYS>`, `--min-fires <N>`, `--out <FILE>`, `--format <FORMAT>` |
 | `feedback submit [OPTIONS] --draft <FILE>` | Explicitly submit a feedback draft — flags: `--draft <FILE>`, `--repo <OWNER/REPO>`, `--yes` |
 | `feedback auto [OPTIONS] --repo <OWNER/REPO>` | Fully automated end-to-end feedback generation, deduplication, and submission — flags: `--repo <OWNER/REPO>`, `--days <DAYS>`, `--min-fires <N>`, `--format <FORMAT>` |
+| `feedback report [OPTIONS] --error <TEXT>` | File a defect report against the tool's own repository — flags: `--repo <OWNER/REPO>`, `--error <TEXT>`, `--log <FILE>`, `--warning`, `--yes`, `--format <FORMAT>` |
 
 Global flags: `--root <DIR>`, `--config <FILE>`, `-q, --quiet`, `--output <FILE>`, `--dry-run`.
 <!-- END GENERATED: cli-commands -->

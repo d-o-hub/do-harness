@@ -1329,6 +1329,7 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('draft', 'draft', [CompletionResultType]::ParameterValue, 'Generate a local feedback draft from recurring or severe failure evidence')
             [CompletionResult]::new('submit', 'submit', [CompletionResultType]::ParameterValue, 'Explicitly submit a feedback draft')
             [CompletionResult]::new('auto', 'auto', [CompletionResultType]::ParameterValue, 'Fully automated end-to-end feedback generation, deduplication, and submission')
+            [CompletionResult]::new('report', 'report', [CompletionResultType]::ParameterValue, 'File a defect report against the tool''s own repository')
             [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
             break
         }
@@ -1383,10 +1384,30 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('--version', '--version', [CompletionResultType]::ParameterName, 'Print version')
             break
         }
+        'do-harness;feedback;report' {
+            [CompletionResult]::new('--repo', '--repo', [CompletionResultType]::ParameterName, 'Target repository override (default: the tool''s own repository)')
+            [CompletionResult]::new('--error', '--error', [CompletionResultType]::ParameterName, 'Failure message to report')
+            [CompletionResult]::new('--log', '--log', [CompletionResultType]::ParameterName, 'Log file whose tail is attached to the report')
+            [CompletionResult]::new('--format', '--format', [CompletionResultType]::ParameterName, 'Output format')
+            [CompletionResult]::new('--root', '--root', [CompletionResultType]::ParameterName, 'Workspace root override (default: walk up from cwd)')
+            [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Explicit path to do-harness.toml')
+            [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)')
+            [CompletionResult]::new('--warning', '--warning', [CompletionResultType]::ParameterName, 'Classify the report as a warning rather than an error')
+            [CompletionResult]::new('--yes', '--yes', [CompletionResultType]::ParameterName, 'Skip interactive confirmation (unattended mode)')
+            [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Perform search and preview without creating an issue')
+            [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Suppress PASS/WARN verdict lines and the success footer')
+            [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Suppress PASS/WARN verdict lines and the success footer')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            [CompletionResult]::new('-V', '-V ', [CompletionResultType]::ParameterName, 'Print version')
+            [CompletionResult]::new('--version', '--version', [CompletionResultType]::ParameterName, 'Print version')
+            break
+        }
         'do-harness;feedback;help' {
             [CompletionResult]::new('draft', 'draft', [CompletionResultType]::ParameterValue, 'Generate a local feedback draft from recurring or severe failure evidence')
             [CompletionResult]::new('submit', 'submit', [CompletionResultType]::ParameterValue, 'Explicitly submit a feedback draft')
             [CompletionResult]::new('auto', 'auto', [CompletionResultType]::ParameterValue, 'Fully automated end-to-end feedback generation, deduplication, and submission')
+            [CompletionResult]::new('report', 'report', [CompletionResultType]::ParameterValue, 'File a defect report against the tool''s own repository')
             [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
             break
         }
@@ -1397,6 +1418,9 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             break
         }
         'do-harness;feedback;help;auto' {
+            break
+        }
+        'do-harness;feedback;help;report' {
             break
         }
         'do-harness;feedback;help;help' {
@@ -1651,6 +1675,7 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('draft', 'draft', [CompletionResultType]::ParameterValue, 'Generate a local feedback draft from recurring or severe failure evidence')
             [CompletionResult]::new('submit', 'submit', [CompletionResultType]::ParameterValue, 'Explicitly submit a feedback draft')
             [CompletionResult]::new('auto', 'auto', [CompletionResultType]::ParameterValue, 'Fully automated end-to-end feedback generation, deduplication, and submission')
+            [CompletionResult]::new('report', 'report', [CompletionResultType]::ParameterValue, 'File a defect report against the tool''s own repository')
             break
         }
         'do-harness;help;feedback;draft' {
@@ -1660,6 +1685,9 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             break
         }
         'do-harness;help;feedback;auto' {
+            break
+        }
+        'do-harness;help;feedback;report' {
             break
         }
         'do-harness;help;help' {

@@ -7,8 +7,10 @@ one cluster when all three hold:
 2. they branch from the same base blob for that file — compare
    `gh pr view PR --json files,baseRefOid` against
    `gh api repos/{owner}/{repo}/contents/<path>?ref=<baseRefOid> --jq .sha`;
-3. they have the same effect on the tree — `scripts/no-effect.sh` on each
-   revision range is the cheap proxy when two branches look identical.
+3. they have the same effect on the tree — `scripts/no-effect.sh` on each PR
+   is the cheap proxy when two branches look identical: it reports `no-effect`
+   only when merging the PR into its current base would not change the base tree
+   (a **no tree effect** verdict with a verified base).
 
 Measure before believing a difference in wording or commit messages: identical
 diffs with different prose are one change.
