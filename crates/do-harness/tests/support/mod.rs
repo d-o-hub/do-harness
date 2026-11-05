@@ -160,3 +160,4 @@ pub mod pr_metrics;
 pub mod pr_readiness;
 pub mod range_selection;
 pub mod reuse;
+pub mod update_base;
