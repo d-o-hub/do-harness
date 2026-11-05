@@ -46,6 +46,17 @@ case "$cmd" in
 
   list)
     pr="${2:?usage: threads.sh list <pr-number>}"
+    bin="${DO_HARNESS_BIN:-}"
+    if [ -z "$bin" ] && command -v do-harness >/dev/null 2>&1; then
+      bin="do-harness"
+    fi
+    if [ -n "$bin" ]; then
+      "$bin" pr ready "$pr" --format json 2>/dev/null | jq -r '
+        .conversations.unresolved_threads[]? |
+        [.id, "false", (.isOutdated|tostring), (.path // ""), (.line // 0 | tostring), .author, .excerpt] |
+        @tsv'
+      exit 0
+    fi
     owner=$(gh repo view --json owner --jq .owner.login)
     name=$(gh repo view --json name --jq .name)
     cursor=""
@@ -65,7 +76,7 @@ case "$cmd" in
 
   issue-comments)
     pr="${2:?usage: threads.sh issue-comments <pr-number>}"
-    gh api "repos/{owner}/{repo}/issues/$pr/comments?per_page=100" \
+    gh api --paginate "repos/{owner}/{repo}/issues/$pr/comments?per_page=100" \
       --jq '.[] | [(.user.login // ""), .created_at, ((.body // "") | gsub("\n"; " ") | .[0:120])] | @tsv'
     ;;
 

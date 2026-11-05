@@ -74,7 +74,7 @@ async fn route(root: &Path, config_path: Option<PathBuf>, cli: Cli) -> Result<()
         | Command::Compliance { .. }
         | Command::Completions { .. }
         | Command::Man { .. } => unreachable!("version/compliance/completions/man handled above"),
-        Command::Pr { action } => pr::command::run(root, action),
+        Command::Pr { action } => pr::command::run(root, action, cli.dry_run),
         Command::Maintenance {
             prune_beats,
             keep_per_task,

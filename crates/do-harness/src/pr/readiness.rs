@@ -72,17 +72,24 @@ pub fn evaluate(root: &Path, number: u64) -> Result<ReadinessReport> {
         // the suite; record that before the state strings move into the report.
         let conflicts = view.merge_state_status == "DIRTY" || view.mergeable == "CONFLICTING";
         let merge_state = MergeState {
-            status: view.merge_state_status,
-            mergeable: view.mergeable,
+            status: view.merge_state_status.clone(),
+            mergeable: view.mergeable.clone(),
             auto_merge: view.auto_merge_request.is_some(),
         };
+        // 2. Review Decision
+        if let Some(decision) = &view.review_decision {
+            if decision == "CHANGES_REQUESTED" {
+                blockers.push("review decision is 'CHANGES_REQUESTED'".to_owned());
+            } else if decision == "REVIEW_REQUIRED" {
+                blockers.push("review decision is 'REVIEW_REQUIRED'".to_owned());
+            }
+        }
 
-        // 2. Checks & Statuses
+        // 3. Checks & Statuses
         let checks = evaluate_checks(root, number, &initial_head, conflicts, &mut blockers)?;
 
-        // 3. Review Threads & Issue Comments
-        let (conversations, codecov) =
-            evaluate_conversations(root, number, &initial_head, &mut blockers)?;
+        // 4. Review Threads, Comments & Dispositions
+        let (conversations, codecov) = evaluate_conversations(root, number, &view, &mut blockers)?;
 
         // 4. Recheck head SHA after collection
         let recheck_view = gh::readiness_view(root, number)
@@ -184,12 +191,18 @@ fn summarize_report(report: checks::ChecksReport) -> CheckSummary {
 fn evaluate_conversations(
     root: &Path,
     number: u64,
-    head_ref_oid: &str,
+    view: &gh::PrReadinessView,
     blockers: &mut Vec<String>,
 ) -> Result<(ConversationSummary, Option<CodecovSummary>)> {
     let threads = gh::review_threads(root, number).context("could not read review threads")?;
+    let comments = gh::issue_comments(root, number).context("could not read issue comments")?;
+    let reviews = gh::reviews(root, number).context("could not read reviews")?;
+
+    let ledger =
+        super::conversations::build_inventory(root, number, view, &threads, &comments, &reviews)?;
+
     let mut unresolved_threads = Vec::new();
-    for thread in threads {
+    for thread in &threads {
         if !thread.is_resolved {
             let author = thread
                 .comments
@@ -217,8 +230,8 @@ fn evaluate_conversations(
                 "unresolved review thread{status_note} on {location} by {author}: {excerpt}"
             ));
             unresolved_threads.push(UnresolvedThread {
-                id: thread.id,
-                path: thread.path,
+                id: thread.id.clone(),
+                path: thread.path.clone(),
                 line: thread.line,
                 author: author.to_owned(),
                 excerpt,
@@ -227,12 +240,38 @@ fn evaluate_conversations(
         }
     }
 
-    let comments = gh::issue_comments(root, number).context("could not read issue comments")?;
+    for rev in &reviews {
+        if rev.state == "CHANGES_REQUESTED" {
+            let author = rev.user.as_ref().map_or("unknown", |u| u.login.as_str());
+            let item_ref = format!(
+                "review:{}",
+                rev.node_id.as_deref().unwrap_or(&rev.id.to_string())
+            );
+            if !ledger
+                .accepted_dispositions
+                .iter()
+                .any(|d| d.item_ref == item_ref)
+            {
+                blockers.push(format!(
+                    "review by {author} requested changes: {}",
+                    first_line(&rev.body, 80)
+                ));
+            }
+        }
+    }
+
+    for item in &ledger.needs_triage {
+        blockers.push(format!(
+            "conversation item '{}' by {} needs triage: {}",
+            item.item_ref, item.author, item.excerpt
+        ));
+    }
+
     let mut actionable_comments = Vec::new();
     let codecov = super::waiver_comment::evaluate_codecov(
         root,
         &comments,
-        head_ref_oid,
+        &view.head_ref_oid,
         blockers,
         &mut actionable_comments,
     );
@@ -240,7 +279,11 @@ fn evaluate_conversations(
     let conversations = ConversationSummary {
         unresolved_threads,
         actionable_comments,
-        complete: true,
+        review_decision: view.review_decision.clone(),
+        conversation_inventory_digest: ledger.inventory_digest,
+        items_count: ledger.items.len(),
+        needs_triage: ledger.needs_triage,
+        complete: ledger.complete,
     };
     Ok((conversations, codecov))
 }

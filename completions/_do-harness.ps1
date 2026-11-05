@@ -220,6 +220,7 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('check', 'check', [CompletionResultType]::ParameterValue, 'Check whether a pull request is ready to merge: merge state, CI checks, and review conversations')
             [CompletionResult]::new('checks', 'checks', [CompletionResultType]::ParameterValue, 'Classify a pull request''s CI checks and commit statuses; fail closed on unknown')
             [CompletionResult]::new('waivers', 'waivers', [CompletionResultType]::ParameterValue, 'Classify patch-coverage residue: waivable classes and lines needing tests')
+            [CompletionResult]::new('disposition', 'disposition', [CompletionResultType]::ParameterValue, 'Record a structured disposition for a review, thread, comment, or finding')
             [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
             break
         }
@@ -333,12 +334,31 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('--version', '--version', [CompletionResultType]::ParameterName, 'Print version')
             break
         }
+        'do-harness;pr;disposition' {
+            [CompletionResult]::new('--decision', '--decision', [CompletionResultType]::ParameterName, 'Decision for the item (fixed, non-actionable, or waived)')
+            [CompletionResult]::new('--head', '--head', [CompletionResultType]::ParameterName, 'Full head commit SHA to bind the disposition to')
+            [CompletionResult]::new('--reason', '--reason', [CompletionResultType]::ParameterName, 'Concrete rationale for the decision')
+            [CompletionResult]::new('--evidence', '--evidence', [CompletionResultType]::ParameterName, 'Optional evidence SHA (required if decision is fixed)')
+            [CompletionResult]::new('--format', '--format', [CompletionResultType]::ParameterName, 'Output format')
+            [CompletionResult]::new('--root', '--root', [CompletionResultType]::ParameterName, 'Workspace root override (default: walk up from cwd)')
+            [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Explicit path to do-harness.toml')
+            [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)')
+            [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Suppress PASS/WARN verdict lines and the success footer')
+            [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Suppress PASS/WARN verdict lines and the success footer')
+            [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Dry run without side effects')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            [CompletionResult]::new('-V', '-V ', [CompletionResultType]::ParameterName, 'Print version')
+            [CompletionResult]::new('--version', '--version', [CompletionResultType]::ParameterName, 'Print version')
+            break
+        }
         'do-harness;pr;help' {
             [CompletionResult]::new('no-effect', 'no-effect', [CompletionResultType]::ParameterValue, 'Report the prospective merge impact of a PR or revision range')
             [CompletionResult]::new('review', 'review', [CompletionResultType]::ParameterValue, 'Emit the semantic residual: changed units evidence could not prove')
             [CompletionResult]::new('ready', 'ready', [CompletionResultType]::ParameterValue, 'Check whether a pull request is ready to merge: merge state, CI checks, and review conversations')
             [CompletionResult]::new('checks', 'checks', [CompletionResultType]::ParameterValue, 'Classify a pull request''s CI checks and commit statuses; fail closed on unknown')
             [CompletionResult]::new('waivers', 'waivers', [CompletionResultType]::ParameterValue, 'Classify patch-coverage residue: waivable classes and lines needing tests')
+            [CompletionResult]::new('disposition', 'disposition', [CompletionResultType]::ParameterValue, 'Record a structured disposition for a review, thread, comment, or finding')
             [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
             break
         }
@@ -355,6 +375,9 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             break
         }
         'do-harness;pr;help;waivers' {
+            break
+        }
+        'do-harness;pr;help;disposition' {
             break
         }
         'do-harness;pr;help;help' {
@@ -1411,6 +1434,7 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('ready', 'ready', [CompletionResultType]::ParameterValue, 'Check whether a pull request is ready to merge: merge state, CI checks, and review conversations')
             [CompletionResult]::new('checks', 'checks', [CompletionResultType]::ParameterValue, 'Classify a pull request''s CI checks and commit statuses; fail closed on unknown')
             [CompletionResult]::new('waivers', 'waivers', [CompletionResultType]::ParameterValue, 'Classify patch-coverage residue: waivable classes and lines needing tests')
+            [CompletionResult]::new('disposition', 'disposition', [CompletionResultType]::ParameterValue, 'Record a structured disposition for a review, thread, comment, or finding')
             break
         }
         'do-harness;help;pr;no-effect' {
@@ -1426,6 +1450,9 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             break
         }
         'do-harness;help;pr;waivers' {
+            break
+        }
+        'do-harness;help;pr;disposition' {
             break
         }
         'do-harness;help;skills' {

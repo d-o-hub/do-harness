@@ -634,7 +634,8 @@
         "review",
         "ready",
         "checks",
-        "waivers"
+        "waivers",
+        "disposition"
       ],
       "invocable": false
     },
@@ -1067,6 +1068,137 @@
             "json"
           ],
           "help": "Output format; `text` prints the paste-ready review comment",
+          "index": null
+        }
+      ],
+      "subcommands": [],
+      "invocable": true
+    },
+    {
+      "path": "pr disposition",
+      "about": "Record a structured disposition for a review, thread, comment, or finding",
+      "usage": "do-harness pr disposition [OPTIONS] --decision <DECISION> --head <HEAD> --reason <REASON> <PR> <ITEM_REF>",
+      "aliases": [],
+      "args": [
+        {
+          "id": "pr",
+          "kind": "positional",
+          "short": null,
+          "long": null,
+          "value_names": [
+            "PR"
+          ],
+          "required": true,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Pull request number",
+          "index": 1
+        },
+        {
+          "id": "item_ref",
+          "kind": "positional",
+          "short": null,
+          "long": null,
+          "value_names": [
+            "ITEM_REF"
+          ],
+          "required": true,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Item reference (e.g. `issue-comment:123`, `review-thread:PRRT_...`, `review:PRR_...`, `finding:...`)",
+          "index": 2
+        },
+        {
+          "id": "decision",
+          "kind": "option",
+          "short": null,
+          "long": "decision",
+          "value_names": [
+            "DECISION"
+          ],
+          "required": true,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [
+            "fixed",
+            "non-actionable",
+            "waived"
+          ],
+          "help": "Decision for the item (fixed, non-actionable, or waived)",
+          "index": null
+        },
+        {
+          "id": "head",
+          "kind": "option",
+          "short": null,
+          "long": "head",
+          "value_names": [
+            "HEAD"
+          ],
+          "required": true,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Full head commit SHA to bind the disposition to",
+          "index": null
+        },
+        {
+          "id": "reason",
+          "kind": "option",
+          "short": null,
+          "long": "reason",
+          "value_names": [
+            "REASON"
+          ],
+          "required": true,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Concrete rationale for the decision",
+          "index": null
+        },
+        {
+          "id": "evidence",
+          "kind": "option",
+          "short": null,
+          "long": "evidence",
+          "value_names": [
+            "EVIDENCE"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Optional evidence SHA (required if decision is fixed)",
+          "index": null
+        },
+        {
+          "id": "format",
+          "kind": "option",
+          "short": null,
+          "long": "format",
+          "value_names": [
+            "FORMAT"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [
+            "text"
+          ],
+          "possible_values": [
+            "text",
+            "json"
+          ],
+          "help": "Output format",
           "index": null
         }
       ],

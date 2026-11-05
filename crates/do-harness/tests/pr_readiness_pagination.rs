@@ -235,3 +235,69 @@ fn head_moving_during_collection_yields_no_ready_result() {
         "stderr: {stderr}"
     );
 }
+
+#[cfg(unix)]
+#[test]
+fn paginated_issue_comments_101st_comment_is_inventoried() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    let bin = fake_gh_router(root);
+
+    std::fs::write(
+        root.join("view.json"),
+        r#"{"number": 2007, "baseRefName": "main", "headRefOid": "head101c", "mergeStateStatus": "CLEAN", "mergeable": "MERGEABLE"}"#,
+    ).unwrap();
+
+    // Generate 101 comments: first 100 courtesy, 101st is an actionable finding
+    let mut comments: Vec<Value> = (1..=100)
+        .map(|i| {
+            serde_json::json!({
+                "id": i,
+                "user": { "login": "dev" },
+                "body": "looks good",
+                "created_at": "2026-11-01T00:00:00Z"
+            })
+        })
+        .collect();
+
+    comments.push(serde_json::json!({
+        "id": 101,
+        "user": { "login": "security-bot[bot]" },
+        "body": "Warning: 101st issue comment finding",
+        "created_at": "2026-11-01T01:00:00Z"
+    }));
+
+    std::fs::write(
+        root.join("comments.json"),
+        serde_json::to_string(&comments).unwrap(),
+    )
+    .unwrap();
+
+    let (code, stdout, _stderr) = run_pr(root, &bin, &["pr", "ready", "2007", "--format", "json"]);
+    assert_eq!(code, Some(1), "101st comment finding must block");
+    let report: Value = serde_json::from_str(&stdout).expect("json report");
+    assert_eq!(report["ready"], false);
+    let triage = report["conversations"]["needs_triage"].as_array().unwrap();
+    assert!(triage.iter().any(|t| t["item_ref"] == "issue-comment:101"));
+}
+
+#[cfg(unix)]
+#[test]
+fn reviews_api_failure_fails_closed() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    let bin = fake_gh_router(root);
+
+    std::fs::write(
+        root.join("view.json"),
+        r#"{"number": 2008, "baseRefName": "main", "headRefOid": "head_err", "mergeStateStatus": "CLEAN", "mergeable": "MERGEABLE"}"#,
+    ).unwrap();
+
+    // Fail reviews API call (HTTP 403)
+    std::fs::write(root.join("fail_reviews"), "").unwrap();
+
+    let (code, stdout, stderr) = run_pr(root, &bin, &["pr", "ready", "2008", "--format", "json"]);
+    assert_ne!(code, Some(0), "reviews failure must fail closed");
+    assert!(stderr.contains("could not read reviews") || stderr.contains("permission denied"));
+    assert!(!stdout.contains(r#""ready": true"#));
+}

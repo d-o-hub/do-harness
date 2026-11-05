@@ -96,7 +96,7 @@ pub fn resolve_root(explicit: Option<&Path>) -> Result<PathBuf> {
 /// Returns [`CliError::Usage`] for invalid argument combinations and
 /// [`CliError::Verify`] when the verdict cannot be determined; an analysis
 /// error is never reported as "no effect".
-pub fn run(root: &Path, action: PrAction) -> Result<(), CliError> {
+pub fn run(root: &Path, action: PrAction, dry_run: bool) -> Result<(), CliError> {
     match action {
         PrAction::NoEffect {
             pr,
@@ -141,6 +141,25 @@ pub fn run(root: &Path, action: PrAction) -> Result<(), CliError> {
                 strip_prefix,
                 format,
             },
+        ),
+        PrAction::Disposition {
+            pr,
+            item_ref,
+            decision,
+            head,
+            reason,
+            evidence,
+            format,
+        } => super::conversations::run_disposition(
+            root,
+            pr,
+            &item_ref,
+            decision,
+            &head,
+            &reason,
+            evidence.as_deref(),
+            format,
+            dry_run,
         ),
         PrAction::External(args) => {
             if let Some(first) = args.first() {
