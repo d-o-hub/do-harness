@@ -85,11 +85,25 @@ async fn init_node_probes_only_proven_signals() {
 
     assert_eq!(report.language, Language::Node);
     let config = fs::read_to_string(dir.path().join("do-harness.toml")).unwrap();
-    assert!(config.contains("name = \"typecheck\""));
+    // Only the declared script is ever a candidate, and only a candidate the CLI
+    // could prove may be configured: a host without a package manager omits it
+    // and says so instead of configuring a sensor that cannot run.
     assert!(!config.contains("name = \"lint\""));
     assert!(!config.contains("name = \"test\""));
     assert!(!config.contains("name = \"build\""));
-    assert!(config.contains("feedback = [\"typecheck\"]"));
-    assert!(config.contains("verification = [\"typecheck\"]"));
-    assert!(config.contains("release = [\"typecheck\"]"));
+    if report.candidates.iter().any(|c| c.included) {
+        assert!(config.contains("name = \"typecheck\""));
+        assert!(config.contains("feedback = [\"typecheck\"]"));
+        assert!(config.contains("verification = [\"typecheck\"]"));
+        assert!(config.contains("release = [\"typecheck\"]"));
+    } else {
+        assert!(
+            report
+                .diagnostics
+                .iter()
+                .any(|d| d.code == "missing_package_manager"),
+            "an omitted signal must be reported: {:?}",
+            report.diagnostics
+        );
+    }
 }
