@@ -101,7 +101,7 @@ export function parseHarnessJson(stdout, what) {
 
 /** Validates a `status` document; throws on shapes the tool cannot trust. */
 export function assertStatusDocument(document) {
-  const states = new Set(['green', 'red', 'stale', 'missing'])
+  const states = new Set(['green', 'red', 'stale', 'missing', 'running'])
   if (
     !document ||
     typeof document !== 'object' ||
@@ -160,6 +160,39 @@ export function tail(text, lines = TAIL_LINES) {
   return all.slice(Math.max(0, all.length - lines)).join('\n').trim()
 }
 
+/** Projects the canonical sensor identities from a verify report. */
+function projectSensors(document) {
+  return document.sensors.map((sensor) => {
+    const entry = {
+      name: sensor.name,
+      ok: sensor.ok,
+      execution: sensor.execution,
+    }
+    if (sensor.reused_beat_id !== undefined && sensor.reused_beat_id !== null) {
+      entry.reused_beat_id = sensor.reused_beat_id
+    }
+    return entry
+  })
+}
+
+/** Projects change-aware selection revisions and skip reasons from a verify report. */
+function projectSelection(selection) {
+  if (!selection || typeof selection !== 'object' || Array.isArray(selection)) {
+    return null
+  }
+  const projected = {
+    mode: selection.mode,
+    changed_files: selection.changed_files ?? [],
+    skipped: Array.isArray(selection.skipped) ? selection.skipped : [],
+  }
+  for (const field of ['since', 'base_sha', 'head_sha', 'merge_base_sha', 'discovery_error']) {
+    if (selection[field] !== undefined && selection[field] !== null) {
+      projected[field] = selection[field]
+    }
+  }
+  return projected
+}
+
 /** Runner bound to one binary/workspace; used by the tool and the gate. */
 export class HarnessRunner {
   constructor({ ctx, binary, workspace }) {
@@ -168,11 +201,31 @@ export class HarnessRunner {
     this.workspace = workspace
   }
 
-  /** Streams the requested signal set (`verify --set`). */
-  async run({ set, changed, signal }) {
+  /**
+   * Streams the requested signal set (`verify --set`), then reads the fresh
+   * evidence status so the caller gets both the run outcome and the current
+   * evidence identity/status. `completion` runs the strict completion
+   * contract (`--strict --record --unchanged=run`); otherwise `task` scopes
+   * recorded beats, `reuse` maps to `--unchanged=skip` (task-scoped only),
+   * and `since` restricts to a committed range.
+   */
+  async run({ set, changed, since, task, reuse, signal, completion }) {
     const args = ['verify', '--set', set, '--format', 'json']
     if (changed) {
       args.push('--changed')
+    }
+    if (since !== undefined && since !== null) {
+      args.push('--since', since)
+    }
+    if (completion) {
+      args.push('--strict', '--record', '--unchanged=run')
+    } else if (reuse) {
+      args.push('--record', '--unchanged=skip')
+    } else if (task !== undefined && task !== null) {
+      args.push('--record')
+    }
+    if (task !== undefined && task !== null) {
+      args.push('--task', String(task))
     }
     const result = await runHarness({
       ctx: this.ctx,
@@ -187,7 +240,15 @@ export class HarnessRunner {
       )
     }
     const document = parseHarnessJson(result.stdout, 'verify')
-    return toRunResult(document, set)
+    const runResult = toRunResult(document, set)
+    const status = await this.status({ set, signal })
+    return {
+      ...runResult,
+      sensors: projectSensors(document),
+      selection: projectSelection(document.selection),
+      evidence: status,
+      diagnostics: tail(result.stderr),
+    }
   }
 
   /** Cheap evidence freshness check (never executes sensors). */
@@ -206,14 +267,17 @@ export class HarnessRunner {
       )
     }
     const document = parseHarnessJson(result.stdout, 'status')
-    return assertStatusDocument(document)
+    return { ...assertStatusDocument(document), diagnostics: tail(result.stderr) }
   }
 
   /** Change-aware applicability explanation (never executes sensors). */
-  async explain({ set, changed, signal }) {
+  async explain({ set, changed, since, signal }) {
     const args = ['explain', '--set', set, '--format', 'json']
     if (changed) {
       args.push('--changed')
+    }
+    if (since !== undefined && since !== null) {
+      args.push('--since', since)
     }
     const result = await runHarness({
       ctx: this.ctx,
@@ -226,6 +290,47 @@ export class HarnessRunner {
     if (result.exitCode !== 0) {
       throw new Error(`do-harness explain failed: ${tail(result.stderr) || tail(result.stdout)}`)
     }
-    return parseHarnessJson(result.stdout, 'explain')
+    return { ...parseHarnessJson(result.stdout, 'explain'), diagnostics: tail(result.stderr) }
+  }
+
+  /**
+   * Bounded, read-only resume context (`task context ID --format json
+   * --max-bytes 8192`). An unavailable outcome (missing/incompatible state
+   * database, unknown task) is preserved as `{ outcome: 'unavailable' }`
+   * rather than being reported as success.
+   */
+  async context({ task, signal }) {
+    const args = ['task', 'context', String(task), '--format', 'json', '--max-bytes', '8192']
+    const result = await runHarness({
+      ctx: this.ctx,
+      binary: this.binary,
+      cwd: this.workspace,
+      args,
+      graceMs: QUICK_GRACE_MS,
+      signal,
+    })
+    const diagnostics = tail(result.stderr)
+    const raw = result.stdout.trim()
+    let document = null
+    if (raw !== '') {
+      try {
+        document = parseHarnessJson(result.stdout, 'task context')
+      } catch {
+        document = null
+      }
+    }
+    // Any non-zero exit is an unavailable outcome (missing/incompatible state
+    // database, unknown task) — preserved as `unavailable`, never a success
+    // and never thrown as a tool error.
+    if (result.exitCode !== 0 || !document) {
+      return {
+        outcome: 'unavailable',
+        exitCode: result.exitCode,
+        reason: diagnostics || 'task context unavailable',
+        document,
+        diagnostics,
+      }
+    }
+    return { outcome: 'ok', exitCode: result.exitCode, document, diagnostics }
   }
 }

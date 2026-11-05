@@ -56,7 +56,7 @@ function git(cwd, args) {
   assert.equal(result.status, 0, `git ${args.join(' ')}: ${result.stderr}`)
 }
 
-/** Creates a committed fixture repo with an instant verification sensor. */
+/** Creates a committed fixture repo with feedback + verification signals. */
 function fixtureRepo() {
   const dir = mkdtempSync(join(tmpdir(), 'dsh-do-harness-e2e-'))
   writeFileSync(
@@ -64,10 +64,12 @@ function fixtureRepo() {
     [
       '[signal-sets]',
       'verification = ["marker"]',
+      'feedback = ["marker"]',
       '',
       '[[sensors]]',
       'name = "marker"',
       'argv = ["true"]',
+      'inputs = ["lib.rs"]',
       '',
     ].join('\n'),
   )
@@ -78,10 +80,29 @@ function fixtureRepo() {
   return dir
 }
 
+/** Runs the real harness binary; returns { status, stdout, stderr }. */
+function harness(dir, args, env = {}) {
+  const childEnv = { ...process.env, ...env }
+  for (const key of ['GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_OBJECT_DIRECTORY', 'GIT_ALTERNATE_OBJECT_DIRECTORIES', 'GIT_CEILING_DIRECTORIES', 'GIT_NAMESPACE', 'GIT_PREFIX']) {
+    delete childEnv[key]
+  }
+  const result = spawnSync(BIN, args, { cwd: dir, encoding: 'utf8', env: childEnv })
+  assert.equal(result.status, 0, `do-harness ${args.join(' ')}: ${result.stderr}`)
+  return result.stdout
+}
+
+/** Creates a task and returns its numeric id. */
+function addTask(dir) {
+  const stdout = harness(dir, ['task', 'add', 'e2e task'])
+  const match = /Added task (\d+)/.exec(stdout)
+  assert.ok(match, `could not parse task id from: ${stdout}`)
+  return Number(match[1])
+}
+
 /** Mounts the bundle against `dir` with real subprocess execution. */
-async function mount(dir) {
+async function mount(dir, { strictCompletion = true } = {}) {
   const ctx = createFakeCtx({ realSpawn: true })
-  const config = { workspace: dir, strictCompletion: true }
+  const config = { workspace: dir, strictCompletion }
   if (process.env.DO_HARNESS_BIN) {
     config.binary = process.env.DO_HARNESS_BIN
   }
@@ -222,5 +243,240 @@ test(
       explain.skipped.map((entry) => entry.name),
       ['rs-check'],
     )
+  },
+)
+test(
+  'a task-scoped run reuses an eligible beat; source, policy, and declared environment edits invalidate it',
+  { skip: e2eSkip() },
+  async (t) => {
+    const dir = fixtureRepo()
+    t.after(() => rmSync(dir, { recursive: true, force: true }))
+    const task = addTask(dir)
+    const ctx = await mount(dir)
+    const tool = ctx.tool('development_signals')
+
+    // First run executes and records a task-scoped beat.
+    const first = await tool.execute({ action: 'run', set: 'feedback', task, reuse: true }, {})
+    assert.equal(first.state, 'green')
+    assert.deepEqual(first.sensors, [{ name: 'marker', ok: true, execution: 'ran' }])
+
+    // Eligible reuse: unchanged scope and inputs skip execution visibly.
+    const second = await tool.execute({ action: 'run', set: 'feedback', task, reuse: true }, {})
+    assert.equal(second.state, 'green')
+    assert.equal(second.sensors[0].execution, 'reused')
+    assert.ok(Number.isInteger(second.sensors[0].reused_beat_id), 'reused beat id must be reported')
+    assert.equal(second.evidence.state, 'red')
+
+    // Source change invalidates reuse: the sensor must execute again.
+    writeFileSync(join(dir, 'lib.rs'), 'v2 changed\n')
+    const afterSource = await tool.execute({ action: 'run', set: 'feedback', task, reuse: true }, {})
+    assert.equal(afterSource.sensors[0].execution, 'ran')
+
+    // Policy change invalidates reuse.
+    writeFileSync(join(dir, 'do-harness.toml'), '\n# policy edit\n', { flag: 'a' })
+    const afterPolicy = await tool.execute({ action: 'run', set: 'feedback', task, reuse: true }, {})
+    assert.equal(afterPolicy.sensors[0].execution, 'ran')
+  },
+)
+
+test(
+  'a declared environment change invalidates reuse',
+  { skip: e2eSkip() },
+  async (t) => {
+    const dir = mkdtempSync(join(tmpdir(), 'dsh-do-harness-env-'))
+    t.after(() => rmSync(dir, { recursive: true, force: true }))
+    writeFileSync(
+      join(dir, 'do-harness.toml'),
+      [
+        '[signal-sets]',
+        'feedback = ["envsensor"]',
+        '',
+        '[[sensors]]',
+        'name = "envsensor"',
+        'argv = ["true"]',
+        'inputs = ["lib.rs"]',
+        'environment-inputs = ["MY_FLAG"]',
+        '',
+      ].join('\n'),
+    )
+    git(dir, ['init', '-q'])
+    git(dir, ['add', '-A'])
+    git(dir, ['commit', '-qm', 'test: base'])
+    const task = addTask(dir)
+    const ctx = await mount(dir)
+    const tool = ctx.tool('development_signals')
+
+    process.env.MY_FLAG = 'one'
+    try {
+      const first = await tool.execute({ action: 'run', set: 'feedback', task, reuse: true }, {})
+      assert.equal(first.state, 'green')
+      // A different declared environment value can never reuse the earlier beat:
+      // it must execute, even when reuse was requested.
+      process.env.MY_FLAG = 'two'
+      const changed = await tool.execute({ action: 'run', set: 'feedback', task, reuse: true }, {})
+      assert.equal(changed.sensors[0].execution, 'ran')
+    } finally {
+      delete process.env.MY_FLAG
+    }
+  },
+)
+
+test(
+  'a newer failing observation is not hidden by an older passing beat',
+  { skip: e2eSkip() },
+  async (t) => {
+    const dir = mkdtempSync(join(tmpdir(), 'dsh-do-harness-shadow-'))
+    t.after(() => rmSync(dir, { recursive: true, force: true }))
+    writeFileSync(join(dir, 'src.txt'), 'ok\n')
+    writeFileSync(
+      join(dir, 'do-harness.toml'),
+      [
+        '[signal-sets]',
+        'feedback = ["content"]',
+        '',
+        '[[sensors]]',
+        'name = "content"',
+        'argv = ["bash", "-c", "grep -q ok src.txt"]',
+        'inputs = ["src.txt"]',
+        '',
+      ].join('\n'),
+    )
+    git(dir, ['init', '-q'])
+    git(dir, ['add', '-A'])
+    git(dir, ['commit', '-qm', 'test: base'])
+    const task = addTask(dir)
+    const ctx = await mount(dir)
+    const tool = ctx.tool('development_signals')
+
+    const passing = await tool.execute({ action: 'run', set: 'feedback', task, reuse: true }, {})
+    assert.equal(passing.state, 'green')
+    writeFileSync(join(dir, 'src.txt'), 'bad\n')
+    const failing = await tool.execute({ action: 'run', set: 'feedback', task, reuse: true }, {})
+    assert.equal(failing.state, 'red')
+    assert.deepEqual(failing.failed, ['content'])
+    const status = await tool.execute({ action: 'status', set: 'feedback' }, {})
+    assert.equal(status.state, 'red', 'the older beat must not hide the newer failure')
+  },
+)
+
+test(
+  'a missing dependency forces execution and never authorizes stale reuse',
+  { skip: e2eSkip() },
+  async (t) => {
+    const dir = mkdtempSync(join(tmpdir(), 'dsh-do-harness-missingdep-'))
+    t.after(() => rmSync(dir, { recursive: true, force: true }))
+    writeFileSync(
+      join(dir, 'do-harness.toml'),
+      [
+        '[signal-sets]',
+        'feedback = ["probe", "missing-tool"]',
+        '',
+        '[[sensors]]',
+        'name = "probe"',
+        'argv = ["true"]',
+        '',
+        '[[sensors]]',
+        'name = "missing-tool"',
+        'argv = ["/nonexistent/tool"]',
+        '',
+      ].join('\n'),
+    )
+    git(dir, ['init', '-q'])
+    git(dir, ['add', '-A'])
+    git(dir, ['commit', '-qm', 'test: base'])
+    const task = addTask(dir)
+    const ctx = await mount(dir)
+    const tool = ctx.tool('development_signals')
+
+    const first = await tool.execute({ action: 'run', set: 'feedback', task, reuse: true }, {})
+    assert.equal(first.state, 'red')
+    const missing = first.sensors.find((entry) => entry.name === 'missing-tool')
+    assert.equal(missing.execution, 'ran')
+    assert.equal(missing.ok, false)
+
+    // Reuse must not invent a pass for the sensor that never succeeded.
+    const second = await tool.execute({ action: 'run', set: 'feedback', task, reuse: true }, {})
+    const again = second.sensors.find((entry) => entry.name === 'missing-tool')
+    assert.notEqual(again.execution, 'reused')
+    assert.equal(again.ok, false)
+  },
+)
+
+test(
+  'context returns bounded resume context; unavailable tasks are preserved, not success',
+  { skip: e2eSkip() },
+  async (t) => {
+    const dir = fixtureRepo()
+    t.after(() => rmSync(dir, { recursive: true, force: true }))
+    const task = addTask(dir)
+    const ctx = await mount(dir)
+    const tool = ctx.tool('development_signals')
+
+    const value = await tool.execute({ action: 'context', task }, {})
+    assert.equal(value.state, 'ok')
+    assert.equal(value.document.task.id, task)
+    assert.ok(value.document.budget.max_bytes === 8192, 'the context budget must be the fixed bound')
+    const rendered = JSON.stringify(value)
+    assert.ok(Buffer.byteLength(rendered) <= 9600, `context must be bounded: ${Buffer.byteLength(rendered)}`)
+    assert.ok(['verify', 'status', 'explain', 'task context', null].includes(value.next_action))
+
+    const unavailable = await tool.execute({ action: 'context', task: 987654321 }, {})
+    assert.equal(unavailable.state, 'unavailable')
+    assert.equal(unavailable.document, null)
+  },
+)
+
+test(
+  'strict completion requires fresh green non-vacuous evidence and is followed by status',
+  { skip: e2eSkip() },
+  async (t) => {
+    const dir = fixtureRepo()
+    t.after(() => rmSync(dir, { recursive: true, force: true }))
+    const ctx = await mount(dir)
+    const tool = ctx.tool('development_signals')
+
+    const passing = await tool.execute({ action: 'run', set: 'verification' }, {})
+    assert.equal(passing.state, 'green')
+    assert.equal(passing.complete, true)
+    assert.equal(passing.evidence.state, 'green')
+    assert.equal(passing.next_action, null)
+    const verifyArgv = ctx.spawnedArgv.find((argv) => argv.join(' ').includes('verify'))
+    assert.ok(verifyArgv.join(' ').includes('--unchanged=run'))
+
+    writeFileSync(
+      join(dir, 'do-harness.toml'),
+      [
+        '[signal-sets]',
+        'verification = ["bad"]',
+        '',
+        '[[sensors]]',
+        'name = "bad"',
+        'argv = ["false"]',
+        '',
+      ].join('\n'),
+    )
+    const failing = await tool.execute({ action: 'run', set: 'verification' }, {})
+    assert.equal(failing.state, 'red')
+    assert.equal(failing.complete, false)
+    assert.equal(failing.next_action, 'verify')
+    const status = await tool.execute({ action: 'status', set: 'verification' }, {})
+    assert.equal(status.state, 'red')
+  },
+)
+
+test(
+  'negative control: with the stop integration removed, stale evidence does not withhold completion',
+  { skip: e2eSkip() },
+  async (t) => {
+    const dir = fixtureRepo()
+    t.after(() => rmSync(dir, { recursive: true, force: true }))
+    const ctx = await mount(dir, { strictCompletion: false })
+    const tool = ctx.tool('development_signals')
+    assert.equal(ctx.listeners.has('agent/turn-stopping'), false)
+    await tool.execute({ action: 'run', set: 'verification' }, {})
+    writeFileSync(join(dir, 'lib.rs'), 'v2 changed\n')
+    const agent = createFakeAgent('e2e-negative')
+    await ctx.emit('agent/turn-stopping', { agent, turn: 1, signal: undefined })
+    assert.equal(agent.steered.length, 0, 'without the gate the loop closes even with stale evidence')
   },
 )

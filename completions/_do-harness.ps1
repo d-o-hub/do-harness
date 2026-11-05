@@ -222,6 +222,7 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('waivers', 'waivers', [CompletionResultType]::ParameterValue, 'Classify patch-coverage residue: waivable classes and lines needing tests')
             [CompletionResult]::new('disposition', 'disposition', [CompletionResultType]::ParameterValue, 'Record a structured disposition for a review, thread, comment, or finding')
             [CompletionResult]::new('findings', 'findings', [CompletionResultType]::ParameterValue, 'Collect and classify findings (annotations, code scanning, artifacts) and track issues')
+            [CompletionResult]::new('update-base', 'update-base', [CompletionResultType]::ParameterValue, 'Update a pull request''s branch to the latest base without overwriting author work (default is read-only; `--execute` acts only on an authorized own/known-bot head)')
             [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
             break
         }
@@ -371,6 +372,21 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('--version', '--version', [CompletionResultType]::ParameterName, 'Print version')
             break
         }
+        'do-harness;pr;update-base' {
+            [CompletionResult]::new('--format', '--format', [CompletionResultType]::ParameterName, 'Output format')
+            [CompletionResult]::new('--root', '--root', [CompletionResultType]::ParameterName, 'Workspace root override (default: walk up from cwd)')
+            [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Explicit path to do-harness.toml')
+            [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)')
+            [CompletionResult]::new('--execute', '--execute', [CompletionResultType]::ParameterName, 'Execute the update (default is a read-only report)')
+            [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Suppress PASS/WARN verdict lines and the success footer')
+            [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Suppress PASS/WARN verdict lines and the success footer')
+            [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Dry run without side effects')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            [CompletionResult]::new('-V', '-V ', [CompletionResultType]::ParameterName, 'Print version')
+            [CompletionResult]::new('--version', '--version', [CompletionResultType]::ParameterName, 'Print version')
+            break
+        }
         'do-harness;pr;help' {
             [CompletionResult]::new('no-effect', 'no-effect', [CompletionResultType]::ParameterValue, 'Report the prospective merge impact of a PR or revision range')
             [CompletionResult]::new('review', 'review', [CompletionResultType]::ParameterValue, 'Emit the semantic residual: changed units evidence could not prove')
@@ -379,6 +395,7 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('waivers', 'waivers', [CompletionResultType]::ParameterValue, 'Classify patch-coverage residue: waivable classes and lines needing tests')
             [CompletionResult]::new('disposition', 'disposition', [CompletionResultType]::ParameterValue, 'Record a structured disposition for a review, thread, comment, or finding')
             [CompletionResult]::new('findings', 'findings', [CompletionResultType]::ParameterValue, 'Collect and classify findings (annotations, code scanning, artifacts) and track issues')
+            [CompletionResult]::new('update-base', 'update-base', [CompletionResultType]::ParameterValue, 'Update a pull request''s branch to the latest base without overwriting author work (default is read-only; `--execute` acts only on an authorized own/known-bot head)')
             [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
             break
         }
@@ -401,6 +418,9 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             break
         }
         'do-harness;pr;help;findings' {
+            break
+        }
+        'do-harness;pr;help;update-base' {
             break
         }
         'do-harness;pr;help;help' {
@@ -1483,6 +1503,7 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('waivers', 'waivers', [CompletionResultType]::ParameterValue, 'Classify patch-coverage residue: waivable classes and lines needing tests')
             [CompletionResult]::new('disposition', 'disposition', [CompletionResultType]::ParameterValue, 'Record a structured disposition for a review, thread, comment, or finding')
             [CompletionResult]::new('findings', 'findings', [CompletionResultType]::ParameterValue, 'Collect and classify findings (annotations, code scanning, artifacts) and track issues')
+            [CompletionResult]::new('update-base', 'update-base', [CompletionResultType]::ParameterValue, 'Update a pull request''s branch to the latest base without overwriting author work (default is read-only; `--execute` acts only on an authorized own/known-bot head)')
             break
         }
         'do-harness;help;pr;no-effect' {
@@ -1504,6 +1525,9 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             break
         }
         'do-harness;help;pr;findings' {
+            break
+        }
+        'do-harness;help;pr;update-base' {
             break
         }
         'do-harness;help;skills' {
