@@ -28,7 +28,7 @@ import argparse
 import json
 import os
 import statistics
-import subprocess
+import subprocess  # nosec B404 - fixed argv, no shell; children are git and the local binary
 import sys
 import tempfile
 import time
@@ -50,7 +50,7 @@ class Harness:
         # The operator points the benchmark at a trusted binary; every argument
         # is a fixed flag or a path this script created, and no shell is used.
         # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit.dangerous-subprocess-use-audit
-        result = subprocess.run(
+        result = subprocess.run(  # nosec B603 - operator-selected trusted binary, fixed argv, no shell
             [str(self.binary), "--root", str(cwd), *args],
             capture_output=True,
             text=True,
@@ -77,7 +77,7 @@ def git(cwd: Path, args: list[str]) -> None:
     }
     # `git` is the fixed program; `args` are flags and paths this script built.
     # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit.dangerous-subprocess-use-audit
-    result = subprocess.run(
+    result = subprocess.run(  # nosec B603 - fixed git argv, no shell
         ["git", *args], cwd=cwd, capture_output=True, text=True, env=env, timeout=120
     )
     if result.returncode != 0:
