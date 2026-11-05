@@ -12,6 +12,7 @@ use std::path::Path;
 use serde::{Deserialize, Serialize};
 
 use super::Language;
+use super::diagnostic::InitDiagnostic;
 
 /// Probe outcome for one candidate sensor.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -47,16 +48,25 @@ pub struct Detection {
     pub language: Language,
     /// Probed candidate signals for the resolved pack.
     pub candidates: Vec<Candidate>,
+    /// Structured onboarding diagnostics (malformed manifests, unsupported
+    /// Node commands, missing package managers).
+    pub diagnostics: Vec<InitDiagnostic>,
+    /// Node-pack sensor specs from the single probe; empty unless Node resolved.
+    pub node_specs: Vec<crate::config::SensorSpec>,
 }
 
 /// Inspects `root`, resolving the language pack and probing candidates.
 ///
 /// Priority: an explicit `requested` pack; then the language declared by an
 /// existing `do-harness.toml` (`existing_language`); then repository markers
-/// (a `Cargo.toml` selects the Rust pack, another non-empty project selects
-/// the generic pack, and an empty or hidden-only directory is greenfield
-/// Rust so `init` can materialize a minimal crate and prove a baseline).
+/// (a `Cargo.toml` selects the Rust pack; a `package.json` that proves a
+/// supported Node command selects the Node pack; another non-empty project
+/// selects the generic pack; and an empty or hidden-only directory is
+/// greenfield Rust so `init` can materialize a minimal crate and prove a
+/// baseline). A malformed or unsupported `package.json` stays Generic and
+/// emits a structured [`InitDiagnostic`] instead of a plausible pass.
 #[must_use]
+#[allow(clippy::too_many_lines)]
 pub fn inspect(
     root: &Path,
     requested: Option<Language>,
@@ -65,7 +75,8 @@ pub fn inspect(
     let mut findings = Vec::new();
     let has_cargo = root.join("Cargo.toml").exists();
     let has_git = root.join(".git").exists();
-    let has_package_json = root.join("package.json").exists();
+    let manifest = super::node_manifest::analyze_node_manifest(root);
+    let has_package_json = manifest.has_package_json;
 
     if has_cargo {
         findings.push("Cargo.toml".to_owned());
@@ -100,6 +111,12 @@ pub fn inspect(
         Some("node") => Some(Language::Node),
         _ => None,
     };
+
+    let mut diagnostics = Vec::new();
+    if let Some(error) = &manifest.malformed {
+        diagnostics.push(InitDiagnostic::invalid_package_json("package.json", error));
+    }
+
     let language = match requested {
         Some(language) => language,
         None if declared.is_some() => {
@@ -114,7 +131,17 @@ pub fn inspect(
             language
         }
         None if has_cargo => Language::Rust,
-        None if has_package_json || has_non_hidden_entries(root) => Language::Generic,
+        None if has_package_json => {
+            if manifest.malformed.is_none() && !manifest.supported_commands().is_empty() {
+                Language::Node
+            } else {
+                if manifest.malformed.is_none() {
+                    diagnostics.push(InitDiagnostic::no_supported_node_commands("package.json"));
+                }
+                Language::Generic
+            }
+        }
+        None if has_non_hidden_entries(root) => Language::Generic,
         None => {
             findings.push("empty directory (greenfield rust)".to_owned());
             Language::Rust
@@ -130,27 +157,37 @@ pub fn inspect(
         findings.push("node pack selected (JS/TS sensors)".to_owned());
     }
 
-    let candidates = match language {
-        Language::Rust => rust_candidates(),
+    let (candidates, node_specs) = match language {
+        Language::Rust => (rust_candidates(), Vec::new()),
         Language::Node => {
-            let (c, _) = super::node::probe_node(root);
-            c
+            let probe = super::node::probe_node_full(root);
+            if !probe.package_manager_present {
+                diagnostics.push(InitDiagnostic::missing_package_manager(
+                    &probe.package_manager,
+                    "package.json",
+                ));
+            }
+            (probe.candidates, probe.specs)
         }
-        Language::Generic | Language::Web => Vec::new(),
+        Language::Generic | Language::Web => (Vec::new(), Vec::new()),
     };
     Detection {
         findings,
         language,
         candidates,
+        diagnostics,
+        node_specs,
     }
 }
 
 /// Canonical specs for `language`, filtered to sensors the probes included.
 ///
-/// Generic has no built-in sensors, so it always returns an empty list.
+/// Node specs come from the single probe stored on [`Detection::node_specs`];
+/// this helper serves the built-in Rust pack. Generic and Web have no
+/// built-in sensors, so they always return an empty list.
 #[must_use]
 pub fn included_specs(
-    root: &Path,
+    _root: &Path,
     language: Language,
     candidates: &[Candidate],
 ) -> Vec<crate::config::SensorSpec> {
@@ -163,18 +200,7 @@ pub fn included_specs(
                     .any(|candidate| candidate.name == spec.name && candidate.included)
             })
             .collect(),
-        Language::Node => {
-            let (_, specs) = super::node::probe_node(root);
-            specs
-                .into_iter()
-                .filter(|spec| {
-                    candidates
-                        .iter()
-                        .any(|candidate| candidate.name == spec.name && candidate.included)
-                })
-                .collect()
-        }
-        Language::Generic | Language::Web => Vec::new(),
+        Language::Generic | Language::Node | Language::Web => Vec::new(),
     }
 }
 
@@ -358,7 +384,7 @@ mod tests {
             detection
                 .findings
                 .iter()
-                .any(|finding| finding.contains("empty directory"))
+                .any(|f| f.contains("empty directory"))
         );
     }
 
@@ -382,14 +408,57 @@ mod tests {
         assert!(detection.findings.iter().any(|f| f == "Rust workspace"));
     }
 
-    /// A non-Rust project resolves to the generic pack.
+    const SUPPORTED_PKG: &str = r#"{"scripts": {"test": "node --test"}}"#;
+
+    fn write_pkg(root: &Path, body: &str) {
+        std::fs::write(root.join("package.json"), body).unwrap();
+    }
+
+    /// A package.json without supported commands stays Generic and emits a
+    /// diagnostic instead of claiming a meaningful green result.
     #[test]
-    fn package_json_selects_generic() {
+    fn unsupported_package_json_selects_generic_with_diagnostic() {
         let dir = tempfile::tempdir().unwrap();
-        std::fs::write(dir.path().join("package.json"), "{}\n").unwrap();
+        write_pkg(dir.path(), "{}\n");
         let detection = inspect(dir.path(), None, None);
         assert_eq!(detection.language, Language::Generic);
         assert_eq!(detection.candidates.len(), 0);
+        assert!(
+            detection
+                .diagnostics
+                .iter()
+                .any(|d| { d.code == crate::init::diagnostic::code::NO_SUPPORTED_NODE_COMMANDS })
+        );
+    }
+
+    /// A package.json proving a supported Node command selects the Node pack.
+    #[test]
+    fn supported_package_json_selects_node() {
+        let dir = tempfile::tempdir().unwrap();
+        write_pkg(dir.path(), SUPPORTED_PKG);
+        let detection = inspect(dir.path(), None, None);
+        assert_eq!(detection.language, Language::Node);
+        assert!(
+            detection
+                .candidates
+                .iter()
+                .any(|c| c.name == "test" && c.included)
+        );
+    }
+
+    /// A malformed package.json stays Generic and emits a diagnostic.
+    #[test]
+    fn malformed_package_json_selects_generic_with_diagnostic() {
+        let dir = tempfile::tempdir().unwrap();
+        write_pkg(dir.path(), "{oops");
+        let detection = inspect(dir.path(), None, None);
+        assert_eq!(detection.language, Language::Generic);
+        assert!(
+            detection
+                .diagnostics
+                .iter()
+                .any(|d| { d.code == crate::init::diagnostic::code::INVALID_PACKAGE_JSON })
+        );
     }
 
     /// An explicit request wins over repository detection.
@@ -405,7 +474,7 @@ mod tests {
     #[test]
     fn existing_config_language_wins_over_markers() {
         let dir = tempfile::tempdir().unwrap();
-        std::fs::write(dir.path().join("package.json"), "{}\n").unwrap();
+        write_pkg(dir.path(), "{}\n");
         let detection = inspect(dir.path(), None, Some("rust"));
         assert_eq!(detection.language, Language::Rust);
         assert!(detection.candidates.iter().any(|c| c.name == "fmt"));

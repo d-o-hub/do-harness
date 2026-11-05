@@ -124,7 +124,8 @@ fn test_node_fixture_yields_actionable_candidates_without_execution() {
     );
 
     let parsed: Value = serde_json::from_slice(&output.stdout).expect("parse json report");
-    assert_eq!(parsed["resolved_language"], "generic");
+    // A package.json with supported scripts auto-selects the Node pack.
+    assert_eq!(parsed["resolved_language"], "node");
     let detected = parsed["detected"].as_array().expect("detected facts");
     assert!(
         detected
@@ -144,10 +145,19 @@ fn test_node_fixture_yields_actionable_candidates_without_execution() {
         "candidate commands should include 'lint': {commands:?}"
     );
 
-    let guidance = parsed["guidance"].as_str().expect("guidance string");
+    let candidates = parsed["candidates"].as_array().expect("candidates");
     assert!(
-        guidance.contains("--language node"),
-        "guidance must advise using --language node: {guidance}"
+        candidates
+            .iter()
+            .any(|c| c["name"] == "test" && c["included"] == true),
+        "the test candidate should be included: {candidates:?}"
+    );
+    assert!(
+        parsed["diagnostics"]
+            .as_array()
+            .expect("diagnostics")
+            .is_empty(),
+        "a supported manifest should produce no diagnostics"
     );
 
     // Invariant: non-executing inspection must write ZERO files

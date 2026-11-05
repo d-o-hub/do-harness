@@ -286,10 +286,17 @@ async fn init_detects_rust_from_manifest() {
 async fn init_detects_generic_from_package_json() {
     let dir = tempfile::tempdir().unwrap();
     fs::write(dir.path().join("package.json"), "{}\n").unwrap();
-
     let report = init_workspace(dir.path(), &opts(None)).await.unwrap();
 
     assert_eq!(report.language, Language::Generic);
+    assert!(
+        report
+            .diagnostics
+            .iter()
+            .any(|d| d.code == super::diagnostic::code::NO_SUPPORTED_NODE_COMMANDS),
+        "an unsupported package.json must surface a diagnostic: {:?}",
+        report.diagnostics
+    );
     assert!(!dir.path().join("Cargo.toml").exists());
     let config = fs::read_to_string(dir.path().join("do-harness.toml")).unwrap();
     assert!(config.contains("language = \"generic\""));
