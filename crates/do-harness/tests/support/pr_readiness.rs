@@ -115,6 +115,18 @@ if [ "$1" = "api" ]; then
             fi
             exit 0
             ;;
+        *reviews*)
+            if [ -f "$MOCK_DIR/fail_reviews" ]; then
+                echo "HTTP 403: permission denied" >&2
+                exit 1
+            fi
+            if [ -f "$MOCK_DIR/reviews.json" ]; then
+                cat "$MOCK_DIR/reviews.json"
+            else
+                printf '%s' '[]'
+            fi
+            exit 0
+            ;;
         *rulesets/*)
             if [ -f "$MOCK_DIR/fail_ruleset_detail" ]; then
                 echo "HTTP 403: permission denied" >&2

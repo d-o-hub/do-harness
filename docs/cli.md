@@ -1271,7 +1271,7 @@ be resolved. A collector that cannot read git history never reads as healthy.
 <!-- BEGIN GENERATED: cli-contract pr -->
 `do-harness pr [OPTIONS] <COMMAND>`
 
-Subcommands: `no-effect`, `review`, `ready`, `checks`, `waivers`.
+Subcommands: `no-effect`, `review`, `ready`, `checks`, `waivers`, `disposition`.
 <!-- END GENERATED: cli-contract pr -->
 Deterministic, read-only PR analysis: every subcommand works in any git repository without harness initialization. Pick the subcommand that answers your question.
 
@@ -1521,6 +1521,22 @@ request, with per-class evidence and per-file counts:
   one covers are reported as **covered since**.
 - `--format <Format>`: `text` (the paste-ready comment) or `json`.
 
+
+### `pr disposition`
+<!-- BEGIN GENERATED: cli-contract pr disposition -->
+`do-harness pr disposition [OPTIONS] --decision <DECISION> --head <HEAD> --reason <REASON> <PR> <ITEM_REF>`
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `<PR>` | yes | — | — | Pull request number |
+| `<ITEM_REF>` | yes | — | — | Item reference (e.g. `issue-comment:123`, `review-thread:PRRT_...`, `review:PRR_...`, `finding:...`) |
+| `--decision <DECISION>` | yes | — | `fixed`, `non-actionable`, `waived` | Decision for the item (fixed, non-actionable, or waived) |
+| `--head <HEAD>` | yes | — | — | Full head commit SHA to bind the disposition to |
+| `--reason <REASON>` | yes | — | — | Concrete rationale for the decision |
+| `--evidence <EVIDENCE>` | no | — | — | Optional evidence SHA (required if decision is fixed) |
+| `--format <FORMAT>` | no | `text` | `text`, `json` | Output format |
+<!-- END GENERATED: cli-contract pr disposition -->
+Record a structured disposition for a review, thread, comment, or finding on a pull request.
 Read-only and offline: a PR target reads the diff through `gh`, everything else
 is local. Exit `2` when an input file is unreadable or the arguments conflict,
 `1` when the patch set cannot be computed, and `0` when the analysis completes —

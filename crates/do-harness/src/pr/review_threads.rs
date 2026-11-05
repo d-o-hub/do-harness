@@ -34,9 +34,13 @@ pub struct ReviewThreadComments {
 /// A single comment in a review thread.
 #[derive(Debug, Clone, Deserialize)]
 pub struct ReviewThreadComment {
+    pub id: Option<String>,
     pub author: Option<CommentAuthor>,
     #[serde(default)]
     pub body: String,
+    #[serde(rename = "createdAt", default)]
+    pub created_at: Option<String>,
+    pub url: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -98,7 +102,7 @@ pub fn review_threads(root: &Path, number: u64) -> Result<Vec<ReviewThread>> {
                     pageInfo { hasNextPage endCursor }
                     nodes {
                         id isResolved isOutdated path line
-                        comments(first: 1) { nodes { author { login } body } }
+                        comments(first: 100) { nodes { id author { login } body createdAt url } }
                     }
                 }
             }

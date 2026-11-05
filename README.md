@@ -224,6 +224,7 @@ export PATH="$HOME/.local/bin:$PATH"
 | `pr ready [OPTIONS] <PR>` | Check whether a pull request is ready to merge: merge state, CI checks, and review conversations (aliases: `readiness`, `check`) — flags: `--format <FORMAT>` |
 | `pr checks [OPTIONS] <PR>` | Classify a pull request's CI checks and commit statuses; fail closed on unknown — flags: `--format <FORMAT>` |
 | `pr waivers [OPTIONS] --lcov <PATH> [PR]` | Classify patch-coverage residue: waivable classes and lines needing tests — flags: `--base <REV>`, `--head <REV>`, `--patch <PATH>`, `--lcov <PATH>`, `--since <PATH>`, `--strip-prefix <PREFIX>`, `--format <FORMAT>` |
+| `pr disposition [OPTIONS] --decision <DECISION> --head <HEAD> --reason <REASON> <PR> <ITEM_REF>` | Record a structured disposition for a review, thread, comment, or finding — flags: `--decision <DECISION>`, `--head <HEAD>`, `--reason <REASON>`, `--evidence <EVIDENCE>`, `--format <FORMAT>` |
 | `skills suggest [OPTIONS] --query <TEXT>` | Rank skills by relevance to a query using metadata only — flags: `--query <TEXT>`, `--limit <N>`, `--format <FORMAT>` |
 | `skills drift [OPTIONS]` | Check manifest-managed shared skills against their pinned digests — flags: `--manifest <FILE>`, `--format <FORMAT>` |
 | `skills refresh-validator [OPTIONS]` | Replace only the installed skill-creator structure validator |

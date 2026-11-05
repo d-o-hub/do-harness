@@ -87,6 +87,14 @@ pub struct CancelledCheck {
 pub struct ConversationSummary {
     pub unresolved_threads: Vec<UnresolvedThread>,
     pub actionable_comments: Vec<ActionableComment>,
+    #[serde(default)]
+    pub review_decision: Option<String>,
+    #[serde(default)]
+    pub conversation_inventory_digest: String,
+    #[serde(default)]
+    pub items_count: usize,
+    #[serde(default)]
+    pub needs_triage: Vec<crate::pr::conversations::NeedsTriageItem>,
     #[serde(default = "default_true")]
     pub complete: bool,
 }

@@ -7,7 +7,7 @@ use serde::Deserialize;
 
 #[path = "review_threads.rs"]
 mod review_threads;
-pub use review_threads::review_threads;
+pub use review_threads::{ReviewThread, review_threads};
 
 /// Minimal PR metadata needed to locate the effective change.
 #[derive(Debug, Clone, Deserialize)]
@@ -89,6 +89,8 @@ pub struct PrReadinessView {
     pub number: u64,
     #[serde(rename = "baseRefName", default)]
     pub base_ref_name: String,
+    #[serde(rename = "baseRefOid", default)]
+    pub base_ref_oid: String,
     #[serde(rename = "headRefOid", default)]
     pub head_ref_oid: String,
     #[serde(rename = "mergeStateStatus", default)]
@@ -97,6 +99,8 @@ pub struct PrReadinessView {
     pub mergeable: String,
     #[serde(rename = "autoMergeRequest")]
     pub auto_merge_request: Option<serde_json::Value>,
+    #[serde(rename = "reviewDecision", default)]
+    pub review_decision: Option<String>,
 }
 
 /// A check run returned by `GitHub`'s check-runs API.
@@ -247,7 +251,7 @@ pub fn readiness_view(root: &Path, number: u64) -> Result<PrReadinessView> {
             "view",
             &number_arg,
             "--json",
-            "number,baseRefName,headRefOid,mergeStateStatus,mergeable,autoMergeRequest",
+            "number,baseRefName,baseRefOid,headRefOid,mergeStateStatus,mergeable,autoMergeRequest,reviewDecision",
         ],
         &format!("pr view {number}"),
     )
@@ -346,4 +350,41 @@ pub fn user_permission(root: &Path, login: &str) -> Result<String> {
         crate::gh::json(root, &["api", &endpoint], "api collaborator permission")?;
     let perm = res.role_name.or(res.permission).unwrap_or_default();
     Ok(perm)
+}
+
+/// A submitted review on a pull request.
+#[derive(Debug, Clone, Deserialize)]
+pub struct Review {
+    pub id: u64,
+    #[serde(rename = "node_id", default)]
+    pub node_id: Option<String>,
+    #[serde(default)]
+    pub user: Option<CommentAuthor>,
+    #[serde(default)]
+    pub body: String,
+    #[serde(default)]
+    pub state: String,
+    pub submitted_at: Option<String>,
+    pub html_url: Option<String>,
+    pub commit_id: Option<String>,
+}
+
+/// Reads all submitted reviews on a pull request.
+///
+/// # Errors
+///
+/// Returns an error when `gh api` fails or the response cannot be parsed.
+pub fn reviews(root: &Path, number: u64) -> Result<Vec<Review>> {
+    let endpoint = format!("repos/{{owner}}/{{repo}}/pulls/{number}/reviews?per_page=100");
+    let output = crate::gh::output(
+        root,
+        &["api", "--paginate", &endpoint],
+        "api pull request reviews",
+    )?;
+    let pages = serde_json::Deserializer::from_slice(&output.stdout).into_iter::<Vec<Review>>();
+    let mut reviews = Vec::new();
+    for page in pages {
+        reviews.extend(page.context("unexpected reviews JSON")?);
+    }
+    Ok(reviews)
 }

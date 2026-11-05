@@ -341,6 +341,28 @@ json\:"Machine-readable JSON output"))' \
 '::pr -- Pull request number; resolves base and head through `gh`:_default' \
 && ret=0
 ;;
+(disposition)
+_arguments "${_arguments_options[@]}" : \
+'--decision=[Decision for the item (fixed, non-actionable, or waived)]:DECISION:(fixed non-actionable waived)' \
+'--head=[Full head commit SHA to bind the disposition to]:HEAD:_default' \
+'--reason=[Concrete rationale for the decision]:REASON:_default' \
+'--evidence=[Optional evidence SHA (required if decision is fixed)]:EVIDENCE:_default' \
+'--format=[Output format]:FORMAT:((text\:"Human-readable text output"
+json\:"Machine-readable JSON output"))' \
+'--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
+'--config=[Explicit path to do-harness.toml]:FILE:_files' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
+'--dry-run[Dry run without side effects]' \
+'-h[Print help (see more with '\''--help'\'')]' \
+'--help[Print help (see more with '\''--help'\'')]' \
+'-V[Print version]' \
+'--version[Print version]' \
+':pr -- Pull request number:_default' \
+':item_ref -- Item reference (e.g. `issue-comment\:123`, `review-thread\:PRRT_...`, `review\:PRR_...`, `finding\:...`):_default' \
+&& ret=0
+;;
 (help)
 _arguments "${_arguments_options[@]}" : \
 ":: :_do-harness__subcmd__pr__subcmd__help_commands" \
@@ -370,6 +392,10 @@ _arguments "${_arguments_options[@]}" : \
 && ret=0
 ;;
 (waivers)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(disposition)
 _arguments "${_arguments_options[@]}" : \
 && ret=0
 ;;
@@ -1706,6 +1732,10 @@ _arguments "${_arguments_options[@]}" : \
 _arguments "${_arguments_options[@]}" : \
 && ret=0
 ;;
+(disposition)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
         esac
     ;;
 esac
@@ -2458,6 +2488,7 @@ _do-harness__subcmd__help__subcmd__pr_commands() {
 'ready:Check whether a pull request is ready to merge\: merge state, CI checks, and review conversations' \
 'checks:Classify a pull request'\''s CI checks and commit statuses; fail closed on unknown' \
 'waivers:Classify patch-coverage residue\: waivable classes and lines needing tests' \
+'disposition:Record a structured disposition for a review, thread, comment, or finding' \
     )
     _describe -t commands 'do-harness help pr commands' commands "$@"
 }
@@ -2465,6 +2496,11 @@ _do-harness__subcmd__help__subcmd__pr_commands() {
 _do-harness__subcmd__help__subcmd__pr__subcmd__checks_commands() {
     local commands; commands=()
     _describe -t commands 'do-harness help pr checks commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__help__subcmd__pr__subcmd__disposition_commands] )) ||
+_do-harness__subcmd__help__subcmd__pr__subcmd__disposition_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness help pr disposition commands' commands "$@"
 }
 (( $+functions[_do-harness__subcmd__help__subcmd__pr__subcmd__no-effect_commands] )) ||
 _do-harness__subcmd__help__subcmd__pr__subcmd__no-effect_commands() {
@@ -2773,6 +2809,7 @@ _do-harness__subcmd__pr_commands() {
 'check:Check whether a pull request is ready to merge\: merge state, CI checks, and review conversations' \
 'checks:Classify a pull request'\''s CI checks and commit statuses; fail closed on unknown' \
 'waivers:Classify patch-coverage residue\: waivable classes and lines needing tests' \
+'disposition:Record a structured disposition for a review, thread, comment, or finding' \
 'help:Print this message or the help of the given subcommand(s)' \
     )
     _describe -t commands 'do-harness pr commands' commands "$@"
@@ -2782,6 +2819,11 @@ _do-harness__subcmd__pr__subcmd__checks_commands() {
     local commands; commands=()
     _describe -t commands 'do-harness pr checks commands' commands "$@"
 }
+(( $+functions[_do-harness__subcmd__pr__subcmd__disposition_commands] )) ||
+_do-harness__subcmd__pr__subcmd__disposition_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness pr disposition commands' commands "$@"
+}
 (( $+functions[_do-harness__subcmd__pr__subcmd__help_commands] )) ||
 _do-harness__subcmd__pr__subcmd__help_commands() {
     local commands; commands=(
@@ -2790,6 +2832,7 @@ _do-harness__subcmd__pr__subcmd__help_commands() {
 'ready:Check whether a pull request is ready to merge\: merge state, CI checks, and review conversations' \
 'checks:Classify a pull request'\''s CI checks and commit statuses; fail closed on unknown' \
 'waivers:Classify patch-coverage residue\: waivable classes and lines needing tests' \
+'disposition:Record a structured disposition for a review, thread, comment, or finding' \
 'help:Print this message or the help of the given subcommand(s)' \
     )
     _describe -t commands 'do-harness pr help commands' commands "$@"
@@ -2798,6 +2841,11 @@ _do-harness__subcmd__pr__subcmd__help_commands() {
 _do-harness__subcmd__pr__subcmd__help__subcmd__checks_commands() {
     local commands; commands=()
     _describe -t commands 'do-harness pr help checks commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__pr__subcmd__help__subcmd__disposition_commands] )) ||
+_do-harness__subcmd__pr__subcmd__help__subcmd__disposition_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness pr help disposition commands' commands "$@"
 }
 (( $+functions[_do-harness__subcmd__pr__subcmd__help__subcmd__help_commands] )) ||
 _do-harness__subcmd__pr__subcmd__help__subcmd__help_commands() {

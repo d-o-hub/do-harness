@@ -4,6 +4,8 @@
 
 #[cfg(unix)]
 use serde_json::Value;
+#[cfg(unix)]
+use sha2::{Digest, Sha256};
 
 mod support;
 
@@ -294,4 +296,179 @@ fn only_codecov_logins_report_and_bots_do_not_answer() {
     assert_eq!(code, Some(1), "the comment bot's gap blocks:\n{stderr}");
     let report: Value = serde_json::from_str(&stdout).expect("json report");
     assert_eq!(report["codecov"]["is_actionable"], serde_json::json!(true));
+}
+
+#[cfg(unix)]
+#[test]
+fn review_decision_changes_requested_blocks_without_threads() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    let bin = fake_gh_router(root);
+
+    std::fs::write(
+        root.join("view.json"),
+        r#"{
+            "number": 1050,
+            "baseRefName": "main",
+            "headRefOid": "abcd1234abcd1234abcd1234abcd1234abcd1234",
+            "mergeStateStatus": "CLEAN",
+            "mergeable": "MERGEABLE",
+            "autoMergeRequest": null,
+            "reviewDecision": "CHANGES_REQUESTED"
+        }"#,
+    )
+    .unwrap();
+
+    let (code, stdout, _stderr) = run_pr(root, &bin, &["pr", "ready", "1050", "--format", "json"]);
+    assert_eq!(
+        code,
+        Some(1),
+        "review decision CHANGES_REQUESTED must block"
+    );
+    let report: Value = serde_json::from_str(&stdout).expect("json report");
+    assert_eq!(report["ready"], false);
+    assert!(
+        report["blockers"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|b| b.as_str().unwrap().contains("CHANGES_REQUESTED"))
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn submitted_review_changes_requested_and_dismissed_states() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    let bin = fake_gh_router(root);
+
+    std::fs::write(
+        root.join("view.json"),
+        r#"{
+            "number": 1051,
+            "baseRefName": "main",
+            "headRefOid": "abcd1234abcd1234abcd1234abcd1234abcd1234",
+            "mergeStateStatus": "CLEAN",
+            "mergeable": "MERGEABLE",
+            "autoMergeRequest": null
+        }"#,
+    )
+    .unwrap();
+
+    // 1. Changes requested in reviews list blocks
+    std::fs::write(
+        root.join("reviews.json"),
+        r#"[{
+            "id": 991,
+            "user": { "login": "reviewer1" },
+            "state": "CHANGES_REQUESTED",
+            "body": "Need tests for the new error branch"
+        }]"#,
+    )
+    .unwrap();
+
+    let (code, stdout, _stderr) = run_pr(root, &bin, &["pr", "ready", "1051", "--format", "json"]);
+    assert_eq!(code, Some(1), "review with CHANGES_REQUESTED must block");
+    let report: Value = serde_json::from_str(&stdout).expect("json report");
+    assert_eq!(report["ready"], false);
+
+    // 2. Dismissed review does not block
+    std::fs::write(
+        root.join("reviews.json"),
+        r#"[{
+            "id": 991,
+            "user": { "login": "reviewer1" },
+            "state": "DISMISSED",
+            "body": "Obsolete review"
+        }]"#,
+    )
+    .unwrap();
+
+    let (code2, stdout2, _stderr2) =
+        run_pr(root, &bin, &["pr", "ready", "1051", "--format", "json"]);
+    assert_eq!(code2, Some(0), "dismissed review does not block");
+    let report2: Value = serde_json::from_str(&stdout2).expect("json report");
+    assert_eq!(report2["ready"], true);
+}
+
+#[cfg(unix)]
+#[test]
+fn bot_finding_needs_triage_until_authorized_disposition() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    let bin = fake_gh_router(root);
+
+    let head = "abcd1234abcd1234abcd1234abcd1234abcd1234";
+    std::fs::write(
+        root.join("view.json"),
+        format!(
+            r#"{{"number": 1052, "baseRefName": "main", "baseRefOid": "base0000base0000base0000base0000base0000", "headRefOid": "{head}", "mergeStateStatus": "CLEAN", "mergeable": "MERGEABLE"}}"#
+        ),
+    )
+    .unwrap();
+
+    // Generic bot finding comment
+    let bot_comment = r#"{
+        "id": 401,
+        "user": { "login": "security-bot[bot]" },
+        "body": "Warning: Potential memory leak detected in parser loop",
+        "created_at": "2026-11-04T10:00:00Z"
+    }"#;
+    std::fs::write(root.join("comments.json"), format!("[{bot_comment}]")).unwrap();
+
+    // 1. Without disposition, it blocks as NEEDS_TRIAGE
+    let (code, stdout, _stderr) = run_pr(root, &bin, &["pr", "ready", "1052", "--format", "json"]);
+    assert_eq!(code, Some(1), "unassessed bot finding must block");
+    let report: Value = serde_json::from_str(&stdout).expect("json report");
+    assert_eq!(report["ready"], false);
+    let triage = report["conversations"]["needs_triage"].as_array().unwrap();
+    assert_eq!(triage.len(), 1);
+    assert_eq!(triage[0]["item_ref"], "issue-comment:401");
+
+    // 2. An authorized maintainer records disposition
+    // Item SHA256 of "Warning: Potential memory leak detected in parser loop"
+    let item_sha = hex::encode(Sha256::digest(
+        b"Warning: Potential memory leak detected in parser loop",
+    ));
+    let disp_comment = format!(
+        r#"{{
+            "id": 402,
+            "user": {{ "login": "maintainer" }},
+            "body": "<!-- do-harness-disposition:v1\n{{\n  \"schema_version\": 1,\n  \"item_ref\": \"issue-comment:401\",\n  \"decision\": \"NON_ACTIONABLE\",\n  \"head_sha\": \"{head}\",\n  \"base_sha\": \"base0000base0000base0000base0000base0000\",\n  \"item_sha256\": \"{item_sha}\",\n  \"policy_sha256\": \"\",\n  \"reason\": \"False positive verified bounded in test loop\"\n}}\n-->\nDisposition recorded."
+        }}"#
+    );
+    std::fs::write(
+        root.join("permission.json"),
+        r#"{"permission":"admin","role_name":"admin"}"#,
+    )
+    .unwrap();
+    std::fs::write(
+        root.join("comments.json"),
+        format!("[{bot_comment}, {disp_comment}]"),
+    )
+    .unwrap();
+
+    let (code2, stdout2, _stderr2) =
+        run_pr(root, &bin, &["pr", "ready", "1052", "--format", "json"]);
+    assert_eq!(
+        code2,
+        Some(0),
+        "authorized disposition clears the finding: {stdout2}"
+    );
+    let report2: Value = serde_json::from_str(&stdout2).expect("json report");
+    assert_eq!(report2["ready"], true);
+    assert_eq!(
+        report2["conversations"]["needs_triage"]
+            .as_array()
+            .unwrap()
+            .len(),
+        0
+    );
+    assert_ne!(
+        report2["conversations"]["conversation_inventory_digest"]
+            .as_str()
+            .unwrap(),
+        ""
+    );
 }
