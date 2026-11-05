@@ -150,6 +150,15 @@ if [ "$1" = "api" ]; then
             fi
             exit 0
             ;;
+        *compare*)
+            if [ -f "$MOCK_DIR/compare_override.json" ]; then
+                cat "$MOCK_DIR/compare_override.json"
+                exit 0
+            fi
+            base=$(printf '%s' "$endpoint" | sed -n 's|.*/compare/\([^.]*\)\.\.\..*|\1|p')
+            printf '{{"status":"ahead","base_commit":{{"sha":"%s"}},"merge_base_commit":{{"sha":"%s"}}}}' "$base" "$base"
+            exit 0
+            ;;
         *issues*)
             if [ "$is_mutation" -eq 1 ]; then
                 count=101
@@ -259,6 +268,8 @@ exit 1
 }
 
 pub fn run_pr(root: &Path, bin: &Path, args: &[&str]) -> (Option<i32>, String, String) {
+    ensure_authorization_fixtures(root);
+    normalize_view(root);
     let path = std::env::var("PATH").unwrap_or_default();
     let output = harness(root)
         .args(args)
@@ -270,4 +281,167 @@ pub fn run_pr(root: &Path, bin: &Path, args: &[&str]) -> (Option<i32>, String, S
         String::from_utf8_lossy(&output.stdout).into_owned(),
         String::from_utf8_lossy(&output.stderr).into_owned(),
     )
+}
+
+/// Default merge-policy and ruleset fixtures.
+///
+/// `pr ready` refuses to authorize without a readable `plans/pr-merge-policy.toml`
+/// and a matching server ruleset (that strictness is proven by `pr_policy`),
+/// so every readiness fixture seeds a coherent pair once. A test that wants to
+/// prove the missing-policy or drift behaviour overwrites these files or calls
+/// the binary through its own runner instead of this helper.
+pub fn ensure_authorization_fixtures(root: &Path) {
+    let plans = root.join("plans");
+    std::fs::create_dir_all(&plans).unwrap();
+    let policy = plans.join("pr-merge-policy.toml");
+    if !policy.exists() {
+        std::fs::write(
+            &policy,
+            r#"schema_version = 1
+ruleset_id = 1
+name = "main"
+target = "branch"
+source_type = "Repository"
+source = "acme/widget"
+enforcement = "active"
+include_refs = ["~DEFAULT_BRANCH"]
+exclude_refs = []
+bypass_actors = []
+current_user_can_bypass = "never"
+
+[required_status_checks]
+strict_required_status_checks_policy = true
+do_not_enforce_on_create = true
+required = [
+  { context = "pr-required", integration_id = 15368 },
+  { context = "semver", integration_id = 15368 },
+]
+
+[pull_request]
+required_approving_review_count = 0
+required_review_thread_resolution = true
+dismiss_stale_reviews_on_push = false
+required_reviewers = []
+require_code_owner_review = false
+require_last_push_approval = false
+require_extra_approval_for_unattributed_changes = false
+allowed_merge_methods = ["merge", "squash", "rebase"]
+
+[[code_scanning_tools]]
+tool = "CodeQL"
+security_alerts_threshold = "high_or_higher"
+alerts_threshold = "errors_and_warnings"
+
+[code_quality]
+severity = "errors"
+
+[other_rules]
+deletion = true
+"#,
+        )
+        .unwrap();
+    }
+
+    let rulesets = root.join("rulesets.json");
+    if !rulesets.exists() {
+        std::fs::write(&rulesets, r#"[{"id":1}]"#).unwrap();
+    }
+    let detail = root.join("ruleset_detail.json");
+    if !detail.exists() {
+        std::fs::write(
+            &detail,
+            r#"{
+  "id": 1,
+  "name": "main",
+  "target": "branch",
+  "enforcement": "active",
+  "conditions": {"ref_name": {"include": ["~DEFAULT_BRANCH"], "exclude": []}},
+  "bypass_actors": [],
+  "current_user_can_bypass": "never",
+  "rules": [
+    {"type": "deletion"},
+    {"type": "code_scanning", "parameters": {"code_scanning_tools": [{"tool": "CodeQL", "security_alerts_threshold": "high_or_higher", "alerts_threshold": "errors_and_warnings"}]}},
+    {"type": "code_quality", "parameters": {"severity": "errors"}},
+    {"type": "pull_request", "parameters": {"required_approving_review_count": 0, "dismiss_stale_reviews_on_push": false, "required_reviewers": [], "require_code_owner_review": false, "require_last_push_approval": false, "required_review_thread_resolution": true, "require_extra_approval_for_unattributed_changes": false, "allowed_merge_methods": ["merge", "squash", "rebase"]}},
+    {"type": "required_status_checks", "parameters": {"strict_required_status_checks_policy": true, "do_not_enforce_on_create": true, "required_status_checks": [{"context": "pr-required", "integration_id": 15368}, {"context": "semver", "integration_id": 15368}]}}
+  ]
+}"#,
+        )
+        .unwrap();
+    }
+    let branch_rules = root.join("branch_rules.json");
+    if !branch_rules.exists() {
+        std::fs::write(
+            &branch_rules,
+            r#"[{"type":"deletion","ruleset_id":1,"ruleset_source":"acme/widget","ruleset_source_type":"Repository"},
+                {"type":"pull_request","ruleset_id":1,"ruleset_source":"acme/widget","ruleset_source_type":"Repository"},
+                {"type":"required_status_checks","ruleset_id":1,"ruleset_source":"acme/widget","ruleset_source_type":"Repository"}]"#,
+        )
+        .unwrap();
+    }
+}
+
+/// Fills the PR fields merge authorization needs into a legacy `view.json`.
+///
+/// The fixtures predate #466 and describe only number/baseRefName/headRefOid/
+/// mergeStateStatus/mergeable. Authorization additionally needs the base SHA,
+/// branch names, `state`, `isDraft` and the head repository, and an API that
+/// omits them is `UNKNOWN` by design. Tests that assert exactly that behaviour
+/// drive the binary through their own runner and skip this normalization.
+pub fn normalize_view(root: &Path) {
+    let path = root.join("view.json");
+    let Ok(text) = std::fs::read_to_string(&path) else {
+        return;
+    };
+    let Ok(mut value) = serde_json::from_str::<serde_json::Value>(&text) else {
+        return;
+    };
+    let Some(map) = value.as_object_mut() else {
+        return;
+    };
+    // A real API always reports a 40-character commit SHA; fixtures written
+    // before #466 use short placeholders, which would make ancestry unprovable.
+    let raw_head = map
+        .get("headRefOid")
+        .and_then(|v| v.as_str())
+        .unwrap_or("head")
+        .to_owned();
+    let head = if raw_head.len() == 40 && raw_head.chars().all(|c| c.is_ascii_hexdigit()) {
+        raw_head
+    } else {
+        use sha2::{Digest, Sha256};
+        let digest = hex::encode(Sha256::digest(raw_head.as_bytes()));
+        digest[..40].to_owned()
+    };
+    if let Some(slot) = map.get_mut("headRefOid") {
+        *slot = serde_json::json!(head);
+    }
+    // The compare API only proves ancestry for full 40-character SHAs, so the
+    // synthesized default base is a well-formed one.
+    let default_base = "1".repeat(40);
+    let defaults: [(&str, serde_json::Value); 6] = [
+        ("baseRefOid", serde_json::json!(default_base)),
+        ("baseRefName", serde_json::json!("main")),
+        ("headRefName", serde_json::json!("topic")),
+        ("state", serde_json::json!("OPEN")),
+        ("isDraft", serde_json::json!(false)),
+        (
+            "headRepository",
+            serde_json::json!({"nameWithOwner": "acme/widget"}),
+        ),
+    ];
+    let mut changed = false;
+    for (key, value) in defaults {
+        if !map.contains_key(key) {
+            map.insert(key.to_owned(), value);
+            changed = true;
+        }
+    }
+    if !map.contains_key("labels") {
+        map.insert("labels".to_owned(), serde_json::json!([]));
+        changed = true;
+    }
+    if changed {
+        std::fs::write(&path, value.to_string()).unwrap();
+    }
 }

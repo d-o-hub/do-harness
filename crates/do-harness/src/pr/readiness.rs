@@ -1,19 +1,22 @@
-//! Deterministic PR merge readiness inspection (#240).
+//! Deterministic PR merge readiness inspection (#240, #466).
 //!
 //! Evaluates:
-//! - Merge state (`mergeStateStatus`, `mergeable`)
-//! - CI check runs and commit statuses, categorizing `cancelled` separately
-//!   from `failure`, with exact `gh run rerun` reproduction guidance
-//! - Review threads and issue comments, detecting unresolved threads and
-//!   unanswered actionable comments (e.g. Codecov coverage gaps)
+//! - Merge state (`mergeStateStatus`, `mergeable`), PR state, draft and labels
+//! - CI check runs and commit statuses through the typed classifier
+//! - Reviews, review threads, issue comments and durable dispositions (#469)
+//! - Findings provenance against the verified base baseline (#470)
+//! - Server merge policy drift (#467)
+//! - Read-only ancestry of the captured `(base, head)` commit pair
+//!
+//! The merge authority is [`model::Authorization`]; `ready` is presentation.
 
 use std::path::Path;
 
 use anyhow::{Context, Result};
 
-use super::checks;
+use super::ancestry;
 use super::gh;
-use super::waiver_comment::first_line;
+use super::policy::{self, PolicyDecision};
 #[allow(unused_imports)]
 pub use super::waiver_comment::{CodecovStatus, CodecovSummary, WaiverAuditRecord};
 use crate::CliError;
@@ -22,6 +25,9 @@ use crate::report::Format;
 /// Logins that post Codecov's own report comments: the app (`codecov[bot]`),
 /// the legacy bot user (`codecov`), and the comment-bot account.
 const CODECOV_AUTHORS: [&str; 3] = ["codecov", "codecov[bot]", "codecov-commenter"];
+
+/// Attempts allowed before a snapshot that keeps moving is declared unstable.
+const MAX_SNAPSHOT_ATTEMPTS: usize = 3;
 
 pub(crate) fn is_codecov_author(login: &str) -> bool {
     CODECOV_AUTHORS.contains(&login)
@@ -36,26 +42,65 @@ pub(crate) fn is_bot_login(login: &str) -> bool {
 #[cfg(test)]
 mod tests;
 
+mod authorization;
+mod collect;
 mod model;
+mod reason;
+mod receipt;
+
+#[allow(unused_imports)]
+pub use authorization::{
+    Authorization, AuthorizationDecision, AuthorizationReason, MergeReceipt, ReceiptVerdict, codes,
+    extract_receipt, validate_receipt,
+};
+#[allow(unused_imports)]
 pub use model::{
     ActionableComment, CancelledCheck, CheckSummary, ConversationSummary, FailedCheck,
     FindingsSummary, MergeState, ReadinessReport, UnresolvedThread,
 };
+
+use collect::{evaluate_checks, evaluate_conversations, evaluate_findings_block};
 
 /// Evaluates merge readiness for PR `number`.
 ///
 /// # Errors
 ///
 /// Returns an error when querying `GitHub` fails.
+#[allow(dead_code)]
 pub fn evaluate(root: &Path, number: u64) -> Result<ReadinessReport> {
-    const MAX_HEAD_RETRIES: usize = 3;
+    evaluate_with_receipt(root, number, None)
+}
 
-    for attempt in 0..MAX_HEAD_RETRIES {
+/// Evaluates readiness, optionally requiring a previously issued receipt.
+///
+/// With `expected`, the report's authorization must match the supplied
+/// receipt: the snapshot is recomputed from scratch and compared, so the file
+/// can only prove that nothing moved, never that something was allowed.
+///
+/// # Errors
+///
+/// Returns an error when querying `GitHub` fails or the receipt file cannot be
+/// read.
+#[allow(clippy::too_many_lines)]
+pub fn evaluate_with_receipt(
+    root: &Path,
+    number: u64,
+    expected: Option<&Path>,
+) -> Result<ReadinessReport> {
+    let supplied = match expected {
+        Some(path) => Some(
+            std::fs::read_to_string(path)
+                .with_context(|| format!("failed to read receipt file {}", path.display()))?,
+        ),
+        None => None,
+    };
+
+    let mut last_moved: Option<String> = None;
+    for attempt in 0..MAX_SNAPSHOT_ATTEMPTS {
         let view = gh::readiness_view(root, number)?;
-        let initial_head = view.head_ref_oid.clone();
         let mut blockers = Vec::new();
 
-        // 1. Merge State
+        // 1. Merge state
         if view.merge_state_status != "CLEAN" {
             blockers.push(format!(
                 "merge state is '{}' (expected 'CLEAN')",
@@ -68,15 +113,14 @@ pub fn evaluate(root: &Path, number: u64) -> Result<ReadinessReport> {
                 view.mergeable
             ));
         }
-        // A conflict stops workflow scheduling, so the check set is a subset of
-        // the suite; record that before the state strings move into the report.
         let conflicts = view.merge_state_status == "DIRTY" || view.mergeable == "CONFLICTING";
         let merge_state = MergeState {
             status: view.merge_state_status.clone(),
             mergeable: view.mergeable.clone(),
             auto_merge: view.auto_merge_request.is_some(),
         };
-        // 2. Review Decision
+
+        // 2. Review decision
         if let Some(decision) = &view.review_decision {
             if decision == "CHANGES_REQUESTED" {
                 blockers.push("review decision is 'CHANGES_REQUESTED'".to_owned());
@@ -85,33 +129,85 @@ pub fn evaluate(root: &Path, number: u64) -> Result<ReadinessReport> {
             }
         }
 
-        // 3. Checks & Statuses
-        let checks = evaluate_checks(root, number, &initial_head, conflicts, &mut blockers)?;
-
-        // 4. Review Threads, Comments & Dispositions
+        // 3. Checks, 4. conversations, 5. findings
+        let checks = evaluate_checks(root, number, &view.head_ref_oid, conflicts, &mut blockers)?;
         let (conversations, codecov) = evaluate_conversations(root, number, &view, &mut blockers)?;
-
-        // 5. Findings provenance against the verified base baseline
         let findings = evaluate_findings_block(root, &view, &mut blockers);
 
-        // 6. Recheck head SHA after collection
-        let recheck_view = gh::readiness_view(root, number)
-            .context("failed to recheck head SHA after metadata collection")?;
+        // 6. Server policy and ancestry proof
+        let policy_report = policy::evaluate(root).ok();
+        let (policy_known, policy_ok, policy_revision) = match &policy_report {
+            Some(report) => (
+                report.decision != PolicyDecision::Unknown,
+                report.decision == PolicyDecision::Pass,
+                report.policy_sha256.clone(),
+            ),
+            None => (false, false, None),
+        };
+        let ancestry_proof = ancestry::compare(root, &view.base_ref_oid, &view.head_ref_oid).ok();
 
-        if recheck_view.head_ref_oid != initial_head {
-            if attempt + 1 < MAX_HEAD_RETRIES {
+        // 7. Re-read the mutable refs: a snapshot that moved is not a snapshot.
+        let recheck = gh::readiness_view(root, number)
+            .context("failed to recheck PR state after metadata collection")?;
+        let moved = recheck.head_ref_oid != view.head_ref_oid
+            || recheck.base_ref_oid != view.base_ref_oid
+            || recheck.state != view.state
+            || recheck.is_draft != view.is_draft
+            || recheck.merge_state_status != view.merge_state_status
+            || recheck.mergeable != view.mergeable
+            || recheck.labels.len() != view.labels.len();
+        if moved {
+            let message = format!(
+                "PR state moved during inspection (head {} -> {}, base {} -> {})",
+                view.head_ref_oid, recheck.head_ref_oid, view.base_ref_oid, recheck.base_ref_oid
+            );
+            if attempt + 1 < MAX_SNAPSHOT_ATTEMPTS {
+                last_moved = Some(message);
                 continue;
             }
-            anyhow::bail!(
-                "head SHA moved during inspection from {initial_head} to {}; snapshot is stale/mixed",
-                recheck_view.head_ref_oid
-            );
+            let authorization = authorization::unstable(message);
+            return Ok(ReadinessReport {
+                pr: number,
+                head_ref_oid: view.head_ref_oid.clone(),
+                collection_complete: false,
+                ready: false,
+                merge_state,
+                checks,
+                conversations,
+                codecov,
+                findings,
+                authorization,
+                blockers,
+            });
         }
 
-        let ready = blockers.is_empty() && checks.verdict == "PASS";
+        // 8. Authorization
+        let now_unix = authorization::now_unix();
+        let inputs = authorization::SnapshotInputs {
+            pr: number,
+            view: &view,
+            merge_state: &merge_state,
+            checks: &checks,
+            conversations: &conversations,
+            findings: &findings,
+            policy_revision,
+            policy_ok,
+            policy_known,
+            ancestry: ancestry_proof.as_ref(),
+            now_unix,
+        };
+        let authorization = authorization::authorize(&inputs);
+        let authorization = match supplied.as_deref() {
+            Some(document) => {
+                authorization::apply_expected_receipt(authorization, document, now_unix)
+            }
+            None => authorization,
+        };
+
+        let ready = authorization.decision == AuthorizationDecision::MergeAllowed;
         return Ok(ReadinessReport {
             pr: number,
-            head_ref_oid: initial_head,
+            head_ref_oid: view.head_ref_oid.clone(),
             collection_complete: conversations.complete,
             ready,
             merge_state,
@@ -119,266 +215,35 @@ pub fn evaluate(root: &Path, number: u64) -> Result<ReadinessReport> {
             conversations,
             codecov,
             findings,
+            authorization,
             blockers,
         });
     }
 
-    anyhow::bail!("failed to obtain a stable head SHA snapshot after {MAX_HEAD_RETRIES} attempts")
-}
-
-/// Evaluates findings provenance and records merge blockers.
-///
-/// Introduced and regressed findings always block. A critical finding blocks
-/// until it is linked to a tracked issue or carries an authorized disposition.
-/// A failed collection blocks too: an unreadable finding set is not a clean one.
-fn evaluate_findings_block(
-    root: &Path,
-    view: &gh::PrReadinessView,
-    blockers: &mut Vec<String>,
-) -> FindingsSummary {
-    use super::findings::{FindingClassification, FindingSeverity};
-
-    let collected = super::findings::collect_and_classify(
-        root,
-        &view.head_ref_oid,
-        &view.base_ref_oid,
-        "repository",
-    );
-
-    let (findings, base_verified) = match collected {
-        Ok(pair) => pair,
-        Err(err) => {
-            blockers.push(format!("findings collection failed: {err:#}"));
-            return FindingsSummary::default();
-        }
-    };
-
-    let mut summary = FindingsSummary {
-        total: findings.len(),
-        base_verified,
-        digest: super::findings::compute_findings_digest(&findings),
-        ..FindingsSummary::default()
-    };
-
-    for finding in &findings {
-        let location = match finding.start_line {
-            Some(line) => format!("{}:{}", finding.path, line),
-            None => finding.path.clone(),
-        };
-        match finding.classification {
-            FindingClassification::Introduced => {
-                summary.introduced += 1;
-                blockers.push(format!(
-                    "introduced {} finding '{}' at {location}: {}",
-                    finding.severity.as_str(),
-                    finding.rule_id,
-                    finding.message
-                ));
-            }
-            FindingClassification::Regressed => {
-                summary.regressed += 1;
-                blockers.push(format!(
-                    "regressed {} finding '{}' at {location}: {}",
-                    finding.severity.as_str(),
-                    finding.rule_id,
-                    finding.message
-                ));
-            }
-            FindingClassification::PreExisting => summary.pre_existing += 1,
-            FindingClassification::Resolved | FindingClassification::Unknown => {}
-        }
-
-        if finding.issue_url.is_none() && finding.disposition.is_none() {
-            summary.untracked += 1;
-            if finding.severity == FindingSeverity::Critical {
-                blockers.push(format!(
-                    "critical finding '{}' at {location} is untracked (no linked issue, no disposition)",
-                    finding.rule_id
-                ));
-            }
-        }
-    }
-
-    summary
-}
-
-fn evaluate_checks(
-    root: &Path,
-    pr: u64,
-    head_ref_oid: &str,
-    conflicts: bool,
-    blockers: &mut Vec<String>,
-) -> Result<CheckSummary> {
-    // Fail closed: a `gh` failure means the check state is unknown, not empty.
-    let report = checks::evaluate_for_head(root, pr, head_ref_oid, conflicts)?;
-    for blocker in &report.blockers {
-        blockers.push(blocker.message.clone());
-    }
-    Ok(summarize_report(report))
-}
-
-/// Projects the typed CI report into the readiness summary shape.
-fn summarize_report(report: checks::ChecksReport) -> CheckSummary {
-    let mut passed = 0;
-    let mut skipped = 0;
-    let mut pending = Vec::new();
-    let mut failed = Vec::new();
-    let mut cancelled = Vec::new();
-    let mut unknown = Vec::new();
-    for entry in &report.checks {
-        match entry.verdict {
-            checks::Verdict::Pass => passed += 1,
-            checks::Verdict::Skip => skipped += 1,
-            checks::Verdict::Pending => pending.push(entry.name.clone()),
-            checks::Verdict::Fail => {
-                if entry.conclusion.as_deref() == Some("cancelled") {
-                    cancelled.push(CancelledCheck {
-                        name: entry.name.clone(),
-                        rerun_command: entry.rerun_command.clone().unwrap_or_default(),
-                        url: entry.url.clone(),
-                    });
-                } else {
-                    failed.push(FailedCheck {
-                        name: entry.name.clone(),
-                        url: entry.url.clone(),
-                    });
-                }
-            }
-            checks::Verdict::Unknown => unknown.push(entry.name.clone()),
-        }
-    }
-    let total = report.checks.len();
-    let incomplete = report
-        .blockers
-        .iter()
-        .any(|blocker| blocker.code == "checks_incomplete");
-    CheckSummary {
-        total,
-        passed,
-        failed,
-        cancelled,
-        pending,
-        skipped,
-        incomplete,
-        verdict: report.verdict.as_str().to_owned(),
-        head_sha: report.head_sha,
-        unknown,
-        entries: report.checks,
-        blockers: report.blockers,
-    }
-}
-
-fn evaluate_conversations(
-    root: &Path,
-    number: u64,
-    view: &gh::PrReadinessView,
-    blockers: &mut Vec<String>,
-) -> Result<(ConversationSummary, Option<CodecovSummary>)> {
-    let threads = gh::review_threads(root, number).context("could not read review threads")?;
-    let comments = gh::issue_comments(root, number).context("could not read issue comments")?;
-    let reviews = gh::reviews(root, number).context("could not read reviews")?;
-
-    let ledger =
-        super::conversations::build_inventory(root, number, view, &threads, &comments, &reviews)?;
-
-    let mut unresolved_threads = Vec::new();
-    for thread in &threads {
-        if !thread.is_resolved {
-            let author = thread
-                .comments
-                .nodes
-                .first()
-                .and_then(|c| c.author.as_ref())
-                .map_or("unknown", |a| a.login.as_str());
-            let excerpt = thread
-                .comments
-                .nodes
-                .first()
-                .map(|c| first_line(&c.body, 80))
-                .unwrap_or_default();
-            let location = match (&thread.path, thread.line) {
-                (Some(p), Some(l)) => format!("{p}:{l}"),
-                (Some(p), None) => p.clone(),
-                _ => "diff".to_owned(),
-            };
-            let status_note = if thread.is_outdated {
-                " (outdated)"
-            } else {
-                ""
-            };
-            blockers.push(format!(
-                "unresolved review thread{status_note} on {location} by {author}: {excerpt}"
-            ));
-            unresolved_threads.push(UnresolvedThread {
-                id: thread.id.clone(),
-                path: thread.path.clone(),
-                line: thread.line,
-                author: author.to_owned(),
-                excerpt,
-                is_outdated: thread.is_outdated,
-            });
-        }
-    }
-
-    for rev in &reviews {
-        if rev.state == "CHANGES_REQUESTED" {
-            let author = rev.user.as_ref().map_or("unknown", |u| u.login.as_str());
-            let item_ref = format!(
-                "review:{}",
-                rev.node_id.as_deref().unwrap_or(&rev.id.to_string())
-            );
-            if !ledger
-                .accepted_dispositions
-                .iter()
-                .any(|d| d.item_ref == item_ref)
-            {
-                blockers.push(format!(
-                    "review by {author} requested changes: {}",
-                    first_line(&rev.body, 80)
-                ));
-            }
-        }
-    }
-
-    for item in &ledger.needs_triage {
-        blockers.push(format!(
-            "conversation item '{}' by {} needs triage: {}",
-            item.item_ref, item.author, item.excerpt
-        ));
-    }
-
-    let mut actionable_comments = Vec::new();
-    let codecov = super::waiver_comment::evaluate_codecov(
-        root,
-        &comments,
-        &view.head_ref_oid,
-        blockers,
-        &mut actionable_comments,
-    );
-
-    let conversations = ConversationSummary {
-        unresolved_threads,
-        actionable_comments,
-        review_decision: view.review_decision.clone(),
-        conversation_inventory_digest: ledger.inventory_digest,
-        items_count: ledger.items.len(),
-        needs_triage: ledger.needs_triage,
-        complete: ledger.complete,
-    };
-    Ok((conversations, codecov))
+    anyhow::bail!(
+        "{}",
+        last_moved.unwrap_or_else(|| {
+            format!("failed to obtain a stable snapshot after {MAX_SNAPSHOT_ATTEMPTS} attempts")
+        })
+    )
 }
 
 /// Runs the ready command and prints the report in `format`.
 ///
-/// Returns `Ok(())` when ready, or an error when blockers exist.
+/// Returns `Ok(())` when the authorization is `MERGE_ALLOWED`.
 ///
 /// # Errors
 ///
-/// Returns [`CliError::Usage`] (exit 2) when `gh` cannot be read — unknown
-/// check state must never read as a silent pass — and [`CliError::Verify`]
-/// (exit 1) when blockers prevent merging.
-pub fn run(root: &Path, number: u64, format: Format) -> std::result::Result<(), CliError> {
-    let report = evaluate(root, number).map_err(CliError::Usage)?;
+/// Returns [`CliError::Usage`] (exit 2) when the snapshot or a supplied receipt
+/// cannot be judged, and [`CliError::Verify`] (exit 1) when a known blocker
+/// prevents merging.
+pub fn run(
+    root: &Path,
+    number: u64,
+    expected_receipt: Option<&Path>,
+    format: Format,
+) -> std::result::Result<(), CliError> {
+    let report = evaluate_with_receipt(root, number, expected_receipt).map_err(CliError::Usage)?;
     match format {
         Format::Json => println!(
             "{}",
@@ -386,26 +251,38 @@ pub fn run(root: &Path, number: u64, format: Format) -> std::result::Result<(), 
         ),
         Format::Text => print_text(&report),
     }
-    if report.ready {
-        Ok(())
-    } else {
-        Err(CliError::Verify(anyhow::anyhow!(
+    match report.authorization.decision {
+        AuthorizationDecision::MergeAllowed => Ok(()),
+        AuthorizationDecision::Blocked => Err(CliError::Verify(anyhow::anyhow!(
             "PR {number} is not ready to merge ({} blocker(s))",
-            report.blockers.len()
-        )))
+            report.authorization.reasons.len()
+        ))),
+        AuthorizationDecision::Unknown => Err(CliError::Usage(anyhow::anyhow!(
+            "PR {number} merge authorization is indeterminate ({} reason(s)): {}",
+            report.authorization.reasons.len(),
+            summarise_reasons(&report.authorization.reasons)
+        ))),
     }
 }
 
+/// Joins up to three reason codes and messages for a one-line failure.
+fn summarise_reasons(reasons: &[AuthorizationReason]) -> String {
+    reasons
+        .iter()
+        .take(3)
+        .map(|reason| format!("[{}] {}", reason.code, reason.message))
+        .collect::<Vec<_>>()
+        .join("; ")
+}
+
 fn print_text(report: &ReadinessReport) {
-    if report.ready {
-        println!("pr {}: merge readiness: READY", report.pr);
-    } else {
-        println!(
-            "pr {}: merge readiness: NOT READY ({} blocker(s))",
-            report.pr,
-            report.blockers.len()
-        );
-    }
+    let headline = if report.ready { "READY" } else { "NOT READY" };
+    println!("pr {}: merge readiness: {headline}", report.pr);
+    println!(
+        "  authorization: {} ({} blocker(s))",
+        report.authorization.decision.as_str(),
+        report.authorization.reasons.len()
+    );
     println!(
         "  merge-state: {} (mergeable: {})",
         report.merge_state.status, report.merge_state.mergeable
@@ -438,9 +315,10 @@ fn print_text(report: &ReadinessReport) {
     }
 
     println!(
-        "  conversations: {} unresolved thread(s), {} actionable comment(s)",
+        "  conversations: {} unresolved thread(s), {} actionable comment(s), {} needing triage",
         report.conversations.unresolved_threads.len(),
-        report.conversations.actionable_comments.len()
+        report.conversations.actionable_comments.len(),
+        report.conversations.needs_triage.len()
     );
     for t in &report.conversations.unresolved_threads {
         let loc = t.path.as_deref().unwrap_or("diff");
@@ -453,28 +331,31 @@ fn print_text(report: &ReadinessReport) {
     for c in &report.conversations.actionable_comments {
         println!("    ACTIONABLE: {}: \"{}\"", c.author, c.excerpt);
     }
+    println!(
+        "  findings: {} total ({} introduced, {} regressed, {} pre-existing, {} untracked)",
+        report.findings.total,
+        report.findings.introduced,
+        report.findings.regressed,
+        report.findings.pre_existing,
+        report.findings.untracked
+    );
 
-    if let Some(c) = &report.codecov {
+    if let Some(receipt) = &report.authorization.receipt {
         println!(
-            "  codecov status: {:?} (actionable: {}, waived: {})",
-            c.status, c.is_actionable, c.waived
+            "  receipt: {} (expires at unix {}, snapshot {})",
+            receipt.pr, receipt.expires_at_unix, receipt.snapshot_sha256
         );
-        if c.waived {
-            if let (Some(author), Some(sha), Some(finding), Some(reason)) = (
-                &c.waiver_author,
-                &c.waiver_head_sha,
-                &c.waiver_finding_ref,
-                &c.waiver_reason,
-            ) {
-                println!("    WAIVED: {finding} for {sha} by {author}: \"{reason}\"");
-            }
-        }
     }
-
     if !report.blockers.is_empty() {
         println!("blockers:");
-        for b in &report.blockers {
-            println!("  - {b}");
+        for blocker in &report.blockers {
+            println!("  - {blocker}");
+        }
+    }
+    if !report.authorization.reasons.is_empty() {
+        println!("authorization reasons:");
+        for reason in &report.authorization.reasons {
+            println!("  - [{}] {}", reason.code, reason.message);
         }
     }
 }

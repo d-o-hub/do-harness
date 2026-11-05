@@ -260,6 +260,7 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             break
         }
         'do-harness;pr;ready' {
+            [CompletionResult]::new('--expected-receipt', '--expected-receipt', [CompletionResultType]::ParameterName, 'Re-validate a previously issued authorization receipt (the full `pr ready --format json` report file). The snapshot is recomputed')
             [CompletionResult]::new('--format', '--format', [CompletionResultType]::ParameterName, 'Output format')
             [CompletionResult]::new('--root', '--root', [CompletionResultType]::ParameterName, 'Workspace root override (default: walk up from cwd)')
             [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Explicit path to do-harness.toml')
@@ -274,6 +275,7 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             break
         }
         'do-harness;pr;readiness' {
+            [CompletionResult]::new('--expected-receipt', '--expected-receipt', [CompletionResultType]::ParameterName, 'Re-validate a previously issued authorization receipt (the full `pr ready --format json` report file). The snapshot is recomputed')
             [CompletionResult]::new('--format', '--format', [CompletionResultType]::ParameterName, 'Output format')
             [CompletionResult]::new('--root', '--root', [CompletionResultType]::ParameterName, 'Workspace root override (default: walk up from cwd)')
             [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Explicit path to do-harness.toml')
@@ -288,6 +290,7 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             break
         }
         'do-harness;pr;check' {
+            [CompletionResult]::new('--expected-receipt', '--expected-receipt', [CompletionResultType]::ParameterName, 'Re-validate a previously issued authorization receipt (the full `pr ready --format json` report file). The snapshot is recomputed')
             [CompletionResult]::new('--format', '--format', [CompletionResultType]::ParameterName, 'Output format')
             [CompletionResult]::new('--root', '--root', [CompletionResultType]::ParameterName, 'Workspace root override (default: walk up from cwd)')
             [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Explicit path to do-harness.toml')

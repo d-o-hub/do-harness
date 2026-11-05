@@ -231,7 +231,7 @@ fn head_moving_during_collection_yields_no_ready_result() {
     assert_ne!(code, Some(0), "unstable head SHA must fail closed");
     assert!(!stdout.contains(r#""ready": true"#));
     assert!(
-        stderr.contains("head SHA moved during inspection"),
+        stderr.contains("PR state moved during inspection"),
         "stderr: {stderr}"
     );
 }
