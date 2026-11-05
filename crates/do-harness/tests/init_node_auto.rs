@@ -77,6 +77,40 @@ fn sensor_names_from_config(config: &str) -> Vec<String> {
         .unwrap_or_default()
 }
 
+/// Whether `tool` is an executable on PATH, mirroring the CLI's own probe
+/// semantics (file exists, and executable on Unix). Used to gate strict
+/// npm/pnpm-present assertions on hosts that actually have the manager, so
+/// the same fixture asserts green/configured sensors where the tool exists
+/// and the INCOMPLETE omitted-semantics path where it does not.
+fn tool_on_path(tool: &str) -> bool {
+    let Some(path_var) = std::env::var_os("PATH") else {
+        return false;
+    };
+    let names = [
+        tool.to_string(),
+        format!("{tool}.exe"),
+        format!("{tool}.cmd"),
+        format!("{tool}.bat"),
+    ];
+    std::env::split_paths(&path_var).any(|dir| {
+        names.iter().any(|name| {
+            let candidate = dir.join(name);
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                candidate.is_file()
+                    && candidate
+                        .metadata()
+                        .is_ok_and(|meta| meta.permissions().mode() & 0o111 != 0)
+            }
+            #[cfg(not(unix))]
+            {
+                candidate.is_file()
+            }
+        })
+    })
+}
+
 /// A clean rustfmt-compliant crate with one passing unit test.
 fn write_clean_crate(root: &Path) {
     fs::create_dir_all(root.join("src")).unwrap();
@@ -101,29 +135,51 @@ fn npm_project_selects_node_and_scaffolds_config() {
     let (code, report, stderr) = run_init(root);
     assert_report(code, &report, &stderr);
     assert_eq!(report["language"], serde_json::json!("node"));
-    assert_eq!(report["baseline"]["state"], serde_json::json!("green"));
     let candidates = report["candidates"].as_array().unwrap();
     assert_eq!(candidates.len(), 4, "{candidates:?}");
-    assert!(
-        candidates
-            .iter()
-            .any(|c| c["name"] == "test" && c["included"] == true)
-    );
-    assert!(
-        candidates
-            .iter()
-            .any(|c| c["name"] == "lint" && c["included"] == true)
-    );
-    assert!(
-        candidates
-            .iter()
-            .any(|c| c["name"] == "typecheck" && c["included"] == false)
-    );
-
-    let config = fs::read_to_string(root.join("do-harness.toml")).unwrap();
-    assert!(config.contains("language = \"node\""));
-    assert!(config.contains("name = \"lint\""));
-    assert!(config.contains("name = \"test\""));
+    if tool_on_path("npm") {
+        // A machine with npm must get the runnable contract: green baseline,
+        // the proven sensors included, and the generated config configured.
+        assert_eq!(report["baseline"]["state"], serde_json::json!("green"));
+        assert!(
+            candidates
+                .iter()
+                .any(|c| c["name"] == "test" && c["included"] == true)
+        );
+        assert!(
+            candidates
+                .iter()
+                .any(|c| c["name"] == "lint" && c["included"] == true)
+        );
+        assert!(
+            candidates
+                .iter()
+                .any(|c| c["name"] == "typecheck" && c["included"] == false)
+        );
+        let config = fs::read_to_string(root.join("do-harness.toml")).unwrap();
+        assert!(config.contains("language = \"node\""));
+        assert!(config.contains("name = \"lint\""));
+        assert!(config.contains("name = \"test\""));
+    } else {
+        // Without npm the same manifest still selects Node, but the contract
+        // is INCOMPLETE with all candidates omitted — never a claimed green.
+        eprintln!("npm not on PATH; asserting the INCOMPLETE omitted-semantics path");
+        assert_eq!(report["baseline"]["state"], serde_json::json!("incomplete"));
+        for candidate in candidates {
+            assert_eq!(
+                candidate["included"],
+                serde_json::json!(false),
+                "{candidate:?}"
+            );
+        }
+        let diagnostics = report["diagnostics"].as_array().unwrap();
+        assert!(
+            diagnostics
+                .iter()
+                .any(|d| d["code"] == "missing_package_manager"),
+            "expected a missing_package_manager diagnostic: {diagnostics:?}"
+        );
+    }
 }
 
 #[test]
@@ -148,8 +204,16 @@ fn pnpm_project_selects_node() {
 
     let config = fs::read_to_string(root.join("do-harness.toml")).unwrap();
     assert!(config.contains("language = \"node\""));
-    assert!(config.contains("name = \"test\""));
-    assert!(config.contains("name = \"build\""));
+    if tool_on_path("pnpm") || tool_on_path("npm") {
+        // Either manager makes the proven scripts runnable; the generated
+        // config must then include the test/build sensors.
+        assert!(config.contains("name = \"test\""));
+        assert!(config.contains("name = \"build\""));
+        assert_eq!(report["baseline"]["state"], serde_json::json!("green"));
+    } else {
+        eprintln!("pnpm/npm not on PATH; asserting the INCOMPLETE path");
+        assert_eq!(report["baseline"]["state"], serde_json::json!("incomplete"));
+    }
 }
 
 #[test]
@@ -333,19 +397,29 @@ fn generated_hooks_and_signal_sets_reference_configured_sensors() {
     let config = fs::read_to_string(root.join("do-harness.toml")).unwrap();
     let value: toml::Value = toml::from_str(&config).expect("parse generated toml");
     let sensor_names = sensor_names_from_config(&config);
-    let sensors: Vec<&str> = sensor_names.iter().map(String::as_str).collect();
-    assert!(
-        !sensors.is_empty(),
-        "generated config must configure sensors"
-    );
+    if tool_on_path("npm") {
+        // A machine with npm must get a configured sensor set.
+        assert!(
+            !sensor_names.is_empty(),
+            "generated config must configure sensors: {sensor_names:?}"
+        );
+    } else {
+        eprintln!(
+            "npm not on PATH; hook/set references are vacuously valid for an empty sensor set"
+        );
+        assert!(
+            sensor_names.is_empty(),
+            "without npm no sensor may be configured: {sensor_names:?}"
+        );
+    }
 
     let hooks = value["hooks"].as_table().expect("hooks table");
     for (hook, names) in hooks {
         for name in names.as_array().expect("hook sensor list") {
             let name = name.as_str().unwrap();
             assert!(
-                sensors.contains(&name),
-                "hook {hook} references {name}, which is not a configured sensor: {sensors:?}"
+                sensor_names.iter().any(|s| s == name),
+                "hook {hook} references {name}, which is not a configured sensor: {sensor_names:?}"
             );
         }
     }
@@ -354,8 +428,8 @@ fn generated_hooks_and_signal_sets_reference_configured_sensors() {
         for name in names.as_array().expect("set sensor list") {
             let name = name.as_str().unwrap();
             assert!(
-                sensors.contains(&name),
-                "signal set {set} references {name}, which is not a configured sensor: {sensors:?}"
+                sensor_names.iter().any(|s| s == name),
+                "signal set {set} references {name}, which is not a configured sensor: {sensor_names:?}"
             );
         }
     }
