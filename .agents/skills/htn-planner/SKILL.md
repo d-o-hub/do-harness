@@ -40,7 +40,9 @@ Decompose incoming software objectives into deterministic Hierarchical Task Netw
 ## Execution Rules
 - Before repository-dependent decomposition or persisting a plan, run the harness freshness step (`bash .agents/skills/harness/scripts/latest-main.sh [--read-only]`). Read-only planning observes remote state via `--read-only` without writing Git, DB, or working-tree state, and reports advertised SHA and local HEAD separately. Clean `main` can fast-forward only; dirty/diverged/in-progress branches are never reset, auto-stashed, or automatically rebased. Fetch or network failure blocks claims of freshness; do not substitute stale source as latest.
 - Check method preconditions before selecting a method; if they are unmet, pick the matching alternative or defer.
-- Always persist current method state and subtask index into `plans/tasks.json` or libSQL.
+- Scope the method to the work: apply HTN decomposition only to genuinely multi-step or dependent requests. Trivial or isolated changes (a typo, a rename, a one-file fix) take the ordinary scoped route without plan artifacts.
+- Completing a slice does not compel a skill update: review the outcome for reusable learning, and distill only when a repeated or consequential failure supplies distilled evidence (see `.agents/skills/skill-distiller`).
+- When decomposition is justified and applied, persist current method state and subtask index into `plans/tasks.json` or libSQL.
 - Never advance subtask pointer until the corresponding sensor passes with exit code 0.
 - When a decomposed subtask carries high uncertainty, delegate to `.agents/skills/spike-runner` before advancing.
 ## Gotchas
