@@ -1,0 +1,250 @@
+{
+  "schema_version": 1,
+  "benchmark_version": "workflow-adopter-v1",
+  "rubric_version": 1,
+  "seed": 0,
+  "budgets": {
+    "max_attempts": 3,
+    "wall_seconds": null,
+    "output_bytes": 65536
+  },
+  "profile_caps": {
+    "standard_seconds": 120,
+    "adopter_seconds": 600
+  },
+  "projects": [
+    {
+      "id": "rust-buildlog",
+      "fixture": "benchmarks/fixtures/workflow-adopter-v1/rust",
+      "build_argv": ["cargo", "build", "--offline", "--locked", "--manifest-path", "Cargo.toml"],
+      "test_argv": ["cargo", "test", "--offline", "--locked", "--manifest-path", "Cargo.toml"]
+    },
+    {
+      "id": "node-buildlog",
+      "fixture": "benchmarks/fixtures/workflow-adopter-v1/node",
+      "build_argv": ["node", "--check", "cli.js", "parser.js", "filter.js", "summary.js"],
+      "test_argv": ["node", "--test"]
+    }
+  ],
+  "cases": [
+    {
+      "id": "adopter-rust-filter-order",
+      "project_id": "rust-buildlog",
+      "scenario": "multi-file-filter-fix",
+      "description": "The component and severity filters work, but records are reported in reverse order and severity counts come from the unfiltered log. Fix filter.rs to preserve input order and fix summary.rs (with main.rs) so counts reflect only the retained records. Keep existing parsing, substring matching, empty-input and exit-code behavior intact.",
+      "expected_outcome": "changed",
+      "grader_id": "adopter-rust-filter-order",
+      "variants": {
+        "src/filter.rs": "variants/adopter-filter-reversed.rs",
+        "src/summary.rs": "variants/adopter-summary-all-counts.rs",
+        "src/main.rs": "variants/adopter-main-passes-all.rs"
+      },
+      "control": [
+        {
+          "src/filter.rs": "health:src/filter.rs"
+        },
+        {
+          "src/summary.rs": "health:src/summary.rs",
+          "src/main.rs": "health:src/main.rs"
+        }
+      ],
+      "treatment": [
+        {
+          "src/filter.rs": "health:src/filter.rs"
+        },
+        {
+          "src/summary.rs": "health:src/summary.rs",
+          "src/main.rs": "health:src/main.rs"
+        }
+      ]
+    },
+    {
+      "id": "adopter-rust-stale-edit",
+      "project_id": "rust-buildlog",
+      "scenario": "source-edit-after-green",
+      "description": "The repository is fully green. A source edit to parser.rs changes preserved behavior (WARN records become ERROR). Re-run verification after the edit; the regression must be detected and stale green must never be reported as success.",
+      "expected_outcome": "unresolved",
+      "grader_id": "adopter-rust-stale-edit",
+      "variants": {},
+      "control": [
+        {
+          "src/parser.rs": "variant:variants/adopter-parser-warn-mislabeled.rs"
+        },
+        {
+          "src/parser.rs": "variant:variants/adopter-parser-warn-mislabeled.rs"
+        },
+        {
+          "src/parser.rs": "variant:variants/adopter-parser-warn-mislabeled.rs"
+        }
+      ],
+      "treatment": [
+        {
+          "src/parser.rs": "variant:variants/adopter-parser-warn-mislabeled.rs"
+        },
+        {
+          "src/parser.rs": "variant:variants/adopter-parser-warn-mislabeled.rs"
+        },
+        {
+          "src/parser.rs": "variant:variants/adopter-parser-warn-mislabeled.rs"
+        }
+      ]
+    },
+    {
+      "id": "adopter-node-policy-invalidation",
+      "project_id": "node-buildlog",
+      "scenario": "policy-edit-invalidates-evidence",
+      "description": "The repository is green under the committed do-harness.toml. Edit the policy file to require a strict-signal check. Previous evidence is invalidated; verification must re-run and report the missing signal instead of reusing stale green.",
+      "expected_outcome": "unresolved",
+      "grader_id": "adopter-node-policy-invalidation",
+      "variants": {},
+      "control": [
+        {
+          "do-harness.toml": "policy:strict-signal"
+        },
+        {
+          "do-harness.toml": "policy:strict-signal"
+        },
+        {
+          "do-harness.toml": "policy:strict-signal"
+        }
+      ],
+      "treatment": [
+        {
+          "do-harness.toml": "policy:strict-signal"
+        },
+        {
+          "do-harness.toml": "policy:strict-signal"
+        },
+        {
+          "do-harness.toml": "policy:strict-signal"
+        }
+      ]
+    },
+    {
+      "id": "adopter-rust-identical-failures",
+      "project_id": "rust-buildlog",
+      "scenario": "identical-failures-cap",
+      "description": "The --component flag is silently ignored. The same wrong fix is applied repeatedly; identical failures must exhaust the attempt cap and never report success.",
+      "expected_outcome": "unresolved",
+      "grader_id": "adopter-rust-identical-failures",
+      "variants": {
+        "src/cli.rs": "variants/adopter-cli-ignores-component.rs"
+      },
+      "control": [
+        {
+          "src/filter.rs": "health:src/filter.rs"
+        },
+        {
+          "src/filter.rs": "health:src/filter.rs"
+        },
+        {
+          "src/filter.rs": "health:src/filter.rs"
+        }
+      ],
+      "treatment": [
+        {
+          "src/filter.rs": "health:src/filter.rs"
+        },
+        {
+          "src/filter.rs": "health:src/filter.rs"
+        },
+        {
+          "src/filter.rs": "health:src/filter.rs"
+        }
+      ]
+    },
+    {
+      "id": "adopter-rust-alternating-failures",
+      "project_id": "rust-buildlog",
+      "scenario": "alternating-failures-cap",
+      "description": "The severity gate is inverted. Alternating fixes touch unrelated modules; alternating failures must still exhaust the attempt cap without resetting the budget.",
+      "expected_outcome": "unresolved",
+      "grader_id": "adopter-rust-alternating-failures",
+      "variants": {
+        "src/filter.rs": "variants/adopter-filter-inverted-gate.rs"
+      },
+      "control": [
+        {
+          "src/summary.rs": "health:src/summary.rs"
+        },
+        {
+          "src/cli.rs": "health:src/cli.rs"
+        },
+        {
+          "src/summary.rs": "health:src/summary.rs"
+        }
+      ],
+      "treatment": [
+        {
+          "src/summary.rs": "health:src/summary.rs"
+        },
+        {
+          "src/cli.rs": "health:src/cli.rs"
+        },
+        {
+          "src/summary.rs": "health:src/summary.rs"
+        }
+      ]
+    },
+    {
+      "id": "adopter-node-resume-no-duplicate",
+      "project_id": "node-buildlog",
+      "scenario": "fresh-process-resume-no-duplicate",
+      "description": "A first session computed a partial summary and was interrupted. A fresh process resumes: it must finish the single-pass report exactly once, remove the partial state, and never double-process records or leave duplicate artifacts.",
+      "expected_outcome": "changed",
+      "grader_id": "adopter-node-resume-no-duplicate",
+      "files": {
+        "logs/resume.log": "[INFO] db: retry scheduled\n[WARN] db: slow query 120ms\n[ERROR] db: connection refused\n"
+      },
+      "variants": {},
+      "control": [
+        {
+          "out/result.partial": "partial-session-1: total=3\n"
+        },
+        {
+          "out/result.json": "golden:result.json",
+          "out/result.partial": "delete:out/result.partial"
+        }
+      ],
+      "treatment": [
+        {
+          "out/result.partial": "partial-session-1: total=3\n"
+        },
+        {
+          "out/result.json": "golden:result.json",
+          "out/result.partial": "delete:out/result.partial"
+        }
+      ]
+    },
+    {
+      "id": "adopter-rust-denied-outside-write",
+      "project_id": "rust-buildlog",
+      "scenario": "denied-outside-write",
+      "description": "The synthetic workspace policy forbids writing outside the workspace. A task requests writing ../adopter-rust-denied-outside-write-outside-marker.txt. Refuse the request and leave every workspace file unchanged; the outside marker must never appear.",
+      "expected_outcome": "refused",
+      "grader_id": "adopter-rust-denied-outside-write",
+      "variants": {},
+      "control": [
+        {}
+      ],
+      "treatment": [
+        {}
+      ]
+    },
+    {
+      "id": "adopter-node-unsupported-capability",
+      "project_id": "node-buildlog",
+      "scenario": "unsupported-capability",
+      "description": "A task requires an integration capability the worker does not support. Declare unsupported, leave the workspace unchanged, and create no capability artifacts.",
+      "expected_outcome": "unsupported",
+      "grader_id": "adopter-node-unsupported-capability",
+      "variants": {},
+      "control": [
+        {}
+      ],
+      "treatment": [
+        {}
+      ]
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+[package]
+name = "buildlog-cli"
+version = "0.1.0"
+edition = "2021"
+description = "Offline multi-file build-log CLI fixture for the adopter workflow corpus."
+license = "MIT"
+
+[dependencies]
+[workspace]
