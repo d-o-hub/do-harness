@@ -213,7 +213,12 @@ Each header stays strict: unknown fields inside a header are rejected.
 
 The harness supports four language packs: `rust` (Rust sensor pack),
 `generic` (no built-in sensors), `web` (web UI audit pack), and `node`
-(Node/JS/TS pack probing package scripts and toolchains). The generic pack
+(Node/JS/TS pack probing package scripts and toolchains). Plain `init`
+selects the Node pack automatically when a `package.json` proves a
+supported command (a `typecheck`/`lint`/`test`/`build` script, turbo task,
+or matching dependency); a malformed or unsupported manifest stays Generic
+with a structured diagnostic (`invalid_package_json`,
+`no_supported_node_commands`, `missing_package_manager`). The generic pack
 ships **zero sensors**: its pass is vacuous, not evidence. Add real checks
 before trusting `verify`.
 
@@ -479,8 +484,8 @@ The harness enforces strict fail-closed contract rules across all supported pack
 | Pack | Selection Criteria | Default Generated Sensors | Strict Verification Contract |
 |------|-------------------|--------------------------|------------------------------|
 | `rust` | `Cargo.toml` | `fmt`, `check`, `clippy`, `test`, `doctest`, `loc`, `deps`, `audit`, `commitlint`, `release-preflight` | Fails closed on zero tests, broken doctests, missing manifest, or missing required tools in CI. |
-| `generic` | Greenfield / non-Rust default | None (empty sensor array) | Vacuous pass (`sensor_pack = "generic"`, 0 sensors executed). Never masquerades as strict evidence for a specific language gate. |
-| `node` | `package.json` | `typecheck`, `lint`, `test`, `build` | Preserves `package.json` and `src/`. Probes package scripts, turbo, tsc, eslint, jest, vitest. The `test` sensor fails when the runner's total summary reports zero tests, so a delegated script cannot pass vacuously. |
+| `generic` | Greenfield / non-supported non-Rust default (e.g. malformed or unsupported `package.json`) | None (empty sensor array) | Vacuous pass (`sensor_pack = "generic"`, 0 sensors executed). Never masquerades as strict evidence for a specific language gate. |
+| `node` | `package.json` proving a supported Node command (script, turbo task, or matching dependency) | `typecheck`, `lint`, `test`, `build` | Preserves `package.json` and `src/`. Probes package scripts, turbo, tsc, eslint, jest, vitest. Missing package-manager tooling yields an INCOMPLETE baseline, never a claimed green; `test` fails when the runner's total summary reports zero tests, so a delegated script cannot pass vacuously. |
 | `web` | `init --language web` | `web-ui-tests`, `viewport-ux`, `a11y`, `console`, `perf`, `visual`, `i18n` | Unconfigured pack emits `SKIP:` (warned verdict). Fails closed under `verify --strict` until `WEB_AUDIT_ROUTES` is set. `web-ui-tests` runs the bundled audit suite and needs no configuration. |
 
 ### Fail-closed verification rules
