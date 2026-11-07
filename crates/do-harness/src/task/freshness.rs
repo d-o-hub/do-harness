@@ -68,7 +68,7 @@ pub(super) fn snapshot(
                 .effective_sensors()
                 .iter()
                 .find(|s| &s.name == sensor)
-                .and_then(|s| crate::provenance::sensor_digest(root, s, bytes.as_deref()))
+                .and_then(|s| crate::provenance::sensor_digest(root, s, bytes.as_deref(), None))
                 .ok_or_else(|| DbError::GateUnsatisfied {
                     task_id: task.id,
                     sensor: sensor.clone(),

@@ -258,7 +258,8 @@ async fn sensor_freshness(
                 match spec {
                     None => ("missing", "unknown_sensor"),
                     Some(spec) => {
-                        let digest = crate::provenance::sensor_digest(root, spec, bytes.as_deref());
+                        let digest =
+                            crate::provenance::sensor_digest(root, spec, bytes.as_deref(), None);
                         match digest {
                             None => ("missing", "inputs_unresolved"),
                             Some(digest) => {
