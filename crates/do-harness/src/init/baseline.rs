@@ -64,8 +64,16 @@ pub struct Baseline {
 /// names cannot occur here, but config-level selection errors propagate).
 pub fn run(cfg: &Config, root: &Path, omitted_core: &[String]) -> anyhow::Result<Baseline> {
     if cfg.effective_sensors().is_empty() {
+        // Zero effective sensors with an omitted core sensor is a tooling gap,
+        // not a genuinely empty contract: the pack intended sensors it could
+        // not include, so the outcome is INCOMPLETE rather than VACUOUS.
+        let state = if omitted_core.is_empty() {
+            BaselineState::Vacuous
+        } else {
+            BaselineState::Incomplete
+        };
         return Ok(Baseline {
-            state: BaselineState::Vacuous,
+            state,
             passed: 0,
             omitted: omitted_core.to_vec(),
             failed: Vec::new(),
