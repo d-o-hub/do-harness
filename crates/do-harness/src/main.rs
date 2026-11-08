@@ -54,6 +54,7 @@ mod gh;
 mod hook_script;
 mod hooks;
 mod init;
+mod job;
 mod learn;
 mod loc;
 mod man;

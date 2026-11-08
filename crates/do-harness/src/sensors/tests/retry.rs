@@ -43,6 +43,7 @@ fn retries_failing_sensor_until_success() {
             when_changed: vec![],
         }],
         jobs: None,
+        repairs: Vec::new(),
     };
 
     let report = verify(
@@ -98,6 +99,7 @@ fn times_out_hanging_sensor() {
             when_changed: vec![],
         }],
         jobs: None,
+        repairs: Vec::new(),
     };
 
     let start = Instant::now();
@@ -157,6 +159,7 @@ fn transient_exit_codes_restricts_retries() {
             when_changed: vec![],
         }],
         jobs: None,
+        repairs: Vec::new(),
     };
 
     let report = verify(

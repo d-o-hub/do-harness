@@ -39,6 +39,7 @@ fn severity_config(name: &str, argv: &[&str], severity: SensorSeverity) -> Confi
             when_changed: vec![],
         }],
         jobs: None,
+        repairs: Vec::new(),
     }
 }
 
