@@ -75,7 +75,8 @@ class Harness:
         # the fixture directory is passed as the child's working directory, so
         # no caller-controlled value reaches the argv. No shell is used.
         result = subprocess.run(  # nosec B603 - trusted repository binary, fixed argv, no shell
-            [str(self.binary), *args],
+            ["do-harness", *args],
+            executable=str(self.binary),
             cwd=cwd,
             capture_output=True,
             text=True,
