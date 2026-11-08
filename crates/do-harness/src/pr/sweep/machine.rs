@@ -185,6 +185,37 @@ fn process_owned(
         return Ok(());
     }
 
+    // Disarm a pre-existing auto-merge request before any other disposition:
+    // an armed request fires on whatever head exists when GitHub next computes
+    // mergeability, so it must not survive a cluster/no-effect decision.
+    if view.auto_merge_request.is_some() {
+        if !input.mode.execute {
+            ctx.finish_blocked(vec![AuthorizationReason::new(
+                crate::pr::readiness::codes::AUTO_MERGE_ARMED,
+                "an auto-merge request is armed; disarm requires --execute",
+            )]);
+            return Ok(());
+        }
+        if let Err(error) = gh::disable_auto_merge(root, number) {
+            ctx.finish_blocked(vec![AuthorizationReason::new(
+                "disarm_failed",
+                format!("auto-merge disarm failed: {error:#}"),
+            )]);
+            return Ok(());
+        }
+        ctx.audit.disarmed_auto_merge = true;
+        match gh::readiness_view(root, number) {
+            Ok(refreshed) if refreshed.auto_merge_request.is_none() => view = refreshed,
+            _ => {
+                ctx.finish_blocked(vec![AuthorizationReason::new(
+                    "disarm_failed",
+                    "auto-merge is still armed after disarm",
+                )]);
+                return Ok(());
+            }
+        }
+    }
+
     // Duplicate clusters: close losers only under --execute --merge.
     if let Some(cluster) = clusters.get(&number) {
         if cluster.losers.contains(&number) {
@@ -228,35 +259,6 @@ fn process_owned(
             keeper: None,
             rule: Some(cluster.rule.to_owned()),
         });
-    }
-
-    // Disarm a pre-existing auto-merge request before validating anything.
-    if view.auto_merge_request.is_some() {
-        if !input.mode.execute {
-            ctx.finish_blocked(vec![AuthorizationReason::new(
-                crate::pr::readiness::codes::AUTO_MERGE_ARMED,
-                "an auto-merge request is armed; disarm requires --execute",
-            )]);
-            return Ok(());
-        }
-        if let Err(error) = gh::disable_auto_merge(root, number) {
-            ctx.finish_blocked(vec![AuthorizationReason::new(
-                "disarm_failed",
-                format!("auto-merge disarm failed: {error:#}"),
-            )]);
-            return Ok(());
-        }
-        ctx.audit.disarmed_auto_merge = true;
-        match gh::readiness_view(root, number) {
-            Ok(refreshed) if refreshed.auto_merge_request.is_none() => view = refreshed,
-            _ => {
-                ctx.finish_blocked(vec![AuthorizationReason::new(
-                    "disarm_failed",
-                    "auto-merge is still armed after disarm",
-                )]);
-                return Ok(());
-            }
-        }
     }
 
     // NO_EFFECT: close only proven, base-verified no-tree-effect PRs.
