@@ -21,8 +21,6 @@ pub const MANY_ATTEMPTS: u32 = 5;
 pub const TIMEOUT_SECONDS: u64 = 30;
 /// Per-attempt budget that deliberately expires.
 pub const HUNG_TIMEOUT_SECONDS: u64 = 1;
-/// How long a test waits for a job to reach an observable state.
-pub const WAIT_SECONDS: u64 = 20;
 /// Poll interval while a job runs.
 pub const POLL_MILLIS: u64 = 50;
 /// Declared result size that must be rejected before it is read.
