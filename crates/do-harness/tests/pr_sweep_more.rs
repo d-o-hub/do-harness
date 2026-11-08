@@ -326,6 +326,64 @@ fn dry_run_reports_and_never_mutates() {
         mutations(root).is_empty(),
         "dry run must make zero mutations"
     );
+
+    // The subcommand `--dry-run` overrides mutating flags.
+    let (dir, bin) = setup();
+    let root = dir.path();
+    write_pr_list(root, &one_pr_list(2));
+    write_view(root, 2, &json!({}));
+    let (code, stdout, stderr) = run_sweep(
+        root,
+        &bin,
+        &[
+            "pr",
+            "sweep",
+            "--all",
+            "--execute",
+            "--merge",
+            "--dry-run",
+            "--format",
+            "json",
+        ],
+    );
+    assert_eq!(code, Some(0), "{stderr}");
+    let report: Value = serde_json::from_str(&stdout).unwrap();
+    assert_eq!(report["mode"]["dry_run"], true);
+    assert_eq!(report["mode"]["execute"], false);
+    assert_eq!(report["mode"]["merge"], false);
+    assert!(
+        mutations(root).is_empty(),
+        "subcommand --dry-run must make zero mutations"
+    );
+
+    // The global `--dry-run` also overrides mutating flags.
+    let (dir, bin) = setup();
+    let root = dir.path();
+    write_pr_list(root, &one_pr_list(2));
+    write_view(root, 2, &json!({}));
+    let (code, stdout, stderr) = run_sweep(
+        root,
+        &bin,
+        &[
+            "--dry-run",
+            "pr",
+            "sweep",
+            "--all",
+            "--execute",
+            "--merge",
+            "--format",
+            "json",
+        ],
+    );
+    assert_eq!(code, Some(0), "{stderr}");
+    let report: Value = serde_json::from_str(&stdout).unwrap();
+    assert_eq!(report["mode"]["dry_run"], true);
+    assert_eq!(report["mode"]["execute"], false);
+    assert_eq!(report["mode"]["merge"], false);
+    assert!(
+        mutations(root).is_empty(),
+        "global --dry-run must make zero mutations"
+    );
 }
 
 #[cfg(unix)]

@@ -172,7 +172,7 @@ pub fn run(root: &Path, action: PrAction, dry_run: bool) -> Result<(), CliError>
         PrAction::Sweep {
             all,
             pr,
-            dry_run,
+            dry_run: subcommand_dry_run,
             execute,
             merge,
             wait,
@@ -182,7 +182,7 @@ pub fn run(root: &Path, action: PrAction, dry_run: bool) -> Result<(), CliError>
             super::sweep::SweepArgs {
                 all,
                 pr,
-                dry_run,
+                dry_run: dry_run || subcommand_dry_run,
                 execute,
                 merge,
                 wait,

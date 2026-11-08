@@ -95,26 +95,19 @@ pub fn find_clusters(root: &Path, owned: &[PlannedPr]) -> Result<Vec<Cluster>> {
         }
         let mut best: Option<&PlannedPr> = None;
         let mut best_green: Option<bool> = None;
-        let mut rule = "tie";
+        let mut greens: HashMap<u64, bool> = HashMap::new();
         for member in members {
             let green = checks_green(root, member);
-            if let (Some(current), Some(current_green)) = (best, best_green) {
-                let take = if green && !current_green {
-                    rule = "a";
-                    true
-                } else if !green && current_green {
-                    false
-                } else if member.entry.updated_at > current.entry.updated_at {
-                    rule = "d";
-                    true
-                } else {
-                    false
-                };
-                if take {
-                    best = Some(member);
-                    best_green = Some(green);
+            greens.insert(member.entry.number, green);
+            let take = match (best, best_green) {
+                (Some(current), Some(current_green)) => {
+                    (green && !current_green)
+                        || (green == current_green
+                            && member.entry.updated_at > current.entry.updated_at)
                 }
-            } else {
+                _ => true,
+            };
+            if take {
                 best = Some(member);
                 best_green = Some(green);
             }
@@ -123,6 +116,20 @@ pub fn find_clusters(root: &Path, owned: &[PlannedPr]) -> Result<Vec<Cluster>> {
             continue;
         };
         let keeper = keeper_planned.entry.number;
+        let keeper_green = greens.get(&keeper).copied().unwrap_or(false);
+        // The rule is derived from the *selected* keeper, not from whichever
+        // comparison happened to run last: a first-member keeper is still a
+        // determinate winner when every other member is older.
+        let rule = if greens.values().any(|green| *green != keeper_green) {
+            "a"
+        } else if members.iter().any(|member| {
+            member.entry.number != keeper
+                && member.entry.updated_at != keeper_planned.entry.updated_at
+        }) {
+            "d"
+        } else {
+            "tie"
+        };
         let losers: Vec<u64> = members
             .iter()
             .map(|member| member.entry.number)

@@ -8,7 +8,7 @@ use sha2::{Digest, Sha256};
 use crate::config::SensorSpec;
 
 /// Change this identifier whenever the canonical input contract changes.
-pub const ALGORITHM: &str = "sha256-canonical-inputs-v1";
+pub const ALGORITHM: &str = "sha256-canonical-inputs-v2";
 
 const POLICY_INPUTS: &[&str] = &[
     "do-harness.toml",
@@ -54,7 +54,17 @@ pub struct InputManifest {
 
 impl InputManifest {
     /// Take one snapshot using exactly the same identity as recorded task beats.
-    pub fn capture(root: &Path, specs: &[&SensorSpec], config: Option<&[u8]>) -> Self {
+    ///
+    /// `selection` is the resolved change selection behind the run (`None`
+    /// when no selection exists): a `--since` range contributes its mode and
+    /// resolved revisions to every per-sensor identity, so a previous passing
+    /// beat recorded under a different range can never be reused.
+    pub fn capture(
+        root: &Path,
+        specs: &[&SensorSpec],
+        config: Option<&[u8]>,
+        selection: Option<&crate::changes::ChangeSelection>,
+    ) -> Self {
         let tools = snapshot_tools(root, specs);
         Self {
             algorithm: ALGORITHM.to_owned(),
@@ -74,7 +84,7 @@ impl InputManifest {
                 .map(|s| {
                     (
                         s.name.clone(),
-                        sensor_digest_with_tools(root, s, config, &tools),
+                        sensor_digest_with_tools(root, s, config, &tools, selection),
                     )
                 })
                 .collect(),
@@ -112,6 +122,31 @@ impl InputManifest {
     }
 }
 
+/// Canonical selection identity for the input digest: the mode plus, for a
+/// `--since` range, the requested ref and its resolved base/head/merge-base
+/// OIDs. An absent selection is equivalent to mode `all` (no filtering), so
+/// task gates and other callers without a selection still match beats recorded
+/// by unfiltered runs.
+fn selection_identity(selection: Option<&crate::changes::ChangeSelection>) -> serde_json::Value {
+    let default = crate::changes::ChangeSelection::default();
+    let selection = selection.unwrap_or(&default);
+    let mut identity = serde_json::Map::new();
+    identity.insert(
+        "mode".to_owned(),
+        serde_json::json!(selection.mode.as_str()),
+    );
+    if let Some(range) = &selection.range {
+        identity.insert("requested".to_owned(), serde_json::json!(range.requested));
+        identity.insert("base_sha".to_owned(), serde_json::json!(range.base_sha));
+        identity.insert("head_sha".to_owned(), serde_json::json!(range.head_sha));
+        identity.insert(
+            "merge_base_sha".to_owned(),
+            serde_json::json!(range.merge_base_sha),
+        );
+    }
+    serde_json::Value::Object(identity)
+}
+
 /// SHA-256 spelling accepted at a freshness boundary.
 pub fn valid_digest(value: &str) -> bool {
     const HEX_LENGTH: usize = 64;
@@ -121,9 +156,17 @@ pub fn valid_digest(value: &str) -> bool {
 }
 
 /// Canonical input identity for one sensor. Any uncertainty returns None.
-pub fn sensor_digest(root: &Path, spec: &SensorSpec, config: Option<&[u8]>) -> Option<String> {
+///
+/// `selection` matches the run that will read or store the identity, exactly
+/// as [`InputManifest::capture`] uses it.
+pub fn sensor_digest(
+    root: &Path,
+    spec: &SensorSpec,
+    config: Option<&[u8]>,
+    selection: Option<&crate::changes::ChangeSelection>,
+) -> Option<String> {
     let tools = snapshot_tools(root, &[spec]);
-    sensor_digest_with_tools(root, spec, config, &tools)
+    sensor_digest_with_tools(root, spec, config, &tools, selection)
 }
 
 type ToolSnapshot = BTreeMap<String, Option<(PathBuf, String)>>;
@@ -145,6 +188,7 @@ fn sensor_digest_with_tools(
     spec: &SensorSpec,
     config: Option<&[u8]>,
     tools: &ToolSnapshot,
+    selection: Option<&crate::changes::ChangeSelection>,
 ) -> Option<String> {
     let sources = crate::sensor_inputs::effective_input_digest(root, spec, config)?;
     let mut files = BTreeMap::new();
@@ -169,6 +213,7 @@ fn sensor_digest_with_tools(
         "environment": env, "tool": tool.to_str()?, "tool_sha256": tool_hash,
         "branch": crate::changes::current_branch(root), "root": root.canonicalize().ok()?.to_str()?,
         "harness": crate::version::VersionInfo::current(),
+        "selection": selection_identity(selection),
     });
     Some(crate::fingerprint::hash_canonical(&payload))
 }

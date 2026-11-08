@@ -31,8 +31,8 @@ pub struct SweepArgs {
     pub all: bool,
     /// Sweep exactly one PR.
     pub pr: Option<u64>,
-    /// Read-only inventory and report (the default).
-    #[allow(dead_code)]
+    /// Read-only inventory and report (the default). Also set by the global
+    /// `--dry-run`, which always wins over `--execute`/`--merge`.
     pub dry_run: bool,
     /// Authorize owned/bot branch updates and auto-merge disarm.
     pub execute: bool,
@@ -64,10 +64,14 @@ pub fn run(root: &Path, args: SweepArgs) -> Result<(), CliError> {
             "--merge requires --execute"
         )));
     }
+    // `--dry-run` is a hard stop: it overrides the mutating flags instead of
+    // being silently ignored when they are also present.
+    let execute = args.execute && !args.dry_run;
+    let merge = args.merge && !args.dry_run;
     let mode = ModeRecord {
-        dry_run: !args.execute,
-        execute: args.execute,
-        merge: args.merge,
+        dry_run: !execute,
+        execute,
+        merge,
     };
 
     // LIST: one read-only inventory.
