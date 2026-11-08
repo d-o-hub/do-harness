@@ -158,4 +158,5 @@ pub mod ci_explain;
 pub mod dora;
 pub mod pr_metrics;
 pub mod pr_readiness;
+pub mod pr_sweep;
 pub mod reuse;

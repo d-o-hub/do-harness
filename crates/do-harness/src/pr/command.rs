@@ -96,6 +96,7 @@ pub fn resolve_root(explicit: Option<&Path>) -> Result<PathBuf> {
 /// Returns [`CliError::Usage`] for invalid argument combinations and
 /// [`CliError::Verify`] when the verdict cannot be determined; an analysis
 /// error is never reported as "no effect".
+#[allow(clippy::too_many_lines)]
 pub fn run(root: &Path, action: PrAction, dry_run: bool) -> Result<(), CliError> {
     match action {
         PrAction::NoEffect {
@@ -168,6 +169,26 @@ pub fn run(root: &Path, action: PrAction, dry_run: bool) -> Result<(), CliError>
         PrAction::Findings { pr, issues, format } => {
             super::findings::run(root, pr, issues, format, dry_run)
         }
+        PrAction::Sweep {
+            all,
+            pr,
+            dry_run,
+            execute,
+            merge,
+            wait,
+            format,
+        } => super::sweep::run(
+            root,
+            super::sweep::SweepArgs {
+                all,
+                pr,
+                dry_run,
+                execute,
+                merge,
+                wait,
+                format,
+            },
+        ),
         PrAction::External(args) => {
             if let Some(first) = args.first() {
                 if let Ok(pr) = first.parse::<u64>() {

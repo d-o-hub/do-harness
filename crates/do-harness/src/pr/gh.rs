@@ -9,6 +9,15 @@ use serde::Deserialize;
 mod review_threads;
 pub use review_threads::{ReviewThread, review_threads};
 
+#[allow(unused_imports)]
+#[path = "gh_sweep.rs"]
+mod sweep_extras;
+#[allow(unused_imports)]
+pub use sweep_extras::{
+    MergeCommitRef, MergedPrView, PrListEntry, close_with_comment, disable_auto_merge,
+    list_open_prs, merge, merged_view, pr_entry_view, pr_file_set, update_branch,
+};
+
 /// Minimal PR metadata needed to locate the effective change.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]

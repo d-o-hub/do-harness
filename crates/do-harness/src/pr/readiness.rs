@@ -50,8 +50,8 @@ mod receipt;
 
 #[allow(unused_imports)]
 pub use authorization::{
-    Authorization, AuthorizationDecision, AuthorizationReason, MergeReceipt, ReceiptVerdict, codes,
-    extract_receipt, validate_receipt,
+    Authorization, AuthorizationDecision, AuthorizationReason, HELD_LABELS, MergeReceipt,
+    ReceiptVerdict, codes, extract_receipt, validate_receipt,
 };
 #[allow(unused_imports)]
 pub use model::{
