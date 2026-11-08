@@ -41,6 +41,7 @@ fn allow_failure_sensor_does_not_fail_gate_but_surfaces_output() {
             when_changed: vec![],
         }],
         jobs: None,
+        repairs: Vec::new(),
     };
 
     let report = verify(

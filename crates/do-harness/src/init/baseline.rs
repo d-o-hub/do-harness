@@ -127,6 +127,7 @@ mod tests {
             signal_sets: std::collections::BTreeMap::new(),
             sensors,
             jobs: None,
+            repairs: Vec::new(),
         }
     }
 

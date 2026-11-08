@@ -117,7 +117,8 @@
       "ci-explain",
       "completions",
       "man",
-      "feedback"
+      "feedback",
+      "job"
     ],
     "invocable": false
   },
@@ -4221,6 +4222,128 @@
           "default_values": [],
           "possible_values": [],
           "help": "Skip interactive confirmation (unattended mode)",
+          "index": null
+        },
+        {
+          "id": "format",
+          "kind": "option",
+          "short": null,
+          "long": "format",
+          "value_names": [
+            "FORMAT"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [
+            "text"
+          ],
+          "possible_values": [
+            "text",
+            "json"
+          ],
+          "help": "Output format",
+          "index": null
+        }
+      ],
+      "subcommands": [],
+      "invocable": true
+    },
+    {
+      "path": "job",
+      "about": "Run and inspect explicitly invoked unattended jobs",
+      "usage": "do-harness job [OPTIONS] <COMMAND>",
+      "aliases": [],
+      "args": [],
+      "subcommands": [
+        "run",
+        "status"
+      ],
+      "invocable": false
+    },
+    {
+      "path": "job run",
+      "about": "Run an explicitly authorized unattended job from a spec",
+      "usage": "do-harness job run [OPTIONS] --spec <FILE>",
+      "aliases": [],
+      "args": [
+        {
+          "id": "spec",
+          "kind": "option",
+          "short": null,
+          "long": "spec",
+          "value_names": [
+            "FILE"
+          ],
+          "required": true,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Job spec (TOML) naming the task, revision, executor, and limits",
+          "index": null
+        },
+        {
+          "id": "resume",
+          "kind": "option",
+          "short": null,
+          "long": "resume",
+          "value_names": [
+            "RESUME"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": false,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Continue an interrupted job with its remaining budget",
+          "index": null
+        },
+        {
+          "id": "format",
+          "kind": "option",
+          "short": null,
+          "long": "format",
+          "value_names": [
+            "FORMAT"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [
+            "text"
+          ],
+          "possible_values": [
+            "text",
+            "json"
+          ],
+          "help": "Output format",
+          "index": null
+        }
+      ],
+      "subcommands": [],
+      "invocable": true
+    },
+    {
+      "path": "job status",
+      "about": "Report durable job receipts without running anything",
+      "usage": "do-harness job status [OPTIONS]",
+      "aliases": [],
+      "args": [
+        {
+          "id": "id",
+          "kind": "option",
+          "short": null,
+          "long": "id",
+          "value_names": [
+            "ID"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Job id (default: every recorded job)",
           "index": null
         },
         {

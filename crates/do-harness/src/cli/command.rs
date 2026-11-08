@@ -12,8 +12,8 @@ use crate::report::Format;
 
 use super::LearnArgs;
 use super::actions::{
-    DoctorAction, ErrorsAction, FeedbackAction, HookAction, MetricsAction, PrAction, SkillsAction,
-    TaskAction, TraceAction,
+    DoctorAction, ErrorsAction, FeedbackAction, HookAction, JobAction, MetricsAction, PrAction,
+    SkillsAction, TaskAction, TraceAction,
 };
 
 /// Available subcommands.
@@ -446,5 +446,10 @@ pub enum Command {
     Feedback {
         #[command(subcommand)]
         action: FeedbackAction,
+    },
+    /// Run and inspect explicitly invoked unattended jobs.
+    Job {
+        #[command(subcommand)]
+        action: JobAction,
     },
 }

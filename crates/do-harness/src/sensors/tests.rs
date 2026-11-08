@@ -44,5 +44,6 @@ fn config_with(specs: &[(&str, &[&str])]) -> Config {
             })
             .collect(),
         jobs: None,
+        repairs: Vec::new(),
     }
 }
