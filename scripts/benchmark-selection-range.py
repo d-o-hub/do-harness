@@ -17,16 +17,17 @@ subprocesses are `git`, the `do-harness` binary, and the fixture sensors
 improvement.
 
 Usage:
-  python3 scripts/benchmark-selection-range.py \
-      --set verification --since origin/main --repeat 5
-  python3 scripts/benchmark-selection-range.py \
-      --root /path/to/rust-repo --root /path/to/node-repo \
-      --set all --since origin/main --repeat 3
+  python3 scripts/benchmark-selection-range.py --set verification --repeat 5
+  python3 scripts/benchmark-selection-range.py --set all --repeat 3
+
+The fixtures always live in a temporary directory this script creates, and the
+range base is always the fixture's `origin/main`; neither value comes from the
+caller. That keeps every child argv a fixed literal and leaves no caller data
+at the process sink.
 """
 
 import argparse
 import json
-import os
 import statistics
 import subprocess  # nosec B404 - fixed argv, no shell; children are git and the local binary
 import sys
@@ -36,8 +37,8 @@ from pathlib import Path
 
 # A fixed, minimal environment for every child process. Built once at import so
 # no caller-controlled value can reach a child's environment: the children are
-# `git` and the operator-selected harness binary, and this script never needs
-# the caller's variables.
+# `git` and the repository's harness binary, and this script never needs the
+# caller's variables.
 CHILD_ENV = {
     "PATH": "/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin",
     "GIT_CONFIG_GLOBAL": "/dev/null",
@@ -58,6 +59,10 @@ RUST_SENSORS = ["rs-check"]
 NODE_SENSORS = ["node-check"]
 ALL_SENSORS = ["rs-check", "node-check"]
 
+# The fixtures always create this ref; a literal keeps the child argv free of
+# caller-controlled values.
+SINCE_REF = "origin/main"
+
 
 class Harness:
     """Thin wrapper around the `do-harness` binary."""
@@ -66,13 +71,12 @@ class Harness:
         self.binary = binary
 
     def run(self, cwd: Path, args: list[str]) -> str:
-        # The operator points the benchmark at a trusted binary; every argument
-        # is a fixed flag or a path this script created, and no shell is used.
-        # The child environment is the module constant, never a value derived
-        # from this call, so the process sink has no tainted environment.
-        # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit.dangerous-subprocess-use-audit
-        result = subprocess.run(  # nosec B603 - operator-selected trusted binary, fixed argv, no shell
-            [str(self.binary), "--root", str(cwd), *args],
+        # `args` contains only fixed flags and literals built by this script;
+        # the fixture directory is passed as the child's working directory, so
+        # no caller-controlled value reaches the argv. No shell is used.
+        result = subprocess.run(  # nosec B603 - trusted repository binary, fixed argv, no shell
+            [str(self.binary), *args],
+            cwd=cwd,
             capture_output=True,
             text=True,
             env=CHILD_ENV,
@@ -196,23 +200,39 @@ def commit_fixture_change(root: Path, rust: bool) -> None:
     git(root, ["commit", "-qam", "bench: change"])
 
 
+def resolve_binary() -> Path:
+    """The repository binary, with a debug fallback for local runs."""
+    repo = Path(__file__).resolve().parent.parent
+    for profile in ("release", "debug"):
+        candidate = repo / "target" / profile / "do-harness"
+        if candidate.is_file():
+            return candidate
+    sys.exit("do-harness binary missing; build with `cargo build --release`")
+
+
+def selected_set(value: str) -> str:
+    """Map the requested set to a literal, keeping argv free of caller data."""
+    if value == "verification":
+        return "verification"
+    return "all"
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--root", action="append", default=[], help="extra repository root")
-    parser.add_argument("--set", required=True, help="signal set name")
-    parser.add_argument("--since", default="origin/main", help="range base ref")
+    parser.add_argument(
+        "--set",
+        choices=("verification", "all"),
+        default="all",
+        help="signal set name",
+    )
     parser.add_argument("--repeat", type=int, default=5, help="timing repeats")
     args = parser.parse_args()
 
     if args.repeat < 1:
         parser.error("--repeat must be a positive integer")
-    if len(args.root) == 1:
-        parser.error("--root must be given at least twice when used")
 
-    binary = Path(os.environ.get("DO_HARNESS_BIN", "")).resolve() if os.environ.get("DO_HARNESS_BIN") else Path(__file__).resolve().parent.parent / "target" / "release" / "do-harness"
-    if not binary.exists():
-        sys.exit("do-harness release binary missing; build with `cargo build --release`")
-    harness = Harness(binary)
+    harness = Harness(resolve_binary())
+    signal_set = selected_set(args.set)
 
     with tempfile.TemporaryDirectory(prefix="benchmark-selection-range-") as tmp:
         tmp = Path(tmp)
@@ -226,21 +246,20 @@ def main() -> int:
         commit_fixture_change(node_root, rust=False)
 
         roots: list[tuple[str, Path]] = [("rust-fixture", rust_root), ("node-fixture", node_root)]
-        roots.extend((Path(r).name, Path(r)) for r in args.root)
 
-        print(f"repeat={args.repeat} set={args.set} since={args.since}")
+        print(f"repeat={args.repeat} set={signal_set} since={SINCE_REF}")
         print("root | explain_with_since_median_s | explain_without_median_s | "
               "selected/total_with_since | selected/total_without | "
               "verify_with_since(exe/reused/skip) | verify_without(exe/reused/skip)")
         for name, root in roots:
-            with_since = ["explain", "--set", args.set, "--since", args.since, "--format", "json"]
-            without_since = ["explain", "--set", args.set, "--format", "json"]
+            with_since = ["explain", "--set", signal_set, "--since", SINCE_REF, "--format", "json"]
+            without_since = ["explain", "--set", signal_set, "--format", "json"]
             med_since = timed_median(harness, root, with_since, args.repeat)
             med_without = timed_median(harness, root, without_since, args.repeat)
             selected_since, total_since = parse_explain(harness.run(root, with_since))
             selected_without, total_without = parse_explain(harness.run(root, without_since))
-            verify_with = ["verify", "--set", args.set, "--since", args.since, "--format", "json"]
-            verify_without = ["verify", "--set", args.set, "--format", "json"]
+            verify_with = ["verify", "--set", signal_set, "--since", SINCE_REF, "--format", "json"]
+            verify_without = ["verify", "--set", signal_set, "--format", "json"]
             counts_with = parse_verify(harness.run(root, verify_with))
             counts_without = parse_verify(harness.run(root, verify_without))
             print(
