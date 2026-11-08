@@ -135,7 +135,7 @@ pub(super) fn run_bounded(
     timeout: Duration,
     redactor: &Redactor,
 ) -> BoundedOutput {
-    let mut child = match command.spawn() {
+    let child = match command.spawn() {
         Ok(child) => child,
         Err(error) => {
             return BoundedOutput {
@@ -149,31 +149,39 @@ pub(super) fn run_bounded(
             };
         }
     };
+    let mut child = Some(child);
     let total = Arc::new(AtomicU64::new(0));
-    let stdout = child.stdout.take().map(|pipe| pump(pipe, total.clone()));
-    let stderr = child.stderr.take().map(|pipe| pump(pipe, total.clone()));
+    let stdout = child
+        .as_mut()
+        .and_then(|process| process.stdout.take())
+        .map(|pipe| pump(pipe, total.clone()));
+    let stderr = child
+        .as_mut()
+        .and_then(|process| process.stderr.take())
+        .map(|pipe| pump(pipe, total.clone()));
     let deadline = Instant::now() + timeout;
     let mut timed_out = false;
     let mut exit_code = None;
     let mut spawn_error = None;
-    loop {
-        match child.try_wait() {
+    while let Some(process) = child.as_mut() {
+        match process.try_wait() {
             Ok(Some(status)) => {
                 exit_code = status.code();
                 break;
             }
             Ok(None) if Instant::now() >= deadline => {
-                shell::kill_tree(&mut child);
                 timed_out = true;
                 break;
             }
             Ok(None) => std::thread::sleep(POLL),
             Err(error) => {
-                shell::kill_tree(&mut child);
                 spawn_error = Some(format!("failed to wait for a child process: {error}"));
                 break;
             }
         }
+    }
+    if timed_out || spawn_error.is_some() {
+        kill_async(child.take());
     }
     // A killed executor's descendants can keep a pipe open; the cleanup
     // budget bounds how long an attempt may wait for them to disappear.
@@ -189,6 +197,19 @@ pub(super) fn run_bounded(
         stdout: stdout_redacted,
         stderr: stderr_redacted,
     }
+}
+
+/// Kills a child on a detached thread.
+///
+/// Windows tree cleanup can block until the process itself exits, so a
+/// platform cleanup path must never extend the attempt that declared the
+/// budget expired; the caller's bounded wait for the pipe readers is what
+/// actually bounds the attempt.
+fn kill_async(child: Option<std::process::Child>) {
+    let Some(mut child) = child else {
+        return;
+    };
+    std::thread::spawn(move || shell::kill_tree(&mut child));
 }
 
 /// Drains one pipe, keeping only a bounded tail and the total byte count.
