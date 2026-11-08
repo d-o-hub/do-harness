@@ -8,15 +8,19 @@ import { runSession } from './host.mjs'
 
 const SUCCEEDING_SENSOR = 'exit 0'
 const FAILING_SENSOR = 'exit 1'
-/** Creates a task in the disposable repo; returns its numeric id. */
-function createTask(repo) {
-  const outcome = spawnSync('do-harness', ['task', 'add', 'conformance'], {
+/** Creates a task in the disposable repo with the same binary as the harness. */
+function createTask(repo, binary) {
+  const outcome = spawnSync(binary, ['task', 'add', 'conformance'], {
     cwd: repo,
     encoding: 'utf8',
   })
+  if (outcome.error || outcome.status !== 0) {
+    const detail = outcome.error?.message ?? outcome.stderr ?? outcome.stdout ?? 'no process output'
+    throw new Error(`could not create a conformance task: ${detail}`)
+  }
   const match = /Added task (\d+)/.exec(outcome.stdout ?? '')
   if (!match) {
-    throw new Error(`could not create a conformance task: ${outcome.stderr ?? outcome.stdout}`)
+    throw new Error(`could not parse the created task id: ${outcome.stderr ?? outcome.stdout ?? 'no output'}`)
   }
   return Number(match[1])
 }
@@ -139,9 +143,9 @@ export const SCENARIO_RUNNERS = [
   },
   {
     id: 'eligible-reuse',
-    async prepare({ repo, harness }) {
+    async prepare({ repo, harness, binary }) {
       writeTwoSetConfig(repo, SUCCEEDING_SENSOR)
-      const taskId = createTask(repo)
+      const taskId = createTask(repo, binary)
       await harness(['verify', '--set', 'feedback', '--record', '--task', String(taskId), '--format', 'json'], repo, {
         tolerateFailure: true,
       })
@@ -189,10 +193,10 @@ export const SCENARIO_RUNNERS = [
   },
   {
     id: 'bounded-resume-context',
-    async prepare({ repo, harness }) {
+    async prepare({ repo, harness, binary }) {
       writeConfig(repo, SUCCEEDING_SENSOR)
       await recordEvidence(repo, harness)
-      const taskId = createTask(repo)
+      const taskId = createTask(repo, binary)
       this.script = [
         { tool: { name: 'development_signals', arguments: { action: 'context', task: taskId } } },
         { finish: 'done' },
@@ -240,8 +244,8 @@ export async function recordEvidence(repo, harness) {
 }
 
 /** Runs one scenario end to end, returning the raw host observation. */
-export async function runScenario({ scenario, host, repo, harness, patch, out, script }) {
-  await scenario.prepare({ repo, harness })
+export async function runScenario({ scenario, host, repo, harness, binary, patch, out, script }) {
+  await scenario.prepare({ repo, harness, binary })
   const session = await runSession({
     dsh: host.dsh,
     home: host.home,
