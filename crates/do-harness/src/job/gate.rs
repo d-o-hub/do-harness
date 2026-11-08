@@ -29,6 +29,9 @@ pub struct GateOutcome {
 #[must_use]
 pub fn run(workspace: &Path, signal_set: &str, timeout: Duration) -> GateOutcome {
     let redactor = Redactor::from_environment(&[]);
+    // Re-invokes this same binary as the authoritative gate: the path
+    // identifies the running tool, not an untrusted input.
+    // nosemgrep: rust.lang.security.current-exe.current-exe
     let Ok(executable) = std::env::current_exe() else {
         return GateOutcome {
             green: false,
