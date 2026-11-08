@@ -44,6 +44,16 @@ CHILD_ENV = {
     "GIT_CONFIG_NOSYSTEM": "1",
 }
 
+# `git` additionally needs a committer identity; the benchmark commits only
+# inside the temporary repository it created itself.
+GIT_ENV = {
+    **CHILD_ENV,
+    "GIT_AUTHOR_NAME": "bench",
+    "GIT_AUTHOR_EMAIL": "bench@example.com",
+    "GIT_COMMITTER_NAME": "bench",
+    "GIT_COMMITTER_EMAIL": "bench@example.com",
+}
+
 RUST_SENSORS = ["rs-check"]
 NODE_SENSORS = ["node-check"]
 ALL_SENSORS = ["rs-check", "node-check"]
@@ -56,15 +66,16 @@ class Harness:
         self.binary = binary
 
     def run(self, cwd: Path, args: list[str]) -> str:
-        env = dict(CHILD_ENV)
         # The operator points the benchmark at a trusted binary; every argument
         # is a fixed flag or a path this script created, and no shell is used.
-        # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit.dangerous-subprocess-use-audit, python.lang.security.audit.dangerous-subprocess-use-tainted-env-args.dangerous-subprocess-use-tainted-env-args, python.lang.security.audit.dangerous-subprocess-use-tainted-env-args.dangerous-subprocess-use-tainted-env-args
+        # The child environment is the module constant, never a value derived
+        # from this call, so the process sink has no tainted environment.
+        # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit.dangerous-subprocess-use-audit
         result = subprocess.run(  # nosec B603 - operator-selected trusted binary, fixed argv, no shell
             [str(self.binary), "--root", str(cwd), *args],
             capture_output=True,
             text=True,
-            env=env,
+            env=CHILD_ENV,
             timeout=300,
         )
         if result.returncode not in (0, 1, 2):
@@ -76,15 +87,7 @@ class Harness:
 
 
 def git(cwd: Path, args: list[str]) -> None:
-    env = dict(CHILD_ENV)
-    env.update(
-        {
-            "GIT_AUTHOR_NAME": "bench",
-            "GIT_AUTHOR_EMAIL": "bench@example.com",
-            "GIT_COMMITTER_NAME": "bench",
-            "GIT_COMMITTER_EMAIL": "bench@example.com",
-        }
-    )
+    env = GIT_ENV
     # `git` is the fixed program; `args` are flags and paths this script built.
     # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit.dangerous-subprocess-use-audit
     result = subprocess.run(  # nosec B603 - fixed git argv, no shell
