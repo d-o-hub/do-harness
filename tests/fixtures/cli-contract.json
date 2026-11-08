@@ -636,7 +636,8 @@
         "checks",
         "waivers",
         "disposition",
-        "findings"
+        "findings",
+        "update-base"
       ],
       "invocable": false
     },
@@ -1278,6 +1279,69 @@
           "takes_value": true,
           "default_values": [
             "json"
+          ],
+          "possible_values": [
+            "text",
+            "json"
+          ],
+          "help": "Output format",
+          "index": null
+        }
+      ],
+      "subcommands": [],
+      "invocable": true
+    },
+    {
+      "path": "pr update-base",
+      "about": "Update a pull request's branch to the latest base without overwriting author work (default is read-only; `--execute` acts only on an authorized own/known-bot head)",
+      "usage": "do-harness pr update-base [OPTIONS] <PR>",
+      "aliases": [],
+      "args": [
+        {
+          "id": "pr",
+          "kind": "positional",
+          "short": null,
+          "long": null,
+          "value_names": [
+            "PR"
+          ],
+          "required": true,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Pull request number",
+          "index": 1
+        },
+        {
+          "id": "execute",
+          "kind": "option",
+          "short": null,
+          "long": "execute",
+          "value_names": [
+            "EXECUTE"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": false,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Execute the update (default is a read-only report)",
+          "index": null
+        },
+        {
+          "id": "format",
+          "kind": "option",
+          "short": null,
+          "long": "format",
+          "value_names": [
+            "FORMAT"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [
+            "text"
           ],
           "possible_values": [
             "text",

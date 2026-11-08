@@ -24,6 +24,11 @@ export const SCENARIOS = Object.freeze([
   { id: 'retry-exhaustion', expectedTerminal: 'blocked' },
   { id: 'plugin-load-failure', expectedTerminal: 'unsupported' },
   { id: 'user-cancellation', expectedTerminal: 'cancelled' },
+  { id: 'edit-explain-run-same-scope', expectedTerminal: 'verified' },
+  { id: 'eligible-reuse', expectedTerminal: 'verified' },
+  { id: 'missing-dependency-forces-execution', expectedTerminal: 'blocked' },
+  { id: 'bounded-resume-context', expectedTerminal: 'verified' },
+  { id: 'strict-completion-then-status', expectedTerminal: 'verified' },
 ])
 
 export const REASON_CODES = Object.freeze([
