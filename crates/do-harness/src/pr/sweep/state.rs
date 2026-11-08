@@ -138,15 +138,15 @@ impl SweepStateV1 {
             if !audit.update_requested {
                 continue;
             }
-            let Ok(view) = gh::readiness_view(root, *number) else {
+            if gh::readiness_view(root, *number).is_err() {
+                // Keep the uncertain flag until the state can be observed.
                 continue;
-            };
-            if audit.update_expected_head.as_deref() == Some(view.head_ref_oid.as_str())
-                && view.merge_state_status == "BEHIND"
-            {
-                audit.update_requested = false;
-                audit.update_expected_head = None;
             }
+            // Whether the prior request landed or not, the next run re-reads
+            // the head and revalidates from scratch; never assume stale
+            // history.
+            audit.update_requested = false;
+            audit.update_expected_head = None;
         }
     }
 }
