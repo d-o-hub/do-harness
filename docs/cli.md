@@ -1989,6 +1989,46 @@ failure links the existing issue instead of creating another. `--warning`
 classifies the report as a warning rather than an error, and `--dry-run`
 performs the deduplication search and preview without creating an issue.
 
+### `job`
+<!-- BEGIN GENERATED: cli-contract job -->
+`do-harness job [OPTIONS] <COMMAND>`
+
+Subcommands: `run`, `status`.
+<!-- END GENERATED: cli-contract job -->
+Run and inspect explicitly invoked unattended jobs. No sensor, hook, or CI path
+launches a job: an operator supplies a spec, so ordinary deterministic
+verification never starts a paid model. See
+[unattended jobs](unattended-jobs.md) for the isolation boundary, budgets, and
+blocked-outcome contract.
+
+#### `job run`
+<!-- BEGIN GENERATED: cli-contract job run -->
+`do-harness job run [OPTIONS] --spec <FILE>`
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `--spec <FILE>` | yes | — | — | Job spec (TOML) naming the task, revision, executor, and limits |
+| `--resume` | no | — | — | Continue an interrupted job with its remaining budget |
+| `--format <FORMAT>` | no | `text` | `text`, `json` | Output format |
+<!-- END GENERATED: cli-contract job run -->
+Run or resume one job. Completion requires fresh, strict verification evidence;
+an executor's exit status or `done` claim is never proof. A blocked job exits
+`1`, prints its typed reason, and leaves the disposable workspace for
+inspection. `--resume` continues an interrupted job with its remaining budget
+and never renews it; a terminal job resumes as an idempotent no-op. The global
+`--dry-run` resolves and prints the plan without creating a workspace.
+
+#### `job status`
+<!-- BEGIN GENERATED: cli-contract job status -->
+`do-harness job status [OPTIONS]`
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `--id <ID>` | no | — | — | Job id (default: every recorded job) |
+| `--format <FORMAT>` | no | `text` | `text`, `json` | Output format |
+<!-- END GENERATED: cli-contract job status -->
+Report durable receipts under `.do-harness/jobs/` without running anything.
+
 ## Exit Codes
 
 | Exit Code | Classification | Meaning |

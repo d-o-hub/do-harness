@@ -8,6 +8,32 @@ use clap::{Subcommand, ValueHint};
 
 use crate::report::Format;
 
+/// Available unattended-job actions.
+#[derive(Debug, Subcommand)]
+pub enum JobAction {
+    /// Run an explicitly authorized unattended job from a spec.
+    Run {
+        /// Job spec (TOML) naming the task, revision, executor, and limits.
+        #[arg(long, value_hint = ValueHint::FilePath, value_name = "FILE")]
+        spec: PathBuf,
+        /// Continue an interrupted job with its remaining budget.
+        #[arg(long)]
+        resume: bool,
+        /// Output format.
+        #[arg(long, value_enum, default_value_t = Format::Text)]
+        format: Format,
+    },
+    /// Report durable job receipts without running anything.
+    Status {
+        /// Job id (default: every recorded job).
+        #[arg(long, value_name = "ID")]
+        id: Option<String>,
+        /// Output format.
+        #[arg(long, value_enum, default_value_t = Format::Text)]
+        format: Format,
+    },
+}
+
 /// Available task-state actions.
 #[derive(Debug, Subcommand)]
 pub enum TaskAction {

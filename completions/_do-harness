@@ -1740,6 +1740,95 @@ esac
     ;;
 esac
 ;;
+(job)
+_arguments "${_arguments_options[@]}" : \
+'--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
+'--config=[Explicit path to do-harness.toml]:FILE:_files' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
+'--dry-run[Dry run without side effects]' \
+'-h[Print help]' \
+'--help[Print help]' \
+'-V[Print version]' \
+'--version[Print version]' \
+":: :_do-harness__subcmd__job_commands" \
+"*::: :->job" \
+&& ret=0
+
+    case $state in
+    (job)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:do-harness-job-command-$line[1]:"
+        case $line[1] in
+            (run)
+_arguments "${_arguments_options[@]}" : \
+'--spec=[Job spec (TOML) naming the task, revision, executor, and limits]:FILE:_files' \
+'--format=[Output format]:FORMAT:((text\:"Human-readable text output"
+json\:"Machine-readable JSON output"))' \
+'--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
+'--config=[Explicit path to do-harness.toml]:FILE:_files' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
+'--resume[Continue an interrupted job with its remaining budget]' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
+'--dry-run[Dry run without side effects]' \
+'-h[Print help (see more with '\''--help'\'')]' \
+'--help[Print help (see more with '\''--help'\'')]' \
+'-V[Print version]' \
+'--version[Print version]' \
+&& ret=0
+;;
+(status)
+_arguments "${_arguments_options[@]}" : \
+'--id=[Job id (default\: every recorded job)]:ID:_default' \
+'--format=[Output format]:FORMAT:((text\:"Human-readable text output"
+json\:"Machine-readable JSON output"))' \
+'--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
+'--config=[Explicit path to do-harness.toml]:FILE:_files' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
+'--dry-run[Dry run without side effects]' \
+'-h[Print help (see more with '\''--help'\'')]' \
+'--help[Print help (see more with '\''--help'\'')]' \
+'-V[Print version]' \
+'--version[Print version]' \
+&& ret=0
+;;
+(help)
+_arguments "${_arguments_options[@]}" : \
+":: :_do-harness__subcmd__job__subcmd__help_commands" \
+"*::: :->help" \
+&& ret=0
+
+    case $state in
+    (help)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:do-harness-job-help-command-$line[1]:"
+        case $line[1] in
+            (run)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(status)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(help)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+        esac
+    ;;
+esac
+;;
+        esac
+    ;;
+esac
+;;
 (help)
 _arguments "${_arguments_options[@]}" : \
 ":: :_do-harness__subcmd__help_commands" \
@@ -2124,6 +2213,30 @@ _arguments "${_arguments_options[@]}" : \
     ;;
 esac
 ;;
+(job)
+_arguments "${_arguments_options[@]}" : \
+":: :_do-harness__subcmd__help__subcmd__job_commands" \
+"*::: :->job" \
+&& ret=0
+
+    case $state in
+    (job)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:do-harness-help-job-command-$line[1]:"
+        case $line[1] in
+            (run)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(status)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+        esac
+    ;;
+esac
+;;
 (help)
 _arguments "${_arguments_options[@]}" : \
 && ret=0
@@ -2173,6 +2286,7 @@ _do-harness_commands() {
 'completions:Generate shell completions' \
 'man:Generate man page documentation' \
 'feedback:Manage impact-gated feedback and issue proposals' \
+'job:Run and inspect explicitly invoked unattended jobs' \
 'help:Print this message or the help of the given subcommand(s)' \
     )
     _describe -t commands 'do-harness commands' commands "$@"
@@ -2391,6 +2505,7 @@ _do-harness__subcmd__help_commands() {
 'completions:Generate shell completions' \
 'man:Generate man page documentation' \
 'feedback:Manage impact-gated feedback and issue proposals' \
+'job:Run and inspect explicitly invoked unattended jobs' \
 'help:Print this message or the help of the given subcommand(s)' \
     )
     _describe -t commands 'do-harness help commands' commands "$@"
@@ -2539,6 +2654,24 @@ _do-harness__subcmd__help__subcmd__init_commands() {
 _do-harness__subcmd__help__subcmd__init-db_commands() {
     local commands; commands=()
     _describe -t commands 'do-harness help init-db commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__help__subcmd__job_commands] )) ||
+_do-harness__subcmd__help__subcmd__job_commands() {
+    local commands; commands=(
+'run:Run an explicitly authorized unattended job from a spec' \
+'status:Report durable job receipts without running anything' \
+    )
+    _describe -t commands 'do-harness help job commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__help__subcmd__job__subcmd__run_commands] )) ||
+_do-harness__subcmd__help__subcmd__job__subcmd__run_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness help job run commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__help__subcmd__job__subcmd__status_commands] )) ||
+_do-harness__subcmd__help__subcmd__job__subcmd__status_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness help job status commands' commands "$@"
 }
 (( $+functions[_do-harness__subcmd__help__subcmd__learn_commands] )) ||
 _do-harness__subcmd__help__subcmd__learn_commands() {
@@ -2851,6 +2984,49 @@ _do-harness__subcmd__init_commands() {
 _do-harness__subcmd__init-db_commands() {
     local commands; commands=()
     _describe -t commands 'do-harness init-db commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__job_commands] )) ||
+_do-harness__subcmd__job_commands() {
+    local commands; commands=(
+'run:Run an explicitly authorized unattended job from a spec' \
+'status:Report durable job receipts without running anything' \
+'help:Print this message or the help of the given subcommand(s)' \
+    )
+    _describe -t commands 'do-harness job commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__job__subcmd__help_commands] )) ||
+_do-harness__subcmd__job__subcmd__help_commands() {
+    local commands; commands=(
+'run:Run an explicitly authorized unattended job from a spec' \
+'status:Report durable job receipts without running anything' \
+'help:Print this message or the help of the given subcommand(s)' \
+    )
+    _describe -t commands 'do-harness job help commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__job__subcmd__help__subcmd__help_commands] )) ||
+_do-harness__subcmd__job__subcmd__help__subcmd__help_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness job help help commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__job__subcmd__help__subcmd__run_commands] )) ||
+_do-harness__subcmd__job__subcmd__help__subcmd__run_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness job help run commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__job__subcmd__help__subcmd__status_commands] )) ||
+_do-harness__subcmd__job__subcmd__help__subcmd__status_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness job help status commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__job__subcmd__run_commands] )) ||
+_do-harness__subcmd__job__subcmd__run_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness job run commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__job__subcmd__status_commands] )) ||
+_do-harness__subcmd__job__subcmd__status_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness job status commands' commands "$@"
 }
 (( $+functions[_do-harness__subcmd__learn_commands] )) ||
 _do-harness__subcmd__learn_commands() {
