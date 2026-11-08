@@ -61,6 +61,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand completions 'Generate shell completions'
             cand man 'Generate man page documentation'
             cand feedback 'Manage impact-gated feedback and issue proposals'
+            cand job 'Run and inspect explicitly invoked unattended jobs'
             cand help 'Print this message or the help of the given subcommand(s)'
         }
         &'do-harness;version'= {
@@ -211,6 +212,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand waivers 'Classify patch-coverage residue: waivable classes and lines needing tests'
             cand disposition 'Record a structured disposition for a review, thread, comment, or finding'
             cand findings 'Collect and classify findings (annotations, code scanning, artifacts) and track issues'
+            cand update-base 'Update a pull request''s branch to the latest base without overwriting author work (default is read-only; `--execute` acts only on an authorized own/known-bot head)'
             cand help 'Print this message or the help of the given subcommand(s)'
         }
         &'do-harness;pr;no-effect'= {
@@ -350,6 +352,20 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand -V 'Print version'
             cand --version 'Print version'
         }
+        &'do-harness;pr;update-base'= {
+            cand --format 'Output format'
+            cand --root 'Workspace root override (default: walk up from cwd)'
+            cand --config 'Explicit path to do-harness.toml'
+            cand --output 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)'
+            cand --execute 'Execute the update (default is a read-only report)'
+            cand -q 'Suppress PASS/WARN verdict lines and the success footer'
+            cand --quiet 'Suppress PASS/WARN verdict lines and the success footer'
+            cand --dry-run 'Dry run without side effects'
+            cand -h 'Print help (see more with ''--help'')'
+            cand --help 'Print help (see more with ''--help'')'
+            cand -V 'Print version'
+            cand --version 'Print version'
+        }
         &'do-harness;pr;help'= {
             cand no-effect 'Report the prospective merge impact of a PR or revision range'
             cand review 'Emit the semantic residual: changed units evidence could not prove'
@@ -358,6 +374,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand waivers 'Classify patch-coverage residue: waivable classes and lines needing tests'
             cand disposition 'Record a structured disposition for a review, thread, comment, or finding'
             cand findings 'Collect and classify findings (annotations, code scanning, artifacts) and track issues'
+            cand update-base 'Update a pull request''s branch to the latest base without overwriting author work (default is read-only; `--execute` acts only on an authorized own/known-bot head)'
             cand help 'Print this message or the help of the given subcommand(s)'
         }
         &'do-harness;pr;help;no-effect'= {
@@ -373,6 +390,8 @@ set edit:completion:arg-completer[do-harness] = {|@words|
         &'do-harness;pr;help;disposition'= {
         }
         &'do-harness;pr;help;findings'= {
+        }
+        &'do-harness;pr;help;update-base'= {
         }
         &'do-harness;pr;help;help'= {
         }
@@ -1299,6 +1318,61 @@ set edit:completion:arg-completer[do-harness] = {|@words|
         }
         &'do-harness;feedback;help;help'= {
         }
+        &'do-harness;job'= {
+            cand --root 'Workspace root override (default: walk up from cwd)'
+            cand --config 'Explicit path to do-harness.toml'
+            cand --output 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)'
+            cand -q 'Suppress PASS/WARN verdict lines and the success footer'
+            cand --quiet 'Suppress PASS/WARN verdict lines and the success footer'
+            cand --dry-run 'Dry run without side effects'
+            cand -h 'Print help'
+            cand --help 'Print help'
+            cand -V 'Print version'
+            cand --version 'Print version'
+            cand run 'Run an explicitly authorized unattended job from a spec'
+            cand status 'Report durable job receipts without running anything'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'do-harness;job;run'= {
+            cand --spec 'Job spec (TOML) naming the task, revision, executor, and limits'
+            cand --format 'Output format'
+            cand --root 'Workspace root override (default: walk up from cwd)'
+            cand --config 'Explicit path to do-harness.toml'
+            cand --output 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)'
+            cand --resume 'Continue an interrupted job with its remaining budget'
+            cand -q 'Suppress PASS/WARN verdict lines and the success footer'
+            cand --quiet 'Suppress PASS/WARN verdict lines and the success footer'
+            cand --dry-run 'Dry run without side effects'
+            cand -h 'Print help (see more with ''--help'')'
+            cand --help 'Print help (see more with ''--help'')'
+            cand -V 'Print version'
+            cand --version 'Print version'
+        }
+        &'do-harness;job;status'= {
+            cand --id 'Job id (default: every recorded job)'
+            cand --format 'Output format'
+            cand --root 'Workspace root override (default: walk up from cwd)'
+            cand --config 'Explicit path to do-harness.toml'
+            cand --output 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)'
+            cand -q 'Suppress PASS/WARN verdict lines and the success footer'
+            cand --quiet 'Suppress PASS/WARN verdict lines and the success footer'
+            cand --dry-run 'Dry run without side effects'
+            cand -h 'Print help (see more with ''--help'')'
+            cand --help 'Print help (see more with ''--help'')'
+            cand -V 'Print version'
+            cand --version 'Print version'
+        }
+        &'do-harness;job;help'= {
+            cand run 'Run an explicitly authorized unattended job from a spec'
+            cand status 'Report durable job receipts without running anything'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'do-harness;job;help;run'= {
+        }
+        &'do-harness;job;help;status'= {
+        }
+        &'do-harness;job;help;help'= {
+        }
         &'do-harness;help'= {
             cand version 'Print CLI version information'
             cand verify 'Run computational sensors'
@@ -1330,6 +1404,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand completions 'Generate shell completions'
             cand man 'Generate man page documentation'
             cand feedback 'Manage impact-gated feedback and issue proposals'
+            cand job 'Run and inspect explicitly invoked unattended jobs'
             cand help 'Print this message or the help of the given subcommand(s)'
         }
         &'do-harness;help;version'= {
@@ -1350,6 +1425,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand waivers 'Classify patch-coverage residue: waivable classes and lines needing tests'
             cand disposition 'Record a structured disposition for a review, thread, comment, or finding'
             cand findings 'Collect and classify findings (annotations, code scanning, artifacts) and track issues'
+            cand update-base 'Update a pull request''s branch to the latest base without overwriting author work (default is read-only; `--execute` acts only on an authorized own/known-bot head)'
         }
         &'do-harness;help;pr;no-effect'= {
         }
@@ -1364,6 +1440,8 @@ set edit:completion:arg-completer[do-harness] = {|@words|
         &'do-harness;help;pr;disposition'= {
         }
         &'do-harness;help;pr;findings'= {
+        }
+        &'do-harness;help;pr;update-base'= {
         }
         &'do-harness;help;skills'= {
             cand suggest 'Rank skills by relevance to a query using metadata only'
@@ -1496,6 +1574,14 @@ set edit:completion:arg-completer[do-harness] = {|@words|
         &'do-harness;help;feedback;auto'= {
         }
         &'do-harness;help;feedback;report'= {
+        }
+        &'do-harness;help;job'= {
+            cand run 'Run an explicitly authorized unattended job from a spec'
+            cand status 'Report durable job receipts without running anything'
+        }
+        &'do-harness;help;job;run'= {
+        }
+        &'do-harness;help;job;status'= {
         }
         &'do-harness;help;help'= {
         }

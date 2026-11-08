@@ -38,6 +38,10 @@ function expectedObserved(id) {
   switch (id) {
     case 'fresh-pass':
     case 'repair-and-reverify':
+    case 'edit-explain-run-same-scope':
+    case 'eligible-reuse':
+    case 'bounded-resume-context':
+    case 'strict-completion-then-status':
       return 'verified'
     case 'plugin-load-failure':
       return 'unsupported'

@@ -475,27 +475,38 @@ Scaffolds a harness workspace in the target directory and proves the
 generated contract before presenting the repository as ready.
 
 Init detects repository reality (Cargo manifest/workspace, git repository,
-package markers), probes each candidate sensor's required tooling, generates
-a `do-harness.toml` containing only proven signals (signal sets and hooks are
-derived from the included subset), writes the portable skill subset
-(`harness` plus `skill-creator`), and then runs the effective sensors once:
+package markers) and selects the pack by precedence: explicit `--language`,
+then the language declared by an existing `do-harness.toml`, then a
+`Cargo.toml` (Rust), then a `package.json` that proves a supported Node
+command (a `typecheck`/`lint`/`test`/`build` script, turbo task, or
+matching dependency) (Node), then any other non-empty project (Generic),
+then an empty directory (greenfield Rust). A malformed or unsupported
+`package.json` stays Generic and emits a structured diagnostic
+(`invalid_package_json`, `no_supported_node_commands`,
+`missing_package_manager`). It probes each candidate sensor's required
+tooling, generates a `do-harness.toml` containing only proven signals
+(signal sets and hooks are derived from the included subset), writes the
+portable skill subset (`harness` plus `skill-creator`), and then runs the
+effective sensors once:
 
 - `Initial verification: GREEN` — every configured sensor passed.
-- `INCOMPLETE` — every configured sensor passed, but a core sensor (`fmt`,
-  `check`, `clippy`, `test`) was omitted because its tooling is absent. The
-  pass is real for what ran and is not full evidence, so it is never reported
-  as `GREEN`; the omitted names and the install-and-`--force` remedy are
-  printed. This is the vacuous-gate rule applied to a partially generated pack.
+- `INCOMPLETE` — every configured sensor passed (or the pack had no
+  runnable sensors), but a core sensor (`fmt`, `check`, `clippy`, `test`)
+  was omitted because its tooling is absent. The pass is real for what ran
+  and is not full evidence, so it is never reported as `GREEN`; the omitted
+  names and the install-and-`--force` remedy are printed. Missing Node
+  package-manager tooling lands here, not on a claimed green. This is the
+  vacuous-gate rule applied to a partially generated pack.
 - `RED` — a required check failed; the command exits 1 and prints bounded
   failure output instead of claiming a verified workspace.
 - `VACUOUS` — the generic pack has zero sensors; the pass is explicitly not
   evidence.
 
 - `--inspect`: Inspect the repository and print discovered project facts,
-  candidate commands, missing tools, and language guidance without writing
-  files, installing packages, or executing project scripts. A repository with
-  `package.json` defaults to the generic pack and prints guidance recommending
-  `--language node` to adopt discovered JS/TS sensors.
+  candidate commands, missing tools, structured diagnostics, and language
+  guidance without writing files, installing packages, or executing project
+  scripts. It resolves the same pack as `init` — a supported `package.json`
+  selects Node without running any tool — so inspect and init agree.
 
 The generated `AGENTS.md` embeds a pinned installer command so an agent
 landing in the repository can obtain the exact CLI version it was initialized
@@ -1271,7 +1282,7 @@ be resolved. A collector that cannot read git history never reads as healthy.
 <!-- BEGIN GENERATED: cli-contract pr -->
 `do-harness pr [OPTIONS] <COMMAND>`
 
-Subcommands: `no-effect`, `review`, `ready`, `checks`, `waivers`, `disposition`, `findings`.
+Subcommands: `no-effect`, `review`, `ready`, `checks`, `waivers`, `disposition`, `findings`, `update-base`.
 <!-- END GENERATED: cli-contract pr -->
 Deterministic, read-only PR analysis: every subcommand works in any git repository without harness initialization. Pick the subcommand that answers your question.
 
@@ -1469,6 +1480,55 @@ the permission lookup fails, the waiver is rejected rather than trusted. Every
 evaluated candidate is recorded in `codecov.audit_waivers` with its
 authorization and staleness verdict, so a rejected waiver is visible instead of
 silently ignored.
+
+
+### `pr update-base`
+<!-- BEGIN GENERATED: cli-contract pr update-base -->
+`do-harness pr update-base [OPTIONS] <PR>`
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `<PR>` | yes | — | — | Pull request number |
+| `--execute` | no | — | — | Execute the update (default is a read-only report) |
+| `--format <FORMAT>` | no | `text` | `text`, `json` | Output format |
+<!-- END GENERATED: cli-contract pr update-base -->
+Report whether an open PR's head contains its current base and, on `--execute`,
+update an eligible own/known-bot head without overwriting author work. The
+verdict is driven by the read-only ancestry proof: `UP_TO_DATE` when the head
+contains the base, `UPDATE_REQUIRED` when it does not (even if GitHub reports a
+`CLEAN` merge state), `BLOCKED` when a confirmed condition forbids the update,
+and `UNKNOWN` when the proof cannot be collected.
+
+- `<PR>`: Pull request number.
+- `--execute`: perform the update. Default (and the global `--dry-run`) is
+  read-only: nothing is ever written without `--execute`.
+- `--format <Format>`: Output format (`text` or `json`).
+
+`--execute` acts only on an eligible head: a branch of this repository (never a
+fork whose permissions are unknown) whose author is the authenticated user or a
+known bot, with the authenticated user holding a write/admin/maintain/owner
+role. The update uses `gh pr update-branch --expected-head-sha <SHA>`, so a
+concurrent author push is rejected by the server (`422`) rather than
+overwritten, and a `403`/`422` blocks without retry. After an accepted update
+the new head is observed immediately, then after 3 s, 10 s, and every 30 s up
+to a 1200 s deadline; a moved base, a stray head, or a timeout is `UNKNOWN`,
+never a success. After the update every gate must be re-run from scratch: the
+report emits `revalidate_required` and the new head OID, and never reuses the
+pre-update snapshot.
+
+For a **stacked** PR (whose base is another PR's head) the parent merges first:
+while an open parent owns the base the verdict is `BLOCKED` (`stack_parent_first`).
+After the parent merges, `--execute` rebases the child onto the default branch
+using the recorded parent head and force-pushes only the authorized branch,
+stopping on conflict; the rebased head is verified to apply none of the parent's
+changes before it is pushed. If the parent branch reference is gone, the child
+is `BLOCKED` (`stack_parent_gone`) until its old head is recovered.
+
+Exit `0` for `UP_TO_DATE`/`UPDATE_REQUIRED`, `1` for `BLOCKED`, and `2` for
+`UNKNOWN`. Reason codes include `fork_head`, `unauthorized`, `identity_unknown`,
+`permission_unknown`, `stack_parent_first`, `stack_parent_gone`,
+`stack_conflict`, `update_rejected_403`, `update_rejected_422`, `base_moved`,
+`poll_timeout`, and `revalidate_required`.
 
 ### `pr checks`
 <!-- BEGIN GENERATED: cli-contract pr checks -->
@@ -1928,6 +1988,46 @@ an optional log tail. The report is deduplicated by fingerprint, so a repeated
 failure links the existing issue instead of creating another. `--warning`
 classifies the report as a warning rather than an error, and `--dry-run`
 performs the deduplication search and preview without creating an issue.
+
+### `job`
+<!-- BEGIN GENERATED: cli-contract job -->
+`do-harness job [OPTIONS] <COMMAND>`
+
+Subcommands: `run`, `status`.
+<!-- END GENERATED: cli-contract job -->
+Run and inspect explicitly invoked unattended jobs. No sensor, hook, or CI path
+launches a job: an operator supplies a spec, so ordinary deterministic
+verification never starts a paid model. See
+[unattended jobs](unattended-jobs.md) for the isolation boundary, budgets, and
+blocked-outcome contract.
+
+#### `job run`
+<!-- BEGIN GENERATED: cli-contract job run -->
+`do-harness job run [OPTIONS] --spec <FILE>`
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `--spec <FILE>` | yes | — | — | Job spec (TOML) naming the task, revision, executor, and limits |
+| `--resume` | no | — | — | Continue an interrupted job with its remaining budget |
+| `--format <FORMAT>` | no | `text` | `text`, `json` | Output format |
+<!-- END GENERATED: cli-contract job run -->
+Run or resume one job. Completion requires fresh, strict verification evidence;
+an executor's exit status or `done` claim is never proof. A blocked job exits
+`1`, prints its typed reason, and leaves the disposable workspace for
+inspection. `--resume` continues an interrupted job with its remaining budget
+and never renews it; a terminal job resumes as an idempotent no-op. The global
+`--dry-run` resolves and prints the plan without creating a workspace.
+
+#### `job status`
+<!-- BEGIN GENERATED: cli-contract job status -->
+`do-harness job status [OPTIONS]`
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `--id <ID>` | no | — | — | Job id (default: every recorded job) |
+| `--format <FORMAT>` | no | `text` | `text`, `json` | Output format |
+<!-- END GENERATED: cli-contract job status -->
+Report durable receipts under `.do-harness/jobs/` without running anything.
 
 ## Exit Codes
 

@@ -35,6 +35,9 @@ pub struct InspectReport {
     pub detected: Vec<String>,
     /// Candidate development signals for the resolved pack.
     pub candidates: Vec<Candidate>,
+    /// Structured onboarding diagnostics (malformed manifests, unsupported
+    /// Node commands, missing package managers).
+    pub diagnostics: Vec<super::diagnostic::InitDiagnostic>,
     /// Discovered candidate commands from scripts/tools.
     pub candidate_commands: Vec<CandidateCommand>,
     /// Missing tools required for candidate signals.
@@ -110,7 +113,8 @@ pub fn inspect_workspace(root: &Path, requested_language: Option<Language>) -> I
     let mut detected = Vec::new();
     let has_cargo = root.join("Cargo.toml").exists();
     let has_git = root.join(".git").exists();
-    let has_pkg_json = root.join("package.json").exists();
+    let manifest = super::node_manifest::analyze_node_manifest(root);
+    let has_pkg_json = manifest.has_package_json;
     let has_py = root.join("requirements.txt").exists()
         || root.join("pyproject.toml").exists()
         || root.join("setup.py").exists();
@@ -156,11 +160,32 @@ pub fn inspect_workspace(root: &Path, requested_language: Option<Language>) -> I
         _ => None,
     };
 
+    let mut diagnostics = Vec::new();
+    if let Some(error) = &manifest.malformed {
+        diagnostics.push(super::diagnostic::InitDiagnostic::invalid_package_json(
+            "package.json",
+            error,
+        ));
+    }
     let resolved_language = match requested_language {
         Some(lang) => lang,
         None if declared.is_some() => declared.unwrap_or(Language::Rust),
         None if has_cargo => Language::Rust,
-        None if has_pkg_json || has_non_hidden_entries(root) => Language::Generic,
+        None if has_pkg_json => {
+            if manifest.malformed.is_none() && !manifest.supported_commands().is_empty() {
+                Language::Node
+            } else {
+                if manifest.malformed.is_none() {
+                    diagnostics.push(
+                        super::diagnostic::InitDiagnostic::no_supported_node_commands(
+                            "package.json",
+                        ),
+                    );
+                }
+                Language::Generic
+            }
+        }
+        None if has_non_hidden_entries(root) => Language::Generic,
         None => Language::Rust,
     };
 
@@ -251,17 +276,43 @@ pub fn inspect_workspace(root: &Path, requested_language: Option<Language>) -> I
         }
         Language::Node => {
             let pm_ok = tool_on_path(pm);
-            candidate_commands
-                .iter()
-                .map(|cmd| Candidate {
-                    name: cmd.name.clone(),
-                    status: if pm_ok {
-                        super::detect::CandidateStatus::Pass
+            if !pm_ok {
+                diagnostics.push(super::diagnostic::InitDiagnostic::missing_package_manager(
+                    pm,
+                    "package.json",
+                ));
+            }
+            manifest
+                .supported_commands()
+                .into_iter()
+                .map(|key| {
+                    let command = if let Some(script) = manifest.get_script(key) {
+                        if pm == "npm" && key == "test" {
+                            format!("npm test # {script}")
+                        } else {
+                            format!("{pm} run {key} # {script}")
+                        }
+                    } else if manifest.has_turbo_task(key) {
+                        format!("{pm} exec turbo run {key}")
                     } else {
-                        super::detect::CandidateStatus::Missing
-                    },
-                    included: pm_ok,
-                    detail: cmd.command.clone(),
+                        let hint = match key {
+                            "typecheck" => "npx tsc --noEmit",
+                            "lint" => "npx eslint .",
+                            "test" => "npx vitest run",
+                            _ => "npx jest",
+                        };
+                        hint.to_owned()
+                    };
+                    Candidate {
+                        name: key.to_owned(),
+                        status: if pm_ok {
+                            super::detect::CandidateStatus::Pass
+                        } else {
+                            super::detect::CandidateStatus::Missing
+                        },
+                        included: pm_ok,
+                        detail: command,
+                    }
                 })
                 .collect()
         }
@@ -269,13 +320,30 @@ pub fn inspect_workspace(root: &Path, requested_language: Option<Language>) -> I
     };
 
     if resolved_language == Language::Generic && has_pkg_json {
-        guidance = Some(
-            "A package.json was found. Run `do-harness init --language node` to scaffold with discovered Node/JS/TS sensors, or declare custom sensors in do-harness.toml under [[sensors]].".to_owned()
-        );
+        if manifest.malformed.is_some() {
+            guidance = Some(
+                "package.json could not be parsed; fix it and re-run `do-harness init`, or \
+                 declare custom sensors in do-harness.toml under [[sensors]]."
+                    .to_owned(),
+            );
+        } else {
+            guidance = Some(
+                "package.json declares no supported Node commands (typecheck/lint/test/build \
+                 scripts, turbo tasks, or matching dependencies). Add one and re-run \
+                 `do-harness init`, or declare custom sensors in do-harness.toml under \
+                 [[sensors]]."
+                    .to_owned(),
+            );
+        }
     } else if resolved_language == Language::Generic && (has_py || has_go) {
         guidance = Some(
             "Generic pack selected. Declare trusted custom sensor commands in do-harness.toml under [[sensors]].".to_owned()
         );
+    } else if resolved_language == Language::Node && !tool_on_path(pm) {
+        guidance = Some(format!(
+            "The {pm} package manager was not found on PATH; install it and re-run \
+             `do-harness init --force` to include the discovered Node sensors."
+        ));
     }
 
     let lang_str = match resolved_language {
@@ -289,6 +357,7 @@ pub fn inspect_workspace(root: &Path, requested_language: Option<Language>) -> I
         resolved_language: lang_str.to_owned(),
         detected,
         candidates,
+        diagnostics,
         candidate_commands,
         missing_tools,
         guidance,

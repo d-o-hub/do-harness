@@ -226,6 +226,7 @@ export PATH="$HOME/.local/bin:$PATH"
 | `pr waivers [OPTIONS] --lcov <PATH> [PR]` | Classify patch-coverage residue: waivable classes and lines needing tests — flags: `--base <REV>`, `--head <REV>`, `--patch <PATH>`, `--lcov <PATH>`, `--since <PATH>`, `--strip-prefix <PREFIX>`, `--format <FORMAT>` |
 | `pr disposition [OPTIONS] --decision <DECISION> --head <HEAD> --reason <REASON> <PR> <ITEM_REF>` | Record a structured disposition for a review, thread, comment, or finding — flags: `--decision <DECISION>`, `--head <HEAD>`, `--reason <REASON>`, `--evidence <EVIDENCE>`, `--format <FORMAT>` |
 | `pr findings [OPTIONS] <PR>` | Collect and classify findings (annotations, code scanning, artifacts) and track issues — flags: `--issues <ISSUES>`, `--format <FORMAT>` |
+| `pr update-base [OPTIONS] <PR>` | Update a pull request's branch to the latest base without overwriting author work (default is read-only; `--execute` acts only on an authorized own/known-bot head) — flags: `--execute`, `--format <FORMAT>` |
 | `skills suggest [OPTIONS] --query <TEXT>` | Rank skills by relevance to a query using metadata only — flags: `--query <TEXT>`, `--limit <N>`, `--format <FORMAT>` |
 | `skills drift [OPTIONS]` | Check manifest-managed shared skills against their pinned digests — flags: `--manifest <FILE>`, `--format <FORMAT>` |
 | `skills refresh-validator [OPTIONS]` | Replace only the installed skill-creator structure validator |
@@ -272,6 +273,8 @@ export PATH="$HOME/.local/bin:$PATH"
 | `feedback submit [OPTIONS] --draft <FILE>` | Explicitly submit a feedback draft — flags: `--draft <FILE>`, `--repo <OWNER/REPO>`, `--yes` |
 | `feedback auto [OPTIONS] --repo <OWNER/REPO>` | Fully automated end-to-end feedback generation, deduplication, and submission — flags: `--repo <OWNER/REPO>`, `--days <DAYS>`, `--min-fires <N>`, `--format <FORMAT>` |
 | `feedback report [OPTIONS] --error <TEXT>` | File a defect report against the tool's own repository — flags: `--repo <OWNER/REPO>`, `--error <TEXT>`, `--log <FILE>`, `--warning`, `--yes`, `--format <FORMAT>` |
+| `job run [OPTIONS] --spec <FILE>` | Run an explicitly authorized unattended job from a spec — flags: `--spec <FILE>`, `--resume`, `--format <FORMAT>` |
+| `job status [OPTIONS]` | Report durable job receipts without running anything — flags: `--id <ID>`, `--format <FORMAT>` |
 
 Global flags: `--root <DIR>`, `--config <FILE>`, `-q, --quiet`, `--output <FILE>`, `--dry-run`.
 <!-- END GENERATED: cli-commands -->
@@ -332,6 +335,14 @@ required sensors, task-scoped freshness and failures, recent traces, and one
 next command into a bounded, read-only result (`--format json` is versioned).
 It never runs a sensor or writes state, and a context packet is not proof that
 the task is complete: the sensor gates still decide.
+
+Unattended jobs are separate from task state: `job run --spec <FILE>` executes
+one explicitly authorized task through an external executor in a disposable
+worktree at a pinned revision, within finite attempt and time budgets, and ends
+only on fresh strict evidence. Every stop is a typed blocked receipt under
+`.do-harness/jobs/`; resuming continues the remaining budget without renewing
+it, and no sensor, hook, or CI path launches a job. See
+[unattended jobs](https://github.com/d-o-hub/do-harness/blob/main/docs/unattended-jobs.md).
 
 ## Hooks
 

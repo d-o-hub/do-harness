@@ -267,6 +267,7 @@ mod tests {
             signal_sets: BTreeMap::new(),
             sensors: specs,
             jobs: None,
+            repairs: Vec::new(),
         }
     }
 

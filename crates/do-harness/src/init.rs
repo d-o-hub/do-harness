@@ -20,8 +20,10 @@ use anyhow::{Context, Result};
 pub mod baseline;
 mod context_sanitization;
 pub mod detect;
+pub mod diagnostic;
 pub mod inspect;
 pub mod node;
+pub mod node_manifest;
 pub mod report;
 mod skills;
 pub(crate) use skills::refresh_skill_creator_validator;
@@ -85,6 +87,9 @@ pub struct InitReport {
     pub detected: Vec<String>,
     /// Probed candidate signals for the resolved pack.
     pub candidates: Vec<Candidate>,
+    /// Structured onboarding diagnostics (malformed manifests, unsupported
+    /// Node commands, missing package managers).
+    pub diagnostics: Vec<diagnostic::InitDiagnostic>,
     /// Outcome of executing the generated contract once; filled by
     /// [`run_baseline`] (the CLI always runs it).
     pub baseline: Option<Baseline>,
@@ -141,6 +146,7 @@ pub async fn init_workspace(root: &Path, opts: &InitOpts) -> Result<InitReport> 
         language: detection.language,
         detected: detection.findings,
         candidates: detection.candidates,
+        diagnostics: detection.diagnostics,
         ..Default::default()
     };
 
@@ -170,8 +176,8 @@ pub async fn init_workspace(root: &Path, opts: &InitOpts) -> Result<InitReport> 
             generate_rust_config(&sensors)?
         }
         Language::Node => {
-            let sensors = detect::included_specs(root, report.language, &report.candidates);
-            node::generate_node_config(&sensors)?
+            let sensors = &detection.node_specs;
+            node::generate_node_config(sensors)?
         }
         Language::Generic => CONFIG_GENERIC.to_owned(),
         Language::Web => CONFIG_WEB.to_owned(),
@@ -361,6 +367,7 @@ fn generate_rust_config(sensors: &[crate::config::SensorSpec]) -> Result<String>
         signal_sets,
         sensors,
         jobs: None,
+        repairs: Vec::new(),
     };
     let body = toml::to_string(&cfg).context("failed to render generated config")?;
     Ok(format!(

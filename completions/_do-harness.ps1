@@ -64,6 +64,7 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('completions', 'completions', [CompletionResultType]::ParameterValue, 'Generate shell completions')
             [CompletionResult]::new('man', 'man', [CompletionResultType]::ParameterValue, 'Generate man page documentation')
             [CompletionResult]::new('feedback', 'feedback', [CompletionResultType]::ParameterValue, 'Manage impact-gated feedback and issue proposals')
+            [CompletionResult]::new('job', 'job', [CompletionResultType]::ParameterValue, 'Run and inspect explicitly invoked unattended jobs')
             [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
             break
         }
@@ -222,6 +223,7 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('waivers', 'waivers', [CompletionResultType]::ParameterValue, 'Classify patch-coverage residue: waivable classes and lines needing tests')
             [CompletionResult]::new('disposition', 'disposition', [CompletionResultType]::ParameterValue, 'Record a structured disposition for a review, thread, comment, or finding')
             [CompletionResult]::new('findings', 'findings', [CompletionResultType]::ParameterValue, 'Collect and classify findings (annotations, code scanning, artifacts) and track issues')
+            [CompletionResult]::new('update-base', 'update-base', [CompletionResultType]::ParameterValue, 'Update a pull request''s branch to the latest base without overwriting author work (default is read-only; `--execute` acts only on an authorized own/known-bot head)')
             [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
             break
         }
@@ -371,6 +373,21 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('--version', '--version', [CompletionResultType]::ParameterName, 'Print version')
             break
         }
+        'do-harness;pr;update-base' {
+            [CompletionResult]::new('--format', '--format', [CompletionResultType]::ParameterName, 'Output format')
+            [CompletionResult]::new('--root', '--root', [CompletionResultType]::ParameterName, 'Workspace root override (default: walk up from cwd)')
+            [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Explicit path to do-harness.toml')
+            [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)')
+            [CompletionResult]::new('--execute', '--execute', [CompletionResultType]::ParameterName, 'Execute the update (default is a read-only report)')
+            [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Suppress PASS/WARN verdict lines and the success footer')
+            [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Suppress PASS/WARN verdict lines and the success footer')
+            [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Dry run without side effects')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            [CompletionResult]::new('-V', '-V ', [CompletionResultType]::ParameterName, 'Print version')
+            [CompletionResult]::new('--version', '--version', [CompletionResultType]::ParameterName, 'Print version')
+            break
+        }
         'do-harness;pr;help' {
             [CompletionResult]::new('no-effect', 'no-effect', [CompletionResultType]::ParameterValue, 'Report the prospective merge impact of a PR or revision range')
             [CompletionResult]::new('review', 'review', [CompletionResultType]::ParameterValue, 'Emit the semantic residual: changed units evidence could not prove')
@@ -379,6 +396,7 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('waivers', 'waivers', [CompletionResultType]::ParameterValue, 'Classify patch-coverage residue: waivable classes and lines needing tests')
             [CompletionResult]::new('disposition', 'disposition', [CompletionResultType]::ParameterValue, 'Record a structured disposition for a review, thread, comment, or finding')
             [CompletionResult]::new('findings', 'findings', [CompletionResultType]::ParameterValue, 'Collect and classify findings (annotations, code scanning, artifacts) and track issues')
+            [CompletionResult]::new('update-base', 'update-base', [CompletionResultType]::ParameterValue, 'Update a pull request''s branch to the latest base without overwriting author work (default is read-only; `--execute` acts only on an authorized own/known-bot head)')
             [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
             break
         }
@@ -401,6 +419,9 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             break
         }
         'do-harness;pr;help;findings' {
+            break
+        }
+        'do-harness;pr;help;update-base' {
             break
         }
         'do-harness;pr;help;help' {
@@ -1426,6 +1447,68 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
         'do-harness;feedback;help;help' {
             break
         }
+        'do-harness;job' {
+            [CompletionResult]::new('--root', '--root', [CompletionResultType]::ParameterName, 'Workspace root override (default: walk up from cwd)')
+            [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Explicit path to do-harness.toml')
+            [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)')
+            [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Suppress PASS/WARN verdict lines and the success footer')
+            [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Suppress PASS/WARN verdict lines and the success footer')
+            [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Dry run without side effects')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('-V', '-V ', [CompletionResultType]::ParameterName, 'Print version')
+            [CompletionResult]::new('--version', '--version', [CompletionResultType]::ParameterName, 'Print version')
+            [CompletionResult]::new('run', 'run', [CompletionResultType]::ParameterValue, 'Run an explicitly authorized unattended job from a spec')
+            [CompletionResult]::new('status', 'status', [CompletionResultType]::ParameterValue, 'Report durable job receipts without running anything')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'do-harness;job;run' {
+            [CompletionResult]::new('--spec', '--spec', [CompletionResultType]::ParameterName, 'Job spec (TOML) naming the task, revision, executor, and limits')
+            [CompletionResult]::new('--format', '--format', [CompletionResultType]::ParameterName, 'Output format')
+            [CompletionResult]::new('--root', '--root', [CompletionResultType]::ParameterName, 'Workspace root override (default: walk up from cwd)')
+            [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Explicit path to do-harness.toml')
+            [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)')
+            [CompletionResult]::new('--resume', '--resume', [CompletionResultType]::ParameterName, 'Continue an interrupted job with its remaining budget')
+            [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Suppress PASS/WARN verdict lines and the success footer')
+            [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Suppress PASS/WARN verdict lines and the success footer')
+            [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Dry run without side effects')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            [CompletionResult]::new('-V', '-V ', [CompletionResultType]::ParameterName, 'Print version')
+            [CompletionResult]::new('--version', '--version', [CompletionResultType]::ParameterName, 'Print version')
+            break
+        }
+        'do-harness;job;status' {
+            [CompletionResult]::new('--id', '--id', [CompletionResultType]::ParameterName, 'Job id (default: every recorded job)')
+            [CompletionResult]::new('--format', '--format', [CompletionResultType]::ParameterName, 'Output format')
+            [CompletionResult]::new('--root', '--root', [CompletionResultType]::ParameterName, 'Workspace root override (default: walk up from cwd)')
+            [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Explicit path to do-harness.toml')
+            [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)')
+            [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Suppress PASS/WARN verdict lines and the success footer')
+            [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Suppress PASS/WARN verdict lines and the success footer')
+            [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Dry run without side effects')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            [CompletionResult]::new('-V', '-V ', [CompletionResultType]::ParameterName, 'Print version')
+            [CompletionResult]::new('--version', '--version', [CompletionResultType]::ParameterName, 'Print version')
+            break
+        }
+        'do-harness;job;help' {
+            [CompletionResult]::new('run', 'run', [CompletionResultType]::ParameterValue, 'Run an explicitly authorized unattended job from a spec')
+            [CompletionResult]::new('status', 'status', [CompletionResultType]::ParameterValue, 'Report durable job receipts without running anything')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'do-harness;job;help;run' {
+            break
+        }
+        'do-harness;job;help;status' {
+            break
+        }
+        'do-harness;job;help;help' {
+            break
+        }
         'do-harness;help' {
             [CompletionResult]::new('version', 'version', [CompletionResultType]::ParameterValue, 'Print CLI version information')
             [CompletionResult]::new('verify', 'verify', [CompletionResultType]::ParameterValue, 'Run computational sensors')
@@ -1457,6 +1540,7 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('completions', 'completions', [CompletionResultType]::ParameterValue, 'Generate shell completions')
             [CompletionResult]::new('man', 'man', [CompletionResultType]::ParameterValue, 'Generate man page documentation')
             [CompletionResult]::new('feedback', 'feedback', [CompletionResultType]::ParameterValue, 'Manage impact-gated feedback and issue proposals')
+            [CompletionResult]::new('job', 'job', [CompletionResultType]::ParameterValue, 'Run and inspect explicitly invoked unattended jobs')
             [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
             break
         }
@@ -1483,6 +1567,7 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('waivers', 'waivers', [CompletionResultType]::ParameterValue, 'Classify patch-coverage residue: waivable classes and lines needing tests')
             [CompletionResult]::new('disposition', 'disposition', [CompletionResultType]::ParameterValue, 'Record a structured disposition for a review, thread, comment, or finding')
             [CompletionResult]::new('findings', 'findings', [CompletionResultType]::ParameterValue, 'Collect and classify findings (annotations, code scanning, artifacts) and track issues')
+            [CompletionResult]::new('update-base', 'update-base', [CompletionResultType]::ParameterValue, 'Update a pull request''s branch to the latest base without overwriting author work (default is read-only; `--execute` acts only on an authorized own/known-bot head)')
             break
         }
         'do-harness;help;pr;no-effect' {
@@ -1504,6 +1589,9 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             break
         }
         'do-harness;help;pr;findings' {
+            break
+        }
+        'do-harness;help;pr;update-base' {
             break
         }
         'do-harness;help;skills' {
@@ -1688,6 +1776,17 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             break
         }
         'do-harness;help;feedback;report' {
+            break
+        }
+        'do-harness;help;job' {
+            [CompletionResult]::new('run', 'run', [CompletionResultType]::ParameterValue, 'Run an explicitly authorized unattended job from a spec')
+            [CompletionResult]::new('status', 'status', [CompletionResultType]::ParameterValue, 'Report durable job receipts without running anything')
+            break
+        }
+        'do-harness;help;job;run' {
+            break
+        }
+        'do-harness;help;job;status' {
             break
         }
         'do-harness;help;help' {

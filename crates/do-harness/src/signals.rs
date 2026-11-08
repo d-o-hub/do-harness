@@ -151,6 +151,7 @@ mod tests {
                 })
                 .collect(),
             jobs: None,
+            repairs: Vec::new(),
         }
     }
 

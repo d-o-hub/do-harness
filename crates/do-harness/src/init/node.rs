@@ -1,24 +1,35 @@
 //! Node/Web JS/TS language pack candidate detection and config generation.
 
+use anyhow::{Context, Result};
 use std::collections::BTreeMap;
-use std::fs;
 use std::path::Path;
 use std::process::Command;
-
-use anyhow::{Context, Result};
 
 use super::{Candidate, CandidateStatus};
 use crate::config::{Config, HooksConfig, SensorSpec};
 
-/// Probes Node candidate sensors in `root` and returns candidates and candidate specs.
+/// One Node probe run: probed candidates plus the specs of the included ones.
+#[derive(Debug, Clone)]
+pub struct NodeProbe {
+    /// Probed candidate signals for the Node pack.
+    pub candidates: Vec<Candidate>,
+    /// Sensor specs for the included candidates.
+    pub specs: Vec<SensorSpec>,
+    /// The selected package-manager name.
+    pub package_manager: String,
+    /// Whether the selected package manager binary is on PATH.
+    pub package_manager_present: bool,
+}
+
+/// Full Node probe result with the package-manager availability facts.
 #[must_use]
 #[allow(clippy::too_many_lines)]
-pub fn probe_node(root: &Path) -> (Vec<Candidate>, Vec<SensorSpec>) {
+pub fn probe_node_full(root: &Path) -> NodeProbe {
+    let analysis = super::node_manifest::analyze_node_manifest(root);
     let has_pnpm_lock = root.join("pnpm-lock.yaml").exists();
     let has_pnpm_ws = root.join("pnpm-workspace.yaml").exists();
     let has_yarn_lock = root.join("yarn.lock").exists();
     let has_package_lock = root.join("package-lock.json").exists();
-    let has_turbo_json = root.join("turbo.json").exists();
 
     let pnpm_ok = probe("pnpm", &["--version"]);
     let yarn_ok = probe("yarn", &["--version"]);
@@ -37,6 +48,11 @@ pub fn probe_node(root: &Path) -> (Vec<Candidate>, Vec<SensorSpec>) {
     } else {
         "npm"
     };
+    let pm_present = match pm {
+        "pnpm" => pnpm_ok,
+        "yarn" => yarn_ok,
+        _ => npm_ok,
+    };
 
     let lockfile = match pm {
         "pnpm" => "pnpm-lock.yaml",
@@ -50,45 +66,10 @@ pub fn probe_node(root: &Path) -> (Vec<Candidate>, Vec<SensorSpec>) {
         _ => vec!["npx".into()],
     };
 
-    let pkg_json = fs::read_to_string(root.join("package.json")).ok();
-    let pkg_val: Option<serde_json::Value> = pkg_json
-        .as_deref()
-        .and_then(|s| serde_json::from_str(s).ok());
-    let scripts = pkg_val
-        .as_ref()
-        .and_then(|v| v.get("scripts"))
-        .and_then(|s| s.as_object());
-    let deps = pkg_val.as_ref();
-
-    let turbo_json = fs::read_to_string(root.join("turbo.json")).ok();
-    let turbo_val: Option<serde_json::Value> = turbo_json
-        .as_deref()
-        .and_then(|s| serde_json::from_str(s).ok());
-    let turbo_tasks = turbo_val.as_ref().and_then(|v| {
-        v.get("tasks")
-            .or_else(|| v.get("pipeline"))
-            .and_then(|t| t.as_object())
-    });
-
-    let has_script = |key: &str| -> bool { scripts.is_some_and(|s| s.contains_key(key)) };
-
-    let get_script =
-        |key: &str| -> Option<&str> { scripts.and_then(|s| s.get(key)).and_then(|v| v.as_str()) };
-
-    let has_turbo_task =
-        |key: &str| -> bool { has_turbo_json && turbo_tasks.is_some_and(|t| t.contains_key(key)) };
-
-    let has_dep = |dep_name: &str| -> bool {
-        deps.is_some_and(|v| {
-            ["dependencies", "devDependencies", "peerDependencies"]
-                .iter()
-                .any(|key| {
-                    v.get(key)
-                        .and_then(|d| d.as_object())
-                        .is_some_and(|obj| obj.contains_key(dep_name))
-                })
-        })
-    };
+    let has_script = |key: &str| analysis.has_script(key);
+    let get_script = |key: &str| analysis.get_script(key);
+    let has_turbo_task = |key: &str| analysis.has_turbo_task(key);
+    let has_dep = |dep_name: &str| analysis.has_dep(dep_name);
 
     let ts_globs = vec![
         "**/*.ts".to_string(),
@@ -119,16 +100,31 @@ pub fn probe_node(root: &Path) -> (Vec<Candidate>, Vec<SensorSpec>) {
         lockfile.to_string(),
     ];
 
+    let supported = analysis.supported_commands();
+    let tc_proven = supported.contains(&"typecheck");
+    let lint_proven = supported.contains(&"lint");
+    let test_proven = supported.contains(&"test");
+    let build_proven = supported.contains(&"build");
+
     let mut candidates = Vec::new();
     let mut specs = Vec::new();
 
-    // 1. typecheck
-    let tc_proven = has_script("typecheck")
-        || has_turbo_task("typecheck")
-        || root.join("tsconfig.json").exists()
-        || root.join("tsconfig.base.json").exists()
-        || has_dep("typescript");
+    // The package-manager binary gates every proven signal: without it the
+    // contract is not runnable and the sensor is omitted with a `Missing`
+    // candidate rather than a silently unverifiable pass.
+    let include = pm_present;
+    let status = if pm_present {
+        CandidateStatus::Pass
+    } else {
+        CandidateStatus::Missing
+    };
+    let tool_detail = if pm_present {
+        String::new()
+    } else {
+        format!("{pm} was not found on PATH")
+    };
 
+    // 1. typecheck
     if tc_proven {
         let argv = if has_script("typecheck") {
             vec![pm.to_string(), "run".to_string(), "typecheck".to_string()]
@@ -147,30 +143,32 @@ pub fn probe_node(root: &Path) -> (Vec<Candidate>, Vec<SensorSpec>) {
 
         candidates.push(Candidate {
             name: "typecheck".to_string(),
-            status: CandidateStatus::Pass,
-            included: true,
-            detail: String::new(),
+            status,
+            included: include,
+            detail: tool_detail.clone(),
         });
-        specs.push(SensorSpec {
-            kind: None,
-            fix: None,
-            name: "typecheck".to_string(),
-            argv,
-            retry: None,
-            timeout_justification: None,
-            max_output_bytes: None,
-            environment_allowlist: None,
-            redact_env: Vec::new(),
-            timeout: None,
-            severity: None,
-            allow_failure: false,
-            transient_exit_codes: Vec::new(),
-            when_changed: ts_globs,
-            artifacts: Vec::new(),
-            environment_inputs: Vec::new(),
-            coverage_inputs: Vec::new(),
-            inputs: Vec::new(),
-        });
+        if include {
+            specs.push(SensorSpec {
+                kind: None,
+                fix: None,
+                name: "typecheck".to_string(),
+                argv,
+                retry: None,
+                timeout_justification: None,
+                max_output_bytes: None,
+                environment_allowlist: None,
+                redact_env: Vec::new(),
+                timeout: None,
+                severity: None,
+                allow_failure: false,
+                transient_exit_codes: Vec::new(),
+                when_changed: ts_globs,
+                artifacts: Vec::new(),
+                environment_inputs: Vec::new(),
+                coverage_inputs: Vec::new(),
+                inputs: Vec::new(),
+            });
+        }
     } else {
         candidates.push(Candidate {
             name: "typecheck".to_string(),
@@ -183,17 +181,6 @@ pub fn probe_node(root: &Path) -> (Vec<Candidate>, Vec<SensorSpec>) {
     }
 
     // 2. lint
-    let has_eslint_config = root.join(".eslintrc").exists()
-        || root.join(".eslintrc.json").exists()
-        || root.join(".eslintrc.js").exists()
-        || root.join(".eslintrc.cjs").exists()
-        || root.join("eslint.config.js").exists()
-        || root.join("eslint.config.mjs").exists()
-        || root.join("eslint.config.cjs").exists();
-
-    let lint_proven =
-        has_script("lint") || has_turbo_task("lint") || has_eslint_config || has_dep("eslint");
-
     if lint_proven {
         let argv = if has_script("lint") {
             vec![pm.to_string(), "run".to_string(), "lint".to_string()]
@@ -212,30 +199,32 @@ pub fn probe_node(root: &Path) -> (Vec<Candidate>, Vec<SensorSpec>) {
 
         candidates.push(Candidate {
             name: "lint".to_string(),
-            status: CandidateStatus::Pass,
-            included: true,
-            detail: String::new(),
+            status,
+            included: include,
+            detail: tool_detail.clone(),
         });
-        specs.push(SensorSpec {
-            kind: None,
-            fix: None,
-            name: "lint".to_string(),
-            argv,
-            retry: None,
-            timeout_justification: None,
-            max_output_bytes: None,
-            environment_allowlist: None,
-            redact_env: Vec::new(),
-            timeout: None,
-            severity: None,
-            allow_failure: false,
-            transient_exit_codes: Vec::new(),
-            when_changed: code_globs.clone(),
-            artifacts: Vec::new(),
-            environment_inputs: Vec::new(),
-            coverage_inputs: Vec::new(),
-            inputs: Vec::new(),
-        });
+        if include {
+            specs.push(SensorSpec {
+                kind: None,
+                fix: None,
+                name: "lint".to_string(),
+                argv,
+                retry: None,
+                timeout_justification: None,
+                max_output_bytes: None,
+                environment_allowlist: None,
+                redact_env: Vec::new(),
+                timeout: None,
+                severity: None,
+                allow_failure: false,
+                transient_exit_codes: Vec::new(),
+                when_changed: code_globs.clone(),
+                artifacts: Vec::new(),
+                environment_inputs: Vec::new(),
+                coverage_inputs: Vec::new(),
+                inputs: Vec::new(),
+            });
+        }
     } else {
         candidates.push(Candidate {
             name: "lint".to_string(),
@@ -249,8 +238,6 @@ pub fn probe_node(root: &Path) -> (Vec<Candidate>, Vec<SensorSpec>) {
     // 3. test
     let is_dummy_test = get_script("test").is_some_and(|s| s.contains("no test specified"));
     let has_real_test_script = has_script("test") && !is_dummy_test;
-    let test_proven =
-        has_real_test_script || has_turbo_task("test") || has_dep("vitest") || has_dep("jest");
 
     if test_proven {
         let argv = if has_real_test_script {
@@ -274,30 +261,32 @@ pub fn probe_node(root: &Path) -> (Vec<Candidate>, Vec<SensorSpec>) {
 
         candidates.push(Candidate {
             name: "test".to_string(),
-            status: CandidateStatus::Pass,
-            included: true,
-            detail: String::new(),
+            status,
+            included: include,
+            detail: tool_detail.clone(),
         });
-        specs.push(SensorSpec {
-            kind: None,
-            fix: None,
-            name: "test".to_string(),
-            argv,
-            retry: None,
-            timeout_justification: None,
-            max_output_bytes: None,
-            environment_allowlist: None,
-            redact_env: Vec::new(),
-            timeout: None,
-            severity: None,
-            allow_failure: false,
-            transient_exit_codes: Vec::new(),
-            when_changed: code_globs,
-            artifacts: Vec::new(),
-            environment_inputs: Vec::new(),
-            coverage_inputs: Vec::new(),
-            inputs: Vec::new(),
-        });
+        if include {
+            specs.push(SensorSpec {
+                kind: None,
+                fix: None,
+                name: "test".to_string(),
+                argv,
+                retry: None,
+                timeout_justification: None,
+                max_output_bytes: None,
+                environment_allowlist: None,
+                redact_env: Vec::new(),
+                timeout: None,
+                severity: None,
+                allow_failure: false,
+                transient_exit_codes: Vec::new(),
+                when_changed: code_globs,
+                artifacts: Vec::new(),
+                environment_inputs: Vec::new(),
+                coverage_inputs: Vec::new(),
+                inputs: Vec::new(),
+            });
+        }
     } else {
         candidates.push(Candidate {
             name: "test".to_string(),
@@ -308,8 +297,6 @@ pub fn probe_node(root: &Path) -> (Vec<Candidate>, Vec<SensorSpec>) {
     }
 
     // 4. build
-    let build_proven = has_script("build") || has_turbo_task("build");
-
     if build_proven {
         let argv = if has_script("build") {
             vec![pm.to_string(), "run".to_string(), "build".to_string()]
@@ -323,30 +310,32 @@ pub fn probe_node(root: &Path) -> (Vec<Candidate>, Vec<SensorSpec>) {
 
         candidates.push(Candidate {
             name: "build".to_string(),
-            status: CandidateStatus::Pass,
-            included: true,
-            detail: String::new(),
+            status,
+            included: include,
+            detail: tool_detail.clone(),
         });
-        specs.push(SensorSpec {
-            kind: None,
-            fix: None,
-            name: "build".to_string(),
-            argv,
-            retry: None,
-            timeout_justification: None,
-            max_output_bytes: None,
-            environment_allowlist: None,
-            redact_env: Vec::new(),
-            timeout: None,
-            severity: None,
-            allow_failure: false,
-            transient_exit_codes: Vec::new(),
-            when_changed: build_globs,
-            artifacts: Vec::new(),
-            environment_inputs: Vec::new(),
-            coverage_inputs: Vec::new(),
-            inputs: Vec::new(),
-        });
+        if include {
+            specs.push(SensorSpec {
+                kind: None,
+                fix: None,
+                name: "build".to_string(),
+                argv,
+                retry: None,
+                timeout_justification: None,
+                max_output_bytes: None,
+                environment_allowlist: None,
+                redact_env: Vec::new(),
+                timeout: None,
+                severity: None,
+                allow_failure: false,
+                transient_exit_codes: Vec::new(),
+                when_changed: build_globs,
+                artifacts: Vec::new(),
+                environment_inputs: Vec::new(),
+                coverage_inputs: Vec::new(),
+                inputs: Vec::new(),
+            });
+        }
     } else {
         candidates.push(Candidate {
             name: "build".to_string(),
@@ -356,7 +345,12 @@ pub fn probe_node(root: &Path) -> (Vec<Candidate>, Vec<SensorSpec>) {
         });
     }
 
-    (candidates, specs)
+    NodeProbe {
+        candidates,
+        specs,
+        package_manager: pm.to_owned(),
+        package_manager_present: pm_present,
+    }
 }
 
 /// Renders the Node `do-harness.toml` for the included sensors.
@@ -406,10 +400,11 @@ pub fn generate_node_config(sensors: &[SensorSpec]) -> Result<String> {
         signal_sets,
         sensors: sensors.to_vec(),
         jobs: None,
+        repairs: Vec::new(),
     };
     let body = toml::to_string(&cfg).context("failed to render generated config")?;
     Ok(format!(
-        "# do-harness.toml — generated by `do-harness init --language node` from detected tooling.\n\
+        "# do-harness.toml — generated by `do-harness init` from detected tooling.\n\
          # Edit freely; `do-harness explain --set verification --changed` shows what applies.\n{body}"
     ))
 }
