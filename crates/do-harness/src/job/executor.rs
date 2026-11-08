@@ -24,6 +24,8 @@ use super::spec::ExecutorSpec;
 
 /// Combined captured output budget for one executor invocation.
 pub const OUTPUT_LIMIT_BYTES: usize = 64 * 1024;
+/// Largest declared executor result accepted.
+pub const MAX_RESULT_BYTES: usize = 64 * 1024;
 /// How often the parent polls the child while waiting.
 const POLL: Duration = Duration::from_millis(20);
 /// Pipe read chunk.
@@ -240,6 +242,22 @@ fn read_report(
     required: bool,
     redactor: &Redactor,
 ) -> (Option<ExecutorReport>, Option<String>) {
+    match std::fs::metadata(path) {
+        Ok(metadata) if metadata.len() > MAX_RESULT_BYTES as u64 => {
+            return (
+                None,
+                Some(format!("executor result exceeds {MAX_RESULT_BYTES} bytes")),
+            );
+        }
+        Ok(_) => {}
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(error) => {
+            return (
+                None,
+                Some(redactor.text(&format!("failed to inspect executor result: {error}"))),
+            );
+        }
+    }
     let text = match std::fs::read_to_string(path) {
         Ok(text) => text,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {

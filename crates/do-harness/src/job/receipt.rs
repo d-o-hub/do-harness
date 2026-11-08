@@ -300,10 +300,7 @@ impl JobReceipt {
             .filter_map(|entry| entry.file_name().to_str().map(ToOwned::to_owned))
             .collect();
         ids.sort();
-        Ok(ids
-            .iter()
-            .filter_map(|id| Self::load(root, id).ok())
-            .collect())
+        ids.iter().map(|id| Self::load(root, id)).collect()
     }
 
     /// Persists the receipt atomically.
