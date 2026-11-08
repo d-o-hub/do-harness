@@ -27,6 +27,19 @@ pub fn fake_gh_router(mock_dir: &Path) -> PathBuf {
 MOCK_DIR="{}"
 # gh pr view ...
 if [ "$1" = "pr" ] && [ "$2" = "view" ]; then
+    # Persistent movement mode: every `pr view` alternates between two fixture
+    # views so readiness can never stabilize (used by the sweep race tests).
+    if [ -f "$MOCK_DIR/always_moving" ]; then
+        if [ -f "$MOCK_DIR/move_toggle.txt" ]; then
+            rm -f "$MOCK_DIR/move_toggle.txt"
+            toggle=2
+        else
+            echo x > "$MOCK_DIR/move_toggle.txt"
+            toggle=1
+        fi
+        cat "$MOCK_DIR/view_move_$toggle.json"
+        exit 0
+    fi
     if [ -f "$MOCK_DIR/view_seq.txt" ]; then
         count=$(cat "$MOCK_DIR/view_seq.txt")
         count=$((count + 1))
@@ -35,6 +48,10 @@ if [ "$1" = "pr" ] && [ "$2" = "view" ]; then
             cat "$MOCK_DIR/view_$count.json"
             exit 0
         fi
+    fi
+    if [ -f "$MOCK_DIR/view_$3.json" ]; then
+        cat "$MOCK_DIR/view_$3.json"
+        exit 0
     fi
     cat "$MOCK_DIR/view.json"
     exit 0
@@ -85,6 +102,13 @@ if [ "$1" = "api" ]; then
             exit 0
             ;;
         *check-runs*)
+            # Post-merge main verification serves its own fixture keyed on the
+            # standard merge SHA (3333…), so a test can mark the merged commit's
+            # runs failing without touching the head's check fixture.
+            if [ -f "$MOCK_DIR/check_runs_merge.json" ] && printf '%s' "$endpoint" | grep -q '3333333333333333333333333333333333333333'; then
+                cat "$MOCK_DIR/check_runs_merge.json"
+                exit 0
+            fi
             if [ -f "$MOCK_DIR/fail_api" ]; then
                 echo "HTTP 403: rate limit exceeded" >&2
                 exit 1
@@ -253,6 +277,10 @@ if [ "$1" = "api" ]; then
             ;;
     esac
 fi
+if [ -f "$MOCK_DIR/gh_extra.sh" ]; then
+    . "$MOCK_DIR/gh_extra.sh"
+fi
+
 echo "unknown fake gh call: $@" >&2
 exit 1
 "#,

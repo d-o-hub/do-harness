@@ -131,6 +131,30 @@ pub enum PrAction {
         #[arg(long, value_enum, default_value_t = Format::Json)]
         format: Format,
     },
+    /// Orchestrate a deterministic, sequential PR sweep (read-only by default).
+    Sweep {
+        /// Sweep every open pull request.
+        #[arg(long, conflicts_with = "pr")]
+        all: bool,
+        /// Sweep only this pull request number.
+        #[arg(long, value_name = "PR")]
+        pr: Option<u64>,
+        /// Read-only inventory and report (the default).
+        #[arg(long)]
+        dry_run: bool,
+        /// Authorize owned/bot branch updates and auto-merge disarm.
+        #[arg(long)]
+        execute: bool,
+        /// Also authorize eligible merges and closures (requires --execute).
+        #[arg(long, requires = "execute")]
+        merge: bool,
+        /// Wait bound (seconds) for CI and post-merge verification.
+        #[arg(long, value_name = "SECONDS", default_value_t = 1200)]
+        wait: u64,
+        /// Output format.
+        #[arg(long, value_enum, default_value_t = Format::Text)]
+        format: Format,
+    },
     /// Update a pull request's branch to the latest base without overwriting
     /// author work (default is read-only; `--execute` acts only on an
     /// authorized own/known-bot head).
