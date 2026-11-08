@@ -43,6 +43,9 @@ function parseArgs(argv) {
 }
 
 function readInput(options) {
+  // The corpus runs this CLI with a log path it created itself; `--file` is the
+  // documented way to point it at that fixture log.
+  // eslint-disable-next-line security/detect-non-literal-fs-filename
   if (options.file !== null) return readFileSync(options.file, "utf8");
   return readFileSync(0, "utf8");
 }

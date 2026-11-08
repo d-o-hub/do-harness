@@ -33,6 +33,9 @@ test("parses multiple records in order", () => {
 });
 
 test("severity ranks are ordered", () => {
-  assert.ok(severityRank.INFO < severityRank.WARN);
-  assert.ok(severityRank.WARN < severityRank.ERROR);
+  // The rank table is a Map, so an unknown severity can never index a
+  // prototype slot; the ordering assertion reads it the same way the filter does.
+  assert.ok(severityRank.get("INFO") < severityRank.get("WARN"));
+  assert.ok(severityRank.get("WARN") < severityRank.get("ERROR"));
+  assert.equal(severityRank.get("VERBOSE"), undefined);
 });

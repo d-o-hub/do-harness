@@ -11,7 +11,7 @@ from unittest import mock
 
 from . import adopter, process
 from .process import execute
-from .runner import ADOPTER_CORPUS, CORPUS, benchmark, environment, load_corpus, run_case, summarize
+from .runner import CORPUS, benchmark, environment, load_corpus, run_case, summarize
 
 
 class BenchmarkTests(unittest.TestCase):
