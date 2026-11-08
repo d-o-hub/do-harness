@@ -76,6 +76,7 @@ impl Config {
                 );
             }
         }
+        validate_repairs(&self.repairs, &known)?;
         for (set, names) in &self.signal_sets {
             if !is_valid_set_name(set) {
                 anyhow::bail!(
@@ -99,6 +100,26 @@ impl Config {
         validate_hook_references("hooks.pre-push", &self.hooks.pre_push, &known)?;
         Ok(())
     }
+}
+
+/// Validates project-policy mechanical repairs against the known sensors.
+fn validate_repairs(repairs: &[super::RepairSpec], known: &[&str]) -> Result<()> {
+    for repair in repairs {
+        if repair.sensor.trim().is_empty() {
+            anyhow::bail!("repair must name the sensor it addresses");
+        }
+        if !known.contains(&repair.sensor.as_str()) {
+            anyhow::bail!(
+                "repair targets unknown sensor '{}' (available: {})",
+                repair.sensor,
+                known.join(", ")
+            );
+        }
+        if repair.argv.is_empty() || repair.argv[0].trim().is_empty() {
+            anyhow::bail!("repair for sensor '{}' must declare argv", repair.sensor);
+        }
+    }
+    Ok(())
 }
 
 /// Validates that every non-empty hook sensor selection references a sensor

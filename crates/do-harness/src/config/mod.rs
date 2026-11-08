@@ -29,6 +29,24 @@ pub struct Config {
     /// results in config order; `--fail-fast` still stops later work.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub jobs: Option<usize>,
+    /// Deterministic mechanical repairs the unattended job runner may apply.
+    /// Empty means no unattended job applies a repair.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub repairs: Vec<RepairSpec>,
+}
+
+/// A mechanical repair declared by project policy.
+///
+/// The job runner applies it only when its `sensor` failed in the same
+/// attempt, and at most once per job. It is deterministic: no model decides
+/// whether or how to repair.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct RepairSpec {
+    /// Sensor whose failure this repair addresses.
+    pub sensor: String,
+    /// Command line, program first, run in the job workspace.
+    pub argv: Vec<String>,
 }
 
 /// Which sensors each workflow gate runs.
@@ -223,6 +241,7 @@ pub fn rust_default() -> Config {
         signal_sets,
         sensors,
         jobs: None,
+        repairs: Vec::new(),
     }
 }
 
