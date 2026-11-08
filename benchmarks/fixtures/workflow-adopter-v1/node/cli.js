@@ -13,35 +13,54 @@ Filter \`[INFO|WARN|ERROR] component: message\` lines and print a JSON report.
 `;
 
 function parseArgs(argv) {
-  const options = { min: "INFO", component: null, message: null, file: null, help: false };
+  // Every option is a named local validated below and returned as an object
+  // literal, so no argv-derived value is ever written through a computed key.
+  let min = "INFO";
+  let component = null;
+  let message = null;
+  let file = null;
+  let help = false;
+
   for (let index = 0; index < argv.length; index += 1) {
     const flag = argv[index];
-    if (flag === "--help" || flag === "-h") {
-      options.help = true;
-      continue;
-    }
-    if (flag === "--min-severity" || flag === "--component" || flag === "--message" || flag === "--file") {
-      const value = argv[index + 1];
-      if (value === undefined) throw new Error(`${flag} requires a value`);
-      index += 1;
-      if (flag === "--min-severity") {
-        if (!["INFO", "WARN", "ERROR"].includes(value)) throw new Error(`unknown severity: ${value}`);
-        options.min = value;
-      } else if (flag === "--component") {
-        options.component = value;
-      } else if (flag === "--message") {
-        options.message = value;
-      } else {
-        options.file = value;
+    switch (flag) {
+      case "--help":
+      case "-h":
+        help = true;
+        break;
+      case "--min-severity":
+      case "--component":
+      case "--message":
+      case "--file": {
+        const value = argv[index + 1];
+        if (value === undefined) throw new Error(`${flag} requires a value`);
+        index += 1;
+        switch (flag) {
+          case "--min-severity":
+            if (!["INFO", "WARN", "ERROR"].includes(value)) {
+              throw new Error(`unknown severity: ${value}`);
+            }
+            min = value;
+            break;
+          case "--component":
+            component = value;
+            break;
+          case "--message":
+            message = value;
+            break;
+          default:
+            file = value;
+            break;
+        }
+        break;
       }
-      continue;
+      default:
+        if (flag.startsWith("-") && flag !== "-") throw new Error(`unknown option: ${flag}`);
+        throw new Error(`unexpected positional argument: ${flag}`);
     }
-    if (flag.startsWith("-") && flag !== "-") throw new Error(`unknown option: ${flag}`);
-    throw new Error(`unexpected positional argument: ${flag}`);
   }
-  return options;
+  return { min, component, message, file, help };
 }
-
 function readInput(options) {
   // The corpus runs this CLI with a log path it created itself; `--file` is the
   // documented way to point it at that fixture log.
