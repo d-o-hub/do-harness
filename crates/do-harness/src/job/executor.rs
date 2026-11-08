@@ -173,8 +173,10 @@ pub(super) fn run_bounded(
             }
         }
     }
-    let stdout_redacted = join(stdout, redactor);
-    let stderr_redacted = join(stderr, redactor);
+    // A killed executor's descendants can keep a pipe open; the cleanup
+    // budget bounds how long an attempt may wait for them to disappear.
+    let stdout_redacted = join(stdout, redactor, shell::PROCESS_CLEANUP_BUDGET);
+    let stderr_redacted = join(stderr, redactor, shell::PROCESS_CLEANUP_BUDGET);
     let observed = total.load(Ordering::Relaxed);
     BoundedOutput {
         exit_code,
@@ -213,11 +215,23 @@ fn pump(
     })
 }
 
-/// Joins a reader thread, redacting its retained tail.
-fn join(handle: Option<std::thread::JoinHandle<String>>, redactor: &Redactor) -> String {
-    handle
-        .and_then(|handle| handle.join().ok())
-        .map_or_else(String::new, |tail| redactor.text(&tail))
+/// Joins a reader thread within `budget`, detaching it if it overruns.
+fn join(
+    handle: Option<std::thread::JoinHandle<String>>,
+    redactor: &Redactor,
+    budget: Duration,
+) -> String {
+    let Some(handle) = handle else {
+        return String::new();
+    };
+    let (sender, receiver) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let _ = sender.send(handle.join().ok());
+    });
+    match receiver.recv_timeout(budget) {
+        Ok(Some(tail)) => redactor.text(&tail),
+        _ => String::new(),
+    }
 }
 
 /// Reads and validates the executor's declared report.
