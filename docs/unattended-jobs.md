@@ -43,8 +43,10 @@ A git worktree is **not** a process, network, or filesystem sandbox. The spec
 must therefore name the external mechanism that provides containment, such as a
 container runtime or a sandbox wrapper. `do-harness` records that declaration
 and never claims to verify it; `git-worktree` and `none` are rejected. The CLI
-terminates the executor's process group when a per-attempt budget expires, but
-descendant cleanup beyond that boundary belongs to the mechanism you declare.
+terminates the executor's process group when a per-attempt budget expires and
+bounds its wait for a killed executor's descendants to release captured output,
+so a missed descendant cannot extend an attempt. Descendant cleanup beyond that
+boundary belongs to the mechanism you declare.
 
 ## Credentials
 
