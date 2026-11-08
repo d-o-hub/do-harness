@@ -46,7 +46,7 @@ pub(super) async fn insert_ok_beat(root: &Path, task_id: i64, sensor: &str) {
         .iter()
         .find(|s| s.name == sensor)
         .unwrap();
-    let digest = crate::provenance::sensor_digest(root, spec, bytes.as_deref()).unwrap();
+    let digest = crate::provenance::sensor_digest(root, spec, bytes.as_deref(), None).unwrap();
     do_harness_db::record_verify_batch(
         &conn,
         &[do_harness_db::SensorOutcome {

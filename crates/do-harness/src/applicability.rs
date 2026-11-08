@@ -5,13 +5,13 @@
 //! deterministic: same config plus same changed files yields the same
 //! selected/skipped split with the same reasons.
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::changes::ChangedFiles;
 use crate::config::SensorSpec;
 
 /// A sensor the current change requires, with its selection reason.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Selected {
     /// Sensor name as configured.
     pub name: String,

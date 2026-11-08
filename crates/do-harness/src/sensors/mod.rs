@@ -287,7 +287,11 @@ pub fn verify_selection<'a>(
 /// Selection input for the report; `None` when no change filtering ran.
 fn selection_report(selection: &ResolvedSelection<'_>) -> Option<crate::report::SelectionReport> {
     (selection.changes.mode != crate::changes::SelectionMode::All).then(|| {
-        crate::report::SelectionReport::from_changes(&selection.changes, &selection.skipped)
+        crate::report::SelectionReport::from_changes(
+            &selection.changes,
+            &selection.selected,
+            &selection.skipped,
+        )
     })
 }
 
@@ -297,6 +301,8 @@ fn selection_report(selection: &ResolvedSelection<'_>) -> Option<crate::report::
 pub struct ResolvedSelection<'a> {
     /// Specs to execute, in run order.
     pub specs: Vec<&'a SensorSpec>,
+    /// Sensors selected by `--changed` applicability, with reasons.
+    pub selected: Vec<crate::applicability::Selected>,
     /// Sensors skipped by `--changed` applicability, with reasons.
     pub skipped: Vec<crate::applicability::Skipped>,
     /// Change input and resolved revisions behind the selection.
@@ -387,6 +393,7 @@ pub fn resolve_selection<'a>(
             .collect();
         return Ok(ResolvedSelection {
             specs,
+            selected: selection.selected,
             skipped,
             changes,
             discovery_error,
@@ -402,8 +409,16 @@ pub fn resolve_selection<'a>(
                 && !effective_exclude.contains(&spec.name)
         })
         .collect();
+    let selected: Vec<crate::applicability::Selected> = specs
+        .iter()
+        .map(|spec| crate::applicability::Selected {
+            name: spec.name.clone(),
+            reason: crate::applicability::UNFILTERED_REASON.to_owned(),
+        })
+        .collect();
     Ok(ResolvedSelection {
         specs,
+        selected,
         skipped: Vec::new(),
         changes: crate::changes::discover_selection(root, false, None),
         discovery_error: None,

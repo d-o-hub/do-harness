@@ -171,20 +171,31 @@ impl CurrentFacts {
         let candidates = crate::signals::candidate_specs(cfg, set)?;
         // Unfiltered evidence fingerprints the working tree, as it always
         // has; range evidence must be judged against the same range.
-        let (changed, range) = if since.is_some() {
-            let changes = crate::changes::discover_selection(root, false, since);
-            (changes.changed, changes.range)
+        let selection = if let Some(since) = since {
+            crate::changes::discover_selection(root, false, Some(since))
         } else {
-            (crate::changes::discover(root), None)
+            let changed = crate::changes::discover(root);
+            crate::changes::ChangeSelection {
+                mode: crate::changes::SelectionMode::All,
+                changed,
+                range: None,
+            }
         };
-        let selection = crate::applicability::select(&candidates, &changed);
-        let required = selection.selected_names();
+        let changed = &selection.changed;
+        let range = selection.range.clone();
+        let applicability = crate::applicability::select(&candidates, changed);
+        let required = applicability.selected_names();
         let fingerprints =
-            crate::fingerprint::for_run(root, cfg, config_bytes, set, &candidates, &changed);
+            crate::fingerprint::for_run(root, cfg, config_bytes, set, &candidates, changed);
         let workspace = fingerprints.workspace;
         let policy = fingerprints.policy;
         let config = fingerprints.config;
-        let manifest = crate::provenance::InputManifest::capture(root, &candidates, config_bytes);
+        let manifest = crate::provenance::InputManifest::capture(
+            root,
+            &candidates,
+            config_bytes,
+            Some(&selection),
+        );
         Ok(Self {
             side: CurrentSide {
                 workspace_fingerprint: workspace.clone(),

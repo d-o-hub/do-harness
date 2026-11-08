@@ -117,6 +117,15 @@ fn committed_range_selects_rust_sensor_on_clean_checkout() {
         report["selection"]["skipped"][0]["name"],
         serde_json::json!("docs")
     );
+    // Selected sensors carry their selection reasons in the verify report.
+    assert_eq!(
+        report["selection"]["selected"][0]["name"],
+        serde_json::json!("rs-check")
+    );
+    let reason = report["selection"]["selected"][0]["reason"]
+        .as_str()
+        .expect("selected reason");
+    assert!(!reason.is_empty(), "selected reason must be recorded");
 }
 
 /// `--since` and `--changed` union committed and uncommitted paths.

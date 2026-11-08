@@ -85,6 +85,7 @@ pub fn resolve_scope(root: &Path, task: Option<&str>, global: bool) -> BeatScope
 /// # Errors
 ///
 /// Returns an error when the state database cannot be initialized or written.
+#[allow(clippy::too_many_arguments)]
 pub async fn record_verify(
     root: &Path,
     report: &VerifyReport,
@@ -93,6 +94,7 @@ pub async fn record_verify(
     cfg: &crate::config::Config,
     config_bytes: Option<&[u8]>,
     pre_digests: &BTreeMap<String, String>,
+    selection: Option<&crate::changes::ChangeSelection>,
 ) -> Result<()> {
     let conn = do_harness_db::connect_and_migrate(root).await?;
     let specs: BTreeMap<&str, &crate::config::SensorSpec> = cfg
@@ -117,6 +119,7 @@ pub async fn record_verify(
                 specs.get(sensor.name.as_str()).copied(),
                 config_bytes,
                 pre_digests,
+                selection,
             )
         })
         .collect();
@@ -173,6 +176,7 @@ fn cache_digest(
     spec: Option<&crate::config::SensorSpec>,
     config_bytes: Option<&[u8]>,
     pre_digests: &BTreeMap<String, String>,
+    selection: Option<&crate::changes::ChangeSelection>,
 ) -> Option<String> {
     let spec = spec?;
     if !sensor.ok || sensor.exit_code != Some(0) || sensor.warned {
@@ -189,7 +193,7 @@ fn cache_digest(
             .lines()
             .any(|line| line.trim_start().starts_with("COVERAGE:"));
     let pre = pre_digests.get(&sensor.name)?;
-    let post = crate::provenance::sensor_digest(root, spec, config_bytes)?;
+    let post = crate::provenance::sensor_digest(root, spec, config_bytes, selection)?;
     (post == *pre).then(|| {
         if observation_only {
             format!("{}{post}", do_harness_db::OBSERVATION_ONLY_PREFIX)

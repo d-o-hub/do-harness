@@ -71,6 +71,7 @@ async fn record_verify_persists_actionable_nextest_failure_context() {
         &crate::config::rust_default(),
         None,
         &std::collections::BTreeMap::new(),
+        None,
     )
     .await
     .unwrap();
