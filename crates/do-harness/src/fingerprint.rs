@@ -300,6 +300,7 @@ mod tests {
                 when_changed: Vec::new(),
             }],
             jobs: None,
+            repairs: Vec::new(),
         }
     }
 
