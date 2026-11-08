@@ -76,7 +76,7 @@ async function main(argv) {
       completionSignalSet: scenario.completionSignalSet ?? 'verification',
     })
     const out = join(runDir, `${scenario.id}.jsonl`)
-    const result = await runScenario({ scenario, host: { dsh, home }, repo, harness, patch, out })
+    const result = await runScenario({ scenario, host: { dsh, home }, repo, harness, binary, patch, out })
     observations.push({ id: result.id, ...result.observed })
     process.stderr.write(
       `scenario ${scenario.id}: ${result.observed.terminal} ` +
@@ -124,7 +124,7 @@ async function runNegative({ scenarioId, runDir, repo, dsh, home, binary, harnes
     strictCompletion: false,
   })
   const out = join(runDir, 'negative.jsonl')
-  const result = await runScenario({ scenario, host: { dsh, home }, repo, harness, patch, out })
+  const result = await runScenario({ scenario, host: { dsh, home }, repo, harness, binary, patch, out })
   const detected = result.observed.terminal === 'verified' && result.observed.continuations === 0
   process.stderr.write(
     `negative control (${scenarioId} without the stop integration): ` +
