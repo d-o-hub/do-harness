@@ -139,6 +139,29 @@ test('an exhausted gate rejects the next step, which is the host blocked outcome
     'the block applies to one turn, not every later turn',
   )
 })
+test('running evidence steers as ordinary non-green, never as an infrastructure exception', async () => {
+  const ctx = createFakeCtx()
+  installCompletionGate({
+    ctx,
+    settings: { ...SETTINGS, maxContinuations: 1 },
+    runner: statusRunner([
+      { state: 'running', reason: 'inflight', set: 'verification', running: { pid: 7 } },
+      { state: 'running', reason: 'inflight', set: 'verification', running: { pid: 7 } },
+    ]),
+    logger: ctx.logger,
+  })
+  const agent = { id: 'a', steered: [], steer(message) { this.steered.push(message) } }
+  await stop(ctx, agent)
+  await stop(ctx, agent)
+  assert.equal(agent.steered.length, 2)
+  assert.match(agent.steered[0].content[0].text, /currently running/)
+  assert.match(agent.steered[0].content[0].text, /action="status"/)
+  assert.match(agent.steered[1].content[0].text, /blocked this turn/)
+  assert.ok(
+    ctx.warnings.some((warning) => warning.includes('blocked the turn')),
+    'the running state counts against the bounded continuation budget',
+  )
+})
 
 test('infrastructure errors steer actionably and then stop', async () => {
   const ctx = createFakeCtx()

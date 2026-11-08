@@ -22,6 +22,7 @@ pub mod proof;
 pub mod readiness;
 pub mod review;
 pub mod sweep;
+pub mod update_base;
 pub mod waiver_classify;
 pub mod waiver_comment;
 pub mod waiver_render;

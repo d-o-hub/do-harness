@@ -75,6 +75,18 @@ async fn route(root: &Path, config_path: Option<PathBuf>, cli: Cli) -> Result<()
         | Command::Completions { .. }
         | Command::Man { .. } => unreachable!("version/compliance/completions/man handled above"),
         Command::Pr { action } => pr::command::run(root, action, cli.dry_run),
+        Command::Job { action } => match action {
+            crate::cli::JobAction::Run {
+                spec,
+                resume,
+                format,
+            } => crate::job::run(root, &spec, resume, cli.dry_run, format)
+                .await
+                .map_err(exit::classify),
+            crate::cli::JobAction::Status { id, format } => {
+                crate::job::status(root, id.as_deref(), format).map_err(exit::classify)
+            }
+        },
         Command::Maintenance {
             prune_beats,
             keep_per_task,

@@ -155,6 +155,20 @@ pub enum PrAction {
         #[arg(long, value_enum, default_value_t = Format::Text)]
         format: Format,
     },
+    /// Update a pull request's branch to the latest base without overwriting
+    /// author work (default is read-only; `--execute` acts only on an
+    /// authorized own/known-bot head).
+    UpdateBase {
+        /// Pull request number.
+        #[arg(value_name = "PR")]
+        pr: u64,
+        /// Execute the update (default is a read-only report).
+        #[arg(long)]
+        execute: bool,
+        /// Output format.
+        #[arg(long, value_enum, default_value_t = Format::Text)]
+        format: Format,
+    },
     /// Direct PR number invocation (e.g. `do-harness pr 240`).
     #[command(external_subcommand)]
     External(Vec<String>),

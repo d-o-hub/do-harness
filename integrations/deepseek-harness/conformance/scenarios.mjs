@@ -1,12 +1,48 @@
 // The required lifecycle scenarios, each driving the real host against a
 // disposable repository.
 
+import { spawnSync } from 'node:child_process'
 import { rmSync, writeFileSync } from 'node:fs'
 
 import { runSession } from './host.mjs'
 
 const SUCCEEDING_SENSOR = 'exit 0'
 const FAILING_SENSOR = 'exit 1'
+/** Creates a task in the disposable repo with the same binary as the harness. */
+function createTask(repo, binary) {
+  const outcome = spawnSync(binary, ['task', 'add', 'conformance'], {
+    cwd: repo,
+    encoding: 'utf8',
+  })
+  if (outcome.error || outcome.status !== 0) {
+    const detail = outcome.error?.message ?? outcome.stderr ?? outcome.stdout ?? 'no process output'
+    throw new Error(`could not create a conformance task: ${detail}`)
+  }
+  const match = /Added task (\d+)/.exec(outcome.stdout ?? '')
+  if (!match) {
+    throw new Error(`could not parse the created task id: ${outcome.stderr ?? outcome.stdout ?? 'no output'}`)
+  }
+  return Number(match[1])
+}
+
+/** Writes a two-set config so task-scoped reuse can be exercised off the completion set. */
+function writeTwoSetConfig(repo, command) {
+  writeFileSync(
+    `${repo}/do-harness.toml`,
+    [
+      'language = "generic"',
+      '',
+      '[signal-sets]',
+      'verification = ["probe"]',
+      'feedback = ["probe"]',
+      '',
+      '[[sensors]]',
+      'name = "probe"',
+      `argv = ["bash", "-c", "${command}"]`,
+      '',
+    ].join('\n'),
+  )
+}
 
 export const SCENARIO_RUNNERS = [
   {
@@ -92,6 +128,94 @@ export const SCENARIO_RUNNERS = [
     },
     script: [{ cancel: 'user' }],
   },
+  {
+    id: 'edit-explain-run-same-scope',
+    async prepare({ repo, harness }) {
+      writeConfig(repo, SUCCEEDING_SENSOR)
+      await recordEvidence(repo, harness)
+    },
+    script: [
+      { tool: { name: 'conformance_probe', arguments: { action: 'edit-source' } } },
+      { tool: { name: 'development_signals', arguments: { action: 'explain', set: 'verification', changed: true } } },
+      { tool: { name: 'development_signals', arguments: { action: 'run', set: 'verification' } } },
+      { finish: 'done' },
+    ],
+  },
+  {
+    id: 'eligible-reuse',
+    async prepare({ repo, harness, binary }) {
+      writeTwoSetConfig(repo, SUCCEEDING_SENSOR)
+      const taskId = createTask(repo, binary)
+      await harness(['verify', '--set', 'feedback', '--record', '--task', String(taskId), '--format', 'json'], repo, {
+        tolerateFailure: true,
+      })
+      await harness(['verify', '--set', 'verification', '--record', '--format', 'json'], repo, {
+        tolerateFailure: true,
+      })
+      this.script = [
+        {
+          tool: {
+            name: 'development_signals',
+            arguments: { action: 'run', set: 'feedback', task: taskId, reuse: true },
+          },
+        },
+        { finish: 'done' },
+      ]
+    },
+    script: [],
+  },
+  {
+    id: 'missing-dependency-forces-execution',
+    async prepare({ repo, harness }) {
+      writeFileSync(
+        `${repo}/do-harness.toml`,
+        [
+          'language = "generic"',
+          '',
+          '[signal-sets]',
+          'verification = ["probe", "missing-tool"]',
+          '',
+          '[[sensors]]',
+          'name = "probe"',
+          'argv = ["true"]',
+          '',
+          '[[sensors]]',
+          'name = "missing-tool"',
+          'argv = ["/nonexistent/tool"]',
+          '',
+        ].join('\n'),
+      )
+      await harness(['verify', '--set', 'verification', '--record', '--format', 'json'], repo, {
+        tolerateFailure: true,
+      })
+    },
+    script: [{ finish: 'done' }],
+  },
+  {
+    id: 'bounded-resume-context',
+    async prepare({ repo, harness, binary }) {
+      writeConfig(repo, SUCCEEDING_SENSOR)
+      await recordEvidence(repo, harness)
+      const taskId = createTask(repo, binary)
+      this.script = [
+        { tool: { name: 'development_signals', arguments: { action: 'context', task: taskId } } },
+        { finish: 'done' },
+      ]
+    },
+    script: [],
+  },
+  {
+    id: 'strict-completion-then-status',
+    async prepare({ repo, harness }) {
+      writeConfig(repo, SUCCEEDING_SENSOR)
+      await recordEvidence(repo, harness)
+    },
+    script: [
+      { tool: { name: 'development_signals', arguments: { action: 'run', set: 'verification' } } },
+      { tool: { name: 'development_signals', arguments: { action: 'status', set: 'verification' } } },
+      { finish: 'done' },
+    ],
+  },
 ]
 
 /** Writes a one-sensor configuration so evidence is cheap and deterministic. */
@@ -120,8 +244,8 @@ export async function recordEvidence(repo, harness) {
 }
 
 /** Runs one scenario end to end, returning the raw host observation. */
-export async function runScenario({ scenario, host, repo, harness, patch, out, script }) {
-  await scenario.prepare({ repo, harness })
+export async function runScenario({ scenario, host, repo, harness, binary, patch, out, script }) {
+  await scenario.prepare({ repo, harness, binary })
   const session = await runSession({
     dsh: host.dsh,
     home: host.home,

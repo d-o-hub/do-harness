@@ -189,6 +189,11 @@ pub fn run(root: &Path, action: PrAction, dry_run: bool) -> Result<(), CliError>
                 format,
             },
         ),
+        PrAction::UpdateBase {
+            pr,
+            execute,
+            format,
+        } => super::update_base::run(root, pr, execute, dry_run, format),
         PrAction::External(args) => {
             if let Some(first) = args.first() {
                 if let Ok(pr) = first.parse::<u64>() {

@@ -12,23 +12,56 @@ validates the JSON it receives.
 
 ## What it provides
 
-- **`development_signals` tool** — one capability with three actions:
+- **`development_signals` tool** — one capability with four actions:
   - `run`: execute a signal set (`verify --set <set> [--changed]`), returning
     `{ state, set, failed, passed, duration_ms, vacuous }`.
   - `status`: cheap evidence freshness check
     (`status --set <set>`), returning the CLI's
-    `green | red | stale | missing` document. Never runs sensors.
+    `green | red | stale | missing | running` document. Never runs sensors.
   - `explain`: change-aware selection report
-    (`explain --set <set> [--changed]`). Never runs sensors.
+    (`explain --set <set> [--changed] [--since <ref>]`). Never runs sensors.
+  - `context`: bounded resume context for a task
+    (`task context <task> --max-bytes 8192`). An unavailable outcome is
+    preserved as `state: "unavailable"`, never reported as success.
+- **`run` options**:
+  - `since: "<ref>"` (run/explain) restricts to the committed range
+    `merge-base(<ref>, HEAD)..HEAD`.
+  - `task: <id>` (run) scopes recorded beats (`--record --task <id>`);
+    required for `context`.
+  - `reuse: true` (run, task-scoped only) maps to `--unchanged=skip`:
+    recorded passing beats for unchanged declared inputs are reused and
+    reported visibly (`execution: "reused"`, `reused_beat_id`), never as a
+    fresh process pass. Source, policy, or declared-environment changes
+    invalidate reuse; unresolved identity forces execution. The completion
+    set rejects `changed`/`since`/`reuse`.
 - **Strict completion gate** (opt-in) — on `agent/turn-stopping` the bundle
   runs only the cheap `status` operation. `green` permits the stop; `stale`,
-  `red`, or `missing` steers the agent with a computational, specific reason
-  and the exact next command, then lets the loop continue. When the bounded
-  repair budget is spent, the gate rejects the next step so the host ends the
-  turn as `blocked` instead of reporting a successful completion.
+  `red`, `running`, or `missing` steers the agent with a computational, specific
+  reason and the exact next command (a `running` state asks for `status`, never
+  a second overlapping verification launch), then lets the loop continue. When
+  the bounded repair budget is spent, the gate rejects the next step so the host
+  ends the turn as `blocked` instead of reporting a successful completion. For
+  the completion set, `run` executes `verify --strict --record --unchanged=run`
+  followed by `status`; only current green, non-vacuous evidence is `complete`.
 
 The model never passes raw CLI argv: the tool schema exposes only
-`action`, `set`, and `changed`.
+`action`, `set`, `changed`, `since`, `task`, and `reuse`.
+
+## Supported agent sequence
+
+1. During edits: `development_signals(action="explain", set="feedback",
+   changed=true)` to see which sensors apply, then `action="run"` to execute
+   them. Pass `task: <id>` (+ `reuse: true`) for task-scoped recorded beats.
+2. Resume: `development_signals(action="context", task=<id>)` for bounded
+   context; full diagnostics remain available through the local
+   `do-harness` CLI.
+3. Before completion: `development_signals(action="run", set="verification")`
+   (strict, non-reused) then `action="status"`. The completion gate enforces
+   the same evidence at the stop boundary.
+
+Compatibility/version assumptions: the bundle pins the conformance client to
+`@deepseek-ai/dsh@0.1.7-rc.2`; other client versions are unverified. Node
+`>=22.19` is required.
 
 ## Install
 
@@ -133,10 +166,12 @@ The runner:
   calls (`conformance_probe` for shape edits, `development_signals` for
   sensors), so plugin loading, the tool runtime, subprocess execution, the
   agent loop, and the stop boundary are the client's own code;
-- records the nine required scenarios: `fresh-pass`, `green-then-edit`,
+- records 14 scenarios: the lifecycle cases `fresh-pass`, `green-then-edit`,
   `repair-and-reverify`, `failing-sensor`, `missing-or-malformed-evidence`,
   `infrastructure-error`, `retry-exhaustion`, `plugin-load-failure`, and
-  `user-cancellation`.
+  `user-cancellation`; plus `edit-explain-run-same-scope`, `eligible-reuse`,
+  `missing-dependency-forces-execution`, `bounded-resume-context`, and
+  `strict-completion-then-status` for the development-signals sequence.
 
 It launches no paid model, contacts no network service, and writes only fixed
 outcomes with a synthetic model identity. No prompts, tool arguments,
@@ -162,9 +197,10 @@ unverified, and only an explicitly enabled protected job may use a real model.
 
 ## Tests
 
-The unit tests exercise the subprocess seam with scripted outcomes; the e2e
-tests drive the real `do-harness` binary (no mock of the state transitions
-they prove):
+The adapter-level tests exercise the subprocess seam with scripted outcomes;
+their e2e fixtures drive the real `do-harness` binary in disposable
+repositories, but do not substitute for the separate real-client conformance
+run above:
 
 <!-- example: id=dsh_tests_cmd classification=illustrative reason="DSH tests execution command" -->
 ```sh
@@ -173,8 +209,11 @@ DO_HARNESS_BIN="$PWD/target/debug/do-harness" \
   node --test integrations/deepseek-harness/test/*.test.mjs
 ```
 
-E2E coverage: `green -> edit -> stale -> verify -> green`, red evidence
-blocking completion, and a docs-only change selecting only the docs signal.
+E2E coverage includes `green -> edit -> stale -> verify -> green`, task-scoped
+reuse and invalidation after source, policy, or declared-environment changes,
+a newer failure shadowing an older pass, missing dependencies, bounded resume
+context, strict non-vacuous completion, red evidence blocking, and docs-only
+selection.
 
 ## Validation
 
@@ -194,20 +233,26 @@ Adapter-level checks, validated against DeepSeek Harness `0.1.5-rc.1`
 - With a missing binary, `apply` rejects and `development_signals` is not
   registered; Cordis contains the plugin error and the host keeps running.
 
-Real-host completion conformance against DeepSeek Harness `0.1.7-rc.2`
-(2026-11-03): all nine scenarios pass. `fresh-pass` and
-`repair-and-reverify` end `verified`; `green-then-edit`, `failing-sensor`,
-`missing-or-malformed-evidence`, `infrastructure-error`, and
-`retry-exhaustion` end `blocked` with non-zero exit; `plugin-load-failure`
-ends `unsupported`; and `user-cancellation` ends `cancelled`. The result is
-`terminal_result: verified`, `verdict: pass`, and `--required` exits 0.
-`green-then-edit` changes a source file and `repair-and-reverify` changes the
-policy file, so both evidence fingerprints are exercised.
+Real-host completion conformance against DeepSeek Harness `0.1.7-rc.2` passed
+all 14 scenarios on 2026-11-08 using Node `v24.19.0`, do-harness `0.4.2`
+(`affbb06`), and evidence schema 5. The adapter content digest was
+`sha256:c82e3212a772ed44516ad673d9c08ae2be4afa2c3979035ae9bc9db652a99b8d`.
+`fresh-pass`, `repair-and-reverify`, `edit-explain-run-same-scope`,
+`eligible-reuse`, `bounded-resume-context`, and `strict-completion-then-status`
+ended `verified`; `green-then-edit`, `failing-sensor`,
+`missing-or-malformed-evidence`, `infrastructure-error`, `retry-exhaustion`,
+and `missing-dependency-forces-execution` ended `blocked`; `plugin-load-failure`
+ended `unsupported`; and `user-cancellation` ended `cancelled`. The result had
+`terminal_result: verified`, `verdict: pass`, and `--required` exited 0.
+`green-then-edit` edits a source file and `repair-and-reverify` edits the
+policy, exercising both evidence fingerprints. These scripted turns prove the
+pinned host lifecycle and tool boundary, not model judgment or reduced model
+usage.
 
 The blocked outcomes come from the host's own `agent/pre-step` rejection, not
 from a cancelled or aborted session: the client records the turn as `blocked`
-and the headless runner exits 1. The `--negative` control still detects a run
-without the stop integration (`terminal=verified`, `continuations=0`), so the
-suite cannot pass by omitting the gate. The adapter-level e2e tests remain
-fast, offline, and labeled separately from these real-host observations.
+and the headless runner exits 1. The real-client `--negative` control detected
+the missing stop integration (`terminal=verified`, `continuations=0`). The
+adapter-level suite passed 50/50 tests and remains separate from these
+real-host observations.
 
