@@ -13,16 +13,18 @@ Filter \`[INFO|WARN|ERROR] component: message\` lines and print a JSON report.
 `;
 
 function parseArgs(argv) {
-  // Every option is a named local validated below and returned as an object
-  // literal, so no argv-derived value is ever written through a computed key.
+  // The argument vector is consumed through its own iterator, so a position is
+  // never used as a key: the fixture parses untrusted argv without any computed
+  // member access, and each option lands in a named local returned as a literal.
+  const tokens = argv.values();
   let min = "INFO";
   let component = null;
   let message = null;
   let file = null;
   let help = false;
 
-  for (let index = 0; index < argv.length; index += 1) {
-    const flag = argv[index];
+  for (let step = tokens.next(); !step.done; step = tokens.next()) {
+    const flag = step.value;
     switch (flag) {
       case "--help":
       case "-h":
@@ -32,9 +34,9 @@ function parseArgs(argv) {
       case "--component":
       case "--message":
       case "--file": {
-        const value = argv[index + 1];
-        if (value === undefined) throw new Error(`${flag} requires a value`);
-        index += 1;
+        const valueStep = tokens.next();
+        if (valueStep.done) throw new Error(`${flag} requires a value`);
+        const value = valueStep.value;
         switch (flag) {
           case "--min-severity":
             if (!["INFO", "WARN", "ERROR"].includes(value)) {
