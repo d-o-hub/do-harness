@@ -223,6 +223,7 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('waivers', 'waivers', [CompletionResultType]::ParameterValue, 'Classify patch-coverage residue: waivable classes and lines needing tests')
             [CompletionResult]::new('disposition', 'disposition', [CompletionResultType]::ParameterValue, 'Record a structured disposition for a review, thread, comment, or finding')
             [CompletionResult]::new('findings', 'findings', [CompletionResultType]::ParameterValue, 'Collect and classify findings (annotations, code scanning, artifacts) and track issues')
+            [CompletionResult]::new('sweep', 'sweep', [CompletionResultType]::ParameterValue, 'Orchestrate a deterministic, sequential PR sweep (read-only by default)')
             [CompletionResult]::new('update-base', 'update-base', [CompletionResultType]::ParameterValue, 'Update a pull request''s branch to the latest base without overwriting author work (default is read-only; `--execute` acts only on an authorized own/known-bot head)')
             [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
             break
@@ -373,6 +374,25 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('--version', '--version', [CompletionResultType]::ParameterName, 'Print version')
             break
         }
+        'do-harness;pr;sweep' {
+            [CompletionResult]::new('--pr', '--pr', [CompletionResultType]::ParameterName, 'Sweep only this pull request number')
+            [CompletionResult]::new('--wait', '--wait', [CompletionResultType]::ParameterName, 'Wait bound (seconds) for CI and post-merge verification')
+            [CompletionResult]::new('--format', '--format', [CompletionResultType]::ParameterName, 'Output format')
+            [CompletionResult]::new('--root', '--root', [CompletionResultType]::ParameterName, 'Workspace root override (default: walk up from cwd)')
+            [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Explicit path to do-harness.toml')
+            [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)')
+            [CompletionResult]::new('--all', '--all', [CompletionResultType]::ParameterName, 'Sweep every open pull request')
+            [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Read-only inventory and report (the default)')
+            [CompletionResult]::new('--execute', '--execute', [CompletionResultType]::ParameterName, 'Authorize owned/bot branch updates and auto-merge disarm')
+            [CompletionResult]::new('--merge', '--merge', [CompletionResultType]::ParameterName, 'Also authorize eligible merges and closures (requires --execute)')
+            [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Suppress PASS/WARN verdict lines and the success footer')
+            [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Suppress PASS/WARN verdict lines and the success footer')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            [CompletionResult]::new('-V', '-V ', [CompletionResultType]::ParameterName, 'Print version')
+            [CompletionResult]::new('--version', '--version', [CompletionResultType]::ParameterName, 'Print version')
+            break
+        }
         'do-harness;pr;update-base' {
             [CompletionResult]::new('--format', '--format', [CompletionResultType]::ParameterName, 'Output format')
             [CompletionResult]::new('--root', '--root', [CompletionResultType]::ParameterName, 'Workspace root override (default: walk up from cwd)')
@@ -396,6 +416,7 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('waivers', 'waivers', [CompletionResultType]::ParameterValue, 'Classify patch-coverage residue: waivable classes and lines needing tests')
             [CompletionResult]::new('disposition', 'disposition', [CompletionResultType]::ParameterValue, 'Record a structured disposition for a review, thread, comment, or finding')
             [CompletionResult]::new('findings', 'findings', [CompletionResultType]::ParameterValue, 'Collect and classify findings (annotations, code scanning, artifacts) and track issues')
+            [CompletionResult]::new('sweep', 'sweep', [CompletionResultType]::ParameterValue, 'Orchestrate a deterministic, sequential PR sweep (read-only by default)')
             [CompletionResult]::new('update-base', 'update-base', [CompletionResultType]::ParameterValue, 'Update a pull request''s branch to the latest base without overwriting author work (default is read-only; `--execute` acts only on an authorized own/known-bot head)')
             [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
             break
@@ -419,6 +440,9 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             break
         }
         'do-harness;pr;help;findings' {
+            break
+        }
+        'do-harness;pr;help;sweep' {
             break
         }
         'do-harness;pr;help;update-base' {
@@ -1567,6 +1591,7 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('waivers', 'waivers', [CompletionResultType]::ParameterValue, 'Classify patch-coverage residue: waivable classes and lines needing tests')
             [CompletionResult]::new('disposition', 'disposition', [CompletionResultType]::ParameterValue, 'Record a structured disposition for a review, thread, comment, or finding')
             [CompletionResult]::new('findings', 'findings', [CompletionResultType]::ParameterValue, 'Collect and classify findings (annotations, code scanning, artifacts) and track issues')
+            [CompletionResult]::new('sweep', 'sweep', [CompletionResultType]::ParameterValue, 'Orchestrate a deterministic, sequential PR sweep (read-only by default)')
             [CompletionResult]::new('update-base', 'update-base', [CompletionResultType]::ParameterValue, 'Update a pull request''s branch to the latest base without overwriting author work (default is read-only; `--execute` acts only on an authorized own/known-bot head)')
             break
         }
@@ -1589,6 +1614,9 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             break
         }
         'do-harness;help;pr;findings' {
+            break
+        }
+        'do-harness;help;pr;sweep' {
             break
         }
         'do-harness;help;pr;update-base' {

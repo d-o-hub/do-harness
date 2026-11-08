@@ -41,6 +41,40 @@ rather than in the diff.
 - A PR number: only that PR.
 - `--dry-run`: analyze and report, perform no `gh` mutations (forwards `--dry-run` to preflight).
 
+
+## Machine orchestration (`do-harness pr sweep`)
+
+`do-harness pr sweep` runs the loop above as one deterministic, sequential
+command — no model calls, no auto-merge, one PR at a time in merge order
+(stack parents first, then oldest-first). The skill stays the repair
+guidance for whatever the sweep reports.
+
+Privilege boundary:
+
+- Default is `--dry-run`: one read-only inventory and a full report, zero
+  mutations. Exactly one target is required (`--all` or `--pr N`).
+- `--execute` authorizes only owned/bot branch updates (`gh pr
+  update-branch`, pinned to the captured head) and auto-merge disarm.
+- `--execute --merge` additionally authorizes eligible direct merges
+  (`gh pr merge N --squash --match-head-commit SHA`), verified no-tree-effect
+  closures, and duplicate-cluster supersede closures — each only for
+  authorized own/bot PRs and only after the #466 receipt revalidation.
+- Drafts, hold labels, closed/conflicting PRs, external authors, and unknown
+  identities are reported as blocked/skipped and never modified. Findings
+  collection always stays `--issues plan`; untracked findings block with the
+  explicit `pr findings --issues create` next action.
+- After every merge the sweep waits for exact-merge main verification (bounded
+  at 900 s); an empty or pending run list is not a pass. A post-merge
+  regression or an unknown deadline halts the whole sweep. Receipts are never
+  cached approvals: every PR is re-collected from scratch and revalidated.
+- Audit/resume state is versioned under the resolved git metadata directory
+  (`pr-triage/sweep-state-v1.json`); an uncertain prior mutation is reconciled
+  before it is repeated.
+
+Blocked PRs are reported with precise reasons and an explicit next action —
+fix the code in an authorized work session, apply an authorized settings
+change, or escalate — never silently cleared.
+
 ## Procedure
 
 Run these steps in order. Stop the sweep on any escalation and report it.

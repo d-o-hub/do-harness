@@ -1282,7 +1282,7 @@ be resolved. A collector that cannot read git history never reads as healthy.
 <!-- BEGIN GENERATED: cli-contract pr -->
 `do-harness pr [OPTIONS] <COMMAND>`
 
-Subcommands: `no-effect`, `review`, `ready`, `checks`, `waivers`, `disposition`, `findings`, `update-base`.
+Subcommands: `no-effect`, `review`, `ready`, `checks`, `waivers`, `disposition`, `findings`, `sweep`, `update-base`.
 <!-- END GENERATED: cli-contract pr -->
 Deterministic, read-only PR analysis: every subcommand works in any git repository without harness initialization. Pick the subcommand that answers your question.
 
@@ -1665,6 +1665,24 @@ every occurrence.
 caps new issues at `max_new_issues_per_run` from
 [`plans/pr-merge-policy.toml`](../plans/pr-merge-policy.toml) (20 at most).
 
+### `pr sweep`
+<!-- BEGIN GENERATED: cli-contract pr sweep -->
+`do-harness pr sweep [OPTIONS]`
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `--all` | no | — | — | Sweep every open pull request |
+| `--pr <PR>` | no | — | — | Sweep only this pull request number |
+| `--execute` | no | — | — | Authorize owned/bot branch updates and auto-merge disarm |
+| `--merge` | no | — | — | Also authorize eligible merges and closures (requires --execute) |
+| `--wait <SECONDS>` | no | `1200` | — | Wait bound (seconds) for CI and post-merge verification |
+| `--format <FORMAT>` | no | `text` | `text`, `json` | Output format |
+<!-- END GENERATED: cli-contract pr sweep -->
+Orchestrate a deterministic, sequential PR sweep: inventory, authorize
+owners, no-effect closure, base update, bounded CI wait, readiness snapshot,
+receipt-pinned direct merge, and post-merge main verification. The default is
+a read-only dry run; `--execute --merge` authorizes merges and verified
+closures for owned/bot PRs only. The deterministic path never calls a model.
 
 ### `skills`
 <!-- BEGIN GENERATED: cli-contract skills -->

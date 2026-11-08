@@ -638,6 +638,7 @@
         "waivers",
         "disposition",
         "findings",
+        "sweep",
         "update-base"
       ],
       "invocable": false
@@ -1280,6 +1281,119 @@
           "takes_value": true,
           "default_values": [
             "json"
+          ],
+          "possible_values": [
+            "text",
+            "json"
+          ],
+          "help": "Output format",
+          "index": null
+        }
+      ],
+      "subcommands": [],
+      "invocable": true
+    },
+    {
+      "path": "pr sweep",
+      "about": "Orchestrate a deterministic, sequential PR sweep (read-only by default)",
+      "usage": "do-harness pr sweep [OPTIONS]",
+      "aliases": [],
+      "args": [
+        {
+          "id": "all",
+          "kind": "option",
+          "short": null,
+          "long": "all",
+          "value_names": [
+            "ALL"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": false,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Sweep every open pull request",
+          "index": null
+        },
+        {
+          "id": "pr",
+          "kind": "option",
+          "short": null,
+          "long": "pr",
+          "value_names": [
+            "PR"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Sweep only this pull request number",
+          "index": null
+        },
+        {
+          "id": "execute",
+          "kind": "option",
+          "short": null,
+          "long": "execute",
+          "value_names": [
+            "EXECUTE"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": false,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Authorize owned/bot branch updates and auto-merge disarm",
+          "index": null
+        },
+        {
+          "id": "merge",
+          "kind": "option",
+          "short": null,
+          "long": "merge",
+          "value_names": [
+            "MERGE"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": false,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Also authorize eligible merges and closures (requires --execute)",
+          "index": null
+        },
+        {
+          "id": "wait",
+          "kind": "option",
+          "short": null,
+          "long": "wait",
+          "value_names": [
+            "SECONDS"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [
+            "1200"
+          ],
+          "possible_values": [],
+          "help": "Wait bound (seconds) for CI and post-merge verification",
+          "index": null
+        },
+        {
+          "id": "format",
+          "kind": "option",
+          "short": null,
+          "long": "format",
+          "value_names": [
+            "FORMAT"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [
+            "text"
           ],
           "possible_values": [
             "text",

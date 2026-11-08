@@ -159,6 +159,7 @@ pub mod dora;
 pub mod job;
 pub mod pr_metrics;
 pub mod pr_readiness;
+pub mod pr_sweep;
 pub mod range_selection;
 pub mod reuse;
 pub mod update_base;
