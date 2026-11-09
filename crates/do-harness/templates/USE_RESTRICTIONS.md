@@ -1,6 +1,6 @@
 # Agent Use Restrictions & Safety Policy
 
-This policy establishes operational boundaries, high-risk operational limits, and human approval requirements for AI agents operating within this repository across Rust, Node, web, and generic projects.
+This policy establishes operational boundaries, high-risk operational limits, and human approval requirements for AI agents operating within this repository across any language or stack (for example Rust, Node/TypeScript, Python, Go, web, and generic projects).
 
 > **Note on Policy Scope & Enforcement**: This document specifies expected operational boundaries and human-in-the-loop review requirements for AI agents and human reviewers. Policy prose alone sets expectations and rules for agent guidance; it does not constitute deterministic runtime technical enforcement or replace runtime tool sandboxing, credential secret brokers, or proxy permission systems.
 

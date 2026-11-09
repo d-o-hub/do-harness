@@ -232,6 +232,7 @@ pub fn verify_selection<'a>(
             unrunnable: vec![],
             sensors: results,
             signal_set,
+            vacuous: selection.specs.is_empty(),
             selection: selection_report(selection),
         });
     }
@@ -244,6 +245,7 @@ pub fn verify_selection<'a>(
             unrunnable: vec![],
             sensors: vec![],
             signal_set,
+            vacuous: selection.specs.is_empty(),
             selection: selection_report(selection),
         });
     }
@@ -280,6 +282,7 @@ pub fn verify_selection<'a>(
         unrunnable,
         sensors: results,
         signal_set,
+        vacuous: false,
         selection: selection_report(selection),
     })
 }

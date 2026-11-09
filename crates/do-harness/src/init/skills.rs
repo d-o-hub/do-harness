@@ -5,7 +5,8 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 
-use super::{InitOpts, InitReport, write_if_absent};
+use super::scaffold::write_if_absent;
+use super::{InitOpts, InitReport};
 
 /// Portable skill templates written into `.agents/skills/<name>/SKILL.md`.
 ///
@@ -77,16 +78,17 @@ pub(super) fn scaffold_skills(root: &Path, opts: &InitOpts, report: &mut InitRep
             report,
         )?;
         if let Some(walkthrough) = spec.walkthrough {
-            write_if_absent(
+            if write_if_absent(
                 root,
                 &format!("{skill_dir}/evals/walkthrough.sh"),
                 walkthrough,
                 opts.force,
                 report,
-            )?;
-            crate::fs_perm::set_owner_exec(
-                &root.join(format!("{skill_dir}/evals/walkthrough.sh")),
-            )?;
+            )? {
+                crate::fs_perm::set_owner_exec(
+                    &root.join(format!("{skill_dir}/evals/walkthrough.sh")),
+                )?;
+            }
         }
         for (rel, contents) in spec.references {
             write_if_absent(
@@ -113,7 +115,7 @@ pub(super) fn scaffold_skills(root: &Path, opts: &InitOpts, report: &mut InitRep
         opts.force,
         report,
     )?;
-    write_if_absent(
+    let validator_written = write_if_absent(
         root,
         ".agents/skills/skill-creator/scripts/quick_validate.py",
         SKILL_CREATOR_QUICK_VALIDATE,
@@ -150,9 +152,11 @@ pub(super) fn scaffold_skills(root: &Path, opts: &InitOpts, report: &mut InitRep
         opts.force,
         report,
     )?;
-    crate::fs_perm::set_owner_exec(
-        &root.join(".agents/skills/skill-creator/scripts/quick_validate.py"),
-    )?;
+    if validator_written {
+        crate::fs_perm::set_owner_exec(
+            &root.join(".agents/skills/skill-creator/scripts/quick_validate.py"),
+        )?;
+    }
     Ok(())
 }
 /// Replaces only the installed structure validator with the bundled version.

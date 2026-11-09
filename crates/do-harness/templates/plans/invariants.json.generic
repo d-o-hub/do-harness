@@ -6,9 +6,9 @@
     "category": "verification"
   },
   {
-    "invariant": "Conventional commits with lowercase subject lines",
-    "rationale": "Machine-parseable history for the distillation loop",
-    "sensor": "scripts/check-commitlint.sh (commitlint sensor)",
+    "invariant": "If this repository adopts conventional commits, use lowercase subject lines",
+    "rationale": "The managed commit-msg hook delegates to the repository's own check-commitlint.sh; replace it to use a different convention",
+    "sensor": "scripts/check-commitlint.sh (managed commit-msg hook)",
     "category": "workflow"
   }
 ]

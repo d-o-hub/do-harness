@@ -64,9 +64,10 @@ Release and post-publication checks exist.
 - Sensors and signal sets live in `do-harness.toml`; run
   `do-harness explain --set verification --changed` to see which sensors apply
   to the current change and why.
-- The `loc` sensor enforces the per-file ceiling over `*.rs`; widen it with
-  `--root`/`--ext` in `do-harness.toml` (and the matching `when-changed` globs)
-  to cover front-end sources with the same invariant.
+- If this repository adopts a per-file line ceiling, the Rust pack seeds the
+  `loc` sensor over `*.rs`; widen it with `--root`/`--ext` in `do-harness.toml`
+  (and the matching `when-changed` globs) for other sources, or remove it.
+  Other packs do not ship `loc` by default.
 - Beats from `verify --record` scope to the current git branch by default, to
   `--task <id>` when passed, or `--global`. `metrics` filters by that workstream
   so branches do not mix.
@@ -80,5 +81,9 @@ Release and post-publication checks exist.
 - `do-harness init` writes this file non-destructively; `--force` overwrites.
 - Sensors wrap the repository's own scripts to keep local evidence and CI identical.
 - The generic pack ships zero sensors: its pass is vacuous, not evidence.
+- Seeded policy, not a universal prerequisite: the 500-LOC `loc` sensor and the
+  `scripts/check-commitlint.sh` commit-message check are defaults you may keep,
+  replace, or remove. The managed `commit-msg` hook delegates to this
+  repository's own script, so the convention is yours to define.
 - Git hooks: `do-harness hook install`. CI:
   `do-harness verify --set verification --format json --strict`.

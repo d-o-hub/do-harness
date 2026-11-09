@@ -7,7 +7,8 @@ use std::path::Path;
 
 use anyhow::Result;
 
-use super::{InitOpts, InitReport, write_if_absent};
+use super::scaffold::write_if_absent;
+use super::{InitOpts, InitReport};
 
 /// Writes the web-pack sensor runners and the bundled web-ui audit library.
 ///

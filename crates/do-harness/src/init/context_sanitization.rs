@@ -12,7 +12,8 @@ use std::path::Path;
 
 use anyhow::Result;
 
-use super::{InitOpts, InitReport, write_if_absent};
+use super::scaffold::write_if_absent;
+use super::{InitOpts, InitReport};
 
 /// The canonical helper script, copied into the adopter's workspace.
 const CHECK_CONTEXT_SANITIZATION: &str =

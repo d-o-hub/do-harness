@@ -222,6 +222,153 @@ with a structured diagnostic (`invalid_package_json`,
 ships **zero sensors**: its pass is vacuous, not evidence. Add real checks
 before trusting `verify`.
 
+## The adopting-repository sensor contract
+
+Language packs are convenience presets over one stack-neutral contract:
+`[[sensors]]` in `do-harness.toml`. Any repository can declare the commands it
+already trusts, and `init` writing configuration is not the same as verifying
+the codebase. The elements below are the contract every pack renders:
+
+| Element | Contract |
+| --- | --- |
+| Command | `argv` is a program followed by arguments, executed without a shell. Path-looking arguments resolve against the workspace root; a missing path fails the sensor instead of recording a pass. |
+| Working directory | Every sensor runs with `cwd` set to the workspace root (the `--root` directory), never the sensor's own directory or a subdirectory. |
+| Timeout | `timeout` is seconds per attempt (default 3600). `timeout = 0` requires `timeout-justification` and means unbounded; prefer a finite value. |
+| Required vs advisory | The default `severity = "error"` is required. `severity = "warn"` and `kind = "project-check"` are advisory; `fix` is printed as remediation when they fail. `verify --strict` promotes advisory failures except in the `feedback` loop. |
+| Bounded diagnostics | `max-output-bytes` defaults to 1 MiB and is capped at 16 MiB. The report retains a bounded tail, and a timeout terminates the process group rather than leaving children running. |
+| Applicable inputs | `when-changed` globs choose the sensors for the current change. `inputs`, `coverage-inputs`, and `environment-inputs` declare additional evidence inputs; an input that cannot be resolved fails closed. |
+| Exit outcome | `0` = every required sensor passed; `1` = a sensor ran and failed; `2` = usage/config error or every selected sensor was unrunnable. A missing program is `unrunnable`, never a pass. |
+| Evidence freshness | `verify --set <set> --strict --record` writes the evidence artifact; `status --set <set>` reports `green`, `red`, `stale`, or `missing` without running sensors. Freshness is bound to inputs, policy, selection range, and harness identity. |
+
+A run that selects no sensors is `VACUOUS`: the JSON report sets
+`vacuous: true` and text output says the run is not verification evidence. A
+zero-sensor exit code of `0` never means the repository was verified.
+
+## Cross-stack command recipes
+
+These recipes use the generic pack and the repository's existing commands.
+`init` auto-detects Rust and Node; it does **not** auto-detect Python or Go, so
+add the entries below (or adapt your existing task runner) after `init`.
+
+### Rust
+
+The Rust pack generates these sensors, including the zero-test guard in
+`scripts/check-test.sh`. Use the same shape when adapting an existing pack:
+
+<!-- example: id=adoption_contract_rust classification=parser-check-only reason="Rust sensor contract recipe" -->
+```toml
+[[sensors]]
+name = "check"
+argv = ["cargo", "check", "--workspace"]
+when-changed = ["**/*.rs", "Cargo.toml", "**/Cargo.toml", "Cargo.lock"]
+
+[[sensors]]
+name = "test"
+argv = ["bash", "scripts/check-test.sh"]
+when-changed = ["**/*.rs", "Cargo.toml", "**/Cargo.toml", "Cargo.lock"]
+```
+
+### Node/TypeScript
+
+Prefer the `package.json` scripts the project already maintains. The Node pack
+probes them; this is the equivalent generic form:
+
+<!-- example: id=adoption_contract_node classification=parser-check-only reason="Node/TypeScript sensor contract recipe" -->
+```toml
+[[sensors]]
+name = "test"
+argv = ["npm", "test"]
+when-changed = ["src/**", "test/**", "package.json", "package-lock.json"]
+
+[[sensors]]
+name = "typecheck"
+argv = ["npm", "run", "typecheck"]
+when-changed = ["src/**", "package.json", "tsconfig.json"]
+```
+
+### Python
+
+`pytest` is a useful default because it exits non-zero when it collects zero
+tests. If the project uses `unittest`, wrap `python3 -m unittest discover` in a
+guard that fails on `Ran 0 tests`.
+
+<!-- example: id=adoption_contract_python classification=parser-check-only reason="Python sensor contract recipe" -->
+```toml
+[[sensors]]
+name = "test"
+argv = ["python3", "-m", "pytest", "-q"]
+when-changed = ["**/*.py", "pyproject.toml", "requirements.txt", "setup.cfg", "tox.ini"]
+
+[[sensors]]
+name = "lint"
+argv = ["python3", "-m", "ruff", "check", "."]
+severity = "warn"
+when-changed = ["**/*.py", "pyproject.toml", "ruff.toml"]
+```
+
+### Go
+
+`go test ./...` exits `0` when a package has no test files, so pair it with a
+guard that fails on `[no test files]` (or ensure every tested package has a
+test). `go vet` is a useful required or advisory companion.
+
+<!-- example: id=adoption_contract_go classification=parser-check-only reason="Go sensor contract recipe" -->
+```toml
+[[sensors]]
+name = "vet"
+argv = ["go", "vet", "./..."]
+when-changed = ["**/*.go", "go.mod", "go.sum"]
+
+[[sensors]]
+name = "test"
+argv = ["bash", "scripts/check-go-test.sh"]
+when-changed = ["**/*.go", "go.mod", "go.sum"]
+```
+
+<!-- example: id=adoption_contract_go_guard classification=illustrative reason="Go zero-test guard wrapper" -->
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+out="$(go test ./... 2>&1)"
+printf '%s\n' "$out"
+! grep -q '\[no test files\]' <<<"$out"
+```
+
+## Onboarding outcomes
+
+`init` reports one baseline state per run. Configuration is written before the
+baseline executes, so a red result still leaves an editable contract.
+
+| Situation | Pack | Baseline | Exit | Meaning |
+| --- | --- | --- | --- | --- |
+| Unsupported `package.json` | `generic` | `VACUOUS` | 0 | `no_supported_node_commands` diagnostic; add a script or declare `[[sensors]]`. |
+| Unknown stack (Python/Go/other) | `generic` | `VACUOUS` | 0 | `generic_stack_selected` diagnostic names the markers; use the recipes above. |
+| No sensors declared | `generic` | `VACUOUS` | 0 | Nothing ran; this is not evidence. |
+| Missing Node package manager | `node` | `INCOMPLETE` | 0 | `missing_package_manager`; install it and re-run `init --force`. |
+| Missing Rust core tool | `rust` | `INCOMPLETE` | 0 | The omitted sensor is named; install the tool and re-run `init --force`. |
+| Missing declared tool at verify | any | n/a | 2 | `verify` exits 2 and names the sensor in `unrunnable`; it is never a pass. |
+| Existing red baseline | any | `RED` | 1 | The repository's own checks failed; the generated config is still written. |
+
+Exit `0` means “configuration written and no required sensor failed”. Verified
+means `baseline.state == "green"` **and** `do-harness status --set verification`
+is green for the current inputs.
+
+## What init owns and preserves
+
+- Files are written only when absent; `--force` overwrites. Existing
+  application source, build manifests, and the greenfield crate scaffold are
+  never replaced.
+- `.gitignore` is appended to, never rewritten; an existing entry is skipped.
+- `init` does not install or edit git hooks. `hook install` owns the
+  pre-commit, commit-msg, and pre-push hooks and refuses a foreign hook without
+  `--force`. A hook delegated to `pre-commit` or a configured `core.hooksPath`
+  is reported as delegated, not replaced.
+- The 500-LOC `loc` ceiling is a Rust-pack default; other packs opt in
+  explicitly. The commit-message check is `scripts/check-commitlint.sh`, which
+  the optional `commit-msg` hook runs from **this repository**; replace the
+  script to use your own convention. Neither is a prerequisite for using the
+  harness.
+
 ## Configure sensors for your stack
 
 Review the [sensor execution trust boundary and resource policy](sensor-execution.md)
@@ -484,7 +631,7 @@ The harness enforces strict fail-closed contract rules across all supported pack
 | Pack | Selection Criteria | Default Generated Sensors | Strict Verification Contract |
 |------|-------------------|--------------------------|------------------------------|
 | `rust` | `Cargo.toml` | `fmt`, `check`, `clippy`, `test`, `doctest`, `loc`, `deps`, `audit`, `commitlint`, `release-preflight` | Fails closed on zero tests, broken doctests, missing manifest, or missing required tools in CI. |
-| `generic` | Greenfield / non-supported non-Rust default (e.g. malformed or unsupported `package.json`) | None (empty sensor array) | Vacuous pass (`sensor_pack = "generic"`, 0 sensors executed). Never masquerades as strict evidence for a specific language gate. |
+| `generic` | Greenfield / unknown stack (Python, Go, other) or malformed/unsupported `package.json` | None (empty sensor array) | Vacuous pass (`sensor_pack = "generic"`, 0 sensors executed) with an actionable diagnostic. Add the cross-stack recipes above; never masquerades as strict evidence for a specific language gate. |
 | `node` | `package.json` proving a supported Node command (script, turbo task, or matching dependency) | `typecheck`, `lint`, `test`, `build` | Preserves `package.json` and `src/`. Probes package scripts, turbo, tsc, eslint, jest, vitest. Missing package-manager tooling yields an INCOMPLETE baseline, never a claimed green; `test` fails when the runner's total summary reports zero tests, so a delegated script cannot pass vacuously. |
 | `web` | `init --language web` | `web-ui-tests`, `viewport-ux`, `a11y`, `console`, `perf`, `visual`, `i18n` | Unconfigured pack emits `SKIP:` (warned verdict). Fails closed under `verify --strict` until `WEB_AUDIT_ROUTES` is set. `web-ui-tests` runs the bundled audit suite and needs no configuration. |
 

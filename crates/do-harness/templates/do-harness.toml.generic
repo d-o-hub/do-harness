@@ -17,6 +17,20 @@ pre-push = []
 # name = "test"
 # argv = ["npm", "test"]
 #
+# Python and Go use this same generic contract; `init` does not auto-detect
+# them. See docs/adoption.md#cross-stack-command-recipes for complete recipes.
+# Example (Python, pytest exits 5 when it collects zero tests):
+# [[sensors]]
+# name = "test"
+# argv = ["python3", "-m", "pytest", "-q"]
+# when-changed = ["**/*.py", "pyproject.toml", "requirements.txt"]
+#
+# Example (Go; add a zero-test guard if the module has no tests):
+# [[sensors]]
+# name = "test"
+# argv = ["go", "test", "./..."]
+# when-changed = ["**/*.go", "go.mod", "go.sum"]
+#
 # Group sensors into development signal sets (feedback / verification / main /
 # release); `verify --set <name>` runs only that set. Sets refer to sensor
 # names and never contain command lines. Add `when-changed` globs to skip a

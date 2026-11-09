@@ -35,13 +35,17 @@ Do not add READMEs, changelogs, or setup docs. Frontmatter accepts
 `category`, and a `metadata` mapping for custom keys. `evals/evals.json`
 accepts optional top-level `version`; other unknown fixture fields are rejected.
 
-## Repo Invariants (Non-Negotiable)
+## Repository Conventions (seeded defaults; adapt)
 
-- 500 LOC ceiling per file; split SKILL.md via `references/` before 450.
-- Rust: `#![forbid(unsafe_code)]`, `#[serde(deny_unknown_fields)]` on
-  config/event types, `thiserror` in libraries / `anyhow` in binaries,
+- If this repository adopts a 500 LOC ceiling per file, split `SKILL.md` via
+  `references/` before 450. The Rust pack seeds a `loc` sensor; other packs
+  opt in explicitly.
+- Rust repositories: `#![forbid(unsafe_code)]`, `#[serde(deny_unknown_fields)]`
+  on config/event types, `thiserror` in libraries / `anyhow` in binaries,
   no `unwrap()` in library code.
-- Commits: conventional commits, lowercase subject.
+- If this repository adopts conventional commits, use lowercase subjects. The
+  managed `commit-msg` hook runs the repository's own commit-message checker;
+  replace that checker to use the repository's own convention.
 - Evals are executable evidence: every `evals.json` assertion that counts
   uses a graded prefix (`exists:`, `absent:`, `contains:`, `db:`, `cli:`,
   `walk:`). Bare prose strings are docs and score nothing — delete them.

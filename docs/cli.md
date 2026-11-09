@@ -508,6 +508,11 @@ effective sensors once:
   scripts. It resolves the same pack as `init` — a supported `package.json`
   selects Node without running any tool — so inspect and init agree.
 
+`init` writing configuration is not the same as verifying the codebase:
+`baseline.state == "green"` plus `status --set verification` green is the
+verified result. The stack-neutral contract and Python/Go recipes are in
+[the adopting-repository contract](adoption.md#the-adopting-repository-sensor-contract).
+
 The generated `AGENTS.md` embeds a pinned installer command so an agent
 landing in the repository can obtain the exact CLI version it was initialized
 with.
@@ -545,7 +550,9 @@ projects.
   detects from the repository (empty/hidden-only directories bootstrap Rust).
 - `--force`: Overwrite existing files.
 - `--format <Format>`: Output format (`text` or `json`); JSON carries
-  `detected`, `candidates`, `written`, `skipped`, and `baseline`.
+  `language`, `detected`, `candidates`, `written`, `skipped`, `seeded`,
+  `skills`, `diagnostics`, and `baseline`. Text mode prints the same
+  diagnostics, including `generic_stack_selected` for an unfamiliar stack.
 - `--no-seed`: Skip seeding `plans/invariants.json`.
 - `--minimal`: Skip skill scaffolding.
 - `--no-gitignore`: Skip creating/modifying `.gitignore`.

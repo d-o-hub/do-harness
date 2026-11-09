@@ -46,6 +46,16 @@ pub fn print_report(report: &InitReport, root: &Path, format: crate::report::For
             );
         }
     }
+    if !report.diagnostics.is_empty() {
+        println!("Onboarding diagnostics:");
+        for diagnostic in &report.diagnostics {
+            println!(
+                "  [{}] {}: {}",
+                diagnostic.code, diagnostic.path, diagnostic.message
+            );
+            println!("    action: {}", diagnostic.action);
+        }
+    }
     println!("Generated:");
     for path in &report.written {
         println!("  wrote {path}");
