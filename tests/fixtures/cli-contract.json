@@ -93,6 +93,7 @@
       "list",
       "explain",
       "status",
+      "sync",
       "pr",
       "skills",
       "init-db",
@@ -597,6 +598,103 @@
           "default_values": [],
           "possible_values": [],
           "help": "Read evidence from this file instead of the default artifact",
+          "index": null
+        },
+        {
+          "id": "format",
+          "kind": "option",
+          "short": null,
+          "long": "format",
+          "value_names": [
+            "FORMAT"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [
+            "text"
+          ],
+          "possible_values": [
+            "text",
+            "json"
+          ],
+          "help": "Output format",
+          "index": null
+        }
+      ],
+      "subcommands": [],
+      "invocable": true
+    },
+    {
+      "path": "sync",
+      "about": "Refresh `origin/main` and reconcile the local `main` branch",
+      "usage": "do-harness sync [OPTIONS]",
+      "aliases": [
+        "latest-main"
+      ],
+      "args": [
+        {
+          "id": "switch",
+          "kind": "option",
+          "short": null,
+          "long": "switch",
+          "value_names": [
+            "SWITCH"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": false,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Check out `main` first when the current branch is clean",
+          "index": null
+        },
+        {
+          "id": "read_only",
+          "kind": "option",
+          "short": null,
+          "long": "read-only",
+          "value_names": [
+            "READ_ONLY"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": false,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Query the advertised `origin/main` without fetching or switching",
+          "index": null
+        },
+        {
+          "id": "reset_diverged",
+          "kind": "option",
+          "short": null,
+          "long": "reset-diverged",
+          "value_names": [
+            "RESET_DIVERGED"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": false,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Back up and hard-reset a diverged `main` onto `origin/main` (implies switching to `main`; refuses a dirty worktree)",
+          "index": null
+        },
+        {
+          "id": "status",
+          "kind": "option",
+          "short": null,
+          "long": "status",
+          "value_names": [
+            "STATUS"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": false,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Include verification evidence freshness (no sensors run)",
           "index": null
         },
         {

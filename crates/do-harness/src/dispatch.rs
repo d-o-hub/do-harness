@@ -59,7 +59,7 @@ pub async fn run(cli: Cli) -> Result<(), CliError> {
 fn resolve_root(cli: &Cli) -> Result<PathBuf, CliError> {
     match &cli.command {
         Command::Init { .. } => commands::init_target(cli.root.as_deref()).map_err(CliError::Usage),
-        Command::Pr { .. } | Command::CiExplain { .. } => {
+        Command::Pr { .. } | Command::CiExplain { .. } | Command::Sync { .. } => {
             pr::command::resolve_root(cli.root.as_deref()).map_err(CliError::Usage)
         }
         _ => commands::resolve_root(cli.root.as_deref()).map_err(CliError::Usage),
@@ -75,6 +75,27 @@ async fn route(root: &Path, config_path: Option<PathBuf>, cli: Cli) -> Result<()
         | Command::Completions { .. }
         | Command::Man { .. } => unreachable!("version/compliance/completions/man handled above"),
         Command::Pr { action } => pr::command::run(root, action, cli.dry_run),
+        Command::Sync {
+            switch,
+            read_only,
+            reset_diverged,
+            status,
+            format,
+        } => {
+            crate::sync::run(
+                root,
+                config_path.as_deref(),
+                crate::sync::SyncOpts {
+                    switch,
+                    read_only,
+                    reset_diverged,
+                    status,
+                },
+                cli.dry_run,
+                format,
+            )
+            .await
+        }
         Command::Job { action } => match action {
             crate::cli::JobAction::Run {
                 spec,

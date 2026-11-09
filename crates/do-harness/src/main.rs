@@ -5,8 +5,8 @@
 //! `plans/invariants.json`), `init` (workspace scaffold), `task` (task
 //! state), `trace` (interaction traces), `distill` (heuristic extraction),
 //! `eval` (skill-eval runner), `hook` (git hook management), `pr`
-//! (deterministic PR analysis), `dora` (deterministic deployment metrics),
-//! and `version` (version information).
+//! (deterministic PR analysis), `sync` (reconcile `origin/main`), `dora`
+//! (deterministic deployment metrics), and `version` (version information).
 
 #![forbid(unsafe_code)]
 
@@ -74,6 +74,7 @@ mod skill_write;
 mod skills;
 mod split;
 mod status;
+mod sync;
 mod task;
 mod telemetry;
 mod trace;

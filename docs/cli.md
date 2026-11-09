@@ -1285,6 +1285,39 @@ count travels in the `FINDINGS:` marker for the blessed ratchet), and `2` for a
 usage/config/discovery problem — including a shallow clone whose ranges cannot
 be resolved. A collector that cannot read git history never reads as healthy.
 
+### `sync`
+<!-- BEGIN GENERATED: cli-contract sync -->
+`do-harness sync [OPTIONS]`
+
+Aliases: `latest-main`.
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `--switch` | no | — | — | Check out `main` first when the current branch is clean |
+| `--read-only` | no | — | — | Query the advertised `origin/main` without fetching or switching |
+| `--reset-diverged` | no | — | — | Back up and hard-reset a diverged `main` onto `origin/main` (implies switching to `main`; refuses a dirty worktree) |
+| `--status` | no | — | — | Include verification evidence freshness (no sensors run) |
+| `--format <FORMAT>` | no | `text` | `text`, `json` | Output format |
+<!-- END GENERATED: cli-contract sync -->
+Refresh `origin/main` and reconcile the local `main` branch without leaving the
+deterministic path for routine baseline work.
+
+The default fetches `origin/main` with the same refspec as the harness
+`latest-main.sh` helper and fast-forwards a clean `main` only when it is strictly
+behind. `--switch` checks out `main` first (a dirty worktree is refused, never
+stashed); `--read-only` (and the global `--dry-run`) queries `git ls-remote`
+without writing refs; `--reset-diverged` creates
+`backup/main-pre-sync-<sha>` and hard-resets a clean, diverged `main`.
+`--status` embeds `verification` evidence freshness without running sensors.
+
+Exit `0` when the fetch or reconciliation completed, `1` when a dirty or diverged
+checkout was refused (nothing was touched: a refused `--switch` stays on the
+branch it found), and `2` for a git, remote, or config failure. JSON reports
+`state` (`up_to_date`, `synced`, `switched`, `fetched`, `read_only`,
+`refused_dirty`, `refused_diverged`), `advertised`, `head`, `ahead`/`behind`,
+`clean`, `switched`, `fast_forwarded`, `reset`, `aligned`, and the optional
+`previous_branch`, `backup_ref`, `local_commits`, and `verification` fields.
+
 ### `pr`
 <!-- BEGIN GENERATED: cli-contract pr -->
 `do-harness pr [OPTIONS] <COMMAND>`
