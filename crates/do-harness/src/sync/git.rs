@@ -52,9 +52,23 @@ pub(super) fn local_branch_sha(root: &Path) -> Result<Option<String>> {
     Ok(Some(sha))
 }
 
-/// Whether the worktree has staged, unstaged, or untracked changes.
-pub(super) fn is_clean(root: &Path) -> Result<bool> {
-    Ok(git_text(root, &["status", "--porcelain"])?.is_empty())
+/// Whether staged or unstaged changes touch tracked files.
+///
+/// Untracked files are excluded: a checkout or fast-forward leaves them alone,
+/// and treating them as "dirty" would refuse work that is perfectly safe.
+pub(super) fn has_tracked_changes(root: &Path) -> Result<bool> {
+    Ok(!git_text(root, &["status", "--porcelain", "--untracked-files=no"])?.is_empty())
+}
+
+/// Whether untracked files are present, reported for information only.
+pub(super) fn has_untracked_files(root: &Path) -> Result<bool> {
+    Ok(
+        !git_text(root, &["status", "--porcelain", "--untracked-files=normal"])?
+            .lines()
+            .filter(|line| line.starts_with("??"))
+            .collect::<Vec<_>>()
+            .is_empty(),
+    )
 }
 
 /// Resolves `reference` to a commit id.

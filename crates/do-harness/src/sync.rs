@@ -15,8 +15,8 @@ use anyhow::Result;
 
 use self::git::{
     counts, create_backup, current_branch, ensure_remote, ensure_work_tree, fast_forward, fetch,
-    head, is_clean, local_branch_sha, local_commits, ls_remote, object_exists, reset_hard,
-    rev_parse, short, switch_to_main,
+    has_tracked_changes, has_untracked_files, head, local_branch_sha, local_commits, ls_remote,
+    object_exists, reset_hard, rev_parse, short, switch_to_main,
 };
 use serde::Serialize;
 
@@ -86,8 +86,10 @@ pub struct SyncReport {
     /// Commits on `origin/main` not on local `main`; absent when untracked.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub behind: Option<usize>,
-    /// Whether the worktree was clean before the attempt.
+    /// Whether the worktree had staged or unstaged changes to tracked files.
     pub clean: bool,
+    /// Whether untracked files were present (they never block a switch).
+    pub untracked: bool,
     /// Whether the checkout was switched to `main`.
     pub switched: bool,
     /// Whether `main` moved forward onto `origin/main`.
@@ -159,7 +161,8 @@ fn execute(root: &Path, opts: SyncOpts, read_only: bool) -> Result<SyncReport> {
     ensure_remote(root)?;
 
     let previous = current_branch(root)?;
-    let clean = is_clean(root)?;
+    let tracked_dirty = has_tracked_changes(root)?;
+    let untracked = has_untracked_files(root)?;
     let local_main = local_branch_sha(root)?;
 
     let advertised = if read_only {
@@ -179,7 +182,8 @@ fn execute(root: &Path, opts: SyncOpts, read_only: bool) -> Result<SyncReport> {
         head: head_before.clone(),
         ahead: None,
         behind: None,
-        clean,
+        clean: !tracked_dirty,
+        untracked,
         switched: false,
         fast_forwarded: false,
         reset: false,
@@ -210,10 +214,15 @@ fn execute(root: &Path, opts: SyncOpts, read_only: bool) -> Result<SyncReport> {
         // `--reset-diverged` is explicit recovery, so it also brings the
         // checkout to `main`; a plain default run only fetches.
         if !opts.switch && !opts.reset_diverged {
+            // Fetch only: `head`/`aligned` already describe the untouched
+            // checkout, so they are not recomputed here.
             report.state = SyncState::Fetched;
             return Ok(report);
         }
-        if !clean {
+        // Unrelated untracked files survive a checkout, so only tracked
+        // changes block the switch. `git switch` itself still aborts if an
+        // untracked file would be overwritten.
+        if tracked_dirty {
             report.state = SyncState::RefusedDirty;
             return Ok(report);
         }
@@ -260,6 +269,9 @@ fn reconcile(root: &Path, opts: SyncOpts, report: &mut SyncReport) -> Result<()>
             report.state = SyncState::RefusedDiverged;
         }
     } else if behind > 0 {
+        // A fast-forward only moves the branch, so an unrelated untracked file
+        // is harmless. A tracked change is not: refusing keeps the operator's
+        // uncommitted work and the branch pointer in sync.
         if report.clean {
             fast_forward(root)?;
             report.fast_forwarded = true;
@@ -358,10 +370,24 @@ fn print_text(report: &SyncReport) {
             println!("  switched from {previous}");
         }
     }
-    println!("  branch {} @ {}", report.branch, short(&report.head));
+    match report.state {
+        // The fetch path never touches the checkout, so naming `main` as the
+        // current branch would misdescribe where `HEAD` actually is.
+        SyncState::Fetched => {
+            if let Some(previous) = &report.previous_branch {
+                println!("  current branch {previous} @ {}", short(&report.head));
+            }
+        }
+        _ => println!("  branch {} @ {}", report.branch, short(&report.head)),
+    }
     println!(
-        "  worktree {}",
-        if report.clean { "clean" } else { "dirty" }
+        "  worktree {}{}",
+        if report.clean { "clean" } else { "dirty" },
+        if report.untracked {
+            " (untracked files present)"
+        } else {
+            ""
+        }
     );
     for commit in &report.local_commits {
         println!("  local: {commit}");
@@ -381,16 +407,14 @@ fn print_text(report: &SyncReport) {
 fn refusal_hint(report: &SyncReport, opts: SyncOpts) -> String {
     match report.state {
         SyncState::RefusedDirty => {
-            let recovery = if opts.reset_diverged {
-                " --reset-diverged"
-            } else if report.switched {
-                ""
+            // Only `--switch`/`--reset-diverged` can add a way forward; a
+            // plain run already fetches successfully, so suggesting it again
+            // would send the operator in a circle.
+            if opts.switch || opts.reset_diverged {
+                "worktree has uncommitted changes to tracked files; commit or stash them, then rerun `do-harness sync`".to_owned()
             } else {
-                " --switch"
-            };
-            format!(
-                "worktree is dirty; commit or stash the changes, then rerun `do-harness sync{recovery}`"
-            )
+                "worktree has uncommitted changes to tracked files; commit or stash them (the fetch half already succeeded), or rerun with --switch once the tree is clean".to_owned()
+            }
         }
         SyncState::RefusedDiverged => format!(
             "{} has {} local commit(s) not on {}/{}; inspect them, then pass --reset-diverged to back up and reset",

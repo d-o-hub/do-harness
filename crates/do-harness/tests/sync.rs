@@ -150,7 +150,9 @@ fn feature_branch_without_switch_is_only_fetched() {
 fn dirty_feature_branch_is_refused_without_switching() {
     let fx = fixture();
     git(&fx.root, &["switch", "-q", "-c", "feature"]);
-    std::fs::write(fx.root.join("dirty.txt"), "uncommitted\n").expect("write dirty file");
+    // A tracked modification, not an untracked file: only tracked changes can
+    // make a checkout unsafe.
+    std::fs::write(fx.root.join("README.md"), "modified\n").expect("modify tracked file");
     let (code, report, _) = sync_json(&fx, &["--switch"]);
     assert_eq!(code, Some(1));
     assert_eq!(report["state"], "refused_dirty");
@@ -232,6 +234,53 @@ fn switch_refuses_a_diverged_main_without_leaving_the_branch() {
 }
 
 #[test]
+fn untracked_files_do_not_block_a_fast_forward() {
+    let fx = fixture();
+    let upstream = advance_origin(&fx, "upstream change");
+    std::fs::write(fx.root.join("scratch.txt"), "scratch\n").expect("write untracked file");
+    let (code, report, stderr) = sync_json(&fx, &[]);
+    assert_eq!(code, Some(0), "stderr: {stderr}");
+    assert_eq!(report["state"], "synced");
+    assert_eq!(report["fast_forwarded"], true);
+    assert_eq!(report["clean"], true, "untracked files are not dirty");
+    assert_eq!(report["untracked"], true);
+    assert_eq!(rev(&fx.root, "HEAD"), upstream);
+    assert!(
+        fx.root.join("scratch.txt").exists(),
+        "the file must survive the fast-forward"
+    );
+}
+
+#[test]
+fn untracked_files_do_not_block_a_switch() {
+    let fx = fixture();
+    git(&fx.root, &["switch", "-q", "-c", "feature"]);
+    commit(&fx.root, "feature.txt", "feature\n", "feature work");
+    std::fs::write(fx.root.join("scratch.txt"), "scratch\n").expect("write untracked file");
+    let (code, report, stderr) = sync_json(&fx, &["--switch"]);
+    assert_eq!(code, Some(0), "stderr: {stderr}");
+    assert_eq!(report["state"], "switched");
+    assert_eq!(report["switched"], true);
+    assert_eq!(branch(&fx.root), "main");
+    assert!(
+        fx.root.join("scratch.txt").exists(),
+        "the file must survive the switch"
+    );
+}
+
+#[test]
+fn tracked_changes_still_refuse_a_fast_forward() {
+    let fx = fixture();
+    advance_origin(&fx, "upstream change");
+    std::fs::write(fx.root.join("README.md"), "modified\n").expect("modify tracked file");
+    let (code, report, _) = sync_json(&fx, &[]);
+    assert_eq!(code, Some(1));
+    assert_eq!(report["state"], "refused_dirty");
+    assert_eq!(report["clean"], false);
+    assert_eq!(report["fast_forwarded"], false);
+}
+
+#[test]
 fn read_only_reports_without_writing_refs() {
     let fx = fixture();
     let before = rev(&fx.root, "origin/main");
@@ -292,6 +341,23 @@ fn status_flag_embeds_verification_freshness() {
     assert_eq!(code, Some(0), "stderr: {stderr}");
     assert_eq!(report["state"], "up_to_date");
     assert_eq!(report["verification"]["state"], "missing");
+}
+
+#[test]
+fn fetched_text_names_the_branch_actually_checked_out() {
+    let fx = fixture();
+    git(&fx.root, &["switch", "-q", "-c", "feature"]);
+    advance_origin(&fx, "upstream change");
+    let (code, stdout, stderr) = run(harness(&fx.root).arg("sync"));
+    assert_eq!(code, Some(0), "stderr: {stderr}");
+    assert!(
+        stdout.contains("current branch feature"),
+        "output must name the branch holding HEAD, not main:\n{stdout}"
+    );
+    assert!(
+        !stdout.contains("branch main @"),
+        "output must not claim main is checked out:\n{stdout}"
+    );
 }
 
 /// Current branch name reported by git.

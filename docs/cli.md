@@ -1304,19 +1304,21 @@ deterministic path for routine baseline work.
 
 The default fetches `origin/main` with the same refspec as the harness
 `latest-main.sh` helper and fast-forwards a clean `main` only when it is strictly
-behind. `--switch` checks out `main` first (a dirty worktree is refused, never
-stashed); `--read-only` (and the global `--dry-run`) queries `git ls-remote`
-without writing refs; `--reset-diverged` creates
-`backup/main-pre-sync-<sha>` and hard-resets a clean, diverged `main`.
-`--status` embeds `verification` evidence freshness without running sensors.
+behind. `--switch` checks out `main` first (uncommitted changes to tracked files
+are refused, never stashed; unrelated untracked files are left alone);
+`--read-only` (and the global `--dry-run`) queries `git ls-remote` without
+writing refs; `--reset-diverged` creates `backup/main-pre-sync-<sha>` and
+hard-resets a clean, diverged `main`. `--status` embeds `verification` evidence
+freshness without running sensors.
 
 Exit `0` when the fetch or reconciliation completed, `1` when a dirty or diverged
 checkout was refused (nothing was touched: a refused `--switch` stays on the
 branch it found), and `2` for a git, remote, or config failure. JSON reports
 `state` (`up_to_date`, `synced`, `switched`, `fetched`, `read_only`,
 `refused_dirty`, `refused_diverged`), `advertised`, `head`, `ahead`/`behind`,
-`clean`, `switched`, `fast_forwarded`, `reset`, `aligned`, and the optional
-`previous_branch`, `backup_ref`, `local_commits`, and `verification` fields.
+`clean` (staged/unstaged tracked changes only), `untracked`, `switched`,
+`fast_forwarded`, `reset`, `aligned`, and the optional `previous_branch`,
+`backup_ref`, `local_commits`, and `verification` fields.
 
 ### `pr`
 <!-- BEGIN GENERATED: cli-contract pr -->
