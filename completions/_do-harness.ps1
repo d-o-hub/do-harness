@@ -38,6 +38,8 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('ls', 'ls', [CompletionResultType]::ParameterValue, 'List sensor names')
             [CompletionResult]::new('explain', 'explain', [CompletionResultType]::ParameterValue, 'Explain which sensors the current change selects, without running them')
             [CompletionResult]::new('status', 'status', [CompletionResultType]::ParameterValue, 'Report verification evidence freshness without running sensors')
+            [CompletionResult]::new('sync', 'sync', [CompletionResultType]::ParameterValue, 'Refresh `origin/main` and reconcile the local `main` branch')
+            [CompletionResult]::new('latest-main', 'latest-main', [CompletionResultType]::ParameterValue, 'Refresh `origin/main` and reconcile the local `main` branch')
             [CompletionResult]::new('pr', 'pr', [CompletionResultType]::ParameterValue, 'Deterministic PR analysis (read-only; works in any git repository)')
             [CompletionResult]::new('skills', 'skills', [CompletionResultType]::ParameterValue, 'Inspect and select skills by progressive disclosure')
             [CompletionResult]::new('init-db', 'init-db', [CompletionResultType]::ParameterValue, 'Apply pending database migrations')
@@ -194,6 +196,42 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('--root', '--root', [CompletionResultType]::ParameterName, 'Workspace root override (default: walk up from cwd)')
             [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Explicit path to do-harness.toml')
             [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)')
+            [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Suppress PASS/WARN verdict lines and the success footer')
+            [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Suppress PASS/WARN verdict lines and the success footer')
+            [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Dry run without side effects')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            [CompletionResult]::new('-V', '-V ', [CompletionResultType]::ParameterName, 'Print version')
+            [CompletionResult]::new('--version', '--version', [CompletionResultType]::ParameterName, 'Print version')
+            break
+        }
+        'do-harness;sync' {
+            [CompletionResult]::new('--format', '--format', [CompletionResultType]::ParameterName, 'Output format')
+            [CompletionResult]::new('--root', '--root', [CompletionResultType]::ParameterName, 'Workspace root override (default: walk up from cwd)')
+            [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Explicit path to do-harness.toml')
+            [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)')
+            [CompletionResult]::new('--switch', '--switch', [CompletionResultType]::ParameterName, 'Check out `main` first when the current branch is clean')
+            [CompletionResult]::new('--read-only', '--read-only', [CompletionResultType]::ParameterName, 'Query the advertised `origin/main` without fetching or switching')
+            [CompletionResult]::new('--reset-diverged', '--reset-diverged', [CompletionResultType]::ParameterName, 'Back up and hard-reset a diverged `main` onto `origin/main` (implies switching to `main`; refuses a dirty worktree)')
+            [CompletionResult]::new('--status', '--status', [CompletionResultType]::ParameterName, 'Include verification evidence freshness (no sensors run)')
+            [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Suppress PASS/WARN verdict lines and the success footer')
+            [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Suppress PASS/WARN verdict lines and the success footer')
+            [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Dry run without side effects')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            [CompletionResult]::new('-V', '-V ', [CompletionResultType]::ParameterName, 'Print version')
+            [CompletionResult]::new('--version', '--version', [CompletionResultType]::ParameterName, 'Print version')
+            break
+        }
+        'do-harness;latest-main' {
+            [CompletionResult]::new('--format', '--format', [CompletionResultType]::ParameterName, 'Output format')
+            [CompletionResult]::new('--root', '--root', [CompletionResultType]::ParameterName, 'Workspace root override (default: walk up from cwd)')
+            [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Explicit path to do-harness.toml')
+            [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)')
+            [CompletionResult]::new('--switch', '--switch', [CompletionResultType]::ParameterName, 'Check out `main` first when the current branch is clean')
+            [CompletionResult]::new('--read-only', '--read-only', [CompletionResultType]::ParameterName, 'Query the advertised `origin/main` without fetching or switching')
+            [CompletionResult]::new('--reset-diverged', '--reset-diverged', [CompletionResultType]::ParameterName, 'Back up and hard-reset a diverged `main` onto `origin/main` (implies switching to `main`; refuses a dirty worktree)')
+            [CompletionResult]::new('--status', '--status', [CompletionResultType]::ParameterName, 'Include verification evidence freshness (no sensors run)')
             [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Suppress PASS/WARN verdict lines and the success footer')
             [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Suppress PASS/WARN verdict lines and the success footer')
             [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Dry run without side effects')
@@ -1539,6 +1577,7 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('list', 'list', [CompletionResultType]::ParameterValue, 'List sensor names')
             [CompletionResult]::new('explain', 'explain', [CompletionResultType]::ParameterValue, 'Explain which sensors the current change selects, without running them')
             [CompletionResult]::new('status', 'status', [CompletionResultType]::ParameterValue, 'Report verification evidence freshness without running sensors')
+            [CompletionResult]::new('sync', 'sync', [CompletionResultType]::ParameterValue, 'Refresh `origin/main` and reconcile the local `main` branch')
             [CompletionResult]::new('pr', 'pr', [CompletionResultType]::ParameterValue, 'Deterministic PR analysis (read-only; works in any git repository)')
             [CompletionResult]::new('skills', 'skills', [CompletionResultType]::ParameterValue, 'Inspect and select skills by progressive disclosure')
             [CompletionResult]::new('init-db', 'init-db', [CompletionResultType]::ParameterValue, 'Apply pending database migrations')
@@ -1581,6 +1620,9 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             break
         }
         'do-harness;help;status' {
+            break
+        }
+        'do-harness;help;sync' {
             break
         }
         'do-harness;help;pr' {

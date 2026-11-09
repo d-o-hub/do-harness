@@ -127,6 +127,32 @@ pub enum Command {
         #[arg(long, value_enum, default_value_t = Format::Text)]
         format: Format,
     },
+    /// Refresh `origin/main` and reconcile the local `main` branch.
+    ///
+    /// Fetches with the same refspec as the harness `latest-main.sh` helper,
+    /// fast-forwards only a clean, strictly-behind `main`, and never stashes,
+    /// rebases, or resets unless `--reset-diverged` is passed. Exit codes: 0
+    /// when the fetch/sync completed, 1 when a dirty or diverged checkout was
+    /// refused, and 2 when git, the remote, or the config could not be read.
+    #[command(visible_alias = "latest-main")]
+    Sync {
+        /// Check out `main` first when the current branch is clean.
+        #[arg(long)]
+        switch: bool,
+        /// Query the advertised `origin/main` without fetching or switching.
+        #[arg(long, conflicts_with_all = ["switch", "reset_diverged"])]
+        read_only: bool,
+        /// Back up and hard-reset a diverged `main` onto `origin/main`
+        /// (implies switching to `main`; refuses a dirty worktree).
+        #[arg(long, conflicts_with = "read_only")]
+        reset_diverged: bool,
+        /// Include verification evidence freshness (no sensors run).
+        #[arg(long)]
+        status: bool,
+        /// Output format.
+        #[arg(long, value_enum, default_value_t = Format::Text)]
+        format: Format,
+    },
     /// Deterministic PR analysis (read-only; works in any git repository).
     Pr {
         #[command(subcommand)]

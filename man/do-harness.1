@@ -1,6 +1,6 @@
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
-.TH do-harness 1  "do-harness 0.4.2 (6e73861-dirty 2026-11-08)" 
+.TH do-harness 1  "do-harness 0.4.2 (29d52f7-dirty 2026-11-08)" 
 .SH NAME
 do\-harness \- do\-harness agent execution harness CLI
 .SH SYNOPSIS
@@ -45,6 +45,9 @@ Explain which sensors the current change selects, without running them
 .TP
 do\-harness status
 Report verification evidence freshness without running sensors
+.TP
+do\-harness sync
+Refresh `origin/main` and reconcile the local `main` branch
 .TP
 do\-harness pr
 Deterministic PR analysis (read\-only; works in any git repository)
@@ -138,4 +141,4 @@ Exit Codes:
   1  Verification or check failure
   2  Usage, configuration, or environment error
 .SH VERSION
-v0.4.2 (6e73861\-dirty 2026\-11\-08)
+v0.4.2 (29d52f7\-dirty 2026\-11\-08)

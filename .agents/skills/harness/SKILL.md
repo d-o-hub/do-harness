@@ -29,15 +29,17 @@ Two modes:
 
 ## First-Step Freshness (Latest-main First)
 
-Before consulting feedforward guides, planning, inspecting, editing, or delegating subagents in an existing Git repository, check and obtain latest `origin/main`:
+Before consulting feedforward guides, planning, inspecting, editing, or delegating subagents in an existing Git repository, refresh `origin/main` with the CLI:
 
 ```bash
-bash .agents/skills/harness/scripts/latest-main.sh [--root DIR] [--read-only]
+do-harness sync [--switch] [--read-only] [--reset-diverged] [--format json]
 ```
 
-- **Normal mode (fetch):** Updates `refs/remotes/origin/main` without modifying the working tree or index. If the checked-out branch is a clean `main`, fast-forward via `git merge --ff-only origin/main`. For new work, branch from the fetched commit. For active feature/PR branches, keep existing branch state intact; never reset, auto-stash, or rebase active work.
-- **Read-only mode (`--read-only`):** Queries `origin/main` via `git ls-remote` without fetching or touching refs/HEAD/index/worktree. Use this in read-only planning or dry-runs. Report advertised SHA and checked-out HEAD separately; do not claim local HEAD is current merely because remote query succeeded. If the commit object is not local, inspect upstream sources pinned to that SHA.
-- **Fail closed:** If git, the target root, the origin remote, or the remote main ref is missing or fails, exit 2 immediately. Never substitute stale local state as "latest".
+- **Default (fetch):** Updates `refs/remotes/origin/main` without modifying the working tree or index. A clean `main` fast-forwards only when it is strictly behind.
+- **`--switch`:** Checks out `main` first when the worktree is clean, then fast-forwards.
+- **Modes:** `--read-only` queries `origin/main` via `git ls-remote` without fetching or touching refs/HEAD/index/worktree (dry-run uses the same mode); report advertised SHA and checked-out HEAD separately. If the commit object is not local, inspect upstream sources pinned to that SHA. `--reset-diverged` is explicit recovery only: it creates `backup/main-pre-sync-<sha>` and hard-resets a clean, diverged `main`.
+- **Exit codes:** `0` refreshed or already current; `1` a dirty or diverged checkout was refused and nothing was touched; `2` git, remote, or config failure. Fail closed: never substitute stale local state as "latest".
+- **Bootstrap fallback:** When the installed binary predates the command, `bash .agents/skills/harness/scripts/latest-main.sh [--root DIR] [--read-only]` performs the fetch/query half.
 - **Greenfield distinction:** Questions about creating brand-new repositories or initializing outside any git checkout do not require an origin remote. However, in an existing Git checkout, missing `origin` or `main` is an error, not a greenfield exception.
 
 ## Feedforward Guides

@@ -35,6 +35,8 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand ls 'List sensor names'
             cand explain 'Explain which sensors the current change selects, without running them'
             cand status 'Report verification evidence freshness without running sensors'
+            cand sync 'Refresh `origin/main` and reconcile the local `main` branch'
+            cand latest-main 'Refresh `origin/main` and reconcile the local `main` branch'
             cand pr 'Deterministic PR analysis (read-only; works in any git repository)'
             cand skills 'Inspect and select skills by progressive disclosure'
             cand init-db 'Apply pending database migrations'
@@ -184,6 +186,40 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand --root 'Workspace root override (default: walk up from cwd)'
             cand --config 'Explicit path to do-harness.toml'
             cand --output 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)'
+            cand -q 'Suppress PASS/WARN verdict lines and the success footer'
+            cand --quiet 'Suppress PASS/WARN verdict lines and the success footer'
+            cand --dry-run 'Dry run without side effects'
+            cand -h 'Print help (see more with ''--help'')'
+            cand --help 'Print help (see more with ''--help'')'
+            cand -V 'Print version'
+            cand --version 'Print version'
+        }
+        &'do-harness;sync'= {
+            cand --format 'Output format'
+            cand --root 'Workspace root override (default: walk up from cwd)'
+            cand --config 'Explicit path to do-harness.toml'
+            cand --output 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)'
+            cand --switch 'Check out `main` first when the current branch is clean'
+            cand --read-only 'Query the advertised `origin/main` without fetching or switching'
+            cand --reset-diverged 'Back up and hard-reset a diverged `main` onto `origin/main` (implies switching to `main`; refuses a dirty worktree)'
+            cand --status 'Include verification evidence freshness (no sensors run)'
+            cand -q 'Suppress PASS/WARN verdict lines and the success footer'
+            cand --quiet 'Suppress PASS/WARN verdict lines and the success footer'
+            cand --dry-run 'Dry run without side effects'
+            cand -h 'Print help (see more with ''--help'')'
+            cand --help 'Print help (see more with ''--help'')'
+            cand -V 'Print version'
+            cand --version 'Print version'
+        }
+        &'do-harness;latest-main'= {
+            cand --format 'Output format'
+            cand --root 'Workspace root override (default: walk up from cwd)'
+            cand --config 'Explicit path to do-harness.toml'
+            cand --output 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)'
+            cand --switch 'Check out `main` first when the current branch is clean'
+            cand --read-only 'Query the advertised `origin/main` without fetching or switching'
+            cand --reset-diverged 'Back up and hard-reset a diverged `main` onto `origin/main` (implies switching to `main`; refuses a dirty worktree)'
+            cand --status 'Include verification evidence freshness (no sensors run)'
             cand -q 'Suppress PASS/WARN verdict lines and the success footer'
             cand --quiet 'Suppress PASS/WARN verdict lines and the success footer'
             cand --dry-run 'Dry run without side effects'
@@ -1401,6 +1437,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand list 'List sensor names'
             cand explain 'Explain which sensors the current change selects, without running them'
             cand status 'Report verification evidence freshness without running sensors'
+            cand sync 'Refresh `origin/main` and reconcile the local `main` branch'
             cand pr 'Deterministic PR analysis (read-only; works in any git repository)'
             cand skills 'Inspect and select skills by progressive disclosure'
             cand init-db 'Apply pending database migrations'
@@ -1438,6 +1475,8 @@ set edit:completion:arg-completer[do-harness] = {|@words|
         &'do-harness;help;explain'= {
         }
         &'do-harness;help;status'= {
+        }
+        &'do-harness;help;sync'= {
         }
         &'do-harness;help;pr'= {
             cand no-effect 'Report the prospective merge impact of a PR or revision range'
