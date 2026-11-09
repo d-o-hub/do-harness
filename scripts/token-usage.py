@@ -92,29 +92,34 @@ SESSION_FIELDS = ", ".join(
 )
 
 
-def fetch_sessions(con, ids, directory, every, limit):
-    """Select sessions, parameterising every value.
+SESSION_QUERY = f"SELECT {SESSION_FIELDS} FROM session_v2 ORDER BY time_updated DESC"  # nosec B608
+# A session table is one row per conversation on this machine — thousands at
+# most — so the filters run in Python rather than assembling a WHERE clause.
+# Reading the whole ordered table also keeps the statement a constant, which is
+# what makes the parameterisation audit trivial.
+MAX_SCANNED_ROWS = 100_000
 
-    Only `?` placeholders carry data. The one interpolated fragment is a run of
-    `?` placeholders whose length comes from the caller's list, and
-    `SESSION_FIELDS` is a module constant, so no caller-supplied string reaches
-    the SQL text.
+
+def fetch_sessions(con, ids, directory, every, limit):
+    """Select sessions newest-first, then apply the id/directory filters.
+
+    The query carries no caller input: the only variable part is the column
+    list, which is a module constant built from a literal. Filtering and
+    limiting happen after the read so no string ever reaches the SQL text.
     """
-    where, params = [], []
-    if ids:
-        where.append(f"id IN ({', '.join('?' for _ in ids)})")
-        params.extend(ids)
-    if every and directory:
-        where.append("directory = ?")
-        params.append(str(directory))
-    sql = f"SELECT {SESSION_FIELDS} FROM session_v2"  # nosec B608
-    if where:
-        sql += " WHERE " + " AND ".join(where)
-    sql += " ORDER BY time_updated DESC"
-    if not ids:
-        sql += " LIMIT ?"
-        params.append(limit)
-    return con.execute(sql, params).fetchall()
+    rows = con.execute(SESSION_QUERY).fetchmany(MAX_SCANNED_ROWS)
+    wanted = set(ids) if ids else None
+    selected = []
+    for row in rows:
+        if wanted is not None:
+            if row["id"] not in wanted:
+                continue
+        elif every and directory and row["directory"] != str(directory):
+            continue
+        selected.append(row)
+    if wanted is not None:
+        return selected
+    return selected[:limit]
 
 
 def usage_of(row) -> dict:
