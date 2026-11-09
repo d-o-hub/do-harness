@@ -32,7 +32,6 @@ import datetime as dt
 import json
 import os
 import sqlite3
-import subprocess
 import sys
 from pathlib import Path
 from urllib.parse import quote
@@ -48,16 +47,11 @@ def default_db_path() -> Path:
 
 
 def repo_root() -> Path:
-    try:
-        out = subprocess.run(
-            ["git", "rev-parse", "--show-toplevel"],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-        return Path(out.stdout.strip())
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        return Path.cwd()
+    """Nearest ancestor containing `.git` (a worktree's `.git` is a file)."""
+    for candidate in [Path.cwd(), *Path.cwd().parents]:
+        if (candidate / ".git").exists():
+            return candidate
+    return Path.cwd()
 
 
 def connect_readonly(path: Path) -> sqlite3.Connection:
@@ -79,23 +73,41 @@ def connect_readonly(path: Path) -> sqlite3.Connection:
     return con
 
 
-SESSION_FIELDS = """
-    id, title, directory, model, agent,
-    tokens_input, tokens_output, tokens_reasoning,
-    tokens_cache_read, tokens_cache_write, cost,
-    time_created, time_updated
-"""
+SESSION_FIELDS = ", ".join(
+    [
+        "id",
+        "title",
+        "directory",
+        "model",
+        "agent",
+        "tokens_input",
+        "tokens_output",
+        "tokens_reasoning",
+        "tokens_cache_read",
+        "tokens_cache_write",
+        "cost",
+        "time_created",
+        "time_updated",
+    ]
+)
 
 
 def fetch_sessions(con, ids, directory, every, limit):
+    """Select sessions, parameterising every value.
+
+    Only `?` placeholders carry data. The one interpolated fragment is a run of
+    `?` placeholders whose length comes from the caller's list, and
+    `SESSION_FIELDS` is a module constant, so no caller-supplied string reaches
+    the SQL text.
+    """
     where, params = [], []
     if ids:
-        where.append(f"id IN ({','.join('?' for _ in ids)})")
+        where.append(f"id IN ({', '.join('?' for _ in ids)})")
         params.extend(ids)
     if every and directory:
         where.append("directory = ?")
         params.append(str(directory))
-    sql = f"SELECT {SESSION_FIELDS} FROM session_v2"
+    sql = f"SELECT {SESSION_FIELDS} FROM session_v2"  # nosec B608
     if where:
         sql += " WHERE " + " AND ".join(where)
     sql += " ORDER BY time_updated DESC"
@@ -176,7 +188,6 @@ def render_text(report) -> str:
 
 
 def event_payload(report) -> dict:
-    t = report["totals"]
     sessions = report["sessions"]
     first = sessions[0] if len(sessions) == 1 else None
     title = (
