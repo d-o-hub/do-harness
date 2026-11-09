@@ -177,7 +177,7 @@ fn python_fixture_passes_then_fails_and_missing_tool_is_unrunnable() {
     git_commit(root);
     init_generic(root);
     assert_green_then_defect(root, &|| {
-        write(root, "app.py", "def add(a, b):\n    return a - b\n");
+        write(root, "app.py", "def add(a, b):\n    return a - b + 0  # planted defect\n");
     });
     write_script_config(root, "scripts/check-test.sh", &["**/*.py"]);
     write(

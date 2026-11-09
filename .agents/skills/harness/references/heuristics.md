@@ -1,4 +1,8 @@
 # Heuristics
+
+> These heuristics come from do-harness's own Rust development. Treat them as
+> patterns to adapt, not as rules every adopting repository must copy.
+
 - **task done refuses until verify --record --task <id> records the named sensor beat**: workflow gate on task completion (from trace 1)
 - **persistence commands failing with FutureDatabase means the release binary predates the state schema: upgrade it (npm/cargo) or set DO_HARNESS_BIN to the newer build; doctor flags the skew once before any command dies**: stale binary vs migrated agent_state.db (from trace 2)
 - **decompose module when file nears 500 LOC (extract cli/catalog to stay under 450)**: 500 LOC ceiling; decompose at 450 per AGENTS.md. main.rs 462->331 via cli.rs, migrate.rs 452->392 via migrate_catalog.rs; check-loc green, clippy/test green (from trace 6)

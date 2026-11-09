@@ -3,9 +3,9 @@ name: harness
 description: >
   Map the harness-engineering feedforward guides and feedback sensors, and run
   the self-correction protocol when a computational sensor fires. Use when a
-  sensor fails (cargo check, test, clippy, fmt), before making code changes, or
-  when setting up agent context for a new task. Triggers: "harness", "sensor
-  fire", "CI failure", "self-correction", "swarm".
+  sensor fails (for example cargo check, npm test, pytest, go test), before
+  making code changes, or when setting up agent context for a new task.
+  Triggers: "harness", "sensor fire", "CI failure", "self-correction", "swarm".
 license: MIT
 metadata:
   version: "0.1.0"
@@ -71,7 +71,7 @@ time on unrelated sensors.
 | `do-harness verify --set verification --strict --record --task <id>` | before calling work done; the recorded beats satisfy the `task done` gate |
 | `do-harness verify --set release` | pre-release, on the whole pack |
 | `do-harness status --set verification` | evidence freshness; runs nothing |
-| `do-harness loc` | file size against the 500-LOC ceiling (Rust sources; the `loc` sensor scopes further trees) |
+| `do-harness loc` | file size against the 500-LOC ceiling (Rust pack default; other packs opt in) |
 | `do-harness seed --prune` | after editing `plans/invariants.json` |
 | `do-harness init-db --check` | when the state database may be behind |
 | `do-harness hook install` | wire pre-commit, commit-msg, and pre-push |
@@ -182,5 +182,5 @@ command.
 - Never trust LLM self-assessment over a computational sensor's exit code.
 - Fix the sensor that fired; do not refactor unrelated code in the same pass.
 - An empty sensor suite passes vacuously; that is not evidence.
-- A gate that runs zero checks is a failed gate, not a pass: `cargo test --doc` reporting `0 passed` proves nothing — add a doc-test on a public API before claiming the sensor green.
+- A gate that runs zero checks is a failed gate, not a pass: a test runner reporting `0 passed` proves nothing — add a real test (for example a Rust doc-test on a public API) before claiming the sensor green.
 - Never read every `SKILL.md` to decide which skill applies; rank metadata first.
