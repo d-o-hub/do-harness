@@ -74,3 +74,5 @@ Version the contract, not the cache:
   release asset, or a server-backed database. Never a live file in git, and
   never Git LFS for a mutable database: LFS versions each rewrite as a new
   blob and cannot merge.
+
+<!-- probe: docs-only change to measure the scoped ci path -->
