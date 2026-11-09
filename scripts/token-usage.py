@@ -8,7 +8,8 @@ session (or several), and writes an AGENTS.md section 6 metrics event under
 `.agents/events/YYYY/MM/DD/` so usage can be compared across sessions later.
 
 It never writes to the OpenCode database, and it never reads credentials:
-only the token/cost counters and session metadata are selected.
+only the token counters and session metadata are selected. Cost is
+deliberately not recorded — these events count tokens, not money.
 
 Usage:
   python3 scripts/token-usage.py                      # latest session in this directory
@@ -76,7 +77,7 @@ def connect_readonly(path: Path) -> sqlite3.Connection:
 SESSION_QUERY = (
     "SELECT id, title, directory, model, agent, "
     "tokens_input, tokens_output, tokens_reasoning, "
-    "tokens_cache_read, tokens_cache_write, cost, "
+    "tokens_cache_read, tokens_cache_write, "
     "time_created, time_updated "
     "FROM session_v2 ORDER BY time_updated DESC"
 )
@@ -125,7 +126,6 @@ def usage_of(row) -> dict:
         "cache_read": row["tokens_cache_read"] or 0,
         "cache_write": row["tokens_cache_write"] or 0,
         "total": input_tokens + output_tokens,
-        "cost_usd": round(row["cost"] or 0.0, 6),
     }
 
 
@@ -154,7 +154,6 @@ def summarise(rows) -> dict:
         key: sum(s["usage"][key] for s in sessions)
         for key in ("input", "output", "reasoning", "cache_read", "cache_write", "total")
     }
-    totals["cost_usd"] = round(sum(s["usage"]["cost_usd"] for s in sessions), 6)
     return {"sessions": sessions, "totals": totals}
 
 
@@ -169,12 +168,12 @@ def render_text(report) -> str:
             f"  tokens   in={u['input']} out={u['output']} reasoning={u['reasoning']} "
             f"cache_read={u['cache_read']} cache_write={u['cache_write']}"
         )
-        lines.append(f"  total    {u['total']} billable input+output, cost ${u['cost_usd']}")
+        lines.append(f"  total    {u['total']} billable input+output")
     t = report["totals"]
     lines.append(
         f"TOTAL       in={t['input']} out={t['output']} reasoning={t['reasoning']} "
         f"cache_read={t['cache_read']} cache_write={t['cache_write']} "
-        f"total={t['total']} cost=${t['cost_usd']}"
+        f"total={t['total']}"
     )
     return "\n".join(lines)
 
