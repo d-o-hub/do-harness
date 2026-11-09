@@ -110,6 +110,20 @@ class TokenUsageTests(unittest.TestCase):
         with self.assertRaises(SystemExit):
             self.module.connect_readonly(Path(self.tmp.name) / "nope.db")
 
+    def test_path_with_uri_special_characters_is_not_truncated(self):
+        # A `?` or `#` in the directory must not turn into URI query/fragment.
+        weird = Path(self.tmp.name) / "odd?dir#x"
+        weird.mkdir()
+        db = weird / "opencode.db"
+        build_db(
+            db,
+            [("ses_odd", "t", "/repo", "m", "build", 2, 3, 0, 0, 0, 0.0, 1, 2)],
+        )
+        con = self.module.connect_readonly(db)
+        rows = self.module.fetch_sessions(con, ["ses_odd"], None, False, 1)
+        con.close()
+        self.assertEqual(self.module.summarise(rows)["totals"]["total"], 5)
+
     def test_event_payload_is_serialisable_and_named(self):
         build_db(
             self.db,

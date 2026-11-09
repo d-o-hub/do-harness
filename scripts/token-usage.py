@@ -35,6 +35,7 @@ import sqlite3
 import subprocess
 import sys
 from pathlib import Path
+from urllib.parse import quote
 
 EVENT_KIND = "metrics"
 DEFAULT_DATA_HOME = Path.home() / ".local" / "share" / "opencode"
@@ -60,17 +61,20 @@ def repo_root() -> Path:
 
 
 def connect_readonly(path: Path) -> sqlite3.Connection:
-    """Open the database without any write capability or WAL side effects."""
-    if not path.is_file():
-        raise SystemExit(f"token-usage: OpenCode database not found: {path}")
-    uri = f"file:{path}?mode=ro&immutable=0"
+    """Open the database without write capability.
+
+    The URI carries the path percent-encoded, so a directory containing `?` or
+    `#` is not silently truncated into a different file. `mode=ro` makes every
+    write fail rather than creating a second writer against a live database.
+    """
+    resolved = path.expanduser().resolve()
+    if not resolved.is_file():
+        raise SystemExit(f"token-usage: OpenCode database not found: {resolved}")
+    uri = f"file:{quote(str(resolved))}?mode=ro"
     try:
         con = sqlite3.connect(uri, uri=True)
     except sqlite3.Error as err:
-        # A live database may refuse a pure read-only open while it holds an
-        # exclusive lock; fall back to the standard read path rather than
-        # silently reporting zero usage.
-        raise SystemExit(f"token-usage: cannot open {path} read-only: {err}")
+        raise SystemExit(f"token-usage: cannot open {resolved} read-only: {err}")
     con.row_factory = sqlite3.Row
     return con
 
