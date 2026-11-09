@@ -133,7 +133,7 @@ This repository enforces its commit convention with commitlint.
 - **Self-correction protocol**: classify the failure, apply the minimal fix, re-run the specific sensor, proceed only when green. See `.agents/skills/harness`.
 - **Steering loop**: if a sensor fires more than 2 times in one sprint, update the matching feedforward guide (or create one via `.agents/skills/skill-distiller`) so sensors fire less over time.
 - **Source grounding**: claims about tool behaviour or "best practice" cite the current official document, fetched and quoted at the time (upstream man/adoc page, vendor docs, spec) with the version verified against; search-result snippets are pointers, never evidence.
-- **Metrics events**: after non-trivial tasks, write a JSON event to `.agents/events/YYYY/MM/DD/`.
+- **Metrics events**: after non-trivial tasks, write a JSON event to `.agents/events/YYYY/MM/DD/`. For agent token usage, `python3 scripts/token-usage.py` reads OpenCode's per-session counters read-only and writes one event with `input`/`output`/`reasoning`/`cache_read`/`cache_write`/`total`/`cost_usd` (see `docs/retention.md`).
 
 ---
 
