@@ -68,31 +68,18 @@ def connect_readonly(path: Path) -> sqlite3.Connection:
     try:
         con = sqlite3.connect(uri, uri=True)
     except sqlite3.Error as err:
-        raise SystemExit(f"token-usage: cannot open {resolved} read-only: {err}")
+        raise SystemExit(f"token-usage: cannot open {resolved} read-only: {err}") from err
     con.row_factory = sqlite3.Row
     return con
 
 
-SESSION_FIELDS = ", ".join(
-    [
-        "id",
-        "title",
-        "directory",
-        "model",
-        "agent",
-        "tokens_input",
-        "tokens_output",
-        "tokens_reasoning",
-        "tokens_cache_read",
-        "tokens_cache_write",
-        "cost",
-        "time_created",
-        "time_updated",
-    ]
+SESSION_QUERY = (
+    "SELECT id, title, directory, model, agent, "
+    "tokens_input, tokens_output, tokens_reasoning, "
+    "tokens_cache_read, tokens_cache_write, cost, "
+    "time_created, time_updated "
+    "FROM session_v2 ORDER BY time_updated DESC"
 )
-
-
-SESSION_QUERY = f"SELECT {SESSION_FIELDS} FROM session_v2 ORDER BY time_updated DESC"  # nosec B608
 # A session table is one row per conversation on this machine — thousands at
 # most — so the filters run in Python rather than assembling a WHERE clause.
 # Reading the whole ordered table also keeps the statement a constant, which is
