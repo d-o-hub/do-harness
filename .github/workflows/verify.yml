@@ -10,6 +10,15 @@ on:
   # Manual re-run: a transient runner failure or a quota exhaustion should not
   # require an empty commit to produce fresh evidence.
   workflow_dispatch:
+    inputs:
+      forced-plan:
+        description: >-
+          PROTOTYPE ONLY: force the scope decision so the scoped path can be
+          timed on a throwaway branch. `auto` (the default) is the real
+          classifier, which always answers `full` for a manual dispatch.
+        type: choice
+        options: [auto, full, scoped]
+        default: auto
 
 permissions:
   contents: read
@@ -26,7 +35,59 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  scope:
+    # PROTOTYPE (measurement only): classifies the pull request so the platform
+    # matrix can be skipped when it cannot possibly be affected. The classifier
+    # is fail-closed — `.github/**`, `do-harness.toml`, Rust sources and every
+    # unrecognised path return `full` — so this job can only ever *grant* a
+    # narrower gate for prose, plans, agent skills and Python tooling.
+    name: scope
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      plan: ${{ steps.scope.outputs.plan }}
+      reason: ${{ steps.scope.outputs.reason }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          # The classifier needs the merge base, which a shallow clone omits.
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Classify the change
+        id: scope
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          # Measurement-only override: `workflow_dispatch` always classifies as
+          # `full`, so a forced value is the only way to time the scoped path
+          # without merging this prototype.
+          FORCED_PLAN: ${{ inputs.forced-plan }}
+        run: |
+          python3 scripts/ci_scope.py \
+            --event "$EVENT_NAME" \
+            --pull-request-base "$PR_BASE_SHA" \
+            --format json
+          if [ -n "$FORCED_PLAN" ] && [ "$FORCED_PLAN" != "auto" ]; then
+            echo "plan=$FORCED_PLAN" >> "$GITHUB_OUTPUT"
+            echo "reason=forced by workflow_dispatch input" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Summarise the decision
+        shell: bash
+        env:
+          PLAN: ${{ steps.scope.outputs.plan }}
+          REASON: ${{ steps.scope.outputs.reason }}
+        run: |
+          {
+            echo "### Scope: \`$PLAN\`"
+            echo ""
+            echo "$REASON"
+          } >> "$GITHUB_STEP_SUMMARY"
+
   source-distribution:
+    needs: scope
+    # Scoped runs skip the platform matrix: a prose-only change cannot alter the
+    # packaged binary.
+    if: needs.scope.outputs.plan == 'full'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     strategy:
@@ -80,6 +141,7 @@ jobs:
           if-no-files-found: error
 
   verify:
+    needs: scope
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -208,12 +270,30 @@ jobs:
           CI: "true"
           # Belt and braces: missing tools fail even if CI=true is dropped.
           DO_HARNESS_REQUIRE_TOOLS: "1"
+          SCOPE_PLAN: ${{ needs.scope.outputs.plan }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           set_name=verification
           if [ "$GITHUB_REF" = 'refs/heads/main' ]; then
             set_name=main
           fi
-          ./target/release/do-harness verify --set "$set_name" --format json --strict
+          # PROTOTYPE (measurement only): a scoped pull request runs the sensors
+          # applicable to its own committed range instead of the whole set.
+          # `main` never scopes — it is the release gate — and the flag is
+          # omitted when the base cannot be resolved, which is the same
+          # fail-closed rule the classifier applies.
+          since_args=""
+          if [ "$SCOPE_PLAN" = 'scoped' ]; then
+            base="$PR_BASE_SHA"
+            if [ -n "$base" ] && git rev-parse --verify --quiet "$base^{commit}" >/dev/null; then
+              since_args="--since $base"
+              echo "scoped run against base $base"
+            else
+              echo "scoped plan but the base commit is unavailable; running the full set"
+            fi
+          fi
+          # shellcheck disable=SC2086 # `since_args` is a validated ref or empty
+          ./target/release/do-harness verify --set "$set_name" $since_args --format json --strict
       - name: Assert selected evidence is green
         run: |
           set_name=verification
@@ -333,6 +413,8 @@ jobs:
           if-no-files-found: error
 
   msrv:
+    needs: scope
+    if: needs.scope.outputs.plan == 'full'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -419,6 +501,8 @@ jobs:
   # partitions. Compilation is a separate step from test execution, which makes
   # the two phases independently timed in the job log.
   windows-tests:
+    needs: scope
+    if: needs.scope.outputs.plan == 'full'
     runs-on: windows-latest
     timeout-minutes: 30
     strategy:
@@ -482,6 +566,8 @@ jobs:
         run: cargo nextest run --workspace --release --exclude do-harness-db --partition slice:${{ matrix.shard }}/3 --final-status-level slow --no-fail-fast
 
   windows:
+    needs: scope
+    if: needs.scope.outputs.plan == 'full'
     runs-on: windows-latest
     timeout-minutes: 30
     steps:
@@ -580,6 +666,8 @@ jobs:
           node --test integrations/npm/test/*.test.mjs
 
   selection-portability:
+    needs: scope
+    if: needs.scope.outputs.plan == 'full'
     runs-on: macos-latest
     timeout-minutes: 30
     steps:
@@ -611,6 +699,7 @@ jobs:
     if: always()
     timeout-minutes: 5
     needs:
+      - scope
       - source-distribution
       - verify
       - msrv
@@ -621,6 +710,8 @@ jobs:
       - name: Verify all required dependencies succeeded
         shell: bash
         env:
+          SCOPE_PLAN: ${{ needs.scope.outputs.plan }}
+          SCOPE_REASON: ${{ needs.scope.outputs.reason }}
           SOURCE_DISTRIBUTION_RESULT: ${{ needs.source-distribution.result }}
           VERIFY_RESULT: ${{ needs.verify.result }}
           MSRV_RESULT: ${{ needs.msrv.result }}
@@ -628,9 +719,24 @@ jobs:
           WINDOWS_RESULT: ${{ needs.windows.result }}
           SELECTION_PORTABILITY_RESULT: ${{ needs.selection-portability.result }}
         run: |
+          # A skipped dependency is acceptable only when the scope job said so:
+          # the skip is then the decision under test, not a silent absence.
+          # `scope` itself must always have produced a judgement.
+          if [ "$SCOPE_PLAN" != "scoped" ] && [ "$SCOPE_PLAN" != "full" ]; then
+            echo "Scope job did not produce a judgement: '$SCOPE_PLAN'" >&2
+            exit 1
+          fi
+          echo "Scope: $SCOPE_PLAN — $SCOPE_REASON"
+          # `verify` runs in both plans: a scoped pull request still executes
+          # the sensor suite, it only skips the platform matrix. A skipped or
+          # failed `verify` is never acceptable.
+          if [ "$VERIFY_RESULT" != "success" ]; then
+            echo "Required job 'verify' did not succeed: $VERIFY_RESULT" >&2
+            exit 1
+          fi
+          echo "Required job 'verify' succeeded"
           for name in \
             "source-distribution:$SOURCE_DISTRIBUTION_RESULT" \
-            "verify:$VERIFY_RESULT" \
             "msrv:$MSRV_RESULT" \
             "windows-tests:$WINDOWS_TESTS_RESULT" \
             "windows:$WINDOWS_RESULT" \
@@ -638,6 +744,10 @@ jobs:
           do
             job="${name%%:*}"
             res="${name#*:}"
+            if [ "$res" = "skipped" ] && [ "$SCOPE_PLAN" = "scoped" ]; then
+              echo "Required job '$job' skipped by the scoped plan"
+              continue
+            fi
             if [ "$res" != "success" ]; then
               echo "Required job '$job' did not succeed: $res" >&2
               exit 1
