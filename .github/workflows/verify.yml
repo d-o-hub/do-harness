@@ -19,6 +19,12 @@ on:
         type: choice
         options: [auto, full, scoped]
         default: auto
+      forced-base:
+        description: >-
+          PROTOTYPE ONLY: the ref the scoped run measures its change against.
+          Empty uses the pull request base, which is empty for a dispatch.
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -47,6 +53,7 @@ jobs:
     outputs:
       plan: ${{ steps.scope.outputs.plan }}
       reason: ${{ steps.scope.outputs.reason }}
+      base: ${{ steps.scope.outputs.base }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -62,11 +69,17 @@ jobs:
           # `full`, so a forced value is the only way to time the scoped path
           # without merging this prototype.
           FORCED_PLAN: ${{ inputs.forced-plan }}
+          FORCED_BASE: ${{ inputs.forced-base }}
         run: |
           python3 scripts/ci_scope.py \
             --event "$EVENT_NAME" \
             --pull-request-base "$PR_BASE_SHA" \
             --format json
+          base="$PR_BASE_SHA"
+          if [ -n "$FORCED_BASE" ]; then
+            base="$FORCED_BASE"
+          fi
+          echo "base=$base" >> "$GITHUB_OUTPUT"
           if [ -n "$FORCED_PLAN" ] && [ "$FORCED_PLAN" != "auto" ]; then
             echo "plan=$FORCED_PLAN" >> "$GITHUB_OUTPUT"
             echo "reason=forced by workflow_dispatch input" >> "$GITHUB_OUTPUT"
@@ -271,7 +284,7 @@ jobs:
           # Belt and braces: missing tools fail even if CI=true is dropped.
           DO_HARNESS_REQUIRE_TOOLS: "1"
           SCOPE_PLAN: ${{ needs.scope.outputs.plan }}
-          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_BASE_SHA: ${{ needs.scope.outputs.base }}
         run: |
           set_name=verification
           if [ "$GITHUB_REF" = 'refs/heads/main' ]; then
