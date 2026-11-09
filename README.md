@@ -126,8 +126,9 @@ The harness is designed to be adopted by any codebase, Rust or not:
    (`scripts/check-context-sanitization.py`): the sensor is off unless you
    declare it and set `DO_HARNESS_CONTEXT_SANITIZATION=enabled`, and it never
    captures prompts, tool arguments, or vault contents. `init` then runs the
-   generated contract once and reports `Initial verification: GREEN | RED | VACUOUS`, exiting
-   non-zero on RED instead of claiming a verified workspace.
+   generated contract once and reports
+   `Initial verification: GREEN | INCOMPLETE | RED | VACUOUS`, exiting non-zero
+   on RED instead of claiming a verified workspace.
    Every pack also gets `scripts/check-commitlint.sh`, because the managed
    `commit-msg` hook runs it and blocks the commit when it is missing.
 
@@ -144,6 +145,9 @@ The harness is designed to be adopted by any codebase, Rust or not:
    diffs, i18n), and `node` (Node/JS/TS pack: typecheck, lint, test, build).
    With zero sensors `verify` exits 0 without running any command: a vacuous
    pass, not evidence. Define real sensors before treating verify output as proof.
+   Language packs are presets over the stack-neutral `[[sensors]]` contract;
+   Python and Go use the generic pack with the recipes in
+   [the adoption contract](docs/adoption.md#cross-stack-command-recipes).
    For soft, project-specific facts checks (status-document drift, tracker
    counts) declare `kind = "project-check"`: warn-only unless `severity` says
    otherwise, with an optional `fix` hint printed on failure. `init` scaffolds

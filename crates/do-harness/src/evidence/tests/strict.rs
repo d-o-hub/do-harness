@@ -100,6 +100,7 @@ fn soft_failure_is_recorded_as_warn_not_pass() {
         root: dir.path().display().to_string(),
         failed: vec![],
         unrunnable: vec![],
+        vacuous: false,
         signal_set: None,
         selection: None,
         sensors: vec![crate::report::SensorResult {
@@ -178,6 +179,7 @@ fn warned_sensor_is_recorded_as_warn_and_fails_summary() {
         root: dir.path().display().to_string(),
         failed: vec![],
         unrunnable: vec![],
+        vacuous: false,
         signal_set: None,
         selection: None,
         sensors: vec![crate::report::SensorResult {

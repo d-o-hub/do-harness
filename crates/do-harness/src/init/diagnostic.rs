@@ -10,6 +10,8 @@ pub mod code {
     pub const NO_SUPPORTED_NODE_COMMANDS: &str = "no_supported_node_commands";
     /// The selected Node package-manager binary is not on PATH.
     pub const MISSING_PACKAGE_MANAGER: &str = "missing_package_manager";
+    /// No built-in pack matched; the generic pack was selected.
+    pub const GENERIC_STACK: &str = "generic_stack_selected";
 }
 
 /// One actionable onboarding diagnostic.
@@ -55,6 +57,28 @@ impl InitDiagnostic {
                 .to_owned(),
             action: "Add a test, lint, typecheck, or build script (or matching dependency) and \
                      re-run init, or pass --language node explicitly."
+                .to_owned(),
+        }
+    }
+
+    /// No built-in pack matched an unfamiliar stack.
+    #[must_use]
+    pub fn generic_stack(markers: &[&str]) -> Self {
+        let marker_list = if markers.is_empty() {
+            "no recognized manifest".to_owned()
+        } else {
+            markers.join(", ")
+        };
+        Self {
+            code: code::GENERIC_STACK.to_owned(),
+            path: markers.first().copied().unwrap_or(".").to_owned(),
+            message: format!(
+                "no built-in pack matched the repository markers ({marker_list}); \
+                 the generic pack was selected with zero sensors"
+            ),
+            action: "Declare [[sensors]] in do-harness.toml for this stack; see \
+                     docs/adoption.md#cross-stack-command-recipes. A zero-sensor verify \
+                     is vacuous, not evidence."
                 .to_owned(),
         }
     }

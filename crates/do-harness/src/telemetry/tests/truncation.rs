@@ -44,6 +44,7 @@ async fn record_verify_persists_actionable_nextest_failure_context() {
         root: dir.path().display().to_string(),
         failed: vec!["coverage".to_owned()],
         unrunnable: vec![],
+        vacuous: false,
         sensors: vec![SensorResult {
             fix: None,
             name: "coverage".to_owned(),

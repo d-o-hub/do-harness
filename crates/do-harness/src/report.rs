@@ -128,6 +128,12 @@ impl SensorResult {
 }
 
 /// Aggregate verify report. Serializes to the stable JSON contract.
+// serde's `skip_serializing_if` predicate takes `&T` by contract.
+#[allow(clippy::trivially_copy_pass_by_ref)]
+const fn is_false(value: &bool) -> bool {
+    !*value
+}
+
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct VerifyReport {
     /// True when every sensor passed.
@@ -142,6 +148,10 @@ pub struct VerifyReport {
     pub unrunnable: Vec<String>,
     /// Per-sensor results in run order.
     pub sensors: Vec<SensorResult>,
+    /// True when no sensor was selected. `ok` is then a vacuous pass, not
+    /// verification evidence.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub vacuous: bool,
     /// Development signal set selected via `--set`; absent for full runs.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub signal_set: Option<String>,
@@ -266,7 +276,14 @@ pub fn print_report(report: &VerifyReport, format: Format, quiet: bool) -> anyho
             }
         }
     }
-    if report.ok {
+    if report.vacuous {
+        let footer = "VACUOUS: no sensors selected; this run is not verification evidence.";
+        if format == Format::Json {
+            eprintln!("{footer}");
+        } else {
+            println!("{footer}");
+        }
+    } else if report.ok {
         // A reused run is green but produced no fresh observations, so the
         // unconditional pass footer is replaced by an explicit reuse count.
         let reused = report
@@ -399,6 +416,7 @@ mod tests {
             root: "/tmp/root".to_owned(),
             failed: vec!["check".to_owned()],
             unrunnable: vec![],
+            vacuous: false,
             sensors: vec![SensorResult {
                 fix: None,
                 name: "check".to_owned(),

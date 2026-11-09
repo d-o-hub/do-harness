@@ -319,6 +319,15 @@ pub fn inspect_workspace(root: &Path, requested_language: Option<Language>) -> I
         Language::Generic | Language::Web => Vec::new(),
     };
 
+    if resolved_language == Language::Generic
+        && requested_language.is_none()
+        && declared.is_none()
+        && !has_pkg_json
+    {
+        let markers = super::detect::unknown_stack_markers(root);
+        diagnostics.push(super::diagnostic::InitDiagnostic::generic_stack(&markers));
+    }
+
     if resolved_language == Language::Generic && has_pkg_json {
         if manifest.malformed.is_some() {
             guidance = Some(
@@ -383,6 +392,16 @@ pub fn run_inspect(root: &Path, language: Option<Language>, format: Format) -> R
             } else {
                 for finding in &report.detected {
                     println!("  * {finding}");
+                }
+            }
+            if !report.diagnostics.is_empty() {
+                println!("Onboarding diagnostics:");
+                for diagnostic in &report.diagnostics {
+                    println!(
+                        "  [{}] {}: {}",
+                        diagnostic.code, diagnostic.path, diagnostic.message
+                    );
+                    println!("    action: {}", diagnostic.action);
                 }
             }
             if !report.candidate_commands.is_empty() {
