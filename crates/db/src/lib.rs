@@ -107,3 +107,5 @@ mod tests {
         assert_eq!(super::bind_limit(Some(7)), 7);
     }
 }
+
+// probe: forces the full plan
