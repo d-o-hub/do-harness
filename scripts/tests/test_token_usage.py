@@ -69,7 +69,27 @@ class TokenUsageTests(unittest.TestCase):
         self.assertEqual(report["totals"]["output"], 40)
         self.assertEqual(report["totals"]["total"], 140)
         self.assertEqual(report["totals"]["cache_read"], 5000)
-        self.assertAlmostEqual(report["totals"]["cost_usd"], 1.5)
+
+    def test_cost_is_not_reported(self):
+        """Events count tokens, not money: a cost field must not reappear."""
+        build_db(
+            self.db,
+            [
+                (
+                    "ses_nopay", "t", "/repo", "m", "build",
+                    10, 5, 0, 0, 0, 9.99, 1, 2,
+                )
+            ],
+        )
+        con = self.module.connect_readonly(self.db)
+        report = self.module.summarise(
+            self.module.fetch_sessions(con, ["ses_nopay"], None, False, 1)
+        )
+        con.close()
+        self.assertNotIn("cost_usd", report["totals"])
+        self.assertNotIn("cost_usd", report["sessions"][0]["usage"])
+        payload = self.module.event_payload(report)
+        self.assertNotIn("cost", json.dumps(payload).lower())
 
     def test_total_excludes_cache_and_reasoning(self):
         build_db(

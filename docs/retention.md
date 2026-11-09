@@ -23,17 +23,19 @@ python3 scripts/token-usage.py --all --limit 20   # every recent session here
 python3 scripts/token-usage.py --report           # print only, write nothing
 ```
 
-The event records `input`, `output`, `reasoning`, `cache_read`, `cache_write`,
-`total` and `cost_usd` per session plus a summed total. `total` is
-**input + output only**: `reasoning` is a subset of output, and cache reads and
-writes bill at separate rates, so folding them in would overstate the new
-context a session actually consumed. The script never writes to the OpenCode
-database and selects no credential columns.
+The event records `input`, `output`, `reasoning`, `cache_read`, `cache_write`
+and `total` per session plus a summed total. `total` is **input + output
+only**: `reasoning` is a subset of output, and cache reads and writes are
+counted separately, so folding them in would overstate the new context a
+session actually consumed. Cost is deliberately not recorded — these events
+count tokens, not money, and a price is a provider setting that changes under
+the log. The script never writes to the OpenCode database and selects no
+credential columns.
 
-Events are deliberately local: they describe one machine's sessions and would
-otherwise publish a contributor's cost profile. Compare them across runs with
-your own tooling, or `python3 scripts/token-usage.py --all --report --format json`
-to regenerate the current picture.
+Events are deliberately local: they describe one machine's sessions. Compare
+them across runs with your own tooling, or
+`python3 scripts/token-usage.py --all --report --format json` to regenerate the
+current picture.
 
 The local database holds no CI secrets; CI uploads only the evidence artifact
 and the lockfile hash, never the database.
