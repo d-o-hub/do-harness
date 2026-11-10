@@ -9,7 +9,7 @@ use std::path::Path;
 use std::time::{Duration, Instant};
 
 use crate::pr::checks::{self, ChecksReport};
-use crate::pr::gh::{self, PrListEntry};
+use crate::pr::gh::{self, PermissionOutcome, PrListEntry};
 use crate::pr::readiness::AuthorizationReason;
 use crate::pr::waiver_comment::is_authorized_role;
 
@@ -29,23 +29,42 @@ pub enum Owner {
 
 /// Classifies whether a PR's author is sweep-owned.
 ///
-/// Bot accounts (`[bot]`, dependabot, renovate) and authors with
-/// admin/write/maintain/owner permission are owned. Permission lookup failure
-/// is an unknown identity, never an implicit pass.
+/// The server's own `is_bot` flag is authoritative and costs zero permission
+/// calls (which cannot even answer for an `app/<slug>` login); documented bot
+/// names are the fallback for payloads that omit the flag. For a non-bot login
+/// the collaborator-permission answer decides: an authorized role is owned, a
+/// `404` is a real third party, and an unreadable answer (`403`) is an unknown
+/// identity — never an implicit pass.
 pub fn classify_author(root: &Path, entry: &PrListEntry) -> Owner {
     let Some(author) = &entry.author else {
         return Owner::UnknownIdentity;
     };
-    if author.login.trim().is_empty() {
+    classify_author_with(author, |login| gh::user_permission_outcome(root, login))
+}
+
+/// The classification fold, with the permission read injected.
+///
+/// Bot classification happens before `permission` is ever consulted, so an
+/// App-authored PR (whose `app/<slug>` login the collaborator endpoint cannot
+/// even answer for) costs zero API calls. The closure is the only I/O, which
+/// lets the acceptance table run without a fake `gh`.
+fn classify_author_with<F>(author: &crate::pr::gh::CommentAuthor, permission: F) -> Owner
+where
+    F: FnOnce(&str) -> anyhow::Result<PermissionOutcome>,
+{
+    let login = author.login.trim();
+    if login.is_empty() {
         return Owner::UnknownIdentity;
     }
-    if crate::pr::readiness::is_bot_login(&author.login) {
+    if crate::pr::readiness::is_bot_author(login, author.is_bot) {
         return Owner::Owned;
     }
-    match gh::user_permission(root, &author.login) {
-        Ok(role) if is_authorized_role(&role) => Owner::Owned,
-        Ok(_) => Owner::External,
-        Err(_) => Owner::UnknownIdentity,
+    match permission(login) {
+        Ok(PermissionOutcome::Role(role)) if is_authorized_role(&role) => Owner::Owned,
+        // An empty role is the endpoint's answer with no role attached: it
+        // proves no collaboration relationship, the same as a `404`.
+        Ok(PermissionOutcome::Role(_) | PermissionOutcome::NotCollaborator) => Owner::External,
+        Ok(PermissionOutcome::Unknown(_)) | Err(_) => Owner::UnknownIdentity,
     }
 }
 
@@ -224,4 +243,126 @@ pub fn supersede_comment(keeper: u64, files: &[String], rule: &str) -> String {
     format!(
         "Superseded by #{keeper}: same {list} change on the same base blob, kept by rule ({rule}) — no tree effect remains for this member."
     )
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used)]
+
+    use std::cell::Cell;
+
+    use super::*;
+    use crate::pr::gh::CommentAuthor;
+
+    fn author(login: &str, is_bot: bool) -> CommentAuthor {
+        CommentAuthor {
+            login: login.to_owned(),
+            is_bot,
+        }
+    }
+
+    /// Classifies with a recording permission read, asserting call counts.
+    fn classify(author: &CommentAuthor, outcome: PermissionOutcome) -> (Owner, usize) {
+        let calls = Cell::new(0);
+        let owner = classify_author_with(author, |_login| {
+            calls.set(calls.get() + 1);
+            Ok(outcome)
+        });
+        (owner, calls.get())
+    }
+
+    #[test]
+    fn an_app_authored_dependency_bot_is_owned_with_zero_permission_calls() {
+        // The regression from #514: `gh` reports the login as `app/dependabot`
+        // and the collaborator endpoint answers neither spelling, so any
+        // permission read is both useless and fatal.
+        let (owner, calls) = classify(
+            &author("app/dependabot", true),
+            PermissionOutcome::Unknown("HTTP 403: rate limit exceeded".to_owned()),
+        );
+        assert_eq!(owner, Owner::Owned);
+        assert_eq!(calls, 0, "bot classification must not read permission");
+    }
+
+    #[test]
+    fn the_server_flag_owns_a_bot_whose_name_matches_no_documented_form() {
+        let (owner, calls) = classify(
+            &author("some-app", true),
+            PermissionOutcome::NotCollaborator,
+        );
+        assert_eq!(owner, Owner::Owned);
+        assert_eq!(calls, 0);
+    }
+
+    #[test]
+    fn a_non_bot_author_is_classified_by_the_permission_answer() {
+        for (role, expected) in [
+            ("admin", Owner::Owned),
+            ("write", Owner::Owned),
+            ("maintain", Owner::Owned),
+            ("owner", Owner::Owned),
+            ("read", Owner::External),
+            ("", Owner::External),
+        ] {
+            let (owner, calls) = classify(
+                &author("octocat", false),
+                PermissionOutcome::Role(role.to_owned()),
+            );
+            assert_eq!(owner, expected, "role {role:?}");
+            assert_eq!(calls, 1);
+        }
+    }
+
+    #[test]
+    fn a_not_found_answer_is_a_real_third_party_and_a_forbidden_one_is_unknown() {
+        // 404 proves no collaboration relationship; 403 proves nothing at all.
+        let (external, _) = classify(
+            &author("octocat", false),
+            PermissionOutcome::NotCollaborator,
+        );
+        assert_eq!(external, Owner::External);
+        let (unknown, _) = classify(
+            &author("octocat", false),
+            PermissionOutcome::Unknown("HTTP 403".to_owned()),
+        );
+        assert_eq!(
+            unknown,
+            Owner::UnknownIdentity,
+            "an unreadable author is never owned"
+        );
+    }
+
+    #[test]
+    fn a_missing_or_blank_author_is_an_unknown_identity() {
+        let entry = PrListEntry {
+            number: 1,
+            title: String::new(),
+            url: String::new(),
+            author: None,
+            created_at: String::new(),
+            updated_at: String::new(),
+            is_draft: false,
+            state: "OPEN".to_owned(),
+            base_ref_name: String::new(),
+            base_ref_oid: String::new(),
+            head_ref_name: String::new(),
+            head_ref_oid: String::new(),
+            merge_state_status: String::new(),
+            labels: Vec::new(),
+            head_repository: None,
+        };
+        assert_eq!(
+            classify_author(Path::new("."), &entry),
+            Owner::UnknownIdentity
+        );
+        let blank = PrListEntry {
+            author: Some(author("   ", false)),
+            ..entry
+        };
+        assert_eq!(
+            classify_author(Path::new("."), &blank),
+            Owner::UnknownIdentity,
+            "a blank login is unreadable, not a third party"
+        );
+    }
 }

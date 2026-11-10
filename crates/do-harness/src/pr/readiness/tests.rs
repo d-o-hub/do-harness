@@ -176,3 +176,42 @@ fn conflicts_with_no_reported_checks_do_not_claim_incompleteness() {
     assert!(!summary.incomplete);
     assert!(blockers.is_empty(), "unexpected blockers: {blockers:?}");
 }
+
+#[test]
+fn bot_logins_cover_app_slugs_bot_suffixes_and_dependency_bots() {
+    // Accepted: the `[bot]` suffix, the bare dependency bots, and the `app/`
+    // form `gh pr list --json author` reports for an App author (#514).
+    for login in [
+        "renovate[bot]",
+        "app/dependabot",
+        "dependabot",
+        "app/renovate",
+        "dependabot[bot]",
+        " app/dependabot ", // a padded payload is still the same login
+    ] {
+        assert!(is_bot_login(login), "{login} must classify as a bot");
+    }
+    // Rejected: the match is a whole login, never a substring, so a hostile
+    // account cannot present itself as a bot by carrying its name.
+    for login in [
+        "dependabot-helper",
+        "notdependabot",
+        "app/dependabot-helper",
+        "renovate-bot",
+        "app/",
+        "",
+    ] {
+        assert!(!is_bot_login(login), "{login} must not classify as a bot");
+    }
+}
+
+#[test]
+fn the_server_is_bot_flag_is_authoritative_over_the_name_forms() {
+    // A login no name form matches is still a bot when `GitHub` says so: the
+    // authoritative signal is the flag, not this harness's vocabulary.
+    assert!(is_bot_author("some-app", true));
+    assert!(is_bot_author("app/dependabot", true));
+    // Absent the flag, the documented names remain the fallback.
+    assert!(is_bot_author("app/dependabot", false));
+    assert!(!is_bot_author("octocat", false));
+}

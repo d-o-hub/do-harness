@@ -137,8 +137,15 @@ if [ "$1" = "api" ]; then
             exit 0
             ;;
         *collaborators*|*permission*)
+            # Every permission read is recorded, so a test can prove a
+            # classification cost zero calls (#514).
+            printf '%s\n' "$endpoint" >> "$MOCK_DIR/permission_calls.txt"
             if [ -f "$MOCK_DIR/permission_fail" ]; then
                 echo "HTTP 403: rate limit exceeded" >&2
+                exit 1
+            fi
+            if [ -f "$MOCK_DIR/permission_404" ]; then
+                echo "HTTP 404: Not Found" >&2
                 exit 1
             fi
             if [ -f "$MOCK_DIR/permission.json" ]; then
