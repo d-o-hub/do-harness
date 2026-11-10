@@ -1115,8 +1115,9 @@ The rules are fixed so the numbers are reproducible:
   execute`, `cannot happen`, `let-else`), `feature-gated` (`feature-gated`,
   `cfg(feature`, `no CI job enables`). The labels are the ones `pr waivers`
   prints, so a waiver here and a verdict there name the same class.
-- **comment classes** — a bot login (`[bot]` suffix, `dependabot`, `renovate`)
-  is informational; a human comment is actionable when its body contains one of
+- **comment classes** — a bot login (`[bot]` suffix, the `app/<slug>` form `gh`
+  reports for an App author, and the `dependabot`/`renovate` logins) is
+  informational; a human comment is actionable when its body contains one of
   `must`, `should`, `please`, `needs`, `needed`, `fix`, `add`, `remove`,
   `rename`, `rerun`, `revert` (whole words) or the prefix `waiv` (so `waive`,
   `waiver`, and `waived` all match), and informational otherwise.
@@ -1725,6 +1726,15 @@ owners, no-effect closure, base update, bounded CI wait, readiness snapshot,
 receipt-pinned direct merge, and post-merge main verification. The default is
 a read-only dry run; `--execute --merge` authorizes merges and verified
 closures for owned/bot PRs only. The deterministic path never calls a model.
+
+Author classification consults the server signal first: an author GitHub marks
+`is_bot` is owned outright, so an App-authored PR reported as `app/dependabot`
+costs no permission lookup. Documented bot names (`[bot]` suffix, `app/<slug>`,
+`dependabot`, `renovate`) are the fallback for payloads without the flag. For a
+human login the contributor-permission answer decides: `admin`/`write`/
+`maintain`/`owner` is owned, `404` (not a collaborator) is
+`external`, and `403` (permission unreadable) is `unknown_identity`. An unknown
+identity is never owned, so a rate-limited sweep skips rather than merges.
 
 ### `skills`
 <!-- BEGIN GENERATED: cli-contract skills -->

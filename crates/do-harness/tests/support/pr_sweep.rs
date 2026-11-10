@@ -188,6 +188,37 @@ pub fn one_pr_list(pr: u64) -> Value {
     }])
 }
 
+/// The same inventory with an App-authored, server-declared bot (#514).
+///
+/// `gh pr list --json author` reports `app/dependabot` with `is_bot: true`
+/// exactly like this, and the collaborator-permission endpoint answers `404`
+/// for that spelling.
+pub fn app_bot_pr_list(pr: u64) -> Value {
+    let mut entries = one_pr_list(pr);
+    entries[0]["author"] = json!({ "login": "app/dependabot", "is_bot": true });
+    entries
+}
+
+/// The open inventory for a human author whose bot flag is explicitly false.
+pub fn human_pr_list(pr: u64) -> Value {
+    let mut entries = one_pr_list(pr);
+    entries[0]["author"] = json!({ "login": "octocat", "is_bot": false });
+    entries
+}
+
+/// The `author` override for an App-authored, server-declared bot (#514).
+///
+/// A single-target sweep reads `gh pr view`, so the same payload must be
+/// available in the view fixture as in the list.
+pub fn app_bot_author() -> Value {
+    json!({ "login": "app/dependabot", "is_bot": true })
+}
+
+/// The `author` override for a human author whose bot flag is false.
+pub fn human_author() -> Value {
+    json!({ "login": "octocat", "is_bot": false })
+}
+
 /// A failing check fixture.
 pub fn failing_checks() -> Value {
     json!({
@@ -206,6 +237,21 @@ pub fn failing_checks() -> Value {
 pub fn mutations(root: &Path) -> Vec<String> {
     let path = root.join("mutations.txt");
     std::fs::read_to_string(path)
+        .map(|text| {
+            text.lines()
+                .map(str::to_owned)
+                .filter(|line| !line.trim().is_empty())
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// Reads the collaborator-permission reads the fake `gh` served.
+///
+/// Empty means no permission was ever consulted, which is the strongest form
+/// of "the classification needed no API call" (#514).
+pub fn permission_calls(root: &Path) -> Vec<String> {
+    std::fs::read_to_string(root.join("permission_calls.txt"))
         .map(|text| {
             text.lines()
                 .map(str::to_owned)

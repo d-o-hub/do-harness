@@ -33,10 +33,37 @@ pub(crate) fn is_codecov_author(login: &str) -> bool {
     CODECOV_AUTHORS.contains(&login)
 }
 
-/// Whether `login` is a bot account: `GitHub` Apps (`[bot]` suffix) and the
-/// well-known dependency bots.
+/// Logins this harness documents as dependency bots without needing a `[bot]`
+/// suffix (#514). The set stays deliberately small: the authoritative signal is
+/// `GitHub`'s own `is_bot` flag, not a longer name list.
+const DEPENDENCY_BOT_LOGINS: [&str; 2] = ["dependabot", "renovate"];
+
+/// Prefix `gh` uses for an App author: `gh pr list --json author` reports
+/// `app/dependabot`, not `dependabot`.
+const APP_LOGIN_PREFIX: &str = "app/";
+
+/// Whether `login` is a bot account: `GitHub` Apps (`[bot]` suffix, or the
+/// `app/<slug>` form `gh` reports for an App-authored PR) and the documented
+/// dependency bots.
+///
+/// The `app/` prefix is stripped before any name comparison, so
+/// `app/dependabot` and `dependabot[bot]` classify alike while
+/// `dependabot-helper` and `notdependabot` do not — the match is a whole login,
+/// never a substring.
 pub(crate) fn is_bot_login(login: &str) -> bool {
-    login.ends_with("[bot]") || login == "dependabot" || login == "renovate"
+    let login = login.trim();
+    let name = login.strip_prefix(APP_LOGIN_PREFIX).unwrap_or(login);
+    name.ends_with("[bot]") || DEPENDENCY_BOT_LOGINS.contains(&name)
+}
+
+/// Whether an author is a bot, honouring the server-declared flag first.
+///
+/// `gh` reports `is_bot: true` authoritatively for App and bot accounts, which
+/// covers accounts whose login matches none of the documented name forms. The
+/// name predicate is the fallback for payloads that omit the field.
+#[must_use]
+pub(crate) fn is_bot_author(login: &str, server_is_bot: bool) -> bool {
+    server_is_bot || is_bot_login(login)
 }
 
 #[cfg(test)]

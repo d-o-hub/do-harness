@@ -9,6 +9,10 @@ use serde::Deserialize;
 mod review_threads;
 pub use review_threads::{ReviewThread, review_threads};
 
+#[path = "permission.rs"]
+mod permission;
+pub use permission::{PermissionOutcome, user_permission, user_permission_outcome};
+
 #[allow(unused_imports)]
 #[path = "gh_sweep.rs"]
 mod sweep_extras;
@@ -235,17 +239,16 @@ pub struct Comment {
     pub html_url: Option<String>,
 }
 
-/// Author of a `GitHub` comment.
+/// Author of a `GitHub` comment, review, or pull request.
 #[derive(Debug, Clone, Deserialize)]
 pub struct CommentAuthor {
     pub login: String,
-}
-
-#[derive(Deserialize)]
-struct PermissionResponse {
-    permission: Option<String>,
-    #[serde(rename = "role_name")]
-    role_name: Option<String>,
+    /// `GitHub`'s own App/bot classification, as `gh pr list --json author`
+    /// reports it. Defaults to `false` for payloads that omit the field (`gh
+    /// api` comments and reviews do), so the name predicate remains the
+    /// fallback rather than the field's absence silently demoting a real bot.
+    #[serde(default)]
+    pub is_bot: bool,
 }
 
 #[derive(Deserialize)]
@@ -369,22 +372,6 @@ pub fn issue_comments(root: &Path, number: u64) -> Result<Vec<Comment>> {
         comments.extend(page.context("unexpected issue comments JSON")?);
     }
     Ok(comments)
-}
-
-/// Reads repository permission for a user via `gh api`.
-///
-/// # Errors
-///
-/// Returns an error when `gh api` fails or author permission cannot be determined.
-pub fn user_permission(root: &Path, login: &str) -> Result<String> {
-    if login.trim().is_empty() {
-        bail!("empty login");
-    }
-    let endpoint = format!("repos/{{owner}}/{{repo}}/collaborators/{login}/permission");
-    let res: PermissionResponse =
-        crate::gh::json(root, &["api", &endpoint], "api collaborator permission")?;
-    let perm = res.role_name.or(res.permission).unwrap_or_default();
-    Ok(perm)
 }
 
 /// A submitted review on a pull request.

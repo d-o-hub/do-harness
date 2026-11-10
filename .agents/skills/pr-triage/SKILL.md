@@ -60,7 +60,9 @@ Privilege boundary:
   closures, and duplicate-cluster supersede closures — each only for
   authorized own/bot PRs and only after the #466 receipt revalidation.
 - Drafts, hold labels, closed/conflicting PRs, external authors, and unknown
-  identities are reported as blocked/skipped and never modified. Findings
+  identities are reported as blocked/skipped and never modified. `external` is
+  a `404` from the collaborator endpoint (a real third party); `unknown_identity`
+  is a `403` or unreadable answer, and it is never treated as owned. Findings
   collection always stays `--issues plan`; untracked findings block with the
   explicit `pr findings --issues create` next action.
 - After every merge the sweep waits for exact-merge main verification (bounded
@@ -88,10 +90,14 @@ Run these steps in order. Stop the sweep on any escalation and report it.
    blob, same effect — keep exactly one member per cluster, and close the losers
    as `superseded by #<keeper>`
    ([references/duplicate-clusters.md](references/duplicate-clusters.md)).
-3. **Author policy.** Auto-triage only PRs authored by you or a bot (`[bot]`
-   suffix or the `dependabot`/`renovate` logins). For any other author: review
-   and post findings as a PR comment, then move on. Never update the branch,
-   resolve threads, push fixes, or merge a PR you do not own.
+3. **Author policy.** Auto-triage only PRs authored by you or a bot. Treat the
+   author as a bot when `gh`'s `author.is_bot` is `true` — that flag is
+   authoritative — or, when the payload omits it, when the login is an App or
+   dependency-bot name: a `[bot]` suffix, the `app/<slug>` form `gh pr list`
+   reports (`app/dependabot`), or `dependabot`/`renovate`. The match is the whole
+   login, so `dependabot-helper` is a human account. For any other author:
+   review and post findings as a PR comment, then move on. Never update the
+   branch, resolve threads, push fixes, or merge a PR you do not own.
 4. **State check.** Read `gh pr view PR --json headRefOid,baseRefName`. Run
    `scripts/auto-merge.sh PR`. Exit 1 means an auto-merge request is armed, so
    run it again with `scripts/auto-merge.sh PR --disable` and continue; only a
