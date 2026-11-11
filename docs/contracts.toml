@@ -76,6 +76,11 @@ classification = "maintained"
 reason = "Maintained architecture and epic design plans."
 
 [[rules]]
+glob = "plans/archive/**"
+classification = "historical"
+reason = "Closed experiment and past-release records retained as evidence; their links and examples are not part of the maintained-document gate."
+
+[[rules]]
 glob = "scripts/selection-impact/*.md"
 classification = "maintained"
 reason = "Maintained benchmark and selection experiment documentation."

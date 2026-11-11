@@ -1,9 +1,11 @@
 # Decision Record: Workflow Adopter Corpus Experiment
 
+> **Status:** closed - the proposed corpus was unreproducible and the work was closed unmerged
+> **Recorded:** archived under `plans/archive/`
+
 **Date**: 2026-11-08
 **Experiment ID**: `exp-workflow-adopter-01`
 **Author**: do-harness core team
-**Status**: CLOSED — NOT MERGED
 **Final Verdict**: `VERDICT=NO_GO (unreproducible)`
 
 ---
