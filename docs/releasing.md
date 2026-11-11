@@ -228,10 +228,11 @@ edit, so merge an overridden proposal before new commits land.
   `GITHUB_TOKEN` starts its checks in an **approval required** state, so that click
   is the one step the automation cannot take for itself; give the workflow a
   fine-grained PAT or a GitHub App installation token and it becomes zero-touch.
-- A failed main gate starts `main-repair.yml`. It may open a PR containing only
-  formatting or generated-document repairs. If those commands fail or make no
-  change, it opens one diagnostic issue for the exact SHA instead; it never
-  guesses at a code, test, security, or dependency repair.
+- A failed main gate does not start a repair workflow. Formatting and
+  generated-document drift are already gated on every pull request (`fmt` and
+  `docs-sync` are ordinary sensors in the `verification` set), so they cannot
+  reach `main` through a green gate; a failure that does reach `main` is code,
+  test, security, or dependency work and stays a human repair.
 - The release pipeline serializes per tag. `release.yml`'s
   workflow-level concurrency group is `release-${{ inputs.tag || github.ref_name }}`
   — keyed to the tag being released rather than to the triggering ref — because a
