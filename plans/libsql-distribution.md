@@ -75,7 +75,10 @@ Publishing for the new name was not yet configured. The `v0.3.0` tag exists on
 idempotency check fixed later in #312/`787c19f`) and
 `registry-validation`/`npm-publish`/`release` were skipped. Recovery: configure
 Trusted Publishing for `do-harness-libsql`, re-cut the tag on `787c19f`, then
-complete the registry-validation step above.
+complete the registry-validation step above. Current status and the operator
+sequence are in [Adding a publishable crate](../docs/releasing.md#adding-a-publishable-crate):
+while `0.9.30` is the current version the publish job skips the crate, so a
+green run does not prove its trusted publisher.
 
 ## Upstream issue watch
 

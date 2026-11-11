@@ -53,9 +53,20 @@ cargo binstall do-harness
 Registry source installs through 0.2.1 do not include the checkout's libSQL
 teardown fix; `--locked` does not restore that missing code. That fix ships from
 0.3.0 on — published with registry validation on musl and Windows — so source
-installs from 0.3.0 use the maintained `do-harness-libsql` fork:
-`cargo install do-harness --version 0.3.0 --locked`.
-See [source-distribution validation](https://github.com/d-o-hub/do-harness/blob/main/docs/releasing.md#source-distribution-validation).
+installs use the maintained `do-harness-libsql` fork. Install the current
+release, or pin the oldest version that carries the fix:
+
+<!-- example: id=cargo_install_registry classification=illustrative reason="Registry source install commands; the pinned version documents the libSQL fix boundary." -->
+```bash
+cargo install do-harness --locked                  # current release
+cargo install do-harness --version 0.3.0 --locked  # oldest version with the fix
+```
+
+Every release is validated from the registry on musl and Windows before the
+GitHub Release and npm packages are published (see
+[source-distribution validation](https://github.com/d-o-hub/do-harness/blob/main/docs/releasing.md#source-distribution-validation));
+published versions are listed on the
+[releases page](https://github.com/d-o-hub/do-harness/releases/latest).
 
 Building from source requires Rust 1.85+:
 

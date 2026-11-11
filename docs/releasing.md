@@ -20,24 +20,33 @@ release"). Nothing publishes unless the tagged commit passes the full release se
   asset, and only then publishes, which is the sequence the immutability guidance
   asks for.
 - **crates.io publishes through Trusted Publishing (OIDC); there is no publish
-  secret.** For each published crate — `do-harness-libsql`, `do-harness-types`, `do-harness-db`,
-  `do-harness` — open <https://crates.io> → the crate → **Settings → Trusted
-  Publishing** and add a GitHub publisher with repository `d-o-hub/do-harness`
-  and workflow filename `release.yml`. Leave *environment* empty: the `publish`
-  job declares none, and an environment recorded here but absent from the job
-  fails the exchange. The job takes `id-token: write`, exchanges its OIDC token
-  with `rust-lang/crates-io-auth-action`, and passes the short-lived token to
-  `cargo publish` through `CARGO_REGISTRY_TOKEN` for that step only. A crate
-  with no trusted publisher fails the job loudly at the exchange; revoke any
-  API token created for the previous secret-based path.
-- **Before the first fork release**, recheck the `do-harness-libsql` name and
-  establish crates.io ownership/publication for that new crate. Configure its
-  trusted publisher for the same repository and `release.yml`. If the registry
-  requires an initial authenticated publish before trust can be configured,
-  publish the functional fork once with
+  secret.** Each published crate — `do-harness-libsql`, `do-harness-types`,
+  `do-harness-db`, `do-harness` — needs a GitHub publisher with repository
+  `d-o-hub/do-harness` and workflow filename `release.yml`, under the crate's
+  **Settings → Trusted Publishing** page on <https://crates.io>. Leave
+  *environment* empty: the `publish` job declares none, and an environment
+  recorded here but absent from the job fails the exchange. The three workspace
+  crates are configured (proved by the `v0.4.3` release run on 2026-11-11);
+  `do-harness-libsql` is the exception recorded below. The job takes
+  `id-token: write`, exchanges its OIDC token with
+  `rust-lang/crates-io-auth-action`, and passes the short-lived token to
+  `cargo publish` through `CARGO_REGISTRY_TOKEN` for that step only. The
+  exchange is repository-scoped and runs before the per-crate skip probe, so a
+  missing publisher does **not** fail at the exchange: the crate is skipped
+  while its version is current and fails only when it must upload a new one.
+  Adding a crate is a one-time bootstrap plus trust setup; the full sequence is
+  under "Adding a publishable crate" below.
+- **`do-harness-libsql` is published but its trusted publisher is unverified
+  (recorded 2026-11-11).** The fork `0.9.30` was published manually on
+  2026-10-15 because OIDC cannot create a name. Its trusted publisher is still
+  recorded as unconfigured, so the release job skips the crate before its
+  publish step. That skip is not proof of configuration: the next bump of
+  `vendor/libsql/Cargo.toml` fails at that `cargo publish` until the publisher
+  exists. Check it in the crates.io UI before bumping the fork version; if it
+  is absent, add it. If a fresh name ever needs the same bootstrap, publish
+  once with
   `cargo publish --locked --manifest-path vendor/libsql/Cargo.toml --no-default-features --features core`,
-  then configure trust; the release job skips an existing exact fork version.
-  Do this before tagging, so the OIDC-only job can publish every dependency.
+  then configure trust.
 - npm Trusted Publisher setup is per existing package. If a package has not
   been published yet, perform a one-time authenticated bootstrap publish first;
   npm exposes its **Settings → Trusted Publisher** page only afterward.
@@ -495,7 +504,40 @@ independent of `[workspace.package].version`. Its versioned path dependency
 is normalized to a registry dependency in `do-harness-db`; no `[patch]` is
 needed by consumers. Preserve upstream licensing and provenance on updates.
 
-Before introducing or publishing a new publishable crate, run the pre-publish name check described in [.agents/skills/crates-io-name-check/SKILL.md](../.agents/skills/crates-io-name-check/SKILL.md). Paste the terminal output (`curl` API status and `cargo search` results) into the release PR or pre-publish record to confirm availability and naming appropriateness before the first publish.
+### Adding a publishable crate
+
+Before introducing or publishing a new publishable crate, run the pre-publish
+name check described in
+[.agents/skills/crates-io-name-check/SKILL.md](../.agents/skills/crates-io-name-check/SKILL.md).
+Paste the terminal output (`curl` API status and `cargo search` results) into
+the release PR or pre-publish record to confirm availability and naming
+appropriateness before the first publish. Adding a crate is otherwise a
+one-time sequence; every later release is OIDC-only.
+
+1. **Add it to the publish list.** Add a `publish <crate> "$version" <manifest>`
+   call to the `release.yml` publish step in dependency order — dependencies
+   before dependents. The step stops on the first real failure.
+2. **Bootstrap once with an API token.** From a maintainer machine that has run
+   `cargo login` (credentials in `~/.cargo/credentials.toml`), run
+   `cargo publish --locked --manifest-path <manifest>`. OIDC cannot create a
+   new crate name; this is the only step that needs a local token.
+3. **Configure the trusted publisher.** On <https://crates.io>, open the crate
+   → **Settings → Trusted Publishing** → GitHub, and set repository
+   `d-o-hub/do-harness`, workflow filename `release.yml`, and an empty
+   environment. The `publish` job declares no environment; a value recorded
+   here but absent from the job fails the exchange.
+4. **Prove it with a new version.** The next release must actually upload a new
+   version of the crate. A skipped `already on crates.io` line is not
+   verification, and a successful OIDC exchange is not per-crate proof: the
+   exchange is repository-scoped and runs before the skip probe.
+5. **Keep the credentials out of CI.** The job exchanges and revokes a
+   short-lived token per run; a `CARGO_REGISTRY_TOKEN` repository secret
+   defeats the OIDC model. Revoke the bootstrap token, or keep it only for
+   manual recovery.
+
+**Credentials:** CI never reads `~/.cargo/credentials.toml` or any other local
+cargo login. `cargo login` is for the one-time bootstrap above and for manual
+recovery publishes, not for routine releases.
 
 The CLI crate embeds repository files through symlinked assets
 (`crates/do-harness/assets/compliance.md` → `docs/compliance.md`,
