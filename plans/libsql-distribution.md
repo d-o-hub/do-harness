@@ -70,15 +70,18 @@ release artifacts, or build this checkout with its versioned fork dependency.
 
 `do-harness-libsql` 0.9.30 was published manually to crates.io on 2026-10-15
 (crates.io API: `published_by: d-o-hub`, `trustpub_data: null`) because Trusted
-Publishing for the new name was not yet configured. The `v0.3.0` tag exists on
+Publishing for the new name was not yet configured. The trusted publisher was
+recorded the same day and is listed by the crates.io API (config id 25968,
+verified 2026-11-11). The `v0.3.0` tag exists on
 `6804b41`; its publish job failed (`do-harness-libsql 0.9.30 already exists`, the
 idempotency check fixed later in #312/`787c19f`) and
-`registry-validation`/`npm-publish`/`release` were skipped. Recovery: configure
-Trusted Publishing for `do-harness-libsql`, re-cut the tag on `787c19f`, then
-complete the registry-validation step above. Current status and the operator
-sequence are in [Adding a publishable crate](../docs/releasing.md#adding-a-publishable-crate):
+`registry-validation`/`npm-publish`/`release` were skipped. Recovery: re-cut the
+tag on `787c19f`, then complete the registry-validation step above. Current
+status and the operator sequence are in
+[Adding a publishable crate](../docs/releasing.md#adding-a-publishable-crate):
 while `0.9.30` is the current version the publish job skips the crate, so a
-green run does not prove its trusted publisher.
+green run still does not exercise the publisher; the first fork version bump is
+its proof.
 
 ## Upstream issue watch
 
