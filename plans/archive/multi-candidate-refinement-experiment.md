@@ -1,9 +1,11 @@
 # Decision Record: Multi-Candidate Skill Refinement Feasibility Experiment
 
+> **Status:** closed - `VERDICT=DEFER`; the evaluator had no discriminating power (all 60 runs scored 1.0)
+> **Recorded:** archived under `plans/archive/`
+
 **Date**: 2026-10-18
 **Experiment ID**: `exp-skill-refinement-01`
 **Author**: do-harness core team
-**Status**: COMPLETE
 **Final Verdict**: `VERDICT=DEFER`
 
 ---
@@ -31,7 +33,7 @@ We evaluated the feasibility and efficacy of evidence-driven multi-candidate ski
 
 The four criteria above are **safety gates**: each records that no contract or runtime regression was introduced. None of them is a *benefit* gate, so none of them can fail on guidance quality.
 
-- **Discriminating power of the instrument** (**post-hoc** — added during review on 2026-10-19): **FAIL** — all 60 runs scored `pass_rate = 1.0000` with `pass_rate_variance = 0.0`, so the deterministic suites cannot separate a 66%-compressed `SKILL.md` from the canonical one. Any re-run must establish this criterion *before* execution; `plans/affected-selection-experiment.md` is the predeclared-gate pattern to follow.
+- **Discriminating power of the instrument** (**post-hoc** — added during review on 2026-10-19): **FAIL** — all 60 runs scored `pass_rate = 1.0000` with `pass_rate_variance = 0.0`, so the deterministic suites cannot separate a 66%-compressed `SKILL.md` from the canonical one. Any re-run must establish this criterion *before* execution; `plans/archive/affected-selection-experiment.md` is the predeclared-gate pattern to follow.
 
 **Final Decision**: **`VERDICT=DEFER`** — driven by execution cost together with the absence of a quality-sensitive instrument, and *not* by a failed safety gate.
 

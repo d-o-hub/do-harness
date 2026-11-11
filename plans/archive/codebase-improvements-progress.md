@@ -1,5 +1,8 @@
 # Post-v0.4.1 codebase improvements progress
 
+> **Status:** closed - post-v0.4.1 improvement batch; every tracked item is implemented and verified
+> **Recorded:** archived under `plans/archive/`
+
 ## Baseline
 
 - **Observation and update timestamp:** 2026-10-31T14:19:36Z.
@@ -17,7 +20,7 @@
 | ID | Slice | State | Changed paths / behavior | Evidence | Next action |
 |---|---|---|---|---|---|
 | CG-01 | Baseline refresh | verified | Fast-forwarded local `main` to `fbd3f4fef682c9cbeebefb5a018c855e0ef6aadf`; created branch `chore/latest-main-guardrails` | Clean working tree; `git fetch` updated `origin/main` from `b29d938` to `fbd3f4f`; `git rev-parse HEAD` returns `fbd3f4fef682c9cbeebefb5a018c855e0ef6aadf` | Advance to CG-02 audit tracking records |
-| CG-02 | Current audit | verified | Created `plans/codebase-improvements-progress.md`; appended post-v0.4.1 review and FU-01–FU-03 follow-ups to `plans/analysis-followups.md` | Tracked files established and linked under `plans/` | Advance to CG-03 shared latest-main helper |
+| CG-02 | Current audit | verified | Created `plans/archive/codebase-improvements-progress.md`; appended post-v0.4.1 review and FU-01–FU-03 follow-ups to `plans/archive/analysis-followups.md` | Tracked files established and linked under `plans/` | Advance to CG-03 shared latest-main helper |
 | CG-03 | Shared helper | verified | Created `.agents/skills/harness/scripts/latest-main.sh` with isolated Git environment, `--read-only`, and fetch modes | Unit tests in `test_latest_main.py` passed (7/7); tested `--read-only`, normal fetch, invalid args, non-git dir | Completed |
 | CG-04 | Workflow preflights | verified | Updated `preflight.sh` in issue-to-pr & pr-triage; updated `start-item.sh` in issue-to-pr to call `latest-main.sh` and removed inline fetch | Hermetic workflow tests in `test_latest_main.py` passed (7/7); dry-run and error refusal verified | Completed |
 | CG-05 | AGENTS/harness/skill instructions | verified | Updated `AGENTS.md`, `harness/SKILL.md`, `heuristics.md`, `htn-planner/SKILL.md`, `issue-to-pr/SKILL.md`, `pr-triage/SKILL.md` | `quick_validate.py` passed on all 4 skills; `check-skills-sync.sh` passed | Completed |
@@ -33,7 +36,7 @@
 - **Commit/PR:** PR #410 (implementation branch `chore/latest-main-guardrails`).
 
 ### CG-02
-- **Affected paths:** `plans/codebase-improvements-progress.md`, `plans/analysis-followups.md`.
+- **Affected paths:** `plans/archive/codebase-improvements-progress.md`, `plans/archive/analysis-followups.md`.
 - **Previous behavior:** No tracked progress file for post-v0.4.1 improvements; `analysis-followups.md` ended at v0.4.0 roadmap notes.
 - **New behavior:** Documented baseline, progress table, and follow-ups FU-01 (migration consistency), FU-02 (locale direction audit ordering), FU-03 (missing advertised scheme matrix).
 - **Commit/PR:** PR #410 (implementation branch `chore/latest-main-guardrails`).
@@ -116,7 +119,7 @@
 
 ## References and follow-ups
 
-- Follow-up records: [plans/analysis-followups.md#post-v041-codebase-review-2026-10-31](analysis-followups.md#post-v041-codebase-review-2026-10-31)
+- Follow-up records: [plans/archive/analysis-followups.md#post-v041-codebase-review-2026-10-31](analysis-followups.md#post-v041-codebase-review-2026-10-31)
   - `FU-01`: Migration-backup consistency under concurrency (`crates/db/src/migrate.rs:299-319`).
   - `FU-02`: Web-UI locale audit direction check order (`integrations/web-ui/lib/i18n-audit.mjs:99-117`).
   - `FU-03`: Web-UI advertised route × viewport × locale × scheme matrix (`integrations/web-ui/README.md:4`, `integrations/web-ui/lib/audit.mjs:102-125`).

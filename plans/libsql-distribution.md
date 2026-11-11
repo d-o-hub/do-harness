@@ -1,5 +1,8 @@
 # libSQL source-distribution parity (#289)
 
+> **Status:** decided - workspace-local patch could not survive publication; vendored line documented
+> **Recorded:** `plans/`
+
 ## Decision
 
 The workspace-local `[patch.crates-io]` did not survive publication. Cargo

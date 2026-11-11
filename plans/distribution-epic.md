@@ -302,7 +302,7 @@ was already at `0.1.1`, so the run correctly skipped each publish
 > npm packages, and created the GitHub Release. `do-harness-libsql`'s own
 > Trusted Publisher remains unconfigured and untested: the version already on
 > crates.io is skipped, so it only bites when the fork version bumps. Detail:
-> `plans/analysis-followups.md` (R1).
+> `plans/archive/analysis-followups.md` (R1).
 
 | Slice | Exit criteria |
 |-------|---------------|

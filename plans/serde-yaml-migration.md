@@ -1,5 +1,8 @@
 # serde_yaml migration (retires the RUSTSEC-2024-0449 ignore)
 
+> **Status:** active - the RUSTSEC-2024-0449 ignore stays until the SDK drops `serde_yaml`
+> **Recorded:** `plans/`
+
 ## Decision
 
 RUSTSEC-2024-0449 marks `unsafe-libyaml` 0.2.11 — pulled only transitively by

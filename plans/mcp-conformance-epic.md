@@ -250,7 +250,7 @@ default-on.
   workspace 1.85; holds only while the feature is off). One adjacent gap worth
   closing: `.clippy.toml` declares no `msrv = "1.85"`, so clippy can suggest
   post-1.85 idioms that pass on the pinned 1.99 channel and fail the MSRV job.
-  See `plans/analysis-followups.md` (F3).
+  See `plans/archive/analysis-followups.md` (F3).
 
 ### Bump done — rmcp 3.5.0 → 3.5.1 (2026-10-16)
 
@@ -263,5 +263,5 @@ bump landed with the full gate set from the note above: `cargo update -p rmcp
 scripts/check-audit.sh` clean (cargo-audit 0.22.2, 290 crates); the machete and
 powerset scripts' pin comments updated. MSRV is unchanged: rmcp 3.x still
 requires 1.88, so the row above holds only while `mcp-surface` is off. The
-`F3` item in `plans/analysis-followups.md` is closed by this bump (the adjacent
+`F3` item in `plans/archive/analysis-followups.md` is closed by this bump (the adjacent
 `.clippy.toml msrv` gap was already closed).

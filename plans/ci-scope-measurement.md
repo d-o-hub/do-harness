@@ -1,5 +1,8 @@
 # CI scoping measurement — 2026-11-09
 
+> **Status:** recorded - one-off measurement backing the change-selection proposal
+> **Recorded:** `plans/`
+
 Measured on `d-o-hub/do-harness` with a throwaway prototype: a `scope` job that
 classifies the pull request with `scripts/ci_scope.py`, then lets five platform
 jobs skip when the change cannot affect them. Both runs used the same prototype

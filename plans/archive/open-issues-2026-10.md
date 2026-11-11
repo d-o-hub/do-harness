@@ -3,6 +3,7 @@
 > **Status:** closed — this records the completed October 2026 batch
 > (#390–#394), each merged via its PR. It is not a live queue; see current
 > task state via `do-harness task list` and the other `plans/` records.
+> **Recorded:** archived under `plans/archive/`
 
 One focused change per issue, based on `3493617` (main confirmed through the
 GitHub connector). The local runner's Git proxy was unreachable and its `gh`

@@ -1,5 +1,8 @@
 # `do-harness sync` — external adopter validation
 
+> **Status:** recorded - external adopter validation of `sync` at v0.1.49
+> **Recorded:** `plans/`
+
 Validation of the `sync` command shipped in #511 against a repository that is a
 real harness adopter rather than this one: `d-o-hub/rust-self-learning-memory`
 at `a190a301` (v0.1.49), cloned read-only. No ref was pushed to that repository;

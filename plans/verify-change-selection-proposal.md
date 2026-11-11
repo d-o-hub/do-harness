@@ -1,6 +1,9 @@
 # Proposal: make `verify` change-selection usable outside the working tree
 
-Status: **proposed** · Measured on 2026-11-09 · Affects `do-harness` CLI, CI policy
+> **Status:** proposed - awaiting a decision; measured 2026-11-09
+> **Recorded:** `plans/`
+
+Measured on 2026-11-09 · Affects `do-harness` CLI, CI policy
 
 ## Why this is a CLI problem
 

@@ -1,9 +1,11 @@
 # Decision Record: Affected-Component Routing Experiment
 
+> **Status:** closed - `VERDICT=NO_GO`; affected-component routing did not pay for itself and is not on any roadmap
+> **Recorded:** archived under `plans/archive/`
+
 **Date**: 2026-10-05
 **Experiment ID**: `exp-selection-01`
 **Author**: do-harness core team
-**Status**: COMPLETE
 **Final Verdict**: `VERDICT=NO_GO`
 
 ---
