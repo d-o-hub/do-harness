@@ -11,6 +11,12 @@
 # publish run and matches only that message: a genuine typo elsewhere in the
 # same file still fails, and a future actionlint that knows `queue` simply
 # never matches the pattern.
+# Supported Intel label added after the pinned actionlint 1.7.7 catalog.
+# https://github.com/actions/runner-images#available-images
+self-hosted-runner:
+  labels:
+    - macos-15-intel
+
 paths:
   .github/workflows/release.yml:
     ignore:

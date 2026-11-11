@@ -276,15 +276,15 @@ jobs:
             musl: true
             binary: do-harness
             archive: tar.gz
-          # Both Darwin targets build on the arm64 runner; the x86_64 target
-          # cross-compiles with Apple clang.
+          # macOS 14 runners retired on 2026-11-02. Use supported macOS 15
+          # runners and smoke-test each Darwin binary on its native architecture.
           - target: x86_64-apple-darwin
-            os: macos-14
+            os: macos-15-intel
             musl: false
             binary: do-harness
             archive: tar.gz
           - target: aarch64-apple-darwin
-            os: macos-14
+            os: macos-15
             musl: false
             binary: do-harness
             archive: tar.gz
