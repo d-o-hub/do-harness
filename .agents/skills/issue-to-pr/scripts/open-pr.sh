@@ -23,6 +23,42 @@ harness_bin() {
   fi
 }
 
+# Turns an issue title into a conventional-commit subject.
+#
+# A squash merge uses the PR title as the commit subject, so the title has to
+# satisfy `commitlint` even though a tracker title does not. A title that opens
+# with a sanctioned type keeps it; anything else — `experiment(benchmarks):`, a
+# `[P2]` tag, a raw panic line — keeps its text but takes the `chore` type, the
+# honest classification for a change that proposes work rather than performing
+# it. The body is lowercased because commitlint demands it.
+issue_title_to_subject() {
+  local raw="$1" type="chore" scope="" rest
+  # Only the types `scripts/check-commitlint.sh` accepts are reused.
+  if [[ "$raw" =~ ^(feat|fix|docs|chore|refactor|test|build|ci|perf|revert)(\(([^\)]*)\))?!?:[[:space:]]*(.*)$ ]]; then
+    type="${BASH_REMATCH[1]}"
+    scope="${BASH_REMATCH[3]}"
+    rest="${BASH_REMATCH[4]}"
+  else
+    rest="$raw"
+  fi
+  # Drop a leading tracker tag such as `[harness:cli]` and any stray brackets.
+  rest="$(printf '%s' "$rest" | sed -E 's/^(\[[^]]*\][[:space:]]*)+//')"
+  rest="$(printf '%s' "$rest" | tr '[:upper:]' '[:lower:]')"
+  # `<path>:#:#` is a placeholder shape, not prose; collapse runs of it.
+  rest="$(printf '%s' "$rest" | sed -E 's/[<>#:*()]+/ /g; s/[[:space:]]+/ /g; s/^ //; s/ $//')"
+  # commitlint constrains the scope to `[a-z0-9._/-]+`, so a title written
+  # `feat(PR):` would be rejected for its case alone.
+  scope="$(printf '%s' "$scope" | tr '[:upper:]' '[:lower:]')"
+  # A title that is nothing but a tracker tag leaves no prose behind; name the
+  # change rather than emitting an empty subject.
+  [ -n "$rest" ] || rest="address the tracked issue"
+  if [ -n "$scope" ]; then
+    printf '%s(%s): %s' "$type" "$scope" "$rest"
+  else
+    printf '%s: %s' "$type" "$rest"
+  fi
+}
+
 kind=""
 id=""
 title=""
@@ -73,6 +109,14 @@ esac
 if [ -z "$title" ]; then
   if [ "$kind" = issue ]; then
     title="$(gh issue view "$id" --json title | jq -r '.title')"
+    # A squash merge uses the PR title as the commit subject, and `commitlint`
+    # requires `type(scope): lowercase subject`. An issue title is not bound by
+    # that rule — an auto-filed `[harness:cli] error: panic at …` defect is not
+    # conventional at all — so a non-conventional one silently breaks `main` on
+    # merge. Prefix a conforming subject rather than inheriting the issue title.
+    if ! printf '%s' "$title" | grep -qE '^(feat|fix|docs|chore|refactor|test|build|ci|perf|revert)(\([^)]*\))?!?: '; then
+      title="$(issue_title_to_subject "$title")"
+    fi
   else
     bin="$(harness_bin)"
     title="$("$bin" --root "$root" task show "$id" --format json | jq -r '.title')"

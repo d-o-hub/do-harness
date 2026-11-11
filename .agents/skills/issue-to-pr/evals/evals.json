@@ -14,7 +14,8 @@
         "contains:start_branch.txt|issue-61-fix-parser-crash-on-empty-input",
         "contains:pr_61.txt|PR #101 created",
         "contains:pushed_branch.txt|issue-61-fix-parser-crash-on-empty-input",
-        "contains:gh_calls.log|Closes #61"
+        "contains:gh_calls.log|Closes #61",
+        "contains:pr_title_conventional.txt|status=conventional"
       ]
     },
     {
