@@ -25,9 +25,11 @@ release"). Nothing publishes unless the tagged commit passes the full release se
   `d-o-hub/do-harness` and workflow filename `release.yml`, under the crate's
   **Settings → Trusted Publishing** page on <https://crates.io>. Leave
   *environment* empty: the `publish` job declares none, and an environment
-  recorded here but absent from the job fails the exchange. The three workspace
-  crates are configured (proved by the `v0.4.3` release run on 2026-11-11);
-  `do-harness-libsql` is the exception recorded below. The job takes
+  recorded here but absent from the job fails the exchange. All four crates are
+  configured, verified on 2026-11-11 through the crates.io trusted-publishing
+  API; the three workspace crates also published through the `v0.4.3` release
+  run. `do-harness-libsql` has a publisher but no OIDC upload yet — see the next
+  item. The job takes
   `id-token: write`, exchanges its OIDC token with
   `rust-lang/crates-io-auth-action`, and passes the short-lived token to
   `cargo publish` through `CARGO_REGISTRY_TOKEN` for that step only. The
@@ -36,14 +38,17 @@ release"). Nothing publishes unless the tagged commit passes the full release se
   while its version is current and fails only when it must upload a new one.
   Adding a crate is a one-time bootstrap plus trust setup; the full sequence is
   under "Adding a publishable crate" below.
-- **`do-harness-libsql` is published but its trusted publisher is unverified
-  (recorded 2026-11-11).** The fork `0.9.30` was published manually on
-  2026-10-15 because OIDC cannot create a name. Its trusted publisher is still
-  recorded as unconfigured, so the release job skips the crate before its
-  publish step. That skip is not proof of configuration: the next bump of
-  `vendor/libsql/Cargo.toml` fails at that `cargo publish` until the publisher
-  exists. Check it in the crates.io UI before bumping the fork version; if it
-  is absent, add it. If a fresh name ever needs the same bootstrap, publish
+- **`do-harness-libsql` has a trusted publisher but has never used it.** The
+  fork `0.9.30` was published manually on 2026-10-15 because OIDC cannot create
+  a name. Its publisher — repository `d-o-hub/do-harness`, workflow
+  `release.yml`, no environment — was recorded the same day and is listed by the
+  crates.io trusted-publishing API (config id 25968, verified 2026-11-11 with
+  `GET https://crates.io/api/v1/trusted_publishing/github_configs?crate=<name>`
+  and an authenticated token). No fork version has been uploaded through it
+  yet: while `0.9.30` is current the release job skips the crate at the
+  per-crate probe, so a green run still does not exercise the publisher. The
+  next bump of `vendor/libsql/Cargo.toml` is the first real proof — watch that
+  `cargo publish` step. If a fresh name ever needs the same bootstrap, publish
   once with
   `cargo publish --locked --manifest-path vendor/libsql/Cargo.toml --no-default-features --features core`,
   then configure trust.
