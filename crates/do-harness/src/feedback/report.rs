@@ -417,6 +417,13 @@ pub fn file_failure(
 ///
 /// The previous hook still runs, so the panic message and backtrace are printed
 /// as before.
+///
+/// A broken-pipe panic is the one exception: the reader stopped asking for
+/// output, which is a finished job rather than a defect in this tool. Filing it
+/// would mail the tracker a new issue for every `do-harness … | head`, and no
+/// fix could ever close them. On Unix that write now dies of `SIGPIPE` before
+/// it can panic at all; this guard covers the platforms where the signal does
+/// not exist and any path that still reaches the unwrap.
 pub fn install_panic_hook() {
     let previous = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
@@ -430,6 +437,9 @@ pub fn install_panic_hook() {
             .map(|text| (*text).to_owned())
             .or_else(|| payload.downcast_ref::<String>().cloned())
             .unwrap_or_else(|| "panic with a non-string payload".to_owned());
+        if crate::stdout::is_broken_pipe_message(&message) {
+            return;
+        }
         let location = info.location().map_or_else(
             || "unknown location".to_owned(),
             |loc| format!("{}:{}:{}", loc.file(), loc.line(), loc.column()),

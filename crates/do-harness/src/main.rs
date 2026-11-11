@@ -74,6 +74,7 @@ mod skill_write;
 mod skills;
 mod split;
 mod status;
+mod stdout;
 mod sync;
 mod task;
 mod telemetry;
@@ -114,18 +115,41 @@ impl std::fmt::Display for CliError {
     }
 }
 
-#[tokio::main(flavor = "current_thread")]
-async fn main() -> ExitCode {
+// A plain `main` rather than `#[tokio::main]`: the dispatch future has to be
+// polled *inside* `catch_unwind`, so the runtime is built here and the block-on
+// call is what the guard wraps. `#[tokio::main]` would enter a runtime first and
+// leave nothing to catch.
+fn main() -> ExitCode {
     // Diagnostic context only: the arguments are reported, never used for
     // authorization.
     // nosemgrep: rust.lang.security.args.args
     diag::set_argv(std::env::args().collect());
+    // Quieting the expected pipe panic happens before the reporting hook is
+    // installed, so the two compose: this one recognises a broken pipe and stays
+    // silent, and every other panic still reaches the reporting hook below.
+    stdout::install_panic_hook_quieting_broken_pipes();
     feedback::report::install_panic_hook();
-    let cli = Cli::parse();
-    let root = cli.root.clone();
-    match dispatch::run(cli).await {
-        Ok(()) => ExitCode::SUCCESS,
-        Err(err) => {
+
+    // A broken-pipe panic must surface as `Err` here instead of aborting the
+    // process: that is what turns `do-harness … | head` from exit 101 plus a
+    // backtrace into the quiet pipe status a pipeline expects.
+    // `AssertUnwindSafe` is sound because the only observed unwind is a failed
+    // stdout write, after which the process is leaving and no invariant is
+    // re-read.
+    let outcome = std::panic::catch_unwind(|| {
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .map_err(|err| CliError::Usage(anyhow::Error::from(err)))?;
+        let cli = Cli::parse();
+        let root = cli.root.clone();
+        let result = runtime.block_on(dispatch::run(cli));
+        Ok::<_, CliError>((result, root))
+    });
+
+    match outcome {
+        Ok(Ok((Ok(()), _))) => ExitCode::SUCCESS,
+        Ok(Ok((Err(err), root))) => {
             let code = err.exit_code();
             let class = match &err {
                 CliError::Usage(_) => feedback::report::FailureClass::Usage,
@@ -138,5 +162,20 @@ async fn main() -> ExitCode {
             eprintln!("error: {message}");
             ExitCode::from(code)
         }
+        Ok(Err(err)) => {
+            let code = err.exit_code();
+            let message = format!("{err:#}");
+            diag::record(&format!("error: {message}"));
+            eprintln!("error: {message}");
+            ExitCode::from(code)
+        }
+        // The reader closed the pipe. Report the status a shell gives a writer
+        // killed by `SIGPIPE` so `| head` looks like every other pipeline.
+        Err(payload) => stdout::broken_pipe_exit(payload.as_ref()).map_or_else(
+            // A panic that is not a broken pipe keeps its usual abort semantics;
+            // re-raising it preserves the message, backtrace, and exit code.
+            || std::panic::resume_unwind(payload),
+            ExitCode::from,
+        ),
     }
 }
