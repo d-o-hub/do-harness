@@ -13,6 +13,7 @@ fn run(name: &str, status: &str, conclusion: Option<&str>) -> CheckRun {
         conclusion: conclusion.map(str::to_owned),
         html_url: None,
         app: Some(CheckApp {
+            id: None,
             slug: Some("github-actions".to_owned()),
         }),
         started_at: None,
@@ -23,6 +24,7 @@ fn run(name: &str, status: &str, conclusion: Option<&str>) -> CheckRun {
 fn app_run(name: &str, app: &str, conclusion: &str) -> CheckRun {
     let mut check = run(name, "completed", Some(conclusion));
     check.app = Some(CheckApp {
+        id: None,
         slug: Some(app.to_owned()),
     });
     check

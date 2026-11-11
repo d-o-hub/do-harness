@@ -15,70 +15,10 @@ use std::path::Path;
 mod support;
 #[cfg(unix)]
 use support::pr_readiness::{fake_gh_router, run_pr};
+#[cfg(unix)]
+use support::pr_readiness_fixtures::{BASE, HEAD, green_checks, reason_codes, write_view};
 
 #[cfg(unix)]
-const HEAD: &str = "2222222222222222222222222222222222222222";
-#[cfg(unix)]
-const BASE: &str = "1111111111111111111111111111111111111111";
-
-#[cfg(unix)]
-fn write_view(root: &Path, pr: u64, overrides: &Value) {
-    let mut view = json!({
-        "number": pr,
-        "baseRefName": "main",
-        "baseRefOid": BASE,
-        "headRefName": "topic",
-        "headRefOid": HEAD,
-        "mergeStateStatus": "CLEAN",
-        "mergeable": "MERGEABLE",
-        "autoMergeRequest": null,
-        "reviewDecision": "",
-        "state": "OPEN",
-        "isDraft": false,
-        "labels": [],
-        "headRepository": { "nameWithOwner": "acme/widget" }
-    });
-    if let (Some(target), Some(source)) = (view.as_object_mut(), overrides.as_object()) {
-        for (key, value) in source {
-            target.insert(key.clone(), value.clone());
-        }
-    }
-    std::fs::write(root.join("view.json"), view.to_string()).unwrap();
-}
-
-#[cfg(unix)]
-fn green_checks(root: &Path) {
-    std::fs::write(
-        root.join("check_runs.json"),
-        json!({
-            "total_count": 1,
-            "check_runs": [{
-                "id": 1,
-                "name": "verify",
-                "status": "completed",
-                "conclusion": "success",
-                "app": { "slug": "github-actions" }
-            }]
-        })
-        .to_string(),
-    )
-    .unwrap();
-}
-
-#[cfg(unix)]
-fn reason_codes(stdout: &str) -> Vec<String> {
-    let report: Value = serde_json::from_str(stdout).unwrap_or(Value::Null);
-    report["authorization"]["reasons"]
-        .as_array()
-        .map(|reasons| {
-            reasons
-                .iter()
-                .filter_map(|r| r["code"].as_str().map(str::to_owned))
-                .collect()
-        })
-        .unwrap_or_default()
-}
-
 #[cfg(unix)]
 #[test]
 fn a_clean_green_pull_request_is_merge_allowed_with_a_receipt() {

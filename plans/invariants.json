@@ -460,5 +460,11 @@
     "rationale": "`$GITHUB_OUTPUT` is a file the runner reads, not a shell variable, so a step that publishes `commits=<n>` and then prints `$commits` fails under `set -u` — run 41814288853 died that way one statement after a correct derivation — and `actionlint` excludes shellcheck's SC2154 for embedded scripts, so no other workflow sensor could see it",
     "sensor": "scripts/check-workflow-shell.py: SC2154 over every `run:` block after declaring its workflow-, job- and step-level `env:` keys, with `--self-test` proving both directions",
     "category": "ci"
+  },
+  {
+    "invariant": "Merge eligibility derives from the server ruleset when no local merge policy exists",
+    "rationale": "An adopting repository has no plans/pr-merge-policy.toml, so reading only the overlay left merge authorization permanently UNKNOWN and the tool could merge in this repository alone. The server rules are authoritative and already readable through the API; the overlay becomes an optional strict tightening, and an unreadable ruleset still fails closed as policy_unavailable.",
+    "sensor": "cargo test -p do-harness --bin do-harness rules_tests (pr::rules_tests)",
+    "category": "architecture"
   }
 ]

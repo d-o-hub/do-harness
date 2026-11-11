@@ -16,7 +16,7 @@ use anyhow::{Context, Result};
 
 use super::ancestry;
 use super::gh;
-use super::policy::{self, PolicyDecision};
+use super::policy_source;
 #[allow(unused_imports)]
 pub use super::waiver_comment::{CodecovStatus, CodecovSummary, WaiverAuditRecord};
 use crate::CliError;
@@ -162,14 +162,16 @@ pub fn evaluate_with_receipt(
         let findings = evaluate_findings_block(root, &view, &mut blockers);
 
         // 6. Server policy and ancestry proof
-        let policy_report = policy::evaluate(root).ok();
-        let (policy_known, policy_ok, policy_revision) = match &policy_report {
-            Some(report) => (
-                report.decision != PolicyDecision::Unknown,
-                report.decision == PolicyDecision::Pass,
-                report.policy_sha256.clone(),
-            ),
-            None => (false, false, None),
+        let resolved_policy = policy_source::resolve(root, &view.base_ref_name);
+        let policy_warnings = resolved_policy.warnings.clone();
+        let (policy_known, policy_ok, policy_revision) = (
+            resolved_policy.known,
+            resolved_policy.ok,
+            resolved_policy.revision.clone(),
+        );
+        let rule_violations = match &resolved_policy.rules {
+            Some(rules) => rules.gate(checks.entries.as_slice()),
+            None => Vec::new(),
         };
         let ancestry_proof = ancestry::compare(root, &view.base_ref_oid, &view.head_ref_oid).ok();
 
@@ -205,6 +207,7 @@ pub fn evaluate_with_receipt(
                 findings,
                 authorization,
                 blockers,
+                warnings: Vec::new(),
             });
         }
 
@@ -220,6 +223,8 @@ pub fn evaluate_with_receipt(
             policy_revision,
             policy_ok,
             policy_known,
+            policy_source: resolved_policy.source,
+            rule_violations: &rule_violations,
             ancestry: ancestry_proof.as_ref(),
             now_unix,
         };
@@ -244,6 +249,7 @@ pub fn evaluate_with_receipt(
             findings,
             authorization,
             blockers,
+            warnings: policy_warnings,
         });
     }
 

@@ -29,6 +29,13 @@ pub struct ReadinessReport {
     #[serde(default = "default_authorization")]
     pub authorization: Authorization,
     pub blockers: Vec<String>,
+    /// Non-fatal policy observations: an empty required set, a rules API error.
+    ///
+    /// Warnings never change the verdict. An empty required set in particular
+    /// is reported rather than silently treated as "nothing to check", because
+    /// a ruleset that requires no checks says nothing about whether any ran.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub warnings: Vec<String>,
 }
 
 /// A report parsed without an authorization block (older artifacts) must not

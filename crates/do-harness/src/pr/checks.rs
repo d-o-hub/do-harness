@@ -89,6 +89,13 @@ pub struct CheckEntry {
     pub name: String,
     /// App slug for a check run, or `status` for a legacy status.
     pub source: String,
+    /// Numeric app id that published the run, when `GitHub` reports one.
+    ///
+    /// A ruleset requires `(context, integration_id)`; matching on the name
+    /// alone would let any app satisfy a required context, so the identity is
+    /// carried here for the comparison.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub app_id: Option<u64>,
     /// `check` or `status`.
     pub kind: String,
     /// Raw status/state reported by `GitHub`.
@@ -248,9 +255,11 @@ fn classify_runs(check_runs: Vec<CheckRun>, policy: &ChecksPolicy) -> Vec<CheckE
             .as_ref()
             .and_then(|app| app.slug.clone())
             .unwrap_or_else(|| "unknown".to_owned());
+        let app_id = run.app.as_ref().and_then(|app| app.id);
         entries.push(CheckEntry {
             name: run.name.clone(),
             source,
+            app_id,
             kind: "check".to_owned(),
             state: run.status.clone(),
             conclusion: run.conclusion.clone(),
@@ -278,6 +287,10 @@ fn classify_statuses(statuses: Vec<CommitStatus>, policy: &ChecksPolicy) -> Vec<
         entries.push(CheckEntry {
             name: status.context.clone(),
             source: "status".to_owned(),
+            // The commit-status API carries no app identity, so a required
+            // context that names an `integration_id` cannot be satisfied here
+            // and the comparison fails closed.
+            app_id: None,
             kind: "status".to_owned(),
             state: status.state.clone(),
             conclusion: None,

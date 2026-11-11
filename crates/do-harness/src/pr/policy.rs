@@ -26,6 +26,10 @@ use model::{BranchRule, RulesetDetail, RulesetSummary};
 /// Path to the repository PR merge policy relative to the workspace root.
 pub const POLICY_PATH: &str = "plans/pr-merge-policy.toml";
 
+/// Explains what the absent overlay means, for the derived-mode warning.
+pub const POLICY_ABSENT_HINT: &str =
+    "add plans/pr-merge-policy.toml to pin these rules and turn the derived mode strict";
+
 fn sha256_hex(bytes: &[u8]) -> String {
     hex::encode(Sha256::digest(bytes))
 }
@@ -217,6 +221,64 @@ fn render_text(report: &PrPolicyReport) {
     }
 }
 
+/// Reports the server-derived merge rules for a repository with no overlay.
+///
+/// # Errors
+///
+/// Returns [`CliError::Usage`] (exit 2) when the ruleset cannot be read, which
+/// is the same fail-closed verdict the merge path takes.
+fn run_derived(root: &Path, format: Format) -> Result<(), CliError> {
+    let rules = super::rules::MergeRules::load(root, "main").map_err(|err| {
+        CliError::Usage(anyhow!(
+            "the server merge rules could not be derived: {err:#}"
+        ))
+    })?;
+    if format == Format::Json {
+        let json =
+            serde_json::to_string_pretty(&rules).map_err(|e| CliError::Usage(anyhow!("{e}")))?;
+        println!("{json}");
+        return Ok(());
+    }
+    println!("PR Merge Rules (derived from the server)");
+    println!("=========================================");
+    println!("Source: server ruleset (no {POLICY_PATH} present)");
+    println!("Rules SHA-256: {}", rules.digest);
+    println!(
+        "Strict up-to-date: {}",
+        if rules.strict_up_to_date { "yes" } else { "no" }
+    );
+    println!(
+        "Linear history: {}",
+        if rules.linear_history { "yes" } else { "no" }
+    );
+    println!(
+        "Review threads must resolve: {}",
+        if rules.thread_resolution { "yes" } else { "no" }
+    );
+    let methods: Vec<&str> = rules.usable_methods().iter().map(|m| m.as_str()).collect();
+    println!("Usable merge methods: {}", methods.join(", "));
+    if rules.has_no_required_checks() {
+        println!("\nWARNING: the ruleset requires no status checks.");
+        println!(
+            "An empty required set is not proof that verification ran; add {POLICY_PATH} to tighten."
+        );
+    } else {
+        println!("\nRequired status checks ({}):", rules.required.len());
+        for required in &rules.required {
+            match required.integration_id {
+                Some(id) => println!("  - {} (app {id})", required.context),
+                None => println!("  - {} (any app)", required.context),
+            }
+        }
+    }
+    if rules.merge_method_unavailable() {
+        return Err(CliError::Verify(anyhow!(
+            "the ruleset permits only merge methods the repository disables"
+        )));
+    }
+    Ok(())
+}
+
 /// Executes `doctor pr-policy` check and emits reports.
 ///
 /// # Errors
@@ -224,6 +286,13 @@ fn render_text(report: &PrPolicyReport) {
 /// Returns `CliError::Verify` on drift (exit 1), or `CliError::Usage` on
 /// indeterminate/unknown status (exit 2).
 pub fn run(root: &Path, format: Format) -> Result<(), CliError> {
+    // An adopting repository has no overlay and never will. Rather than
+    // reporting an indeterminate policy, describe the rules the server actually
+    // enforces, read-only: this is a report command, so it neither gates a merge
+    // nor writes anything.
+    if !root.join(POLICY_PATH).exists() {
+        return run_derived(root, format);
+    }
     let report = match evaluate(root) {
         Ok(r) => r,
         Err(err) => {

@@ -14,6 +14,18 @@
 use std::path::PathBuf;
 use std::process::Command;
 
+/// `YYYY-MM-DD`: the shape of the date token inside a build fingerprint.
+const DATE_LEN: usize = 10;
+/// Byte positions of the two separators in that token.
+const DATE_MONTH_SEPARATOR: usize = 4;
+const DATE_DAY_SEPARATOR: usize = 7;
+/// Digits the token carries (`YYYY`, `MM`, `DD`).
+const DATE_DIGITS: usize = 8;
+/// Length of the `" ("` that opens a fingerprint.
+const FINGERPRINT_OPEN: usize = 2;
+/// Header lines quoted when the page announces the wrong version.
+const HEADER_LINES: usize = 4;
+
 /// Replaces a build fingerprint `(<rev>[-dirty] <date>)` with `(<build>)`.
 ///
 /// Both spellings appear in the page: the `.TH` header writes the fingerprint
@@ -22,13 +34,13 @@ fn normalize(text: &str) -> String {
     text.lines()
         .map(|line| match (line.find(" ("), line.rfind(')')) {
             (Some(open), Some(close)) if close > open + 2 => {
-                let inside = &line[open + 2..close];
+                let inside = &line[open + FINGERPRINT_OPEN..close];
                 let dated = inside.split_whitespace().any(|token| {
                     let token = token.replace('\\', "");
-                    token.len() == 10
-                        && token.as_bytes()[4] == b'-'
-                        && token.as_bytes()[7] == b'-'
-                        && token.chars().filter(char::is_ascii_digit).count() == 8
+                    token.len() == DATE_LEN
+                        && token.as_bytes()[DATE_MONTH_SEPARATOR] == b'-'
+                        && token.as_bytes()[DATE_DAY_SEPARATOR] == b'-'
+                        && token.chars().filter(char::is_ascii_digit).count() == DATE_DIGITS
                 });
                 if dated {
                     format!("{}(<build>){}", &line[..open], &line[close + 1..])
@@ -79,6 +91,10 @@ fn committed_man_page_matches_the_cli() {
     assert!(
         committed.contains(version),
         "the committed page must announce {version}: {}",
-        committed.lines().take(4).collect::<Vec<_>>().join(" | ")
+        committed
+            .lines()
+            .take(HEADER_LINES)
+            .collect::<Vec<_>>()
+            .join(" | ")
     );
 }
