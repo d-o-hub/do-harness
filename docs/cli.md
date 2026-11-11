@@ -2106,3 +2106,4 @@ Report durable receipts under `.do-harness/jobs/` without running anything.
 | `0` | Success | All requested operations and sensors succeeded. |
 | `1` | Verification Failure | One or more computational sensors, evals, or audit-chain checks failed. |
 | `2` | Usage / Config Error | Invalid CLI parameters, missing config/root, or database/I/O error. |
+| `141` | Closed Reader | The reader stopped reading its stdout pipe (`\| head`, a closed pager, a terminated consumer) and the write failed with `EPIPE`. This mirrors `SIGPIPE` (`128 + 13`), the status a shell reports for any other pipeline writer. |
