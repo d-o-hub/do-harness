@@ -40,6 +40,8 @@ cat >> "$root/.git/info/exclude" <<'EOF'
 /open_pr_dry.txt
 /dry_pushed_state.txt
 /pr_61.txt
+/pr_title.txt
+/pr_title_conventional.txt
 /open_pr_second.txt
 /created_count.txt
 /pushed_branch.txt
@@ -141,6 +143,21 @@ fi > "$root/dry_pushed_state.txt"
 
 "$skill/scripts/open-pr.sh" --issue 61 --body-file "$root/body-61.md" > "$root/pr_61.txt"
 git --git-dir="$root/origin.git" branch --list 'issue-61-*' > "$root/pushed_branch.txt"
+
+# The issue title is `Fix parser crash on empty input` — not a conventional
+# commit subject, and a squash merge would land exactly that on `main`. The PR
+# title must therefore be normalised, never the raw tracker title. Select by head
+# branch: a later task PR is created in the same run and `tail -1` would grade it.
+printf '%s\n' "$(jq -r 'select(.headRefName | startswith("issue-61-")) | .title' \
+  "$root/gh_created_prs.jsonl" 2>/dev/null | tail -1)" > "$root/pr_title.txt"
+# The token is `status=conventional`, not bare `conventional`: the failing
+# branch would otherwise print `non-conventional`, which still *contains* the
+# needle and makes a `contains:` assertion pass on broken output.
+if grep -qE '^(feat|fix|docs|chore|refactor|test|build|ci|perf|revert|experiment|spike)(\([^)]*\))?!?: .+' "$root/pr_title.txt"; then
+  printf 'status=conventional\n'
+else
+  printf 'status=non-conventional\n'
+fi > "$root/pr_title_conventional.txt"
 
 # 5. Idempotence: a second run reports the PR instead of creating a duplicate.
 "$skill/scripts/open-pr.sh" --issue 61 --body-file "$root/body-61.md" \
