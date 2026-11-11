@@ -133,9 +133,9 @@ fn main() -> ExitCode {
     // A broken-pipe panic must surface as `Err` here instead of aborting the
     // process: that is what turns `do-harness … | head` from exit 101 plus a
     // backtrace into the quiet pipe status a pipeline expects.
-    // `AssertUnwindSafe` is sound because the only observed unwind is a failed
-    // stdout write, after which the process is leaving and no invariant is
-    // re-read.
+    // `AssertUnwindSafe` is sound because every panic that is *not* a broken
+    // pipe is re-raised immediately below, so no invariant is ever read after
+    // an unwind has been swallowed.
     let outcome = std::panic::catch_unwind(|| {
         let runtime = tokio::runtime::Builder::new_current_thread()
             .enable_all()
@@ -149,26 +149,10 @@ fn main() -> ExitCode {
 
     match outcome {
         Ok(Ok((Ok(()), _))) => ExitCode::SUCCESS,
-        Ok(Ok((Err(err), root))) => {
-            let code = err.exit_code();
-            let class = match &err {
-                CliError::Usage(_) => feedback::report::FailureClass::Usage,
-                CliError::Verify(_) => feedback::report::FailureClass::Verify,
-                CliError::Running(_) => feedback::report::FailureClass::Running,
-            };
-            let message = format!("{err:#}");
-            diag::record(&format!("error: {message}"));
-            feedback::report::file_failure(root.as_deref(), class, &message, &diag::argv(), code);
-            eprintln!("error: {message}");
-            ExitCode::from(code)
-        }
-        Ok(Err(err)) => {
-            let code = err.exit_code();
-            let message = format!("{err:#}");
-            diag::record(&format!("error: {message}"));
-            eprintln!("error: {message}");
-            ExitCode::from(code)
-        }
+        Ok(Ok((Err(err), root))) => report_and_exit(&err, root.as_deref()),
+        // A runtime that cannot be built has no workspace root yet, because the
+        // CLI has not been parsed; report it against the default target.
+        Ok(Err(err)) => report_and_exit(&err, None),
         // The reader closed the pipe. Report the status a shell gives a writer
         // killed by `SIGPIPE` so `| head` looks like every other pipeline.
         Err(payload) => stdout::broken_pipe_exit(payload.as_ref()).map_or_else(
@@ -178,4 +162,19 @@ fn main() -> ExitCode {
             ExitCode::from,
         ),
     }
+}
+
+/// Records, reports, and classifies a `CliError` exactly once.
+fn report_and_exit(err: &CliError, root: Option<&std::path::Path>) -> ExitCode {
+    let code = err.exit_code();
+    let class = match err {
+        CliError::Usage(_) => feedback::report::FailureClass::Usage,
+        CliError::Verify(_) => feedback::report::FailureClass::Verify,
+        CliError::Running(_) => feedback::report::FailureClass::Running,
+    };
+    let message = format!("{err:#}");
+    diag::record(&format!("error: {message}"));
+    feedback::report::file_failure(root, class, &message, &diag::argv(), code);
+    eprintln!("error: {message}");
+    ExitCode::from(code)
 }

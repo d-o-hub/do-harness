@@ -16,11 +16,13 @@
 //! forbids `unsafe` and restoring `SIG_DFL` needs a C `signal(2)` call. `main`
 //! catches the panic at the process boundary and reports [`SIGPIPE_EXIT_CODE`]
 //! instead, which is the status a shell would have reported for the signal. The
-//! observable contract is identical; only the mechanism differs.
+//! observable contract is the same — the writer stops and the pipeline reports a
+//! pipe status — while the mechanism differs: the process exits normally rather
+//! than dying from the signal.
 //!
-//! Platforms without `SIGPIPE` (Windows) never see the signal either, so the
-//! same boundary handling covers them: the reader stopped asking for output,
-//! which is a finished job rather than a failed one.
+//! Windows has no `SIGPIPE`, so there is no matching status to mirror. It takes
+//! the same caught-panic path and exits `0`: the reader stopped asking for
+//! output, which is a finished job rather than a failed one.
 
 /// Exit status a shell reports for a process killed by `SIGPIPE`.
 pub const SIGPIPE_EXIT_CODE: u8 = 141;
