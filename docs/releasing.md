@@ -28,8 +28,8 @@ release"). Nothing publishes unless the tagged commit passes the full release se
   recorded here but absent from the job fails the exchange. All four crates are
   configured, verified on 2026-11-11 through the crates.io trusted-publishing
   API; the three workspace crates also published through the `v0.4.3` release
-  run. `do-harness-libsql` has a publisher but no OIDC upload yet — see the next
-  item. The job takes
+  run, and `do-harness-libsql` through the `v0.4.5` run — see the next item. The
+  job takes
   `id-token: write`, exchanges its OIDC token with
   `rust-lang/crates-io-auth-action`, and passes the short-lived token to
   `cargo publish` through `CARGO_REGISTRY_TOKEN` for that step only. The
@@ -44,11 +44,11 @@ release"). Nothing publishes unless the tagged commit passes the full release se
   `release.yml`, no environment — was recorded the same day and is listed by the
   crates.io trusted-publishing API (config id 25968, verified 2026-11-11 with
   `GET https://crates.io/api/v1/trusted_publishing/github_configs?crate=<name>`
-  and an authenticated token). `0.9.31` contains no source change over `0.9.30`
-  and exists to upload through that publisher for the first time; confirm the
-  release run's `cargo publish` step and record the version's `trustpub_data`.
-  If a fresh name ever needs the same bootstrap, publish
-  once with
+  and an authenticated token). `0.9.31` contains no source change over `0.9.30`;
+  the `v0.4.5` release run `43270254771` (sha `6dfdb33`) published it through
+  that publisher on 2026-11-12, and crates.io records `trustpub_data` naming
+  this repository, the workflow and the run. If a fresh name ever needs the same
+  bootstrap, publish once with
   `cargo publish --locked --manifest-path vendor/libsql/Cargo.toml --no-default-features --features core`,
   then configure trust.
 - npm Trusted Publisher setup is per existing package. If a package has not
