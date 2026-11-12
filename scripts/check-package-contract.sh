@@ -58,18 +58,27 @@ check_crate_package() {
     fi
 
     # Require declared files
+    #
+    # Feed grep from a here-string, never `echo "$list" | grep -q`: `-q` exits
+    # on the first match, the unsent remainder gives `echo` SIGPIPE, and under
+    # `set -o pipefail` that surfaces as exit 141 — which reads exactly like
+    # "the file is missing". The listing has ~500 lines and the required files
+    # sit near the top, so this failed intermittently, naming whichever file
+    # happened to trip the race.
     for req in "${required_files[@]}"; do
-        if ! echo "$list" | grep -qxF "$req"; then
+        if ! grep -qxF "$req" <<<"$list"; then
             echo "FAIL: $crate package is missing required file: $req"
             FAIL=1
         fi
     done
 
-    # Reject accidental inclusion of local state, target output, secrets
+    # Reject accidental inclusion of local state, target output, secrets.
+    # Same SIGPIPE hazard, inverted: a rejected match would read as "nothing
+    # forbidden here", so this check failed OPEN.
     local forbidden_regex='(\.do-harness/|\.git/|\.env|target/|secrets)'
-    if echo "$list" | grep -qE "$forbidden_regex"; then
+    if grep -qE "$forbidden_regex" <<<"$list"; then
         echo "FAIL: $crate package contains forbidden files:"
-        echo "$list" | grep -E "$forbidden_regex"
+        grep -E "$forbidden_regex" <<<"$list"
         FAIL=1
     fi
 }
