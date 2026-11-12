@@ -260,6 +260,34 @@ struct HeadView {
     head_ref_oid: String,
 }
 
+#[derive(Deserialize)]
+struct BaseView {
+    #[serde(rename = "baseRefName", default)]
+    base_ref_name: String,
+}
+
+/// Reads the base branch name of a PR.
+///
+/// The base names which ruleset applies, so the required-check set depends on
+/// it. An empty name is an error rather than a default: defaulting to `main`
+/// would consult the wrong ruleset in a repository whose default branch differs.
+///
+/// # Errors
+///
+/// Returns an error when `gh` fails or reports an empty base branch.
+pub fn base_ref_name(root: &Path, number: u64) -> Result<String> {
+    let number_arg = number.to_string();
+    let view: BaseView = crate::gh::json(
+        root,
+        &["pr", "view", &number_arg, "--json", "baseRefName"],
+        &format!("pr view {number}"),
+    )?;
+    if view.base_ref_name.trim().is_empty() {
+        bail!("PR {number} reported an empty base branch name");
+    }
+    Ok(view.base_ref_name)
+}
+
 /// Reads the current head SHA of a PR.
 ///
 /// # Errors

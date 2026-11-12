@@ -11,23 +11,16 @@
 //! not keep a second parser.
 
 use std::collections::BTreeSet;
-use std::path::Path;
 
-use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
 use super::gh::{CheckRun, CommitStatus};
 
 #[path = "checks_eval.rs"]
 mod eval;
+#[allow(unused_imports)]
+pub use eval::evaluate_for_head_with_base;
 pub use eval::{evaluate_for_head, run};
-
-/// Directory holding the auditable CI policy, relative to the repository root.
-pub const POLICY_DIR: &str = ".git/pr-triage";
-/// TOML policy file: `allow_no_ci`, `required`, and `allow_skips`.
-pub const POLICY_FILE: &str = "checks-policy.toml";
-/// Legacy one-name-per-line skip allowlist, still honoured.
-pub const ALLOW_FILE: &str = "checks-allow.txt";
 
 /// How many times a moving head is re-read before the snapshot is declared
 /// unstable.
@@ -149,66 +142,10 @@ pub struct ChecksReport {
     pub policy: PolicySummary,
 }
 
-/// Loaded policy, with the skip allowlist as a set.
-#[derive(Debug, Clone, Default)]
-pub struct ChecksPolicy {
-    /// An empty check set is a pass.
-    pub allow_no_ci: bool,
-    /// Check names that must be present and passing.
-    pub required: Vec<String>,
-    /// Check names whose skipped/neutral conclusion is acceptable.
-    pub allow_skips: BTreeSet<String>,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct PolicyFile {
-    #[serde(default)]
-    allow_no_ci: bool,
-    #[serde(default)]
-    required: Vec<String>,
-    #[serde(default)]
-    allow_skips: Vec<String>,
-}
-
-/// Reads the repository's CI policy.
-///
-/// A missing policy is the strict default: CI is expected, no check is
-/// required by name, and no skip is allowed. A malformed policy is an error,
-/// never a silent fallback to permissive defaults.
-///
-/// # Errors
-///
-/// Returns an error when a policy file exists but cannot be read or parsed.
-pub fn load_policy(root: &Path) -> Result<ChecksPolicy> {
-    let dir = root.join(POLICY_DIR);
-    let mut policy = ChecksPolicy::default();
-
-    let path = dir.join(POLICY_FILE);
-    if path.is_file() {
-        let text = std::fs::read_to_string(&path)
-            .with_context(|| format!("failed to read {}", path.display()))?;
-        let file: PolicyFile = toml::from_str(&text)
-            .with_context(|| format!("invalid CI policy {}", path.display()))?;
-        policy.allow_no_ci = file.allow_no_ci;
-        policy.required = file.required;
-        policy.allow_skips.extend(file.allow_skips);
-    }
-
-    let allow = dir.join(ALLOW_FILE);
-    if allow.is_file() {
-        let text = std::fs::read_to_string(&allow)
-            .with_context(|| format!("failed to read {}", allow.display()))?;
-        for line in text.lines() {
-            let line = line.trim();
-            if !line.is_empty() && !line.starts_with('#') {
-                policy.allow_skips.insert(line.to_owned());
-            }
-        }
-    }
-
-    Ok(policy)
-}
+// Re-exported so `pr::checks::*` keeps meaning the same thing to every caller
+// (the tests read the file names, the evaluator reads `load_policy`).
+#[allow(unused_imports)]
+pub use super::checks_policy::{ALLOW_FILE, ChecksPolicy, POLICY_DIR, POLICY_FILE, load_policy};
 
 /// Classifies check runs and commit statuses into a merge-gating report.
 ///
@@ -330,16 +267,46 @@ fn apply_policy(
     }
 
     for required in &policy.required {
-        let present = entries
+        let matching: Vec<&CheckEntry> = entries
             .iter()
-            .any(|entry| entry.name == *required && entry.verdict == Verdict::Pass);
-        if !present {
-            verdict = verdict.merge(Verdict::Unknown);
+            .filter(|entry| entry.name == *required)
+            .collect();
+        if matching.iter().any(|entry| entry.verdict == Verdict::Pass) {
+            continue;
+        }
+        // Distinguish "the required context said skipped" from "no run
+        // publishes it": both block, but only one of them is the operator's
+        // fixture to fix, and a bare `missing_required_check` for a context the
+        // API did report reads as a bug in the tool.
+        let skipped = matching
+            .iter()
+            .any(|entry| entry.reason.as_deref() == Some("skipped_required"));
+        if skipped {
+            blockers.push(CheckBlocker {
+                code: "required_check_skipped".to_owned(),
+                message: format!(
+                    "required check '{required}' was skipped; a required context can never be satisfied by a skip"
+                ),
+            });
+        } else {
             blockers.push(CheckBlocker {
                 code: "missing_required_check".to_owned(),
                 message: format!("required check '{required}' is missing or not passing"),
             });
         }
+        verdict = verdict.merge(Verdict::Unknown);
+    }
+
+    // `allow_skips` naming a required context is a contradiction, not a knob:
+    // the required entry always wins, so the allowlist entry can never take
+    // effect. Say so instead of leaving a reviewer to believe the gate moved.
+    for name in policy.contradictory_skips() {
+        blockers.push(CheckBlocker {
+            code: "contradictory_required_skip".to_owned(),
+            message: format!(
+                "'{name}' is in allow_skips but is a required check; the required set always wins, so remove the allowlist entry"
+            ),
+        });
     }
 
     if conflicts && !entries.is_empty() {
@@ -374,19 +341,41 @@ fn apply_policy(
     (verdict, blockers)
 }
 
+/// Classifies a `skipped`/`neutral` conclusion against the required set.
+///
+/// A context the server requires is blocking whatever its conclusion, so a
+/// required skip stays a failure and is labelled as such. Everything else is
+/// optional CI: an unrelated maintenance job that concludes `skipped` says
+/// nothing about whether the change may merge, and treating it as a failure is
+/// a false blocker that no repository without a hand-written allowlist could
+/// clear. The skip is still reported — `Skip`, with the app slug and conclusion
+/// carried on the entry — so it never disappears from the report.
+fn classify_skip(name: &str, policy: &ChecksPolicy) -> (Verdict, Option<String>) {
+    if policy.is_required(name) {
+        (Verdict::Fail, Some("skipped_required".to_owned()))
+    } else if !policy.required_known {
+        // The required set is unknown, so "nothing requires this context" is
+        // not a fact. Reporting a skip as a pass here would widen what merges
+        // exactly when the tool failed to read the rules — the opposite of the
+        // fail-closed contract.
+        (
+            Verdict::Unknown,
+            Some("skipped, but the required set could not be read".to_owned()),
+        )
+    } else if policy.allow_skips.contains(name) {
+        (Verdict::Skip, Some("allowlisted skip".to_owned()))
+    } else {
+        (Verdict::Skip, Some("optional skip".to_owned()))
+    }
+}
+
 fn classify_run(run: &CheckRun, policy: &ChecksPolicy) -> (Verdict, Option<String>) {
     if run.status != "completed" {
         return (Verdict::Pending, Some(format!("status={}", run.status)));
     }
     match run.conclusion.as_deref() {
         Some("success") => (Verdict::Pass, None),
-        Some("skipped" | "neutral") => {
-            if policy.allow_skips.contains(&run.name) {
-                (Verdict::Skip, Some("allowlisted skip".to_owned()))
-            } else {
-                (Verdict::Fail, Some("unallowlisted skip".to_owned()))
-            }
-        }
+        Some("skipped" | "neutral") => classify_skip(&run.name, policy),
         Some("cancelled") => (Verdict::Fail, Some("cancelled".to_owned())),
         Some("timed_out") => (Verdict::Fail, Some("timed_out".to_owned())),
         Some("action_required") => (Verdict::Fail, Some("action_required".to_owned())),
@@ -408,13 +397,7 @@ fn classify_status(status: &CommitStatus, policy: &ChecksPolicy) -> (Verdict, Op
         "success" => (Verdict::Pass, None),
         "pending" => (Verdict::Pending, Some("pending".to_owned())),
         "failure" | "error" => (Verdict::Fail, Some(status.state.clone())),
-        "neutral" => {
-            if policy.allow_skips.contains(&status.context) {
-                (Verdict::Skip, Some("allowlisted skip".to_owned()))
-            } else {
-                (Verdict::Fail, Some("unallowlisted skip".to_owned()))
-            }
-        }
+        "neutral" => classify_skip(&status.context, policy),
         other => (Verdict::Unknown, Some(format!("unknown state {other}"))),
     }
 }

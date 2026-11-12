@@ -202,7 +202,10 @@ fn an_allowlisted_skip_passes_and_the_report_carries_identity() {
     let root = dir.path();
     let bin = fake_gh_router(root);
     write_view(root, 2006);
-    write_policy(root, "allow_skips = [\"docs\"]\n");
+    // The required set must be declared: an `allow_skips`-only policy leaves it
+    // undetermined, which is a deliberate fail-closed state rather than a
+    // licence to widen the gate.
+    write_policy(root, "required = [\"verify\"]\nallow_skips = [\"docs\"]\n");
     write_page(
         root,
         &json!({
@@ -320,4 +323,146 @@ fn a_failure_on_the_second_page_is_collected() {
         "must request pagination: {flags}"
     );
     assert!(flags.contains("--slurp"), "must slurp every page: {flags}");
+}
+
+// ---------------------------------------------------------------------------
+// #516: an optional skip is not a failure.
+// ---------------------------------------------------------------------------
+
+/// The shape of `d-o-hub/rust-self-learning-memory` PR 1263: the two contexts
+/// the server requires both succeeded, and five unrelated maintenance jobs
+/// concluded `skipped`. `gh pr view --json mergeStateStatus` said `CLEAN`.
+#[cfg(unix)]
+fn write_1263_page(root: &std::path::Path) {
+    write_page(
+        root,
+        &json!({
+            "total_count": 7,
+            "check_runs": [
+                {"id": 1, "name": "CI / Required", "status": "completed", "conclusion": "success", "app": {"slug": "github-actions"}},
+                {"id": 2, "name": "Codacy Static Code Analysis", "status": "completed", "conclusion": "success", "app": {"slug": "codacy"}},
+                {"id": 3, "name": "Store Benchmark Results", "status": "completed", "conclusion": "skipped", "app": {"slug": "github-actions"}},
+                {"id": 4, "name": "Maintain canonical drift issue", "status": "completed", "conclusion": "skipped", "app": {"slug": "github-actions"}},
+                {"id": 5, "name": "Maintain canonical drift issue", "status": "completed", "conclusion": "skipped", "app": {"slug": "github-actions"}},
+                {"id": 6, "name": "Maintain canonical drift issue", "status": "completed", "conclusion": "skipped", "app": {"slug": "github-actions"}},
+                {"id": 7, "name": "Maintain canonical drift issue", "status": "completed", "conclusion": "skipped", "app": {"slug": "github-actions"}}
+            ]
+        }),
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn the_1263_shape_passes_when_only_optional_jobs_are_skipped() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    let bin = fake_gh_router(root);
+    write_view(root, 2010);
+    // The ruleset fixture `run_pr` seeds requires `pr-required` and `semver`;
+    // this page reports the adopter's own contexts, so the required set is
+    // declared through the local policy instead — either source may decide,
+    // and both must agree that a non-required skip is not a failure.
+    write_policy(
+        root,
+        "required = [\"CI / Required\", \"Codacy Static Code Analysis\"]\n",
+    );
+    write_1263_page(root);
+
+    let (code, stdout, stderr) = run_pr(root, &bin, &["pr", "checks", "2010", "--format", "json"]);
+    assert_eq!(
+        code,
+        Some(0),
+        "the required checks are green, so this must pass: {stderr}\n{stdout}"
+    );
+    let report: Value = serde_json::from_str(&stdout).expect("JSON report");
+    assert_eq!(report["verdict"], "PASS");
+    assert_eq!(report["blockers"].as_array().unwrap().len(), 0);
+
+    // Every optional skip is still listed, with its app slug and conclusion.
+    let skips: Vec<&Value> = report["checks"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|c| c["verdict"] == "SKIP")
+        .collect();
+    assert_eq!(skips.len(), 5, "all five optional skips are reported");
+    for skip in &skips {
+        assert_eq!(skip["conclusion"], "skipped");
+        assert_eq!(skip["source"], "github-actions");
+        assert_eq!(skip["reason"], "optional skip");
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn the_1263_shape_fails_when_a_required_context_fails() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    let bin = fake_gh_router(root);
+    write_view(root, 2011);
+    write_policy(
+        root,
+        "required = [\"CI / Required\", \"Codacy Static Code Analysis\"]\n",
+    );
+    write_page(
+        root,
+        &json!({
+            "total_count": 3,
+            "check_runs": [
+                {"id": 1, "name": "CI / Required", "status": "completed", "conclusion": "failure", "app": {"slug": "github-actions"}},
+                {"id": 2, "name": "Codacy Static Code Analysis", "status": "completed", "conclusion": "success", "app": {"slug": "codacy"}},
+                {"id": 3, "name": "Store Benchmark Results", "status": "completed", "conclusion": "skipped", "app": {"slug": "github-actions"}}
+            ]
+        }),
+    );
+
+    let (code, stdout, stderr) = run_pr(root, &bin, &["pr", "checks", "2011", "--format", "json"]);
+    assert_eq!(
+        code,
+        Some(1),
+        "a failing required check must exit 1: {stderr}"
+    );
+    let report: Value = serde_json::from_str(&stdout).expect("JSON report");
+    assert_eq!(report["verdict"], "FAIL");
+    assert!(
+        report["blockers"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|b| b["code"] == "check_failed"),
+        "expected the required failure to be the blocker"
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn a_required_context_that_is_skipped_names_the_skip_as_the_reason() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    let bin = fake_gh_router(root);
+    write_view(root, 2012);
+    write_policy(root, "required = [\"CI / Required\"]\n");
+    write_page(
+        root,
+        &json!({
+            "total_count": 1,
+            "check_runs": [
+                {"id": 1, "name": "CI / Required", "status": "completed", "conclusion": "skipped", "app": {"slug": "github-actions"}}
+            ]
+        }),
+    );
+
+    let (code, stdout, _stderr) = run_pr(root, &bin, &["pr", "checks", "2012", "--format", "json"]);
+    assert_eq!(code, Some(1));
+    let report: Value = serde_json::from_str(&stdout).expect("JSON report");
+    let codes: Vec<&str> = report["blockers"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|b| b["code"].as_str())
+        .collect();
+    assert!(
+        codes.contains(&"required_check_skipped"),
+        "a required skip is its own blocker, not `missing_required_check`: {codes:?}"
+    );
 }

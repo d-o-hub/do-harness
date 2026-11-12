@@ -155,10 +155,130 @@ fn cancelled_and_action_required_never_pass() {
     }
 }
 
+/// A policy whose required set is a decision the operator made.
+fn known_policy(required: &[&str], allow_skips: &[&str]) -> ChecksPolicy {
+    let mut policy = ChecksPolicy {
+        required: required.iter().map(|s| (*s).to_owned()).collect(),
+        required_known: true,
+        ..ChecksPolicy::default()
+    };
+    policy
+        .allow_skips
+        .extend(allow_skips.iter().map(|s| (*s).to_owned()));
+    policy
+}
+
 #[test]
-fn skipped_and_neutral_pass_only_when_allowlisted() {
-    let mut policy = ChecksPolicy::default();
-    policy.allow_skips.insert("docs".to_owned());
+fn an_optional_skip_passes_and_is_still_reported() {
+    // The #516 shape: the required contexts are green and unrelated
+    // maintenance jobs concluded `skipped`. Those are not failures.
+    let policy = known_policy(&["CI / Required"], &[]);
+    let report = classify_with(
+        vec![
+            run("CI / Required", "completed", Some("success")),
+            run("Store Benchmark Results", "completed", Some("skipped")),
+            run(
+                "Maintain canonical drift issue",
+                "completed",
+                Some("skipped"),
+            ),
+        ],
+        vec![],
+        &policy,
+    );
+    assert_eq!(report.verdict, Verdict::Pass, "{:?}", report.blockers);
+    assert!(report.blockers.is_empty());
+    // Reported, not dropped: a skip that vanished from the report would hide
+    // which jobs did not run.
+    let benchmark = report
+        .checks
+        .iter()
+        .find(|c| c.name == "Store Benchmark Results")
+        .expect("the optional skip is listed");
+    assert_eq!(benchmark.verdict, Verdict::Skip);
+    assert_eq!(benchmark.reason.as_deref(), Some("optional skip"));
+    assert_eq!(benchmark.source, "github-actions");
+    assert_eq!(benchmark.conclusion.as_deref(), Some("skipped"));
+}
+
+#[test]
+fn a_required_context_that_is_skipped_blocks_with_its_own_code() {
+    let policy = known_policy(&["CI / Required"], &[]);
+    let report = classify_with(
+        vec![run("CI / Required", "completed", Some("skipped"))],
+        vec![],
+        &policy,
+    );
+    assert_eq!(report.verdict, Verdict::Fail);
+    assert_eq!(report.checks[0].verdict, Verdict::Fail);
+    assert_eq!(report.checks[0].reason.as_deref(), Some("skipped_required"));
+    assert_eq!(report.blockers[0].code, "required_check_skipped");
+}
+
+#[test]
+fn a_required_context_that_fails_blocks_as_a_failure() {
+    let policy = known_policy(&["CI / Required"], &[]);
+    let report = classify_with(
+        vec![run("CI / Required", "completed", Some("failure"))],
+        vec![],
+        &policy,
+    );
+    assert_eq!(report.verdict, Verdict::Fail);
+    assert_eq!(report.checks[0].reason.as_deref(), Some("failure"));
+}
+
+#[test]
+fn a_required_context_absent_from_the_payload_is_missing() {
+    let policy = known_policy(&["CI / Required"], &[]);
+    let report = classify_with(
+        vec![run("unrelated", "completed", Some("success"))],
+        vec![],
+        &policy,
+    );
+    assert_eq!(report.verdict, Verdict::Unknown);
+    assert_eq!(report.blockers[0].code, "missing_required_check");
+}
+
+#[test]
+fn an_allowlisted_skip_on_a_required_context_is_reported_as_a_contradiction() {
+    // The two lists disagree, and the required entry wins. Saying so is the
+    // point: a reviewer must not believe a gate was relaxed when it was not.
+    let policy = known_policy(&["CI / Required"], &["CI / Required"]);
+    let report = classify_with(
+        vec![run("CI / Required", "completed", Some("success"))],
+        vec![],
+        &policy,
+    );
+    assert_eq!(report.verdict, Verdict::Pass);
+    assert!(
+        report
+            .blockers
+            .iter()
+            .any(|b| b.code == "contradictory_required_skip"),
+        "expected the contradiction to be reported: {:?}",
+        report.blockers
+    );
+}
+
+#[test]
+fn an_unknown_required_set_never_lets_a_skip_pass() {
+    // `required_known = false` is the state after the ruleset could not be
+    // read. Treating "nothing requires this" as a fact would widen what
+    // merges exactly when the tool failed.
+    let policy = ChecksPolicy::default();
+    assert!(!policy.required_known);
+    let report = classify_with(
+        vec![run("lint", "completed", Some("neutral"))],
+        vec![],
+        &policy,
+    );
+    assert_eq!(report.verdict, Verdict::Unknown);
+    assert_eq!(report.checks[0].verdict, Verdict::Unknown);
+}
+
+#[test]
+fn an_allowlisted_skip_still_passes_when_required_is_known() {
+    let policy = known_policy(&[], &["docs"]);
     let allowed = classify_with(
         vec![run("docs", "completed", Some("skipped"))],
         vec![],
@@ -166,16 +286,9 @@ fn skipped_and_neutral_pass_only_when_allowlisted() {
     );
     assert_eq!(allowed.verdict, Verdict::Pass);
     assert_eq!(allowed.checks[0].verdict, Verdict::Skip);
-
-    let denied = classify_with(
-        vec![run("lint", "completed", Some("neutral"))],
-        vec![],
-        &policy,
-    );
-    assert_eq!(denied.verdict, Verdict::Fail);
     assert_eq!(
-        denied.checks[0].reason.as_deref(),
-        Some("unallowlisted skip")
+        allowed.checks[0].reason.as_deref(),
+        Some("allowlisted skip")
     );
 }
 
@@ -270,4 +383,89 @@ fn the_legacy_allowlist_is_still_honoured() {
     std::fs::write(policy_dir.join(ALLOW_FILE), "# comment\ndocs\n").unwrap();
     let policy = load_policy(dir.path()).unwrap();
     assert!(policy.allow_skips.contains("docs"));
+}
+
+/// An `allow_skips`-only policy leaves the required set undetermined.
+///
+/// The distinction matters more than it looks: declaring `required = []` is an
+/// operator saying "nothing gates a merge", while omitting the key says "I did
+/// not answer that question". Collapsing the two would let a policy written to
+/// widen one allowlist silently delete every server-required context, which is
+/// the one direction a tightening knob must never move.
+#[test]
+fn a_policy_without_a_required_key_does_not_claim_a_required_set() {
+    let dir = tempfile::tempdir().unwrap();
+    let policy_dir = dir.path().join(POLICY_DIR);
+    std::fs::create_dir_all(&policy_dir).unwrap();
+    std::fs::write(policy_dir.join(POLICY_FILE), "allow_skips = [\"docs\"]\n").unwrap();
+    let policy = load_policy(dir.path()).unwrap();
+    assert!(
+        !policy.required_known,
+        "an absent `required` key must stay undetermined"
+    );
+    assert!(policy.allow_skips.contains("docs"));
+}
+
+/// The same file with an explicit empty list *is* a decision.
+#[test]
+fn an_explicitly_empty_required_list_is_a_decision() {
+    let dir = tempfile::tempdir().unwrap();
+    let policy_dir = dir.path().join(POLICY_DIR);
+    std::fs::create_dir_all(&policy_dir).unwrap();
+    std::fs::write(policy_dir.join(POLICY_FILE), "required = []\n").unwrap();
+    let policy = load_policy(dir.path()).unwrap();
+    assert!(policy.required_known);
+    assert!(policy.required.is_empty(), "{:?}", policy.required);
+}
+
+/// The server's required set is used only when the local policy did not answer.
+#[test]
+fn the_resolved_required_set_fills_only_an_undetermined_policy() {
+    use crate::pr::policy_source::{PolicySource, ResolvedPolicy};
+
+    let resolved = ResolvedPolicy {
+        source: PolicySource::Derived,
+        known: true,
+        ok: true,
+        revision: None,
+        rules: None,
+        required: Some(vec!["CI / Required".to_owned()]),
+        warnings: Vec::new(),
+    };
+
+    let filled =
+        crate::pr::checks_policy::with_resolved_required(ChecksPolicy::default(), &resolved);
+    assert!(filled.required_known);
+    assert_eq!(filled.required, vec!["CI / Required".to_owned()]);
+
+    // A local declaration wins: it is the auditable tightening knob.
+    let local = known_policy(&["mine"], &[]);
+    let kept = crate::pr::checks_policy::with_resolved_required(local, &resolved);
+    assert_eq!(kept.required, vec!["mine".to_owned()]);
+}
+
+/// An unreadable source leaves the policy undetermined, never empty-and-known.
+#[test]
+fn an_unreadable_source_leaves_the_required_set_unknown() {
+    use crate::pr::policy_source::{PolicySource, ResolvedPolicy};
+
+    let resolved = ResolvedPolicy {
+        source: PolicySource::Derived,
+        known: false,
+        ok: false,
+        revision: None,
+        rules: None,
+        required: None,
+        warnings: Vec::new(),
+    };
+    let policy =
+        crate::pr::checks_policy::with_resolved_required(ChecksPolicy::default(), &resolved);
+    assert!(!policy.required_known);
+    // And a skip therefore cannot pass.
+    let report = classify_with(
+        vec![run("lint", "completed", Some("skipped"))],
+        vec![],
+        &policy,
+    );
+    assert_eq!(report.verdict, Verdict::Unknown);
 }

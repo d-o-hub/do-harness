@@ -44,6 +44,13 @@ pub struct ResolvedPolicy {
     pub revision: Option<String>,
     /// The derived rules, when the derived source decided.
     pub rules: Option<MergeRules>,
+    /// Required check contexts from the deciding source, or `None` when the
+    /// source could not be read.
+    ///
+    /// This is what makes a non-required skip a *skip* rather than a failure.
+    /// `None` is not "nothing is required" — it is "unknown", and the CI
+    /// classifier refuses to wave a skip through on it.
+    pub required: Option<Vec<String>>,
     /// Non-fatal observations worth surfacing (for example a ruleset that
     /// requires no checks at all).
     pub warnings: Vec<String>,
@@ -57,9 +64,29 @@ impl ResolvedPolicy {
             ok: false,
             revision: None,
             rules: None,
+            required: None,
             warnings: Vec::new(),
         }
     }
+}
+
+/// The required contexts the overlay declares, when it can be read.
+///
+/// Separate from [`policy::evaluate`] because that function answers "does the
+/// server still match this file", which is a different question from "which
+/// contexts does this file require". A file that exists but cannot be parsed has
+/// no answer, hence the `Option`.
+fn overlay_required(root: &Path) -> Option<Vec<String>> {
+    let text = std::fs::read_to_string(root.join(policy::POLICY_PATH)).ok()?;
+    let policy: policy::PrMergePolicy = toml::from_slice(text.as_bytes()).ok()?;
+    Some(
+        policy
+            .required_status_checks
+            .required
+            .iter()
+            .map(|item| item.context.clone())
+            .collect(),
+    )
 }
 
 /// Decides from the overlay when it exists, and from the server otherwise.
@@ -73,14 +100,25 @@ pub fn resolve(root: &Path, base: &str) -> ResolvedPolicy {
     if root.join(policy::POLICY_PATH).exists() {
         // Overlay present: today's behaviour, unchanged, drift gate included.
         return match policy::evaluate(root) {
-            Ok(report) => ResolvedPolicy {
-                source: PolicySource::Overlay,
-                known: report.decision != PolicyDecision::Unknown,
-                ok: report.decision == PolicyDecision::Pass,
-                revision: report.policy_sha256,
-                rules: None,
-                warnings: Vec::new(),
-            },
+            Ok(report) => {
+                // The overlay's own required list is the decision when it has
+                // one; a drift/unknown decision means the file and the server
+                // disagree, so the required set is not established either.
+                let required = if report.decision == PolicyDecision::Unknown {
+                    None
+                } else {
+                    Some(overlay_required(root).unwrap_or_default())
+                };
+                ResolvedPolicy {
+                    source: PolicySource::Overlay,
+                    known: report.decision != PolicyDecision::Unknown,
+                    ok: report.decision == PolicyDecision::Pass,
+                    revision: report.policy_sha256,
+                    rules: None,
+                    required,
+                    warnings: Vec::new(),
+                }
+            }
             Err(err) => {
                 // Carry the reason instead of dropping it: an overlay that
                 // exists but cannot be evaluated is `policy_unavailable`, and a
@@ -113,6 +151,7 @@ pub fn resolve(root: &Path, base: &str) -> ResolvedPolicy {
                 known: true,
                 ok: !rules.merge_method_unavailable(),
                 revision: Some(rules.digest.clone()),
+                required: Some(rules.required.iter().map(|c| c.context.clone()).collect()),
                 rules: Some(rules),
                 warnings,
             }

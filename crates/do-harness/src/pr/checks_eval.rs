@@ -9,6 +9,7 @@ use super::{
 };
 use crate::CliError;
 use crate::pr::gh;
+use crate::pr::{checks_policy, policy_source};
 use crate::report::Format;
 
 /// Evaluates the checks for a known head SHA.
@@ -22,7 +23,34 @@ pub fn evaluate_for_head(
     head_sha: &str,
     conflicts: bool,
 ) -> Result<ChecksReport> {
-    let policy = load_policy(root)?;
+    let base = gh::base_ref_name(root, pr)?;
+    evaluate_for_head_with_base(root, pr, head_sha, conflicts, &base)
+}
+
+/// Evaluates the checks, taking the base branch from the caller.
+///
+/// Split out so a caller that already knows the base does not pay for another
+/// `gh pr view`, and so the required set is resolved against the same base the
+/// merge decision will use.
+///
+/// # Errors
+///
+/// Returns an error when the policy, check runs, or statuses cannot be read.
+pub fn evaluate_for_head_with_base(
+    root: &Path,
+    pr: u64,
+    head_sha: &str,
+    conflicts: bool,
+    base: &str,
+) -> Result<ChecksReport> {
+    let mut policy = load_policy(root)?;
+    // The server's required set decides when the local policy does not. A
+    // ruleset that cannot be read leaves `required_known` false, and the
+    // classifier then refuses to wave through an optional-looking skip.
+    if !policy.required_known {
+        let resolved = policy_source::resolve(root, base);
+        policy = checks_policy::with_resolved_required(policy, &resolved);
+    }
     let runs = gh::check_runs_page(root, head_sha).context("could not read check runs")?;
     let statuses =
         gh::commit_statuses_page(root, head_sha).context("could not read commit statuses")?;
