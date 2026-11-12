@@ -19,7 +19,8 @@ mod sweep_extras;
 #[allow(unused_imports)]
 pub use sweep_extras::{
     MergeCommitRef, MergedPrView, PrListEntry, close_with_comment, disable_auto_merge,
-    list_open_prs, merge, merged_view, pr_entry_view, pr_file_set, update_branch,
+    list_open_prs, merge, merged_view, post_issue_comment, pr_entry_view, pr_file_set,
+    update_branch,
 };
 
 /// Minimal PR metadata needed to locate the effective change.

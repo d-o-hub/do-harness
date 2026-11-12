@@ -6,9 +6,10 @@ use std::path::Path;
 use anyhow::Result;
 
 use crate::pr::gh::{self, PrReadinessView};
+use crate::pr::no_effect::merge_impact_for_pr;
 use crate::pr::readiness::AuthorizationReason;
 use crate::pr::sweep::plan::{Cluster, PlannedPr};
-use crate::pr::sweep::report::{HaltRecord, PerPrReport};
+use crate::pr::sweep::report::{ClusterRecord, HaltRecord, PerPrReport};
 use crate::pr::sweep::state::{PrAudit, SweepStateV1};
 use crate::pr::sweep::step::{self, Owner};
 
@@ -31,38 +32,6 @@ pub(super) fn merge_commit_after(root: &Path, number: u64) -> Option<String> {
             return None;
         }
         std::thread::sleep(std::time::Duration::from_millis(500));
-    }
-}
-
-/// Result of waiting for an update-branch head change.
-pub(super) enum HeadPoll {
-    Changed(Box<PrReadinessView>),
-    Unchanged,
-    ReadFailed,
-}
-
-/// Waits for the head to change after an update-branch request, observing
-/// immediately and never before the first read.
-pub(super) fn wait_for_head_change(
-    root: &Path,
-    number: u64,
-    old_head: &str,
-    wait_seconds: u64,
-) -> HeadPoll {
-    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(wait_seconds);
-    loop {
-        match gh::readiness_view(root, number) {
-            Ok(view) => {
-                if view.head_ref_oid != old_head {
-                    return HeadPoll::Changed(Box::new(view));
-                }
-            }
-            Err(_) => return HeadPoll::ReadFailed,
-        }
-        if std::time::Instant::now() >= deadline {
-            return HeadPoll::Unchanged;
-        }
-        std::thread::sleep(std::time::Duration::from_secs(3));
     }
 }
 
@@ -115,6 +84,7 @@ pub(super) fn report_for(entry: &crate::pr::gh::PrListEntry) -> PerPrReport {
         next_action: None,
         base_sha: None,
         head_sha: None,
+        branch_update: None,
         checks: None,
         conversations: None,
         findings: None,
@@ -171,4 +141,217 @@ impl PrCtx {
             .push(AuthorizationReason::new(code, message));
         self.audit.outcome = Some("unknown".to_owned());
     }
+}
+
+/// Everything that must pass before CI is worth waiting for.
+///
+/// Returns `Some(view)` when the PR continues to the update/CI/merge steps, and
+/// `None` when this step already finished it — skipped, blocked, or closed. The
+/// caller cannot tell those apart by outcome here and must not need to: the
+/// report row already carries the reason.
+pub(super) fn preflight(
+    root: &Path,
+    ctx: &mut PrCtx,
+    clusters: &HashMap<u64, Cluster>,
+    input: &super::DriveInput<'_>,
+) -> Option<PrReadinessView> {
+    let number = ctx.report.number;
+    let mut view = match gh::readiness_view(root, number) {
+        Ok(view) => view,
+        Err(error) => {
+            ctx.finish_unknown("api_incomplete", &format!("{error:#}"));
+            return None;
+        }
+    };
+    // Hard stops first: an armed auto-merge or a duplicate closure would
+    // otherwise mutate a PR that should never have been touched.
+    if !quick_stops(ctx, &view) {
+        return None;
+    }
+    if !disarm_auto_merge(root, ctx, input, &mut view) {
+        return None;
+    }
+    if !resolve_cluster(root, ctx, clusters, input) {
+        return None;
+    }
+    no_effect(root, ctx, input, &view).then_some(view)
+}
+
+/// The stops visible in the full view but not in the list.
+fn quick_stops(ctx: &mut PrCtx, view: &PrReadinessView) -> bool {
+    if view.state != "OPEN" {
+        ctx.finish_skipped("closed", &format!("PR state is '{}'", view.state));
+        return false;
+    }
+    if view.is_draft {
+        ctx.finish_skipped(
+            "draft",
+            "PR is a draft; un-drafting is the author's decision",
+        );
+        return false;
+    }
+    if let Some(label) = step::held_label(&view.labels) {
+        ctx.finish_skipped("held", &format!("PR carries a hard-stop label: {label}"));
+        return false;
+    }
+    if view.mergeable == "CONFLICTING" || view.merge_state_status == "DIRTY" {
+        ctx.finish_skipped("conflict", "PR conflicts with its base");
+        return false;
+    }
+    true
+}
+
+/// Disarms a pre-existing auto-merge request before any other disposition.
+///
+/// An armed request fires on whatever head exists when `GitHub` next computes
+/// mergeability, so it must not survive a cluster/no-effect decision. Returns
+/// `true` when the PR may continue.
+fn disarm_auto_merge(
+    root: &Path,
+    ctx: &mut PrCtx,
+    input: &super::DriveInput<'_>,
+    view: &mut PrReadinessView,
+) -> bool {
+    if view.auto_merge_request.is_none() {
+        return true;
+    }
+    if !input.mode.execute {
+        ctx.finish_blocked(vec![AuthorizationReason::new(
+            crate::pr::readiness::codes::AUTO_MERGE_ARMED,
+            "an auto-merge request is armed; disarm requires --execute",
+        )]);
+        return false;
+    }
+    if let Err(error) = gh::disable_auto_merge(root, ctx.report.number) {
+        ctx.finish_blocked(vec![AuthorizationReason::new(
+            "disarm_failed",
+            format!("auto-merge disarm failed: {error:#}"),
+        )]);
+        return false;
+    }
+    ctx.audit.disarmed_auto_merge = true;
+    match gh::readiness_view(root, ctx.report.number) {
+        Ok(refreshed) if refreshed.auto_merge_request.is_none() => {
+            *view = refreshed;
+            true
+        }
+        _ => {
+            ctx.finish_blocked(vec![AuthorizationReason::new(
+                "disarm_failed",
+                "auto-merge is still armed after disarm",
+            )]);
+            false
+        }
+    }
+}
+
+/// Handles duplicate-cluster roles: close losers, mark keepers.
+///
+/// Returns `false` when the PR is finished here (a loser, closed or blocked).
+fn resolve_cluster(
+    root: &Path,
+    ctx: &mut PrCtx,
+    clusters: &HashMap<u64, Cluster>,
+    input: &super::DriveInput<'_>,
+) -> bool {
+    let number = ctx.report.number;
+    let Some(cluster) = clusters.get(&number) else {
+        return true;
+    };
+    if !cluster.losers.contains(&number) {
+        ctx.report.cluster = Some(ClusterRecord {
+            role: "keeper".to_owned(),
+            keeper: None,
+            rule: Some(cluster.rule.to_owned()),
+        });
+        return true;
+    }
+    ctx.report.cluster = Some(ClusterRecord {
+        role: "loser".to_owned(),
+        keeper: Some(cluster.keeper),
+        rule: Some(cluster.rule.to_owned()),
+    });
+    if !input.mode.merge {
+        ctx.finish_blocked(vec![AuthorizationReason::new(
+            "execute_merge_required",
+            "duplicate supersede closure requires --execute --merge",
+        )]);
+        return false;
+    }
+    let files = match gh::pr_file_set(root, number) {
+        Ok(files) => files,
+        Err(error) => {
+            ctx.finish_unknown("api_incomplete", &format!("{error:#}"));
+            return false;
+        }
+    };
+    match gh::close_with_comment(
+        root,
+        number,
+        &step::supersede_comment(cluster.keeper, &files, cluster.rule),
+    ) {
+        Ok(()) => {
+            "closed_superseded".clone_into(&mut ctx.report.outcome);
+            ctx.audit.outcome = Some("closed_superseded".to_owned());
+        }
+        Err(error) => ctx.finish_blocked(vec![AuthorizationReason::new(
+            "close_refused",
+            format!("{error:#}"),
+        )]),
+    }
+    false
+}
+
+/// Closes a proven, base-verified no-tree-effect PR.
+///
+/// Returns `true` when the PR continues to the merge steps.
+fn no_effect(
+    root: &Path,
+    ctx: &mut PrCtx,
+    input: &super::DriveInput<'_>,
+    view: &PrReadinessView,
+) -> bool {
+    let number = ctx.report.number;
+    let impact = merge_impact_for_pr(
+        root,
+        &view.base_ref_oid,
+        &view.base_ref_name,
+        &view.head_ref_oid,
+    );
+    if !step::closure_eligible(&impact) {
+        return true;
+    }
+    let base = impact.base_sha.as_deref().unwrap_or_default().to_owned();
+    let head = impact.head_sha.as_deref().unwrap_or_default().to_owned();
+    let unchanged = matches!(
+        gh::readiness_view(root, number),
+        Ok(view) if view.base_ref_oid == base && view.head_ref_oid == head
+    );
+    if !unchanged {
+        ctx.finish_blocked(vec![AuthorizationReason::new(
+            crate::pr::readiness::codes::SNAPSHOT_MOVED,
+            "base/head moved after the no-effect proof; closure refused",
+        )]);
+        return false;
+    }
+    if !input.mode.merge {
+        ctx.finish_blocked(vec![AuthorizationReason::new(
+            "execute_merge_required",
+            "no-tree-effect closure requires --execute --merge",
+        )]);
+        return false;
+    }
+    match gh::close_with_comment(root, number, &step::no_effect_comment(&impact)) {
+        Ok(()) => {
+            "closed_no_effect".clone_into(&mut ctx.report.outcome);
+            ctx.report.base_sha = Some(base);
+            ctx.report.head_sha = Some(head);
+            ctx.audit.outcome = Some("closed_no_effect".to_owned());
+        }
+        Err(error) => ctx.finish_blocked(vec![AuthorizationReason::new(
+            "close_refused",
+            format!("{error:#}"),
+        )]),
+    }
+    false
 }

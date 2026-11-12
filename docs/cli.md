@@ -1774,6 +1774,32 @@ human login the contributor-permission answer decides: `admin`/`write`/
 `external`, and `403` (permission unreadable) is `unknown_identity`. An unknown
 identity is never owned, so a rate-limited sweep skips rather than merges.
 
+A branch that is `BEHIND` its base is recovered by an ordered chain, under
+`--execute` only:
+
+1. `PUT /pulls/{n}/update-branch`, pinned to the captured head. This is the
+   only step when it succeeds, and the head is then re-read before any merge.
+2. On refusal, **and only when the author is Dependabot**
+   (`app/dependabot`, `dependabot[bot]`, or `dependabot`), the fixed comment
+   `@dependabot rebase` is posted — the vendor command GitHub documents for
+   this case. The body is a literal this tool owns, never text taken from the
+   pull request. At most **one** comment is posted per head; a repeat at the
+   same head cannot help, because the bot either already rebased (the head
+   would have moved) or will not (the 30-day rule, or extra commits).
+3. The head change is awaited within the `--wait` bound (at most the same
+   1200 s the API path uses).
+4. On a changed head the whole snapshot is recomputed — checks, conversations,
+   findings, ancestry, receipt — and the merge proceeds only on
+   `MERGE_ALLOWED`.
+
+A human or external author is never commented at and never pushed. When no
+mechanism can move the branch, the row is `blocked` with reason
+`behind_unupdatable` and a `next_action` naming the author and the required
+update; the sweep continues with the next pull request rather than halting.
+`branch_update` on the row records `update-branch`, `dependabot-rebase`, or
+`none`, and is absent when the branch was never behind. This tool never uses
+`--admin`, never arms `--auto`, and never force-pushes.
+
 ### `skills`
 <!-- BEGIN GENERATED: cli-contract skills -->
 `do-harness skills [OPTIONS] <COMMAND>`

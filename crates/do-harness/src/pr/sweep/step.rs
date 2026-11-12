@@ -16,6 +16,14 @@ use crate::pr::waiver_comment::is_authorized_role;
 /// Bound for post-merge main verification, regardless of `--wait`.
 pub const MAX_POST_MERGE_WAIT_SECONDS: u64 = 900;
 
+/// The branch is behind its base and no available mechanism can move it.
+///
+/// Distinct from `update_refused` (the API said no, and the fallback was not
+/// applicable) and from `update_timeout` (the API said yes and nothing
+/// happened): this one means the recovery chain ran out with the branch still
+/// behind — a state a human must resolve, not an indeterminate one (#518).
+pub const BEHIND_UNUPDATABLE: &str = "behind_unupdatable";
+
 /// Owner classification for a PR author.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Owner {
@@ -210,6 +218,11 @@ pub fn next_action(pr: u64, reasons: &[AuthorizationReason]) -> Option<String> {
                     "update the branch, or resolve the merge conflict in an authorized work session"
                         .to_owned(),
                 );
+            }
+            BEHIND_UNUPDATABLE => {
+                // The message names the author and the required update, so it
+                // is the remediation verbatim.
+                return Some(reason.message.clone());
             }
             _ => {}
         }
