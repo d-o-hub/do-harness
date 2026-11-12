@@ -472,5 +472,11 @@
     "rationale": "The conversation inventory blocked a merge on any comment that did not match a few hardcoded English phrasings, so a repository using a vendor outside that list was permanently blocked on what is a report about the PR rather than a request to its author. Attributing the comment to a check-run app is structural identity rather than a phrase list, and the failure vocabulary veto is absolute and checked first so an attributable app reporting a real failure stays actionable; the classification is recorded as evidence and never resolves a thread, disposes an item, or mutates anything.",
     "sensor": "cargo test -p do-harness --test pr_app_report && cargo test -p do-harness --bin do-harness app_report::tests (app_report)",
     "category": "architecture"
+  },
+  {
+    "invariant": "A BEHIND branch is recovered only through the ordered chain update-branch then the documented dependency-bot rebase command, and only for a Dependabot author; otherwise it is blocked as behind_unupdatable",
+    "rationale": "With strict_required_status_checks_policy a merge makes the next pull request BEHIND, and update-branch needs write access to the head branch, so a Dependabot branch cannot be updated by the API and a sweep merged exactly one dependency pull request before stopping. The fallback is the vendor command GitHub documents, posted at most once per head and only under --execute, and the changed head is revalidated from scratch before any merge because a rebase force-pushes and invalidates every prior receipt. A human or external author is never commented at or pushed, the comment body is a fixed literal rather than text derived from the pull request, and no path uses --admin, --auto, or a force-push.",
+    "sensor": "cargo test -p do-harness --test pr_sweep_behind && cargo test -p do-harness --bin do-harness behind::tests",
+    "category": "architecture"
   }
 ]

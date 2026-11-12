@@ -8,6 +8,7 @@
 //! `--execute --merge` additionally authorizes eligible merges and verified
 //! closures. The deterministic path never calls a model.
 
+pub mod behind;
 pub mod machine;
 pub mod plan;
 pub mod report;

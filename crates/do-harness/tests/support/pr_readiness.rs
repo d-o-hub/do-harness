@@ -49,6 +49,28 @@ if [ "$1" = "pr" ] && [ "$2" = "view" ]; then
             exit 0
         fi
     fi
+    # Once a branch-recovery comment has been posted (#518), the vendor bot's
+    # force-push is what the next reads observe, so a fixture can move the head
+    # *after* the comment and prove no stale receipt authorizes a merge.
+    # `always_moving_after_comment` keeps alternating, which is what makes the
+    # snapshot unable to stabilize for a receipt at all.
+    if [ -f "$MOCK_DIR/comment_posts.txt" ]; then
+        if [ -f "$MOCK_DIR/always_moving_after_comment" ]; then
+            if [ -f "$MOCK_DIR/move_toggle.txt" ]; then
+                rm -f "$MOCK_DIR/move_toggle.txt"
+                toggle=2
+            else
+                echo x > "$MOCK_DIR/move_toggle.txt"
+                toggle=1
+            fi
+            cat "$MOCK_DIR/view_move_$toggle.json"
+            exit 0
+        fi
+        if [ -f "$MOCK_DIR/view_after_comment_$3.json" ]; then
+            cat "$MOCK_DIR/view_after_comment_$3.json"
+            exit 0
+        fi
+    fi
     if [ -f "$MOCK_DIR/view_$3.json" ]; then
         cat "$MOCK_DIR/view_$3.json"
         exit 0
@@ -166,6 +188,30 @@ if [ "$1" = "api" ]; then
                 printf ']'
             else
                 printf '%s' '[{{"total_count":0,"statuses":[]}}]'
+            fi
+            exit 0
+            ;;
+        *issues/*/comments*)
+            # A comment post is the one write the `BEHIND` recovery chain makes
+            # (#518). Record the exact argv so a test can assert the literal
+            # body, and let the fixture decide whether the vendor bot reacts: an
+            # asynchronous rebase is modelled by rewriting the view's head.
+            if [ "$is_mutation" -eq 1 ]; then
+                printf '%s\n' "$*" >> "$MOCK_DIR/comment_posts.txt"
+                PR=$(printf '%s' "$endpoint" | sed -n 's|.*/issues/\([0-9]*\)/comments.*|\1|p')
+                if [ -f "$MOCK_DIR/rebase_rewrites_head" ] && [ -f "$MOCK_DIR/view_$PR.json" ]; then
+                    sed -E -e 's/"headRefOid":[[:space:]]*"[0-9a-f]+"/"headRefOid": "5555555555555555555555555555555555555555"/' \
+                        -e 's/"mergeStateStatus":[[:space:]]*"BEHIND"/"mergeStateStatus": "CLEAN"/' \
+                        "$MOCK_DIR/view_$PR.json" > "$MOCK_DIR/view_rebased_$PR"
+                    mv "$MOCK_DIR/view_rebased_$PR" "$MOCK_DIR/view_$PR.json"
+                fi
+                printf '%s' '{{"id": 9001, "html_url": "https://github.com/acme/widget/pull/1#issuecomment-9001"}}'
+                exit 0
+            fi
+            if [ -f "$MOCK_DIR/comments.json" ]; then
+                cat "$MOCK_DIR/comments.json"
+            else
+                printf '%s' '[]'
             fi
             exit 0
             ;;

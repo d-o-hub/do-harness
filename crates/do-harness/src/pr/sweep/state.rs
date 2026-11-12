@@ -44,6 +44,20 @@ pub struct PrAudit {
     pub update_requested: bool,
     /// Head SHA pinned when the last update was requested.
     pub update_expected_head: Option<String>,
+    /// Whether the documented dependency-bot rebase command was posted at least
+    /// once for this PR (#518).
+    ///
+    /// Kept separately from the head it was posted at so the report can say the
+    /// fallback was used, while `rebase_comment_head` keeps "once per head".
+    #[serde(default)]
+    pub rebase_comment_posted: bool,
+    /// The head SHA the rebase comment was last posted at.
+    ///
+    /// A repeat request for the same head cannot help — the bot either already
+    /// rebased (the head would have moved) or will not — so this is the guard
+    /// that makes the comment at most one per head rather than one per run.
+    #[serde(default)]
+    pub rebase_comment_head: Option<String>,
 }
 
 /// Mode record for one sweep run.

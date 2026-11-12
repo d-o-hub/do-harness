@@ -12,6 +12,21 @@ use crate::report::Format;
 
 use super::state::ModeRecord;
 
+/// Branch-recovery mechanism recorded on a sweep row (#518).
+///
+/// The variants are the ordered recovery chain: the API update, then the
+/// documented dependency-bot rebase command, then nothing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum BranchUpdate {
+    /// `PUT /pulls/{n}/update-branch` was accepted and moved the head.
+    UpdateBranch,
+    /// The documented `@dependabot rebase` command was posted.
+    DependabotRebase,
+    /// Nothing moved the branch; a human must.
+    None,
+}
+
 /// Report schema version.
 pub const SWEEP_REPORT_SCHEMA_VERSION: u32 = 1;
 
@@ -76,6 +91,13 @@ pub struct PerPrReport {
     pub base_sha: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub head_sha: Option<String>,
+    /// Which branch-recovery mechanism was used for a `BEHIND` base (#518).
+    ///
+    /// Absent when the branch was never behind. Present on every row that ran
+    /// the chain, so "the fallback was not used opportunistically" is readable
+    /// from the report rather than inferred from the mutation log.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub branch_update: Option<BranchUpdate>,
     /// Classified checks from the final snapshot, when collected.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub checks: Option<CheckSummary>,
@@ -125,6 +147,18 @@ pub struct SweepReport {
     pub halted: Option<HaltRecord>,
 }
 
+impl BranchUpdate {
+    /// The stable token recorded in the report and read by tests.
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::UpdateBranch => "update-branch",
+            Self::DependabotRebase => "dependabot-rebase",
+            Self::None => "none",
+        }
+    }
+}
+
 impl SweepReport {
     /// Prints the report in `format`.
     pub fn render(&self, format: Format) {
@@ -167,6 +201,9 @@ impl SweepReport {
             }
             for blocker in &pr.blockers {
                 println!("  {blocker}");
+            }
+            if let Some(update) = pr.branch_update {
+                println!("  branch update: {}", update.as_str());
             }
             if let Some(action) = &pr.next_action {
                 println!("  next: {action}");

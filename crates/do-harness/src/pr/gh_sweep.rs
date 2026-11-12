@@ -153,6 +153,23 @@ pub fn update_branch(root: &Path, number: u64, expected_head_sha: &str) -> Resul
     Ok(())
 }
 
+/// Posts a top-level issue comment on a PR.
+///
+/// Used only for the documented dependency-bot rebase command (#518): the body
+/// is a fixed string this module owns, never text derived from the pull
+/// request, so a comment can never carry attacker-controlled content into
+/// another repository's thread.
+pub fn post_issue_comment(root: &Path, number: u64, body: &str) -> Result<()> {
+    let endpoint = format!("repos/{{owner}}/{{repo}}/issues/{number}/comments");
+    let field = format!("body={body}");
+    crate::gh::output(
+        root,
+        &["api", "--method", "POST", &endpoint, "-f", &field],
+        "api post issue comment",
+    )?;
+    Ok(())
+}
+
 /// Disarms a pre-existing auto-merge request.
 pub fn disable_auto_merge(root: &Path, number: u64) -> Result<()> {
     let endpoint = format!("repos/{{owner}}/{{repo}}/pulls/{number}/auto-merge");
