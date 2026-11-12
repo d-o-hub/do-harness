@@ -1,5 +1,6 @@
 //! Conversation ledger, review decisions, and structured dispositions (#469).
 
+pub mod app_report;
 pub mod digest;
 pub mod disposition;
 pub mod inventory;

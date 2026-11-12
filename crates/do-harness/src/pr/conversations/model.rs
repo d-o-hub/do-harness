@@ -100,6 +100,19 @@ pub struct ConversationItem {
     pub commit_oid: Option<String>,
     pub state: String,
     pub actionable: bool,
+    /// How this item was classified (`app-report`, `actionable`, …).
+    ///
+    /// Recorded on every item so the verdict is auditable rather than implied by
+    /// `actionable` alone: a reader must be able to see *why* a bot comment
+    /// stopped gating a merge.
+    #[serde(default)]
+    pub classification: String,
+    /// The evidence that produced `classification`.
+    ///
+    /// For an `app-report` this names the matched slug, how attribution was
+    /// established, and the pass phrase if one was recognised (#517).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub evidence: Option<String>,
 }
 
 /// Unresolved or unassessed item requiring action or assessment.
@@ -109,6 +122,12 @@ pub struct NeedsTriageItem {
     pub author: String,
     pub excerpt: String,
     pub reason: String,
+    /// Classification that kept this item actionable.
+    #[serde(default)]
+    pub classification: String,
+    /// Why the classification refused to treat it as informational.
+    #[serde(default)]
+    pub evidence: String,
 }
 
 /// Evaluated conversation summary emitted in readiness reports.

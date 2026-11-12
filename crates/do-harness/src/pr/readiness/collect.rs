@@ -95,13 +95,25 @@ pub(super) fn evaluate_conversations(
     root: &Path,
     number: u64,
     view: &gh::PrReadinessView,
+    checks: &CheckSummary,
     blockers: &mut Vec<String>,
 ) -> Result<(ConversationSummary, Option<super::CodecovSummary>)> {
     let threads = gh::review_threads(root, number).context("could not read review threads")?;
     let comments = gh::issue_comments(root, number).context("could not read issue comments")?;
     let reviews = gh::reviews(root, number).context("could not read reviews")?;
 
-    let ledger = conversations::build_inventory(root, number, view, &threads, &comments, &reviews)?;
+    // The classified entries are already collected, and an app can only be
+    // attributed by a check it published on *this* head, so they are passed in
+    // rather than re-read (#517).
+    let ledger = conversations::build_inventory(
+        root,
+        number,
+        view,
+        &threads,
+        &comments,
+        &reviews,
+        &checks.entries,
+    )?;
 
     let mut unresolved_threads = Vec::new();
     for thread in &threads {
@@ -187,6 +199,7 @@ pub(super) fn evaluate_conversations(
         conversation_inventory_digest: ledger.inventory_digest,
         items_count: ledger.items.len(),
         needs_triage: ledger.needs_triage,
+        items: ledger.items,
         changes_requested_reviews,
         complete: ledger.complete,
     };
