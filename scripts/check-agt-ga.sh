@@ -123,7 +123,7 @@ if [[ -n "$legacy_raw" ]]; then
 fi
 echo "release: tag=$tag prerelease=$prerelease"
 
-if echo "$desc" | grep -qi "preview"; then
+if grep -qi "preview" <<<"$desc"; then
     echo "VERDICT=NOT_GA"
     exit 0
 fi

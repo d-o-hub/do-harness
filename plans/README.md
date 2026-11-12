@@ -16,17 +16,20 @@ holds three kinds of file, and only the first kind is a live contract:
 
 ## Gates (do not rename)
 
-| File | Consumed by |
-| --- | --- |
-| `invariants.json` | `do-harness seed`, the `check-invariants` sensor |
-| `methods.json` | `do-harness task add --method`, the HTN runtime |
-| `baselines.json` | `verify --record`'s `FINDINGS: <n>` ratchet |
-| `dora.json` | `do-harness dora` |
-| `ci-workflow-costs.json` | `scripts/ci-workflow-costs.sh` |
-| `pr-merge-policy.toml` | `do-harness pr` readiness checks |
+| File | Consumed by | If it is missing |
+| --- | --- | --- |
+| `invariants.json` | `do-harness seed`, the `check-invariants` sensor | Fail closed: `check-invariants.sh` reports `does not exist` |
+| `methods.json` | `do-harness task add --method`, the HTN runtime | Silent fallback: `methods.rs` uses the embedded catalog, so a local edit disappears |
+| `baselines.json` | `verify --record`'s `FINDINGS: <n>` ratchet | Silent fallback: `Baselines::load` returns the default, so the ratchet stops ratcheting |
+| `dora.json` | `do-harness dora` | Fail closed: `dora::policy::load` errors naming the path |
+| `ci-workflow-costs.json` | `scripts/ci-workflow-costs.sh` | Fail closed: `FileNotFoundError` |
+| `pr-merge-policy.toml` | `do-harness pr` readiness checks | Reports `UNKNOWN`, never a pass |
 
-A rename here is not a move, it is an outage: the sensor that owns the file
-fails closed rather than falling back to a default.
+A rename here is not a move, it is a change in gate strength, and which way it
+changes depends on the file: three fail closed, two fall back to a built-in
+default, and one turns the merge decision into `UNKNOWN`. The two that fall back
+are the dangerous ones — a rename there is silent, and nothing red will tell
+you. Rename any of them in a reviewed change that also updates the consumer.
 
 ## Live records
 
@@ -49,7 +52,10 @@ fails closed rather than falling back to a default.
 `archive/` holds the closed records: the 0.4.0 roadmap and its progress record,
 the 2026-10-15 codebase analysis and its follow-ups, the October issue batch, and
 the three rejected or deferred experiments (affected-component selection,
-workflow-adopter corpus, multi-candidate refinement).
+workflow-adopter corpus, multi-candidate refinement). `refinement-raw-data.json`
+is the raw measurement output behind the last of those — the 60 runs whose
+`VERDICT=DEFER` it records — so it lives beside the record that cites it, not
+with the gates.
 
 Read them for *why* a decision went the way it did. Do not reopen one as missing
 work without checking its recorded `Status:` line first — several argument
@@ -58,8 +64,10 @@ already resolved.
 
 ## Conventions
 
-- Every file opens with an H1 and a `> **Status:**` line. `closed`, `active`,
-  `decided`, `proposed`, and `recorded` are the states in use.
+- Every file opens with an H1 and a `> **Status:**` line. `closed`, `recorded`,
+  `active`, `decided`, and `proposed` are the states in use; a few older epics
+  open with a bare `**Status:**` line instead, which is accepted but not the
+  form to copy.
 - Renaming or archiving a file means fixing every reference *and* any
   `file.md:NN-NN` line citation: `docs-links` proves a link resolves, but it
   does not follow a line range, so a stale `:13-25` rots silently.

@@ -283,8 +283,15 @@ fn known_secrets_in_argv_are_redacted_from_persisted_metadata() {
 #[test]
 fn status_rejects_a_fifo_instead_of_blocking_on_evidence() {
     use std::time::{Duration, Instant};
-    const DEADLINE: Duration = Duration::from_secs(2);
     const POLL: Duration = Duration::from_millis(10);
+    // The failure this guards is a *blocked* `read`, and a FIFO read never
+    // returns on its own, so any deadline catches it. 2s was too tight: under a
+    // full parallel suite the spawn alone can take that long on a loaded host,
+    // which read as a hang and made this test intermittent. The deadline is a
+    // liveness bound, not a performance claim.
+    // A cold binary still starts in milliseconds; 30s only separates "slow
+    // machine" from "never returns".
+    const DEADLINE: Duration = Duration::from_secs(30);
     let root = tempfile::tempdir().unwrap();
     policy(root.path(), "print('ok')", "");
     let path = root.path().join("do-harness.toml");

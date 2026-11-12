@@ -66,7 +66,7 @@ The four criteria above are **safety gates**: each records that no contract or r
 - **Harness Build**: `do-harness 0.3.0` (debug target)
 - **Evaluator Mode**: Deterministic (`eval --format json`)
 - **Iterations**: 5 repeated benchmark runs per variant (60 total evaluated runs)
-- **Reproduction**: `ITERATIONS=5 scripts/skill-refinement-benchmark.sh plans/refinement-raw-data.json` (pin `DO_HARNESS_BIN` to the binary revision under test). The §4 baseline rows were independently reproduced on `main` from the three canonical skills.
+- **Reproduction**: `ITERATIONS=5 scripts/skill-refinement-benchmark.sh plans/archive/refinement-raw-data.json` (pin `DO_HARNESS_BIN` to the binary revision under test). The §4 baseline rows were independently reproduced on `main` from the three canonical skills.
 
 ---
 
