@@ -5,7 +5,7 @@ members = ["crates/db", "crates/types", "crates/do-harness", "crates/guardian-pr
 exclude = ["vendor/libsql"]
 
 [workspace.package]
-version = "0.4.4"
+version = "0.4.5"
 edition = "2024"
 rust-version = "1.85"
 license = "MIT"
@@ -14,7 +14,7 @@ repository = "https://github.com/d-o-hub/do-harness"
 [workspace.dependencies]
 # The version survives Cargo package normalization; consumers receive the same
 # teardown fix as checkout builds without a workspace-local patch.
-libsql = { package = "do-harness-libsql", version = "0.9.30", path = "vendor/libsql", default-features = false }
+libsql = { package = "do-harness-libsql", version = "0.9.31", path = "vendor/libsql", default-features = false }
 tokio = { version = "1", features = ["rt", "macros", "fs", "process", "sync", "time"] }
 anyhow = "1"
 serde = "1"

@@ -32,14 +32,14 @@ name = "do-harness-db"
 version = "0.3.0"
 [dependencies.libsql]
 package = "do-harness-libsql"
-version = "0.9.30"
+version = "0.9.31"
 default-features = false
 features = ["core"]
 '''
         (self.db / "Cargo.toml").write_text(self.manifest, encoding="utf-8")
         source = "registry+https://github.com/rust-lang/crates.io-index"
         self.metadata = {"packages": [
-            {"id": "fork", "name": "do-harness-libsql", "version": "0.9.30",
+            {"id": "fork", "name": "do-harness-libsql", "version": "0.9.31",
              "source": source, "manifest_path": str(self.fork / "Cargo.toml")},
             {"id": "db", "name": "do-harness-db", "version": "0.3.0",
              "source": source, "manifest_path": str(self.db / "Cargo.toml")},
