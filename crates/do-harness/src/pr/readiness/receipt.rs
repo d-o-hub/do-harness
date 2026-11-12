@@ -78,6 +78,7 @@ pub fn findings_digest(findings: &FindingsSummary) -> String {
     sha256_hex(&hasher.finalize())
 }
 
+#[allow(clippy::too_many_lines)] // one assignment per receipt field, in wire order
 pub(super) fn build_receipt(inputs: &SnapshotInputs<'_>) -> MergeReceipt {
     let mut labels: Vec<String> = inputs
         .view
@@ -136,6 +137,13 @@ pub(super) fn build_receipt(inputs: &SnapshotInputs<'_>) -> MergeReceipt {
         ("conversations", conversations_sha256.clone()),
         ("findings", findings_sha256.clone()),
         ("policy", policy_revision.clone()),
+        (
+            "policy_source",
+            match inputs.policy_source {
+                crate::pr::policy_source::PolicySource::Overlay => "overlay".to_owned(),
+                crate::pr::policy_source::PolicySource::Derived => "derived".to_owned(),
+            },
+        ),
         ("ancestry", ancestry.clone()),
         ("ancestry_base", ancestry_base.clone()),
         ("ancestry_merge_base", ancestry_merge_base.clone()),
@@ -171,6 +179,11 @@ pub(super) fn build_receipt(inputs: &SnapshotInputs<'_>) -> MergeReceipt {
         conversations_sha256,
         findings_sha256,
         policy_revision,
+        policy_source: match inputs.policy_source {
+            crate::pr::policy_source::PolicySource::Overlay => "overlay",
+            crate::pr::policy_source::PolicySource::Derived => "derived",
+        }
+        .to_owned(),
         ancestry,
         ancestry_base_commit: ancestry_base,
         ancestry_merge_base,
@@ -369,6 +382,7 @@ mod tests {
             conversations_sha256: String::new(),
             findings_sha256: String::new(),
             policy_revision: "absent".to_owned(),
+            policy_source: "overlay".to_owned(),
             ancestry: "ahead".to_owned(),
             ancestry_base_commit: "b".to_owned(),
             ancestry_merge_base: "b".to_owned(),
@@ -405,6 +419,7 @@ mod tests {
             conversations_sha256: String::new(),
             findings_sha256: String::new(),
             policy_revision: "absent".to_owned(),
+            policy_source: "overlay".to_owned(),
             ancestry: "ahead".to_owned(),
             ancestry_base_commit: "b".to_owned(),
             ancestry_merge_base: "b".to_owned(),
@@ -444,6 +459,7 @@ mod digest_tests {
             entries: vec![CheckEntry {
                 name: "verify".to_owned(),
                 source: "github-actions".to_owned(),
+                app_id: None,
                 kind: "check".to_owned(),
                 state: "completed".to_owned(),
                 conclusion: Some("success".to_owned()),

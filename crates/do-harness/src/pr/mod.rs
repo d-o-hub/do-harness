@@ -18,9 +18,11 @@ pub mod lcov;
 pub mod loop_fetch;
 pub mod no_effect;
 pub mod policy;
+pub mod policy_source;
 pub mod proof;
 pub mod readiness;
 pub mod review;
+pub mod rules;
 pub mod sweep;
 pub mod update_base;
 pub mod waiver_classify;
@@ -32,6 +34,9 @@ pub mod waivers;
 
 #[cfg(test)]
 mod diff_tests;
+
+#[cfg(test)]
+mod rules_tests;
 
 #[cfg(test)]
 mod lcov_tests;

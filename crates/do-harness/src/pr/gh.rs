@@ -166,6 +166,9 @@ pub struct CheckRun {
 /// The app that owns a check run.
 #[derive(Debug, Clone, Deserialize)]
 pub struct CheckApp {
+    /// Numeric app id, the identity a ruleset's `integration_id` names.
+    #[serde(default)]
+    pub id: Option<u64>,
     /// App slug, e.g. `github-actions` or `dependabot`.
     #[serde(default)]
     pub slug: Option<String>,

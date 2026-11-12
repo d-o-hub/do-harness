@@ -354,25 +354,50 @@ fn unexpected_inherited_branch_ruleset_is_drift() {
 
 #[cfg(unix)]
 #[test]
-fn missing_or_malformed_policy_file_is_unknown_and_exits_2() {
+fn a_malformed_policy_file_is_unknown_and_exits_2() {
     let dir = tempfile::tempdir().unwrap();
     let root = dir.path();
     let bin = fake_gh_router(root);
 
-    // 1. Missing policy file
+    // A file that exists but cannot be parsed is still an error: the operator
+    // wrote an overlay and it is wrong, which is not the same as never having
+    // written one (#515 made only *absence* non-fatal).
+    write_policy(root, "schema_version = 'not a number'");
     let (code, stdout, _stderr) = run_doctor_pr_policy(root, &bin);
-    assert_eq!(code, Some(2), "missing policy file must exit 2");
+    assert_eq!(code, Some(2), "malformed policy file must exit 2");
     let report: Value = serde_json::from_str(&stdout).expect("JSON report");
     assert_eq!(report["decision"], "UNKNOWN");
     assert_eq!(report["findings"][0]["rule_type"], "policy_file");
+}
 
-    // 2. Malformed policy file
-    write_policy(root, "schema_version = 'not a number'");
-    let (code2, stdout2, _stderr2) = run_doctor_pr_policy(root, &bin);
-    assert_eq!(code2, Some(2), "malformed policy file must exit 2");
-    let report2: Value = serde_json::from_str(&stdout2).expect("JSON report");
-    assert_eq!(report2["decision"], "UNKNOWN");
-    assert_eq!(report2["findings"][0]["rule_type"], "policy_file");
+#[cfg(unix)]
+#[test]
+fn a_missing_policy_file_falls_back_to_the_server_rules() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    let bin = fake_gh_router(root);
+    // No overlay, but the ruleset fixtures are present, so the derived mode has
+    // something to read. `run_pr_without_policy` seeds exactly those.
+    support::pr_readiness::ensure_ruleset_fixtures(root);
+
+    let (code, stdout, stderr) = run_doctor_pr_policy(root, &bin);
+    assert_eq!(
+        code,
+        Some(0),
+        "an absent overlay must report the derived rules instead of UNKNOWN: {stderr}\n{stdout}"
+    );
+    let report: Value = serde_json::from_str(&stdout).expect("JSON rules report");
+    assert_eq!(
+        report["required"][0]["context"], "pr-required",
+        "the derived report names the ruleset's required contexts"
+    );
+    assert!(
+        report["digest"]
+            .as_str()
+            .unwrap_or_default()
+            .starts_with("sha256:"),
+        "the derived rules carry a digest"
+    );
 }
 
 #[cfg(unix)]

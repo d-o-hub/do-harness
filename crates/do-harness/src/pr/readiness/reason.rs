@@ -149,7 +149,14 @@ pub struct MergeReceipt {
     /// Digest of the classified findings.
     pub findings_sha256: String,
     /// Merge policy revision digest, or `absent`.
+    ///
+    /// This is the overlay's `sha256` when one decided, and the server-derived
+    /// rules' `rules_sha256` when they did. Either way a change between
+    /// collection and merge invalidates the receipt exactly like a moved head.
     pub policy_revision: String,
+    /// Which source produced the policy decision (`overlay` or `derived`).
+    #[serde(default)]
+    pub policy_source: String,
     /// Ancestry verdict.
     pub ancestry: String,
     /// Base commit the compare API confirmed.

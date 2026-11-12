@@ -22,6 +22,44 @@ Exit codes:
 - `1`: DRIFT — server rulesets diverge from `plans/pr-merge-policy.toml`.
 - `2`: UNKNOWN — permissions, API failure, or malformed policy prevent verification.
 
+## Derived mode: repositories without an overlay
+
+`plans/pr-merge-policy.toml` is **optional**. An adopting repository that never
+writes one still gets a merge decision, because the authoritative rules already
+exist server-side and are read from
+`GET /repos/{owner}/{repo}/rules/branches/{base}` plus the repository's merge
+settings. The overlay is a strict tightening, not the only source:
+
+| Overlay | Source of truth | Behaviour |
+| --- | --- | --- |
+| present | `plans/pr-merge-policy.toml` | Unchanged, including the drift gate |
+| absent | the server ruleset | Rules derived; `doctor pr-policy` reports them read-only |
+| absent, rules unreadable | — | `policy_unavailable`, still fail-closed (exit 2) |
+
+The derived rules pin `rules_sha256` into the merge receipt, so a ruleset change
+between collecting the snapshot and merging invalidates the receipt exactly like
+a moved head SHA.
+
+**Required-check identity is `(context, integration_id)`, not the context name.**
+A required context is satisfied only by a check run whose owning `app.id` equals
+the ruleset's `integration_id`. A run named `CI / Required` published by a
+different app is blocked as `required_check_app_mismatch`; a run that carries no
+app id fails closed rather than assuming it matches. A ruleset entry with
+`integration_id: null` is matched on the context alone, because that is all the
+server asked for.
+
+Two contradictions are reported rather than silently tolerated:
+
+- the ruleset permits only merge methods the repository disables
+  (`policy_drift` with the derived wording);
+- the ruleset requires no status checks at all. This is a **warning**, never
+  proof: an empty required set says nothing about whether any check ran, and the
+  checks module still fails closed on an empty check set.
+
+A repository whose merge settings the API does not report (they are returned
+only to a caller with admin permission) is treated as *unknown*, not as "every
+method disabled": absence of a field is not a `false`.
+
 ## Enforced Ruleset Requirements
 
 Targeting the default branch (`main`), active rulesets must enforce:

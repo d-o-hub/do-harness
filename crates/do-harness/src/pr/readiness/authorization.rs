@@ -38,6 +38,10 @@ pub struct SnapshotInputs<'a> {
     pub policy_ok: bool,
     /// Whether the policy could be evaluated at all.
     pub policy_known: bool,
+    /// Which source produced the policy decision.
+    pub policy_source: crate::pr::policy_source::PolicySource,
+    /// Ways the head's checks fail the derived ruleset.
+    pub rule_violations: &'a [crate::pr::rules::RuleViolation],
     /// Ancestry proof, or `None` when it could not be collected.
     pub ancestry: Option<&'a AncestryProof>,
     /// UTC epoch seconds used to seal the receipt.
@@ -187,9 +191,26 @@ pub fn authorize(inputs: &SnapshotInputs<'_>) -> Authorization {
             "the merge policy could not be evaluated against the server ruleset",
         ));
     } else if !inputs.policy_ok {
+        // The message names the source, because "drifts from
+        // plans/pr-merge-policy.toml" is wrong when no such file exists.
+        let detail = match inputs.policy_source {
+            crate::pr::policy_source::PolicySource::Overlay => {
+                "server ruleset drifts from plans/pr-merge-policy.toml"
+            }
+            crate::pr::policy_source::PolicySource::Derived => {
+                "the server ruleset permits no merge method the repository enables"
+            }
+        };
+        blocked.push(AuthorizationReason::new(codes::POLICY_DRIFT, detail));
+    }
+
+    // The derived ruleset's own check gate: a missing context, a failing one,
+    // or one published by an app it did not name. The last is the
+    // impersonation case — the ruleset names an app for a reason.
+    for violation in inputs.rule_violations {
         blocked.push(AuthorizationReason::new(
-            codes::POLICY_DRIFT,
-            "server ruleset drifts from plans/pr-merge-policy.toml",
+            violation.code,
+            format!("{}: {}", violation.context, violation.detail),
         ));
     }
 
