@@ -6,6 +6,7 @@ use std::path::Path;
 use anyhow::Result;
 use sha2::{Digest, Sha256};
 
+use super::app_report;
 use super::digest::compute_inventory_digest;
 use super::disposition::parse_disposition;
 #[allow(unused_imports)]
@@ -67,7 +68,15 @@ pub fn build_inventory(
     threads: &[gh::ReviewThread],
     comments: &[gh::Comment],
     reviews: &[gh::Review],
+    checks: &[crate::pr::checks::CheckEntry],
 ) -> Result<ConversationLedger> {
+    // The app slugs that published a check on this head. This is the structural
+    // half of the `app-report` test: a comment is attributable when its authoring
+    // app is one of these (#517).
+    // `CheckEntry.source` *is* the app slug for a check run (`status` for a
+    // legacy commit status, which `check_run_slugs` drops).
+    let head_apps = app_report::check_run_slugs(checks.iter().map(|entry| entry.source.as_str()));
+    let app_allowlist = app_report::load_app_allowlist(root);
     // 1. Gather all raw items first to calculate hashes
     let mut items = Vec::new();
     let mut item_hash_map: BTreeMap<String, String> = BTreeMap::new();
@@ -103,6 +112,12 @@ pub fn build_inventory(
             commit_oid: rev.commit_id.clone(),
             state: rev.state.clone(),
             actionable: rev.state == "CHANGES_REQUESTED",
+            classification: if rev.state == "CHANGES_REQUESTED" {
+                "changes-requested".to_owned()
+            } else {
+                "review".to_owned()
+            },
+            evidence: None,
         });
     }
 
@@ -147,6 +162,12 @@ pub fn build_inventory(
                 "unresolved".to_owned()
             },
             actionable: !thread.is_resolved,
+            classification: if thread.is_resolved {
+                "resolved-thread".to_owned()
+            } else {
+                "unresolved-thread".to_owned()
+            },
+            evidence: None,
         });
 
         // Also record individual thread reply comments
@@ -177,6 +198,8 @@ pub fn build_inventory(
                 commit_oid: None,
                 state: "comment".to_owned(),
                 actionable: false,
+                classification: "thread-reply".to_owned(),
+                evidence: None,
             });
         }
     }
@@ -273,7 +296,25 @@ pub fn build_inventory(
         }
 
         let is_disposed = disposed_item_refs.contains(&item_ref);
-        let courtesy = is_courtesy_or_pass(&author, &comm.body, false);
+
+        // #517: a status comment from an app that reports checks on this head is
+        // an informational report, not a request to the author. The failure
+        // vocabulary veto inside `classify` keeps a real failure actionable, and
+        // a report is informational only — it can never dispose of an item.
+        let report = app_report::classify(&author, &comm.body, &head_apps, &app_allowlist);
+        let informational = matches!(report, app_report::AppReport::Informational { .. });
+        // The legacy courtesy/pass and PR-author rules still apply to anything
+        // the app classifier refused.
+        let courtesy = informational || is_courtesy_or_pass(&author, &comm.body, false);
+        let classification = if informational {
+            report.classification()
+        } else if courtesy {
+            "courtesy"
+        } else {
+            report.classification()
+        }
+        .to_owned();
+        let evidence = informational.then(|| report.evidence());
 
         let actionable = !is_disposed && !courtesy;
         if actionable {
@@ -282,6 +323,8 @@ pub fn build_inventory(
                 author: author.clone(),
                 excerpt: first_line(&comm.body, 80),
                 reason: "unassessed top-level review or bot comment".to_owned(),
+                classification: classification.clone(),
+                evidence: report.evidence(),
             });
         }
 
@@ -298,6 +341,8 @@ pub fn build_inventory(
             commit_oid: None,
             state: if is_disposed { "disposed" } else { "open" }.to_owned(),
             actionable,
+            classification,
+            evidence,
         });
     }
 

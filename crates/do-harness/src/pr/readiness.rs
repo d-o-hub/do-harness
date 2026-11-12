@@ -165,7 +165,8 @@ pub fn evaluate_with_receipt(
             &view.base_ref_name,
             &mut blockers,
         )?;
-        let (conversations, codecov) = evaluate_conversations(root, number, &view, &mut blockers)?;
+        let (conversations, codecov) =
+            evaluate_conversations(root, number, &view, &checks, &mut blockers)?;
         let findings = evaluate_findings_block(root, &view, &mut blockers);
 
         // 6. Server policy and ancestry proof

@@ -1496,6 +1496,30 @@ a `receipt`. Reason codes are stable: `draft`, `held`, `state_not_open`,
 `ancestry_diverged`, `ancestry_unknown`, `snapshot_moved`, `receipt_invalid`,
 `receipt_expired`, `receipt_changed`.
 
+A top-level comment is classified `app-report` — informational, so it raises no
+`conversation_needs_triage` — only when **both** hold:
+
+1. **Attributable.** The login is `<slug>[bot]` and `slug` publishes a check run
+   on this head, or `slug` is listed one-per-line in
+   `.git/pr-triage/app-report-allow.txt`. The comparison is a whole slug, so
+   `app/sonar` cannot borrow `sonarqubecloud`'s credibility, and a legacy commit
+   status (whose source is `status`) never attributes anything.
+2. **No failure vocabulary.** The body carries no failure signal — `fail`,
+   `blocked`, `vulnerab`, `error`, `critical`, `does not pass`, `not pass`,
+   `unsuccessful`, `regression`, `breaking`. This veto is absolute and is
+   checked first, so an attributable app reporting a real failure stays
+   actionable.
+
+Pass phrasing (`Quality Gate Passed`, `Up to standards`, `0 issues`,
+`benchmark results`, …) only selects the direction of the verdict and is
+recorded as evidence; it can never make an unattributable comment informational,
+and an unrecognised phrasing degrades to "not an app report" rather than to a
+false pass. An `app-report` never resolves a thread, disposes of an item, or
+mutates anything. Code-review apps (`coderabbitai`, `sourcery-ai`, …) are always
+actionable, and human comments, `CHANGES_REQUESTED` reviews and unresolved
+threads are unchanged. Every item in `conversations.items` carries its
+`classification` and `evidence`, so the decision is auditable.
+
 A known blocker settles the verdict even when other proof is also missing: the
 merge cannot proceed regardless. Exit `0` only for `MERGE_ALLOWED`, `1` for
 `BLOCKED`, and `2` for `UNKNOWN` — including a receipt that is expired,

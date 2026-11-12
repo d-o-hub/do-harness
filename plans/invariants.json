@@ -466,5 +466,11 @@
     "rationale": "An adopting repository has no plans/pr-merge-policy.toml, so reading only the overlay left merge authorization permanently UNKNOWN and the tool could merge in this repository alone. The server rules are authoritative and already readable through the API; the overlay becomes an optional strict tightening, and an unreadable ruleset still fails closed as policy_unavailable.",
     "sensor": "cargo test -p do-harness --bin do-harness rules_tests (pr::rules_tests)",
     "category": "architecture"
+  },
+  {
+    "invariant": "A bot status comment is informational only when its authoring app publishes a check run on the same head and the body carries no failure vocabulary",
+    "rationale": "The conversation inventory blocked a merge on any comment that did not match a few hardcoded English phrasings, so a repository using a vendor outside that list was permanently blocked on what is a report about the PR rather than a request to its author. Attributing the comment to a check-run app is structural identity rather than a phrase list, and the failure vocabulary veto is absolute and checked first so an attributable app reporting a real failure stays actionable; the classification is recorded as evidence and never resolves a thread, disposes an item, or mutates anything.",
+    "sensor": "cargo test -p do-harness --test pr_app_report && cargo test -p do-harness --bin do-harness app_report::tests (app_report)",
+    "category": "architecture"
   }
 ]

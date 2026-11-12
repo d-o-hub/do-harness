@@ -145,6 +145,15 @@ pub struct ConversationSummary {
     pub items_count: usize,
     #[serde(default)]
     pub needs_triage: Vec<crate::pr::conversations::NeedsTriageItem>,
+    /// The full conversation ledger, carrying each item's classification and
+    /// evidence.
+    ///
+    /// `needs_triage` alone says what still blocks; this says why everything
+    /// else did not, which is the auditable half of an `app-report` decision
+    /// (#517). It is covered by `conversation_inventory_digest`, so exposing it
+    /// does not change the receipt.
+    #[serde(default)]
+    pub items: Vec<crate::pr::conversations::ConversationItem>,
     /// Submitted reviews currently requesting changes.
     #[serde(default)]
     pub changes_requested_reviews: usize,
