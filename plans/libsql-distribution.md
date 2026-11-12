@@ -76,12 +76,14 @@ verified 2026-11-11). The `v0.3.0` tag exists on
 `6804b41`; its publish job failed (`do-harness-libsql 0.9.30 already exists`, the
 idempotency check fixed later in #312/`787c19f`) and
 `registry-validation`/`npm-publish`/`release` were skipped. Recovery: re-cut the
-tag on `787c19f`, then complete the registry-validation step above. Current
-status and the operator sequence are in
-[Adding a publishable crate](../docs/releasing.md#adding-a-publishable-crate):
-while `0.9.30` is the current version the publish job skips the crate, so a
-green run still does not exercise the publisher; the first fork version bump is
-its proof.
+tag on `787c19f`, then complete the registry-validation step above.
+
+`do-harness-libsql` 0.9.31 was published through GitHub Actions OIDC by the
+`v0.4.5` release run `43270254771` on 2026-11-12 (sha `6dfdb33`); crates.io
+records `trustpub_data` for `d-o-hub/do-harness`, so the trusted publisher is
+proven. 0.9.31 contains no source change over 0.9.30 — it exists to exercise the
+publisher. Current status and the operator sequence are in
+[Adding a publishable crate](../docs/releasing.md#adding-a-publishable-crate).
 
 ## Upstream issue watch
 
