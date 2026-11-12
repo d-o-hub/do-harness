@@ -12,7 +12,7 @@
 [package]
 edition = "2021"
 name = "do-harness-libsql"
-version = "0.9.30"
+version = "0.9.31"
 authors = ["the libSQL authors"]
 build = false
 autolib = false

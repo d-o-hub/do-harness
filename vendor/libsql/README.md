@@ -1,6 +1,6 @@
 # libSQL API for Rust
 
-This directory publishes as **`do-harness-libsql` 0.9.30**, a maintenance fork
+This directory publishes as **`do-harness-libsql` 0.9.31**, a maintenance fork
 of crates.io `libsql` 0.9.30 for do-harness. It retains the upstream MIT license,
 authors, API and Rust library name (`libsql`). The upstream manifest is retained
 as `Cargo.toml.upstream`; package metadata records the upstream repository and
@@ -13,6 +13,9 @@ Both upstream stable 0.9.30 and 0.10.0-pre.4 remain unfixed as of 2026-10-08.
 The project pins a digest of the fixed connection source and checks normalized
 packages and resolved registry dependencies before shipping. Remove this fork
 only after validating an upstream release with the fix on musl and Windows.
+
+`0.9.31` republishes `0.9.30` without a source change, to exercise this crate's
+crates.io Trusted Publishing publisher for the first time.
 
 The sections below are the original upstream README.
 

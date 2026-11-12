@@ -38,17 +38,16 @@ release"). Nothing publishes unless the tagged commit passes the full release se
   while its version is current and fails only when it must upload a new one.
   Adding a crate is a one-time bootstrap plus trust setup; the full sequence is
   under "Adding a publishable crate" below.
-- **`do-harness-libsql` has a trusted publisher but has never used it.** The
-  fork `0.9.30` was published manually on 2026-10-15 because OIDC cannot create
-  a name. Its publisher — repository `d-o-hub/do-harness`, workflow
+- **`do-harness-libsql` has a trusted publisher, first exercised by `0.9.31`.**
+  The fork `0.9.30` was published manually on 2026-10-15 because OIDC cannot
+  create a name. Its publisher — repository `d-o-hub/do-harness`, workflow
   `release.yml`, no environment — was recorded the same day and is listed by the
   crates.io trusted-publishing API (config id 25968, verified 2026-11-11 with
   `GET https://crates.io/api/v1/trusted_publishing/github_configs?crate=<name>`
-  and an authenticated token). No fork version has been uploaded through it
-  yet: while `0.9.30` is current the release job skips the crate at the
-  per-crate probe, so a green run still does not exercise the publisher. The
-  next bump of `vendor/libsql/Cargo.toml` is the first real proof — watch that
-  `cargo publish` step. If a fresh name ever needs the same bootstrap, publish
+  and an authenticated token). `0.9.31` contains no source change over `0.9.30`
+  and exists to upload through that publisher for the first time; confirm the
+  release run's `cargo publish` step and record the version's `trustpub_data`.
+  If a fresh name ever needs the same bootstrap, publish
   once with
   `cargo publish --locked --manifest-path vendor/libsql/Cargo.toml --no-default-features --features core`,
   then configure trust.
@@ -504,7 +503,8 @@ exists. It is idempotent: a version already present on crates.io is skipped, so
 a partially failed run can be re-run safely. Publish order is `do-harness-libsql` → `do-harness-types` → `do-harness-db` → `do-harness`;
 each step retries while the registry index catches up.
 
-The fork has its own version (`vendor/libsql/Cargo.toml`, currently 0.9.30),
+The fork has its own version (`vendor/libsql/Cargo.toml`, currently 0.9.31,
+which contains no source change over 0.9.30),
 independent of `[workspace.package].version`. Its versioned path dependency
 is normalized to a registry dependency in `do-harness-db`; no `[patch]` is
 needed by consumers. Preserve upstream licensing and provenance on updates.
