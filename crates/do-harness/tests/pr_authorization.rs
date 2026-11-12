@@ -196,14 +196,19 @@ fn a_fresh_receipt_is_accepted_and_a_moved_snapshot_is_not() {
         "an unchanged snapshot accepts its receipt: {stderr}"
     );
 
-    // A new failing check changes the snapshot while the receipt stays put.
+    // A new check changes the snapshot while the receipt stays put. The
+    // required contexts keep their green state, so this is a moved snapshot
+    // rather than a newly-unknown suite: the receipt must catch the difference
+    // on the check set alone.
     std::fs::write(
         root.join("check_runs.json"),
         json!({
-            "total_count": 2,
+            "total_count": 4,
             "check_runs": [
-                {"id": 1, "name": "verify", "status": "completed", "conclusion": "success", "app": {"slug": "github-actions"}},
-                {"id": 2, "name": "docs", "status": "completed", "conclusion": "success", "app": {"slug": "github-actions"}}
+                {"id": 1, "name": "verify", "status": "completed", "conclusion": "success", "app": {"id": 15368, "slug": "github-actions"}},
+                {"id": 2, "name": "pr-required", "status": "completed", "conclusion": "success", "app": {"id": 15368, "slug": "github-actions"}},
+                {"id": 3, "name": "semver", "status": "completed", "conclusion": "success", "app": {"id": 15368, "slug": "github-actions"}},
+                {"id": 4, "name": "docs", "status": "completed", "conclusion": "success", "app": {"id": 15368, "slug": "github-actions"}}
             ]
         })
         .to_string(),

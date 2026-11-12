@@ -41,6 +41,23 @@ fn summarize(
     summarize_with(runs, statuses, conflicts, &checks::ChecksPolicy::default())
 }
 
+/// A policy whose required set is an explicit operator decision.
+///
+/// `ChecksPolicy::default()` deliberately leaves `required_known` false — "the
+/// rules were never read" — so a test that means "nothing is required" has to
+/// say so instead of inheriting the undetermined state.
+fn known_policy(required: &[&str], allow_skips: &[&str]) -> checks::ChecksPolicy {
+    let mut policy = checks::ChecksPolicy {
+        required: required.iter().map(|s| (*s).to_owned()).collect(),
+        required_known: true,
+        ..checks::ChecksPolicy::default()
+    };
+    policy
+        .allow_skips
+        .extend(allow_skips.iter().map(|s| (*s).to_owned()));
+    policy
+}
+
 fn summarize_with(
     runs: Vec<CheckRun>,
     statuses: Vec<CommitStatus>,
@@ -95,7 +112,7 @@ fn a_cancelled_run_carries_a_rerun_command() {
 
 #[test]
 fn success_and_neutral_runs_do_not_block() {
-    let mut policy = checks::ChecksPolicy::default();
+    let mut policy = known_policy(&["build"], &["docs", "lint"]);
     policy.allow_skips.insert("docs".to_owned());
     policy.allow_skips.insert("lint".to_owned());
     let (summary, blockers) = summarize_with(
@@ -113,16 +130,57 @@ fn success_and_neutral_runs_do_not_block() {
     assert!(blockers.is_empty(), "unexpected blockers: {blockers:?}");
 }
 
+/// A skip on a context the policy does not require passes, and is still
+/// counted as skipped rather than silently dropped (#516).
 #[test]
-fn an_unallowlisted_skip_blocks() {
+fn an_optional_skip_does_not_block() {
+    let policy = known_policy(&["build"], &[]);
+    let (summary, blockers) = summarize_with(
+        vec![
+            run("build", "completed", Some("success")),
+            run("docs", "completed", Some("skipped")),
+        ],
+        vec![],
+        false,
+        &policy,
+    );
+    assert_eq!(summary.verdict, "PASS");
+    assert_eq!(summary.skipped, 1);
+    assert!(blockers.is_empty(), "unexpected blockers: {blockers:?}");
+}
+
+/// A skip on the required context itself still blocks, and the blocker names
+/// the skip rather than a missing check.
+#[test]
+fn a_required_skip_blocks_and_is_named_as_a_skip() {
+    let policy = known_policy(&["docs"], &[]);
+    let (summary, blockers) = summarize_with(
+        vec![run("docs", "completed", Some("skipped"))],
+        vec![],
+        false,
+        &policy,
+    );
+    assert_eq!(summary.verdict, "FAIL");
+    assert!(
+        blockers.iter().any(|b| b.contains("was skipped")),
+        "unexpected blockers: {blockers:?}"
+    );
+}
+
+/// With no established required set, a skip is `UNKNOWN`, never a pass: the
+/// tool cannot claim "nothing requires this" without having read the rules.
+#[test]
+fn an_undetermined_required_set_makes_a_skip_unknown() {
     let (summary, blockers) = summarize(
         vec![run("docs", "completed", Some("skipped"))],
         vec![],
         false,
     );
-    assert_eq!(summary.verdict, "FAIL");
+    assert_eq!(summary.verdict, "UNKNOWN");
     assert!(
-        blockers.iter().any(|b| b.contains("unallowlisted skip")),
+        blockers
+            .iter()
+            .any(|b| b.contains("the required set could not be read")),
         "unexpected blockers: {blockers:?}"
     );
 }

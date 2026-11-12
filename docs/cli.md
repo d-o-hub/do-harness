@@ -1599,8 +1599,22 @@ verdict, and an explicit blocker list.
 
 Policy lives in `.git/pr-triage/checks-policy.toml` (`allow_no_ci`,
 `required`, `allow_skips`); `.git/pr-triage/checks-allow.txt` remains a
-one-name-per-line skip allowlist. `cancelled`, `action_required`, and
-unallowlisted `skipped`/`neutral` checks are blockers.
+one-name-per-line skip allowlist. `cancelled` and `action_required` checks are
+always blockers.
+
+A `skipped` or `neutral` conclusion is judged against the required set, not
+against the allowlist. A **required** context that concludes `skipped` blocks
+with `required_check_skipped`, and one absent from the payload blocks with
+`missing_required_check`; any other skip is `SKIP` — reported with its reason,
+app slug and conclusion, but not a blocker (#516). The required set comes from
+`required` when the policy declares it, and otherwise from the merge rules the
+server enforces (`pr ready` reads the same set), so the CI verdict and the merge
+decision cannot disagree. `required = []` is a decision that nothing gates; an
+*absent* `required` key is not, and leaves the set to the server. When no source
+can be read the set is unknown and a skip becomes `UNKNOWN` rather than a pass —
+`allow_skips` can tighten this, never widen it. An `allow_skips` entry naming a
+required context is reported as `contradictory_required_skip`, because the
+required entry wins and a reviewer must not believe the gate moved.
 
 ### `pr waivers`
 <!-- BEGIN GENERATED: cli-contract pr waivers -->

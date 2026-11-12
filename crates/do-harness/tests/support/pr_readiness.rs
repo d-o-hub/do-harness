@@ -130,9 +130,13 @@ if [ "$1" = "api" ]; then
                 cat "$MOCK_DIR/check_runs.json"
                 printf ']'
             else
-                # Default fixture: a green suite, so tests about conversations
-                # or waivers do not have to restate CI.
-                printf '%s' '[{{"total_count":1,"check_runs":[{{"id":1,"name":"verify","status":"completed","conclusion":"success","app":{{"slug":"github-actions"}}}}]}}]'
+                # Default fixture: a green suite that satisfies the default
+                # overlay's required contexts (`pr-required`, `semver`), so
+                # tests about conversations or waivers do not have to restate
+                # CI. A fixture naming only `verify` would be a *missing
+                # required check* once the required set comes from the merge
+                # policy, not a green suite.
+                printf '%s' '[{{"total_count":3,"check_runs":[{{"id":1,"name":"verify","status":"completed","conclusion":"success","app":{{"id":15368,"slug":"github-actions"}}}},{{"id":2,"name":"pr-required","status":"completed","conclusion":"success","app":{{"id":15368,"slug":"github-actions"}}}},{{"id":3,"name":"semver","status":"completed","conclusion":"success","app":{{"id":15368,"slug":"github-actions"}}}}]}}]'
             fi
             exit 0
             ;;

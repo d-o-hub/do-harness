@@ -9,6 +9,7 @@ pub use agent_view::ReviewView;
 pub mod ancestry;
 pub mod cache;
 pub mod checks;
+pub mod checks_policy;
 pub mod command;
 pub mod conversations;
 pub mod diff;

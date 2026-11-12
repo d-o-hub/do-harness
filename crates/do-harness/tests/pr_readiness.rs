@@ -188,7 +188,11 @@ fn a_clean_pull_request_does_not_flag_its_checks_as_incomplete() {
     .unwrap();
     std::fs::write(
         root.join("check_runs.json"),
-        r#"{"total_count": 1, "check_runs": [{"id": 1, "name": "verify", "status": "completed", "conclusion": "success"}]}"#,
+        r#"{"total_count": 3, "check_runs": [
+            {"id": 1, "name": "verify", "status": "completed", "conclusion": "success", "app": {"id": 15368, "slug": "github-actions"}},
+            {"id": 2, "name": "pr-required", "status": "completed", "conclusion": "success", "app": {"id": 15368, "slug": "github-actions"}},
+            {"id": 3, "name": "semver", "status": "completed", "conclusion": "success", "app": {"id": 15368, "slug": "github-actions"}}
+        ]}"#,
     )
     .unwrap();
 

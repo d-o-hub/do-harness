@@ -154,18 +154,41 @@ pub fn write_view(root: &Path, pr: u64, overrides: &Value) {
     std::fs::write(root.join("view.json"), view.to_string()).unwrap();
 }
 
+/// A green head that satisfies the default overlay's required contexts.
+///
+/// `ensure_authorization_fixtures` declares `pr-required` and `semver` as
+/// required, and a readiness snapshot now resolves the required set from the
+/// merge policy — so a fixture named `verify` alone would be a *missing
+/// required check*, not a green suite. Both contexts are reported from the
+/// `github-actions` app id the ruleset names.
 pub fn green_checks(root: &Path) {
     std::fs::write(
         root.join("check_runs.json"),
         json!({
-            "total_count": 1,
-            "check_runs": [{
-                "id": 1,
-                "name": "verify",
-                "status": "completed",
-                "conclusion": "success",
-                "app": { "id": 15368, "slug": "github-actions" }
-            }]
+            "total_count": 3,
+            "check_runs": [
+                {
+                    "id": 1,
+                    "name": "verify",
+                    "status": "completed",
+                    "conclusion": "success",
+                    "app": { "id": 15368, "slug": "github-actions" }
+                },
+                {
+                    "id": 2,
+                    "name": "pr-required",
+                    "status": "completed",
+                    "conclusion": "success",
+                    "app": { "id": 15368, "slug": "github-actions" }
+                },
+                {
+                    "id": 3,
+                    "name": "semver",
+                    "status": "completed",
+                    "conclusion": "success",
+                    "app": { "id": 15368, "slug": "github-actions" }
+                }
+            ]
         })
         .to_string(),
     )

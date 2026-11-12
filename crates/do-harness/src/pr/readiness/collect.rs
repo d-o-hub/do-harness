@@ -19,15 +19,20 @@ use crate::pr::gh;
 use crate::pr::waiver_comment::first_line;
 
 /// Classifies CI state through the typed checker and folds its blockers in.
+///
+/// `base` comes from the view the snapshot already read, so the required set is
+/// resolved against the same base the authorization will use — reading it twice
+/// could consult a different ruleset if the base changed between calls.
 pub(super) fn evaluate_checks(
     root: &Path,
     pr: u64,
     head_ref_oid: &str,
     conflicts: bool,
+    base: &str,
     blockers: &mut Vec<String>,
 ) -> Result<CheckSummary> {
     // Fail closed: a `gh` failure means the check state is unknown, not empty.
-    let report = checks::evaluate_for_head(root, pr, head_ref_oid, conflicts)?;
+    let report = checks::evaluate_for_head_with_base(root, pr, head_ref_oid, conflicts, base)?;
     for blocker in &report.blockers {
         blockers.push(blocker.message.clone());
     }

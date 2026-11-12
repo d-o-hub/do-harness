@@ -157,7 +157,14 @@ pub fn evaluate_with_receipt(
         }
 
         // 3. Checks, 4. conversations, 5. findings
-        let checks = evaluate_checks(root, number, &view.head_ref_oid, conflicts, &mut blockers)?;
+        let checks = evaluate_checks(
+            root,
+            number,
+            &view.head_ref_oid,
+            conflicts,
+            &view.base_ref_name,
+            &mut blockers,
+        )?;
         let (conversations, codecov) = evaluate_conversations(root, number, &view, &mut blockers)?;
         let findings = evaluate_findings_block(root, &view, &mut blockers);
 
