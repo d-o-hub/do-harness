@@ -176,6 +176,7 @@ pub fn run(root: &Path, action: PrAction, dry_run: bool) -> Result<(), CliError>
             execute,
             merge,
             wait,
+            author_policy,
             format,
         } => super::sweep::run(
             root,
@@ -186,6 +187,7 @@ pub fn run(root: &Path, action: PrAction, dry_run: bool) -> Result<(), CliError>
                 execute,
                 merge,
                 wait,
+                author_policy,
                 format,
             },
         ),

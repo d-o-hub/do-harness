@@ -65,6 +65,19 @@ Privilege boundary:
   is a `403` or unreadable answer, and it is never treated as owned. Findings
   collection always stays `--issues plan`; untracked findings block with the
   explicit `pr findings --issues create` next action.
+- **Author policy.** Who may be merged is declared, not inferred: `--author-policy
+  <owned|owned-or-external-green>` on `pr sweep`, or `[pr] author_policy` in
+  `do-harness.toml`. The default `owned` is the boundary above. The opt-in
+  `owned-or-external-green` additionally merges an external author's PR **when
+  the readiness snapshot has zero blockers** — the same gate an owned merge
+  passes, so required-check identity, conversation dispositions, findings, merge
+  state, and ancestry all still apply. It never widens writing: an external
+  branch is merged, never updated, disarmed, commented at, closed, or pushed,
+  and a PR needing one of those writes is reported (`external_behind`,
+  `external_auto_merge_armed`, `external_blocked`). An unknown value is a usage
+  error (exit 2, no `gh` call); an unreadable one in `do-harness.toml` is a
+  config error, never a silent default. Only widen this when the human has asked
+  for it by name — a sweep run is never the place to discover the policy.
 - After every merge the sweep waits for exact-merge main verification (bounded
   at 900 s); an empty or pending run list is not a pass. A post-merge
   regression or an unknown deadline halts the whole sweep. Receipts are never
@@ -97,7 +110,12 @@ Run these steps in order. Stop the sweep on any escalation and report it.
    reports (`app/dependabot`), or `dependabot`/`renovate`. The match is the whole
    login, so `dependabot-helper` is a human account. For any other author:
    review and post findings as a PR comment, then move on. Never update the
-   branch, resolve threads, push fixes, or merge a PR you do not own.
+   branch, resolve threads, or push fixes to a PR you do not own — that is true
+   under every author policy. Merging one is the single exception, and only when
+   the sweep runs with `--author-policy owned-or-external-green` (or the
+   repository declares it) **and** the PR is fully green; see the machine
+   orchestration section. Without that explicit policy the answer is "post the
+   review, do not merge".
 4. **State check.** Read `gh pr view PR --json headRefOid,baseRefName`. Run
    `scripts/auto-merge.sh PR`. Exit 1 means an auto-merge request is armed, so
    run it again with `scripts/auto-merge.sh PR --disable` and continue; only a

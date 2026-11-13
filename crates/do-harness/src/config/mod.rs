@@ -33,6 +33,9 @@ pub struct Config {
     /// Empty means no unattended job applies a repair.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub repairs: Vec<RepairSpec>,
+    /// Pull-request governance: who a sweep may merge (#519).
+    #[serde(default)]
+    pub pr: crate::pr::author_policy::PrConfig,
 }
 
 /// A mechanical repair declared by project policy.
@@ -187,6 +190,27 @@ pub async fn load(root: &Path, explicit: Option<&Path>) -> Result<Config> {
     Ok(load_raw(root, explicit).await?.0)
 }
 
+/// Loads the workspace configuration without entering a runtime.
+///
+/// `pr` subcommands are dispatched *inside* the async runtime, so a nested
+/// `block_on` there would panic. They only need the declaration tables, never a
+/// sensor definition, so the file is parsed synchronously and the result is
+/// identical to [`load`] for every key they read.
+///
+/// # Errors
+///
+/// Returns an error when `do-harness.toml` exists but cannot be read or parsed.
+pub fn load_sync(root: &Path) -> Result<Config> {
+    let path = root.join("do-harness.toml");
+    let Ok(text) = std::fs::read_to_string(&path) else {
+        return Ok(rust_default());
+    };
+    let cfg: Config =
+        toml::from_str(&text).with_context(|| format!("invalid config file {}", path.display()))?;
+    cfg.validate()?;
+    Ok(cfg)
+}
+
 /// Loads configuration plus the raw file bytes for policy fingerprinting.
 ///
 /// The bytes are `None` when no file exists and the built-in Rust pack is
@@ -242,6 +266,7 @@ pub fn rust_default() -> Config {
         sensors,
         jobs: None,
         repairs: Vec::new(),
+        pr: crate::pr::author_policy::PrConfig::default(),
     }
 }
 

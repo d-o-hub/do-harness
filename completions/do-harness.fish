@@ -324,6 +324,8 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_see
 complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from findings" -s V -l version -d 'Print version'
 complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from sweep" -l pr -d 'Sweep only this pull request number' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from sweep" -l wait -d 'Wait bound (seconds) for CI and post-merge verification' -r
+complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from sweep" -l author-policy -d 'Who this sweep may merge: `owned` (default) or `owned-or-external-green`. Overrides `[pr] author_policy`' -r -f -a "owned\t'Only own/bot/admin-authored pull requests (the default)'
+owned-or-external-green\t'Also an external author\'s pull request, but only when it is fully green'"
 complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from sweep" -l format -d 'Output format' -r -f -a "text\t'Human-readable text output'
 json\t'Machine-readable JSON output'"
 complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from sweep" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"

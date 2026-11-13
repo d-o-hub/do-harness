@@ -259,6 +259,7 @@ mod tests {
 
     fn config_with(specs: Vec<SensorSpec>) -> Config {
         Config {
+            pr: crate::pr::author_policy::PrConfig::default(),
             language: None,
             hooks: HooksConfig {
                 pre_commit: vec![],

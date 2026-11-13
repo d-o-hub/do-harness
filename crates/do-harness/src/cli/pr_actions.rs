@@ -151,6 +151,10 @@ pub enum PrAction {
         /// Wait bound (seconds) for CI and post-merge verification.
         #[arg(long, value_name = "SECONDS", default_value_t = 1200)]
         wait: u64,
+        /// Who this sweep may merge: `owned` (default) or
+        /// `owned-or-external-green`. Overrides `[pr] author_policy`.
+        #[arg(long, value_name = "POLICY")]
+        author_policy: Option<crate::pr::author_policy::AuthorPolicy>,
         /// Output format.
         #[arg(long, value_enum, default_value_t = Format::Text)]
         format: Format,

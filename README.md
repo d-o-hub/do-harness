@@ -242,7 +242,7 @@ export PATH="$HOME/.local/bin:$PATH"
 | `pr waivers [OPTIONS] --lcov <PATH> [PR]` | Classify patch-coverage residue: waivable classes and lines needing tests — flags: `--base <REV>`, `--head <REV>`, `--patch <PATH>`, `--lcov <PATH>`, `--since <PATH>`, `--strip-prefix <PREFIX>`, `--format <FORMAT>` |
 | `pr disposition [OPTIONS] --decision <DECISION> --head <HEAD> --reason <REASON> <PR> <ITEM_REF>` | Record a structured disposition for a review, thread, comment, or finding — flags: `--decision <DECISION>`, `--head <HEAD>`, `--reason <REASON>`, `--evidence <EVIDENCE>`, `--format <FORMAT>` |
 | `pr findings [OPTIONS] <PR>` | Collect and classify findings (annotations, code scanning, artifacts) and track issues — flags: `--issues <ISSUES>`, `--format <FORMAT>` |
-| `pr sweep [OPTIONS]` | Orchestrate a deterministic, sequential PR sweep (read-only by default) — flags: `--all`, `--pr <PR>`, `--execute`, `--merge`, `--wait <SECONDS>`, `--format <FORMAT>` |
+| `pr sweep [OPTIONS]` | Orchestrate a deterministic, sequential PR sweep (read-only by default) — flags: `--all`, `--pr <PR>`, `--execute`, `--merge`, `--wait <SECONDS>`, `--author-policy <POLICY>`, `--format <FORMAT>` |
 | `pr update-base [OPTIONS] <PR>` | Update a pull request's branch to the latest base without overwriting author work (default is read-only; `--execute` acts only on an authorized own/known-bot head) — flags: `--execute`, `--format <FORMAT>` |
 | `skills suggest [OPTIONS] --query <TEXT>` | Rank skills by relevance to a query using metadata only — flags: `--query <TEXT>`, `--limit <N>`, `--format <FORMAT>` |
 | `skills drift [OPTIONS]` | Check manifest-managed shared skills against their pinned digests — flags: `--manifest <FILE>`, `--format <FORMAT>` |

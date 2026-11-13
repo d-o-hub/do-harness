@@ -15,6 +15,7 @@ fn severity_config(name: &str, argv: &[&str], severity: SensorSeverity) -> Confi
     let mut signal_sets = BTreeMap::new();
     signal_sets.insert("feedback".to_owned(), vec![name.to_owned()]);
     Config {
+        pr: crate::pr::author_policy::PrConfig::default(),
         language: None,
         hooks: HooksConfig::default(),
         signal_sets,

@@ -6,6 +6,7 @@
 
 use serde::Serialize;
 
+use crate::pr::author_policy::AuthorPolicy;
 use crate::pr::readiness::AuthorizationReason;
 use crate::pr::readiness::{CheckSummary, ConversationSummary, FindingsSummary};
 use crate::report::Format;
@@ -137,6 +138,9 @@ pub struct SweepReport {
     pub target: TargetRecord,
     /// Wait bound used for CI and post-merge verification.
     pub wait_seconds: u64,
+    /// The author policy that gated merging, so an audit can tell which rule
+    /// authorised a merge (#519).
+    pub author_policy: AuthorPolicy,
     /// Always true: the deterministic path never calls a model.
     pub zero_model: bool,
     /// Where the audit state is stored.
@@ -184,7 +188,8 @@ impl SweepReport {
             None => "all open PRs".to_owned(),
         };
         println!(
-            "sweep: {target} ({mode}, zero-model, state {})",
+            "sweep: {target} ({mode}, author policy {}, zero-model, state {})",
+            self.author_policy.as_str(),
             self.state_path
         );
         for pr in &self.prs {

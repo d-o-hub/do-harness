@@ -392,6 +392,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
         &'do-harness;pr;sweep'= {
             cand --pr 'Sweep only this pull request number'
             cand --wait 'Wait bound (seconds) for CI and post-merge verification'
+            cand --author-policy 'Who this sweep may merge: `owned` (default) or `owned-or-external-green`. Overrides `[pr] author_policy`'
             cand --format 'Output format'
             cand --root 'Workspace root override (default: walk up from cwd)'
             cand --config 'Explicit path to do-harness.toml'

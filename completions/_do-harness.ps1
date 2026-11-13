@@ -415,6 +415,7 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
         'do-harness;pr;sweep' {
             [CompletionResult]::new('--pr', '--pr', [CompletionResultType]::ParameterName, 'Sweep only this pull request number')
             [CompletionResult]::new('--wait', '--wait', [CompletionResultType]::ParameterName, 'Wait bound (seconds) for CI and post-merge verification')
+            [CompletionResult]::new('--author-policy', '--author-policy', [CompletionResultType]::ParameterName, 'Who this sweep may merge: `owned` (default) or `owned-or-external-green`. Overrides `[pr] author_policy`')
             [CompletionResult]::new('--format', '--format', [CompletionResultType]::ParameterName, 'Output format')
             [CompletionResult]::new('--root', '--root', [CompletionResultType]::ParameterName, 'Workspace root override (default: walk up from cwd)')
             [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Explicit path to do-harness.toml')

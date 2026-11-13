@@ -88,6 +88,53 @@ Mandatory approval count is not fabricated through bot reviews or synthetic acco
 instead, server enforcement guarantees conversation resolution and required CI checks
 pass before any merge can complete.
 
+## Author Policy (`[pr] author_policy`)
+
+Merging was restricted to own/bot/admin-authored pull requests with no way to
+relax that. It is now a declared policy whose default is the safe value:
+
+| Value | Merges | Notes |
+| --- | --- | --- |
+| `owned` (default) | own, bot, and admin/collaborator authors | today's behaviour |
+| `owned-or-external-green` | also an external author, when fully green | opt-in |
+
+`--author-policy <POLICY>` on `pr sweep` overrides the key for one invocation, so
+a permissive repository can be swept under the tighter boundary without editing
+the file. Precedence is flag, then `[pr] author_policy`, then the compiled-in
+`owned`.
+
+**"Green" is not a separate judgement.** Under the relaxed policy an external
+pull request merges only when the readiness snapshot carries zero blockers — the
+same snapshot that gates an owned merge, so the required-check identity rules
+from the derived-retirement work, the conversation dispositions, the findings
+policy, `CLEAN`/`MERGEABLE` merge state, and proved ancestry all apply unchanged.
+Relaxing *who may merge* relaxes nothing about *what must be true*.
+
+**The relaxed policy never widens writing.** An external branch is read and
+merged, never modified: no `update-branch`, no auto-merge disarm, no
+`@dependabot rebase`, no closure, no thread resolution, no push. That boundary is
+structural — the owned path's write helpers are simply not called on the
+external path — so no policy value can turn a merge permission into a licence to
+rewrite someone's branch. A pull request that *needs* one of those writes is
+reported instead:
+
+| Situation | Outcome |
+| --- | --- |
+| external, zero blockers | merged |
+| external, any blocker | `skipped` + the blockers, plus `external_blocked` |
+| external, behind its base | `skipped: external_behind` — only its author can update it |
+| external, auto-merge armed | `skipped: external_auto_merge_armed` — disarming is a write |
+| draft, or `hold`/`wip`/`do-not-merge` | `skipped: draft` / `skipped: held`, for **every** author |
+| permission unreadable (`403`) | `skipped: unknown_identity` — never mergeable under any policy |
+
+A draft or a hold label stays a hard stop whichever policy is in force: those are
+the author's or a maintainer's own decisions, and a wider merge policy is not a
+licence to override them.
+
+The policy that authorised a run is recorded as `author_policy` in the sweep
+report, so an audit can tell which rule permitted a merge rather than inferring
+it from configuration that may have changed since.
+
 ## Findings Policy (`[findings]`)
 
 The `[findings]` table declares how CI findings are tracked:
