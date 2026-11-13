@@ -75,9 +75,12 @@ pub const FETCH_TIMEOUT_ENV: &str = "DO_HARNESS_FETCH_TIMEOUT_SECS";
 /// Commits of history requested per deepening attempt.
 ///
 /// A history is deepened geometrically, so the *number of round trips* stays
-/// small while a large gap is still crossed: one attempt covers a pull request
-/// whose fork point is 40 commits back, and four attempts cover one 600 commits
-/// back. A linear step would need hundreds of fetches for the same gap.
+/// small while a large gap is still crossed. `git-fetch(1)` defines
+/// `--deepen=<depth>` as commits "from the current shallow boundary", so each
+/// attempt moves `DEEPEN_INCREMENT * step` commits further and the reach
+/// compounds rather than repeating: with this value, four attempts cover 400
+/// commits and all eight cover 1,440 (40 + 80 + … + 320). A linear step of 40
+/// would need ten times as many fetches for the same gap.
 pub const DEEPEN_INCREMENT: u32 = 40;
 
 /// Maximum deepening attempts per run.
@@ -294,11 +297,19 @@ pub fn prefetch(
     }
 }
 
-/// Deepens the base history until the pair connects.
+/// Deepens the available history until the pair connects.
 ///
 /// Each attempt deepens by a growing multiple of [`DEEPEN_INCREMENT`] so the
-/// round-trip count stays small, and the history is scoped to the base branch's
-/// remote-tracking ref so an unrelated branch's history is not dragged in.
+/// round-trip count stays small.
+///
+/// No refspec is passed, so this deepens **every** remote-tracking branch, not
+/// one: `git-fetch(1)` defines `--deepen=<depth>` as moving the shallow boundary
+/// for "each remote branch history". That is the intended trade — a single
+/// bounded request instead of one per candidate branch — but it is measurably
+/// larger than a scoped fetch: on a `--depth 1 --no-single-branch` clone of 38
+/// shallow branches, one `--deepen=40` took the pack from 4,769 to 9,464
+/// objects and cut the shallow boundary to 3 entries. [`MAX_DEPTHEN_STEPS`]
+/// bounds the number of requests, not the bytes each one moves.
 fn deepen_until_connected(
     root: &Path,
     base_oid: &str,
