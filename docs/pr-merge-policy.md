@@ -135,6 +135,29 @@ The policy that authorised a run is recorded as `author_policy` in the sweep
 report, so an audit can tell which rule permitted a merge rather than inferring
 it from configuration that may have changed since.
 
+### Upgrade order: the flag before the key
+
+`Config` carries `#[serde(deny_unknown_fields)]`, so a `do-harness.toml` holding
+a `[pr]` table is **rejected outright** by a binary that predates this key — not
+ignored, and not just for `pr` commands: `verify`, `status`, and every other
+config consumer fail closed with `invalid config file … TOML parse error`. The
+deployed-binary check is real, not theoretical: a 0.4.5 binary given a config
+with `[pr]` exits 2 on `verify --only fmt`.
+
+Failing closed is the right direction — an older binary never silently merges
+under a policy it cannot read — but it means the ordering matters when a
+repository adopts the key:
+
+1. upgrade every installing binary first (`do-harness upgrade`, or reinstall);
+2. only then commit `[pr] author_policy`.
+
+Until the whole fleet is upgraded, use the flag. `--author-policy` needs no
+config support, works on any binary new enough to have it, and narrows or widens
+a single invocation — so a repository can run one relaxed sweep without writing
+the key at all. The flag also cannot be *read* by an older binary: it fails with
+`unexpected argument '--author-policy'` and exit 2, which is a visible scripting
+error rather than a silent policy downgrade.
+
 ## Findings Policy (`[findings]`)
 
 The `[findings]` table declares how CI findings are tracked:

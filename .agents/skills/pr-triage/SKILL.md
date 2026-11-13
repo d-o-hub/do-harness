@@ -77,7 +77,10 @@ Privilege boundary:
   `external_auto_merge_armed`, `external_blocked`). An unknown value is a usage
   error (exit 2, no `gh` call); an unreadable one in `do-harness.toml` is a
   config error, never a silent default. Only widen this when the human has asked
-  for it by name — a sweep run is never the place to discover the policy.
+  for it by name — a sweep run is never the place to discover the policy. Prefer
+  the **flag** over the file key: `Config` rejects unknown keys, so a
+  `do-harness.toml` carrying `[pr]` fails every command on a binary that predates
+  it. Upgrade the binaries first, then commit the key.
 - After every merge the sweep waits for exact-merge main verification (bounded
   at 900 s); an empty or pending run list is not a pass. A post-merge
   regression or an unknown deadline halts the whole sweep. Receipts are never
