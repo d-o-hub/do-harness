@@ -401,6 +401,7 @@ pub fn generate_node_config(sensors: &[SensorSpec]) -> Result<String> {
         sensors: sensors.to_vec(),
         jobs: None,
         repairs: Vec::new(),
+        pr: crate::pr::author_policy::PrConfig::default(),
     };
     let body = toml::to_string(&cfg).context("failed to render generated config")?;
     Ok(format!(

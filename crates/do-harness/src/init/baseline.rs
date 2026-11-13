@@ -122,6 +122,7 @@ mod tests {
     /// empty list means genuinely zero effective sensors.
     fn config(sensors: Vec<crate::config::SensorSpec>) -> Config {
         Config {
+            pr: crate::pr::author_policy::PrConfig::default(),
             language: Some("generic".to_owned()),
             hooks: crate::config::HooksConfig::default(),
             signal_sets: std::collections::BTreeMap::new(),

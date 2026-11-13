@@ -23,6 +23,7 @@ use crate::report::Format;
 
 use self::report::SweepReport;
 use self::state::ModeRecord;
+use crate::pr::author_policy::{self, AuthorPolicy};
 
 /// Arguments for `pr sweep` as parsed by the CLI.
 #[derive(Debug, Clone, Copy)]
@@ -41,6 +42,9 @@ pub struct SweepArgs {
     pub merge: bool,
     /// Wait bound (seconds) for CI and post-merge verification.
     pub wait: u64,
+    /// Who this sweep may merge; `None` means "use `[pr] author_policy`, else
+    /// the compiled-in `owned`" (#519).
+    pub author_policy: Option<AuthorPolicy>,
     /// Output format.
     pub format: Format,
 }
@@ -74,6 +78,11 @@ pub fn run(root: &Path, args: SweepArgs) -> Result<(), CliError> {
         execute,
         merge,
     };
+    // Resolve the author policy before the inventory: a malformed value in
+    // `do-harness.toml` is a configuration error that must not reach a single
+    // `gh` call (#519).
+    let author_policy =
+        author_policy::resolve(root, args.author_policy).map_err(CliError::Usage)?;
 
     // LIST: one read-only inventory.
     let entries = if let Some(number) = args.pr {
@@ -93,6 +102,7 @@ pub fn run(root: &Path, args: SweepArgs) -> Result<(), CliError> {
 
     let mut drive_input = machine::DriveInput {
         mode: mode.clone(),
+        author_policy,
         wait_seconds: args.wait,
         state_path: &state_file,
         state: &mut sweep_state,
@@ -107,6 +117,7 @@ pub fn run(root: &Path, args: SweepArgs) -> Result<(), CliError> {
             pr: args.pr,
         },
         wait_seconds: args.wait,
+        author_policy,
         zero_model: true,
         state_path: state_file.display().to_string(),
         prs: output.prs,

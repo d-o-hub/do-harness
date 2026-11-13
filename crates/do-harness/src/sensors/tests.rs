@@ -14,6 +14,7 @@ mod vacuous_gate;
 
 fn config_with(specs: &[(&str, &[&str])]) -> Config {
     Config {
+        pr: crate::pr::author_policy::PrConfig::default(),
         language: None,
         hooks: HooksConfig {
             pre_commit: vec![],

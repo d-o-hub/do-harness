@@ -7,6 +7,7 @@ pub mod agent_view;
 pub use agent_view::ReviewView;
 
 pub mod ancestry;
+pub mod author_policy;
 pub mod cache;
 pub mod checks;
 pub mod checks_policy;

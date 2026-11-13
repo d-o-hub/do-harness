@@ -1757,6 +1757,7 @@ caps new issues at `max_new_issues_per_run` from
 | `--execute` | no | — | — | Authorize owned/bot branch updates and auto-merge disarm |
 | `--merge` | no | — | — | Also authorize eligible merges and closures (requires --execute) |
 | `--wait <SECONDS>` | no | `1200` | — | Wait bound (seconds) for CI and post-merge verification |
+| `--author-policy <POLICY>` | no | — | `owned`, `owned-or-external-green` | Who this sweep may merge: `owned` (default) or `owned-or-external-green`. Overrides `[pr] author_policy` |
 | `--format <FORMAT>` | no | `text` | `text`, `json` | Output format |
 <!-- END GENERATED: cli-contract pr sweep -->
 Orchestrate a deterministic, sequential PR sweep: inventory, authorize
@@ -1799,6 +1800,24 @@ update; the sweep continues with the next pull request rather than halting.
 `branch_update` on the row records `update-branch`, `dependabot-rebase`, or
 `none`, and is absent when the branch was never behind. This tool never uses
 `--admin`, never arms `--auto`, and never force-pushes.
+
+Who may be merged is a declared policy, defaulting to the safe value:
+
+| Value | Merges |
+| --- | --- |
+| `owned` (default) | own, bot, and admin/collaborator authors |
+| `owned-or-external-green` | also an external author, when the snapshot has zero blockers |
+
+`--author-policy` overrides `[pr] author_policy` for one invocation, and an
+unknown value is a usage error (exit 2) that reaches no `gh` call at all. Under
+the relaxed policy an external branch is read and merged but **never written**:
+no `update-branch`, no auto-merge disarm, no rebase comment, no closure, no
+thread resolution, no push. A behind external branch is `skipped:
+external_behind`, an armed auto-merge is `skipped: external_auto_merge_armed`,
+any blocker is `skipped` with the blockers plus `external_blocked`, and a draft
+or `hold`/`wip`/`do-not-merge` label stays a hard stop for every author. An
+undetermined identity (`403` from the permission endpoint) is never mergeable
+under any policy. The run records the policy it applied as `author_policy`.
 
 ### `skills`
 <!-- BEGIN GENERATED: cli-contract skills -->

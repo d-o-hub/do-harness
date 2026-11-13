@@ -19,6 +19,8 @@ use crate::pr::sweep::report::{HaltRecord, PerPrReport, SummaryRecord};
 use crate::pr::sweep::state::{ModeRecord, SweepStateV1};
 use crate::pr::sweep::step::{self, MainVerdict, Owner, WaitOutcome};
 
+#[path = "machine_external.rs"]
+mod external;
 #[path = "machine_utils.rs"]
 mod utils;
 use utils::{
@@ -33,6 +35,8 @@ pub struct DriveInput<'a> {
     pub wait_seconds: u64,
     /// Where the audit state is stored.
     pub state_path: &'a Path,
+    /// Who this sweep may merge (#519).
+    pub author_policy: crate::pr::author_policy::AuthorPolicy,
     /// Audit state (loaded and reconciled by the caller).
     pub state: &'a mut SweepStateV1,
 }
@@ -86,6 +90,14 @@ pub fn drive(
                 Owner::Owned => {
                     ctx.report.authorized = true;
                     process_owned(root, &mut ctx, &clusters, &*input)?;
+                }
+                // An external author is mergeable only under the relaxed policy,
+                // and even then the branch is never *written*: `process_external`
+                // reads the full readiness snapshot and merges on zero blockers
+                // or reports `external` with the findings (#519).
+                Owner::External if input.author_policy.may_merge(Owner::External) => {
+                    ctx.report.authorized = true;
+                    external::process_external(root, &mut ctx, &*input)?;
                 }
                 Owner::External => {
                     ctx.finish_skipped("external", "third-party author; never modified");
@@ -273,6 +285,23 @@ fn process_owned(
         AuthorizationDecision::MergeAllowed => {}
     }
 
+    finish_and_merge(root, ctx, input, &snapshot)
+}
+
+/// Drives `FINAL_READY` → `DIRECT_MERGE` → `VERIFY_MAIN` from an authorizing
+/// snapshot.
+///
+/// Shared by the owned path and the external path so "merge only on
+/// `MERGE_ALLOWED`, with the receipt recomputed and the head pinned" has exactly
+/// one implementation: an external pull request must not be merged by a
+/// weaker or differently-shaped copy of the rule (#519).
+fn finish_and_merge(
+    root: &Path,
+    ctx: &mut PrCtx,
+    input: &DriveInput<'_>,
+    snapshot: &readiness::ReadinessReport,
+) -> Result<()> {
+    let number = ctx.report.number;
     // FINAL_READY: re-collect against the receipt immediately before merge.
     if !input.mode.merge {
         "deferred".clone_into(&mut ctx.report.outcome);

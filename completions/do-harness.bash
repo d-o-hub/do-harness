@@ -4865,7 +4865,7 @@ _do__harness() {
             return 0
             ;;
         do__subcmd__harness__subcmd__pr__subcmd__sweep)
-            opts="-q -h -V --all --pr --dry-run --execute --merge --wait --format --root --config --quiet --output --help --version"
+            opts="-q -h -V --all --pr --dry-run --execute --merge --wait --author-policy --format --root --config --quiet --output --help --version"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -4877,6 +4877,10 @@ _do__harness() {
                     ;;
                 --wait)
                     COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --author-policy)
+                    COMPREPLY=($(compgen -W "owned owned-or-external-green" -- "${cur}"))
                     return 0
                     ;;
                 --format)

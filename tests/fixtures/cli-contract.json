@@ -1480,6 +1480,25 @@
           "index": null
         },
         {
+          "id": "author_policy",
+          "kind": "option",
+          "short": null,
+          "long": "author-policy",
+          "value_names": [
+            "POLICY"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [
+            "owned",
+            "owned-or-external-green"
+          ],
+          "help": "Who this sweep may merge: `owned` (default) or `owned-or-external-green`. Overrides `[pr] author_policy`",
+          "index": null
+        },
+        {
           "id": "format",
           "kind": "option",
           "short": null,

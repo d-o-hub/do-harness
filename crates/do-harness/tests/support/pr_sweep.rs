@@ -260,3 +260,47 @@ pub fn permission_calls(root: &Path) -> Vec<String> {
         })
         .unwrap_or_default()
 }
+
+/// Writes a `do-harness.toml` declaring only `[pr] author_policy` (#519).
+///
+/// A file holding just this table is valid — `sensors` defaults to the built-in
+/// pack — so the fixture states the governance decision without restating a
+/// sensor suite.
+pub fn write_author_policy_config(root: &Path, policy: &str) {
+    std::fs::write(
+        root.join("do-harness.toml"),
+        format!("[pr]\nauthor_policy = \"{policy}\"\n"),
+    )
+    .unwrap();
+}
+
+/// An external human author whose PR is fully green (#519).
+///
+/// `setup()` already seeds the policy overlay, the ruleset, and a green check
+/// suite covering the required contexts, so this only has to make the author
+/// external: `404` from the collaborator endpoint is an answer, and the answer
+/// is "not a collaborator" (#514).
+pub fn external_green_pr(root: &Path, pr: u64) {
+    write_pr_list(root, &human_pr_list(pr));
+    write_view(root, pr, &json!({ "author": human_author() }));
+    std::fs::write(root.join("permission_404"), "x").unwrap();
+}
+
+/// Asserts the mutation log carries no write this tool must never make on a
+/// branch it does not own (#519).
+pub fn assert_read_only(root: &Path) {
+    let cmds = mutations(root);
+    for forbidden in [
+        "update-branch",
+        "auto-merge",
+        "pr close",
+        "--admin",
+        "--auto",
+        " push",
+    ] {
+        assert!(
+            cmds.iter().all(|cmd| !cmd.contains(forbidden)),
+            "the external path must never {forbidden:?}: {cmds:#?}"
+        );
+    }
+}

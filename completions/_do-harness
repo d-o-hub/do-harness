@@ -428,6 +428,8 @@ json\:"Machine-readable JSON output"))' \
 _arguments "${_arguments_options[@]}" : \
 '--pr=[Sweep only this pull request number]:PR:_default' \
 '--wait=[Wait bound (seconds) for CI and post-merge verification]:SECONDS:_default' \
+'--author-policy=[Who this sweep may merge\: \`owned\` (default) or \`owned-or-external-green\`. Overrides \`\[pr\] author_policy\`]:POLICY:((owned\:"Only own/bot/admin-authored pull requests (the default)"
+owned-or-external-green\:"Also an external author'\''s pull request, but only when it is fully green"))' \
 '--format=[Output format]:FORMAT:((text\:"Human-readable text output"
 json\:"Machine-readable JSON output"))' \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
