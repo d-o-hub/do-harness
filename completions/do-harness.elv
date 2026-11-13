@@ -259,6 +259,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand --root 'Workspace root override (default: walk up from cwd)'
             cand --config 'Explicit path to do-harness.toml'
             cand --output 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)'
+            cand --no-fetch 'Do not fetch the commits the proof needs'
             cand -q 'Suppress PASS/WARN verdict lines and the success footer'
             cand --quiet 'Suppress PASS/WARN verdict lines and the success footer'
             cand --dry-run 'Dry run without side effects'

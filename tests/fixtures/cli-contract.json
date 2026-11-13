@@ -796,6 +796,22 @@
           "index": null
         },
         {
+          "id": "no_fetch",
+          "kind": "option",
+          "short": null,
+          "long": "no-fetch",
+          "value_names": [
+            "NO_FETCH"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": false,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Do not fetch the commits the proof needs",
+          "index": null
+        },
+        {
           "id": "format",
           "kind": "option",
           "short": null,

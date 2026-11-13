@@ -14,6 +14,7 @@ pub mod checks_policy;
 pub mod command;
 pub mod conversations;
 pub mod diff;
+pub mod fetch;
 pub mod findings;
 pub mod gh;
 pub mod lcov;

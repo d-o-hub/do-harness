@@ -224,6 +224,7 @@ json\t'Machine-readable JSON output'"
 complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from no-effect" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"
 complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from no-effect" -l config -d 'Explicit path to do-harness.toml' -r -F
 complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from no-effect" -l output -d 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from no-effect" -l no-fetch -d 'Do not fetch the commits the proof needs'
 complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from no-effect" -s q -l quiet -d 'Suppress PASS/WARN verdict lines and the success footer'
 complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from no-effect" -l dry-run -d 'Dry run without side effects'
 complete -c do-harness -n "__fish_do_harness_using_subcommand pr; and __fish_seen_subcommand_from no-effect" -s h -l help -d 'Print help (see more with \'--help\')'

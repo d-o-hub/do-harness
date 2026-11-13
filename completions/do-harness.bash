@@ -4665,7 +4665,7 @@ _do__harness() {
             return 0
             ;;
         do__subcmd__harness__subcmd__pr__subcmd__no__subcmd__effect)
-            opts="-q -h -V --base --head --format --root --config --quiet --output --dry-run --help --version"
+            opts="-q -h -V --base --head --no-fetch --format --root --config --quiet --output --dry-run --help --version"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
