@@ -258,6 +258,7 @@ json\:"Machine-readable JSON output"))' \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
 '--config=[Explicit path to do-harness.toml]:FILE:_files' \
 '--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
+'--no-fetch[Do not fetch the commits the proof needs]' \
 '-q[Suppress PASS/WARN verdict lines and the success footer]' \
 '--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
 '--dry-run[Dry run without side effects]' \

@@ -235,7 +235,7 @@ export PATH="$HOME/.local/bin:$PATH"
 | `explain [OPTIONS]` | Explain which sensors the current change selects, without running them — flags: `--set <SET>`, `--changed`, `--since <REF>`, `--format <FORMAT>` |
 | `status [OPTIONS]` | Report verification evidence freshness without running sensors — flags: `--set <SET>`, `--evidence <FILE>`, `--format <FORMAT>` |
 | `sync [OPTIONS]` | Refresh `origin/main` and reconcile the local `main` branch (alias: `latest-main`) — flags: `--switch`, `--read-only`, `--reset-diverged`, `--status`, `--format <FORMAT>` |
-| `pr no-effect [OPTIONS] [PR]` | Report the prospective merge impact of a PR or revision range — flags: `--base <REV>`, `--head <REV>`, `--format <FORMAT>` |
+| `pr no-effect [OPTIONS] [PR]` | Report the prospective merge impact of a PR or revision range — flags: `--base <REV>`, `--head <REV>`, `--no-fetch`, `--format <FORMAT>` |
 | `pr review [OPTIONS] [PR]` | Emit the semantic residual: changed units evidence could not prove — flags: `--base <REV>`, `--head <REV>`, `--recompute`, `--view <VIEW>`, `--format <FORMAT>` |
 | `pr ready [OPTIONS] <PR>` | Check whether a pull request is ready to merge: merge state, CI checks, and review conversations (aliases: `readiness`, `check`) — flags: `--expected-receipt <FILE>`, `--format <FORMAT>` |
 | `pr checks [OPTIONS] <PR>` | Classify a pull request's CI checks and commit statuses; fail closed on unknown — flags: `--format <FORMAT>` |

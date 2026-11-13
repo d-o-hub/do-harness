@@ -1327,7 +1327,7 @@ branch it found), and `2` for a git, remote, or config failure. JSON reports
 
 Subcommands: `no-effect`, `review`, `ready`, `checks`, `waivers`, `disposition`, `findings`, `sweep`, `update-base`.
 <!-- END GENERATED: cli-contract pr -->
-Deterministic, read-only PR analysis: every subcommand works in any git repository without harness initialization. Pick the subcommand that answers your question.
+Deterministic PR analysis: every subcommand works in any git repository without harness initialization. Pick the subcommand that answers your question. Everything here is read-only with respect to the pull request — no subcommand writes a comment, a label, or a merge — and reaches GitHub only through `gh`. The one local exception is `pr no-effect`, which prefetches the commits its proof needs (see below); `--no-fetch` turns that off.
 
 ### `pr no-effect`
 <!-- BEGIN GENERATED: cli-contract pr no-effect -->
@@ -1338,10 +1338,13 @@ Deterministic, read-only PR analysis: every subcommand works in any git reposito
 | `[PR]` | no | — | — | Pull request number; resolves base and head through `gh` |
 | `--base <REV>` | no | — | — | Base revision (local mode; requires --head) |
 | `--head <REV>` | no | — | — | Head revision (local mode; requires --base) |
+| `--no-fetch` | no | — | — | Do not fetch the commits the proof needs |
 | `--format <FORMAT>` | no | `text` | `text`, `json` | Output format |
 <!-- END GENERATED: cli-contract pr no-effect -->
-Report two distinct measurements for a pull request or revision range. Read-only;
-works in any git repository without harness initialization.
+Report two distinct measurements for a pull request or revision range. Works in
+any git repository without harness initialization, and never writes to the pull
+request; it does fetch the commits its proof needs, which is the one local write
+it makes.
 
 - `effective_change` (historical branch change, `method: "git"`): whether the
   merge-base..head diff is nonempty. This is what the branch changed since it
@@ -1375,6 +1378,46 @@ when GitHub supplies no OID (`base_verified: false`). The clone must also
 resolve the head for merge-impact analysis; the older compare-API file count
 only feeds the historical `effective_change` field with
 `"method": "compare-api"` and can never recommend closure.
+
+#### Prefetching the commits a proof needs
+
+In a fresh or shallow clone the proof often has nothing to compare, so the
+verdict is `UNKNOWN`. PR mode therefore prefetches exactly what the proof needs,
+at most once per ref and within a bounded wait:
+
+- `git fetch --no-tags origin +refs/pull/<N>/head:refs/remotes/pr-triage/<N>`
+- `git fetch --no-tags origin <baseRefOid>`
+
+Only `refs/remotes/pr-triage/*` is written. The worktree, the index, the
+checked-out branch, and `HEAD` are never touched: no `checkout`, no `switch`, no
+branch or tag is created or moved. That matters because this runs inside a path
+that can close a pull request, so a fetch able to move a ref a local branch
+points at would make the proof describe something other than the reviewed commit.
+
+Availability is not enough, and this is the part that is easy to get wrong. A
+shallow clone carries a graft at its tip, so an object fetched by id arrives as
+its own root and git sees two unrelated histories
+(`fatal: refusing to merge unrelated histories`). The common production shape is
+exactly this: the clone sits on the base tip, the pull request forked from a
+commit below it, and the head is fetched into a grafted history. When the pair is
+not connected, the prefetch deepens the history — a finite number of attempts
+(`DEEPEN_INCREMENT` commits each, compounding) — until a merge base exists. It
+never converts a shallow clone into a full one, and gives up rather than walking
+forever, because an unrelated history never connects.
+
+The prefetch runs in `--dry-run` too: a dry run that cannot prove anything is a
+vacuous gate. `--no-fetch` disables it and reproduces the older behaviour —
+`UNKNOWN` with the exact command to run — which is the honest escape hatch when
+the clone must not be modified. `DO_HARNESS_FETCH_TIMEOUT_SECS` overrides the
+per-fetch bound in whole seconds; a value that is not a positive integer falls
+back to the default rather than removing the bound.
+
+After a successful fetch the base is read again and must be unchanged. A base
+that moved mid-fetch yields `UNKNOWN` with `"evidence": "base-moved"` and never a
+merge-impact verdict or a closure recommendation, because a proof prepared
+against one base says nothing about the next. No fetch failure is ever a pass: an
+unreachable remote, an unknown ref, or a timeout all leave the verdict `UNKNOWN`
+and put the exact `git fetch` to run in `merge_impact.warnings`.
 
 The JSON contract is `schema_version: 2`; version 1 carried only
 `effective_change` and `method`, which keep their original meaning. Exit `0`

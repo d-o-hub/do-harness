@@ -20,6 +20,14 @@ pub enum PrAction {
         /// Head revision (local mode; requires --base).
         #[arg(long, value_name = "REV", requires = "base")]
         head: Option<String>,
+        /// Do not fetch the commits the proof needs.
+        ///
+        /// In a shallow or fresh clone the base and head objects are often
+        /// absent, so the verdict is `UNKNOWN`. The default prefetches exactly
+        /// those two refs under `refs/remotes/pr-triage/*`; this flag keeps the
+        /// clone untouched and reproduces the pre-prefetch behaviour.
+        #[arg(long)]
+        no_fetch: bool,
         /// Output format.
         #[arg(long, value_enum, default_value_t = Format::Text)]
         format: Format,

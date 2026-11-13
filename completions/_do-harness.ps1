@@ -273,6 +273,7 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('--root', '--root', [CompletionResultType]::ParameterName, 'Workspace root override (default: walk up from cwd)')
             [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Explicit path to do-harness.toml')
             [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)')
+            [CompletionResult]::new('--no-fetch', '--no-fetch', [CompletionResultType]::ParameterName, 'Do not fetch the commits the proof needs')
             [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Suppress PASS/WARN verdict lines and the success footer')
             [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Suppress PASS/WARN verdict lines and the success footer')
             [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Dry run without side effects')

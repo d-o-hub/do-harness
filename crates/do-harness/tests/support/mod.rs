@@ -157,6 +157,8 @@ pub fn git_command(root: &Path) -> Command {
 pub mod ci_explain;
 pub mod dora;
 pub mod job;
+pub mod pr_fetch;
+pub mod pr_fetch_run;
 pub mod pr_metrics;
 pub mod pr_readiness;
 pub mod pr_readiness_fixtures;
