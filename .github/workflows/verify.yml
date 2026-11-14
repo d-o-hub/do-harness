@@ -80,7 +80,8 @@ jobs:
           if-no-files-found: error
 
   verify:
-    runs-on: ubuntu-latest
+    # Playwright 1.50.1 supports Ubuntu 24.04, but not ubuntu-latest's 26.04.
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
       # Least privilege: read source, write only the evidence artifact.
