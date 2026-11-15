@@ -8,7 +8,7 @@
 
 use std::path::Path;
 use std::process::{Command, Stdio};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use crate::redaction::Redactor;
 
@@ -28,6 +28,7 @@ pub struct GateOutcome {
 /// Runs verification and freshness checks in `workspace` for `signal_set`.
 #[must_use]
 pub fn run(workspace: &Path, signal_set: &str, timeout: Duration) -> GateOutcome {
+    let started = Instant::now();
     let redactor = Redactor::from_environment(&[]);
     // Re-invokes this same binary as the authoritative gate: the path
     // identifies the running tool, not an untrusted input.
@@ -39,33 +40,43 @@ pub fn run(workspace: &Path, signal_set: &str, timeout: Duration) -> GateOutcome
             diagnostic: Some("cannot locate the do-harness binary for the gate".to_owned()),
         };
     };
-    let verify = run_harness(
-        &executable,
-        workspace,
-        &[
-            "verify",
-            "--set",
-            signal_set,
-            "--strict",
-            "--record",
-            "--unchanged=run",
-            "--format",
-            "json",
-        ],
-        timeout,
-        &redactor,
+    run_with_budget(signal_set, timeout, started, |args, budget| {
+        run_harness(&executable, workspace, args, budget, &redactor)
+    })
+}
+
+fn run_with_budget(
+    signal_set: &str,
+    timeout: Duration,
+    started: Instant,
+    mut run_command: impl FnMut(&[&str], Duration) -> BoundedOutput,
+) -> GateOutcome {
+    let verify_args = [
+        "verify",
+        "--set",
+        signal_set,
+        "--strict",
+        "--record",
+        "--unchanged=run",
+        "--format",
+        "json",
+    ];
+    let status_args = ["status", "--set", signal_set, "--format", "json"];
+    let verify = run_if_budget(
+        &mut run_command,
+        &verify_args,
+        remaining_budget(started, timeout),
     );
-    let status = run_harness(
-        &executable,
-        workspace,
-        &["status", "--set", signal_set, "--format", "json"],
-        timeout,
-        &redactor,
+    let status = run_if_budget(
+        &mut run_command,
+        &status_args,
+        remaining_budget(started, timeout),
     );
 
     let (failed, unrunnable) = parse_verify(&verify.stdout);
     let (state, reason, recovery) = parse_status(&status.stdout);
-    let green = verify.exit_code == Some(0) && state.as_deref() == Some("green");
+    let within_deadline = started.elapsed() < timeout;
+    let green = within_deadline && verify.exit_code == Some(0) && state.as_deref() == Some("green");
     let verification = state.map(|state| VerificationRecord {
         state,
         reason: reason.unwrap_or_else(|| "unknown".to_owned()),
@@ -82,6 +93,28 @@ pub fn run(workspace: &Path, signal_set: &str, timeout: Duration) -> GateOutcome
         verification,
         diagnostic,
     }
+}
+
+fn remaining_budget(started: Instant, timeout: Duration) -> Duration {
+    timeout.saturating_sub(started.elapsed())
+}
+
+fn run_if_budget<F>(run_command: &mut F, args: &[&str], budget: Duration) -> BoundedOutput
+where
+    F: FnMut(&[&str], Duration) -> BoundedOutput,
+{
+    if budget.is_zero() {
+        return BoundedOutput {
+            exit_code: None,
+            timed_out: true,
+            spawn_error: None,
+            output_bytes: 0,
+            output_truncated: false,
+            stdout: String::new(),
+            stderr: String::new(),
+        };
+    }
+    run_command(args, budget)
 }
 
 /// Runs one harness command with a bounded wall clock.
@@ -170,3 +203,7 @@ fn describe(verify: &BoundedOutput, status: &BoundedOutput, recovery: Option<&st
     }
     super::receipt::bounded(&parts.join("; "))
 }
+
+#[cfg(test)]
+#[path = "gate_tests.rs"]
+mod tests;
