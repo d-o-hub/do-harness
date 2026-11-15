@@ -155,11 +155,11 @@ pub fn status_report(
             missing_report(set, &paths, covering, facts.side)
         }
     };
-    if let Some(since) = since
-        && let Some(recovery) = &mut report.recovery
-    {
-        recovery.push_str(" --since ");
-        recovery.push_str(&crate::util::shell_quote(since));
+    if let Some(since) = since {
+        if let Some(recovery) = &mut report.recovery {
+            recovery.push_str(" --since ");
+            recovery.push_str(&crate::util::shell_quote(since));
+        }
     }
     Ok(report)
 }
