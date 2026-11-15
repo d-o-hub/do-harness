@@ -70,10 +70,30 @@ pub(crate) fn render_text(snapshot: &PrLoopSnapshot) -> String {
             .map_or_else(|| "-".to_owned(), |rate| format!("{:.1}%", rate * 100.0)),
         totals.reruns
     );
+    let _ = writeln!(
+        out,
+        "observations: {}/{prs} PR(s) with check runs, {unobserved} unobserved ({}); {}/{} with workflow runs",
+        totals.prs_ci_observed,
+        retention_note(totals),
+        totals.prs_runs_unobserved,
+        totals.prs,
+        prs = totals.prs,
+        unobserved = totals.prs_ci_unobserved,
+    );
     for warning in &snapshot.warnings {
         let _ = writeln!(out, "warning: {warning}");
     }
     out
+}
+
+/// Why an observation can be missing, so a trimmed history is not read as a
+/// measured zero.
+fn retention_note(totals: &super::Totals) -> &'static str {
+    if totals.prs_ci_unobserved == 0 && totals.prs_runs_unobserved == 0 {
+        "every head observed"
+    } else {
+        "absent CI records expire under Actions retention; they are missing, not failures"
+    }
 }
 
 /// `macro-field 2, guarded-arm 5`, or `-` when empty.

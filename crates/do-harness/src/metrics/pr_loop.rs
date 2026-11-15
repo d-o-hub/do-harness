@@ -44,7 +44,12 @@ pub(crate) use report::render_text;
 pub(crate) use window::{now_epoch, parse_window};
 
 /// Snapshot schema version; a bump invalidates cached entries.
-pub const SCHEMA_VERSION: u32 = 1;
+///
+/// Version 2 adds the observation counts that separate an unmeasured head from
+/// a head that never went green: GitHub expires checks, runs, and statuses
+/// under Actions retention, so a missing record is a fact about the history,
+/// not about the pull request.
+pub const SCHEMA_VERSION: u32 = 2;
 
 /// Conclusions that leave a check green.
 const GREEN_CONCLUSIONS: [&str; 3] = ["success", "neutral", "skipped"];
@@ -85,6 +90,9 @@ pub struct PrRow {
     pub actionable_comments: usize,
     /// Bot comments and human comments without an action marker.
     pub informational_comments: usize,
+    /// Check runs observed for the head. Zero means the observation is
+    /// missing (an expired record), never that the head failed.
+    pub check_runs: usize,
     /// Workflow runs for the head commit.
     pub runs: usize,
     /// Runs that concluded `cancelled`.
@@ -108,6 +116,13 @@ pub struct Totals {
     pub prs: usize,
     /// Pull requests with a fully green head.
     pub green_prs: usize,
+    /// Pull requests whose head exposed at least one check run.
+    pub prs_ci_observed: usize,
+    /// Pull requests with no observable check run. Their CI outcome is unknown;
+    /// counting them as not-green would read retention as a measured failure.
+    pub prs_ci_unobserved: usize,
+    /// Pull requests whose head exposed no workflow run at all.
+    pub prs_runs_unobserved: usize,
     /// Commits summed over the measured pull requests.
     pub pushes: u32,
     /// `pushes / green_prs`, when any pull request went green.
@@ -208,6 +223,7 @@ pub fn measure(
         actionable_comments,
         informational_comments,
         runs: runs.len(),
+        check_runs: check_runs.len(),
         cancelled_runs,
         reruns,
     }
@@ -231,9 +247,14 @@ pub fn totals(rows: &[PrRow]) -> Totals {
     }
     let runs: usize = rows.iter().map(|row| row.runs).sum();
     let cancelled_runs: usize = rows.iter().map(|row| row.cancelled_runs).sum();
+    let prs_ci_observed = rows.iter().filter(|row| row.check_runs > 0).count();
+    let prs_runs_unobserved = rows.iter().filter(|row| row.runs == 0).count();
     Totals {
         prs: rows.len(),
         green_prs,
+        prs_ci_observed,
+        prs_ci_unobserved: rows.len().saturating_sub(prs_ci_observed),
+        prs_runs_unobserved,
         pushes,
         pushes_per_green: (green_prs > 0)
             .then(|| f64::from(pushes) / f64::from(u32::try_from(green_prs).unwrap_or(u32::MAX))),

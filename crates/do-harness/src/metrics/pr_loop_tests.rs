@@ -9,6 +9,7 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use crate::pr::gh::{CheckRun, Comment};
@@ -237,4 +238,38 @@ fn the_snapshot_cache_round_trips_and_expires() {
     expired.fetched_at = now_epoch() - 2 * 600;
     store(dir.path(), &expired).unwrap();
     assert!(cached(dir.path(), &expired.repo, &expired.since, expired.limit).is_none());
+}
+
+/// A head whose CI records are gone reads as unobserved, never as failed.
+///
+/// GitHub expires checks and runs under Actions retention, so an older window
+/// can lose the observations behind `green_prs`. The totals must carry that
+/// distinction instead of letting a trimmed history look like a measured zero.
+#[test]
+fn absent_check_runs_are_unobserved_not_failures() {
+    let row = |number: u64, check_runs: usize, runs: usize| PrRow {
+        number,
+        state: "closed".to_owned(),
+        head_sha: format!("{number:040x}"),
+        pushes: 1,
+        first_push_at: Some(1_700_000_000),
+        green_at: None,
+        time_to_green_secs: None,
+        waivers: BTreeMap::new(),
+        actionable_comments: 0,
+        informational_comments: 0,
+        check_runs,
+        runs,
+        cancelled_runs: 0,
+        reruns: 0,
+    };
+    let totals = totals(&[row(1, 3, 2), row(2, 0, 0)]);
+
+    assert_eq!(totals.prs, 2);
+    assert_eq!(totals.green_prs, 0, "neither head proves a green");
+    assert_eq!(totals.prs_ci_observed, 1);
+    assert_eq!(totals.prs_ci_unobserved, 1);
+    assert_eq!(totals.prs_runs_unobserved, 1);
+    assert_eq!(totals.runs, 2);
+    assert_eq!(totals.cancelled_rate, Some(0.0));
 }

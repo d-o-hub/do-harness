@@ -87,6 +87,12 @@ fn the_text_report_shows_the_measured_rows_and_totals() {
     );
     assert!(stdout.contains("pushes/green: 4.0"), "{stdout}");
     assert!(
+        stdout.contains(
+            "observations: 3/3 PR(s) with check runs, 0 unobserved (every head observed)"
+        ),
+        "{stdout}"
+    );
+    assert!(
         stdout.contains("comments: actionable 2, informational 4"),
         "{stdout}"
     );
@@ -101,10 +107,13 @@ fn the_json_report_carries_the_raw_counts() {
     let (dir, bin) = fixture_root();
     let report = report(dir.path(), &bin, &[]);
     assert_eq!(report["repo"], "d-o-hub/do-harness");
-    assert_eq!(report["schema_version"], 1);
+    assert_eq!(report["schema_version"], 2);
     assert_eq!(report["cached"], false);
     assert_eq!(report["totals"]["prs"], 3);
     assert_eq!(report["totals"]["green_prs"], 2);
+    assert_eq!(report["totals"]["prs_ci_observed"], 3);
+    assert_eq!(report["totals"]["prs_ci_unobserved"], 0);
+    assert_eq!(report["totals"]["prs_runs_unobserved"], 0);
     assert_eq!(report["totals"]["pushes"], 8);
     assert_eq!(report["totals"]["cancelled_runs"], 1);
     assert_eq!(report["totals"]["reruns"], 1);

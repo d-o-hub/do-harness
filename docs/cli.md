@@ -1124,6 +1124,13 @@ The rules are fixed so the numbers are reproducible:
 - **cancelled runs** and **reruns** — workflow runs for the head commit, counting
   `conclusion == "cancelled"` and `run_attempt - 1` respectively (run-level, so
   a cancelled matrix leg counts once for the run).
+- **observations** — each row records the check runs and workflow runs it saw. A
+  head whose CI records are gone is *unobserved* (`prs_ci_unobserved`,
+  `prs_runs_unobserved`) and never counted as a failure: GitHub expires checks,
+  runs, and statuses under Actions retention, so a missing record is missing
+  evidence, not a measured zero. The text report prints the counts on its
+  `observations:` line, and schema v2 invalidates snapshots cached before the
+  counts existed.
 
 A `gh` read that fails on a single pull request is reported as a warning and the
 snapshot keeps the pull requests it could measure; a failed *list* read exits `1`
