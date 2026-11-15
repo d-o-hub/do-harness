@@ -193,12 +193,13 @@ pub async fn run(options: Options<'_>) -> Result<RunOutcome> {
             blocked: None,
         };
         if outcome.green {
-            receipt.state = JobState::Verified;
-            receipt.blocked = None;
-            receipt.workspace_removed = workspace::remove(options.root, &paths.workspace);
-            receipt.attempts.push(record);
-            receipt.save(options.root)?;
-            return Ok(RunOutcome::Finished(Box::new(receipt)));
+            return finish_green_attempt(
+                &mut receipt,
+                options.root,
+                &paths.workspace,
+                record,
+                now(),
+            );
         }
         record.failure_signature = Some(signature.clone());
         record.failure_set = failure_set.iter().cloned().collect();
@@ -236,6 +237,35 @@ pub async fn run(options: Options<'_>) -> Result<RunOutcome> {
         receipt.attempts.push(record);
         receipt.save(options.root)?;
     }
+}
+
+/// Marks a successful gate verified only if the attempt finished in budget.
+fn finish_green_attempt(
+    receipt: &mut JobReceipt,
+    root: &Path,
+    workspace_path: &Path,
+    mut record: AttemptRecord,
+    finished_at: i64,
+) -> Result<RunOutcome> {
+    record.finished_at = finished_at;
+    if record.finished_at >= receipt.deadline_at {
+        let code = BlockedCode::DeadlineExhausted;
+        let reason = BlockedReason::new(
+            code,
+            "the whole-job time limit expired before authoritative verification completed",
+            resume_text(code),
+        );
+        record.blocked = Some(reason.clone());
+        receipt.attempts.push(record);
+        return block_with(receipt, root, Some(reason));
+    }
+
+    receipt.state = JobState::Verified;
+    receipt.blocked = None;
+    receipt.workspace_removed = workspace::remove(root, workspace_path);
+    receipt.attempts.push(record);
+    receipt.save(root)?;
+    Ok(RunOutcome::Finished(Box::new(receipt.clone())))
 }
 
 /// Builds the new-job receipt.
@@ -411,3 +441,7 @@ fn now() -> i64 {
             i64::try_from(elapsed.as_secs()).unwrap_or(i64::MAX)
         })
 }
+
+#[cfg(test)]
+#[path = "runner_tests.rs"]
+mod tests;
