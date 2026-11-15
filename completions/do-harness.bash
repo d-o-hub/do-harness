@@ -5510,7 +5510,7 @@ _do__harness() {
             return 0
             ;;
         do__subcmd__harness__subcmd__status)
-            opts="-q -h -V --set --evidence --format --root --config --quiet --output --dry-run --help --version"
+            opts="-q -h -V --set --evidence --since --format --root --config --quiet --output --dry-run --help --version"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -5533,6 +5533,10 @@ _do__harness() {
                     if [[ "${BASH_VERSINFO[0]}" -ge 4 ]]; then
                         compopt -o filenames
                     fi
+                    return 0
+                    ;;
+                --since)
+                    COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;
                 --format)

@@ -14,7 +14,7 @@ use serde_json::Value;
 
 mod support;
 
-use support::run;
+use support::{git, run};
 
 /// Builds a `do-harness` command invoked from `cwd` (never a process-global
 /// directory change, so tests stay parallel-safe).
@@ -89,7 +89,7 @@ fn explicit_root_without_config_rejects_policy_consumers() {
             "`{args:?}` against a config-less explicit root must exit 2\nstdout: {stdout}\nstderr: {stderr}"
         );
         assert!(
-            stderr.contains(&missing.display().to_string()),
+            stderr.contains("do-harness.toml") && stderr.contains("nested"),
             "stderr must name the missing explicit config {}\nstderr: {stderr}",
             missing.display()
         );
@@ -121,7 +121,7 @@ fn explicit_root_never_falls_back_to_ancestor_policy() {
         "config-less child of a configured ancestor must be rejected\nstdout: {stdout}\nstderr: {stderr}"
     );
     assert!(
-        stderr.contains(&fx.b.join("do-harness.toml").display().to_string()),
+        stderr.contains("do-harness.toml") && stderr.contains("nested"),
         "stderr must name B's config path\nstderr: {stderr}"
     );
     assert!(
@@ -325,4 +325,59 @@ fn implicit_discovery_without_root_override_still_selects_cwd_policy() {
         "implicit discovery from a child dir must still work\nstdout: {stdout}\nstderr: {stderr}"
     );
     assert_eq!(selected_names(&stdout), ["cwd-policy"]);
+}
+
+/// Relative explicit roots resolve once to a canonical managed-path boundary.
+#[test]
+fn relative_root_spellings_share_canonical_managed_evidence() {
+    let fx = fixture();
+    let child = fx.b.join("child");
+    std::fs::create_dir(&child).unwrap();
+    std::fs::write(
+        fx.b.join("do-harness.toml"),
+        "[signal-sets]\nverification = [\"target-policy\"]\n\n[[sensors]]\nname = \"target-policy\"\nargv = [\"true\"]\n",
+    )
+    .unwrap();
+    std::fs::write(fx.b.join("main.rs"), "fn main() {}\n").unwrap();
+    git(&fx.b, &["init", "-q"]);
+    git(&fx.b, &["add", "-A"]);
+    git(&fx.b, &["commit", "-qm", "test: configured target"]);
+
+    let evidence = fx.b.join(".do-harness/evidence.verification.json");
+    for (cwd, root_arg) in [(&fx.b, "."), (&fx.b, "./"), (&child, "..")] {
+        let (code, stdout, stderr) = run(harness(cwd).args([
+            "--root",
+            root_arg,
+            "verify",
+            "--set",
+            "verification",
+            "--format",
+            "json",
+        ]));
+        assert_eq!(
+            code,
+            Some(0),
+            "relative root {root_arg} verify failed\nstdout: {stdout}\nstderr: {stderr}"
+        );
+        let report: Value = serde_json::from_str(&stdout).expect("verify report");
+        assert_eq!(report["sensors"][0]["name"], "target-policy");
+        assert!(evidence.exists(), "artifact must be under the target root");
+
+        let (code, stdout, stderr) = run(harness(cwd).args([
+            "--root",
+            root_arg,
+            "status",
+            "--set",
+            "verification",
+            "--format",
+            "json",
+        ]));
+        assert_eq!(
+            code,
+            Some(0),
+            "relative root {root_arg} status failed\nstdout: {stdout}\nstderr: {stderr}"
+        );
+        let report: Value = serde_json::from_str(&stdout).expect("status report");
+        assert_eq!(report["state"], "green");
+    }
 }

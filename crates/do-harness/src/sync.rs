@@ -302,6 +302,7 @@ async fn verification_status(root: &Path, config_path: Option<&Path>) -> Result<
         config_bytes.as_deref(),
         Some(VERIFICATION_SET),
         None,
+        None,
     )
 }
 

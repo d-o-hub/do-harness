@@ -20,6 +20,7 @@ use anyhow::{Context, Result, bail};
 use serde::Serialize;
 
 use crate::report::Format;
+use crate::util::shell_quote;
 
 mod sources;
 
@@ -157,14 +158,6 @@ fn draft(fires: BTreeMap<String, Fires>, window_days: i64, min_fires: u32) -> Le
         sensors,
         below_threshold,
     }
-}
-/// Quotes `value` as one POSIX shell single-quoted fragment.
-///
-/// The drafted commands are meant to be pasted and run, and the sensor name
-/// comes from event records and config, so an embedded quote must not close
-/// the fragment.
-fn shell_quote(value: &str) -> String {
-    format!("'{}'", value.replace('\'', r"'\''"))
 }
 /// Collapses control characters so a name cannot break a Markdown row.
 fn display_name(sensor: &str) -> String {
