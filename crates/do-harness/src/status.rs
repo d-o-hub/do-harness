@@ -7,7 +7,7 @@
 //!
 //! - `green`: passing evidence covers the requested set and matches the
 //!   current workspace and policy.
-//! - `red`: matching evidence exists and contains required failures.
+//! - `red`: matching evidence has required failures or non-pass `warn`/`skip` verdicts.
 //! - `stale`: evidence exists but no longer applies (workspace or policy
 //!   changed).
 //! - `running`: a `verify` run is executing now and will replace the evidence.
@@ -21,11 +21,13 @@ use crate::evidence::EvidenceDocument;
 use crate::report::Format;
 use crate::{CliError, config};
 
+mod evidence;
 mod inflight;
 mod locate;
 mod present;
 mod selection;
 
+use evidence::evidence_side;
 use inflight::running_report;
 use locate::{Coverage, evidence_paths, find_covering_evidence};
 use present::{failure_summary, print_text};
@@ -36,7 +38,7 @@ use present::{failure_summary, print_text};
 pub enum EvidenceState {
     /// Current passing evidence covers the requested set.
     Green,
-    /// Current matching evidence contains required failures.
+    /// Current matching evidence has required failures or non-pass verdicts.
     Red,
     /// Evidence exists but no longer applies to workspace/policy.
     Stale,
@@ -59,6 +61,12 @@ pub struct EvidenceSide {
     pub policy_fingerprint: String,
     /// Failed sensor names.
     pub failed: Vec<String>,
+    /// Advisory sensor names (`warn` verdict).
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub warned: Vec<String>,
+    /// Non-fresh sensor names (`skip` verdict).
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub skipped: Vec<String>,
 }
 
 /// Current side of the status comparison.
@@ -382,22 +390,6 @@ fn decide(set: Option<&str>, facts: &CurrentFacts, document: &EvidenceDocument) 
         current_side,
         Vec::new(),
     )
-}
-
-/// The evidence side of the status comparison.
-fn evidence_side(document: &EvidenceDocument) -> EvidenceSide {
-    EvidenceSide {
-        signal_set: document.signal_set.clone(),
-        verdict: document.summary.verdict.clone(),
-        workspace_fingerprint: document.workspace_fingerprint.clone(),
-        policy_fingerprint: document.policy_fingerprint.clone(),
-        failed: document
-            .sensors
-            .iter()
-            .filter(|s| s.verdict == "fail")
-            .map(|s| s.name.clone())
-            .collect(),
-    }
 }
 
 /// Recorded sensor names: `(passed, executed)`.

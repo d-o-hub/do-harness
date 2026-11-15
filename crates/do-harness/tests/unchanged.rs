@@ -11,8 +11,8 @@
 mod support;
 
 use support::reuse::{
-    PROBE, assert_ran, assert_reused, evidence, fixture, fixture_no_git, git, log, probe_config,
-    status, verify, verify_code, verify_raw,
+    PROBE, assert_ran, assert_reused, evidence, fixture, fixture_no_git, git, harness, log,
+    probe_config, run, status, verify, verify_code, verify_raw,
 };
 
 /// The full lifecycle: first record executes, the default `warn` mode
@@ -172,6 +172,13 @@ fn reuse_is_not_fresh_evidence_for_strict_or_status() {
     let (code, doc) = status(&root);
     assert_eq!(code, Some(1), "reused evidence is not green: {doc}");
     assert_ne!(doc["state"], "green");
+    assert_eq!(doc["evidence"]["skipped"], serde_json::json!(["probe"]));
+    let mut command = harness(&root);
+    command.args(["status", "--set", "verification"]);
+    let (text_code, stdout, stderr) = run(&mut command);
+    assert_eq!(text_code, Some(1));
+    assert!(stdout.contains("non-fresh sensors: probe"), "{stdout}");
+    assert!(stderr.contains("non-fresh sensors: probe"), "{stderr}");
 
     verify_code(&root, &["--record", "--unchanged=run"], 0);
     let (code, doc) = status(&root);

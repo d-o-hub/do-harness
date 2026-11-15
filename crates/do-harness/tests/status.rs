@@ -218,6 +218,40 @@ fn failing_verification_reports_red() {
     assert_eq!(doc["evidence"]["failed"], serde_json::json!(["bad"]));
 }
 
+/// Warning-only evidence remains red and names its advisory sensor.
+#[test]
+fn warning_only_evidence_reports_advisory_sensor() {
+    let (_dir, root) = fixture_repo_with_sensors(
+        &[("advisory", &["false"] as &[_])],
+        &[("verification", &["advisory"])],
+    );
+    let config_path = root.join("do-harness.toml");
+    let config = std::fs::read_to_string(&config_path).unwrap().replacen(
+        "argv = [\"false\"]\n",
+        "argv = [\"false\"]\nseverity = \"warn\"\n",
+        1,
+    );
+    std::fs::write(&config_path, config).unwrap();
+    git(&root, &["add", "do-harness.toml"]);
+    git(
+        &root,
+        &["commit", "-qm", "test: mark advisory sensor as warning"],
+    );
+
+    verify(&root, "verification", 0);
+    let (code, doc) = status(&root, "verification");
+    assert_eq!(code, Some(1));
+    assert_eq!(doc["state"], serde_json::json!("red"));
+    assert_eq!(doc["reason"], serde_json::json!("failures"));
+    assert_eq!(doc["evidence"]["failed"], serde_json::json!([]));
+    assert_eq!(doc["evidence"]["warned"], serde_json::json!(["advisory"]));
+
+    let (code, stdout, stderr) = status_text(&root, "verification");
+    assert_eq!(code, Some(1));
+    assert!(stdout.contains("advisory sensors: advisory"), "{stdout}");
+    assert!(stderr.contains("advisory sensors: advisory"), "{stderr}");
+}
+
 /// No evidence at all reports missing.
 #[test]
 fn no_evidence_reports_missing() {
