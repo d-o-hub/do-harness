@@ -242,7 +242,7 @@ fn the_snapshot_cache_round_trips_and_expires() {
 
 /// A head whose CI records are gone reads as unobserved, never as failed.
 ///
-/// GitHub expires checks and runs under Actions retention, so an older window
+/// `GitHub` expires checks and runs under Actions retention, so an older window
 /// can lose the observations behind `green_prs`. The totals must carry that
 /// distinction instead of letting a trimmed history look like a measured zero.
 #[test]

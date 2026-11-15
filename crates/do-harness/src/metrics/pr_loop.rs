@@ -46,7 +46,7 @@ pub(crate) use window::{now_epoch, parse_window};
 /// Snapshot schema version; a bump invalidates cached entries.
 ///
 /// Version 2 adds the observation counts that separate an unmeasured head from
-/// a head that never went green: GitHub expires checks, runs, and statuses
+/// a head that never went green: `GitHub` expires checks, runs, and statuses
 /// under Actions retention, so a missing record is a fact about the history,
 /// not about the pull request.
 pub const SCHEMA_VERSION: u32 = 2;
