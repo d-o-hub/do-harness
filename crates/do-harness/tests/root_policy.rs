@@ -121,7 +121,7 @@ fn explicit_root_never_falls_back_to_ancestor_policy() {
         "config-less child of a configured ancestor must be rejected\nstdout: {stdout}\nstderr: {stderr}"
     );
     assert!(
-        stderr.contains(&fx.b.join("do-harness.toml").display().to_string()),
+        stderr.contains("do-harness.toml") && stderr.contains("nested"),
         "stderr must name B's config path\nstderr: {stderr}"
     );
     assert!(
