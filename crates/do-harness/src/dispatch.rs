@@ -4,6 +4,7 @@
 //! the dispatch table is not a second, unrelated responsibility on the same
 //! file.
 
+use anyhow::Context;
 use std::path::{Path, PathBuf};
 
 use clap::CommandFactory;
@@ -57,13 +58,18 @@ pub async fn run(cli: Cli) -> Result<(), CliError> {
 
 /// Resolves the workspace root for the subcommand that was asked to run.
 fn resolve_root(cli: &Cli) -> Result<PathBuf, CliError> {
-    match &cli.command {
+    let resolved = match &cli.command {
         Command::Init { .. } => commands::init_target(cli.root.as_deref()).map_err(CliError::Usage),
         Command::Pr { .. } | Command::CiExplain { .. } | Command::Sync { .. } => {
             pr::command::resolve_root(cli.root.as_deref()).map_err(CliError::Usage)
         }
         _ => commands::resolve_root(cli.root.as_deref()).map_err(CliError::Usage),
-    }
+    }?;
+    resolved
+        .canonicalize()
+        .map(crate::util::without_verbatim_prefix)
+        .with_context(|| format!("failed to resolve workspace root {}", resolved.display()))
+        .map_err(CliError::Usage)
 }
 
 /// Routes a root-bound subcommand.
@@ -233,8 +239,9 @@ async fn route(root: &Path, config_path: Option<PathBuf>, cli: Cli) -> Result<()
         Command::Status {
             set,
             evidence,
+            since,
             format,
-        } => status::run(root, config_path.as_deref(), set, evidence, format).await,
+        } => status::run(root, config_path.as_deref(), set, evidence, format, since).await,
         Command::Loc {
             dir: dir_args,
             ext: ext_args,

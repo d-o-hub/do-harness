@@ -173,6 +173,7 @@ json\:"Machine-readable JSON output"))' \
 _arguments "${_arguments_options[@]}" : \
 '--set=[Check evidence for this development signal set]:SET:_default' \
 '--evidence=[Read evidence from this file instead of the default artifact]:FILE:_files' \
+'--since=[Require evidence for the committed range \`merge-base(<REF>, HEAD)..HEAD\`]:REF:_default' \
 '--format=[Output format]:FORMAT:((text\:"Human-readable text output"
 json\:"Machine-readable JSON output"))' \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \

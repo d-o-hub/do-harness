@@ -182,6 +182,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
         &'do-harness;status'= {
             cand --set 'Check evidence for this development signal set'
             cand --evidence 'Read evidence from this file instead of the default artifact'
+            cand --since 'Require evidence for the committed range `merge-base(<REF>, HEAD)..HEAD`'
             cand --format 'Output format'
             cand --root 'Workspace root override (default: walk up from cwd)'
             cand --config 'Explicit path to do-harness.toml'

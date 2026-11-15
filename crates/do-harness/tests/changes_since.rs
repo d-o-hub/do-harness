@@ -71,25 +71,34 @@ fn committed_rust_change(root: &Path) -> String {
     base
 }
 
-/// A clean committed branch selects its sensors from the committed range,
-/// where `--changed` alone sees nothing.
+/// A clean committed branch has no working-tree input, so `--changed` is
+/// rejected; an explicit committed range still selects its changed sensors.
 #[test]
 fn committed_range_selects_rust_sensor_on_clean_checkout() {
     let (_dir, root) = fixture_repo();
     let base = committed_rust_change(&root);
 
-    let (code, stdout, _) = run(harness(&root)
+    let (code, stdout, stderr) = run(harness(&root)
         .arg("verify")
         .arg("--set")
         .arg("all")
         .arg("--changed")
         .arg("--format")
         .arg("json"));
-    assert_eq!(code, Some(0), "changed run must exit 0:\n{stdout}");
-    let report: Value = serde_json::from_str(&stdout).expect("json report");
+    assert_eq!(
+        code,
+        Some(2),
+        "changed with no working-tree input must exit 2:\n{stderr}"
+    );
     assert!(
-        sensor_names(&report).is_empty(),
-        "a clean checkout has no working-tree change: {report}"
+        stderr.contains(
+            "no change input: pass --since <REF> for committed changes or run verify without change filtering"
+        ),
+        "{stderr}"
+    );
+    assert!(
+        stdout.is_empty(),
+        "usage error should not print a report: {stdout}"
     );
 
     let (code, stdout, _) = run(harness(&root)

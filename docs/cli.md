@@ -345,14 +345,17 @@ line/branch proof from `cargo-llvm-cov nextest`.
 | --- | --- | --- | --- | --- |
 | `--set <SET>` | no | — | — | Check evidence for this development signal set |
 | `--evidence <FILE>` | no | — | — | Read evidence from this file instead of the default artifact |
+| `--since <REF>` | no | — | — | Require evidence for the committed range `merge-base(<REF>, HEAD)..HEAD` |
 | `--format <FORMAT>` | no | `text` | `text`, `json` | Output format |
 <!-- END GENERATED: cli-contract status -->
 Reports verification evidence freshness for a signal set without executing
 any sensor: `green` (current passing evidence covers the set), `red`
-(matching evidence contains required failures), `stale` (evidence exists but
-the workspace, policy, or recorded selection revisions changed), `running`
-(a `verify` run is executing now for the set), or `missing` (no qualifying
-evidence). Stronger evidence can satisfy a weaker set when it shares the
+(matching evidence has required failures or non-pass `warn`/`skip` verdicts;
+`evidence.failed`, `evidence.warned`, and `evidence.skipped` list sensors
+separately), `stale`
+(evidence exists but the workspace, policy, or recorded selection revisions
+changed), `running` (a `verify` run is executing now for the set), or `missing`
+(no qualifying evidence). Stronger evidence can satisfy a weaker set when it
 config fingerprint and covers every required sensor. Exit 0 on green, 1 on
 red/stale/missing, 2 on usage/config errors, 3 while a run is in flight.
 
@@ -360,6 +363,12 @@ red/stale/missing, 2 on usage/config errors, 3 while a run is in flight.
   `.do-harness/evidence.<set>.json`; default `.do-harness/evidence.json`
   without `--set`).
 - `--evidence <FILE>`: Read evidence from this file instead.
+- `--since <REF>`: Require evidence for the locally resolved committed range
+  `merge-base(<REF>, HEAD)..HEAD`; `status` never fetches. Only a nonempty
+  `range` selection with the exact requested spelling and matching base/head/
+  merge-base SHAs can pass. Unfiltered or `working-tree+range` evidence cannot
+  pass; adequate mismatched coverage reports `stale/selection_changed`, while
+  insufficient coverage remains `missing`. Recovery hints retain the ref.
 - `--format <Format>`: Output format (`text` or `json`).
 - Unusable evidence names its remedy: the `no_evidence`,
   `insufficient_coverage`, `policy_changed`, and `selection_changed` reasons
@@ -1124,6 +1133,13 @@ The rules are fixed so the numbers are reproducible:
 - **cancelled runs** and **reruns** — workflow runs for the head commit, counting
   `conclusion == "cancelled"` and `run_attempt - 1` respectively (run-level, so
   a cancelled matrix leg counts once for the run).
+- **observations** — each row records the check runs and workflow runs it saw. A
+  head whose CI records are gone is *unobserved* (`prs_ci_unobserved`,
+  `prs_runs_unobserved`) and never counted as a failure: GitHub expires checks,
+  runs, and statuses under Actions retention, so a missing record is missing
+  evidence, not a measured zero. The text report prints the counts on its
+  `observations:` line, and schema v2 invalidates snapshots cached before the
+  counts existed.
 
 A `gh` read that fails on a single pull request is reported as a warning and the
 snapshot keeps the pull requests it could measure; a failed *list* read exits `1`
