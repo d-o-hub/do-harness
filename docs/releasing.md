@@ -148,6 +148,16 @@ it derives the next version from the conventional commits and opens — or refre
 `chore(release): vX.Y.Z` pull request that applies it. A maintainer may dispatch
 the workflow with `force=true` to release a smaller batch, but the exact main
 commit must still have a successful main gate.
+
+The bump pull request is opened by `github-actions[bot]`, so GitHub queues its
+`pull_request` workflows as `action_required` until a maintainer approves them:
+the pull request then shows `BLOCKED` with no failing check. Approve them with
+`bash scripts/approve-release-runs.sh --branch release/vX.Y.Z` (`--dry-run` prints
+the plan). It approves only held runs on the current head of a `release/*`
+branch, only for the `verify` and `semver` workflows, and only when the triggering
+actor is `github-actions[bot]`; any other held run is the human review that gate
+exists for, and is reported rather than approved.
+
 Refreshing means the branch *and the body* are brought up to date (the body carries
 the derived version, the bump class, the basis tag, and the commit count, so it must
 not age), and any open automation-owned `release/v<major>.<minor>.<patch>` pull
