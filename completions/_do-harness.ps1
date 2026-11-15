@@ -192,6 +192,7 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
         'do-harness;status' {
             [CompletionResult]::new('--set', '--set', [CompletionResultType]::ParameterName, 'Check evidence for this development signal set')
             [CompletionResult]::new('--evidence', '--evidence', [CompletionResultType]::ParameterName, 'Read evidence from this file instead of the default artifact')
+            [CompletionResult]::new('--since', '--since', [CompletionResultType]::ParameterName, 'Require evidence for the committed range `merge-base(<REF>, HEAD)..HEAD`')
             [CompletionResult]::new('--format', '--format', [CompletionResultType]::ParameterName, 'Output format')
             [CompletionResult]::new('--root', '--root', [CompletionResultType]::ParameterName, 'Workspace root override (default: walk up from cwd)')
             [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Explicit path to do-harness.toml')

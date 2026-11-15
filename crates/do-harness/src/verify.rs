@@ -83,6 +83,11 @@ pub(crate) async fn run(root: &Path, mut opts: VerifyOpts) -> std::result::Resul
             "--bless cannot be combined with --dry-run (a bless writes state)"
         )));
     }
+    let selection = sensors::resolve_selection(&cfg, root, &opts).map_err(CliError::Usage)?;
+    if let Some(error) = &selection.discovery_error {
+        eprintln!("warning: change discovery failed ({error}); selecting every candidate sensor");
+    }
+
     // Publish the in-flight marker before any sensor runs so `status` can
     // distinguish "running now" from "never run". Concurrent runs share it;
     // the evidence write lock already serializes their artifacts.
@@ -97,10 +102,6 @@ pub(crate) async fn run(root: &Path, mut opts: VerifyOpts) -> std::result::Resul
             .map_err(CliError::Usage)?
     };
     opts.baselines = Baselines::load(root).await.map_err(CliError::Usage)?;
-    let selection = sensors::resolve_selection(&cfg, root, &opts).map_err(CliError::Usage)?;
-    if let Some(error) = &selection.discovery_error {
-        eprintln!("warning: change discovery failed ({error}); selecting every candidate sensor");
-    }
 
     // Pre-execution input digests detect mid-run input mutations.
     let pre_digests: std::collections::BTreeMap<String, String> =

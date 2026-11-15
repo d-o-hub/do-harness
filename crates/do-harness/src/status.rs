@@ -117,29 +117,51 @@ pub fn default_path_for_set(root: &Path, set: &str) -> PathBuf {
 ///
 /// # Errors
 ///
-/// Returns an error when the config cannot load or the set is unknown.
+/// Returns an error when the config or set is invalid, or an explicit range
+/// cannot be resolved or contains no changed files.
 pub fn status_report(
     root: &Path,
     cfg: &config::Config,
     config_bytes: Option<&[u8]>,
     set: Option<&str>,
     evidence_override: Option<&Path>,
+    since: Option<&str>,
 ) -> anyhow::Result<StatusReport> {
     let paths = evidence_paths(root, set, evidence_override);
     // A range-selected artifact must be judged against the same range, not
     // the (usually empty) working tree of a clean committed checkout.
-    let since = selection::recorded_since(&paths);
-    let facts = CurrentFacts::compute(root, cfg, config_bytes, set, since.as_deref())?;
-    for path in &paths {
-        if let Some(running) = crate::evidence::running::inspect(root, path) {
-            return Ok(running_report(set, facts.side, running));
+    let explicit_range = since.is_some();
+    let selected_since = since
+        .map(ToOwned::to_owned)
+        .or_else(|| selection::recorded_since(&paths));
+    let facts = CurrentFacts::compute(
+        root,
+        cfg,
+        config_bytes,
+        set,
+        selected_since.as_deref(),
+        explicit_range,
+    )?;
+    let mut report = if let Some(running) = paths
+        .iter()
+        .find_map(|path| crate::evidence::running::inspect(root, path))
+    {
+        running_report(set, facts.side, running)
+    } else {
+        let (document, covering) = find_covering_evidence(&paths, set, &facts.required);
+        if let Some(document) = document {
+            decide(set, &facts, &document)
+        } else {
+            missing_report(set, &paths, covering, facts.side)
         }
-    }
-    let (document, covering) = find_covering_evidence(&paths, set, &facts.required);
-    let Some(document) = document else {
-        return Ok(missing_report(set, &paths, covering, facts.side));
     };
-    Ok(decide(set, &facts, &document))
+    if let Some(since) = since
+        && let Some(recovery) = &mut report.recovery
+    {
+        recovery.push_str(" --since ");
+        recovery.push_str(&crate::util::shell_quote(since));
+    }
+    Ok(report)
 }
 
 /// Current fingerprint facts a status decision compares evidence against.
@@ -154,68 +176,11 @@ struct CurrentFacts {
     policy: String,
     /// Current set-free config fingerprint.
     config: String,
-    /// Current resolved range, when the evidence selected by `--since`.
+    /// Current resolved range, when the requested or recorded selection used `--since`.
     pub(super) range: Option<crate::changes::ResolvedRange>,
+    /// Whether status was explicitly bound to a committed range.
+    explicit_range: bool,
     manifest: crate::provenance::InputManifest,
-}
-
-impl CurrentFacts {
-    /// Recomputes fingerprints and the required sensor list (no sensors run).
-    fn compute(
-        root: &Path,
-        cfg: &config::Config,
-        config_bytes: Option<&[u8]>,
-        set: Option<&str>,
-        since: Option<&str>,
-    ) -> anyhow::Result<Self> {
-        let candidates = crate::signals::candidate_specs(cfg, set)?;
-        // Unfiltered evidence fingerprints the working tree, as it always
-        // has; range evidence must be judged against the same range.
-        let selection = if let Some(since) = since {
-            crate::changes::discover_selection(root, false, Some(since))
-        } else {
-            let changed = crate::changes::discover(root);
-            crate::changes::ChangeSelection {
-                mode: crate::changes::SelectionMode::All,
-                changed,
-                range: None,
-            }
-        };
-        let changed = &selection.changed;
-        let range = selection.range.clone();
-        let applicability = crate::applicability::select(&candidates, changed);
-        let required = applicability.selected_names();
-        let fingerprints =
-            crate::fingerprint::for_run(root, cfg, config_bytes, set, &candidates, changed);
-        let workspace = fingerprints.workspace;
-        let policy = fingerprints.policy;
-        let config = fingerprints.config;
-        let manifest = crate::provenance::InputManifest::capture(
-            root,
-            &candidates,
-            config_bytes,
-            Some(&selection),
-        );
-        Ok(Self {
-            side: CurrentSide {
-                workspace_fingerprint: workspace.clone(),
-                policy_fingerprint: policy.clone(),
-                failed: Vec::new(),
-                input_mismatches: manifest
-                    .sensors
-                    .iter()
-                    .filter(|(_, digest)| digest.is_none())
-                    .map(|(name, _)| name.clone())
-                    .collect(),
-            },
-            required,
-            workspace,
-            policy,
-            config,
-            range,
-            manifest,
-        })
-    }
 }
 
 /// Builds the missing-evidence report from the search outcome.
@@ -460,6 +425,7 @@ pub(crate) async fn run(
     set: Option<String>,
     evidence: Option<PathBuf>,
     format: Format,
+    since: Option<String>,
 ) -> std::result::Result<(), CliError> {
     let (cfg, config_bytes) = config::load_raw(root, config_path)
         .await
@@ -470,6 +436,7 @@ pub(crate) async fn run(
         config_bytes.as_deref(),
         set.as_deref(),
         evidence.as_deref(),
+        since.as_deref(),
     )
     .map_err(CliError::Usage)?;
     match format {

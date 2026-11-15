@@ -345,6 +345,7 @@ line/branch proof from `cargo-llvm-cov nextest`.
 | --- | --- | --- | --- | --- |
 | `--set <SET>` | no | — | — | Check evidence for this development signal set |
 | `--evidence <FILE>` | no | — | — | Read evidence from this file instead of the default artifact |
+| `--since <REF>` | no | — | — | Require evidence for the committed range `merge-base(<REF>, HEAD)..HEAD` |
 | `--format <FORMAT>` | no | `text` | `text`, `json` | Output format |
 <!-- END GENERATED: cli-contract status -->
 Reports verification evidence freshness for a signal set without executing
@@ -360,6 +361,12 @@ red/stale/missing, 2 on usage/config errors, 3 while a run is in flight.
   `.do-harness/evidence.<set>.json`; default `.do-harness/evidence.json`
   without `--set`).
 - `--evidence <FILE>`: Read evidence from this file instead.
+- `--since <REF>`: Require evidence for the locally resolved committed range
+  `merge-base(<REF>, HEAD)..HEAD`; `status` never fetches. Only a nonempty
+  `range` selection with the exact requested spelling and matching base/head/
+  merge-base SHAs can pass. Unfiltered or `working-tree+range` evidence cannot
+  pass; adequate mismatched coverage reports `stale/selection_changed`, while
+  insufficient coverage remains `missing`. Recovery hints retain the ref.
 - `--format <Format>`: Output format (`text` or `json`).
 - Unusable evidence names its remedy: the `no_evidence`,
   `insufficient_coverage`, `policy_changed`, and `selection_changed` reasons

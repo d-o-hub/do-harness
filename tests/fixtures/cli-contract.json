@@ -601,6 +601,22 @@
           "index": null
         },
         {
+          "id": "since",
+          "kind": "option",
+          "short": null,
+          "long": "since",
+          "value_names": [
+            "REF"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Require evidence for the committed range `merge-base(<REF>, HEAD)..HEAD`",
+          "index": null
+        },
+        {
           "id": "format",
           "kind": "option",
           "short": null,

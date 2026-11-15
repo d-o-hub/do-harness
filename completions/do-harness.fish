@@ -163,6 +163,7 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand explain" -s h -l h
 complete -c do-harness -n "__fish_do_harness_using_subcommand explain" -s V -l version -d 'Print version'
 complete -c do-harness -n "__fish_do_harness_using_subcommand status" -l set -d 'Check evidence for this development signal set' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand status" -l evidence -d 'Read evidence from this file instead of the default artifact' -r -F
+complete -c do-harness -n "__fish_do_harness_using_subcommand status" -l since -d 'Require evidence for the committed range `merge-base(<REF>, HEAD)..HEAD`' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand status" -l format -d 'Output format' -r -f -a "text\t'Human-readable text output'
 json\t'Machine-readable JSON output'"
 complete -c do-harness -n "__fish_do_harness_using_subcommand status" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"

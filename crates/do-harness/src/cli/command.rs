@@ -123,6 +123,9 @@ pub enum Command {
         /// Read evidence from this file instead of the default artifact.
         #[arg(long, value_hint = ValueHint::FilePath, value_name = "FILE")]
         evidence: Option<PathBuf>,
+        /// Require evidence for the committed range `merge-base(<REF>, HEAD)..HEAD`.
+        #[arg(long, value_name = "REF")]
+        since: Option<String>,
         /// Output format.
         #[arg(long, value_enum, default_value_t = Format::Text)]
         format: Format,

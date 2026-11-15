@@ -382,6 +382,11 @@ pub fn resolve_selection<'a>(
 
     let applicable: Vec<&SensorSpec> = if opts.changed || opts.since.is_some() {
         let changes = crate::changes::discover_selection(root, opts.changed, opts.since.as_deref());
+        if changes.changed.discovery_error.is_none() && changes.changed.files.is_empty() {
+            return Err(anyhow!(
+                "no change input: pass --since <REF> for committed changes or run verify without change filtering"
+            ));
+        }
         let discovery_error = changes.changed.discovery_error.clone();
         let selection = crate::applicability::select(&ordered, &changes.changed);
         let names = selection.selected_names();

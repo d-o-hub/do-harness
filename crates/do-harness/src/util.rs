@@ -4,6 +4,15 @@
 /// the whole scale.
 const PERCENTILE_SCALE: u64 = 100;
 
+/// Quotes `value` as one POSIX shell single-quoted fragment.
+///
+/// The drafted commands are meant to be pasted and run, and the sensor name
+/// comes from event records and config, so an embedded quote must not close
+/// the fragment.
+pub(crate) fn shell_quote(value: &str) -> String {
+    format!("'{}'", value.replace('\'', r"'\''"))
+}
+
 /// Nearest-rank percentile over an ascending slice.
 ///
 /// The rank is `ceil(pct * n / 100)` clamped to at least 1 (the nearest-rank
