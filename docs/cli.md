@@ -349,10 +349,12 @@ line/branch proof from `cargo-llvm-cov nextest`.
 <!-- END GENERATED: cli-contract status -->
 Reports verification evidence freshness for a signal set without executing
 any sensor: `green` (current passing evidence covers the set), `red`
-(matching evidence contains required failures), `stale` (evidence exists but
-the workspace, policy, or recorded selection revisions changed), `running`
-(a `verify` run is executing now for the set), or `missing` (no qualifying
-evidence). Stronger evidence can satisfy a weaker set when it shares the
+(matching evidence has required failures or non-pass `warn`/`skip` verdicts;
+`evidence.failed`, `evidence.warned`, and `evidence.skipped` list sensors
+separately), `stale`
+(evidence exists but the workspace, policy, or recorded selection revisions
+changed), `running` (a `verify` run is executing now for the set), or `missing`
+(no qualifying evidence). Stronger evidence can satisfy a weaker set when it
 config fingerprint and covers every required sensor. Exit 0 on green, 1 on
 red/stale/missing, 2 on usage/config errors, 3 while a run is in flight.
 
