@@ -32,9 +32,13 @@ reuse retains its stricter no-symlink rule.
 
 ## Gates and concurrency
 
-`status` reports green for current passing evidence, red for matching failures,
-stale for drift or unknown provenance, running while a `verify` run is
-executing for the set, and missing for absent/unreadable evidence or
+`status` reports green for current passing evidence; red for matching evidence
+with failures or non-pass verdicts. JSON reports names in `evidence.failed`,
+`evidence.warned`, and `evidence.skipped`; text labels warnings as advisory
+sensors and skips as non-fresh sensors. Warnings and skips remain red, not
+passing evidence.
+Stale covers drift or unknown provenance; running is emitted
+while a `verify` run executes; missing covers absent/unreadable evidence or
 insufficient coverage. `no_evidence`, `insufficient_coverage`, and
 `policy_changed` carry the concrete recovery command (`verify --set <set>
 --record`), and `insufficient_coverage` names the unrecorded required sensors.

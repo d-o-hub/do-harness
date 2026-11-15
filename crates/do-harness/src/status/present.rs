@@ -25,6 +25,12 @@ pub(super) fn failure_summary(report: &StatusReport) -> String {
             report.missing_sensors.join(", ")
         );
     }
+    if let Some(evidence) = &report.evidence {
+        let details = sensor_details(evidence);
+        if !details.is_empty() {
+            let _ = write!(summary, "; {}", details.join("; "));
+        }
+    }
     if let Some(recovery) = &report.recovery {
         let _ = write!(summary, "\n  → recover: {recovery}");
     }
@@ -39,12 +45,22 @@ pub(super) fn print_text(report: &StatusReport) {
             println!("green: signal set '{set}' evidence is current.");
         }
         EvidenceState::Red => {
-            let failed = report
+            let details = report
                 .evidence
                 .as_ref()
-                .map(|e| e.failed.join(", "))
+                .map(sensor_details)
                 .unwrap_or_default();
-            println!("red: signal set '{set}' evidence has failures: {failed}.");
+            if details.is_empty() {
+                println!(
+                    "red: signal set '{set}' evidence is not a current pass ({}).",
+                    report.reason
+                );
+            } else {
+                println!(
+                    "red: signal set '{set}' evidence has {}.",
+                    details.join("; ")
+                );
+            }
         }
         EvidenceState::Stale => {
             println!(
@@ -63,4 +79,21 @@ pub(super) fn print_text(report: &StatusReport) {
             );
         }
     }
+}
+
+fn sensor_details(evidence: &super::EvidenceSide) -> Vec<String> {
+    let mut details = Vec::new();
+    if !evidence.failed.is_empty() {
+        details.push(format!("failures: {}", evidence.failed.join(", ")));
+    }
+    if !evidence.warned.is_empty() {
+        details.push(format!("advisory sensors: {}", evidence.warned.join(", ")));
+    }
+    if !evidence.skipped.is_empty() {
+        details.push(format!(
+            "non-fresh sensors: {}",
+            evidence.skipped.join(", ")
+        ));
+    }
+    details
 }
