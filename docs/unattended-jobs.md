@@ -77,6 +77,10 @@ nothing. After every attempt the job runs the repository's own
 `status` to report `green`. Stale, missing, red, or vacuous evidence is not
 success, and a malformed executor result is recorded rather than trusted.
 
+The gate's `verify` and subsequent `status` share the same remaining whole-job
+deadline. A green result completed at or after `deadline-seconds` is recorded
+as `deadline-exhausted`, not `verified`.
+
 ## Mechanical repairs
 
 Project policy may declare deterministic repairs in `do-harness.toml`:
