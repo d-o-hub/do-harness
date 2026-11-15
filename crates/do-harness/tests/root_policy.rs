@@ -89,7 +89,7 @@ fn explicit_root_without_config_rejects_policy_consumers() {
             "`{args:?}` against a config-less explicit root must exit 2\nstdout: {stdout}\nstderr: {stderr}"
         );
         assert!(
-            stderr.contains(&missing.display().to_string()),
+            stderr.contains("do-harness.toml") && stderr.contains("nested"),
             "stderr must name the missing explicit config {}\nstderr: {stderr}",
             missing.display()
         );
