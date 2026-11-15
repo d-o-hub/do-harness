@@ -67,6 +67,7 @@ fn resolve_root(cli: &Cli) -> Result<PathBuf, CliError> {
     }?;
     resolved
         .canonicalize()
+        .map(crate::util::without_verbatim_prefix)
         .with_context(|| format!("failed to resolve workspace root {}", resolved.display()))
         .map_err(CliError::Usage)
 }
