@@ -8,8 +8,10 @@ use serde_json::Value;
 
 mod support;
 
+#[cfg(unix)]
+use support::git_command;
 use support::range_selection::{committed_rust_change, fixture_repo, rev};
-use support::{git, git_command, harness, run};
+use support::{git, harness, run};
 
 const NO_CHANGE: &str = "no change input: pass --since <REF> for committed changes or run verify without change filtering";
 
