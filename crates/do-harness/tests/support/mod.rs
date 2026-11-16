@@ -155,6 +155,7 @@ pub fn git_command(root: &Path) -> Command {
 }
 
 pub mod ci_explain;
+#[cfg(unix)]
 pub mod cleanup;
 pub mod dora;
 pub mod job;

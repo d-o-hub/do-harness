@@ -145,18 +145,25 @@ fn a_live_compiler_in_the_worktree_refuses_the_build_tree() {
     fixture.merge("compiling");
     fixture.prs("[]", &merged_pr(7, &head));
 
-    let sleeper = fixture.dir.path().join("bin").join("cargo");
+    // The decoy lives outside the fixture's `bin/` (which is on `PATH`), or it
+    // would also shadow the real `cargo` that reclamation shells out to.
+    let decoy = fixture.dir.path().join("decoy");
+    std::fs::create_dir_all(&decoy).unwrap();
+    let sleeper = decoy.join("cargo");
     std::fs::copy("/bin/sleep", &sleeper).unwrap();
     let mut child = Command::new(&sleeper)
         .arg("60")
         .current_dir(&worktree)
         .spawn()
-        .expect("spawn fake cargo");
+        .expect("spawn decoy cargo");
+    // `spawn` returns before the child has exec'd, so `/proc/<pid>/comm` is still
+    // the test harness's name for a moment; wait for it or the probe races it.
+    wait_for_process_name(child.id(), "cargo");
 
     let (code, document, _stderr) = fixture.json(&["cleanup", "--format", "json"]);
     let _ = child.kill();
     let _ = child.wait();
-    assert_eq!(code, Some(0));
+    assert_eq!(code, Some(0), "{document}");
     assert_eq!(candidate(&document, &worktree)["reason"], "in_use");
     assert!(worktree.join("target/debug/blob.rlib").exists());
 }
@@ -316,3 +323,25 @@ fn the_main_worktree_is_protected() {
     assert_eq!(code, Some(0));
     assert_eq!(candidate(&document, &fixture.root)["reason"], "protected");
 }
+
+/// Blocks until `pid` has exec'd a program whose `/proc` name is `name`.
+///
+/// A freshly spawned child is briefly still running the parent's image, so the
+/// liveness probe would see the harness's name and miss it.
+#[cfg(target_os = "linux")]
+fn wait_for_process_name(pid: u32, name: &str) {
+    let path = format!("/proc/{pid}/comm");
+    for _ in 0..200 {
+        if let Ok(comm) = std::fs::read_to_string(&path) {
+            if comm.trim() == name {
+                return;
+            }
+        }
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+    panic!("process {pid} never became {name}");
+}
+
+/// Non-Linux hosts have no `/proc`; the caller gates on `target_os`.
+#[cfg(not(target_os = "linux"))]
+fn wait_for_process_name(_pid: u32, _name: &str) {}
