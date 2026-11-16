@@ -267,7 +267,21 @@ mod tests {
         };
         let block = render_block(&args);
         assert!(block.contains("name = \"check\""));
-        assert!(block.contains(r#"argv = ["bash", "scripts/check \"quoted\".sh"]"#));
+        // The serializer may choose basic (`"..."`) or literal (`'...'`)
+        // strings depending on the content; the contract is that the block is
+        // valid TOML and the argv survives byte for byte, not one spelling.
+        let parsed: toml::Value = toml::from_str(&block).expect("block is valid TOML");
+        let rendered: Vec<String> = parsed["sensors"]
+            .as_array()
+            .expect("sensors array")
+            .first()
+            .expect("one sensor")["argv"]
+            .as_array()
+            .expect("argv array")
+            .iter()
+            .map(|value| value.as_str().expect("argv string").to_owned())
+            .collect();
+        assert_eq!(rendered, args.args);
         assert!(!block.contains("when-changed"));
     }
 
