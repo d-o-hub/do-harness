@@ -55,7 +55,7 @@ pub enum Reason {
     Detached,
     /// `gh` could not answer, so the merge is unproven.
     Unproven,
-    /// `origin/main` is unresolvable or its fetch is too old.
+    /// The remote's default branch is unresolvable or its fetch is too old.
     StaleBase,
     /// No build tree exists at the resolved location.
     NoTarget,
@@ -202,7 +202,8 @@ pub fn run(root: &Path, options: &Options) -> Result<()> {
         root: root.display().to_string(),
         generated_at_unix: now,
         dry_run: options.dry_run,
-        origin_main: base.as_ref().map(|base| base.oid.clone()),
+        origin_main: base.as_ref().map(|base| base.reference.clone()),
+        origin_main_oid: base.as_ref().map(|base| base.oid.clone()),
         origin_main_fetched_at_unix: base.as_ref().and_then(|base| base.fetched_at_unix),
         candidates,
         reclaimed_bytes: reclaimed,
@@ -293,6 +294,13 @@ impl Context<'_> {
 
     /// Resolves the target, runs the guards, then proves the merge.
     fn classify(&self, entry: &discover::Entry, candidate: &mut Candidate) {
+        // `refusal` already rejected a candidate without a resolvable base, so
+        // this is unreachable in practice; treat a lost base as the error it is
+        // rather than proving against a reference that may be wrong.
+        let Some(base) = self.base else {
+            candidate.reason = Some(Reason::StaleBase.as_str());
+            return;
+        };
         let record = self
             .records
             .and_then(|records| records.iter().find(|record| record.worktree == entry.path));
@@ -320,7 +328,7 @@ impl Context<'_> {
                         .worktrees
                         .iter()
                         .any(|path| path == &entry.path);
-                    match proof::prove(self.root, entry, explicit, self.options.optimistic) {
+                    match proof::prove(self.root, base, entry, explicit, self.options.optimistic) {
                         proof::Proof::Merged(merge_proof) => candidate.merge_proof = merge_proof,
                         proof::Proof::Refused(reason) => {
                             candidate.reason = Some(reason.as_str());

@@ -73,15 +73,15 @@ struct Pull {
     merged_at: Option<String>,
 }
 
-/// Proves whether `entry` is merged into `base`.
+/// Proves whether `entry` is merged into the resolved base.
 ///
 /// `explicit` records that the operator named this worktree, which is the only
 /// case where a detached head may be promoted by tree equality. `optimistic`
 /// permits a local proof when `gh` cannot answer, and is reported by the caller
 /// as the documented risk it is.
-pub fn prove(root: &Path, entry: &Entry, explicit: bool, optimistic: bool) -> Proof {
+pub fn prove(root: &Path, base: &Base, entry: &Entry, explicit: bool, optimistic: bool) -> Proof {
     if entry.detached {
-        return if explicit && tree_absorbed(root, &entry.head) {
+        return if explicit && tree_absorbed(root, &base.reference, &entry.head) {
             Proof::Merged(MergeProof {
                 kind: ProofKind::TreeAbsorbed,
                 pr: None,
@@ -96,7 +96,7 @@ pub fn prove(root: &Path, entry: &Entry, explicit: bool, optimistic: bool) -> Pr
     };
     let open = match pulls(root, branch, "open") {
         Ok(pulls) => pulls,
-        Err(_) if optimistic => return local(root, entry),
+        Err(_) if optimistic => return local(root, base, entry),
         Err(_) => return Proof::Refused(Reason::Unproven),
     };
     if !open.is_empty() {
@@ -104,7 +104,7 @@ pub fn prove(root: &Path, entry: &Entry, explicit: bool, optimistic: bool) -> Pr
     }
     let merged = match pulls(root, branch, "merged") {
         Ok(pulls) => pulls,
-        Err(_) if optimistic => return local(root, entry),
+        Err(_) if optimistic => return local(root, base, entry),
         Err(_) => return Proof::Refused(Reason::Unproven),
     };
     if let Some(pull) = merged.iter().find(|pull| pull.head_ref_oid == entry.head) {
@@ -115,24 +115,30 @@ pub fn prove(root: &Path, entry: &Entry, explicit: bool, optimistic: bool) -> Pr
         });
     }
     if merged.is_empty() {
-        local(root, entry)
+        local(root, base, entry)
+    } else if merged.len() >= PULL_LIMIT {
+        // Every merged pull request for the name came back and none matched this
+        // head, but the page was full, so an older merge for this exact head may
+        // be past the cut. Reporting `proof_stale` here would assert something
+        // the query did not establish, so fail closed instead.
+        Proof::Refused(Reason::Unproven)
     } else {
-        // A merged pull request exists for the branch name, but it merged a
-        // different head: the name was reused after the merge.
+        // A complete list of merged pull requests exists for the branch name, and
+        // none merged this head: the name was reused after a merge.
         Proof::Refused(Reason::ProofStale)
     }
 }
 
 /// Local fallbacks, only reached when no open pull request exists.
-fn local(root: &Path, entry: &Entry) -> Proof {
-    if ancestor(root, &entry.head) {
+fn local(root: &Path, base: &Base, entry: &Entry) -> Proof {
+    if ancestor(root, &base.reference, &entry.head) {
         return Proof::Merged(MergeProof {
             kind: ProofKind::Ancestor,
             pr: None,
             merged_at: None,
         });
     }
-    if tree_absorbed(root, &entry.head) {
+    if tree_absorbed(root, &base.reference, &entry.head) {
         return Proof::Merged(MergeProof {
             kind: ProofKind::TreeAbsorbed,
             pr: None,
@@ -142,9 +148,16 @@ fn local(root: &Path, entry: &Entry) -> Proof {
     Proof::Refused(Reason::Unmerged)
 }
 
+/// How many merged pull requests one branch-name lookup requests.
+///
+/// The list is matched on `headRefOid`, so it must be complete enough that a
+/// missing match means "this head was never merged" rather than "the page ran
+/// out". A full page makes the caller fail closed instead of guessing.
+const PULL_LIMIT: usize = 100;
+
 /// Lists pull requests for `branch` in the given state.
 fn pulls(root: &Path, branch: &str, state: &str) -> Result<Vec<Pull>> {
-    let limit = "10";
+    let limit = PULL_LIMIT.to_string();
     gh::json::<Vec<Pull>>(
         root,
         &[
@@ -155,7 +168,7 @@ fn pulls(root: &Path, branch: &str, state: &str) -> Result<Vec<Pull>> {
             "--state",
             state,
             "--limit",
-            limit,
+            &limit,
             "--json",
             "number,headRefOid,mergedAt",
         ],
@@ -163,14 +176,14 @@ fn pulls(root: &Path, branch: &str, state: &str) -> Result<Vec<Pull>> {
     )
 }
 
-/// Whether `head` is an ancestor of `origin/main`.
-fn ancestor(root: &Path, head: &str) -> bool {
-    exit_ok(root, &["merge-base", "--is-ancestor", head, "origin/main"])
+/// Whether `head` is an ancestor of the base reference.
+fn ancestor(root: &Path, reference: &str, head: &str) -> bool {
+    exit_ok(root, &["merge-base", "--is-ancestor", head, reference])
 }
 
-/// Whether `head`'s tree equals `origin/main`'s tree.
-fn tree_absorbed(root: &Path, head: &str) -> bool {
-    exit_ok(root, &["diff", "--quiet", "origin/main", head])
+/// Whether `head`'s tree equals the base reference's tree.
+fn tree_absorbed(root: &Path, reference: &str, head: &str) -> bool {
+    exit_ok(root, &["diff", "--quiet", reference, head])
 }
 
 /// Runs `git <args>` and reports whether it exited zero.
@@ -183,7 +196,7 @@ fn exit_ok(root: &Path, args: &[&str]) -> bool {
         .is_ok_and(|output| output.status.success())
 }
 
-/// The age after which a fetched `origin/main` is no longer trusted.
+/// The age after which a fetched base ref is no longer trusted.
 pub const MAX_BASE_AGE_SECONDS: i64 = 7 * 24 * 60 * 60;
 
 /// Whether the base is fresh enough to prove against.
@@ -229,8 +242,11 @@ struct RegistryFile {
 /// Resolves the target directory for `entry`.
 ///
 /// An explicit `--target-dir` wins, then a registry record, then
-/// `<worktree>/target`. A record or explicit path outside the worktree is only
-/// honoured with `--include-shared`.
+/// `<worktree>/target`. `--target-dir` is a global flag, so an explicit path is
+/// only adopted by the worktree it actually belongs to; otherwise every
+/// candidate would claim the same directory, report the same size, and race to
+/// delete it. A record or explicit path outside the worktree is only honoured
+/// with `--include-shared`, which is where the operator accepts that risk.
 #[must_use]
 pub fn target(
     entry: &Entry,
@@ -238,11 +254,22 @@ pub fn target(
     explicit: &[std::path::PathBuf],
     include_shared: bool,
 ) -> TargetOutcome {
-    let candidate = explicit
+    let own = explicit
         .iter()
-        .find(|path| super::guard::is_real_dir(path))
-        .cloned()
+        .find(|path| path.starts_with(&entry.path) && super::guard::is_real_dir(path))
+        .cloned();
+    let candidate = own
         .or_else(|| record.map(|record| record.target_dir.clone()))
+        .or_else(|| {
+            include_shared
+                .then(|| {
+                    explicit
+                        .iter()
+                        .find(|path| super::guard::is_real_dir(path))
+                        .cloned()
+                })
+                .flatten()
+        })
         .unwrap_or_else(|| entry.path.join("target"));
     let inside = candidate.starts_with(&entry.path);
     if !inside && !include_shared {

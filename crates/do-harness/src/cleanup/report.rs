@@ -73,8 +73,10 @@ pub struct Report {
     pub generated_at_unix: i64,
     /// Whether anything was reclaimed.
     pub dry_run: bool,
-    /// Commit `origin/main` named at the start of the run.
+    /// Remote-tracking ref (`origin/main`, `origin/master`, …) the proof used.
     pub origin_main: Option<String>,
+    /// Commit that ref named at the start of the run.
+    pub origin_main_oid: Option<String>,
     /// When that remote-tracking ref last moved, when knowable.
     pub origin_main_fetched_at_unix: Option<i64>,
     /// Every candidate, in discovery order.

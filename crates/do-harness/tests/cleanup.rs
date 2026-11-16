@@ -1,191 +1,20 @@
-//! Acceptance fixtures for `do-harness cleanup` (#569, #570, #571, #572).
+//! Integration coverage for `do-harness cleanup`.
 //!
-//! Every case drives the real binary against a real git repository with real
-//! linked worktrees, and injects `gh` answers through a fake on `PATH` so the
-//! merge-proof matrix runs offline.
+//! Every case runs the real binary against a real git repository with a fake
+//! `gh` on `PATH`: the command deletes directories, so the proof and the guards
+//! are tested against git's own state rather than a model of it.
 
 #![cfg(unix)]
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-use std::os::unix::fs::PermissionsExt;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::Command;
 
 use serde_json::Value;
-use tempfile::TempDir;
 
 mod support;
 
-/// A repository with a `main` branch, a fake `gh`, and helpers to add worktrees.
-struct Fixture {
-    dir: TempDir,
-    root: PathBuf,
-    gh: PathBuf,
-}
-
-impl Fixture {
-    fn new() -> Self {
-        let dir = tempfile::tempdir().unwrap();
-        let root = dir.path().join("repo");
-        std::fs::create_dir_all(&root).unwrap();
-        let root = root.canonicalize().unwrap();
-        git(&root, &["init", "-b", "main"]);
-        git(&root, &["config", "user.email", "fixture@example.invalid"]);
-        git(&root, &["config", "user.name", "Fixture"]);
-        std::fs::write(root.join(".gitignore"), "/target\n").unwrap();
-        std::fs::write(root.join("README.md"), "fixture\n").unwrap();
-        git(&root, &["add", "."]);
-        git(&root, &["commit", "-m", "init"]);
-        let head = git(&root, &["rev-parse", "HEAD"]);
-        git(
-            &root,
-            &["update-ref", "refs/remotes/origin/main", head.trim()],
-        );
-        let gh = fake_gh(dir.path());
-        Self { dir, root, gh }
-    }
-
-    fn mock(&self) -> PathBuf {
-        self.dir.path().join("mock")
-    }
-
-    /// Adds a worktree on a new branch with one commit and a fake build tree.
-    fn worktree(&self, branch: &str) -> PathBuf {
-        let path = self.dir.path().join(format!("wt-{branch}"));
-        git(
-            &self.root,
-            &["worktree", "add", "-b", branch, path.to_str().unwrap()],
-        );
-        std::fs::create_dir_all(path.join("src")).unwrap();
-        std::fs::write(
-            path.join("Cargo.toml"),
-            "[package]\nname = \"fixture\"\nversion = \"0.1.0\"\nedition = \"2021\"\n",
-        )
-        .unwrap();
-        std::fs::write(path.join("src/lib.rs"), "pub fn f() {}\n").unwrap();
-        build_tree(&path);
-        git(&path, &["add", "."]);
-        git(&path, &["commit", "-m", "work"]);
-        path
-    }
-
-    /// Fast-forwards `main` to `branch` and republishes `origin/main`.
-    fn merge(&self, branch: &str) {
-        git(&self.root, &["merge", "--ff-only", branch]);
-        let head = git(&self.root, &["rev-parse", "HEAD"]);
-        git(
-            &self.root,
-            &["update-ref", "refs/remotes/origin/main", head.trim()],
-        );
-    }
-
-    /// Records the fake `gh` answers: open PRs and merged PRs.
-    fn prs(&self, open: &str, merged: &str) {
-        let mock = self.mock();
-        std::fs::create_dir_all(&mock).unwrap();
-        std::fs::write(mock.join("open.json"), open).unwrap();
-        std::fs::write(mock.join("merged.json"), merged).unwrap();
-    }
-
-    fn head(&self, branch: &str) -> String {
-        git(&self.root, &["rev-parse", branch]).trim().to_owned()
-    }
-
-    fn run(&self, args: &[&str]) -> (Option<i32>, String, String) {
-        let path = std::env::var("PATH").unwrap_or_default();
-        let output = support::harness(&self.root)
-            .args(args)
-            .env("PATH", format!("{}:{path}", self.gh.display()))
-            .env("GH_MOCK", self.mock())
-            .output()
-            .expect("spawn do-harness");
-        (
-            output.status.code(),
-            String::from_utf8_lossy(&output.stdout).into_owned(),
-            String::from_utf8_lossy(&output.stderr).into_owned(),
-        )
-    }
-
-    fn json(&self, args: &[&str]) -> (Option<i32>, Value, String) {
-        let (code, stdout, stderr) = self.run(args);
-        if code != Some(0) {
-            eprintln!("DEBUG cleanup exit {code:?}: {stdout}\n{stderr}");
-        }
-        let document: Value = serde_json::from_str(&stdout)
-            .unwrap_or_else(|error| panic!("cleanup JSON: {error}\n{stdout}\n{stderr}"));
-        (code, document, stderr)
-    }
-}
-
-/// Creates a plausible Cargo build tree: cache tag, profile lock, object file.
-fn build_tree(worktree: &Path) {
-    let debug = worktree.join("target/debug");
-    std::fs::create_dir_all(&debug).unwrap();
-    std::fs::write(
-        worktree.join("target/CACHEDIR.TAG"),
-        "Signature: 8a477f597d28d172789f06886806bc55\n",
-    )
-    .unwrap();
-    std::fs::write(debug.join(".cargo-lock"), "").unwrap();
-    std::fs::write(debug.join("blob.rlib"), vec![0u8; 4096]).unwrap();
-}
-
-fn git(dir: &Path, args: &[&str]) -> String {
-    let output = Command::new("git")
-        .current_dir(dir)
-        .args(args)
-        .output()
-        .expect("spawn git");
-    assert!(
-        output.status.success(),
-        "git {} failed: {}",
-        args.join(" "),
-        String::from_utf8_lossy(&output.stderr)
-    );
-    String::from_utf8_lossy(&output.stdout).into_owned()
-}
-
-/// Writes a fake `gh` that answers `pr list --state <state>` from a mock file.
-fn fake_gh(dir: &Path) -> PathBuf {
-    let bin = dir.join("bin");
-    std::fs::create_dir_all(&bin).unwrap();
-    let script = bin.join("gh");
-    std::fs::write(
-        &script,
-        r#"#!/bin/sh
-if [ -n "$GH_FAIL" ]; then
-    echo "gh: not authenticated" >&2
-    exit 1
-fi
-state=""
-while [ "$#" -gt 0 ]; do
-    case "$1" in
-        --state) state="$2"; shift 2 ;;
-        *) shift ;;
-    esac
-done
-file="$GH_MOCK/$state.json"
-if [ -f "$file" ]; then cat "$file"; else echo '[]'; fi
-"#,
-    )
-    .unwrap();
-    std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755)).unwrap();
-    bin
-}
-
-fn merged_pr(pr: u64, head: &str) -> String {
-    format!(r#"[{{"number":{pr},"headRefOid":"{head}","mergedAt":"2026-11-16T00:00:00Z"}}]"#)
-}
-
-fn candidate<'a>(document: &'a Value, worktree: &Path) -> &'a Value {
-    let worktree = worktree.display().to_string();
-    document["candidates"]
-        .as_array()
-        .expect("candidates array")
-        .iter()
-        .find(|candidate| candidate["worktree"] == worktree.as_str())
-        .unwrap_or_else(|| panic!("no candidate for {worktree}"))
-}
+use support::cleanup::{Fixture, candidate, full_page_of_unrelated_merges, git, merged_pr};
 
 #[test]
 fn a_merged_worktree_is_proven_by_its_pr_and_cleaned() {
@@ -284,6 +113,107 @@ fn a_held_cargo_lock_refuses_the_build_tree() {
 }
 
 #[test]
+fn a_master_default_repository_resolves_its_base_and_cleans() {
+    // Regression: the base was hardcoded to `origin/main`, so in a repository
+    // whose remote default branch is `master` the base never resolved and every
+    // candidate was reported as an error-class `stale_base` — the command was
+    // unusable there, not merely conservative.
+    let fixture = Fixture::on_default_branch("master");
+    let worktree = fixture.worktree("topic");
+    let head = fixture.head("topic");
+    fixture.merge("topic");
+    fixture.prs("[]", &merged_pr(8, &head));
+
+    let (code, document, stderr) = fixture.json(&["cleanup", "--format", "json"]);
+    assert_eq!(code, Some(0), "{stderr}\n{document}");
+    assert_eq!(document["origin_main"], "origin/master");
+    let candidate = candidate(&document, &worktree);
+    assert_eq!(candidate["verdict"], "cleaned", "{document}");
+    assert_eq!(candidate["merge_proof"]["kind"], "pr-merged");
+    assert!(!worktree.join("target").exists());
+}
+
+#[test]
+fn a_live_compiler_in_the_worktree_refuses_the_build_tree() {
+    // Regression: the first implementation tested `cwd.starts_with(target)`, but
+    // neither cargo nor rustc changes directory into the build tree (cargo runs
+    // in the worktree root and passes `--out-dir <target>/debug/deps`), so the
+    // probe could never fire and this exact race went unguarded.
+    let fixture = Fixture::new();
+    let worktree = fixture.worktree("compiling");
+    let head = fixture.head("compiling");
+    fixture.merge("compiling");
+    fixture.prs("[]", &merged_pr(7, &head));
+
+    let sleeper = fixture.dir.path().join("bin").join("cargo");
+    std::fs::copy("/bin/sleep", &sleeper).unwrap();
+    let mut child = Command::new(&sleeper)
+        .arg("60")
+        .current_dir(&worktree)
+        .spawn()
+        .expect("spawn fake cargo");
+
+    let (code, document, _stderr) = fixture.json(&["cleanup", "--format", "json"]);
+    let _ = child.kill();
+    let _ = child.wait();
+    assert_eq!(code, Some(0));
+    assert_eq!(candidate(&document, &worktree)["reason"], "in_use");
+    assert!(worktree.join("target/debug/blob.rlib").exists());
+}
+
+#[test]
+fn an_explicit_target_dir_is_only_adopted_by_the_worktree_that_owns_it() {
+    // Regression: `--target-dir` is a global flag, and the resolver took the
+    // first existing path for every candidate. Two worktrees then claimed the
+    // same directory, reported each other's size, and both tried to delete it.
+    let fixture = Fixture::new();
+    let first = fixture.worktree("first");
+    let second = fixture.worktree("second");
+    for branch in ["first", "second"] {
+        let head = fixture.head(branch);
+        fixture.merge(branch);
+        fixture.prs("[]", &merged_pr(9, &head));
+    }
+
+    let (code, document, stderr) = fixture.json(&[
+        "cleanup",
+        "--dry-run",
+        "--target-dir",
+        first.join("target").to_str().unwrap(),
+        "--format",
+        "json",
+    ]);
+    assert_eq!(code, Some(0), "{stderr}\n{document}");
+    assert_eq!(
+        candidate(&document, &first)["target_dir"],
+        first.join("target").display().to_string()
+    );
+    assert_eq!(
+        candidate(&document, &second)["target_dir"],
+        second.join("target").display().to_string(),
+        "the second worktree must keep its own build tree"
+    );
+}
+
+#[test]
+fn a_truncated_merged_page_fails_closed_instead_of_claiming_proof_stale() {
+    // Regression: the lookup requested only 10 merged pull requests. When a
+    // long-lived branch name had more, the match could be past the cut, and the
+    // code reported `proof_stale` — asserting the name was reused when the query
+    // had simply not looked far enough. A full page now means "unknown".
+    let fixture = Fixture::new();
+    let worktree = fixture.worktree("longlived");
+    let head = fixture.head("longlived");
+    fixture.merge("longlived");
+    fixture.prs("[]", &full_page_of_unrelated_merges(&head));
+
+    let (code, document, _stderr) = fixture.json(&["cleanup", "--format", "json"]);
+    assert_eq!(code, Some(1), "unproven is error-class: {document}");
+    assert_eq!(candidate(&document, &worktree)["reason"], "unproven");
+    assert!(worktree.join("target").exists(), "nothing may be reclaimed");
+}
+
+#[test]
 fn a_reused_branch_name_is_proof_stale() {
     let fixture = Fixture::new();
     let worktree = fixture.worktree("reused");
@@ -353,8 +283,8 @@ fn keep_retains_the_most_recently_used_tree() {
     let newer = fixture.worktree("newer");
     fixture.merge("older");
     fixture.merge("newer");
-    // Both branches are ancestors of origin/main, so the local fallback proves
-    // them without a pull request; the fixture then sets distinct mtimes.
+    // Both branches are ancestors of the default branch, so the local fallback
+    // proves them without a pull request; the fixture then sets distinct mtimes.
     fixture.prs("[]", "[]");
     set_modified(&older.join("target"), 1_000_000);
     set_modified(&newer.join("target"), 2_000_000);

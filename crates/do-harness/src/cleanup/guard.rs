@@ -73,7 +73,7 @@ fn refusal(entry: &Entry, main: &Path, target: Option<&Path>, optimistic: bool) 
     if dirty(&entry.path) {
         return Some(Reason::Dirty);
     }
-    target.and_then(|target| in_use(target, optimistic))
+    target.and_then(|target| in_use(&entry.path, target, optimistic))
 }
 
 /// Whether `git status --porcelain` reports anything, including untracked files.
@@ -117,12 +117,12 @@ fn is_protected(main: &Path, worktree: &Path, target: &Path) -> bool {
 }
 
 /// Runs the liveness probes, returning a refusal when the tree may be in use.
-fn in_use(target: &Path, optimistic: bool) -> Option<Reason> {
+fn in_use(worktree: &Path, target: &Path, optimistic: bool) -> Option<Reason> {
     if lock_held(target) {
         return Some(Reason::InUse);
     }
     if cfg!(target_os = "linux") {
-        return process_uses(target).then_some(Reason::InUse);
+        return process_uses(worktree, target).then_some(Reason::InUse);
     }
     if optimistic {
         None
@@ -167,9 +167,15 @@ fn lock_files(target: &Path) -> Vec<PathBuf> {
     files
 }
 
-/// Whether a live compiler or test process works inside `target`.
+/// Whether a live compiler or test process is working on this worktree.
+///
+/// Neither `cargo` nor `rustc` changes directory into the build tree: cargo
+/// runs in the worktree root and passes `--out-dir <target>/debug/deps`, and
+/// rustc inherits that cwd. A `cwd.starts_with(target)` test therefore never
+/// fires and the guard would silently permit the very race it exists to
+/// prevent, so both the cwd and the argument list are inspected.
 #[cfg(target_os = "linux")]
-fn process_uses(target: &Path) -> bool {
+fn process_uses(worktree: &Path, target: &Path) -> bool {
     const NAMES: [&str; 6] = [
         "cargo",
         "rustc",
@@ -178,7 +184,9 @@ fn process_uses(target: &Path) -> bool {
         "sccache",
         "rust-analyzer",
     ];
-    let Ok(canonical) = target.canonicalize() else {
+    let (Ok(canonical_worktree), Ok(canonical_target)) =
+        (worktree.canonicalize(), target.canonicalize())
+    else {
         return true;
     };
     let Ok(processes) = std::fs::read_dir("/proc") else {
@@ -193,10 +201,20 @@ fn process_uses(target: &Path) -> bool {
         if !NAMES.contains(&name) {
             continue;
         }
-        let Ok(cwd) = std::fs::read_link(format!("/proc/{pid}/cwd")) else {
+        if let Ok(cwd) = std::fs::read_link(format!("/proc/{pid}/cwd")) {
+            if cwd.starts_with(&canonical_worktree) {
+                return true;
+            }
+        }
+        // The build tree is named in the argument list, not the cwd: cargo
+        // passes `--target-dir`/`--out-dir`, rustc passes `--out-dir`.
+        let Ok(cmdline) = std::fs::read(format!("/proc/{pid}/cmdline")) else {
             continue;
         };
-        if cwd.starts_with(&canonical) {
+        let args = String::from_utf8_lossy(&cmdline).replace('\0', " ");
+        if args.contains(canonical_target.to_string_lossy().as_ref())
+            || args.contains(target.to_string_lossy().as_ref())
+        {
             return true;
         }
     }
@@ -205,7 +223,7 @@ fn process_uses(target: &Path) -> bool {
 
 /// Non-Linux hosts have no process probe; the caller reports `lock-only`.
 #[cfg(not(target_os = "linux"))]
-fn process_uses(_target: &Path) -> bool {
+fn process_uses(_worktree: &Path, _target: &Path) -> bool {
     false
 }
 

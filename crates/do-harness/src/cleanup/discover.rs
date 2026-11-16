@@ -1,4 +1,4 @@
-//! Discovery of linked worktrees and the fetched `origin/main` base.
+//! Discovery of linked worktrees and the fetched remote default branch.
 //!
 //! `git worktree list --porcelain` is the only supported source: it is stable
 //! enough to parse, and it reports the two states a cleanup must never touch —
@@ -142,28 +142,85 @@ fn apply(entry: &mut Entry, line: &str) {
 /// The fetched base a local merge proof compares against.
 #[derive(Debug, Clone)]
 pub struct Base {
-    /// Commit id `origin/main` currently names.
+    /// Remote-tracking reference the proof compares against, e.g. `origin/main`.
+    pub reference: String,
+    /// Commit id that reference currently names.
     pub oid: String,
     /// When the remote-tracking ref last moved, when that is knowable.
     pub fetched_at_unix: Option<i64>,
 }
 
-/// Resolves `origin/main` and its fetch age.
+/// Remote-tracking refs to consider, in order, when `origin/HEAD` is unset.
+const BASE_CANDIDATES: [&str; 2] = ["main", "master"];
+
+/// Resolves the remote default branch and its fetch age.
+///
+/// The base is whatever the remote calls its default branch — resolved locally
+/// from `origin/HEAD` so no network call is needed — never a hardcoded `main`.
+/// A hardcoded name makes the command useless in every repository that still
+/// uses `master`, where the base would never resolve and every candidate would
+/// be reported as an error.
 ///
 /// # Errors
 ///
-/// Returns an error when `origin/main` does not resolve: a local proof against
+/// Returns an error when no candidate base ref resolves: a local proof against
 /// an unresolvable base is not a proof.
 pub fn base(root: &Path) -> Result<Base> {
-    let output = git(root, &["rev-parse", "--verify", "origin/main^{commit}"])?;
+    let reference = base_reference(root)?;
+    let output = git(
+        root,
+        &["rev-parse", "--verify", &format!("{reference}^{{commit}}")],
+    )?;
     let oid = String::from_utf8_lossy(&output.stdout).trim().to_owned();
     if oid.is_empty() {
-        bail!("origin/main did not resolve to a commit");
+        bail!("{reference} did not resolve to a commit");
     }
+    let fetched_at_unix = fetch_time(root, &format!("refs/remotes/{reference}"));
     Ok(Base {
+        reference,
         oid,
-        fetched_at_unix: fetch_time(root),
+        fetched_at_unix,
     })
+}
+/// The remote-tracking ref naming the default branch.
+///
+/// `origin/HEAD` is the authoritative local answer; the candidate list is the
+/// documented fallback for a clone that never recorded it.
+fn base_reference(root: &Path) -> Result<String> {
+    if let Ok(output) = git(
+        root,
+        &["symbolic-ref", "--short", "refs/remotes/origin/HEAD"],
+    ) {
+        let name = String::from_utf8_lossy(&output.stdout).trim().to_owned();
+        if !name.is_empty()
+            && git(
+                root,
+                &["rev-parse", "--verify", &format!("{name}^{{commit}}")],
+            )
+            .is_ok()
+        {
+            return Ok(name);
+        }
+    }
+    for branch in BASE_CANDIDATES {
+        let reference = format!("origin/{branch}");
+        if git(
+            root,
+            &["rev-parse", "--verify", &format!("{reference}^{{commit}}")],
+        )
+        .is_ok()
+        {
+            return Ok(reference);
+        }
+    }
+    bail!(
+        "no remote default branch resolved: tried origin/HEAD, {}",
+        BASE_CANDIDATES
+            .iter()
+            .map(|branch| format!("origin/{branch}"))
+            .collect::<Vec<_>>()
+            .join(", ")
+    )
 }
 
 /// Best-effort fetch timestamp for the remote-tracking ref.
@@ -172,13 +229,13 @@ pub fn base(root: &Path) -> Result<Base> {
 /// remote-tracking ref or `packed-refs` carries the last write time. `None`
 /// means the age is unknowable, which callers treat as stale unless the
 /// operator opts in.
-fn fetch_time(root: &Path) -> Option<i64> {
+fn fetch_time(root: &Path, reference: &str) -> Option<i64> {
     let git_dir = git(root, &["rev-parse", "--absolute-git-dir"])
         .ok()
         .map(|output| PathBuf::from(String::from_utf8_lossy(&output.stdout).trim().to_owned()))?;
     [
         git_dir.join("FETCH_HEAD"),
-        git_dir.join("refs/remotes/origin/main"),
+        git_dir.join(reference),
         git_dir.join("packed-refs"),
     ]
     .iter()

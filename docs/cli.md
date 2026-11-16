@@ -1257,17 +1257,26 @@ reclaimed only when two independent questions both answer yes.
 needs: `git merge-base --is-ancestor` reports every squash-merged branch as
 unmerged. Ancestry and tree equality are local fallbacks, and they only promote
 a branch that has no open pull request. A merged PR for the same branch name
-with a different head is `proof_stale`; a missing or unauthenticated `gh` is
-`unproven` and exits `1` rather than downgrading silently. `origin/main` must
-resolve and its fetch must be at most seven days old, or the candidate is
-`stale_base`.
+with a different head is `proof_stale`; if the merged list came back full, an
+older merge for this head may be past the cut, so the verdict is `unproven`
+instead of a `proof_stale` claim the query did not establish. A missing or
+unauthenticated `gh` is `unproven` and exits `1` rather than downgrading
+silently.
+
+The base is the remote's own default branch, resolved locally from
+`origin/HEAD` (falling back to `origin/main`, then `origin/master`) rather than
+assuming `main`, so the command works in a repository whose default branch is
+`master`. It must resolve, and its fetch must be at most seven days old, or the
+candidate is `stale_base`.
 
 **Is anything using it?** A dirty worktree (including untracked files), a
 `locked` or `prunable` registry entry, a held Cargo build lock, or a live
-`cargo`/`rustc`/`rustdoc`/`nextest`/`sccache` process inside the tree refuses
-the candidate. On hosts without a process probe the report says
-`probe: "lock-only"`, and an unprobeable tree is `in_use_unknown` unless
-`--optimistic` accepts the risk.
+`cargo`/`rustc`/`rustdoc`/`nextest`/`sccache` process working on the tree
+refuses the candidate. The process probe reads both the process's working
+directory and its argument list, because cargo runs in the worktree root and
+names the build tree in `--out-dir`/`--target-dir` rather than changing into it.
+On hosts without a process probe the report says `probe: "lock-only"`, and an
+unprobeable tree is `in_use_unknown` unless `--optimistic` accepts the risk.
 
 Reclamation is `cargo clean --target-dir`, then `git worktree remove`, then one
 `git worktree prune` for the repository — Cargo's API for its own directory and
