@@ -194,3 +194,68 @@ async fn has_ok_beat_reflects_the_status_column() {
         "any beat with status 'ok' counts, not only sensor beats"
     );
 }
+
+/// The export keeps every execution in the window, oldest first, and derives
+/// the duration from the two timestamps; filters compose instead of widening.
+#[tokio::test(flavor = "current_thread")]
+async fn sensor_executions_exports_the_window_oldest_first() {
+    let (_dir, conn) = open().await;
+    seed_history(&conn).await;
+    insert_beat(
+        &conn,
+        &NewBeat {
+            task_id: None,
+            scope: Some(BeatScope::Branch("main".to_owned())),
+            beat_type: BeatType::Sensor,
+            status: BeatStatus::Failed,
+            sensor_exit_code: Some(2),
+            sensor_name: Some("check"),
+            started_at: 250,
+            completed_at: Some(253),
+        },
+    )
+    .await
+    .unwrap();
+
+    let all = sensor_executions(&conn, None, None, None, None)
+        .await
+        .unwrap();
+    let names: Vec<&str> = all.iter().map(|row| row.sensor.as_str()).collect();
+    assert_eq!(names, vec!["check", "check", "check", "check", "test"]);
+    let times: Vec<i64> = all.iter().map(|row| row.started_at).collect();
+    assert_eq!(times, vec![50, 100, 200, 250, 300]);
+    assert_eq!(
+        all.iter().map(|row| row.duration_ms).collect::<Vec<_>>(),
+        vec![Some(1000), Some(1000), Some(1000), Some(3000), Some(1000)]
+    );
+    assert_eq!(all[3].exit_code, Some(2));
+    assert_eq!(all[3].status, "failed");
+    assert_eq!(all[0].scope, "global");
+
+    // Window + scope + sensor compose: only the two in `branch:main` inside
+    // 100..=200 remain, and the older `global` beat stays out.
+    let windowed = sensor_executions(
+        &conn,
+        Some(100),
+        Some(200),
+        Some("branch:main"),
+        Some("check"),
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        windowed
+            .iter()
+            .map(|row| row.started_at)
+            .collect::<Vec<_>>(),
+        vec![100, 200]
+    );
+
+    assert!(
+        sensor_executions(&conn, None, None, Some("task:99"), None)
+            .await
+            .unwrap()
+            .is_empty(),
+        "an unused scope reports nothing"
+    );
+}

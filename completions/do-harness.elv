@@ -52,6 +52,8 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand hook 'Manage git hooks that run `do-harness verify`'
             cand doctor 'Run diagnostic checks on binary resolution and git hook health'
             cand metrics 'Report harness trends: sensor stats, strikes, eval pass-rate history'
+            cand report 'Export recorded sensor executions (durations, exit codes, failures)'
+            cand sensor 'Scaffold and validate a new sensor entry'
             cand learn 'Draft skill/guide updates from sensors that keep firing (never applies them)'
             cand overlap 'Rank skill pairs by guidance overlap (Tier-2 distinctiveness advisory)'
             cand maintenance 'Prune old beats and compact the state database'
@@ -1141,6 +1143,64 @@ set edit:completion:arg-completer[do-harness] = {|@words|
         }
         &'do-harness;metrics;help;help'= {
         }
+        &'do-harness;report'= {
+            cand --format 'Output format'
+            cand --sensor 'Filter by sensor name'
+            cand --since 'Inclusive window start as a Unix timestamp in seconds'
+            cand --until 'Inclusive window end as a Unix timestamp in seconds'
+            cand --scope 'Filter by workstream scope (e.g. `branch:main`, `task:1`, `global`, or `all`). Defaults to the current git branch'
+            cand --task 'Filter by task id (equivalent to `--scope task:<ID>`)'
+            cand --branch 'Filter by branch name (equivalent to `--scope branch:<NAME>`)'
+            cand --root 'Workspace root override (default: walk up from cwd)'
+            cand --config 'Explicit path to do-harness.toml'
+            cand --output 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)'
+            cand --all 'Aggregate across all workstreams and scopes'
+            cand -q 'Suppress PASS/WARN verdict lines and the success footer'
+            cand --quiet 'Suppress PASS/WARN verdict lines and the success footer'
+            cand --dry-run 'Dry run without side effects'
+            cand -h 'Print help (see more with ''--help'')'
+            cand --help 'Print help (see more with ''--help'')'
+            cand -V 'Print version'
+            cand --version 'Print version'
+        }
+        &'do-harness;sensor'= {
+            cand --root 'Workspace root override (default: walk up from cwd)'
+            cand --config 'Explicit path to do-harness.toml'
+            cand --output 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)'
+            cand -q 'Suppress PASS/WARN verdict lines and the success footer'
+            cand --quiet 'Suppress PASS/WARN verdict lines and the success footer'
+            cand --dry-run 'Dry run without side effects'
+            cand -h 'Print help'
+            cand --help 'Print help'
+            cand -V 'Print version'
+            cand --version 'Print version'
+            cand new 'Add a validated `[[sensors]]` entry to do-harness.toml'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'do-harness;sensor;new'= {
+            cand --arg 'One argv element; repeat once for the program and once per argument'
+            cand --when-changed 'Restrict the sensor to changes matching this glob; repeatable'
+            cand --set 'Add the sensor to this already-declared signal set'
+            cand --script 'Scaffold an executable stub script at this path (never overwrites)'
+            cand --root 'Workspace root override (default: walk up from cwd)'
+            cand --config 'Explicit path to do-harness.toml'
+            cand --output 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)'
+            cand -q 'Suppress PASS/WARN verdict lines and the success footer'
+            cand --quiet 'Suppress PASS/WARN verdict lines and the success footer'
+            cand --dry-run 'Dry run without side effects'
+            cand -h 'Print help'
+            cand --help 'Print help'
+            cand -V 'Print version'
+            cand --version 'Print version'
+        }
+        &'do-harness;sensor;help'= {
+            cand new 'Add a validated `[[sensors]]` entry to do-harness.toml'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'do-harness;sensor;help;new'= {
+        }
+        &'do-harness;sensor;help;help'= {
+        }
         &'do-harness;learn'= {
             cand --days 'Window in days the fires are counted over'
             cand --min-fires 'Fires a sensor needs to appear in the draft'
@@ -1456,6 +1516,8 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand hook 'Manage git hooks that run `do-harness verify`'
             cand doctor 'Run diagnostic checks on binary resolution and git hook health'
             cand metrics 'Report harness trends: sensor stats, strikes, eval pass-rate history'
+            cand report 'Export recorded sensor executions (durations, exit codes, failures)'
+            cand sensor 'Scaffold and validate a new sensor entry'
             cand learn 'Draft skill/guide updates from sensors that keep firing (never applies them)'
             cand overlap 'Rank skill pairs by guidance overlap (Tier-2 distinctiveness advisory)'
             cand maintenance 'Prune old beats and compact the state database'
@@ -1609,6 +1671,13 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand pr 'PR-loop measures: time-to-green, pushes per green, waivers, comments, cancelled runs, reruns'
         }
         &'do-harness;help;metrics;pr'= {
+        }
+        &'do-harness;help;report'= {
+        }
+        &'do-harness;help;sensor'= {
+            cand new 'Add a validated `[[sensors]]` entry to do-harness.toml'
+        }
+        &'do-harness;help;sensor;new'= {
         }
         &'do-harness;help;learn'= {
         }

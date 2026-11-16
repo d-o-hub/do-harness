@@ -62,7 +62,7 @@ pub use repo_exec::{
     record_sensor_outcome, record_verify_batch, struck_signatures, vacuum,
 };
 pub use repo_heuristic::{NewHeuristic, insert_heuristic, list_heuristics};
-pub use repo_metrics::{SensorStat, has_ok_beat, sensor_stats};
+pub use repo_metrics::{SensorExecution, SensorStat, has_ok_beat, sensor_executions, sensor_stats};
 pub use repo_scope::{clear_error_signatures, list_error_signatures, reset_error_signature};
 pub use repo_sensors::{
     SensorBless, SensorFindings, insert_sensor_bless, list_sensor_blesses, list_sensor_findings,
