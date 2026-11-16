@@ -114,6 +114,8 @@ or mechanical the change is.
 - **Constants**: Named constants over magic numbers.
 - **Async**: `#[tokio::main(flavor = "current_thread")]` for CLI binaries; sync `main` when no async is required. Follow workload-aware Tokio guidance (template #336, `.agents/skills/tokio-performance/SKILL.md`): short bounded CPU (<10–100µs) stays on worker threads; reserve `spawn_blocking`/pools for genuinely blocking disk/FFI or sustained heavy CPU (>1ms). Review flags: unbounded spawn fan-out, lock-across-`.await`, and repeatedly-ready loops.
 - **Commits**: Conventional commits with lowercase subject lines.
+- **MSRV**: `rust-version` is a compile gate, not a lint. A language feature newer than the declared minimum (an `if let … && let …` chain needs 1.88 against a 1.85 floor) compiles and lints clean locally and fails only the `msrv` job, because clippy's MSRV-aware lints merely suppress *suggestions*. Prove the change with `cargo +1.85.0 check --workspace` (that toolchain is installed) before pushing, or expect the CI `msrv` job to be the first witness.
+- **Cross-target code**: a `#[cfg(unix)]`/`#[cfg(windows)]` block is not compiled on the other host, so a locally green tree can still break the Windows runner. Gate an import with the same `cfg` as its only use, and never compare a raw fixture path against a message that prints a canonical path: `Path::canonicalize` yields a verbatim `\\?\…` path on Windows (strip it with `util::without_verbatim_prefix`) and expands the runner's short temp directory, so assert on the file name and the targeted directory instead.
 
 ## Commit convention
 
