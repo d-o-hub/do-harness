@@ -190,8 +190,9 @@ Run these steps in order. Stop the sweep on any escalation and report it.
     `"$DO_HARNESS_BIN" pr ready PR --format json > "$receipt_file"`
     then `scripts/merge.sh PR "$receipt_file"`. The script re-runs
     `pr ready --expected-receipt`, which recomputes the whole snapshot and
-    accepts the file only when nothing moved and its 60-second lifetime has not
-    elapsed; it then requires `MERGE_ALLOWED` and issues exactly
+    accepts the file only when nothing moved and its generation-bounded
+    lifetime (60-second minimum) has not elapsed; it then requires
+    `MERGE_ALLOWED` and issues exactly
     `gh pr merge PR --squash --match-head-commit HEAD_SHA`.
     Exit `1` is a known blocker (draft, hold label, not open, `CHANGES_REQUESTED`,
     unresolved thread, needs-triage item, merge state not `CLEAN`/`MERGEABLE`, a

@@ -215,9 +215,10 @@ write_report() { # $1=path $2=decision $3=head
      conversations: {unresolved_threads: [], actionable_comments: [], needs_triage: [], complete: true},
      codecov: null, findings: {total: 0},
      blockers: [],
-     authorization: {schema_version: 1, decision: $decision, reasons: [{code: "test", message: "fixture"}],
+     authorization: {schema_version: 2, decision: $decision, reasons: [{code: "test", message: "fixture"}],
        receipt: (if $decision == "MERGE_ALLOWED" then
-         {schema_version: 1, pr: 9, issued_at_unix: 0, expires_at_unix: 0, snapshot_sha256: "x",
+         {schema_version: 2, pr: 9, issued_at_unix: 0, expires_at_unix: 60, generation_seconds: 0,
+          snapshot_sha256: "x",
           base_ref_name: "main", base_ref_oid: "1111111111111111111111111111111111111111",
           head_ref_name: "feature", head_ref_oid: $head, state: "OPEN", is_draft: false, labels: [],
           mergeable: "MERGEABLE", merge_state_status: "CLEAN", auto_merge: false, review_decision: null,

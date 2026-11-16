@@ -38,14 +38,17 @@ fn a_clean_green_pull_request_is_merge_allowed_with_a_receipt() {
     assert_eq!(report["ready"], true);
     assert_eq!(report["authorization"]["decision"], "MERGE_ALLOWED");
     let receipt = &report["authorization"]["receipt"];
-    assert_eq!(receipt["schema_version"], 1);
+    assert_eq!(receipt["schema_version"], 2);
     assert_eq!(receipt["pr"], 4001);
     assert_eq!(receipt["head_ref_oid"], HEAD);
     assert_eq!(receipt["ancestry"], "ahead");
+    let issued = receipt["issued_at_unix"].as_i64().unwrap();
+    let generation = receipt["generation_seconds"].as_i64().unwrap();
+    let lifetime = receipt["expires_at_unix"].as_i64().unwrap() - issued;
     assert_eq!(
-        receipt["expires_at_unix"].as_i64().unwrap() - receipt["issued_at_unix"].as_i64().unwrap(),
-        60,
-        "the receipt lifetime is exactly 60 seconds"
+        lifetime,
+        generation.max(0).saturating_mul(2).clamp(60, 600),
+        "the receipt lifetime is generation-bounded with a 60-second floor"
     );
     assert_eq!(receipt["snapshot_sha256"].as_str().unwrap().len(), 64);
 }
@@ -237,6 +240,30 @@ fn a_fresh_receipt_is_accepted_and_a_moved_snapshot_is_not() {
 }
 
 #[cfg(unix)]
+fn revalidate(
+    root: &Path,
+    bin: &Path,
+    name: &str,
+    document: &Value,
+) -> (Option<i32>, String, String) {
+    let path = root.join(name);
+    std::fs::write(&path, document.to_string()).unwrap();
+    run_pr(
+        root,
+        bin,
+        &[
+            "pr",
+            "ready",
+            "4010",
+            "--expected-receipt",
+            path.to_str().unwrap(),
+            "--format",
+            "json",
+        ],
+    )
+}
+
+#[cfg(unix)]
 #[test]
 fn an_expired_or_forged_or_foreign_receipt_is_rejected() {
     let dir = tempfile::tempdir().unwrap();
@@ -247,100 +274,70 @@ fn an_expired_or_forged_or_foreign_receipt_is_rejected() {
 
     let report = authorize_and_capture(root, &bin, 4010);
     let mut document: Value = serde_json::from_str(&report).unwrap();
+    let issued = document["authorization"]["receipt"]["issued_at_unix"]
+        .as_i64()
+        .unwrap();
 
     // 1. Expired: timestamps pushed into the past, snapshot left intact.
     let mut expired = document.clone();
-    let issued = expired["authorization"]["receipt"]["issued_at_unix"]
-        .as_i64()
-        .unwrap();
     expired["authorization"]["receipt"]["issued_at_unix"] = json!(issued - 1000);
     expired["authorization"]["receipt"]["expires_at_unix"] = json!(issued - 940);
-    let expired_path = root.join("expired.json");
-    std::fs::write(&expired_path, expired.to_string()).unwrap();
-
-    let (code, stdout, _stderr) = run_pr(
-        root,
-        &bin,
-        &[
-            "pr",
-            "ready",
-            "4010",
-            "--expected-receipt",
-            expired_path.to_str().unwrap(),
-            "--format",
-            "json",
-        ],
-    );
+    let (code, stdout, _stderr) = revalidate(root, &bin, "expired.json", &expired);
     assert_eq!(code, Some(2));
     assert!(
         reason_codes(&stdout).iter().any(|c| c == "receipt_expired"),
         "{stdout}"
     );
+    assert!(
+        stdout.contains("issued at") && stdout.contains("of collection"),
+        "the expiry diagnostic names the generation, not just the clock: {stdout}"
+    );
 
-    // 2. A lifetime longer than the contract is invalid, not merely expired.
+    // 2. A generation-bounded window up to the hard cap still authorizes.
+    let mut widened = document.clone();
+    widened["authorization"]["receipt"]["expires_at_unix"] = json!(issued + 240);
+    widened["authorization"]["receipt"]["generation_seconds"] = json!(120);
+    let (code, stdout, stderr) = revalidate(root, &bin, "widened.json", &widened);
+    assert_eq!(
+        code,
+        Some(0),
+        "a slow generation's bounded window must still authorize: {stderr}\n{stdout}"
+    );
+    assert!(stdout.contains("MERGE_ALLOWED"), "{stdout}");
+
+    // 3. A lifetime longer than the contract is invalid, not merely expired.
     let mut long_lived = document.clone();
     long_lived["authorization"]["receipt"]["expires_at_unix"] = json!(issued + 3600);
-    let long_path = root.join("long.json");
-    std::fs::write(&long_path, long_lived.to_string()).unwrap();
-    let (code, stdout, _stderr) = run_pr(
-        root,
-        &bin,
-        &[
-            "pr",
-            "ready",
-            "4010",
-            "--expected-receipt",
-            long_path.to_str().unwrap(),
-            "--format",
-            "json",
-        ],
-    );
+    let (code, stdout, _stderr) = revalidate(root, &bin, "long.json", &long_lived);
     assert_eq!(code, Some(2));
     assert!(
         reason_codes(&stdout).iter().any(|c| c == "receipt_invalid"),
         "{stdout}"
     );
 
-    // 3. A standalone receipt document is not a readiness report.
+    // 4. A receipt from the pre-generation schema is invalid.
+    let mut old_schema = document.clone();
+    old_schema["authorization"]["receipt"]["schema_version"] = json!(1);
+    let (code, stdout, _stderr) = revalidate(root, &bin, "old-schema.json", &old_schema);
+    assert_eq!(code, Some(2));
+    assert!(
+        reason_codes(&stdout).iter().any(|c| c == "receipt_invalid"),
+        "{stdout}"
+    );
+    assert!(stdout.contains("schema_version is 1"), "{stdout}");
+
+    // 5. A standalone receipt document is not a readiness report.
     let standalone = document["authorization"]["receipt"].clone();
-    let standalone_path = root.join("standalone.json");
-    std::fs::write(&standalone_path, standalone.to_string()).unwrap();
-    let (code, stdout, _stderr) = run_pr(
-        root,
-        &bin,
-        &[
-            "pr",
-            "ready",
-            "4010",
-            "--expected-receipt",
-            standalone_path.to_str().unwrap(),
-            "--format",
-            "json",
-        ],
-    );
+    let (code, stdout, _stderr) = revalidate(root, &bin, "standalone.json", &standalone);
     assert_eq!(code, Some(2));
     assert!(
         reason_codes(&stdout).iter().any(|c| c == "receipt_invalid"),
         "{stdout}"
     );
 
-    // 4. A receipt for another PR is invalid.
+    // 6. A receipt for another PR is invalid.
     document["authorization"]["receipt"]["pr"] = json!(9999);
-    let foreign_path = root.join("foreign.json");
-    std::fs::write(&foreign_path, document.to_string()).unwrap();
-    let (code, stdout, _stderr) = run_pr(
-        root,
-        &bin,
-        &[
-            "pr",
-            "ready",
-            "4010",
-            "--expected-receipt",
-            foreign_path.to_str().unwrap(),
-            "--format",
-            "json",
-        ],
-    );
+    let (code, stdout, _stderr) = revalidate(root, &bin, "foreign.json", &document);
     assert_eq!(code, Some(2));
     assert!(
         reason_codes(&stdout).iter().any(|c| c == "receipt_invalid"),

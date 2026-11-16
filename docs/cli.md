@@ -1586,8 +1586,9 @@ malformed, standalone (not a full report), issued for another PR, or superseded
 by a snapshot that moved.
 
 The receipt is recomputed, never trusted. It records the schema version, PR
-number, UTC epoch `issued_at_unix`/`expires_at_unix` (exactly 60 seconds), a
-canonical `snapshot_sha256`, base and head ref names and OIDs, PR state,
+number, UTC epoch `issued_at_unix`/`expires_at_unix`, the collection's
+`generation_seconds` (the lifetime is `max(60, 2 × generation)`, capped at
+600 seconds), a canonical `snapshot_sha256`, base and head ref names and OIDs, PR state,
 draft flag, sorted labels, mergeability, merge state, auto-merge flag, review
 decision, digests of the check set, conversation inventory and findings, the
 policy revision, and the ancestry verdict with the compared OIDs.

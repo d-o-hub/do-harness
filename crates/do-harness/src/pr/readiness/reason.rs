@@ -3,9 +3,11 @@
 use serde::{Deserialize, Serialize};
 
 /// Receipt schema version.
-pub const RECEIPT_SCHEMA_VERSION: u32 = 1;
-/// Authorizing receipt lifetime in seconds.
+pub const RECEIPT_SCHEMA_VERSION: u32 = 2;
+/// Minimum authorizing receipt lifetime in seconds.
 pub const RECEIPT_LIFETIME_SECONDS: i64 = 60;
+/// Hard ceiling on a receipt lifetime, even when collection was slow.
+pub const MAX_RECEIPT_LIFETIME_SECONDS: i64 = 600;
 /// Labels that make a pull request a hard stop.
 pub const HELD_LABELS: [&str; 3] = ["hold", "wip", "do-not-merge"];
 
@@ -115,6 +117,13 @@ pub struct MergeReceipt {
     pub issued_at_unix: i64,
     /// UTC epoch seconds after which the receipt is void.
     pub expires_at_unix: i64,
+    /// Seconds the successful collection attempt took before sealing.
+    ///
+    /// Revalidation recomputes the whole snapshot, so a lifetime that ignored
+    /// generation cost could expire while the validator was still collecting.
+    /// This is metadata: it is recorded and reported, never hashed into the
+    /// snapshot digest.
+    pub generation_seconds: i64,
     /// Canonical digest of every authorization input.
     pub snapshot_sha256: String,
     /// Base branch name.

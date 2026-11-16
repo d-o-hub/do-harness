@@ -8,8 +8,8 @@
 #
 # The receipt is never trusted as a token. The script:
 #   1. runs `pr ready PR --expected-receipt FILE --format json`, which recomputes
-#      the whole snapshot and accepts the file only when nothing moved and the
-#      60-second lifetime has not elapsed;
+#      the whole snapshot and accepts the file only when nothing moved and its
+#      lifetime (60 s minimum, generation-bounded) has not elapsed;
 #   2. requires exit 0 and authorization.decision == MERGE_ALLOWED;
 #   3. issues exactly `gh pr merge PR --squash --match-head-commit HEAD_SHA`.
 #
@@ -51,7 +51,12 @@ if [ "$code" -ne 0 ]; then
   printf '%s\n' "$stderr" >&2
   case "$code" in
     1) fail "PR $pr is blocked; not merging" 1 ;;
-    2) fail "PR $pr cannot be judged (unknown state or rejected receipt); not merging" 2 ;;
+    2)
+      if printf '%s' "$out" | jq -e '.authorization.reasons[]? | select(.code == "receipt_expired")' >/dev/null 2>&1; then
+        fail "PR $pr receipt expired during revalidation; regenerate the report and retry" 2
+      fi
+      fail "PR $pr cannot be judged (unknown state or rejected receipt); not merging" 2
+      ;;
     *) fail "pr ready exited $code; not merging" 2 ;;
   esac
 fi

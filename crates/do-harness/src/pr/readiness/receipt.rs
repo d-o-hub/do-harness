@@ -7,8 +7,8 @@ use sha2::{Digest, Sha256};
 use super::authorization::SnapshotInputs;
 use super::model::{CheckSummary, ConversationSummary, FindingsSummary, ReadinessReport};
 use super::reason::{
-    Authorization, AuthorizationDecision, AuthorizationReason, MergeReceipt,
-    RECEIPT_LIFETIME_SECONDS, RECEIPT_SCHEMA_VERSION, codes,
+    Authorization, AuthorizationDecision, AuthorizationReason, MAX_RECEIPT_LIFETIME_SECONDS,
+    MergeReceipt, RECEIPT_LIFETIME_SECONDS, RECEIPT_SCHEMA_VERSION, codes,
 };
 
 fn sha256_hex(bytes: &[u8]) -> String {
@@ -76,6 +76,18 @@ pub fn findings_digest(findings: &FindingsSummary) -> String {
         &findings.base_verified.to_string(),
     );
     sha256_hex(&hasher.finalize())
+}
+
+/// Lifetime a receipt may carry for a collection that took `generation` seconds.
+///
+/// The floor is the documented 60-second contract; the ceiling keeps a
+/// pathological API call from widening the reuse window without bound. A
+/// generation of zero still yields the floor.
+fn receipt_lifetime_seconds(generation: i64) -> i64 {
+    generation
+        .max(0)
+        .saturating_mul(2)
+        .clamp(RECEIPT_LIFETIME_SECONDS, MAX_RECEIPT_LIFETIME_SECONDS)
 }
 
 #[allow(clippy::too_many_lines)] // one assignment per receipt field, in wire order
@@ -153,11 +165,15 @@ pub(super) fn build_receipt(inputs: &SnapshotInputs<'_>) -> MergeReceipt {
     }
     let snapshot_sha256 = sha256_hex(&hasher.finalize());
 
+    let generation_seconds = inputs.generation_seconds.max(0);
+    let lifetime = receipt_lifetime_seconds(generation_seconds);
+
     MergeReceipt {
         schema_version: RECEIPT_SCHEMA_VERSION,
         pr: inputs.pr,
         issued_at_unix: inputs.now_unix,
-        expires_at_unix: inputs.now_unix + RECEIPT_LIFETIME_SECONDS,
+        expires_at_unix: inputs.now_unix.saturating_add(lifetime),
+        generation_seconds,
         snapshot_sha256,
         base_ref_name: inputs.view.base_ref_name.clone(),
         base_ref_oid: inputs.view.base_ref_oid.clone(),
@@ -222,14 +238,25 @@ pub fn validate_receipt(
             supplied.pr, refreshed.pr
         ));
     }
-    if supplied.expires_at_unix <= supplied.issued_at_unix
-        || supplied.expires_at_unix - supplied.issued_at_unix > RECEIPT_LIFETIME_SECONDS
-    {
-        return ReceiptVerdict::Invalid(
-            "receipt lifetime is not the declared 60 seconds".to_owned(),
-        );
+    let lifetime = supplied
+        .expires_at_unix
+        .saturating_sub(supplied.issued_at_unix);
+    if !(RECEIPT_LIFETIME_SECONDS..=MAX_RECEIPT_LIFETIME_SECONDS).contains(&lifetime) {
+        return ReceiptVerdict::Invalid(format!(
+            "receipt lifetime is {lifetime}s (expected {RECEIPT_LIFETIME_SECONDS}..={MAX_RECEIPT_LIFETIME_SECONDS} seconds)"
+        ));
     }
-    if supplied.issued_at_unix > now_unix + RECEIPT_LIFETIME_SECONDS {
+    // The recorded generation is what bounds the window, so it must agree with
+    // the sealed lifetime: a hand-edited expiry cannot claim a long collection
+    // it did not pay for.
+    let expected_lifetime = receipt_lifetime_seconds(supplied.generation_seconds);
+    if lifetime != expected_lifetime {
+        return ReceiptVerdict::Invalid(format!(
+            "receipt lifetime is {lifetime}s but {generation}s of collection yields {expected_lifetime}s",
+            generation = supplied.generation_seconds
+        ));
+    }
+    if supplied.issued_at_unix > now_unix.saturating_add(RECEIPT_LIFETIME_SECONDS) {
         return ReceiptVerdict::Invalid("receipt was issued in the future".to_owned());
     }
     if now_unix > supplied.expires_at_unix {
@@ -299,8 +326,10 @@ pub fn apply_expected_receipt(
             reasons: vec![AuthorizationReason::new(
                 codes::RECEIPT_EXPIRED,
                 format!(
-                    "receipt expired at unix {} (now {now_unix})",
-                    supplied.expires_at_unix
+                    "receipt expired at unix {expires} (now {now_unix}); issued at {issued} after {generation}s of collection",
+                    expires = supplied.expires_at_unix,
+                    issued = supplied.issued_at_unix,
+                    generation = supplied.generation_seconds,
                 ),
             )],
             receipt: None,
@@ -348,135 +377,9 @@ pub fn extract_receipt(document: &str) -> std::result::Result<MergeReceipt, Stri
 }
 
 #[cfg(test)]
-mod tests {
-    use crate::pr::readiness::reason::{RECEIPT_LIFETIME_SECONDS, RECEIPT_SCHEMA_VERSION};
-
-    use super::{MergeReceipt, ReceiptVerdict, validate_receipt};
-
-    #[test]
-    fn receipt_lifetime_is_sixty_seconds() {
-        assert_eq!(RECEIPT_LIFETIME_SECONDS, 60);
-    }
-
-    #[test]
-    fn a_wrong_pr_number_is_an_invalid_receipt() {
-        let refreshed = MergeReceipt {
-            schema_version: RECEIPT_SCHEMA_VERSION,
-            pr: 7,
-            issued_at_unix: 100,
-            expires_at_unix: 160,
-            snapshot_sha256: "abc".to_owned(),
-            base_ref_name: "main".to_owned(),
-            base_ref_oid: "b".to_owned(),
-            head_ref_name: "topic".to_owned(),
-            head_ref_oid: "h".to_owned(),
-            head_repository: Some("acme/widget".to_owned()),
-            state: "OPEN".to_owned(),
-            is_draft: false,
-            labels: Vec::new(),
-            mergeable: "MERGEABLE".to_owned(),
-            merge_state_status: "CLEAN".to_owned(),
-            auto_merge: false,
-            review_decision: None,
-            checks_sha256: String::new(),
-            conversations_sha256: String::new(),
-            findings_sha256: String::new(),
-            policy_revision: "absent".to_owned(),
-            policy_source: "overlay".to_owned(),
-            ancestry: "ahead".to_owned(),
-            ancestry_base_commit: "b".to_owned(),
-            ancestry_merge_base: "b".to_owned(),
-        };
-        let mut supplied = refreshed.clone();
-        supplied.pr = 8;
-        assert!(matches!(
-            validate_receipt(&supplied, &refreshed, 120),
-            ReceiptVerdict::Invalid(_)
-        ));
-    }
-
-    #[test]
-    fn an_expired_receipt_is_expired_not_changed() {
-        let refreshed = MergeReceipt {
-            schema_version: RECEIPT_SCHEMA_VERSION,
-            pr: 7,
-            issued_at_unix: 100,
-            expires_at_unix: 160,
-            snapshot_sha256: "abc".to_owned(),
-            base_ref_name: "main".to_owned(),
-            base_ref_oid: "b".to_owned(),
-            head_ref_name: "topic".to_owned(),
-            head_ref_oid: "h".to_owned(),
-            head_repository: Some("acme/widget".to_owned()),
-            state: "OPEN".to_owned(),
-            is_draft: false,
-            labels: Vec::new(),
-            mergeable: "MERGEABLE".to_owned(),
-            merge_state_status: "CLEAN".to_owned(),
-            auto_merge: false,
-            review_decision: None,
-            checks_sha256: String::new(),
-            conversations_sha256: String::new(),
-            findings_sha256: String::new(),
-            policy_revision: "absent".to_owned(),
-            policy_source: "overlay".to_owned(),
-            ancestry: "ahead".to_owned(),
-            ancestry_base_commit: "b".to_owned(),
-            ancestry_merge_base: "b".to_owned(),
-        };
-        assert_eq!(
-            validate_receipt(&refreshed, &refreshed, 161),
-            ReceiptVerdict::Expired
-        );
-        let mut moved = refreshed.clone();
-        moved.snapshot_sha256 = "def".to_owned();
-        assert_eq!(
-            validate_receipt(&refreshed, &moved, 120),
-            ReceiptVerdict::Changed
-        );
-    }
-}
+#[path = "receipt_tests.rs"]
+mod tests;
 
 #[cfg(test)]
-mod digest_tests {
-    use crate::pr::checks::{CheckEntry, Verdict};
-    use crate::pr::readiness::model::CheckSummary;
-
-    use super::checks_digest;
-
-    fn check_summary(verdict: &str) -> CheckSummary {
-        CheckSummary {
-            total: 1,
-            passed: 1,
-            failed: Vec::new(),
-            cancelled: Vec::new(),
-            pending: Vec::new(),
-            skipped: 0,
-            incomplete: false,
-            verdict: verdict.to_owned(),
-            head_sha: "h".to_owned(),
-            unknown: Vec::new(),
-            entries: vec![CheckEntry {
-                name: "verify".to_owned(),
-                source: "github-actions".to_owned(),
-                app_id: None,
-                kind: "check".to_owned(),
-                state: "completed".to_owned(),
-                conclusion: Some("success".to_owned()),
-                verdict: Verdict::Pass,
-                reason: None,
-                rerun_command: None,
-                url: None,
-            }],
-            blockers: Vec::new(),
-        }
-    }
-
-    #[test]
-    fn checks_digest_changes_when_a_check_verdict_changes() {
-        let mut summary = check_summary("PASS");
-        let before = checks_digest(&summary);
-        summary.verdict = "FAIL".to_owned();
-        assert_ne!(before, checks_digest(&summary));
-    }
-}
+#[path = "receipt_digest_tests.rs"]
+mod digest_tests;
