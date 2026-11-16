@@ -1,6 +1,7 @@
 # serde_yaml migration (retires the RUSTSEC-2024-0449 ignore)
 
 > **Status:** active - the RUSTSEC-2024-0449 ignore stays until the SDK drops `serde_yaml`
+> **Dated checkpoints:** `plans/dependency-checkpoints.md` (2027-02-15 migration-or-removal decision; 2027-03-25 advisory expiry)
 > **Recorded:** `plans/`
 
 ## Decision
