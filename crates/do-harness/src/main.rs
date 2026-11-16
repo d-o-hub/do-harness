@@ -25,6 +25,7 @@ mod baselines;
 mod binary;
 mod changes;
 mod ci_explain;
+mod cleanup;
 mod cli;
 mod commands;
 mod config;

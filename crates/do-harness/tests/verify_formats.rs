@@ -180,7 +180,14 @@ argv = ["/nonexistent-do-harness-sensor"]
         xml.contains("<error message=\"sensor could not run\">"),
         "{xml}"
     );
-    assert!(xml.contains("No such file or directory"), "{xml}");
+    // The OS error text differs by platform ("No such file or directory" vs
+    // "The system cannot find the file specified."), so assert the shared
+    // prefix and that the unspawnable program is named.
+    assert!(
+        xml.contains("failed to spawn /nonexistent-do-harness-sensor"),
+        "{xml}"
+    );
+    assert!(xml.contains("os error 2"), "{xml}");
     assert!(xml.contains("errors=\"1\""), "{xml}");
 }
 
