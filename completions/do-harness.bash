@@ -6845,14 +6845,14 @@ _do__harness() {
             return 0
             ;;
         do__subcmd__harness__subcmd__verify)
-            opts="-q -h -V --fail-fast --format --set --changed --since --only --exclude --jobs --unchanged --record --task --global --evidence --strict --bless --approver --root --config --quiet --output --dry-run --help --version"
+            opts="-q -h -V --fail-fast --format --simulate --set --changed --since --only --exclude --jobs --unchanged --record --task --global --evidence --strict --bless --approver --root --config --quiet --output --dry-run --help --version"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
             fi
             case "${prev}" in
                 --format)
-                    COMPREPLY=($(compgen -W "text json" -- "${cur}"))
+                    COMPREPLY=($(compgen -W "text json junit" -- "${cur}"))
                     return 0
                     ;;
                 --set)

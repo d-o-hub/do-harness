@@ -53,6 +53,32 @@ pub enum Format {
     Json,
 }
 
+/// Output format for `verify`.
+///
+/// A dedicated enum keeps `--format junit` off every other command's surface:
+/// a sensor report maps naturally onto a `JUnit` test suite, while a signal-set
+/// listing does not, and offering the value there would be a flag that can only
+/// fail.
+#[derive(ValueEnum, Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub enum VerifyFormat {
+    /// Human-readable text output.
+    #[default]
+    Text,
+    /// Machine-readable JSON output.
+    Json,
+    /// `JUnit` XML: one `<testcase>` per sensor for CI test tabs and annotations.
+    Junit,
+}
+
+impl From<VerifyFormat> for Format {
+    fn from(format: VerifyFormat) -> Self {
+        match format {
+            VerifyFormat::Text | VerifyFormat::Junit => Self::Text,
+            VerifyFormat::Json => Self::Json,
+        }
+    }
+}
+
 /// How a sensor produced its verdict.
 ///
 /// Reuse is never reported as an observed pass: a reused result carries no
@@ -355,7 +381,7 @@ pub fn json_compact<T: serde::Serialize + ?Sized>(value: &T) -> anyhow::Result<S
 }
 
 /// Human-readable findings/baseline suffix for a sensor verdict line.
-fn findings_suffix(sensor: &SensorResult) -> String {
+pub(crate) fn findings_suffix(sensor: &SensorResult) -> String {
     let Some(findings) = sensor.findings else {
         return String::new();
     };

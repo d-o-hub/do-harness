@@ -523,6 +523,34 @@ resolved base/head/merge-base SHAs, the driving paths, and every skip reason.
 Its `unrunnable` array names sensors that never started (an unspawnable
 program, an empty `argv`, or a missing declared `argv` path); when every
 selected sensor is unrunnable the run exits `2` instead of `1`.
+
+### Planning a run before paying for it
+
+`verify --simulate` is the pre-flight an agent or a CI scheduler runs first: it
+resolves the same selection `verify` would use and prints the plan — `argv`,
+signal sets, `when-changed` globs, timeout, retry, severity, and skip reasons —
+then exits `0` without spawning a sensor, reading beat state, or writing
+evidence. `--record`, `--bless`, and `--evidence` are rejected, and JUnit is not
+a plan format.
+
+<!-- example: id=adoption_simulate classification=illustrative reason="Simulate pre-flight CLI command" -->
+```bash
+do-harness verify --set verification --changed --simulate --format json
+```
+
+The document carries `schema_version: 1`; `sensors` is the run order and
+`estimated_order` mirrors the names for consumers that only need the schedule.
+
+### Reports a CI system can ingest
+
+`verify --format junit` emits a JUnit XML suite with one `<testcase>` per
+sensor: a failing `error`-severity sensor is `<failure>` with its already
+redacted output tail, an unrunnable one is `<error>` (the run still exits `2`),
+and a reused, planned, or advisory result is `<skipped>` so a green advisory
+run never shows a red test. A vacuous run (no sensors selected) is an `<error>`
+testcase, because an empty suite would otherwise read as a pass. Exit codes are
+unchanged.
+
 `status --format json` returns
 `green | red | stale | missing` without running sensors; `green` means passing
 evidence still matches the workspace, policy, and selection revisions (a moved
@@ -530,6 +558,26 @@ head or advanced base reports `stale` with reason `selection_changed`).
 `verify --set <set>` writes
 `.do-harness/evidence.<set>.json`, so feedback runs never clobber verification
 evidence.
+
+### Selecting against the CI base branch
+
+`--since @ci` resolves the pull/merge request's base branch from the provider's
+own variable (`GITHUB_BASE_REF`, `CI_MERGE_REQUEST_TARGET_BRANCH_NAME`,
+`SYSTEM_PULLREQUEST_TARGETBRANCH`, `BITBUCKET_PR_DESTINATION_BRANCH`,
+`BUILDKITE_PULL_REQUEST_BASE_BRANCH`, `CHANGE_TARGET`,
+`CI_COMMIT_TARGET_BRANCH`) and selects `merge-base(origin/<base>, HEAD)..HEAD`.
+It is opt-in and fail-closed: no known variable, or a base branch that was never
+fetched, exits `2` with the fetch command to run — never a green full run. The
+evidence records the requested spelling (`@ci`) and the resolved revisions, so
+`status --since @ci` and `status --since origin/<base>` agree or report
+`selection_changed`. A shallow checkout needs `fetch-depth: 0` (or
+`git fetch origin <base>`).
+
+<!-- example: id=adoption_since_ci classification=illustrative reason="CI base resolution preflight" -->
+```bash
+do-harness explain --since @ci --format json     # resolves with no sensor run
+do-harness verify --set verification --since @ci --strict
+```
 
 On session start or resume, `task context <ID>` assembles the current step,
 required sensors, task-scoped freshness and failures, recent traces, and one
@@ -573,6 +621,38 @@ Set `CI=true` and `DO_HARNESS_REQUIRE_TOOLS=1` (the repo's own
 `.github/workflows/verify.yml` does this): without them `check-deps.sh` /
 `check-audit.sh` print `SKIP` when `cargo-deny`/`cargo-audit` are absent, and
 since a SKIP records as `warn`, a strict run fails on an otherwise clean repo.
+
+For a CI test tab, run the same gate with `--format junit` and publish the XML.
+Exit codes do not change, so the job still fails on a red sensor; the file only
+adds inline annotations and a test report. A failing sensor carries its redacted
+output tail, an unrunnable one is an `<error>`, and an advisory result is
+`<skipped>`.
+
+<!-- example: id=adoption_gha_junit classification=illustrative reason="GitHub Actions JUnit upload" -->
+```yaml
+- name: Verify
+  env:
+    CI: "true"
+    DO_HARNESS_REQUIRE_TOOLS: "1"
+  run: do-harness verify --set verification --format junit --strict > junit.xml
+- name: Publish test report
+  if: always()
+  uses: actions/upload-artifact@v4
+  with:
+    name: verify-junit
+    path: junit.xml
+```
+
+<!-- example: id=adoption_gitlab_junit classification=illustrative reason="GitLab JUnit artifact" -->
+```yaml
+verify:
+  script:
+    - do-harness verify --set verification --format junit --strict > junit.xml
+  artifacts:
+    when: always
+    reports:
+      junit: junit.xml
+```
 
 ## Releasing
 

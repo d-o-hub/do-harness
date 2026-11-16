@@ -79,7 +79,8 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand version" -l dry-ru
 complete -c do-harness -n "__fish_do_harness_using_subcommand version" -s h -l help -d 'Print help (see more with \'--help\')'
 complete -c do-harness -n "__fish_do_harness_using_subcommand version" -s V -l version -d 'Print version'
 complete -c do-harness -n "__fish_do_harness_using_subcommand verify" -l format -d 'Output format' -r -f -a "text\t'Human-readable text output'
-json\t'Machine-readable JSON output'"
+json\t'Machine-readable JSON output'
+junit\t'`JUnit` XML: one `<testcase>` per sensor for CI test tabs and annotations'"
 complete -c do-harness -n "__fish_do_harness_using_subcommand verify" -l set -d 'Run only the sensors in this development signal set' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand verify" -l since -d 'Run only sensors applicable to the committed range `merge-base(<REF>, HEAD)..HEAD`; combine with `--changed` to union committed and uncommitted paths' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand verify" -l only -d 'Run only the named sensor (repeatable or comma-separated)' -r
@@ -95,6 +96,7 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand verify" -l root -d
 complete -c do-harness -n "__fish_do_harness_using_subcommand verify" -l config -d 'Explicit path to do-harness.toml' -r -F
 complete -c do-harness -n "__fish_do_harness_using_subcommand verify" -l output -d 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)' -r -F
 complete -c do-harness -n "__fish_do_harness_using_subcommand verify" -l fail-fast -d 'Halt at the first failing sensor'
+complete -c do-harness -n "__fish_do_harness_using_subcommand verify" -l simulate -d 'Print the execution plan and exit without spawning a sensor or writing evidence (a pre-flight for agents and CI cost checks)'
 complete -c do-harness -n "__fish_do_harness_using_subcommand verify" -l changed -d 'Run only sensors applicable to the working-tree change'
 complete -c do-harness -n "__fish_do_harness_using_subcommand verify" -l record -d 'Persist beats and error signatures into the state database'
 complete -c do-harness -n "__fish_do_harness_using_subcommand verify" -l global -d 'Record unscoped beats in the global namespace'
@@ -105,7 +107,8 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand verify" -l dry-run
 complete -c do-harness -n "__fish_do_harness_using_subcommand verify" -s h -l help -d 'Print help (see more with \'--help\')'
 complete -c do-harness -n "__fish_do_harness_using_subcommand verify" -s V -l version -d 'Print version'
 complete -c do-harness -n "__fish_do_harness_using_subcommand check" -l format -d 'Output format' -r -f -a "text\t'Human-readable text output'
-json\t'Machine-readable JSON output'"
+json\t'Machine-readable JSON output'
+junit\t'`JUnit` XML: one `<testcase>` per sensor for CI test tabs and annotations'"
 complete -c do-harness -n "__fish_do_harness_using_subcommand check" -l set -d 'Run only the sensors in this development signal set' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand check" -l since -d 'Run only sensors applicable to the committed range `merge-base(<REF>, HEAD)..HEAD`; combine with `--changed` to union committed and uncommitted paths' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand check" -l only -d 'Run only the named sensor (repeatable or comma-separated)' -r
@@ -121,6 +124,7 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand check" -l root -d 
 complete -c do-harness -n "__fish_do_harness_using_subcommand check" -l config -d 'Explicit path to do-harness.toml' -r -F
 complete -c do-harness -n "__fish_do_harness_using_subcommand check" -l output -d 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)' -r -F
 complete -c do-harness -n "__fish_do_harness_using_subcommand check" -l fail-fast -d 'Halt at the first failing sensor'
+complete -c do-harness -n "__fish_do_harness_using_subcommand check" -l simulate -d 'Print the execution plan and exit without spawning a sensor or writing evidence (a pre-flight for agents and CI cost checks)'
 complete -c do-harness -n "__fish_do_harness_using_subcommand check" -l changed -d 'Run only sensors applicable to the working-tree change'
 complete -c do-harness -n "__fish_do_harness_using_subcommand check" -l record -d 'Persist beats and error signatures into the state database'
 complete -c do-harness -n "__fish_do_harness_using_subcommand check" -l global -d 'Record unscoped beats in the global namespace'
