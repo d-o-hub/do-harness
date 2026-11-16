@@ -44,6 +44,8 @@ pub struct SnapshotInputs<'a> {
     pub rule_violations: &'a [crate::pr::rules::RuleViolation],
     /// Ancestry proof, or `None` when it could not be collected.
     pub ancestry: Option<&'a AncestryProof>,
+    /// Seconds the successful collection attempt took before sealing.
+    pub generation_seconds: i64,
     /// UTC epoch seconds used to seal the receipt.
     pub now_unix: i64,
 }

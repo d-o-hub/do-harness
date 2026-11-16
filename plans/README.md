@@ -44,6 +44,7 @@ you. Rename any of them in a reviewed change that also updates the consumer.
 | `serde-yaml-migration.md` | The live reason `RUSTSEC-2024-0449` is ignored |
 | `ci-concurrency-prevention.md` | CI concurrency, timeout, and OOM guardrails |
 | `ci-scope-measurement.md` | Measurement behind change-selection scoping |
+| `merge-receipt-latency.md` | Merge receipt lifetime under slow revalidation (#574) and the 0.5.0 delivery contract |
 | `verify-change-selection-proposal.md` | Proposed CLI fixes for `verify --changed` |
 | `sync-adopter-validation.md` | `sync` validated against an external adopter |
 

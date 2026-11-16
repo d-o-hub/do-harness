@@ -7,8 +7,8 @@ use sha2::{Digest, Sha256};
 use super::authorization::SnapshotInputs;
 use super::model::{CheckSummary, ConversationSummary, FindingsSummary, ReadinessReport};
 use super::reason::{
-    Authorization, AuthorizationDecision, AuthorizationReason, MergeReceipt,
-    RECEIPT_LIFETIME_SECONDS, RECEIPT_SCHEMA_VERSION, codes,
+    Authorization, AuthorizationDecision, AuthorizationReason, MAX_RECEIPT_LIFETIME_SECONDS,
+    MergeReceipt, RECEIPT_LIFETIME_SECONDS, RECEIPT_SCHEMA_VERSION, codes,
 };
 
 fn sha256_hex(bytes: &[u8]) -> String {
@@ -76,6 +76,18 @@ pub fn findings_digest(findings: &FindingsSummary) -> String {
         &findings.base_verified.to_string(),
     );
     sha256_hex(&hasher.finalize())
+}
+
+/// Lifetime a receipt may carry for a collection that took `generation` seconds.
+///
+/// The floor is the documented 60-second contract; the ceiling keeps a
+/// pathological API call from widening the reuse window without bound. A
+/// generation of zero still yields the floor.
+fn receipt_lifetime_seconds(generation: i64) -> i64 {
+    generation
+        .max(0)
+        .saturating_mul(2)
+        .clamp(RECEIPT_LIFETIME_SECONDS, MAX_RECEIPT_LIFETIME_SECONDS)
 }
 
 #[allow(clippy::too_many_lines)] // one assignment per receipt field, in wire order
@@ -153,11 +165,15 @@ pub(super) fn build_receipt(inputs: &SnapshotInputs<'_>) -> MergeReceipt {
     }
     let snapshot_sha256 = sha256_hex(&hasher.finalize());
 
+    let generation_seconds = inputs.generation_seconds.max(0);
+    let lifetime = receipt_lifetime_seconds(generation_seconds);
+
     MergeReceipt {
         schema_version: RECEIPT_SCHEMA_VERSION,
         pr: inputs.pr,
         issued_at_unix: inputs.now_unix,
-        expires_at_unix: inputs.now_unix + RECEIPT_LIFETIME_SECONDS,
+        expires_at_unix: inputs.now_unix.saturating_add(lifetime),
+        generation_seconds,
         snapshot_sha256,
         base_ref_name: inputs.view.base_ref_name.clone(),
         base_ref_oid: inputs.view.base_ref_oid.clone(),
@@ -222,14 +238,15 @@ pub fn validate_receipt(
             supplied.pr, refreshed.pr
         ));
     }
-    if supplied.expires_at_unix <= supplied.issued_at_unix
-        || supplied.expires_at_unix - supplied.issued_at_unix > RECEIPT_LIFETIME_SECONDS
-    {
-        return ReceiptVerdict::Invalid(
-            "receipt lifetime is not the declared 60 seconds".to_owned(),
-        );
+    let lifetime = supplied
+        .expires_at_unix
+        .saturating_sub(supplied.issued_at_unix);
+    if !(RECEIPT_LIFETIME_SECONDS..=MAX_RECEIPT_LIFETIME_SECONDS).contains(&lifetime) {
+        return ReceiptVerdict::Invalid(format!(
+            "receipt lifetime is {lifetime}s (expected {RECEIPT_LIFETIME_SECONDS}..={MAX_RECEIPT_LIFETIME_SECONDS} seconds)"
+        ));
     }
-    if supplied.issued_at_unix > now_unix + RECEIPT_LIFETIME_SECONDS {
+    if supplied.issued_at_unix > now_unix.saturating_add(RECEIPT_LIFETIME_SECONDS) {
         return ReceiptVerdict::Invalid("receipt was issued in the future".to_owned());
     }
     if now_unix > supplied.expires_at_unix {
@@ -299,8 +316,10 @@ pub fn apply_expected_receipt(
             reasons: vec![AuthorizationReason::new(
                 codes::RECEIPT_EXPIRED,
                 format!(
-                    "receipt expired at unix {} (now {now_unix})",
-                    supplied.expires_at_unix
+                    "receipt expired at unix {expires} (now {now_unix}); issued at {issued} after {generation}s of collection",
+                    expires = supplied.expires_at_unix,
+                    issued = supplied.issued_at_unix,
+                    generation = supplied.generation_seconds,
                 ),
             )],
             receipt: None,

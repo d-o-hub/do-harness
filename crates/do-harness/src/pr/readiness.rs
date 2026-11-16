@@ -121,9 +121,14 @@ pub fn evaluate_with_receipt(
         ),
         None => None,
     };
+    // Expiry is judged when validation begins, not when its own collection
+    // finishes: revalidation costs as much as generation, so a clock read after
+    // it would consume the receipt's whole lifetime on a slow repository.
+    let validation_started_unix = authorization::now_unix();
 
     let mut last_moved: Option<String> = None;
     for attempt in 0..MAX_SNAPSHOT_ATTEMPTS {
+        let attempt_started_unix = authorization::now_unix();
         let view = gh::readiness_view(root, number)?;
         let mut blockers = Vec::new();
 
@@ -221,7 +226,9 @@ pub fn evaluate_with_receipt(
 
         // 8. Authorization
         let now_unix = authorization::now_unix();
+        let generation_seconds = now_unix.saturating_sub(attempt_started_unix).max(0);
         let inputs = authorization::SnapshotInputs {
+            generation_seconds,
             pr: number,
             view: &view,
             merge_state: &merge_state,
@@ -238,9 +245,11 @@ pub fn evaluate_with_receipt(
         };
         let authorization = authorization::authorize(&inputs);
         let authorization = match supplied.as_deref() {
-            Some(document) => {
-                authorization::apply_expected_receipt(authorization, document, now_unix)
-            }
+            Some(document) => authorization::apply_expected_receipt(
+                authorization,
+                document,
+                validation_started_unix,
+            ),
             None => authorization,
         };
 
