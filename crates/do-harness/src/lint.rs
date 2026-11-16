@@ -362,6 +362,6 @@ mod tests {
         let text = "# This heading is long enough to be mistaken for an instruction\n| a | b |\n";
         let mut diagnostics = Vec::new();
         duplicate_instructions(text, Path::new("AGENTS.md"), &mut diagnostics);
-        assert!(diagnostics.is_empty());
+        assert_eq!(diagnostics.len(), 0);
     }
 }
