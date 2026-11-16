@@ -233,6 +233,7 @@ export PATH="$HOME/.local/bin:$PATH"
 | `verify [OPTIONS]` | Run computational sensors (alias: `check`) — flags: `--fail-fast`, `--format <FORMAT>`, `--set <SET>`, `--changed`, `--since <REF>`, `--only <SENSOR>`, `--exclude <SENSOR>`, `--jobs <N>`, `--unchanged <MODE>`, `--record`, `--task <ID>`, `--global`, `--evidence <FILE>`, `--strict`, `--bless`, `--approver <NAME>` |
 | `list [OPTIONS]` | List sensor names (alias: `ls`) — flags: `--sets`, `--format <FORMAT>` |
 | `explain [OPTIONS]` | Explain which sensors the current change selects, without running them — flags: `--set <SET>`, `--changed`, `--since <REF>`, `--format <FORMAT>` |
+| `lint [OPTIONS]` | Lint the feedforward guides (AGENTS.md and skills) against the sensors — flags: `--format <FORMAT>` |
 | `status [OPTIONS]` | Report verification evidence freshness without running sensors — flags: `--set <SET>`, `--evidence <FILE>`, `--since <REF>`, `--format <FORMAT>` |
 | `sync [OPTIONS]` | Refresh `origin/main` and reconcile the local `main` branch (alias: `latest-main`) — flags: `--switch`, `--read-only`, `--reset-diverged`, `--status`, `--format <FORMAT>` |
 | `pr no-effect [OPTIONS] [PR]` | Report the prospective merge impact of a PR or revision range — flags: `--base <REV>`, `--head <REV>`, `--no-fetch`, `--format <FORMAT>` |

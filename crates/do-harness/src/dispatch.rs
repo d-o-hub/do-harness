@@ -443,6 +443,7 @@ async fn route(root: &Path, config_path: Option<PathBuf>, cli: Cli) -> Result<()
             };
             metrics::dispatch(root, action, format, filter).await
         }
+        Command::Lint { format } => crate::lint::run(root, format).await,
         Command::Overlap { threshold, format } => {
             overlap::run_overlap(root, threshold, format).map_err(CliError::Usage)
         }

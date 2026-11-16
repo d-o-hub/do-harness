@@ -34,6 +34,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand list 'List sensor names'
             cand ls 'List sensor names'
             cand explain 'Explain which sensors the current change selects, without running them'
+            cand lint 'Lint the feedforward guides (AGENTS.md and skills) against the sensors'
             cand status 'Report verification evidence freshness without running sensors'
             cand sync 'Refresh `origin/main` and reconcile the local `main` branch'
             cand latest-main 'Refresh `origin/main` and reconcile the local `main` branch'
@@ -171,6 +172,19 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand --config 'Explicit path to do-harness.toml'
             cand --output 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)'
             cand --changed 'Select by working-tree change instead of listing everything'
+            cand -q 'Suppress PASS/WARN verdict lines and the success footer'
+            cand --quiet 'Suppress PASS/WARN verdict lines and the success footer'
+            cand --dry-run 'Dry run without side effects'
+            cand -h 'Print help (see more with ''--help'')'
+            cand --help 'Print help (see more with ''--help'')'
+            cand -V 'Print version'
+            cand --version 'Print version'
+        }
+        &'do-harness;lint'= {
+            cand --format 'Output format'
+            cand --root 'Workspace root override (default: walk up from cwd)'
+            cand --config 'Explicit path to do-harness.toml'
+            cand --output 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)'
             cand -q 'Suppress PASS/WARN verdict lines and the success footer'
             cand --quiet 'Suppress PASS/WARN verdict lines and the success footer'
             cand --dry-run 'Dry run without side effects'
@@ -1439,6 +1453,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand verify 'Run computational sensors'
             cand list 'List sensor names'
             cand explain 'Explain which sensors the current change selects, without running them'
+            cand lint 'Lint the feedforward guides (AGENTS.md and skills) against the sensors'
             cand status 'Report verification evidence freshness without running sensors'
             cand sync 'Refresh `origin/main` and reconcile the local `main` branch'
             cand pr 'Deterministic PR analysis (read-only; works in any git repository)'
@@ -1476,6 +1491,8 @@ set edit:completion:arg-completer[do-harness] = {|@words|
         &'do-harness;help;list'= {
         }
         &'do-harness;help;explain'= {
+        }
+        &'do-harness;help;lint'= {
         }
         &'do-harness;help;status'= {
         }
