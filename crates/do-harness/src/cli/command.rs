@@ -39,8 +39,12 @@ pub enum Command {
         #[arg(long)]
         fail_fast: bool,
         /// Output format.
-        #[arg(long, value_enum, default_value_t = Format::Text)]
-        format: Format,
+        #[arg(long, value_enum, default_value_t = crate::report::VerifyFormat::Text)]
+        format: crate::report::VerifyFormat,
+        /// Print the execution plan and exit without spawning a sensor or
+        /// writing evidence (a pre-flight for agents and CI cost checks).
+        #[arg(long, conflicts_with_all = ["record", "bless", "evidence"])]
+        simulate: bool,
         /// Run only the sensors in this development signal set.
         #[arg(long, value_name = "SET")]
         set: Option<String>,

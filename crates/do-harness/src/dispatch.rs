@@ -176,6 +176,7 @@ async fn route(root: &Path, config_path: Option<PathBuf>, cli: Cli) -> Result<()
             strict,
             bless,
             approver,
+            simulate,
         } => {
             let (task_id, raw_task) = match task.as_deref() {
                 Some("global") => (None, Some("global".to_string())),
@@ -195,6 +196,7 @@ async fn route(root: &Path, config_path: Option<PathBuf>, cli: Cli) -> Result<()
             let opts = sensors::VerifyOpts {
                 fail_fast,
                 dry_run: cli.dry_run,
+                simulate,
                 set,
                 changed,
                 since,

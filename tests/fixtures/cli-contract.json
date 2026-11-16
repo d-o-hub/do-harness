@@ -195,9 +195,26 @@
           ],
           "possible_values": [
             "text",
-            "json"
+            "json",
+            "junit"
           ],
           "help": "Output format",
+          "index": null
+        },
+        {
+          "id": "simulate",
+          "kind": "option",
+          "short": null,
+          "long": "simulate",
+          "value_names": [
+            "SIMULATE"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": false,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Print the execution plan and exit without spawning a sensor or writing evidence (a pre-flight for agents and CI cost checks)",
           "index": null
         },
         {
