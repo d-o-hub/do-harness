@@ -12,8 +12,8 @@ use crate::report::Format;
 
 use super::LearnArgs;
 use super::actions::{
-    DoctorAction, ErrorsAction, FeedbackAction, HookAction, JobAction, MetricsAction, PrAction,
-    SkillsAction, TaskAction, TraceAction,
+    CleanupArgs, DoctorAction, ErrorsAction, FeedbackAction, HookAction, JobAction, MetricsAction,
+    PrAction, SkillsAction, TaskAction, TraceAction,
 };
 
 /// Available subcommands.
@@ -416,6 +416,12 @@ pub enum Command {
         #[arg(long, value_name = "N", default_value_t = 20)]
         keep_per_task: i64,
     },
+    /// Reclaim the build output of provably merged, idle worktrees.
+    ///
+    /// A candidate is reclaimed only when its branch is provably merged into
+    /// the fetched `origin/main` and nothing is using its build tree. A safety
+    /// refusal is reported and left untouched; an unprovable candidate exits 1.
+    Cleanup(CleanupArgs),
     /// Print compliance mapping to OWASP Agentic Top 10, NIST AI RMF, and EU AI Act.
     Compliance {
         /// Filter framework (owasp, nist, eu, soc; hyphenated ids accepted).
