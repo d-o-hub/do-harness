@@ -7,7 +7,7 @@ use anyhow::{Result, anyhow};
 use clap::ValueEnum;
 
 use crate::config::{Config, SensorSpec};
-use crate::report::{Format, SensorResult, VerifyReport};
+use crate::report::{SensorResult, VerifyReport};
 
 /// Builds the clear command hint for a sensor error signature, optionally scoped.
 fn clear_cmd_hint(sensor_name: &str, scope: Option<&str>) -> String {
@@ -130,6 +130,10 @@ pub struct VerifyOpts {
     pub fail_fast: bool,
     /// Plan the selected sensors without spawning them or writing state.
     pub dry_run: bool,
+    /// Print the execution plan as JSON and exit; nothing runs, nothing is
+    /// written. Distinct from `dry_run`, which plans a *run* and reports it as
+    /// an unsuccessful run because no evidence was produced.
+    pub simulate: bool,
     /// Restrict execution to this development signal set; empty = all.
     pub set: Option<String>,
     /// Restrict execution to sensors applicable to the working-tree change.
@@ -169,8 +173,8 @@ pub struct VerifyOpts {
     pub bless: bool,
     /// Approver identity recorded with `bless`.
     pub approver: Option<String>,
-    /// Report output format.
-    pub format: Format,
+    /// Report output format (`text` | `json` | `junit`).
+    pub format: crate::report::VerifyFormat,
     /// Suppress PASS/WARN verdict lines and the success footer.
     pub quiet: bool,
     /// Default evidence artifact path; `evidence` wins when both are set.
@@ -314,6 +318,27 @@ pub struct ResolvedSelection<'a> {
     pub discovery_error: Option<String>,
 }
 
+/// The usage error for a failed `@ci` resolution, when one applies.
+///
+/// An explicit `--since <REF>` that does not resolve keeps the documented
+/// fail-closed selection behaviour (every candidate sensor). `@ci` differs: it
+/// asks the environment for a base, so a missing variable or an unfetched
+/// branch means the run cannot know what applies. Selecting everything would
+/// turn a missing base into a green full run, so it exits 2 instead.
+fn ci_selection_error(
+    since: Option<&str>,
+    changes: &crate::changes::ChangeSelection,
+) -> Option<anyhow::Error> {
+    if !since.is_some_and(crate::changes::is_ci_since) {
+        return None;
+    }
+    changes
+        .changed
+        .discovery_error
+        .as_ref()
+        .map(|error| anyhow!("--since @ci: {error}"))
+}
+
 /// Resolves the ordered sensor specs a verify run executes.
 ///
 /// `--set` defines the candidate list (in set order); `--changed` keeps only
@@ -382,6 +407,14 @@ pub fn resolve_selection<'a>(
 
     let applicable: Vec<&SensorSpec> = if opts.changed || opts.since.is_some() {
         let changes = crate::changes::discover_selection(root, opts.changed, opts.since.as_deref());
+        // `@ci` is a resolution *request*, not a ref: the environment may be
+        // absent or the base branch may never have been fetched. Either way
+        // the run cannot know which sensors apply, and selecting everything
+        // would launder a missing base into a green full run. Explicit refs
+        // keep the documented fail-closed-as-selection behaviour.
+        if let Some(error) = ci_selection_error(opts.since.as_deref(), &changes) {
+            return Err(error);
+        }
         if changes.changed.discovery_error.is_none() && changes.changed.files.is_empty() {
             return Err(anyhow!(
                 "no change input: pass --since <REF> for committed changes or run verify without change filtering"
