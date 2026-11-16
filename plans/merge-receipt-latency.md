@@ -61,7 +61,9 @@ budget, or both.
 - **D3 - Hard cap.** Add `MAX_RECEIPT_LIFETIME_SECONDS = 600`. The validator
   accepts a supplied lifetime in `60..=600` and rejects anything outside it as
   `receipt_invalid`. The cap keeps the reuse window honest instead of widening
-  to whatever the API did; do not make it configurable.
+  to whatever the API did; do not make it configurable. The sealed lifetime must
+  also equal `max(60, 2 * generation_seconds)` for the recorded generation: a
+  hand-edited expiry cannot claim a long collection it did not pay for.
 - **D4 - Schema version 2.** `generation_seconds` is a new required field (no
   `serde(default)`) and the accepted lifetime range changed, so old receipts must
   fail with a clear version mismatch, not a confusing lifetime error. Update all
@@ -124,8 +126,9 @@ keeps the slice out of a forced mid-feature split.
 - `build_receipt`: `expires = issued + max(60, 2 * generation_seconds)`; write
   `generation_seconds`.
 - `validate_receipt`: require schema 2 and PR match; require lifetime within
-  `60..=MAX`; keep the future-timestamp guard; compare expiry against the
-  supplied `now`; keep snapshot equality last.
+  `60..=MAX` and equal to the generation-derived lifetime; keep the
+  future-timestamp guard; compare expiry against the supplied `now`; keep
+  snapshot equality last.
 - Expired diagnostic: include issued, generation, expires, now, and the age.
 - Invalid-lifetime diagnostic: name the accepted range.
 

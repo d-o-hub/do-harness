@@ -117,6 +117,19 @@ fn a_lifetime_outside_the_bounded_range_is_invalid() {
 }
 
 #[test]
+fn a_lifetime_that_does_not_match_the_recorded_generation_is_invalid() {
+    let refreshed = receipt();
+    let mut supplied = refreshed.clone();
+    supplied.expires_at_unix = 340;
+    supplied.generation_seconds = 0;
+    assert!(matches!(
+        validate_receipt(&supplied, &refreshed, 120),
+        ReceiptVerdict::Invalid(message)
+            if message.contains("240s") && message.contains("yields 60s")
+    ));
+}
+
+#[test]
 fn a_receipt_from_the_previous_schema_is_invalid() {
     let refreshed = receipt();
     let mut supplied = refreshed.clone();

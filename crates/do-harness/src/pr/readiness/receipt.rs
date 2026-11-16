@@ -246,6 +246,16 @@ pub fn validate_receipt(
             "receipt lifetime is {lifetime}s (expected {RECEIPT_LIFETIME_SECONDS}..={MAX_RECEIPT_LIFETIME_SECONDS} seconds)"
         ));
     }
+    // The recorded generation is what bounds the window, so it must agree with
+    // the sealed lifetime: a hand-edited expiry cannot claim a long collection
+    // it did not pay for.
+    let expected_lifetime = receipt_lifetime_seconds(supplied.generation_seconds);
+    if lifetime != expected_lifetime {
+        return ReceiptVerdict::Invalid(format!(
+            "receipt lifetime is {lifetime}s but {generation}s of collection yields {expected_lifetime}s",
+            generation = supplied.generation_seconds
+        ));
+    }
     if supplied.issued_at_unix > now_unix.saturating_add(RECEIPT_LIFETIME_SECONDS) {
         return ReceiptVerdict::Invalid("receipt was issued in the future".to_owned());
     }

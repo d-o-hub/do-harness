@@ -52,11 +52,9 @@ if [ "$code" -ne 0 ]; then
   case "$code" in
     1) fail "PR $pr is blocked; not merging" 1 ;;
     2)
-      case "$stderr" in
-        *receipt_expired*)
-          fail "PR $pr receipt expired during revalidation; regenerate the report and retry" 2
-          ;;
-      esac
+      if printf '%s' "$out" | jq -e '.authorization.reasons[]? | select(.code == "receipt_expired")' >/dev/null 2>&1; then
+        fail "PR $pr receipt expired during revalidation; regenerate the report and retry" 2
+      fi
       fail "PR $pr cannot be judged (unknown state or rejected receipt); not merging" 2
       ;;
     *) fail "pr ready exited $code; not merging" 2 ;;
