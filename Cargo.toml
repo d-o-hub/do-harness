@@ -70,6 +70,11 @@ rmcp = { version = "=3.9.0", features = ["server", "transport-streamable-http-se
 # (opt-level 0): optimizing build scripts raises peak RSS for no runtime gain.
 [profile.dev]
 debug = "line-tables-only"
+# Move debug info out of the linked object and into a sibling .dwp/.dSYM file.
+# The Cargo maintainer measured this at roughly half the linker's peak RSS
+# (rust-lang/cargo#9157), which is what makes a large test binary link on a
+# small container; on Linux the binary still carries full debug info.
+split-debuginfo = "packed"
 
 [profile.dev.package."*"]
 debug = false
