@@ -150,9 +150,16 @@ fn a_live_compiler_in_the_worktree_refuses_the_build_tree() {
     let decoy = fixture.dir.path().join("decoy");
     std::fs::create_dir_all(&decoy).unwrap();
     let sleeper = decoy.join("cargo");
-    std::fs::copy("/bin/sleep", &sleeper).unwrap();
+    // The probe matches `/proc/<pid>/comm`, which the kernel takes from the
+    // executable's basename, so the decoy must be a *copy* of a long-lived
+    // binary named `cargo`. It cannot be a copy of `/bin/sleep`: Ubuntu ships
+    // `sleep` as a uutils-coreutils multicall symlink, and the renamed copy
+    // dispatches on its basename, prints `coreutils: unknown program 'cargo'`
+    // and exits before the probe runs (that is how this test failed on 1.85).
+    // A shell copy is a real single-purpose interpreter and stays alive.
+    std::fs::copy("/bin/sh", &sleeper).unwrap();
     let mut child = Command::new(&sleeper)
-        .arg("60")
+        .args(["-c", "while :; do sleep 0.5; done"])
         .current_dir(&worktree)
         .spawn()
         .expect("spawn decoy cargo");
