@@ -121,3 +121,59 @@ fn included_specs_follow_probes() {
     let names: Vec<&str> = specs.iter().map(|s| s.name.as_str()).collect();
     assert_eq!(names, vec!["fmt", "clippy"]);
 }
+
+/// Python markers select the Python pack.
+#[test]
+fn python_markers_select_python() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(
+        dir.path().join("pyproject.toml"),
+        "[project]\nname = \"x\"\n",
+    )
+    .unwrap();
+    let detection = inspect(dir.path(), None, None);
+    assert_eq!(detection.language, Language::Python);
+    assert!(detection.findings.iter().any(|f| f == "Python project"));
+}
+
+/// A `go.mod` selects the Go pack.
+#[test]
+fn go_mod_selects_go() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(
+        dir.path().join("go.mod"),
+        "module example.com/x\n\ngo 1.22\n",
+    )
+    .unwrap();
+    let detection = inspect(dir.path(), None, None);
+    assert_eq!(detection.language, Language::Go);
+    assert!(detection.findings.iter().any(|f| f == "Go module"));
+}
+
+/// Python markers select the Python pack.
+#[test]
+fn python_markers_select_python() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(
+        dir.path().join("pyproject.toml"),
+        "[project]\nname = \"x\"\n",
+    )
+    .unwrap();
+    let detection = inspect(dir.path(), None, None);
+    assert_eq!(detection.language, Language::Python);
+    assert!(detection.findings.iter().any(|f| f == "Python project"));
+}
+
+/// A `go.mod` selects the Go pack.
+#[test]
+fn go_mod_selects_go() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(
+        dir.path().join("go.mod"),
+        "module example.com/x\n\ngo 1.22\n",
+    )
+    .unwrap();
+    let detection = inspect(dir.path(), None, None);
+    assert_eq!(detection.language, Language::Go);
+    assert!(detection.findings.iter().any(|f| f == "Go module"));
+}

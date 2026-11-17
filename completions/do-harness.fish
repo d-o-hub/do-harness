@@ -428,7 +428,9 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand seed" -s V -l vers
 complete -c do-harness -n "__fish_do_harness_using_subcommand init" -l language -d 'Language pack to scaffold (default: detect from the repository)' -r -f -a "rust\t'Rust sensor pack (fmt/check/clippy/test/loc) plus check scripts'
 generic\t'No built-in sensors; commented sensor stubs to fill in'
 web\t'Web UI sensor pack: viewport text audit, axe accessibility, and console noise sensors (Playwright runners plus the shipped `scripts/web-ui/` audit library)'
-node\t'Node/Web JS/TS language pack (typecheck, lint, test, build)'"
+node\t'Node/Web JS/TS language pack (typecheck, lint, test, build)'
+python\t'Python language pack (ruff lint/format, optional typecheck, pytest)'
+go\t'Go language pack (gofmt, go vet/test, optional staticcheck)'"
 complete -c do-harness -n "__fish_do_harness_using_subcommand init" -l format -d 'Output format' -r -f -a "text\t'Human-readable text output'
 json\t'Machine-readable JSON output'"
 complete -c do-harness -n "__fish_do_harness_using_subcommand init" -l root -d 'Workspace root override (default: walk up from cwd)' -r -f -a "(__fish_complete_directories)"

@@ -1860,7 +1860,9 @@
             "rust",
             "generic",
             "web",
-            "node"
+            "node",
+            "python",
+            "go"
           ],
           "help": "Language pack to scaffold (default: detect from the repository)",
           "index": null

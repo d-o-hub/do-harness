@@ -10,6 +10,10 @@ pub mod code {
     pub const NO_SUPPORTED_NODE_COMMANDS: &str = "no_supported_node_commands";
     /// The selected Node package-manager binary is not on PATH.
     pub const MISSING_PACKAGE_MANAGER: &str = "missing_package_manager";
+    /// A required Python tool (`ruff`/`pytest`) is not on PATH.
+    pub const MISSING_PYTHON_TOOLING: &str = "missing_python_tooling";
+    /// A required Go tool (`go`/`gofmt`) is not on PATH.
+    pub const MISSING_GO_TOOLING: &str = "missing_go_tooling";
     /// No built-in pack matched; the generic pack was selected.
     pub const GENERIC_STACK: &str = "generic_stack_selected";
 }
@@ -94,6 +98,38 @@ impl InitDiagnostic {
                 "Install {package_manager} and re-run `do-harness init --force` to include \
                  the discovered Node sensors"
             ),
+        }
+    }
+
+    /// Required Python tooling (`ruff`/`pytest`) is not on PATH.
+    #[must_use]
+    pub fn missing_python_tooling(missing: &[&str]) -> Self {
+        Self {
+            code: code::MISSING_PYTHON_TOOLING.to_owned(),
+            path: ".".to_owned(),
+            message: format!(
+                "required Python tooling was not found on PATH: {}",
+                missing.join(", ")
+            ),
+            action: "Install the missing tools and re-run `do-harness init --force` to include \
+                     the discovered Python sensors."
+                .to_owned(),
+        }
+    }
+
+    /// Required Go tooling (`go`/`gofmt`) is not on PATH.
+    #[must_use]
+    pub fn missing_go_tooling(missing: &[&str]) -> Self {
+        Self {
+            code: code::MISSING_GO_TOOLING.to_owned(),
+            path: ".".to_owned(),
+            message: format!(
+                "required Go tooling was not found on PATH: {}",
+                missing.join(", ")
+            ),
+            action: "Install the Go toolchain and re-run `do-harness init --force` to include \
+                     the discovered Go sensors."
+                .to_owned(),
         }
     }
 }

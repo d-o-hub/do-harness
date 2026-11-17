@@ -473,7 +473,7 @@ drift from the file.
 
 | Argument | Required | Default | Possible values | Description |
 | --- | --- | --- | --- | --- |
-| `--language <LANG>` | no | — | `rust`, `generic`, `web`, `node` | Language pack to scaffold (default: detect from the repository) |
+| `--language <LANG>` | no | — | `rust`, `generic`, `web`, `node`, `python`, `go` | Language pack to scaffold (default: detect from the repository) |
 | `--force` | no | — | — | Overwrite existing files |
 | `--format <FORMAT>` | no | `text` | `text`, `json` | Output format |
 | `--no-seed` | no | — | — | Do not seed invariants |
@@ -489,12 +489,15 @@ package markers) and selects the pack by precedence: explicit `--language`,
 then the language declared by an existing `do-harness.toml`, then a
 `Cargo.toml` (Rust), then a `package.json` that proves a supported Node
 command (a `typecheck`/`lint`/`test`/`build` script, turbo task, or
-matching dependency) (Node), then any other non-empty project (Generic),
-then an empty directory (greenfield Rust). A malformed or unsupported
-`package.json` stays Generic and emits a structured diagnostic
-(`invalid_package_json`, `no_supported_node_commands`,
-`missing_package_manager`). It probes each candidate sensor's required
-tooling, generates a `do-harness.toml` containing only proven signals
+matching dependency) (Node), then Python markers (`pyproject.toml`,
+`requirements.txt`, `setup.py`, `setup.cfg`, `tox.ini`) (Python), then a
+`go.mod` (Go), then any other non-empty project (Generic), then an empty
+directory (greenfield Rust). A malformed or unsupported `package.json`
+stays Generic and emits a structured diagnostic (`invalid_package_json`,
+`no_supported_node_commands`, `missing_package_manager`,
+`missing_python_tooling`, `missing_go_tooling`). It probes each candidate
+sensor's required tooling, generates a `do-harness.toml` containing only
+proven signals
 (signal sets and hooks are derived from the included subset), writes the
 portable skill subset (`harness` plus `skill-creator`), and then runs the
 effective sensors once:
@@ -505,7 +508,8 @@ effective sensors once:
   was omitted because its tooling is absent. The pass is real for what ran
   and is not full evidence, so it is never reported as `GREEN`; the omitted
   names and the install-and-`--force` remedy are printed. Missing Node
-  package-manager tooling lands here, not on a claimed green. This is the
+  package-manager tooling, Python tooling (`ruff`/`pytest`), or Go tooling
+  lands here, not on a claimed green. This is the
   vacuous-gate rule applied to a partially generated pack.
 - `RED` — a required check failed; the command exits 1 and prints bounded
   failure output instead of claiming a verified workspace.
@@ -556,8 +560,9 @@ development-methodology skills used to build do-harness itself (HTN planning,
 spikes, event modeling, skill distillation) are not scaffolded into adopting
 projects.
 
-- `--language <LANG>`: Force a pack (`rust`, `generic`, `web`, `node`); default
-  detects from the repository (empty/hidden-only directories bootstrap Rust).
+- `--language <LANG>`: Force a pack (`rust`, `generic`, `web`, `node`,
+  `python`, `go`); default detects from the repository (empty/hidden-only
+  directories bootstrap Rust).
 - `--force`: Overwrite existing files.
 - `--format <Format>`: Output format (`text` or `json`); JSON carries
   `language`, `detected`, `candidates`, `written`, `skipped`, `seeded`,

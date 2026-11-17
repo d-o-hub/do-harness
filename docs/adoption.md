@@ -103,6 +103,8 @@ do-harness init --language rust    # Rust sensor pack, explicit
 do-harness init --language generic # no built-in sensors (vacuous pass)
 do-harness init --language web     # web UI audit pack (viewport, a11y, console, perf, visual, i18n)
 do-harness init --language node    # Node/JS/TS pack (typecheck, lint, test, build)
+do-harness init --language python  # Python pack (ruff lint/format, optional typecheck, pytest)
+do-harness init --language go      # Go pack (gofmt, go vet/test, optional staticcheck)
 do-harness hook install            # pre-commit, commit-msg, pre-push
 do-harness doctor                  # binary resolution, hooks, db skew
 ```
@@ -115,7 +117,7 @@ helpers plus `scripts/check-release-preflight.sh` and its `plans/RELEASING.md`
 runbook, `.gitignore` entries, the ignored `.agents/events/` metrics-event
 tree, and the local libSQL state. Scaffolding of `USE_RESTRICTIONS.md` is independent
 from skill scaffolding (it is written even under `--minimal`) and is emitted across
-all language packs (`rust`, `generic`, `web`, `node`). Every pack also gets
+all language packs (`rust`, `generic`, `web`, `node`, `python`, `go`). Every pack also gets
 `scripts/check-commitlint.sh`, because the managed `commit-msg` hook runs it and
 fails closed when it is absent. Existing policy files are never overwritten
 without `--force`, and existing application source is never touched. Note that policy
@@ -211,16 +213,20 @@ are separate claims; unsupported routes remain unknown.
 a top-level `invariants` array (extra keys such as `$comment` are ignored).
 Each header stays strict: unknown fields inside a header are rejected.
 
-The harness supports four language packs: `rust` (Rust sensor pack),
-`generic` (no built-in sensors), `web` (web UI audit pack), and `node`
-(Node/JS/TS pack probing package scripts and toolchains). Plain `init`
-selects the Node pack automatically when a `package.json` proves a
-supported command (a `typecheck`/`lint`/`test`/`build` script, turbo task,
-or matching dependency); a malformed or unsupported manifest stays Generic
-with a structured diagnostic (`invalid_package_json`,
-`no_supported_node_commands`, `missing_package_manager`). The generic pack
-ships **zero sensors**: its pass is vacuous, not evidence. Add real checks
-before trusting `verify`.
+The harness supports six language packs: `rust` (Rust sensor pack),
+`generic` (no built-in sensors), `web` (web UI audit pack), `node`
+(Node/JS/TS pack probing package scripts and toolchains), `python` (ruff
+lint/format, optional typecheck, pytest), and `go` (gofmt, go vet/test,
+optional staticcheck). Plain `init` selects the Node pack automatically when
+a `package.json` proves a supported command (a `typecheck`/`lint`/`test`/
+`build` script, turbo task, or matching dependency); Python markers
+(`pyproject.toml`, `requirements.txt`, `setup.py`, `setup.cfg`, `tox.ini`)
+select the Python pack; a `go.mod` selects the Go pack. A malformed or
+unsupported manifest stays Generic with a structured diagnostic
+(`invalid_package_json`, `no_supported_node_commands`,
+`missing_package_manager`, `missing_python_tooling`, `missing_go_tooling`).
+The generic pack ships **zero sensors**: its pass is vacuous, not evidence.
+Add real checks before trusting `verify`.
 
 ## The adopting-repository sensor contract
 
@@ -247,8 +253,9 @@ zero-sensor exit code of `0` never means the repository was verified.
 ## Cross-stack command recipes
 
 These recipes use the generic pack and the repository's existing commands.
-`init` auto-detects Rust and Node; it does **not** auto-detect Python or Go, so
-add the entries below (or adapt your existing task runner) after `init`.
+`init` auto-detects Rust, Node, Python, and Go; the entries below are the
+manual generic form for when you prefer to hand-declare sensors (or adapt an
+existing task runner) after `init`.
 
 ### Rust
 
@@ -288,9 +295,14 @@ when-changed = ["src/**", "package.json", "tsconfig.json"]
 
 ### Python
 
-`pytest` is a useful default because it exits non-zero when it collects zero
-tests. If the project uses `unittest`, wrap `python3 -m unittest discover` in a
-guard that fails on `Ran 0 tests`.
+`init` auto-detects the Python pack from `pyproject.toml`/`requirements.txt`/
+`setup.py`/`setup.cfg`/`tox.ini` and generates `ruff check`, `ruff format
+--check`, an optional typecheck (mypy/pyright, only when configured), and a
+`pytest` test sensor with a zero-tests-collected guard. `pytest` is a useful
+default because it exits non-zero when it collects zero tests; the pack's test
+sensor treats that as a skip. If the project uses `unittest`, wrap `python3 -m
+unittest discover` in a guard that fails on `Ran 0 tests`. The manual generic
+form is:
 
 <!-- example: id=adoption_contract_python classification=parser-check-only reason="Python sensor contract recipe" -->
 ```toml
@@ -308,9 +320,12 @@ when-changed = ["**/*.py", "pyproject.toml", "ruff.toml"]
 
 ### Go
 
-`go test ./...` exits `0` when a package has no test files, so pair it with a
-guard that fails on `[no test files]` (or ensure every tested package has a
-test). `go vet` is a useful required or advisory companion.
+`init` auto-detects the Go pack from `go.mod` and generates `gofmt -l`,
+`go vet ./...`, `go test ./...`, and an optional `staticcheck` when installed.
+`go test ./...` exits `0` when a package has no test files, so pair a manual
+`test` sensor with a guard that fails on `[no test files]` (or ensure every
+tested package has a test). `go vet` is a useful required or advisory
+companion. The manual generic form is:
 
 <!-- example: id=adoption_contract_go classification=parser-check-only reason="Go sensor contract recipe" -->
 ```toml
@@ -342,9 +357,11 @@ baseline executes, so a red result still leaves an editable contract.
 | Situation | Pack | Baseline | Exit | Meaning |
 | --- | --- | --- | --- | --- |
 | Unsupported `package.json` | `generic` | `VACUOUS` | 0 | `no_supported_node_commands` diagnostic; add a script or declare `[[sensors]]`. |
-| Unknown stack (Python/Go/other) | `generic` | `VACUOUS` | 0 | `generic_stack_selected` diagnostic names the markers; use the recipes above. |
+| Unknown stack | `generic` | `VACUOUS` | 0 | `generic_stack_selected` diagnostic names the markers; use the recipes above. |
 | No sensors declared | `generic` | `VACUOUS` | 0 | Nothing ran; this is not evidence. |
 | Missing Node package manager | `node` | `INCOMPLETE` | 0 | `missing_package_manager`; install it and re-run `init --force`. |
+| Missing Python tooling | `python` | `INCOMPLETE` | 0 | `missing_python_tooling`; install `ruff`/`pytest` and re-run `init --force`. |
+| Missing Go tooling | `go` | `INCOMPLETE` | 0 | `missing_go_tooling`; install the Go toolchain and re-run `init --force`. |
 | Missing Rust core tool | `rust` | `INCOMPLETE` | 0 | The omitted sensor is named; install the tool and re-run `init --force`. |
 | Missing declared tool at verify | any | n/a | 2 | `verify` exits 2 and names the sensor in `unrunnable`; it is never a pass. |
 | Existing red baseline | any | `RED` | 1 | The repository's own checks failed; the generated config is still written. |
@@ -706,13 +723,15 @@ documented in `docs/releasing.md`.
 
 ## Adoption contract matrix
 
-The harness enforces strict fail-closed contract rules across all supported packs (`rust`, `generic`, `node`, `web`):
+The harness enforces strict fail-closed contract rules across all supported packs (`rust`, `generic`, `node`, `web`, `python`, `go`):
 
 | Pack | Selection Criteria | Default Generated Sensors | Strict Verification Contract |
 |------|-------------------|--------------------------|------------------------------|
 | `rust` | `Cargo.toml` | `fmt`, `check`, `clippy`, `test`, `doctest`, `loc`, `deps`, `audit`, `commitlint`, `release-preflight` | Fails closed on zero tests, broken doctests, missing manifest, or missing required tools in CI. |
-| `generic` | Greenfield / unknown stack (Python, Go, other) or malformed/unsupported `package.json` | None (empty sensor array) | Vacuous pass (`sensor_pack = "generic"`, 0 sensors executed) with an actionable diagnostic. Add the cross-stack recipes above; never masquerades as strict evidence for a specific language gate. |
+| `generic` | Greenfield / unknown stack or malformed/unsupported `package.json` | None (empty sensor array) | Vacuous pass (`sensor_pack = "generic"`, 0 sensors executed) with an actionable diagnostic. Add the cross-stack recipes above; never masquerades as strict evidence for a specific language gate. |
 | `node` | `package.json` proving a supported Node command (script, turbo task, or matching dependency) | `typecheck`, `lint`, `test`, `build` | Preserves `package.json` and `src/`. Probes package scripts, turbo, tsc, eslint, jest, vitest. Missing package-manager tooling yields an INCOMPLETE baseline, never a claimed green; `test` fails when the runner's total summary reports zero tests, so a delegated script cannot pass vacuously. |
+| `python` | Python markers (`pyproject.toml`, `requirements.txt`, `setup.py`, `setup.cfg`, `tox.ini`) | `lint`, `format`, optional `typecheck`, `test` | Probes `ruff`, the configured type checker, and `pytest`. A sensor is included only when its tooling probe succeeds; missing `pytest` (or a missing configured checker) yields an INCOMPLETE baseline, never a claimed green. The `test` sensor runs through `scripts/check-python-test.sh`, which treats pytest's zero-tests-collected exit as a skip. |
+| `go` | `go.mod` | `fmt`, `vet`, `test`, optional `staticcheck` | Probes `gofmt`, `go`, and optional `staticcheck`. Missing `go`/`gofmt` yields an INCOMPLETE baseline, never a claimed green. |
 | `web` | `init --language web` | `web-ui-tests`, `viewport-ux`, `a11y`, `console`, `perf`, `visual`, `i18n` | Unconfigured pack emits `SKIP:` (warned verdict). Fails closed under `verify --strict` until `WEB_AUDIT_ROUTES` is set. `web-ui-tests` runs the bundled audit suite and needs no configuration. |
 
 ### Fail-closed verification rules
