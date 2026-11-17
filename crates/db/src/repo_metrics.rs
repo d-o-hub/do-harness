@@ -54,6 +54,79 @@ pub async fn sensor_stats(
     Ok(stats)
 }
 
+/// One recorded sensor execution, as exported by `do-harness report`.
+///
+/// A beat keeps its timestamps; the duration is derived here so every consumer
+/// (JSON, Prometheus, dashboards) computes it the same way instead of each
+/// re-deriving seconds from two columns.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct SensorExecution {
+    /// Beat primary key.
+    pub id: i64,
+    /// Sensor name.
+    pub sensor: String,
+    /// Workstream scope (`branch:<name>`, `task:<id>`, or `global`).
+    pub scope: String,
+    /// Outcome label (`ok`, `failed`, `warn`).
+    pub status: String,
+    /// Exit code recorded for the run, when the sensor started.
+    pub exit_code: Option<i32>,
+    /// Unix timestamp when the run started.
+    pub started_at: i64,
+    /// Unix timestamp when the run completed, when known.
+    pub completed_at: Option<i64>,
+    /// Wall-clock duration in milliseconds, when both timestamps exist.
+    pub duration_ms: Option<i64>,
+}
+
+/// Lists sensor beats in a time window, oldest first.
+///
+/// This is the historical counterpart of [`sensor_stats`]: it keeps every
+/// execution instead of aggregating, so a CI dashboard can chart durations and
+/// exit codes without querying the database directly. `None` means "no filter"
+/// for every argument, and a scope of `all` must be resolved to `None` by the
+/// caller (the same convention `metrics` uses).
+///
+/// # Errors
+///
+/// Returns an error when the query fails.
+pub async fn sensor_executions(
+    conn: &Connection,
+    since: Option<i64>,
+    until: Option<i64>,
+    scope: Option<&str>,
+    sensor: Option<&str>,
+) -> Result<Vec<SensorExecution>> {
+    let mut rows = conn
+        .query(
+            "SELECT id, sensor_name, scope, status, sensor_exit_code, started_at, completed_at \
+             FROM beats WHERE beat_type = ?1 AND sensor_name IS NOT NULL \
+             AND (?2 IS NULL OR started_at >= ?2) \
+             AND (?3 IS NULL OR started_at <= ?3) \
+             AND (?4 IS NULL OR scope = ?4) \
+             AND (?5 IS NULL OR sensor_name = ?5) \
+             ORDER BY started_at, id",
+            libsql::params!(BeatType::Sensor.as_str(), since, until, scope, sensor),
+        )
+        .await?;
+    let mut executions = Vec::new();
+    while let Some(row) = rows.next().await? {
+        let started_at: i64 = row.get(5)?;
+        let completed_at: Option<i64> = row.get(6)?;
+        executions.push(SensorExecution {
+            id: row.get(0)?,
+            sensor: row.get(1)?,
+            scope: row.get(2)?,
+            status: row.get(3)?,
+            exit_code: row.get(4)?,
+            started_at,
+            completed_at,
+            duration_ms: completed_at.map(|completed| completed.saturating_sub(started_at) * 1000),
+        });
+    }
+    Ok(executions)
+}
+
 /// Whether any beat ever ended `ok` (existence probe, not a table scan into
 /// the application).
 ///
