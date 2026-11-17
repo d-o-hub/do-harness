@@ -222,15 +222,22 @@ fn plan_v0_to_v1(text: &str, plan: &mut MigrationPlan) {
             });
         }
     }
-    plan.changes.insert(
-        0,
-        Change {
-            line: 0,
-            reason: "schema-version",
-            before: String::new(),
-            after: format!("schema-version = {CONFIG_SCHEMA_VERSION}"),
-        },
-    );
+    // A file may declare version 0 explicitly; rewriting that line is a
+    // migration, inserting a second key is a duplicate-key parse error.
+    let declared = text.lines().position(|line| {
+        let trimmed = line.trim();
+        trimmed.starts_with("schema-version") && !trimmed.starts_with("[[")
+    });
+    let change = Change {
+        line: declared.map_or(0, |index| index + 1),
+        reason: "schema-version",
+        before: declared
+            .and_then(|index| text.lines().nth(index))
+            .map(|line| line.trim().to_owned())
+            .unwrap_or_default(),
+        after: format!("schema-version = {CONFIG_SCHEMA_VERSION}"),
+    };
+    plan.changes.insert(0, change);
 }
 
 /// Applies the plan to the text.

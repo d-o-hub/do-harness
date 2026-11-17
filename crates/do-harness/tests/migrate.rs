@@ -124,7 +124,9 @@ fn a_missing_config_is_a_usage_error() {
 
 #[test]
 fn doctor_recommends_migrate_and_accepts_the_result() {
-    let (_dir, root) = fixture(V0_CONFIG);
+    // A *declared* older version is skew; an absent key is a legacy file the
+    // binary still reads, so `migrate --diff` is the recommendation there.
+    let (_dir, root) = fixture(&format!("schema-version = 0\n{V0_CONFIG}"));
     support::git(&root, &["init", "-q"]);
     let (code, _stdout, stderr) = run(harness(&root).arg("doctor"));
     assert_eq!(code, Some(1), "an outdated schema is a doctor failure");
