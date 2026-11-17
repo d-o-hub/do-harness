@@ -60,7 +60,8 @@ Aliases: `check`.
 | Argument | Required | Default | Possible values | Description |
 | --- | --- | --- | --- | --- |
 | `--fail-fast` | no | — | — | Halt at the first failing sensor |
-| `--format <FORMAT>` | no | `text` | `text`, `json` | Output format |
+| `--format <FORMAT>` | no | `text` | `text`, `json`, `junit` | Output format |
+| `--simulate` | no | — | — | Print the execution plan and exit without spawning a sensor or writing evidence (a pre-flight for agents and CI cost checks) |
 | `--set <SET>` | no | — | — | Run only the sensors in this development signal set |
 | `--changed` | no | — | — | Run only sensors applicable to the working-tree change |
 | `--since <REF>` | no | — | — | Run only sensors applicable to the committed range `merge-base(<REF>, HEAD)..HEAD`; combine with `--changed` to union committed and uncommitted paths |

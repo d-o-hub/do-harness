@@ -4,9 +4,12 @@ use std::path::Path;
 
 use crate::baselines::{Baselines, BlessOutcome};
 use crate::config::SensorSeverity;
-use crate::evidence::EvidenceSkipped;
 use crate::sensors::VerifyOpts;
 use crate::{CliError, config, evidence, report, sensors, telemetry};
+
+mod evidence_write;
+
+use evidence_write::{evidence_destination, to_i64, write_evidence};
 
 /// Marker exported by managed git hooks (`hook install`); see
 /// `hook_script::EXEC_VERIFY`.
@@ -86,6 +89,20 @@ pub(crate) async fn run(root: &Path, mut opts: VerifyOpts) -> std::result::Resul
     let selection = sensors::resolve_selection(&cfg, root, &opts).map_err(CliError::Usage)?;
     if let Some(error) = &selection.discovery_error {
         eprintln!("warning: change discovery failed ({error}); selecting every candidate sensor");
+    }
+
+    // Simulate is a pre-flight, not a run: nothing below this point may write
+    // state, read beats, or spawn a sensor. JUnit is rejected because a plan is
+    // not a test report and an empty suite would read as a pass in CI.
+    if opts.simulate {
+        if opts.format == crate::report::VerifyFormat::Junit {
+            return Err(CliError::Usage(anyhow::anyhow!(
+                "--simulate cannot be combined with --format junit (a plan is not a test report)"
+            )));
+        }
+        let plan = crate::simulate::plan(root, &cfg, &selection, opts.set.as_deref());
+        crate::simulate::print(&plan, opts.format).map_err(CliError::Verify)?;
+        return Ok(());
     }
 
     // Publish the in-flight marker before any sensor runs so `status` can
@@ -184,7 +201,15 @@ pub(crate) async fn run(root: &Path, mut opts: VerifyOpts) -> std::result::Resul
                 bless_baselines(root, &report, &opts).await?;
             }
 
-            report::print_report(&report, opts.format, opts.quiet).map_err(CliError::Verify)?;
+            match opts.format {
+                crate::report::VerifyFormat::Junit => {
+                    crate::junit::print_junit(&report);
+                }
+                format => {
+                    report::print_report(&report, format.into(), opts.quiet)
+                        .map_err(CliError::Verify)?;
+                }
+            }
 
             if !opts.dry_run {
                 write_evidence(
@@ -356,118 +381,6 @@ async fn bless_baselines(
     }
     if changed {
         baselines.save(root).await.map_err(CliError::Usage)?;
-    }
-    Ok(())
-}
-
-/// Converts a findings count to the database integer type.
-fn to_i64(value: u64) -> i64 {
-    i64::try_from(value).unwrap_or(i64::MAX)
-}
-
-/// Resolves the evidence artifact the run owns, or `None` when it writes none.
-fn evidence_destination(root: &Path, opts: &VerifyOpts) -> Option<std::path::PathBuf> {
-    opts.evidence
-        .clone()
-        .map(|p| if p.is_relative() { root.join(p) } else { p })
-        .or_else(|| {
-            opts.output
-                .clone()
-                .map(|p| if p.is_relative() { root.join(p) } else { p })
-        })
-        .or_else(|| {
-            opts.set
-                .as_ref()
-                .map(|set| crate::status::default_path_for_set(root, set))
-        })
-        .or_else(|| opts.strict.then(|| root.join(".do-harness/evidence.json")))
-}
-
-/// Writes the evidence artifact for runs that own one.
-///
-/// Signal-set runs own their evidence file so a feedback run can never
-/// clobber verification evidence (or vice versa). Runs without `--set` keep
-/// the legacy behavior: an artifact only for `--evidence` or `--strict`.
-#[allow(clippy::too_many_arguments)]
-fn write_evidence(
-    root: &Path,
-    cfg: &config::Config,
-    config_bytes: Option<&[u8]>,
-    report: &report::VerifyReport,
-    opts: &VerifyOpts,
-    started_at: i64,
-    selection: &sensors::ResolvedSelection<'_>,
-    invalidated_reason: Option<&str>,
-) -> std::result::Result<(), CliError> {
-    let Some(path) = evidence_destination(root, opts) else {
-        return Ok(());
-    };
-    let selected: Vec<String> = selection.specs.iter().map(|s| s.name.clone()).collect();
-    let skipped: Vec<EvidenceSkipped> = selection
-        .skipped
-        .iter()
-        .map(|s| EvidenceSkipped {
-            name: s.name.clone(),
-            reason: s.reason.clone(),
-        })
-        .collect();
-    let candidates =
-        crate::signals::candidate_specs(cfg, opts.set.as_deref()).map_err(CliError::Usage)?;
-    // Fingerprints describe the post-execution workspace: sensors may create
-    // files, and status never executes sensors, so the left-behind state is
-    // the stable comparison point.
-    // Fingerprints must describe the same selection input `status` recomputes:
-    // a range run on a clean checkout has an empty working tree, so hashing
-    // the working-tree change would make its own evidence look stale.
-    let post = if opts.since.is_some() {
-        crate::changes::discover_selection(root, opts.changed, opts.since.as_deref()).changed
-    } else {
-        crate::changes::discover(root)
-    };
-    let fingerprints = crate::fingerprint::for_run(
-        root,
-        cfg,
-        config_bytes,
-        opts.set.as_deref(),
-        &candidates,
-        &post,
-    );
-    let finished_at = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_or(0, |d| i64::try_from(d.as_secs()).unwrap_or(i64::MAX));
-    let meta = evidence::RunMeta {
-        cfg,
-        config_bytes,
-        root,
-        set: opts.set.as_deref(),
-        selected: &selected,
-        fingerprints,
-        changed: opts.changed,
-        changes: (selection.changes.mode != crate::changes::SelectionMode::All)
-            .then_some(&selection.changes),
-        selection: (selection.changes.mode != crate::changes::SelectionMode::All).then(|| {
-            evidence::EvidenceSelection::from_changes(&selection.changes, &selection.selected)
-        }),
-        skipped,
-        task: opts.task,
-        record: opts.record,
-        started_at,
-        finished_at,
-        invalidated_reason: invalidated_reason.map(ToOwned::to_owned),
-    };
-    let path = crate::managed_path::evidence_path(root, &path).map_err(CliError::Usage)?;
-    let mut doc = evidence::EvidenceDocument::from_run(report, &meta);
-    evidence::write_document(root, &path, &mut doc).map_err(CliError::Verify)?;
-
-    if opts.strict && !(doc.is_strict_clean() && doc.verify_chain(doc.prev_hash.as_deref())) {
-        eprintln!(
-            "strict evidence check failed; artifact at {}",
-            path.display()
-        );
-        if all_unrunnable(report) {
-            return Err(unrunnable_error(report));
-        }
-        return Err(CliError::Verify(anyhow::anyhow!("weak evidence")));
     }
     Ok(())
 }

@@ -53,7 +53,8 @@ json\:"Machine-readable JSON output"))' \
 (verify)
 _arguments "${_arguments_options[@]}" : \
 '--format=[Output format]:FORMAT:((text\:"Human-readable text output"
-json\:"Machine-readable JSON output"))' \
+json\:"Machine-readable JSON output"
+junit\:"\`JUnit\` XML\: one \`<testcase>\` per sensor for CI test tabs and annotations"))' \
 '--set=[Run only the sensors in this development signal set]:SET:_default' \
 '--since=[Run only sensors applicable to the committed range \`merge-base(<REF>, HEAD)..HEAD\`; combine with \`--changed\` to union committed and uncommitted paths]:REF:_default' \
 '*--only=[Run only the named sensor (repeatable or comma-separated)]:SENSOR:_default' \
@@ -69,6 +70,7 @@ run\:"Execute unconditionally; no reuse lookup at all"))' \
 '--config=[Explicit path to do-harness.toml]:FILE:_files' \
 '--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
 '--fail-fast[Halt at the first failing sensor]' \
+'(--record --bless --evidence)--simulate[Print the execution plan and exit without spawning a sensor or writing evidence (a pre-flight for agents and CI cost checks)]' \
 '--changed[Run only sensors applicable to the working-tree change]' \
 '--record[Persist beats and error signatures into the state database]' \
 '(--task)--global[Record unscoped beats in the global namespace]' \
@@ -86,7 +88,8 @@ run\:"Execute unconditionally; no reuse lookup at all"))' \
 (check)
 _arguments "${_arguments_options[@]}" : \
 '--format=[Output format]:FORMAT:((text\:"Human-readable text output"
-json\:"Machine-readable JSON output"))' \
+json\:"Machine-readable JSON output"
+junit\:"\`JUnit\` XML\: one \`<testcase>\` per sensor for CI test tabs and annotations"))' \
 '--set=[Run only the sensors in this development signal set]:SET:_default' \
 '--since=[Run only sensors applicable to the committed range \`merge-base(<REF>, HEAD)..HEAD\`; combine with \`--changed\` to union committed and uncommitted paths]:REF:_default' \
 '*--only=[Run only the named sensor (repeatable or comma-separated)]:SENSOR:_default' \
@@ -102,6 +105,7 @@ run\:"Execute unconditionally; no reuse lookup at all"))' \
 '--config=[Explicit path to do-harness.toml]:FILE:_files' \
 '--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
 '--fail-fast[Halt at the first failing sensor]' \
+'(--record --bless --evidence)--simulate[Print the execution plan and exit without spawning a sensor or writing evidence (a pre-flight for agents and CI cost checks)]' \
 '--changed[Run only sensors applicable to the working-tree change]' \
 '--record[Persist beats and error signatures into the state database]' \
 '(--task)--global[Record unscoped beats in the global namespace]' \

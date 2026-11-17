@@ -7,13 +7,15 @@ use anyhow::Result;
 
 use crate::dbcheck;
 use crate::hook_script::BinSource;
-use crate::hooks::{self, HookOwner};
+use crate::hooks;
+#[cfg(test)]
+use crate::hooks::HookOwner;
 use crate::report::Format;
 
+mod checks;
 mod client_profile;
-mod facts;
 
-use facts::{check_sensor_argv, check_task_export, config_schema};
+use checks::{check_sensor_argv, check_task_export, config_schema, hook_line};
 
 /// Outcome of the event-chain tamper audit, computed once so both output
 /// formats report it. Before this existed the audit ran only in the text
@@ -420,46 +422,6 @@ pub(crate) fn describe_binary(source: &BinSource) -> String {
     }
 }
 
-/// Renders one `[OK]`/`[WARN]`/`[FAIL]` line for a hook path.
-///
-/// A delegated hook is healthy: the pre-commit framework, or the hook manager
-/// behind `core.hooksPath`, owns the gate and `doctor --strict` must not call it
-/// missing. An absent hook that a pre-commit configuration was meant to own
-/// carries the command that installs it.
-fn hook_line(
-    name: &str,
-    owner: HookOwner,
-    shadowed: bool,
-    core_hooks_path: Option<&str>,
-    commitlint_missing: bool,
-    pre_commit_config: bool,
-) -> String {
-    let configured = core_hooks_path.unwrap_or("configured");
-    if shadowed && owner == HookOwner::Absent {
-        return format!(
-            "  [FAIL] {name} hook: installed in .git/hooks but shadowed by core.hooksPath={configured}"
-        );
-    }
-    match owner {
-        HookOwner::Managed if name == "commit-msg" && commitlint_missing => {
-            format!("  [FAIL] {name} hook: installed but scripts/check-commitlint.sh is missing")
-        }
-        HookOwner::Managed => format!("  [OK] {name} hook: installed"),
-        HookOwner::PreCommit => format!("  [OK] {name} hook: delegated to pre-commit"),
-        HookOwner::HooksPath => {
-            format!("  [OK] {name} hook: delegated to core.hooksPath={configured}")
-        }
-        HookOwner::Foreign => {
-            format!("  [WARN] {name} hook: foreign hook not managed by do-harness")
-        }
-        HookOwner::Absent if pre_commit_config => format!(
-            "  [WARN] {name} hook: absent (pre-commit config present; run: pre-commit install --hook-type {name})"
-        ),
-        HookOwner::Absent => format!("  [WARN] {name} hook: absent"),
-    }
-}
-
-/// Resolves path-looking `argv` arguments for the effective sensors. Returns
 #[cfg(test)]
 #[path = "doctor_tests.rs"]
 mod tests;
