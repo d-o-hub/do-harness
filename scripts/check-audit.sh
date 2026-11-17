@@ -72,7 +72,8 @@ fi
 run_audit() {
     cargo audit --deny warnings \
         --ignore RUSTSEC-2026-0097 \
-        --ignore RUSTSEC-2024-0449 "$@"
+        --ignore RUSTSEC-2024-0449 \
+        --ignore RUSTSEC-2026-0543 "$@"
 }
 
 if ! run_audit "$@"; then

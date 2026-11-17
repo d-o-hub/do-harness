@@ -23,6 +23,7 @@ yanked = "deny"
 # this entry when plans/serde-yaml-migration.md lands.
 ignore = [
   { id = "RUSTSEC-2024-0449", reason = "unmaintained, not a vulnerability; reachable only transitively via serde_yaml 0.9, see plans/serde-yaml-migration.md" },
+  { id = "RUSTSEC-2026-0543", reason = "unmaintained, not a vulnerability; reachable only through rmcp -> schemars in the optional mcp-surface feature, see scripts/check-audit.sh rationale" },
 ]
 
 [bans]
