@@ -6,10 +6,35 @@ use std::path::Path;
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
+/// Schema version of `do-harness.toml` this binary understands.
+///
+/// Bumped when a key is renamed, removed, or given new semantics. Absent means
+/// version 0 (the pre-versioning schema); `migrate` adds the key, and
+/// `doctor` recommends it when the file is older. A *newer* declared version
+/// fails closed: the binary cannot know what a future key means.
+pub const CONFIG_SCHEMA_VERSION: u32 = 1;
+
+/// `skip_serializing_if` predicate for the schema version (0 means absent).
+// serde's predicate takes `&T` by contract, and `u32` is trivially copyable.
+#[allow(clippy::trivially_copy_pass_by_ref)]
+const fn schema_version_is_zero(version: &u32) -> bool {
+    *version == 0
+}
+
 /// Parsed `do-harness.toml` configuration.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct Config {
+    /// Declared configuration schema version (`schema-version`).
+    ///
+    /// Serialized by `init` so the key appears in every scaffolded file; a
+    /// hand-written file without it is version 0 until `migrate` writes it.
+    #[serde(
+        default,
+        rename = "schema-version",
+        skip_serializing_if = "schema_version_is_zero"
+    )]
+    pub schema_version: u32,
     /// Optional host language tag (informational; reserved for language packs).
     pub language: Option<String>,
     /// Hook sensor selection.
@@ -190,6 +215,21 @@ pub async fn load(root: &Path, explicit: Option<&Path>) -> Result<Config> {
     Ok(load_raw(root, explicit).await?.0)
 }
 
+/// Parses configuration text and validates it.
+///
+/// The single parse entry point: `schema-version` is part of the struct, so a
+/// file written by `migrate` and one hand-written before versioning both load
+/// through here.
+///
+/// # Errors
+///
+/// Returns an error when the text is not valid TOML or fails validation.
+pub fn parse_str(text: &str) -> Result<Config> {
+    let cfg: Config = toml::from_str(text)?;
+    cfg.validate()?;
+    Ok(cfg)
+}
+
 /// Loads the workspace configuration without entering a runtime.
 ///
 /// `pr` subcommands are dispatched *inside* the async runtime, so a nested
@@ -257,6 +297,7 @@ pub fn rust_default() -> Config {
     signal_sets.insert("main".to_owned(), verification_names);
     signal_sets.insert("release".to_owned(), names);
     Config {
+        schema_version: crate::config::CONFIG_SCHEMA_VERSION,
         language: None,
         hooks: HooksConfig {
             pre_commit: vec!["fmt".to_owned(), "loc".to_owned()],

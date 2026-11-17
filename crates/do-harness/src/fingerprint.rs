@@ -276,6 +276,7 @@ mod tests {
     /// Builds a minimal config with one sensor for fingerprint tests.
     fn config() -> Config {
         Config {
+            schema_version: crate::config::CONFIG_SCHEMA_VERSION,
             pr: crate::pr::author_policy::PrConfig::default(),
             language: None,
             hooks: crate::config::HooksConfig::default(),

@@ -116,6 +116,7 @@ mod tests {
     /// Config with two declared sets over two sensors.
     fn sets_config() -> Config {
         Config {
+            schema_version: crate::config::CONFIG_SCHEMA_VERSION,
             pr: crate::pr::author_policy::PrConfig::default(),
             language: None,
             hooks: crate::config::HooksConfig::default(),

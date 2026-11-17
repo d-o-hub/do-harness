@@ -100,6 +100,9 @@ _do__harness() {
             do__harness,metrics)
                 cmd="do__harness__subcmd__metrics"
                 ;;
+            do__harness,migrate)
+                cmd="do__harness__subcmd__migrate"
+                ;;
             do__harness,overlap)
                 cmd="do__harness__subcmd__overlap"
                 ;;
@@ -270,6 +273,9 @@ _do__harness() {
                 ;;
             do__harness__subcmd__help,metrics)
                 cmd="do__harness__subcmd__help__subcmd__metrics"
+                ;;
+            do__harness__subcmd__help,migrate)
+                cmd="do__harness__subcmd__help__subcmd__migrate"
                 ;;
             do__harness__subcmd__help,overlap)
                 cmd="do__harness__subcmd__help__subcmd__overlap"
@@ -689,7 +695,7 @@ _do__harness() {
 
     case "${cmd}" in
         do__harness)
-            opts="-q -h -V --root --config --quiet --output --dry-run --help --version version verify check list ls explain lint status sync latest-main pr skills init-db seed init task trace distill errors loc split eval hook doctor metrics report sensor learn overlap maintenance cleanup compliance audit-chain dora ci-explain ci completions man feedback job help"
+            opts="-q -h -V --root --config --quiet --output --dry-run --help --version version verify check migrate list ls explain lint status sync latest-main pr skills init-db seed init task trace distill errors loc split eval hook doctor metrics report sensor learn overlap maintenance cleanup compliance audit-chain dora ci-explain ci completions man feedback job help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 1 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -2138,7 +2144,7 @@ _do__harness() {
             return 0
             ;;
         do__subcmd__harness__subcmd__help)
-            opts="version verify list explain lint status sync pr skills init-db seed init task trace distill errors loc split eval hook doctor metrics report sensor learn overlap maintenance cleanup compliance audit-chain dora ci-explain completions man feedback job help"
+            opts="version verify migrate list explain lint status sync pr skills init-db seed init task trace distill errors loc split eval hook doctor metrics report sensor learn overlap maintenance cleanup compliance audit-chain dora ci-explain completions man feedback job help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -2672,6 +2678,20 @@ _do__harness() {
         do__subcmd__harness__subcmd__help__subcmd__metrics__subcmd__pr)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        do__subcmd__harness__subcmd__help__subcmd__migrate)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
             fi
@@ -4404,6 +4424,61 @@ _do__harness() {
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;
+                --format)
+                    COMPREPLY=($(compgen -W "text json" -- "${cur}"))
+                    return 0
+                    ;;
+                --root)
+                    COMPREPLY=()
+                    if [[ "${BASH_VERSINFO[0]}" -ge 4 ]]; then
+                        compopt -o plusdirs
+                    fi
+                    return 0
+                    ;;
+                --config)
+                    local oldifs
+                    if [ -n "${IFS+x}" ]; then
+                        oldifs="$IFS"
+                    fi
+                    IFS=$'\n'
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    if [ -n "${oldifs+x}" ]; then
+                        IFS="$oldifs"
+                    fi
+                    if [[ "${BASH_VERSINFO[0]}" -ge 4 ]]; then
+                        compopt -o filenames
+                    fi
+                    return 0
+                    ;;
+                --output)
+                    local oldifs
+                    if [ -n "${IFS+x}" ]; then
+                        oldifs="$IFS"
+                    fi
+                    IFS=$'\n'
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    if [ -n "${oldifs+x}" ]; then
+                        IFS="$oldifs"
+                    fi
+                    if [[ "${BASH_VERSINFO[0]}" -ge 4 ]]; then
+                        compopt -o filenames
+                    fi
+                    return 0
+                    ;;
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        do__subcmd__harness__subcmd__migrate)
+            opts="-q -h -V --diff --write --format --root --config --quiet --output --dry-run --help --version"
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
                 --format)
                     COMPREPLY=($(compgen -W "text json" -- "${cur}"))
                     return 0

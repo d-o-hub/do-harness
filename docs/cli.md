@@ -591,6 +591,34 @@ projects.
 - `--minimal`: Skip skill scaffolding.
 - `--no-gitignore`: Skip creating/modifying `.gitignore`.
 
+### `migrate`
+<!-- BEGIN GENERATED: cli-contract migrate -->
+`do-harness migrate [OPTIONS]`
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `--diff` | no | — | — | Preview the required changes without writing (the default) |
+| `--write` | no | — | — | Apply the changes; refuses conflicts it cannot resolve |
+| `--format <FORMAT>` | no | `text` | `text`, `json` | Output format |
+<!-- END GENERATED: cli-contract migrate -->
+Brings `do-harness.toml` to the current configuration schema
+(`schema-version = 1`). The plan is deterministic and text-scoped:
+
+- add `schema-version = 1` before the first table when the key is absent
+  (absent means version 0);
+- rewrite the deprecated `allow_failure = true` alias as `severity = "warn"`,
+  and remove `allow_failure = false`;
+- refuse a block that sets both `allow_failure` and `severity` (the intent is
+  ambiguous), and refuse a file that declares a schema version newer than the
+  binary — that needs an upgrade, not a migration.
+
+`--diff` (the default) prints the plan and writes nothing. `--write` applies
+it, re-parses the result with the real config parser before accepting it, and
+then runs `doctor` (reported, not promoted: a migration does not fix unrelated
+workspace health). `--format json` emits `{from, to, changes, conflicts,
+applicable}`. `doctor` reports an outdated schema version as a failure with the
+`migrate --write` command, and a newer one as a failure that says to upgrade.
+
 ### `task`
 <!-- BEGIN GENERATED: cli-contract task -->
 `do-harness task [OPTIONS] <COMMAND>`

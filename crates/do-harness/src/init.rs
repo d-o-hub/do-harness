@@ -352,6 +352,7 @@ fn generate_rust_config(sensors: &[crate::config::SensorSpec]) -> Result<String>
         .map(ToString::to_string)
         .collect();
     let cfg = crate::config::Config {
+        schema_version: crate::config::CONFIG_SCHEMA_VERSION,
         language: Some("rust".to_owned()),
         hooks: crate::config::HooksConfig {
             pre_commit,

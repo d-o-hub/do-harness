@@ -94,16 +94,11 @@ pub enum Command {
         #[arg(long, requires = "bless", value_name = "NAME")]
         approver: Option<String>,
     },
+    /// Migrate do-harness.toml to the current configuration schema.
+    Migrate(#[command(flatten)] super::actions::MigrateArgs),
     /// List sensor names.
     #[command(visible_alias = "ls")]
-    List {
-        /// List development signal-set names instead of sensors.
-        #[arg(long)]
-        sets: bool,
-        /// Output format.
-        #[arg(long, value_enum, default_value_t = Format::Text)]
-        format: Format,
-    },
+    List(#[command(flatten)] super::actions::ListArgs),
     /// Explain which sensors the current change selects, without running them.
     Explain {
         /// Explain this development signal set (default: all sensors).

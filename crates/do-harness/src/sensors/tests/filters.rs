@@ -104,6 +104,7 @@ fn fail_fast_stops_at_first_failure() {
 fn verify_with_no_effective_sensors_succeeds() {
     let dir = tempfile::tempdir().expect("tempdir");
     let cfg = Config {
+        schema_version: crate::config::CONFIG_SCHEMA_VERSION,
         pr: crate::pr::author_policy::PrConfig::default(),
         language: Some("generic".to_owned()),
         hooks: HooksConfig {

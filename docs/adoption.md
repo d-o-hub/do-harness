@@ -407,6 +407,14 @@ pack entirely. Non-empty `pre-commit` and `pre-push` hook selections under
 and any unknown sensor name fails configuration loading before hooks are
 written. An empty hook list defaults to running the full effective suite.
 
+`do-harness.toml` carries an explicit `schema-version`; `init` writes the
+current one. `do-harness migrate --diff` previews the changes a newer binary
+needs (currently: declare the version and replace the deprecated
+`allow_failure` alias with `severity = "warn"`), and `migrate --write` applies
+them, re-parsing the result with the real config parser. Ambiguous blocks and
+files from a newer binary are refused, never guessed at; `doctor` fails on
+either skew and names the fix.
+
 `sensor new` writes that entry for you and then proves it: the block is
 appended, an existing single-line signal-set array gains the name with
 `--set`, and the resulting configuration is resolved through the same selection
