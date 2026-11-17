@@ -410,7 +410,7 @@ fn discover_inner(root: &Path) -> Result<Vec<ChangedFile>, DiscoveryError> {
 
 mod range;
 
-pub use range::{ChangeSelection, ResolvedRange, SelectionMode, discover_selection};
+pub use range::{ChangeSelection, ResolvedRange, SelectionMode, discover_selection, is_ci_since};
 
 #[cfg(test)]
 #[path = "changes_tests.rs"]

@@ -60,7 +60,8 @@ Aliases: `check`.
 | Argument | Required | Default | Possible values | Description |
 | --- | --- | --- | --- | --- |
 | `--fail-fast` | no | — | — | Halt at the first failing sensor |
-| `--format <FORMAT>` | no | `text` | `text`, `json` | Output format |
+| `--format <FORMAT>` | no | `text` | `text`, `json`, `junit` | Output format |
+| `--simulate` | no | — | — | Print the execution plan and exit without spawning a sensor or writing evidence (a pre-flight for agents and CI cost checks) |
 | `--set <SET>` | no | — | — | Run only the sensors in this development signal set |
 | `--changed` | no | — | — | Run only sensors applicable to the working-tree change |
 | `--since <REF>` | no | — | — | Run only sensors applicable to the committed range `merge-base(<REF>, HEAD)..HEAD`; combine with `--changed` to union committed and uncommitted paths |
@@ -1233,6 +1234,74 @@ Prune unbounded history and compact the local state database.
 `maintenance --prune-beats 30` on a schedule; `skill_eval_runs` history is
 retained in full locally (it is small) but CI only uploads the current
 `.do-harness/evidence.json` artifact, not the database.
+
+### `cleanup`
+<!-- BEGIN GENERATED: cli-contract cleanup -->
+`do-harness cleanup [OPTIONS]`
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `--keep <N>` | no | — | — | Retain the N most recently used eligible build trees |
+| `--worktree <PATH>` (repeatable) | no | — | — | Restrict to this worktree (repeatable); default: every linked worktree |
+| `--target-dir <PATH>` (repeatable) | no | — | — | A redirected build tree to consider alongside `<worktree>/target` |
+| `--include-shared` | no | — | — | Permit a build tree outside the worktree it belongs to |
+| `--optimistic` | no | — | — | Clean even when the merge proof is unavailable (documented risk) |
+| `--format <FORMAT>` | no | `text` | `text`, `json` | Output format |
+<!-- END GENERATED: cli-contract cleanup -->
+Reclaim the build output of worktrees that are provably disposable.
+
+A candidate is a linked worktree — never the main worktree — and it is
+reclaimed only when two independent questions both answer yes.
+
+**Was it merged?** The authoritative proof is a merged pull request whose
+`headRefOid` equals the worktree's current `HEAD`. That is what a squash merge
+needs: `git merge-base --is-ancestor` reports every squash-merged branch as
+unmerged. Ancestry and tree equality are local fallbacks, and they only promote
+a branch that has no open pull request. A merged PR for the same branch name
+with a different head is `proof_stale`; if the merged list came back full, an
+older merge for this head may be past the cut, so the verdict is `unproven`
+instead of a `proof_stale` claim the query did not establish. A missing or
+unauthenticated `gh` is `unproven` and exits `1` rather than downgrading
+silently.
+
+The base is the remote's own default branch, resolved locally from
+`origin/HEAD` (falling back to `origin/main`, then `origin/master`) rather than
+assuming `main`, so the command works in a repository whose default branch is
+`master`. It must resolve, and its fetch must be at most seven days old, or the
+candidate is `stale_base`.
+
+**Is anything using it?** A dirty worktree (including untracked files), a
+`locked` or `prunable` registry entry, a held Cargo build lock, or a live
+`cargo`/`rustc`/`rustdoc`/`nextest`/`sccache` process working on the tree
+refuses the candidate. The process probe reads both the process's working
+directory and its argument list, because cargo runs in the worktree root and
+names the build tree in `--out-dir`/`--target-dir` rather than changing into it.
+On hosts without a process probe the report says `probe: "lock-only"`, and an
+unprobeable tree is `in_use_unknown` unless `--optimistic` accepts the risk.
+
+Reclamation is `cargo clean --target-dir`, then `git worktree remove`, then one
+`git worktree prune` for the repository — Cargo's API for its own directory and
+git's API for its own registry. `.do-harness/`, the main worktree, and any path
+reached through a symlink are never touched.
+
+- `--dry-run`: print the plan and write nothing — no state, no evidence, no
+  registry update.
+- `--format json`: one schema-versioned document with per-candidate worktree,
+  branch, head, target directory and size, probe, merge proof, verdict, reason,
+  reclaimed bytes, and duration.
+- `--keep <N>`: retain the N most recently used eligible build trees; the rest
+  are reported as `kept`.
+- `--worktree <PATH>`: restrict to the named worktrees (repeatable).
+- `--target-dir <PATH>`: a redirected build tree to consider alongside
+  `<worktree>/target`; outside the worktree it needs `--include-shared`.
+- `--optimistic`: reclaim when the merge proof or the liveness probe is
+  unavailable, accepting the documented risk.
+
+Exit codes: `0` when every eligible candidate was cleaned — a safety refusal is
+not an error; `1` when a candidate was skipped for an error-class reason
+(`unproven`, `stale_base`, `registry_unreadable`, `in_use_unknown`) or a
+deletion failed; `2` for usage errors such as an unreadable repository or an
+unregistered `--worktree`.
 
 ### `compliance`
 <!-- BEGIN GENERATED: cli-contract compliance -->
