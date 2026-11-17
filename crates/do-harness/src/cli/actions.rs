@@ -4,9 +4,42 @@
 
 use std::path::PathBuf;
 
-use clap::{Subcommand, ValueHint};
+use clap::{Args, Subcommand, ValueHint};
 
 use crate::report::Format;
+
+/// Arguments for `do-harness cleanup`.
+#[derive(Debug, Args)]
+pub struct CleanupArgs {
+    /// Retain the N most recently used eligible build trees.
+    #[arg(long, value_name = "N")]
+    pub keep: Option<usize>,
+    /// Restrict to this worktree (repeatable); default: every linked worktree.
+    #[arg(
+        long,
+        value_name = "PATH",
+        value_hint = ValueHint::DirPath,
+        action = clap::ArgAction::Append
+    )]
+    pub worktree: Vec<PathBuf>,
+    /// A redirected build tree to consider alongside `<worktree>/target`.
+    #[arg(
+        long,
+        value_name = "PATH",
+        value_hint = ValueHint::DirPath,
+        action = clap::ArgAction::Append
+    )]
+    pub target_dir: Vec<PathBuf>,
+    /// Permit a build tree outside the worktree it belongs to.
+    #[arg(long)]
+    pub include_shared: bool,
+    /// Clean even when the merge proof is unavailable (documented risk).
+    #[arg(long)]
+    pub optimistic: bool,
+    /// Output format.
+    #[arg(long, value_enum, default_value_t = Format::Text)]
+    pub format: Format,
+}
 
 /// Available unattended-job actions.
 #[derive(Debug, Subcommand)]
@@ -438,6 +471,14 @@ pub struct NewSensorArgs {
     /// Scaffold an executable stub script at this path (never overwrites).
     #[arg(long, value_hint = ValueHint::FilePath, value_name = "PATH")]
     pub script: Option<PathBuf>,
+}
+
+/// Arguments for the `sensor` command group (flattened into a tuple variant).
+#[derive(Debug, clap::Args)]
+pub struct SensorArgs {
+    /// Sensor subcommand.
+    #[command(subcommand)]
+    pub action: SensorAction,
 }
 
 /// Available sensor actions.

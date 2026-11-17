@@ -230,7 +230,7 @@ export PATH="$HOME/.local/bin:$PATH"
 | Command | Description |
 | --- | --- |
 | `version [OPTIONS]` | Print CLI version information — flags: `--format <FORMAT>` |
-| `verify [OPTIONS]` | Run computational sensors (alias: `check`) — flags: `--fail-fast`, `--format <FORMAT>`, `--set <SET>`, `--changed`, `--since <REF>`, `--only <SENSOR>`, `--exclude <SENSOR>`, `--jobs <N>`, `--unchanged <MODE>`, `--record`, `--task <ID>`, `--global`, `--evidence <FILE>`, `--strict`, `--bless`, `--approver <NAME>` |
+| `verify [OPTIONS]` | Run computational sensors (alias: `check`) — flags: `--fail-fast`, `--format <FORMAT>`, `--simulate`, `--set <SET>`, `--changed`, `--since <REF>`, `--only <SENSOR>`, `--exclude <SENSOR>`, `--jobs <N>`, `--unchanged <MODE>`, `--record`, `--task <ID>`, `--global`, `--evidence <FILE>`, `--strict`, `--bless`, `--approver <NAME>` |
 | `list [OPTIONS]` | List sensor names (alias: `ls`) — flags: `--sets`, `--format <FORMAT>` |
 | `explain [OPTIONS]` | Explain which sensors the current change selects, without running them — flags: `--set <SET>`, `--changed`, `--since <REF>`, `--format <FORMAT>` |
 | `status [OPTIONS]` | Report verification evidence freshness without running sensors — flags: `--set <SET>`, `--evidence <FILE>`, `--since <REF>`, `--format <FORMAT>` |
@@ -282,6 +282,7 @@ export PATH="$HOME/.local/bin:$PATH"
 | `learn [OPTIONS] --draft` | Draft skill/guide updates from sensors that keep firing (never applies them) — flags: `--draft`, `--days <DAYS>`, `--min-fires <N>`, `--format <FORMAT>` |
 | `overlap [OPTIONS]` | Rank skill pairs by guidance overlap (Tier-2 distinctiveness advisory) — flags: `--threshold <THRESHOLD>`, `--format <FORMAT>` |
 | `maintenance [OPTIONS]` | Prune old beats and compact the state database — flags: `--prune-beats <DAYS>`, `--keep-per-task <N>` |
+| `cleanup [OPTIONS]` | Reclaim the build output of provably merged, idle worktrees — flags: `--keep <N>`, `--worktree <PATH>`, `--target-dir <PATH>`, `--include-shared`, `--optimistic`, `--format <FORMAT>` |
 | `compliance [OPTIONS]` | Print compliance mapping to OWASP Agentic Top 10, NIST AI RMF, and EU AI Act — flags: `--framework <FRAMEWORK>`, `--format <FORMAT>` |
 | `audit-chain [OPTIONS]` | Recompute workflow event hash chain and report first divergence — flags: `--format <FORMAT>` |
 | `dora [OPTIONS]` | Derive DORA deployment metrics from git history (deterministic, read-only) — flags: `--days <DAYS>`, `--format <FORMAT>`, `--record`, `--source <SOURCE>`, `--now <UNIX_SECONDS>` |

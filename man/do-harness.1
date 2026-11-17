@@ -1,6 +1,6 @@
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
-.TH do-harness 1  "do-harness 0.4.7 (e9dbd23-dirty 2026-11-16)" 
+.TH do-harness 1  "do-harness 0.4.7 (a85256e-dirty 2026-11-16)" 
 .SH NAME
 do\-harness \- do\-harness agent execution harness CLI
 .SH SYNOPSIS
@@ -109,6 +109,9 @@ Rank skill pairs by guidance overlap (Tier\-2 distinctiveness advisory)
 do\-harness maintenance
 Prune old beats and compact the state database
 .TP
+do\-harness cleanup
+Reclaim the build output of provably merged, idle worktrees
+.TP
 do\-harness compliance
 Print compliance mapping to OWASP Agentic Top 10, NIST AI RMF, and EU AI Act
 .TP
@@ -147,4 +150,4 @@ Exit Codes:
   1  Verification or check failure
   2  Usage, configuration, or environment error
 .SH VERSION
-v0.4.7 (e9dbd23\-dirty 2026\-11\-16)
+v0.4.7 (a85256e\-dirty 2026\-11\-16)

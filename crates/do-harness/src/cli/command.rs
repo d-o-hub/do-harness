@@ -12,8 +12,8 @@ use crate::report::Format;
 
 use super::LearnArgs;
 use super::actions::{
-    DoctorAction, ErrorsAction, FeedbackAction, HookAction, JobAction, MetricsAction, PrAction,
-    SkillsAction, TaskAction, TraceAction,
+    CleanupArgs, DoctorAction, ErrorsAction, FeedbackAction, HookAction, JobAction, MetricsAction,
+    PrAction, SkillsAction, TaskAction, TraceAction,
 };
 
 /// Available subcommands.
@@ -39,8 +39,12 @@ pub enum Command {
         #[arg(long)]
         fail_fast: bool,
         /// Output format.
-        #[arg(long, value_enum, default_value_t = Format::Text)]
-        format: Format,
+        #[arg(long, value_enum, default_value_t = crate::report::VerifyFormat::Text)]
+        format: crate::report::VerifyFormat,
+        /// Print the execution plan and exit without spawning a sensor or
+        /// writing evidence (a pre-flight for agents and CI cost checks).
+        #[arg(long, conflicts_with_all = ["record", "bless", "evidence"])]
+        simulate: bool,
         /// Run only the sensors in this development signal set.
         #[arg(long, value_name = "SET")]
         set: Option<String>,
@@ -393,15 +397,9 @@ pub enum Command {
         all: bool,
     },
     /// Export recorded sensor executions (durations, exit codes, failures).
-    Report {
-        #[command(flatten)]
-        args: super::actions::ReportArgs,
-    },
+    Report(#[command(flatten)] super::actions::ReportArgs),
     /// Scaffold and validate a new sensor entry.
-    Sensor {
-        #[command(subcommand)]
-        action: crate::cli::SensorAction,
-    },
+    Sensor(#[command(flatten)] super::actions::SensorArgs),
     /// Draft skill/guide updates from sensors that keep firing (never applies them).
     Learn {
         /// Draft arguments (`--draft` is required; the command writes nothing).
@@ -426,6 +424,12 @@ pub enum Command {
         #[arg(long, value_name = "N", default_value_t = 20)]
         keep_per_task: i64,
     },
+    /// Reclaim the build output of provably merged, idle worktrees.
+    ///
+    /// A candidate is reclaimed only when its branch is provably merged into
+    /// the fetched `origin/main` and nothing is using its build tree. A safety
+    /// refusal is reported and left untouched; an unprovable candidate exits 1.
+    Cleanup(CleanupArgs),
     /// Print compliance mapping to OWASP Agentic Top 10, NIST AI RMF, and EU AI Act.
     Compliance {
         /// Filter framework (owasp, nist, eu, soc; hyphenated ids accepted).
