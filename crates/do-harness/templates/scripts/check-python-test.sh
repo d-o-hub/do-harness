@@ -7,17 +7,17 @@
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-cd "$ROOT"
+cd "$ROOT" || exit 1
 
 pytest -q
 status=$?
 
 # pytest exits 5 when it collects zero tests. A green gate must never pass for
-# nothing, but a fresh repo legitimately has no tests yet; surface it as a
-# skip rather than a red instead of hiding it.
+# nothing: a repository with a Python pack declares pytest as its test gate, so
+# zero collected tests is a red run, not a skip (the no-vacuous-tests rule).
 if [ "$status" -eq 5 ]; then
-    echo "pytest: zero tests collected; skipping"
-    exit 0
+    echo "pytest: zero tests collected; the test gate measured nothing" >&2
+    exit 1
 fi
 
 exit "$status"
