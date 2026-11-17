@@ -1,6 +1,7 @@
 # Epic: Agent Governance Toolkit (AGT) Tracking
 
 > **Status:** tracking epic (replaces #14 as durable backlog)
+> **Dated checkpoints:** `plans/dependency-checkpoints.md` (2027-02-15: migrate or remove `agt-governance`; 2027-03-25: `RUSTSEC-2024-0449` expiry)
 > **Related:** #11 (closed), #14 (spike), #25 (merged then reverted by #26), #30 (cherry-picked SHA pin to #31, closed as no-impact), #31 (chore: pin contributor-check SHA)
 > **Owner:** orchestrator swarm (full autonomy)
 > **Created:** 2026-09-02

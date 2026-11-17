@@ -419,16 +419,5 @@ pub enum DoctorAction {
     },
 }
 
-/// Arguments for `migrate` (flattened into the `migrate` subcommand).
-#[derive(Debug, clap::Args)]
-pub struct MigrateArgs {
-    /// Preview the required changes without writing (the default).
-    #[arg(long, conflicts_with = "write")]
-    pub diff: bool,
-    /// Apply the changes; refuses conflicts it cannot resolve.
-    #[arg(long)]
-    pub write: bool,
-    /// Output format.
-    #[arg(long, value_enum, default_value_t = crate::report::Format::Text)]
-    pub format: crate::report::Format,
-}
+mod arg_groups;
+pub use arg_groups::*;

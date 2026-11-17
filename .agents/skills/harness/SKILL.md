@@ -60,7 +60,10 @@ not proven when the workspace was initialized (the `loc` sensor among them),
 and the generic pack starts with no sensors and no sets at all, so
 `verify` there is a vacuous pass, not evidence.
 `do-harness explain --set verification --changed` shows which sensors apply to
-the current change.
+the current change. `do-harness lint` reads the guide layer the other way: it
+reports broken skill references and skills no sensor names, so a guide that has
+drifted from the feedback layer shows up as a diagnostic instead of as silent
+advice.
 
 For efficient agent loops, prefer `--changed`, `--only`, and the smallest
 affected signal set; reserve the full `main`/`release` sets for their CI gates.

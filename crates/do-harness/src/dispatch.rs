@@ -233,7 +233,8 @@ async fn route(root: &Path, config_path: Option<PathBuf>, cli: Cli) -> Result<()
             };
             verify::run(root, opts).await
         }
-        Command::List { sets, format } => {
+        Command::List(args) => {
+            let (sets, format) = (args.sets, args.format);
             let cfg = config::load(root, config_path.as_deref())
                 .await
                 .map_err(CliError::Usage)?;
@@ -451,6 +452,7 @@ async fn route(root: &Path, config_path: Option<PathBuf>, cli: Cli) -> Result<()
                 sensor: sensor.as_deref(),
                 skill: skill.as_deref(),
                 since: since.as_deref(),
+                until: None,
                 scope: scope.as_deref(),
                 task,
                 branch: branch.as_deref(),
@@ -458,7 +460,7 @@ async fn route(root: &Path, config_path: Option<PathBuf>, cli: Cli) -> Result<()
             };
             metrics::dispatch(root, action, format, filter).await
         }
-        Command::Migrate { args } => {
+        Command::Migrate(args) => {
             crate::migrate::run(
                 root,
                 config_path.as_deref(),
@@ -468,6 +470,25 @@ async fn route(root: &Path, config_path: Option<PathBuf>, cli: Cli) -> Result<()
             )
             .await
         }
+        Command::Report(args) => {
+            let filter = metrics::MetricsFilter {
+                sensor: args.sensor.as_deref(),
+                skill: None,
+                since: args.since.as_deref(),
+                until: args.until.as_deref(),
+                scope: args.scope.as_deref(),
+                task: args.task,
+                branch: args.branch.as_deref(),
+                all: args.all,
+            };
+            crate::reports::run(root, &filter, args.format).await
+        }
+        Command::Sensor(args) => match args.action {
+            crate::cli::SensorAction::New(args) => {
+                crate::sensor_new::run(root, config_path.as_deref(), &args, cli.dry_run).await
+            }
+        },
+        Command::Lint(args) => crate::lint::run(root, args.format).await,
         Command::Overlap { threshold, format } => {
             overlap::run_overlap(root, threshold, format).map_err(CliError::Usage)
         }

@@ -65,6 +65,18 @@ pub fn create_router_degraded(error: String) -> Router {
 /// at `/mcp` (modern protocol revision only); the legacy flat routes keep
 /// precedence for their exact paths.
 pub fn create_router_with_state(state: AppState) -> Router {
+    create_router_with_transport(state, true)
+}
+
+/// Creates a router and chooses whether the deprecated flat transport is
+/// mounted.
+///
+/// `transport_v1 = false` is the removal configuration: `/mcp/tools/call`
+/// returns 404 while `/mcp` (with `mcp-surface`) and the observability routes
+/// stay mounted. The default path keeps it enabled until
+/// [`crate::TRANSPORT_V1_REMOVAL_TARGET`], and a test proves the disabled
+/// router really does not serve the route.
+pub fn create_router_with_transport(state: AppState, transport_v1: bool) -> Router {
     // Observability surface: `/health` stays probeable by orchestrators and
     // `/metrics` keeps its own `metrics_token`, so neither sits behind the
     // ingress token.
@@ -75,7 +87,11 @@ pub fn create_router_with_state(state: AppState) -> Router {
     // Mediation surface: the deprecated flat route plus, with `mcp-surface`,
     // the nested MCP transport. Both sit behind the ingress token so an
     // unauthenticated request never reaches mediation, audit, or `rmcp`.
-    let mediation = Router::new().route("/mcp/tools/call", post(tool_call_handler));
+    let mediation = if transport_v1 {
+        Router::new().route("/mcp/tools/call", post(tool_call_handler))
+    } else {
+        Router::new()
+    };
     #[cfg(feature = "mcp-surface")]
     let mediation = crate::mcp::mount(mediation, state.clone());
     // Applied last so it runs first; `DefaultBodyLimit` only sets a request
@@ -230,7 +246,21 @@ async fn tool_call_handler(
 }
 
 /// Tags a legacy tool-call response with governance mode and deprecation.
+///
+/// The structured warning is emitted per request on purpose: this route is the
+/// one an un-migrated client keeps calling, and an operator needs the removal
+/// target in the proxy's own log, not only in a response header the client may
+/// discard.
 fn tag_response(mut response: Response) -> Response {
+    eprintln!(
+        "{}",
+        serde_json::json!({
+            "event": "transport_v1_deprecated",
+            "route": "/mcp/tools/call",
+            "successor": "/mcp",
+            "removal_target": crate::TRANSPORT_V1_REMOVAL_TARGET,
+        })
+    );
     let mode = crate::governance_mode().as_str();
     response
         .headers_mut()

@@ -8,6 +8,16 @@
 
 use serde::{Deserialize, Serialize};
 
+/// Version that removes the flat `POST /mcp/tools/call` transport.
+///
+/// The route predates the MCP Streamable HTTP surface and stays mounted until
+/// this release. It is advertised on every request (`deprecation` header, a
+/// `successor-version` link when `mcp-surface` is built, and one structured
+/// warning line), and `docs/guardian-proxy-migration.md` records the route
+/// mapping. The removal is a code gate, not a comment: a router built with the
+/// v1 transport disabled serves 404 for the route, and a test pins that.
+pub const TRANSPORT_V1_REMOVAL_TARGET: &str = "1.0.0";
+
 /// Proxy configuration (deny-unknown-fields for forward compatibility).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]

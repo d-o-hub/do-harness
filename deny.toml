@@ -19,8 +19,16 @@ yanked = "deny"
 # plans/invariants.json. Table form (not a bare string) so the ignore carries
 # its reason in the policy itself. (cargo-deny has no stable machine-readable
 # expiry: `advisories.ignore.expiry` is unreleased as of cargo-deny 0.20.2, so
-# the revisit date lives here in prose.) Expiry: revisit by 2027-03-25; delete
-# this entry when plans/serde-yaml-migration.md lands.
+# the revisit date lives here in prose.) Expiry: revisit by 2027-03-25; the
+# migration-or-removal decision is due at the 2027-02-15 checkpoint recorded in
+# plans/dependency-checkpoints.md. Delete this entry when
+# plans/serde-yaml-migration.md lands.
+# RUSTSEC-2026-0543: `chrono` 0.4.45 is unmaintained (advisory 2026-09-14),
+# reachable only through `rmcp` -> `schemars` in guardian-proxy's optional
+# `mcp-surface` feature; no default build links it. Rationale and the dated
+# retirement checkpoint live in scripts/check-audit.sh and
+# plans/dependency-checkpoints.md. Revisit by 2027-03-25; retire by upgrading
+# rmcp to a release that drops chrono.
 ignore = [
   { id = "RUSTSEC-2024-0449", reason = "unmaintained, not a vulnerability; reachable only transitively via serde_yaml 0.9, see plans/serde-yaml-migration.md" },
   { id = "RUSTSEC-2026-0543", reason = "unmaintained, not a vulnerability; reachable only through rmcp -> schemars in the optional mcp-surface feature, see plans/dependency-checkpoints.md" },

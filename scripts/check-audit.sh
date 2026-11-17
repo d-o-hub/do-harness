@@ -58,6 +58,13 @@ fi
 # Ignore RUSTSEC-2024-0449 (unsafe-libyaml 0.2.11 unmaintained: upstream
 # dtolnay/unsafe-libyaml is archived; advisory:
 # https://rustsec.org/advisories/RUSTSEC-2024-0449).
+# Ignore RUSTSEC-2026-0543 (chrono 0.4.45 unmaintained: advisory 2026-09-14;
+# https://rustsec.org/advisories/RUSTSEC-2026-0543). Scope justification:
+# chrono is reachable ONLY through rmcp's schemars support in the optional
+# `mcp-surface` feature of guardian-proxy; no transport v1 or default build
+# links it. Retire by upgrading rmcp to a release that drops chrono, tracked in
+# plans/dependency-checkpoints.md (revisit 2027-03-25, same checkpoint as the
+# serde_yaml advisory).
 # Scope justification: unsafe-libyaml is reachable ONLY transitively via
 # serde_yaml 0.9, which parses skill frontmatter and the optional pre-GA AGT
 # policy parameters; the advisory records maintenance status, not a reported
