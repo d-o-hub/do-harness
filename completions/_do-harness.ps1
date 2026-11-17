@@ -59,6 +59,7 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('learn', 'learn', [CompletionResultType]::ParameterValue, 'Draft skill/guide updates from sensors that keep firing (never applies them)')
             [CompletionResult]::new('overlap', 'overlap', [CompletionResultType]::ParameterValue, 'Rank skill pairs by guidance overlap (Tier-2 distinctiveness advisory)')
             [CompletionResult]::new('maintenance', 'maintenance', [CompletionResultType]::ParameterValue, 'Prune old beats and compact the state database')
+            [CompletionResult]::new('cleanup', 'cleanup', [CompletionResultType]::ParameterValue, 'Reclaim the build output of provably merged, idle worktrees')
             [CompletionResult]::new('compliance', 'compliance', [CompletionResultType]::ParameterValue, 'Print compliance mapping to OWASP Agentic Top 10, NIST AI RMF, and EU AI Act')
             [CompletionResult]::new('audit-chain', 'audit-chain', [CompletionResultType]::ParameterValue, 'Recompute workflow event hash chain and report first divergence')
             [CompletionResult]::new('dora', 'dora', [CompletionResultType]::ParameterValue, 'Derive DORA deployment metrics from git history (deterministic, read-only)')
@@ -100,6 +101,7 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Explicit path to do-harness.toml')
             [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)')
             [CompletionResult]::new('--fail-fast', '--fail-fast', [CompletionResultType]::ParameterName, 'Halt at the first failing sensor')
+            [CompletionResult]::new('--simulate', '--simulate', [CompletionResultType]::ParameterName, 'Print the execution plan and exit without spawning a sensor or writing evidence (a pre-flight for agents and CI cost checks)')
             [CompletionResult]::new('--changed', '--changed', [CompletionResultType]::ParameterName, 'Run only sensors applicable to the working-tree change')
             [CompletionResult]::new('--record', '--record', [CompletionResultType]::ParameterName, 'Persist beats and error signatures into the state database')
             [CompletionResult]::new('--global', '--global', [CompletionResultType]::ParameterName, 'Record unscoped beats in the global namespace')
@@ -129,6 +131,7 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Explicit path to do-harness.toml')
             [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)')
             [CompletionResult]::new('--fail-fast', '--fail-fast', [CompletionResultType]::ParameterName, 'Halt at the first failing sensor')
+            [CompletionResult]::new('--simulate', '--simulate', [CompletionResultType]::ParameterName, 'Print the execution plan and exit without spawning a sensor or writing evidence (a pre-flight for agents and CI cost checks)')
             [CompletionResult]::new('--changed', '--changed', [CompletionResultType]::ParameterName, 'Run only sensors applicable to the working-tree change')
             [CompletionResult]::new('--record', '--record', [CompletionResultType]::ParameterName, 'Persist beats and error signatures into the state database')
             [CompletionResult]::new('--global', '--global', [CompletionResultType]::ParameterName, 'Record unscoped beats in the global namespace')
@@ -1315,6 +1318,25 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('--version', '--version', [CompletionResultType]::ParameterName, 'Print version')
             break
         }
+        'do-harness;cleanup' {
+            [CompletionResult]::new('--keep', '--keep', [CompletionResultType]::ParameterName, 'Retain the N most recently used eligible build trees')
+            [CompletionResult]::new('--worktree', '--worktree', [CompletionResultType]::ParameterName, 'Restrict to this worktree (repeatable); default: every linked worktree')
+            [CompletionResult]::new('--target-dir', '--target-dir', [CompletionResultType]::ParameterName, 'A redirected build tree to consider alongside `<worktree>/target`')
+            [CompletionResult]::new('--format', '--format', [CompletionResultType]::ParameterName, 'Output format')
+            [CompletionResult]::new('--root', '--root', [CompletionResultType]::ParameterName, 'Workspace root override (default: walk up from cwd)')
+            [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Explicit path to do-harness.toml')
+            [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)')
+            [CompletionResult]::new('--include-shared', '--include-shared', [CompletionResultType]::ParameterName, 'Permit a build tree outside the worktree it belongs to')
+            [CompletionResult]::new('--optimistic', '--optimistic', [CompletionResultType]::ParameterName, 'Clean even when the merge proof is unavailable (documented risk)')
+            [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Suppress PASS/WARN verdict lines and the success footer')
+            [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Suppress PASS/WARN verdict lines and the success footer')
+            [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Dry run without side effects')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            [CompletionResult]::new('-V', '-V ', [CompletionResultType]::ParameterName, 'Print version')
+            [CompletionResult]::new('--version', '--version', [CompletionResultType]::ParameterName, 'Print version')
+            break
+        }
         'do-harness;compliance' {
             [CompletionResult]::new('--framework', '--framework', [CompletionResultType]::ParameterName, 'Filter framework (owasp, nist, eu, soc; hyphenated ids accepted)')
             [CompletionResult]::new('--format', '--format', [CompletionResultType]::ParameterName, 'Output format')
@@ -1615,6 +1637,7 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('learn', 'learn', [CompletionResultType]::ParameterValue, 'Draft skill/guide updates from sensors that keep firing (never applies them)')
             [CompletionResult]::new('overlap', 'overlap', [CompletionResultType]::ParameterValue, 'Rank skill pairs by guidance overlap (Tier-2 distinctiveness advisory)')
             [CompletionResult]::new('maintenance', 'maintenance', [CompletionResultType]::ParameterValue, 'Prune old beats and compact the state database')
+            [CompletionResult]::new('cleanup', 'cleanup', [CompletionResultType]::ParameterValue, 'Reclaim the build output of provably merged, idle worktrees')
             [CompletionResult]::new('compliance', 'compliance', [CompletionResultType]::ParameterValue, 'Print compliance mapping to OWASP Agentic Top 10, NIST AI RMF, and EU AI Act')
             [CompletionResult]::new('audit-chain', 'audit-chain', [CompletionResultType]::ParameterValue, 'Recompute workflow event hash chain and report first divergence')
             [CompletionResult]::new('dora', 'dora', [CompletionResultType]::ParameterValue, 'Derive DORA deployment metrics from git history (deterministic, read-only)')
@@ -1831,6 +1854,9 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             break
         }
         'do-harness;help;maintenance' {
+            break
+        }
+        'do-harness;help;cleanup' {
             break
         }
         'do-harness;help;compliance' {

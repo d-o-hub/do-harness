@@ -73,6 +73,7 @@ time on unrelated sensors.
 | Command | Stage |
 |---------|-------|
 | `do-harness verify --set feedback` | the edit loop (fast subset) |
+| `do-harness verify --simulate --format json` | pre-flight: the exact plan (`argv`, sets, timeouts) with nothing executed and nothing written |
 | `do-harness verify --set verification --strict --record --task <id>` | before calling work done; the recorded beats satisfy the `task done` gate |
 | `do-harness verify --set release` | pre-release, on the whole pack |
 | `do-harness status --set verification` | evidence freshness; runs nothing |
@@ -80,6 +81,13 @@ time on unrelated sensors.
 | `do-harness seed --prune` | after editing `plans/invariants.json` |
 | `do-harness init-db --check` | when the state database may be behind |
 | `do-harness hook install` | wire pre-commit, commit-msg, and pre-push |
+
+Before an expensive run, `verify --simulate` is the recommended first step for
+an agent: it resolves the same selection (`--set`, `--changed`, `--since`,
+`--only`) and prints what would execute, so cost and side effects are known
+before paying for them. It rejects `--record`, `--bless`, and `--evidence`
+because it writes nothing. `verify --format junit` reports the same run as a
+JUnit suite for CI test tabs; unrunnable sensors stay `<error>` and keep exit 2.
 
 Strikes are scoped per workstream — `branch:<name>`, `task:<id>`, or `global` —
 so `--task <id>` records the beats a task-scoped `task done` gate reads; an

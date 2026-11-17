@@ -56,6 +56,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand learn 'Draft skill/guide updates from sensors that keep firing (never applies them)'
             cand overlap 'Rank skill pairs by guidance overlap (Tier-2 distinctiveness advisory)'
             cand maintenance 'Prune old beats and compact the state database'
+            cand cleanup 'Reclaim the build output of provably merged, idle worktrees'
             cand compliance 'Print compliance mapping to OWASP Agentic Top 10, NIST AI RMF, and EU AI Act'
             cand audit-chain 'Recompute workflow event hash chain and report first divergence'
             cand dora 'Derive DORA deployment metrics from git history (deterministic, read-only)'
@@ -95,6 +96,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand --config 'Explicit path to do-harness.toml'
             cand --output 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)'
             cand --fail-fast 'Halt at the first failing sensor'
+            cand --simulate 'Print the execution plan and exit without spawning a sensor or writing evidence (a pre-flight for agents and CI cost checks)'
             cand --changed 'Run only sensors applicable to the working-tree change'
             cand --record 'Persist beats and error signatures into the state database'
             cand --global 'Record unscoped beats in the global namespace'
@@ -123,6 +125,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand --config 'Explicit path to do-harness.toml'
             cand --output 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)'
             cand --fail-fast 'Halt at the first failing sensor'
+            cand --simulate 'Print the execution plan and exit without spawning a sensor or writing evidence (a pre-flight for agents and CI cost checks)'
             cand --changed 'Run only sensors applicable to the working-tree change'
             cand --record 'Persist beats and error signatures into the state database'
             cand --global 'Record unscoped beats in the global namespace'
@@ -1199,6 +1202,24 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand -V 'Print version'
             cand --version 'Print version'
         }
+        &'do-harness;cleanup'= {
+            cand --keep 'Retain the N most recently used eligible build trees'
+            cand --worktree 'Restrict to this worktree (repeatable); default: every linked worktree'
+            cand --target-dir 'A redirected build tree to consider alongside `<worktree>/target`'
+            cand --format 'Output format'
+            cand --root 'Workspace root override (default: walk up from cwd)'
+            cand --config 'Explicit path to do-harness.toml'
+            cand --output 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)'
+            cand --include-shared 'Permit a build tree outside the worktree it belongs to'
+            cand --optimistic 'Clean even when the merge proof is unavailable (documented risk)'
+            cand -q 'Suppress PASS/WARN verdict lines and the success footer'
+            cand --quiet 'Suppress PASS/WARN verdict lines and the success footer'
+            cand --dry-run 'Dry run without side effects'
+            cand -h 'Print help (see more with ''--help'')'
+            cand --help 'Print help (see more with ''--help'')'
+            cand -V 'Print version'
+            cand --version 'Print version'
+        }
         &'do-harness;compliance'= {
             cand --framework 'Filter framework (owasp, nist, eu, soc; hyphenated ids accepted)'
             cand --format 'Output format'
@@ -1474,6 +1495,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand learn 'Draft skill/guide updates from sensors that keep firing (never applies them)'
             cand overlap 'Rank skill pairs by guidance overlap (Tier-2 distinctiveness advisory)'
             cand maintenance 'Prune old beats and compact the state database'
+            cand cleanup 'Reclaim the build output of provably merged, idle worktrees'
             cand compliance 'Print compliance mapping to OWASP Agentic Top 10, NIST AI RMF, and EU AI Act'
             cand audit-chain 'Recompute workflow event hash chain and report first divergence'
             cand dora 'Derive DORA deployment metrics from git history (deterministic, read-only)'
@@ -1632,6 +1654,8 @@ set edit:completion:arg-completer[do-harness] = {|@words|
         &'do-harness;help;overlap'= {
         }
         &'do-harness;help;maintenance'= {
+        }
+        &'do-harness;help;cleanup'= {
         }
         &'do-harness;help;compliance'= {
         }

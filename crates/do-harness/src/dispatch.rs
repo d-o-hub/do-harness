@@ -120,6 +120,19 @@ async fn route(root: &Path, config_path: Option<PathBuf>, cli: Cli) -> Result<()
         } => commands::maintenance(root, prune_beats, keep_per_task, cli.dry_run)
             .await
             .map_err(CliError::Usage),
+        Command::Cleanup(args) => crate::cleanup::run(
+            root,
+            &crate::cleanup::Options {
+                dry_run: cli.dry_run,
+                format: args.format,
+                keep: args.keep,
+                worktrees: args.worktree,
+                target_dirs: args.target_dir,
+                include_shared: args.include_shared,
+                optimistic: args.optimistic,
+            },
+        )
+        .map_err(exit::classify),
         Command::Init {
             language,
             force,
@@ -176,6 +189,7 @@ async fn route(root: &Path, config_path: Option<PathBuf>, cli: Cli) -> Result<()
             strict,
             bless,
             approver,
+            simulate,
         } => {
             let (task_id, raw_task) = match task.as_deref() {
                 Some("global") => (None, Some("global".to_string())),
@@ -195,6 +209,7 @@ async fn route(root: &Path, config_path: Option<PathBuf>, cli: Cli) -> Result<()
             let opts = sensors::VerifyOpts {
                 fail_fast,
                 dry_run: cli.dry_run,
+                simulate,
                 set,
                 changed,
                 since,

@@ -113,6 +113,7 @@
       "learn",
       "overlap",
       "maintenance",
+      "cleanup",
       "compliance",
       "audit-chain",
       "dora",
@@ -196,9 +197,26 @@
           ],
           "possible_values": [
             "text",
-            "json"
+            "json",
+            "junit"
           ],
           "help": "Output format",
+          "index": null
+        },
+        {
+          "id": "simulate",
+          "kind": "option",
+          "short": null,
+          "long": "simulate",
+          "value_names": [
+            "SIMULATE"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": false,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Print the execution plan and exit without spawning a sensor or writing evidence (a pre-flight for agents and CI cost checks)",
           "index": null
         },
         {
@@ -3896,6 +3914,117 @@
           ],
           "possible_values": [],
           "help": "Minimum most-recent beats kept per task when pruning",
+          "index": null
+        }
+      ],
+      "subcommands": [],
+      "invocable": true
+    },
+    {
+      "path": "cleanup",
+      "about": "Reclaim the build output of provably merged, idle worktrees",
+      "usage": "do-harness cleanup [OPTIONS]",
+      "aliases": [],
+      "args": [
+        {
+          "id": "keep",
+          "kind": "option",
+          "short": null,
+          "long": "keep",
+          "value_names": [
+            "N"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Retain the N most recently used eligible build trees",
+          "index": null
+        },
+        {
+          "id": "worktree",
+          "kind": "option",
+          "short": null,
+          "long": "worktree",
+          "value_names": [
+            "PATH"
+          ],
+          "required": false,
+          "repeatable": true,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Restrict to this worktree (repeatable); default: every linked worktree",
+          "index": null
+        },
+        {
+          "id": "target_dir",
+          "kind": "option",
+          "short": null,
+          "long": "target-dir",
+          "value_names": [
+            "PATH"
+          ],
+          "required": false,
+          "repeatable": true,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "A redirected build tree to consider alongside `<worktree>/target`",
+          "index": null
+        },
+        {
+          "id": "include_shared",
+          "kind": "option",
+          "short": null,
+          "long": "include-shared",
+          "value_names": [
+            "INCLUDE_SHARED"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": false,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Permit a build tree outside the worktree it belongs to",
+          "index": null
+        },
+        {
+          "id": "optimistic",
+          "kind": "option",
+          "short": null,
+          "long": "optimistic",
+          "value_names": [
+            "OPTIMISTIC"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": false,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Clean even when the merge proof is unavailable (documented risk)",
+          "index": null
+        },
+        {
+          "id": "format",
+          "kind": "option",
+          "short": null,
+          "long": "format",
+          "value_names": [
+            "FORMAT"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [
+            "text"
+          ],
+          "possible_values": [
+            "text",
+            "json"
+          ],
+          "help": "Output format",
           "index": null
         }
       ],
