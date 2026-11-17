@@ -33,7 +33,7 @@ curl -fsSL https://raw.githubusercontent.com/d-o-hub/do-harness/main/scripts/ins
 
 # pinned, reproducible install
 curl -fsSL https://raw.githubusercontent.com/d-o-hub/do-harness/main/scripts/install.sh \
-  | sh -s -- --version v0.2.1
+  | sh -s -- --version v0.4.7
 ```
 
 The installer verifies the artifact against the release `checksums.txt` before
@@ -95,7 +95,7 @@ The harness is designed to be adopted by any codebase, Rust or not:
    <!-- example: id=use_another_repo_install classification=illustrative reason="Alternative adoption installation flows" -->
    ```bash
    curl -fsSL https://raw.githubusercontent.com/d-o-hub/do-harness/main/scripts/install.sh \
-     | sh -s -- --version v0.2.1
+     | sh -s -- --version v0.4.7
    # or, from a vendored checkout:
    cargo install --path vendor/do-harness/crates/do-harness
    ```
@@ -201,7 +201,7 @@ set -euo pipefail
 
 # Prebuilt binary (pinned):
 curl -fsSL https://raw.githubusercontent.com/d-o-hub/do-harness/main/scripts/install.sh \
-  | sh -s -- --version v0.2.1
+  | sh -s -- --version v0.4.7
 # ...or a vendored checkout (installs outside the workspace target/):
 # cargo install --path vendor/do-harness/crates/do-harness
 
@@ -226,7 +226,7 @@ For CI, install the pinned binary first, then invoke `do-harness verify --format
 <!-- example: id=ci_path_export classification=illustrative reason="CI environment path export snippet" -->
 ```bash
 curl -fsSL https://raw.githubusercontent.com/d-o-hub/do-harness/main/scripts/install.sh \
-  | sh -s -- --version v0.2.1
+  | sh -s -- --version v0.4.7
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
@@ -241,6 +241,7 @@ export PATH="$HOME/.local/bin:$PATH"
 | `verify [OPTIONS]` | Run computational sensors (alias: `check`) — flags: `--fail-fast`, `--format <FORMAT>`, `--simulate`, `--set <SET>`, `--changed`, `--since <REF>`, `--only <SENSOR>`, `--exclude <SENSOR>`, `--jobs <N>`, `--unchanged <MODE>`, `--record`, `--task <ID>`, `--global`, `--evidence <FILE>`, `--strict`, `--bless`, `--approver <NAME>` |
 | `list [OPTIONS]` | List sensor names (alias: `ls`) — flags: `--sets`, `--format <FORMAT>` |
 | `explain [OPTIONS]` | Explain which sensors the current change selects, without running them — flags: `--set <SET>`, `--changed`, `--since <REF>`, `--format <FORMAT>` |
+| `lint [OPTIONS]` | Lint the feedforward guides (AGENTS.md and skills) against the sensors — flags: `--format <FORMAT>` |
 | `status [OPTIONS]` | Report verification evidence freshness without running sensors — flags: `--set <SET>`, `--evidence <FILE>`, `--since <REF>`, `--format <FORMAT>` |
 | `sync [OPTIONS]` | Refresh `origin/main` and reconcile the local `main` branch (alias: `latest-main`) — flags: `--switch`, `--read-only`, `--reset-diverged`, `--status`, `--format <FORMAT>` |
 | `pr no-effect [OPTIONS] [PR]` | Report the prospective merge impact of a PR or revision range — flags: `--base <REV>`, `--head <REV>`, `--no-fetch`, `--format <FORMAT>` |
@@ -285,6 +286,8 @@ export PATH="$HOME/.local/bin:$PATH"
 | `doctor pr-policy [OPTIONS]` | Check repository PR merge policy against configured expectations — flags: `--format <FORMAT>` |
 | `metrics [OPTIONS] [COMMAND]` | Report harness trends: sensor stats, strikes, eval pass-rate history — flags: `--format <FORMAT>`, `--sensor <SENSOR>`, `--skill <SKILL>`, `--since <UNIX_SECONDS>`, `--scope <SCOPE>`, `--task <ID>`, `--branch <BRANCH>`, `--all` |
 | `metrics pr [OPTIONS] --repo <OWNER/NAME>` | PR-loop measures: time-to-green, pushes per green, waivers, comments, cancelled runs, reruns — flags: `--repo <OWNER/NAME>`, `--since <WINDOW>`, `--limit <N>`, `--recompute`, `--format <FORMAT>` |
+| `report [OPTIONS]` | Export recorded sensor executions (durations, exit codes, failures) — flags: `--format <FORMAT>`, `--sensor <SENSOR>`, `--since <UNIX_SECONDS>`, `--until <UNIX_SECONDS>`, `--scope <SCOPE>`, `--task <ID>`, `--branch <BRANCH>`, `--all` |
+| `sensor new [OPTIONS] --arg <ARG> <NAME>` | Add a validated `[[sensors]]` entry to do-harness.toml — flags: `--arg <ARG>`, `--when-changed <GLOB>`, `--set <SET>`, `--script <PATH>` |
 | `learn [OPTIONS] --draft` | Draft skill/guide updates from sensors that keep firing (never applies them) — flags: `--draft`, `--days <DAYS>`, `--min-fires <N>`, `--format <FORMAT>` |
 | `overlap [OPTIONS]` | Rank skill pairs by guidance overlap (Tier-2 distinctiveness advisory) — flags: `--threshold <THRESHOLD>`, `--format <FORMAT>` |
 | `maintenance [OPTIONS]` | Prune old beats and compact the state database — flags: `--prune-beats <DAYS>`, `--keep-per-task <N>` |

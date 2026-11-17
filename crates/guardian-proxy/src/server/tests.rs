@@ -440,3 +440,5 @@ async fn test_legacy_route_advertises_deprecation() {
 }
 
 mod auth;
+
+mod transport;

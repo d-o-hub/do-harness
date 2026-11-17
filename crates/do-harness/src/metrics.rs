@@ -66,12 +66,14 @@ pub struct MetricsSnapshot {
     pub skills: Vec<SkillTrend>,
 }
 
-/// Query filters for `do-harness metrics`.
+/// Query filters for `do-harness metrics` and `do-harness report`.
 #[derive(Debug, Default)]
 pub struct MetricsFilter<'a> {
     pub sensor: Option<&'a str>,
     pub skill: Option<&'a str>,
     pub since: Option<&'a str>,
+    /// Inclusive Unix-seconds upper bound, used by `report` only.
+    pub until: Option<&'a str>,
     pub scope: Option<&'a str>,
     pub task: Option<i64>,
     pub branch: Option<&'a str>,
@@ -104,6 +106,7 @@ pub async fn dispatch(
         if filter.sensor.is_some()
             || filter.skill.is_some()
             || filter.since.is_some()
+            || filter.until.is_some()
             || filter.scope.is_some()
             || filter.task.is_some()
             || filter.branch.is_some()
@@ -127,11 +130,11 @@ pub async fn dispatch(
         .map_err(CliError::Usage)
 }
 
-/// Resolves the workstream scope for metrics filtering.
+/// The effective workstream scope for metrics-style filtering.
 ///
 /// One key serves beats, sensors, and strikes — the same string `verify
 /// --record` writes — so a snapshot can never mix another branch's rows in.
-fn resolve_effective_scope(root: &Path, filter: &MetricsFilter<'_>) -> Option<String> {
+pub(crate) fn effective_scope(root: &Path, filter: &MetricsFilter<'_>) -> Option<String> {
     if filter.all {
         return None;
     }
@@ -238,7 +241,7 @@ pub async fn run_metrics(root: &Path, format: Format, filter: &MetricsFilter<'_>
         })?),
         None => None,
     };
-    let effective_scope = resolve_effective_scope(root, filter);
+    let effective_scope = effective_scope(root, filter);
     let conn = do_harness_db::connect_and_migrate(root).await?;
     let mut sensors = do_harness_db::sensor_stats(&conn, since, effective_scope.as_deref()).await?;
     if let Some(s) = filter.sensor {

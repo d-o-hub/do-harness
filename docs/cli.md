@@ -430,6 +430,30 @@ in `changed_files` and `discovery_error`.
   `base_sha`, `head_sha`, and `merge_base_sha`.
 - `--format <Format>`: Output format (`text` or `json`).
 
+### `lint`
+<!-- BEGIN GENERATED: cli-contract lint -->
+`do-harness lint [OPTIONS]`
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `--format <FORMAT>` | no | `text` | `text`, `json` | Output format |
+<!-- END GENERATED: cli-contract lint -->
+Lints the feedforward guide layer — every `AGENTS.md` under the workspace root
+plus `.agents/skills/` — without running anything:
+
+- **error `broken-skill-reference`**: a link to `.agents/skills/<name>` or a
+  `skill://<name>` URI that does not resolve;
+- **error `skill-without-contract`**: a skill directory without `SKILL.md`;
+- **warning `duplicate-instruction`**: the same substantive instruction line
+  appears twice (headings, tables, fences, and short lines are ignored);
+- **warning `skill-without-sensor`**: no configured sensor names the skill or
+  its directory, which is what guide drift from the feedback layer looks like.
+
+Exit `1` when any error is reported, `0` with warnings only, `2` when the root
+has no `AGENTS.md` (a lint over nothing must not report green). `--format json`
+emits `{root, diagnostics, errors, warnings, ok}` with every diagnostic carrying
+`severity`, `code`, `path`, `line`, and `message`.
+
 ### `init-db`
 <!-- BEGIN GENERATED: cli-contract init-db -->
 `do-harness init-db [OPTIONS]`
@@ -1151,6 +1175,85 @@ A `gh` read that fails on a single pull request is reported as a warning and the
 snapshot keeps the pull requests it could measure; a failed *list* read exits `1`
 rather than reporting an empty window. An unreadable window or repository is a
 usage error (`2`).
+
+### `report`
+<!-- BEGIN GENERATED: cli-contract report -->
+`do-harness report [OPTIONS]`
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `--format <FORMAT>` | no | `text` | `text`, `json`, `prometheus` | Output format |
+| `--sensor <SENSOR>` | no | — | — | Filter by sensor name |
+| `--since <UNIX_SECONDS>` | no | — | — | Inclusive window start as a Unix timestamp in seconds |
+| `--until <UNIX_SECONDS>` | no | — | — | Inclusive window end as a Unix timestamp in seconds |
+| `--scope <SCOPE>` | no | — | — | Filter by workstream scope (e.g. `branch:main`, `task:1`, `global`, or `all`). Defaults to the current git branch |
+| `--task <ID>` | no | — | — | Filter by task id (equivalent to `--scope task:<ID>`) |
+| `--branch <BRANCH>` | no | — | — | Filter by branch name (equivalent to `--scope branch:<NAME>`) |
+| `--all` | no | — | — | Aggregate across all workstreams and scopes |
+<!-- END GENERATED: cli-contract report -->
+Export the recorded sensor executions (`verify --record` beats) as a historical
+series: one row per run with its status, exit code, start/finish timestamps, and
+derived `duration_ms`, oldest first. The window (`--since`, `--until`) is in
+inclusive Unix seconds and composes with `--sensor` and the same scope selectors
+`metrics` uses (`--scope`, `--task`, `--branch`, `--all`). An inverted window is
+a usage error (`2`).
+
+`--format json` emits a versioned document:
+
+<!-- example: id=cli_report_json classification=illustrative reason="Report JSON shape" -->
+```json
+{
+  "schema_version": 1,
+  "scope": "branch:main",
+  "window": {"since": 1760000000, "until": null},
+  "executions": [
+    {"id": 7, "sensor": "test", "scope": "branch:main", "status": "ok",
+     "exit_code": 0, "started_at": 1760000010, "completed_at": 1760000032,
+     "duration_ms": 22000}
+  ]
+}
+```
+
+`--format prometheus` emits text exposition (v0.0.4) aggregated per
+`(sensor, scope)` over the window: `do_harness_sensor_runs_total`,
+`do_harness_sensor_failures_total`,
+`do_harness_sensor_duration_seconds_total`, and
+`do_harness_sensor_last_exit_code`. Counters are window-scoped, so a changing
+window resets them; scrape without a window for monotonic totals. The command is
+read-only: it never runs a sensor and never writes state.
+
+### `sensor`
+<!-- BEGIN GENERATED: cli-contract sensor -->
+`do-harness sensor [OPTIONS] <COMMAND>`
+
+Subcommands: `new`.
+<!-- END GENERATED: cli-contract sensor -->
+Scaffold sensor configuration. Both the write and its proof happen here so a
+generated entry cannot be one that `explain`/`verify` would reject.
+
+#### `sensor new`
+<!-- BEGIN GENERATED: cli-contract sensor new -->
+`do-harness sensor new [OPTIONS] --arg <ARG> <NAME>`
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `<NAME>` | yes | — | — | New sensor name (lowercase ASCII letters, digits, '-' and '_') |
+| `--arg <ARG>` (repeatable) | yes | — | — | One argv element; repeat once for the program and once per argument |
+| `--when-changed <GLOB>` (repeatable) | no | — | — | Restrict the sensor to changes matching this glob; repeatable |
+| `--set <SET>` | no | — | — | Add the sensor to this already-declared signal set |
+| `--script <PATH>` | no | — | — | Scaffold an executable stub script at this path (never overwrites) |
+<!-- END GENERATED: cli-contract sensor new -->
+Append a `[[sensors]]` block to `do-harness.toml` and, with `--set`, add the
+name to an existing signal set (which must be declared; a multi-line set array
+is refused instead of being reformatted). `--arg` is repeated once per argv
+element, program first. `--script` scaffolds an executable stub that fails
+until you replace its body, and never overwrites an existing file.
+
+After writing, the command resolves the new entry with the real selection path
+(`--set` + `--only <NAME>`); a failure restores the previous file byte for byte
+and exits `2`. A name that is already declared, an invalid name, an empty argv,
+or a missing signal set is refused before anything is written. `--dry-run`
+prints the block without writing.
 
 ### `loc`
 <!-- BEGIN GENERATED: cli-contract loc -->

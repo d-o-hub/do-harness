@@ -23,6 +23,19 @@ Before claiming completion:
 
     do-harness verify --set verification --changed --strict
 
+On a clean committed branch — CI, or after you committed — the working tree is
+empty, and `--changed` refuses with exit 2 (`no change input`). Select the
+committed range instead, and check evidence against the same range:
+
+    do-harness verify --set verification --since origin/main --strict
+    do-harness status --set verification --since origin/main
+
+Use `origin/<base>` (the branch you will merge into). A shallow clone may not
+have the base object: fetch it (`git fetch origin <base>`, or
+`fetch-depth: 0` in CI) rather than treating the empty selection as a pass.
+The working-tree form stays correct during edits; the committed-range form is
+the one a CI job or a post-commit agent runs.
+
 Do not disable, bypass, remove, or weaken a required signal merely to obtain a
 passing result. Fix the underlying cause and re-run the sensor.
 

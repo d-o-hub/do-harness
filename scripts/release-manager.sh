@@ -526,6 +526,18 @@ prepare_man() {
     (cd "$ROOT" && cargo run --quiet -p do-harness --bin do-harness -- man man)
 }
 
+prepare_docs_pins() {
+    # Install snippets pin the release tag. They are not generated, so a release
+    # that bumped only the manifests left readers installing an old build until
+    # `docs-pins` caught it. `$version` is validated by require_version, so it is
+    # safe inside the sed expression.
+    local version="$1" file
+    for file in "$ROOT/README.md" "$ROOT/docs/adoption.md"; do
+        [ -f "$file" ] || continue
+        substitute "s/--version v[0-9][0-9]*\(\.[0-9][0-9]*\)*/--version v$version/g" "$file"
+    done
+}
+
 cmd_prepare() {
     local version="${1:-}"
     [ -n "$version" ] || die "prepare needs a version (try: release-manager.sh next)"
@@ -546,6 +558,7 @@ cmd_prepare() {
         prepare_cargo "$version"
         prepare_pins "$version"
         prepare_npm "$version"
+        prepare_docs_pins "$version"
         printf 'applied %s (was %s)\n' "$version" "$current"
     fi
     if [ "$DO_LOCK" = true ]; then
