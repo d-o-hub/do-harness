@@ -1,6 +1,6 @@
 # Proposal: make `verify` change-selection usable outside the working tree
 
-> **Status:** proposed - awaiting a decision; measured 2026-11-09
+> **Status:** implemented — P1 (#551: empty change input exits 2), P2 (#551: relative `--root`), `status --since` (#551), and P3 (scaffolded `AGENTS.md` now shows the committed-range form) have shipped. The change-scoped CI gate is a separate decision, recorded in `plans/ci-scope-decision.md`; measured 2026-11-09
 > **Recorded:** `plans/`
 
 Measured on 2026-11-09 · Affects `do-harness` CLI, CI policy

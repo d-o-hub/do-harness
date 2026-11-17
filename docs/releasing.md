@@ -299,10 +299,13 @@ completions change when the CLI surface does, and `prepare` regenerates the page
 
 1. Apply the version to every managed manifest — `[workspace.package].version` in
    `Cargo.toml`, `Cargo.lock`, `integrations/npm/package.json`, the five
-   `integrations/npm/platforms/*/package.json`, and the generated man page — and
-   merge that change to `main`. `scripts/release-manager.sh prepare <version>` does
-   the whole set, and the release preflight enforces it afterwards
-   (`scripts/check-package-contract.sh`).
+   `integrations/npm/platforms/*/package.json`, the generated man page, and the
+   pinned `--version vX.Y.Z` install snippets in `README.md` and
+   `docs/adoption.md` — and merge that change to `main`.
+   `scripts/release-manager.sh prepare <version>` does the whole set, and the
+   release preflight enforces it afterwards
+   (`scripts/check-package-contract.sh`, plus the `docs-pins` sensor for the
+   snippets).
 2. Tag the merge commit and push the tag:
 
    <!-- example: id=releasing_tag_commands classification=illustrative reason="Git tag creation and push commands" -->

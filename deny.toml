@@ -19,8 +19,10 @@ yanked = "deny"
 # plans/invariants.json. Table form (not a bare string) so the ignore carries
 # its reason in the policy itself. (cargo-deny has no stable machine-readable
 # expiry: `advisories.ignore.expiry` is unreleased as of cargo-deny 0.20.2, so
-# the revisit date lives here in prose.) Expiry: revisit by 2027-03-25; delete
-# this entry when plans/serde-yaml-migration.md lands.
+# the revisit date lives here in prose.) Expiry: revisit by 2027-03-25; the
+# migration-or-removal decision is due at the 2027-02-15 checkpoint recorded in
+# plans/dependency-checkpoints.md. Delete this entry when
+# plans/serde-yaml-migration.md lands.
 ignore = [
   { id = "RUSTSEC-2024-0449", reason = "unmaintained, not a vulnerability; reachable only transitively via serde_yaml 0.9, see plans/serde-yaml-migration.md" },
 ]
