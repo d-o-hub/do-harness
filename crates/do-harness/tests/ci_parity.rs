@@ -130,7 +130,21 @@ fn assert_missing_tool_policy(name: &str, utilities: &[&str]) {
         let mut cmd = Command::new("/bin/bash");
         cmd.arg(script(name));
         sensor_env(&mut cmd, &bin, ci, require_tools);
-        cmd.output().expect("spawn script")
+        // The stubs above were just copied. Another test thread's fork can
+        // still hold the copy's write descriptor, so the first exec of a stub
+        // returns ETXTBSY ("Text file busy", os error 26) before its own
+        // branch runs. Retry instead of recording a failure the script never
+        // produced (the same race the harness handles in shell::exec).
+        for attempt in 0..40 {
+            let output = cmd.output().expect("spawn script");
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            if stderr.contains("Text file busy") && attempt + 1 < 40 {
+                std::thread::sleep(std::time::Duration::from_millis(25));
+                continue;
+            }
+            return output;
+        }
+        unreachable!("the retry loop always returns or continues")
     };
 
     let local = run_scenario(false, false);
