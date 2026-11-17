@@ -341,8 +341,10 @@ mod tests {
         assert!(plan.changes.iter().any(|change| change.line == 0
             && change.after == format!("schema-version = {CONFIG_SCHEMA_VERSION}")));
         let migrated = apply(text, &plan).unwrap();
-        assert!(
-            migrated.starts_with("# comment\nlanguage = \"rust\"\nschema-version = 1\n\n[hooks]")
+        // The key goes before the first table, after the leading scalar keys.
+        assert_eq!(
+            migrated,
+            "# comment\nlanguage = \"rust\"\n\nschema-version = 1\n[hooks]\npre-commit = []\n"
         );
     }
 
