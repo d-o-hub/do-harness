@@ -108,13 +108,11 @@ pub(super) async fn check_task_export(
 pub(super) fn config_schema(root: &Path) -> Option<u32> {
     let text = std::fs::read_to_string(root.join("do-harness.toml")).ok()?;
     let value: toml::Value = toml::from_str(&text).ok()?;
+    // Absent means a pre-versioning file this binary still reads. Treating it
+    // as skew would fail `doctor` for every existing adopter; `migrate --diff`
+    // is the recommendation, and a *declared* older version is the failure.
     match value.get("schema-version") {
-        // Absent means a pre-versioning file this binary still reads. Treating
-        // it as skew would fail `doctor` for every existing adopter; `migrate
-        // --diff` is the recommendation, and a *declared* older version is the
-        // failure.
-        None => None,
         Some(toml::Value::Integer(version)) => u32::try_from(*version).ok(),
-        Some(_) => None,
+        _ => None,
     }
 }
