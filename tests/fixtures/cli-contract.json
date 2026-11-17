@@ -110,6 +110,8 @@
       "hook",
       "doctor",
       "metrics",
+      "report",
+      "sensor",
       "learn",
       "overlap",
       "maintenance",
@@ -3738,6 +3740,251 @@
             "json"
           ],
           "help": "Output format",
+          "index": null
+        }
+      ],
+      "subcommands": [],
+      "invocable": true
+    },
+    {
+      "path": "report",
+      "about": "Export recorded sensor executions (durations, exit codes, failures)",
+      "usage": "do-harness report [OPTIONS]",
+      "aliases": [],
+      "args": [
+        {
+          "id": "format",
+          "kind": "option",
+          "short": null,
+          "long": "format",
+          "value_names": [
+            "FORMAT"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [
+            "text"
+          ],
+          "possible_values": [
+            "text",
+            "json",
+            "prometheus"
+          ],
+          "help": "Output format",
+          "index": null
+        },
+        {
+          "id": "sensor",
+          "kind": "option",
+          "short": null,
+          "long": "sensor",
+          "value_names": [
+            "SENSOR"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Filter by sensor name",
+          "index": null
+        },
+        {
+          "id": "since",
+          "kind": "option",
+          "short": null,
+          "long": "since",
+          "value_names": [
+            "UNIX_SECONDS"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Inclusive window start as a Unix timestamp in seconds",
+          "index": null
+        },
+        {
+          "id": "until",
+          "kind": "option",
+          "short": null,
+          "long": "until",
+          "value_names": [
+            "UNIX_SECONDS"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Inclusive window end as a Unix timestamp in seconds",
+          "index": null
+        },
+        {
+          "id": "scope",
+          "kind": "option",
+          "short": null,
+          "long": "scope",
+          "value_names": [
+            "SCOPE"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Filter by workstream scope (e.g. `branch:main`, `task:1`, `global`, or `all`). Defaults to the current git branch",
+          "index": null
+        },
+        {
+          "id": "task",
+          "kind": "option",
+          "short": null,
+          "long": "task",
+          "value_names": [
+            "ID"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Filter by task id (equivalent to `--scope task:<ID>`)",
+          "index": null
+        },
+        {
+          "id": "branch",
+          "kind": "option",
+          "short": null,
+          "long": "branch",
+          "value_names": [
+            "BRANCH"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Filter by branch name (equivalent to `--scope branch:<NAME>`)",
+          "index": null
+        },
+        {
+          "id": "all",
+          "kind": "option",
+          "short": null,
+          "long": "all",
+          "value_names": [
+            "ALL"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": false,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Aggregate across all workstreams and scopes",
+          "index": null
+        }
+      ],
+      "subcommands": [],
+      "invocable": true
+    },
+    {
+      "path": "sensor",
+      "about": "Scaffold and validate a new sensor entry",
+      "usage": "do-harness sensor [OPTIONS] <COMMAND>",
+      "aliases": [],
+      "args": [],
+      "subcommands": [
+        "new"
+      ],
+      "invocable": false
+    },
+    {
+      "path": "sensor new",
+      "about": "Add a validated `[[sensors]]` entry to do-harness.toml",
+      "usage": "do-harness sensor new [OPTIONS] --arg <ARG> <NAME>",
+      "aliases": [],
+      "args": [
+        {
+          "id": "name",
+          "kind": "positional",
+          "short": null,
+          "long": null,
+          "value_names": [
+            "NAME"
+          ],
+          "required": true,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "New sensor name (lowercase ASCII letters, digits, '-' and '_')",
+          "index": 1
+        },
+        {
+          "id": "args",
+          "kind": "option",
+          "short": null,
+          "long": "arg",
+          "value_names": [
+            "ARG"
+          ],
+          "required": true,
+          "repeatable": true,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "One argv element; repeat once for the program and once per argument",
+          "index": null
+        },
+        {
+          "id": "when_changed",
+          "kind": "option",
+          "short": null,
+          "long": "when-changed",
+          "value_names": [
+            "GLOB"
+          ],
+          "required": false,
+          "repeatable": true,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Restrict the sensor to changes matching this glob; repeatable",
+          "index": null
+        },
+        {
+          "id": "set",
+          "kind": "option",
+          "short": null,
+          "long": "set",
+          "value_names": [
+            "SET"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Add the sensor to this already-declared signal set",
+          "index": null
+        },
+        {
+          "id": "script",
+          "kind": "option",
+          "short": null,
+          "long": "script",
+          "value_names": [
+            "PATH"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Scaffold an executable stub script at this path (never overwrites)",
           "index": null
         }
       ],

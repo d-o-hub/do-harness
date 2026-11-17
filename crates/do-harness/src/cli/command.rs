@@ -120,11 +120,7 @@ pub enum Command {
         format: Format,
     },
     /// Lint the feedforward guides (AGENTS.md and skills) against the sensors.
-    Lint {
-        /// Output format.
-        #[arg(long, value_enum, default_value_t = Format::Text)]
-        format: Format,
-    },
+    Lint(#[command(flatten)] super::actions::LintArgs),
     /// Report verification evidence freshness without running sensors.
     Status {
         /// Check evidence for this development signal set.
@@ -402,6 +398,10 @@ pub enum Command {
         #[arg(long, conflicts_with_all = ["scope", "task", "branch"])]
         all: bool,
     },
+    /// Export recorded sensor executions (durations, exit codes, failures).
+    Report(#[command(flatten)] super::actions::ReportArgs),
+    /// Scaffold and validate a new sensor entry.
+    Sensor(#[command(flatten)] super::actions::SensorArgs),
     /// Draft skill/guide updates from sensors that keep firing (never applies them).
     Learn {
         /// Draft arguments (`--draft` is required; the command writes nothing).

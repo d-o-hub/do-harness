@@ -407,6 +407,20 @@ pack entirely. Non-empty `pre-commit` and `pre-push` hook selections under
 and any unknown sensor name fails configuration loading before hooks are
 written. An empty hook list defaults to running the full effective suite.
 
+`sensor new` writes that entry for you and then proves it: the block is
+appended, an existing single-line signal-set array gains the name with
+`--set`, and the resulting configuration is resolved through the same selection
+path `explain`/`verify` use. A failed proof restores the file byte for byte.
+`--script` scaffolds an executable stub that exits non-zero until you replace
+its body, so a placeholder can never pass as a check.
+
+<!-- example: id=adoption_sensor_new classification=illustrative reason="Sensor scaffolding command" -->
+```bash
+do-harness sensor new ruff --arg ruff --arg check --arg . \
+  --when-changed '**/*.py' --set feedback --script scripts/ruff.sh
+do-harness verify --only ruff
+```
+
 `verify` resolves the path-looking arguments in each sensor's `argv` before it
 spawns the command. A missing script or data file fails the sensor instead of
 recording a pass, because an interpreter or wrapper can exit 0 while ignoring
@@ -652,6 +666,40 @@ verify:
     when: always
     reports:
       junit: junit.xml
+```
+
+## Sensor execution reports
+
+`verify --record` persists one beat per sensor run. `report` exports them
+historically: durations, exit codes, status, and scope, filtered by an inclusive
+Unix-seconds window (`--since`, `--until`), `--sensor`, and the same scope
+selectors `metrics` uses (`--scope`, `--task`, `--branch`, `--all`). It reads
+the state database only; it never runs a sensor.
+
+`--format json` emits `schema_version: 1` with `scope`, `window`, and an
+`executions` array (oldest first). `--format prometheus` emits valid text
+exposition for a scrape, aggregated per `(sensor, scope)` over the window:
+`do_harness_sensor_runs_total`, `do_harness_sensor_failures_total`,
+`do_harness_sensor_duration_seconds_total`, and
+`do_harness_sensor_last_exit_code`. A window-scoped counter resets when the
+window moves, so scrape the whole history for monotonically increasing totals.
+
+<!-- example: id=adoption_report classification=illustrative reason="Report export commands" -->
+```bash
+do-harness report --format json --since 1760000000 --scope branch:main
+do-harness report --format prometheus --all
+```
+
+GitHub Actions job summary from the JSON export (`jq` is preinstalled):
+
+<!-- example: id=adoption_report_gha classification=illustrative reason="GitHub Actions job summary from report JSON" -->
+```yaml
+- name: Sensor history
+  if: always()
+  run: |
+    do-harness report --format json --all \
+      | jq -r '"| sensor | runs |", "|---|---|", (.executions | group_by(.sensor)[] | "| \(.[0].sensor) | \(length) |")' \
+      >> "$GITHUB_STEP_SUMMARY"
 ```
 
 ## Releasing

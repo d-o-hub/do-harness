@@ -1,6 +1,6 @@
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
-.TH do-harness 1  "do-harness 0.4.7 (b46e586 2026-11-17)" 
+.TH do-harness 1  "do-harness 0.4.7 (3dc9721-dirty 2026-11-17)" 
 .SH NAME
 do\-harness \- do\-harness agent execution harness CLI
 .SH SYNOPSIS
@@ -97,6 +97,12 @@ Run diagnostic checks on binary resolution and git hook health
 do\-harness metrics
 Report harness trends: sensor stats, strikes, eval pass\-rate history
 .TP
+do\-harness report
+Export recorded sensor executions (durations, exit codes, failures)
+.TP
+do\-harness sensor
+Scaffold and validate a new sensor entry
+.TP
 do\-harness learn
 Draft skill/guide updates from sensors that keep firing (never applies them)
 .TP
@@ -147,4 +153,4 @@ Exit Codes:
   1  Verification or check failure
   2  Usage, configuration, or environment error
 .SH VERSION
-v0.4.7 (b46e586 2026\-11\-17)
+v0.4.7 (3dc9721\-dirty 2026\-11\-17)
