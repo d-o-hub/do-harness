@@ -58,6 +58,7 @@ mod init;
 mod job;
 mod junit;
 mod learn;
+mod lint;
 mod loc;
 mod man;
 mod managed_path;

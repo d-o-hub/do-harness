@@ -92,6 +92,7 @@
       "verify",
       "list",
       "explain",
+      "lint",
       "status",
       "sync",
       "pr",
@@ -557,6 +558,37 @@
           "help": "Select by the committed range `merge-base(<REF>, HEAD)..HEAD`",
           "index": null
         },
+        {
+          "id": "format",
+          "kind": "option",
+          "short": null,
+          "long": "format",
+          "value_names": [
+            "FORMAT"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [
+            "text"
+          ],
+          "possible_values": [
+            "text",
+            "json"
+          ],
+          "help": "Output format",
+          "index": null
+        }
+      ],
+      "subcommands": [],
+      "invocable": true
+    },
+    {
+      "path": "lint",
+      "about": "Lint the feedforward guides (AGENTS.md and skills) against the sensors",
+      "usage": "do-harness lint [OPTIONS]",
+      "aliases": [],
+      "args": [
         {
           "id": "format",
           "kind": "option",

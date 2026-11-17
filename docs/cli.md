@@ -430,6 +430,30 @@ in `changed_files` and `discovery_error`.
   `base_sha`, `head_sha`, and `merge_base_sha`.
 - `--format <Format>`: Output format (`text` or `json`).
 
+### `lint`
+<!-- BEGIN GENERATED: cli-contract lint -->
+`do-harness lint [OPTIONS]`
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `--format <FORMAT>` | no | `text` | `text`, `json` | Output format |
+<!-- END GENERATED: cli-contract lint -->
+Lints the feedforward guide layer — every `AGENTS.md` under the workspace root
+plus `.agents/skills/` — without running anything:
+
+- **error `broken-skill-reference`**: a link to `.agents/skills/<name>` or a
+  `skill://<name>` URI that does not resolve;
+- **error `skill-without-contract`**: a skill directory without `SKILL.md`;
+- **warning `duplicate-instruction`**: the same substantive instruction line
+  appears twice (headings, tables, fences, and short lines are ignored);
+- **warning `skill-without-sensor`**: no configured sensor names the skill or
+  its directory, which is what guide drift from the feedback layer looks like.
+
+Exit `1` when any error is reported, `0` with warnings only, `2` when the root
+has no `AGENTS.md` (a lint over nothing must not report green). `--format json`
+emits `{root, diagnostics, errors, warnings, ok}` with every diagnostic carrying
+`severity`, `code`, `path`, `line`, and `message`.
+
 ### `init-db`
 <!-- BEGIN GENERATED: cli-contract init-db -->
 `do-harness init-db [OPTIONS]`

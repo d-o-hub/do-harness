@@ -449,6 +449,14 @@ pub struct ReportArgs {
     pub all: bool,
 }
 
+/// Arguments for `lint` (flattened into a tuple variant).
+#[derive(Debug, clap::Args)]
+pub struct LintArgs {
+    /// Output format.
+    #[arg(long, value_enum, default_value_t = crate::report::Format::Text)]
+    pub format: crate::report::Format,
+}
+
 /// Arguments for `sensor new`.
 #[derive(Debug, clap::Args)]
 pub struct NewSensorArgs {

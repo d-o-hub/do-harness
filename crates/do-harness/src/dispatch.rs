@@ -477,6 +477,7 @@ async fn route(root: &Path, config_path: Option<PathBuf>, cli: Cli) -> Result<()
                 crate::sensor_new::run(root, config_path.as_deref(), &args, cli.dry_run).await
             }
         },
+        Command::Lint(args) => crate::lint::run(root, args.format).await,
         Command::Overlap { threshold, format } => {
             overlap::run_overlap(root, threshold, format).map_err(CliError::Usage)
         }

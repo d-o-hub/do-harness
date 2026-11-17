@@ -37,6 +37,7 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('list', 'list', [CompletionResultType]::ParameterValue, 'List sensor names')
             [CompletionResult]::new('ls', 'ls', [CompletionResultType]::ParameterValue, 'List sensor names')
             [CompletionResult]::new('explain', 'explain', [CompletionResultType]::ParameterValue, 'Explain which sensors the current change selects, without running them')
+            [CompletionResult]::new('lint', 'lint', [CompletionResultType]::ParameterValue, 'Lint the feedforward guides (AGENTS.md and skills) against the sensors')
             [CompletionResult]::new('status', 'status', [CompletionResultType]::ParameterValue, 'Report verification evidence freshness without running sensors')
             [CompletionResult]::new('sync', 'sync', [CompletionResultType]::ParameterValue, 'Refresh `origin/main` and reconcile the local `main` branch')
             [CompletionResult]::new('latest-main', 'latest-main', [CompletionResultType]::ParameterValue, 'Refresh `origin/main` and reconcile the local `main` branch')
@@ -185,6 +186,20 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Explicit path to do-harness.toml')
             [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)')
             [CompletionResult]::new('--changed', '--changed', [CompletionResultType]::ParameterName, 'Select by working-tree change instead of listing everything')
+            [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Suppress PASS/WARN verdict lines and the success footer')
+            [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Suppress PASS/WARN verdict lines and the success footer')
+            [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Dry run without side effects')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            [CompletionResult]::new('-V', '-V ', [CompletionResultType]::ParameterName, 'Print version')
+            [CompletionResult]::new('--version', '--version', [CompletionResultType]::ParameterName, 'Print version')
+            break
+        }
+        'do-harness;lint' {
+            [CompletionResult]::new('--format', '--format', [CompletionResultType]::ParameterName, 'Output format')
+            [CompletionResult]::new('--root', '--root', [CompletionResultType]::ParameterName, 'Workspace root override (default: walk up from cwd)')
+            [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Explicit path to do-harness.toml')
+            [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)')
             [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Suppress PASS/WARN verdict lines and the success footer')
             [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Suppress PASS/WARN verdict lines and the success footer')
             [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Dry run without side effects')
@@ -1667,6 +1682,7 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('verify', 'verify', [CompletionResultType]::ParameterValue, 'Run computational sensors')
             [CompletionResult]::new('list', 'list', [CompletionResultType]::ParameterValue, 'List sensor names')
             [CompletionResult]::new('explain', 'explain', [CompletionResultType]::ParameterValue, 'Explain which sensors the current change selects, without running them')
+            [CompletionResult]::new('lint', 'lint', [CompletionResultType]::ParameterValue, 'Lint the feedforward guides (AGENTS.md and skills) against the sensors')
             [CompletionResult]::new('status', 'status', [CompletionResultType]::ParameterValue, 'Report verification evidence freshness without running sensors')
             [CompletionResult]::new('sync', 'sync', [CompletionResultType]::ParameterValue, 'Refresh `origin/main` and reconcile the local `main` branch')
             [CompletionResult]::new('pr', 'pr', [CompletionResultType]::ParameterValue, 'Deterministic PR analysis (read-only; works in any git repository)')
@@ -1711,6 +1727,9 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             break
         }
         'do-harness;help;explain' {
+            break
+        }
+        'do-harness;help;lint' {
             break
         }
         'do-harness;help;status' {

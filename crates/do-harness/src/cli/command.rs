@@ -119,6 +119,8 @@ pub enum Command {
         #[arg(long, value_enum, default_value_t = Format::Text)]
         format: Format,
     },
+    /// Lint the feedforward guides (AGENTS.md and skills) against the sensors.
+    Lint(#[command(flatten)] super::actions::LintArgs),
     /// Report verification evidence freshness without running sensors.
     Status {
         /// Check evidence for this development signal set.
