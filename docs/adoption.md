@@ -23,7 +23,7 @@ curl -fsSL https://raw.githubusercontent.com/d-o-hub/do-harness/main/scripts/ins
 
 # Pinned and reproducible (recommended for CI and agent instructions).
 curl -fsSL https://raw.githubusercontent.com/d-o-hub/do-harness/main/scripts/install.sh \
-  | sh -s -- --version v0.4.7
+  | sh -s -- --version v0.4.8
 ```
 
 The installer places `do-harness` in `$HOME/.local/bin` by default. Override
@@ -618,7 +618,7 @@ GitHub Actions:
 - name: Install do-harness
   run: |
     curl -fsSL https://raw.githubusercontent.com/d-o-hub/do-harness/main/scripts/install.sh \
-      | sh -s -- --version v0.4.7
+      | sh -s -- --version v0.4.8
     echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 - name: Verify
   env:
@@ -633,7 +633,7 @@ GitLab CI:
 ```yaml
 verify:
   script:
-    - curl -fsSL https://raw.githubusercontent.com/d-o-hub/do-harness/main/scripts/install.sh | sh -s -- --version v0.4.7
+    - curl -fsSL https://raw.githubusercontent.com/d-o-hub/do-harness/main/scripts/install.sh | sh -s -- --version v0.4.8
     - export PATH="$HOME/.local/bin:$PATH"
     - export CI=true DO_HARNESS_REQUIRE_TOOLS=1
     - do-harness verify --set verification --format json --strict

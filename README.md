@@ -33,7 +33,7 @@ curl -fsSL https://raw.githubusercontent.com/d-o-hub/do-harness/main/scripts/ins
 
 # pinned, reproducible install
 curl -fsSL https://raw.githubusercontent.com/d-o-hub/do-harness/main/scripts/install.sh \
-  | sh -s -- --version v0.4.7
+  | sh -s -- --version v0.4.8
 ```
 
 The installer verifies the artifact against the release `checksums.txt` before
@@ -95,7 +95,7 @@ The harness is designed to be adopted by any codebase, Rust or not:
    <!-- example: id=use_another_repo_install classification=illustrative reason="Alternative adoption installation flows" -->
    ```bash
    curl -fsSL https://raw.githubusercontent.com/d-o-hub/do-harness/main/scripts/install.sh \
-     | sh -s -- --version v0.4.7
+     | sh -s -- --version v0.4.8
    # or, from a vendored checkout:
    cargo install --path vendor/do-harness/crates/do-harness
    ```
@@ -193,7 +193,7 @@ set -euo pipefail
 
 # Prebuilt binary (pinned):
 curl -fsSL https://raw.githubusercontent.com/d-o-hub/do-harness/main/scripts/install.sh \
-  | sh -s -- --version v0.4.7
+  | sh -s -- --version v0.4.8
 # ...or a vendored checkout (installs outside the workspace target/):
 # cargo install --path vendor/do-harness/crates/do-harness
 
@@ -218,7 +218,7 @@ For CI, install the pinned binary first, then invoke `do-harness verify --format
 <!-- example: id=ci_path_export classification=illustrative reason="CI environment path export snippet" -->
 ```bash
 curl -fsSL https://raw.githubusercontent.com/d-o-hub/do-harness/main/scripts/install.sh \
-  | sh -s -- --version v0.4.7
+  | sh -s -- --version v0.4.8
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
