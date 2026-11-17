@@ -158,11 +158,10 @@ fn a_live_compiler_in_the_worktree_refuses_the_build_tree() {
     // and exits before the probe runs (that is how this test failed on 1.85).
     // A shell copy is a real single-purpose interpreter and stays alive.
     std::fs::copy("/bin/sh", &sleeper).unwrap();
-    let mut child = Command::new(&sleeper)
-        .args(["-c", "while :; do sleep 0.5; done"])
-        .current_dir(&worktree)
-        .spawn()
-        .expect("spawn decoy cargo");
+    // Another test's `fork` can inherit the copy's write descriptor, so the
+    // kernel briefly answers ETXTBSY ("Text file busy"). Retry instead of
+    // racing the whole suite.
+    let mut child = spawn_with_retry(&sleeper, &worktree);
     // `spawn` returns before the child has exec'd, so `/proc/<pid>/comm` is still
     // the test harness's name for a moment; wait for it or the probe races it.
     wait_for_process_name(child.id(), "cargo");
@@ -329,6 +328,24 @@ fn the_main_worktree_is_protected() {
         fixture.json(&["cleanup", "--worktree", &root, "--format", "json"]);
     assert_eq!(code, Some(0));
     assert_eq!(candidate(&document, &fixture.root)["reason"], "protected");
+}
+
+/// Spawns the decoy, retrying while the kernel reports `ETXTBSY`.
+fn spawn_with_retry(sleeper: &Path, worktree: &Path) -> std::process::Child {
+    for _ in 0..100 {
+        match Command::new(sleeper)
+            .args(["-c", "while :; do sleep 0.5; done"])
+            .current_dir(worktree)
+            .spawn()
+        {
+            Ok(child) => return child,
+            Err(error) if error.kind() == std::io::ErrorKind::ExecutableFileBusy => {
+                std::thread::sleep(std::time::Duration::from_millis(20));
+            }
+            Err(error) => panic!("spawn decoy cargo: {error}"),
+        }
+    }
+    panic!("decoy cargo stayed busy for two seconds");
 }
 
 /// Blocks until `pid` has exec'd a program whose `/proc` name is `name`.
