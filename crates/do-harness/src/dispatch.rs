@@ -456,6 +456,16 @@ async fn route(root: &Path, config_path: Option<PathBuf>, cli: Cli) -> Result<()
             };
             metrics::dispatch(root, action, format, filter).await
         }
+        Command::Migrate { args } => {
+            crate::migrate::run(
+                root,
+                config_path.as_deref(),
+                args.diff,
+                args.write,
+                args.format,
+            )
+            .await
+        }
         Command::Overlap { threshold, format } => {
             overlap::run_overlap(root, threshold, format).map_err(CliError::Usage)
         }

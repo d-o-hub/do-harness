@@ -5,14 +5,15 @@ use std::path::Path;
 
 use anyhow::Result;
 
-use crate::argv_paths::{self, MissingArgvPath};
-use crate::config;
 use crate::dbcheck;
 use crate::hook_script::BinSource;
 use crate::hooks::{self, HookOwner};
 use crate::report::Format;
 
 mod client_profile;
+mod facts;
+
+use facts::{check_sensor_argv, check_task_export, config_schema};
 
 /// Outcome of the event-chain tamper audit, computed once so both output
 /// formats report it. Before this existed the audit ran only in the text
@@ -138,6 +139,21 @@ pub(crate) async fn run_with_status(
     let (sensor_argv_missing, config_error) = check_sensor_argv(root).await;
     if let Some(err) = config_error {
         failures.push(format!("sensor config unreadable: {err}"));
+    }
+    // Configuration schema skew is actionable: a newer key set cannot be
+    // interpreted by this binary, and an older file should be migrated rather
+    // than hand-edited across releases.
+    if let Some(version) = config_schema(root) {
+        if version > crate::config::CONFIG_SCHEMA_VERSION {
+            failures.push(format!(
+                "do-harness.toml declares schema version {version}, newer than this binary ({}); upgrade do-harness",
+                crate::config::CONFIG_SCHEMA_VERSION
+            ));
+        } else if version < crate::config::CONFIG_SCHEMA_VERSION {
+            failures.push(format!(
+                "do-harness.toml schema version {version} is outdated; run: do-harness migrate --write"
+            ));
+        }
     }
     if strict {
         for missing in &sensor_argv_missing {
@@ -444,56 +460,6 @@ fn hook_line(
 }
 
 /// Resolves path-looking `argv` arguments for the effective sensors. Returns
-/// the missing ones and a config-load error, if any.
-async fn check_sensor_argv(root: &Path) -> (Vec<MissingArgvPath>, Option<String>) {
-    match config::load_raw(root, None).await {
-        Ok((cfg, _)) => (
-            argv_paths::missing_paths_for(root, cfg.effective_sensors()),
-            None,
-        ),
-        Err(err) => (Vec::new(), Some(format!("{err:#}"))),
-    }
-}
-
-/// Flags `plans/tasks.json` when it predates the newest task update.
-///
-/// Returns `true` when the export is missing, unreadable, invalid, or stale;
-/// failures are also appended to `failures`.
-async fn check_task_export(
-    root: &Path,
-    latest_task_update: Option<i64>,
-    failures: &mut Vec<String>,
-) -> bool {
-    let path = root.join("plans/tasks.json");
-    if !path.exists() {
-        return false;
-    }
-    let raw = match tokio::fs::read_to_string(&path).await {
-        Ok(raw) => raw,
-        Err(err) => {
-            failures.push(format!("plans/tasks.json unreadable: {err}"));
-            return true;
-        }
-    };
-    match serde_json::from_str::<crate::task::TaskSnapshot>(&raw) {
-        Ok(snapshot) => {
-            if latest_task_update.is_some_and(|updated| updated > snapshot.exported_at) {
-                failures.push(
-                    "plans/tasks.json export lags the database (run: do-harness task export)"
-                        .to_owned(),
-                );
-                true
-            } else {
-                false
-            }
-        }
-        Err(err) => {
-            failures.push(format!("plans/tasks.json invalid: {err}"));
-            true
-        }
-    }
-}
-
 #[cfg(test)]
 #[path = "doctor_tests.rs"]
 mod tests;

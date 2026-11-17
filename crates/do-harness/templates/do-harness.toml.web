@@ -11,6 +11,7 @@
 # WEB_AUDIT_LOCALE_PARAM (default "lang") or WEB_AUDIT_LOCALE_COOKIE; the
 # visual sensor blesses baselines under WEB_VISUAL_BASELINE_DIR (default
 # .do-harness/visual) and re-blesses changed cells with WEB_VISUAL_UPDATE=1.
+schema-version = 1
 language = "web"
 
 [hooks]

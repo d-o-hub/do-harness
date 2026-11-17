@@ -90,6 +90,7 @@
     "subcommands": [
       "version",
       "verify",
+      "migrate",
       "list",
       "explain",
       "status",
@@ -429,6 +430,69 @@
           "default_values": [],
           "possible_values": [],
           "help": "Approver identity recorded with `--bless` (defaults to `DO_HARNESS_APPROVER` or the git user email)",
+          "index": null
+        }
+      ],
+      "subcommands": [],
+      "invocable": true
+    },
+    {
+      "path": "migrate",
+      "about": "Migrate do-harness.toml to the current configuration schema",
+      "usage": "do-harness migrate [OPTIONS]",
+      "aliases": [],
+      "args": [
+        {
+          "id": "diff",
+          "kind": "option",
+          "short": null,
+          "long": "diff",
+          "value_names": [
+            "DIFF"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": false,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Preview the required changes without writing (the default)",
+          "index": null
+        },
+        {
+          "id": "write",
+          "kind": "option",
+          "short": null,
+          "long": "write",
+          "value_names": [
+            "WRITE"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": false,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Apply the changes; refuses conflicts it cannot resolve",
+          "index": null
+        },
+        {
+          "id": "format",
+          "kind": "option",
+          "short": null,
+          "long": "format",
+          "value_names": [
+            "FORMAT"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [
+            "text"
+          ],
+          "possible_values": [
+            "text",
+            "json"
+          ],
+          "help": "Output format",
           "index": null
         }
       ],

@@ -90,6 +90,11 @@ pub enum Command {
         #[arg(long, requires = "bless", value_name = "NAME")]
         approver: Option<String>,
     },
+    /// Migrate do-harness.toml to the current configuration schema.
+    Migrate {
+        #[command(flatten)]
+        args: super::actions::MigrateArgs,
+    },
     /// List sensor names.
     #[command(visible_alias = "ls")]
     List {
