@@ -239,12 +239,11 @@ pub fn inspect(
 #[must_use]
 pub fn unknown_stack_markers(root: &Path) -> Vec<&'static str> {
     [
-        "pyproject.toml",
-        "requirements.txt",
-        "setup.py",
-        "setup.cfg",
-        "tox.ini",
-        "go.mod",
+        "pom.xml",
+        "build.gradle",
+        "Gemfile",
+        "composer.json",
+        "mix.exs",
     ]
     .into_iter()
     .filter(|name| root.join(name).exists())
