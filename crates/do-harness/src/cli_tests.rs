@@ -15,7 +15,7 @@ fn visible_aliases_parse_correctly() {
     assert!(matches!(check.command, Command::Verify { .. }));
 
     let ls = Cli::try_parse_from(["do-harness", "ls"]).expect("ls alias");
-    assert!(matches!(ls.command, Command::List { .. }));
+    assert!(matches!(ls.command, Command::List(_)));
 }
 
 #[test]

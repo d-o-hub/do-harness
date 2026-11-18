@@ -13,6 +13,7 @@ use crate::config::{Config, HooksConfig, SensorSpec};
 fn allow_failure_sensor_does_not_fail_gate_but_surfaces_output() {
     let dir = tempfile::tempdir().expect("tempdir");
     let cfg = Config {
+        schema_version: crate::config::CONFIG_SCHEMA_VERSION,
         pr: crate::pr::author_policy::PrConfig::default(),
         language: None,
         hooks: HooksConfig::default(),

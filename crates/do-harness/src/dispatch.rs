@@ -233,7 +233,8 @@ async fn route(root: &Path, config_path: Option<PathBuf>, cli: Cli) -> Result<()
             };
             verify::run(root, opts).await
         }
-        Command::List { sets, format } => {
+        Command::List(args) => {
+            let (sets, format) = (args.sets, args.format);
             let cfg = config::load(root, config_path.as_deref())
                 .await
                 .map_err(CliError::Usage)?;
@@ -458,6 +459,16 @@ async fn route(root: &Path, config_path: Option<PathBuf>, cli: Cli) -> Result<()
                 all,
             };
             metrics::dispatch(root, action, format, filter).await
+        }
+        Command::Migrate(args) => {
+            crate::migrate::run(
+                root,
+                config_path.as_deref(),
+                args.diff,
+                args.write,
+                args.format,
+            )
+            .await
         }
         Command::Report(args) => {
             let filter = metrics::MetricsFilter {

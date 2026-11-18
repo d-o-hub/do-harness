@@ -99,3 +99,20 @@ pub(super) async fn check_task_export(
         }
     }
 }
+
+/// The declared configuration schema version, or `None` when there is no file.
+///
+/// Read from the raw TOML rather than the typed config so a file this binary
+/// cannot fully parse (a future schema) still reports its version instead of
+/// the unrelated parse error.
+pub(super) fn config_schema(root: &Path) -> Option<u32> {
+    let text = std::fs::read_to_string(root.join("do-harness.toml")).ok()?;
+    let value: toml::Value = toml::from_str(&text).ok()?;
+    // Absent means a pre-versioning file this binary still reads. Treating it
+    // as skew would fail `doctor` for every existing adopter; `migrate --diff`
+    // is the recommendation, and a *declared* older version is the failure.
+    match value.get("schema-version") {
+        Some(toml::Value::Integer(version)) => u32::try_from(*version).ok(),
+        _ => None,
+    }
+}

@@ -31,6 +31,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand version 'Print CLI version information'
             cand verify 'Run computational sensors'
             cand check 'Run computational sensors'
+            cand migrate 'Migrate do-harness.toml to the current configuration schema'
             cand list 'List sensor names'
             cand ls 'List sensor names'
             cand explain 'Explain which sensors the current change selects, without running them'
@@ -133,6 +134,21 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand --global 'Record unscoped beats in the global namespace'
             cand --strict 'Enforce strong evidence: exit non-zero on skips or missing timing/exit codes'
             cand --bless 'Lower or initialize blessed findings baselines from this run (requires --record; a bless never raises a baseline)'
+            cand -q 'Suppress PASS/WARN verdict lines and the success footer'
+            cand --quiet 'Suppress PASS/WARN verdict lines and the success footer'
+            cand --dry-run 'Dry run without side effects'
+            cand -h 'Print help (see more with ''--help'')'
+            cand --help 'Print help (see more with ''--help'')'
+            cand -V 'Print version'
+            cand --version 'Print version'
+        }
+        &'do-harness;migrate'= {
+            cand --format 'Output format'
+            cand --root 'Workspace root override (default: walk up from cwd)'
+            cand --config 'Explicit path to do-harness.toml'
+            cand --output 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)'
+            cand --diff 'Preview the required changes without writing (the default)'
+            cand --write 'Apply the changes; refuses conflicts it cannot resolve'
             cand -q 'Suppress PASS/WARN verdict lines and the success footer'
             cand --quiet 'Suppress PASS/WARN verdict lines and the success footer'
             cand --dry-run 'Dry run without side effects'
@@ -1532,6 +1548,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
         &'do-harness;help'= {
             cand version 'Print CLI version information'
             cand verify 'Run computational sensors'
+            cand migrate 'Migrate do-harness.toml to the current configuration schema'
             cand list 'List sensor names'
             cand explain 'Explain which sensors the current change selects, without running them'
             cand lint 'Lint the feedforward guides (AGENTS.md and skills) against the sensors'
@@ -1571,6 +1588,8 @@ set edit:completion:arg-completer[do-harness] = {|@words|
         &'do-harness;help;version'= {
         }
         &'do-harness;help;verify'= {
+        }
+        &'do-harness;help;migrate'= {
         }
         &'do-harness;help;list'= {
         }

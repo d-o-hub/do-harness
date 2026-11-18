@@ -1,4 +1,5 @@
 # do-harness.toml — sensor pack for this workspace.
+schema-version = 1
 language = "generic"
 
 [hooks]

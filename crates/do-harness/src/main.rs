@@ -64,6 +64,7 @@ mod man;
 mod managed_path;
 mod methods;
 mod metrics;
+mod migrate;
 mod overlap;
 mod pr;
 mod provenance;

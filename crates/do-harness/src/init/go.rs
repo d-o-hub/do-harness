@@ -166,6 +166,7 @@ pub fn generate_go_config(sensors: &[SensorSpec]) -> Result<String> {
         .collect();
 
     let cfg = Config {
+        schema_version: crate::config::CONFIG_SCHEMA_VERSION,
         language: Some("go".to_owned()),
         hooks: HooksConfig {
             pre_commit,

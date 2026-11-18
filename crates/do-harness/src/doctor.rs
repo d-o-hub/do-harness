@@ -15,7 +15,7 @@ use crate::report::Format;
 mod checks;
 mod client_profile;
 
-use checks::{check_sensor_argv, check_task_export, hook_line};
+use checks::{check_sensor_argv, check_task_export, config_schema, hook_line};
 
 /// Outcome of the event-chain tamper audit, computed once so both output
 /// formats report it. Before this existed the audit ran only in the text
@@ -141,6 +141,21 @@ pub(crate) async fn run_with_status(
     let (sensor_argv_missing, config_error) = check_sensor_argv(root).await;
     if let Some(err) = config_error {
         failures.push(format!("sensor config unreadable: {err}"));
+    }
+    // Configuration schema skew is actionable: a newer key set cannot be
+    // interpreted by this binary, and an older file should be migrated rather
+    // than hand-edited across releases.
+    if let Some(version) = config_schema(root) {
+        if version > crate::config::CONFIG_SCHEMA_VERSION {
+            failures.push(format!(
+                "do-harness.toml declares schema version {version}, newer than this binary ({}); upgrade do-harness",
+                crate::config::CONFIG_SCHEMA_VERSION
+            ));
+        } else if version < crate::config::CONFIG_SCHEMA_VERSION {
+            failures.push(format!(
+                "do-harness.toml schema version {version} is outdated; run: do-harness migrate --write"
+            ));
+        }
     }
     if strict {
         for missing in &sensor_argv_missing {

@@ -1,3 +1,4 @@
+schema-version = 1
 language = "rust"
 
 [hooks]
