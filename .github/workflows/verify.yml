@@ -581,7 +581,11 @@ jobs:
           node --test integrations/npm/test/*.test.mjs
 
   selection-portability:
-    runs-on: macos-latest
+    # Pin a GitHub-hosted Intel macOS runner: macos-latest maps to arm64, and
+    # GitHub repeatedly failed to allocate that runner for this required job.
+    # The acceptance suite needs macOS semantics, not ARM64 specifically.
+    # Runner labels: https://docs.github.com/en/actions/reference/runners/github-hosted-runners
+    runs-on: macos-15-intel
     timeout-minutes: 30
     steps:
       # actions/checkout@v7.0.1
