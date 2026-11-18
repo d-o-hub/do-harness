@@ -650,7 +650,10 @@ cmd_e2e() {
     # repository instead of a list that can rot. A member manifest counts only
     # when it actually carries an intra-workspace pin, which is exactly when
     # `prepare_pins` rewrites it — so the expected set is derived the same way
-    # the edit is made, rather than listing crates that have no pin.
+    # the edit is made, rather than listing crates that have no pin. The install
+    # snippets follow the same rule: `prepare_docs_pins` rewrites a document only
+    # when it carries a `--version v<semver>` pin, so only such a document is
+    # expected to move.
     expected="$({
         printf '%s\n' Cargo.toml Cargo.lock integrations/npm/package.json
         for file in "$E2E_SCRATCH"/integrations/npm/platforms/*/package.json; do
@@ -662,10 +665,15 @@ cmd_e2e() {
             grep -qE '^do-harness-[a-z0-9-]* *= *\{[^}]*version *= *"' "$file" || continue
             printf '%s\n' "${file#"$E2E_SCRATCH"/}"
         done
+        for file in "$E2E_SCRATCH/README.md" "$E2E_SCRATCH/docs/adoption.md"; do
+            [ -f "$file" ] || continue
+            grep -qE -- '--version v[0-9]' "$file" || continue
+            printf '%s\n' "${file#"$E2E_SCRATCH"/}"
+        done
     } | sort)"
     actual="$(git -C "$E2E_SCRATCH" diff --name-only | sort)"
     if [ "$actual" = "$expected" ]; then
-        printf 'ok   e2e: prepare touched exactly the managed manifests and the lock\n'
+        printf 'ok   e2e: prepare touched exactly the managed manifests, the lock and the install pins\n'
     else
         printf 'FAIL e2e: unexpected diff\n--- expected ---\n%s\n--- actual ---\n%s\n' \
             "$expected" "$actual" >&2
