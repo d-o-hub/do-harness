@@ -7,7 +7,12 @@
 //! unconfigured toolchain reports INCOMPLETE rather than a claimed green.
 //! Every test is deterministic: it drives the real binary with stub
 //! executables on a fake PATH so no ruff/go/pytest installation is required.
+//!
+//! Unix-only: the stubs are extensionless `sh` scripts and the private core
+//! bin symlinks `/usr/bin` tools. Windows only resolves `.exe`/`.cmd` shims, so
+//! the stubs are never found there and every baseline reports `incomplete`.
 
+#![cfg(unix)]
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use serde_json::Value;
