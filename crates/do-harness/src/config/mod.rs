@@ -93,7 +93,7 @@ mod sensor;
 pub use sensor::{SensorSeverity, SensorSpec};
 
 /// Language pack identifiers accepted in `Config.language`.
-pub const SUPPORTED_LANGUAGES: &[&str] = &["rust", "generic", "web", "node"];
+pub const SUPPORTED_LANGUAGES: &[&str] = &["rust", "generic", "web", "node", "python", "go"];
 
 pub(crate) const DEFAULT_SENSOR_TIMEOUT_SECS: u64 = 3600;
 pub(crate) const DEFAULT_OUTPUT_BYTES: usize = 1024 * 1024;
@@ -318,7 +318,10 @@ impl Config {
         if !self.sensors.is_empty() {
             return &self.sensors;
         }
-        if matches!(self.language.as_deref(), Some("generic" | "web" | "node")) {
+        if matches!(
+            self.language.as_deref(),
+            Some("generic" | "web" | "node" | "python" | "go")
+        ) {
             return &[];
         }
         &RUST_SENSORS

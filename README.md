@@ -111,12 +111,17 @@ The harness is designed to be adopted by any codebase, Rust or not:
    do-harness init --language generic   # no built-in sensors
    do-harness init --language web       # web UI audit pack (viewport, a11y, console, perf, visual, i18n)
    do-harness init --language node      # Node/JS/TS pack (typecheck, lint, test, build)
+   do-harness init --language python    # Python pack (ruff lint/format, optional typecheck, pytest)
+   do-harness init --language go        # Go pack (gofmt, go vet/test, optional staticcheck)
    ```
 
    Plain `init` detects the target instead of assuming Rust: an explicit
    `--language` wins, an existing `do-harness.toml` keeps its declared pack, a
-   `Cargo.toml` selects rust, any other non-empty project selects the generic
-   pack, and an empty directory bootstraps rust.
+   `Cargo.toml` selects rust, a `package.json` that proves a supported Node
+   command selects node, Python markers (`pyproject.toml`, `requirements.txt`,
+   `setup.py`, `setup.cfg`, `tox.ini`) select python, a `go.mod` selects go,
+   any other non-empty project selects the generic pack, and an empty directory
+   bootstraps rust.
 
    The web pack's sensors require the `WEB_AUDIT_*` environment plus the
    `playwright`, `@axe-core/playwright`, and `lighthouse` peer dependencies
@@ -153,12 +158,15 @@ The harness is designed to be adopted by any codebase, Rust or not:
    `rust` (fmt/check/clippy/test/loc/deps/audit/commitlint), `generic`
    (ships no sensors — add your own `[[sensors]]` entries), `web` (web UI
    audit pack: viewport text, axe accessibility, console noise, performance, visual
-   diffs, i18n), and `node` (Node/JS/TS pack: typecheck, lint, test, build).
+   diffs, i18n), `node` (Node/JS/TS pack: typecheck, lint, test, build),
+   `python` (ruff lint/format, optional typecheck, pytest), and `go` (gofmt,
+   go vet/test, optional staticcheck).
    With zero sensors `verify` exits 0 without running any command: a vacuous
    pass, not evidence. Define real sensors before treating verify output as proof.
    Language packs are presets over the stack-neutral `[[sensors]]` contract;
-   Python and Go use the generic pack with the recipes in
-   [the adoption contract](docs/adoption.md#cross-stack-command-recipes).
+   the manual recipes in
+   [the adoption contract](docs/adoption.md#cross-stack-command-recipes) remain
+   available for hand-declared sensors.
    For soft, project-specific facts checks (status-document drift, tracker
    counts) declare `kind = "project-check"`: warn-only unless `severity` says
    otherwise, with an optional `fix` hint printed on failure. `init` scaffolds
@@ -458,8 +466,8 @@ environment allowlist. Local commands retain the caller's permissions.
 
 `do-harness.toml` at the workspace root configures the harness:
 
-- `language` — the language pack (`"rust"`, `"generic"`, `"web"`, or `"node"`;
-  the generic pack ships no sensors).
+- `language` — the language pack (`"rust"`, `"generic"`, `"web"`, `"node"`,
+  `"python"`, or `"go"`; the generic pack ships no sensors).
 - `[hooks]` — `pre-commit` / `pre-push` lists naming the sensors each hook runs; an empty `pre-push` list means the full suite.
 - `[[sensors]]` — each sensor has a `name` and an `argv` (the command to execute).
   Optional `when-changed` globs declare when the sensor applies to the current

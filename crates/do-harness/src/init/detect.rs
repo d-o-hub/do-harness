@@ -49,10 +49,11 @@ pub struct Detection {
     /// Probed candidate signals for the resolved pack.
     pub candidates: Vec<Candidate>,
     /// Structured onboarding diagnostics (malformed manifests, unsupported
-    /// Node commands, missing package managers).
+    /// Node commands, missing package managers/tools).
     pub diagnostics: Vec<InitDiagnostic>,
-    /// Node-pack sensor specs from the single probe; empty unless Node resolved.
-    pub node_specs: Vec<crate::config::SensorSpec>,
+    /// Sensor specs from the resolved pack's single probe; empty unless a
+    /// probe-driven pack (Node/Python/Go) resolved.
+    pub specs: Vec<crate::config::SensorSpec>,
 }
 
 /// Inspects `root`, resolving the language pack and probing candidates.
@@ -60,7 +61,8 @@ pub struct Detection {
 /// Priority: an explicit `requested` pack; then the language declared by an
 /// existing `do-harness.toml` (`existing_language`); then repository markers
 /// (a `Cargo.toml` selects the Rust pack; a `package.json` that proves a
-/// supported Node command selects the Node pack; another non-empty project
+/// supported Node command selects the Node pack; Python markers select the
+/// Python pack; a `go.mod` selects the Go pack; another non-empty project
 /// selects the generic pack; and an empty or hidden-only directory is
 /// greenfield Rust so `init` can materialize a minimal crate and prove a
 /// baseline). A malformed or unsupported `package.json` stays Generic and
@@ -77,6 +79,9 @@ pub fn inspect(
     let has_git = root.join(".git").exists();
     let manifest = super::node_manifest::analyze_node_manifest(root);
     let has_package_json = manifest.has_package_json;
+    let python_manifest = super::python_manifest::analyze_python_manifest(root);
+    let has_python = python_manifest.has_python_markers;
+    let has_go = root.join("go.mod").exists();
 
     if has_cargo {
         findings.push("Cargo.toml".to_owned());
@@ -108,10 +113,10 @@ pub fn inspect(
     for marker in &stack_markers {
         findings.push((*marker).to_owned());
     }
-    if stack_markers.iter().any(|marker| *marker != "go.mod") {
+    if has_python {
         findings.push("Python project".to_owned());
     }
-    if stack_markers.contains(&"go.mod") {
+    if has_go {
         findings.push("Go module".to_owned());
     }
 
@@ -120,6 +125,8 @@ pub fn inspect(
         Some("generic") => Some(Language::Generic),
         Some("web") => Some(Language::Web),
         Some("node") => Some(Language::Node),
+        Some("python") => Some(Language::Python),
+        Some("go") => Some(Language::Go),
         _ => None,
     };
 
@@ -137,6 +144,8 @@ pub fn inspect(
                 Language::Generic => "generic",
                 Language::Web => "web",
                 Language::Node => "node",
+                Language::Python => "python",
+                Language::Go => "go",
             };
             findings.push(format!("existing do-harness.toml selects the {name} pack"));
             language
@@ -152,6 +161,8 @@ pub fn inspect(
                 Language::Generic
             }
         }
+        None if has_python => Language::Python,
+        None if has_go => Language::Go,
         None if has_non_hidden_entries(root) => Language::Generic,
         None => {
             findings.push("empty directory (greenfield rust)".to_owned());
@@ -162,6 +173,8 @@ pub fn inspect(
         && requested.is_none()
         && declared.is_none()
         && !has_package_json
+        && !has_python
+        && !has_go
         && diagnostics.is_empty()
     {
         diagnostics.push(InitDiagnostic::generic_stack(&stack_markers));
@@ -175,8 +188,14 @@ pub fn inspect(
     if language == Language::Node && !findings.iter().any(|f| f.contains("node")) {
         findings.push("node pack selected (JS/TS sensors)".to_owned());
     }
+    if language == Language::Python && !findings.iter().any(|f| f.contains("python")) {
+        findings.push("python pack selected (ruff/pytest sensors)".to_owned());
+    }
+    if language == Language::Go && !findings.iter().any(|f| f.contains("go")) {
+        findings.push("go pack selected (gofmt/vet/test sensors)".to_owned());
+    }
 
-    let (candidates, node_specs) = match language {
+    let (candidates, specs) = match language {
         Language::Rust => (rust_candidates(), Vec::new()),
         Language::Node => {
             let probe = super::node::probe_node_full(root);
@@ -188,6 +207,20 @@ pub fn inspect(
             }
             (probe.candidates, probe.specs)
         }
+        Language::Python => {
+            let probe = super::python::probe_python_full(root);
+            if !probe.missing_tools.is_empty() {
+                diagnostics.push(InitDiagnostic::missing_python_tooling(&probe.missing_tools));
+            }
+            (probe.candidates, probe.specs)
+        }
+        Language::Go => {
+            let probe = super::go::probe_go_full(root);
+            if !probe.missing_tools.is_empty() {
+                diagnostics.push(InitDiagnostic::missing_go_tooling(&probe.missing_tools));
+            }
+            (probe.candidates, probe.specs)
+        }
         Language::Generic | Language::Web => (Vec::new(), Vec::new()),
     };
     Detection {
@@ -195,7 +228,7 @@ pub fn inspect(
         language,
         candidates,
         diagnostics,
-        node_specs,
+        specs,
     }
 }
 
@@ -206,12 +239,11 @@ pub fn inspect(
 #[must_use]
 pub fn unknown_stack_markers(root: &Path) -> Vec<&'static str> {
     [
-        "pyproject.toml",
-        "requirements.txt",
-        "setup.py",
-        "setup.cfg",
-        "tox.ini",
-        "go.mod",
+        "pom.xml",
+        "build.gradle",
+        "Gemfile",
+        "composer.json",
+        "mix.exs",
     ]
     .into_iter()
     .filter(|name| root.join(name).exists())
@@ -220,9 +252,9 @@ pub fn unknown_stack_markers(root: &Path) -> Vec<&'static str> {
 
 /// Canonical specs for `language`, filtered to sensors the probes included.
 ///
-/// Node specs come from the single probe stored on [`Detection::node_specs`];
-/// this helper serves the built-in Rust pack. Generic and Web have no
-/// built-in sensors, so they always return an empty list.
+/// Probe-driven packs (Node/Python/Go) carry their specs from the single probe
+/// on [`Detection::specs`]; this helper serves the built-in Rust pack. Generic
+/// and Web have no built-in sensors, so they always return an empty list.
 #[must_use]
 pub fn included_specs(
     _root: &Path,
@@ -238,7 +270,9 @@ pub fn included_specs(
                     .any(|candidate| candidate.name == spec.name && candidate.included)
             })
             .collect(),
-        Language::Generic | Language::Node | Language::Web => Vec::new(),
+        Language::Generic | Language::Node | Language::Web | Language::Python | Language::Go => {
+            Vec::new()
+        }
     }
 }
 

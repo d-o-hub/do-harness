@@ -36,7 +36,7 @@ pub struct InspectReport {
     /// Candidate development signals for the resolved pack.
     pub candidates: Vec<Candidate>,
     /// Structured onboarding diagnostics (malformed manifests, unsupported
-    /// Node commands, missing package managers).
+    /// Node commands, missing package managers/tools).
     pub diagnostics: Vec<super::diagnostic::InitDiagnostic>,
     /// Discovered candidate commands from scripts/tools.
     pub candidate_commands: Vec<CandidateCommand>,
@@ -115,9 +115,8 @@ pub fn inspect_workspace(root: &Path, requested_language: Option<Language>) -> I
     let has_git = root.join(".git").exists();
     let manifest = super::node_manifest::analyze_node_manifest(root);
     let has_pkg_json = manifest.has_package_json;
-    let has_py = root.join("requirements.txt").exists()
-        || root.join("pyproject.toml").exists()
-        || root.join("setup.py").exists();
+    let python_manifest = super::python_manifest::analyze_python_manifest(root);
+    let has_py = python_manifest.has_python_markers;
     let has_go = root.join("go.mod").exists();
     let has_pnpm_ws = root.join("pnpm-workspace.yaml").exists();
     let has_turbo = root.join("turbo.json").exists();
@@ -157,6 +156,8 @@ pub fn inspect_workspace(root: &Path, requested_language: Option<Language>) -> I
         Some("generic") => Some(Language::Generic),
         Some("web") => Some(Language::Web),
         Some("node") => Some(Language::Node),
+        Some("python") => Some(Language::Python),
+        Some("go") => Some(Language::Go),
         _ => None,
     };
 
@@ -185,6 +186,8 @@ pub fn inspect_workspace(root: &Path, requested_language: Option<Language>) -> I
                 Language::Generic
             }
         }
+        None if has_py => Language::Python,
+        None if has_go => Language::Go,
         None if has_non_hidden_entries(root) => Language::Generic,
         None => Language::Rust,
     };
@@ -316,6 +319,26 @@ pub fn inspect_workspace(root: &Path, requested_language: Option<Language>) -> I
                 })
                 .collect()
         }
+        Language::Python => {
+            let probe = super::python::probe_python_full(root);
+            if !probe.missing_tools.is_empty() {
+                diagnostics.push(super::diagnostic::InitDiagnostic::missing_python_tooling(
+                    &probe.missing_tools,
+                ));
+            }
+            missing_tools.extend(probe.missing_tools.iter().map(|tool| (*tool).to_owned()));
+            probe.candidates
+        }
+        Language::Go => {
+            let probe = super::go::probe_go_full(root);
+            if !probe.missing_tools.is_empty() {
+                diagnostics.push(super::diagnostic::InitDiagnostic::missing_go_tooling(
+                    &probe.missing_tools,
+                ));
+            }
+            missing_tools.extend(probe.missing_tools.iter().map(|tool| (*tool).to_owned()));
+            probe.candidates
+        }
         Language::Generic | Language::Web => Vec::new(),
     };
 
@@ -323,6 +346,8 @@ pub fn inspect_workspace(root: &Path, requested_language: Option<Language>) -> I
         && requested_language.is_none()
         && declared.is_none()
         && !has_pkg_json
+        && !has_py
+        && !has_go
     {
         let markers = super::detect::unknown_stack_markers(root);
         diagnostics.push(super::diagnostic::InitDiagnostic::generic_stack(&markers));
@@ -353,6 +378,18 @@ pub fn inspect_workspace(root: &Path, requested_language: Option<Language>) -> I
             "The {pm} package manager was not found on PATH; install it and re-run \
              `do-harness init --force` to include the discovered Node sensors."
         ));
+    } else if resolved_language == Language::Python && !missing_tools.is_empty() {
+        guidance = Some(format!(
+            "Required Python tooling was not found on PATH ({}); install the missing tools \
+             and re-run `do-harness init --force` to include the discovered Python sensors.",
+            missing_tools.join(", ")
+        ));
+    } else if resolved_language == Language::Go && !missing_tools.is_empty() {
+        guidance = Some(
+            "The Go toolchain was not found on PATH; install it and re-run \
+             `do-harness init --force` to include the discovered Go sensors."
+                .to_owned(),
+        );
     }
 
     let lang_str = match resolved_language {
@@ -360,6 +397,8 @@ pub fn inspect_workspace(root: &Path, requested_language: Option<Language>) -> I
         Language::Node => "node",
         Language::Web => "web",
         Language::Generic => "generic",
+        Language::Python => "python",
+        Language::Go => "go",
     };
 
     InspectReport {

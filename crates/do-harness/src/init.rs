@@ -21,15 +21,22 @@ pub mod baseline;
 mod context_sanitization;
 pub mod detect;
 pub mod diagnostic;
+pub mod go;
+pub mod go_manifest;
 pub mod inspect;
 pub mod node;
 pub mod node_manifest;
+pub mod python;
+pub mod python_manifest;
 pub mod report;
 mod scaffold;
 mod skills;
 pub(crate) use skills::refresh_skill_creator_validator;
 mod web;
-use scaffold::{scaffold_crate, scaffold_scripts, scaffold_shared_scripts, write_if_absent};
+use scaffold::{
+    scaffold_crate, scaffold_go_scripts, scaffold_python_scripts, scaffold_scripts,
+    scaffold_shared_scripts, write_if_absent,
+};
 
 pub use baseline::{Baseline, BaselineState};
 pub use detect::{Candidate, CandidateStatus};
@@ -51,6 +58,10 @@ pub enum Language {
     Web,
     /// Node/Web JS/TS language pack (typecheck, lint, test, build).
     Node,
+    /// Python language pack (ruff lint/format, optional typecheck, pytest).
+    Python,
+    /// Go language pack (gofmt, go vet/test, optional staticcheck).
+    Go,
 }
 
 /// Options for [`init_workspace`].
@@ -90,7 +101,7 @@ pub struct InitReport {
     /// Probed candidate signals for the resolved pack.
     pub candidates: Vec<Candidate>,
     /// Structured onboarding diagnostics (malformed manifests, unsupported
-    /// Node commands, missing package managers).
+    /// Node commands, missing package managers/tools).
     pub diagnostics: Vec<diagnostic::InitDiagnostic>,
     /// Outcome of executing the generated contract once; filled by
     /// [`run_baseline`] (the CLI always runs it).
@@ -125,6 +136,7 @@ pub(crate) const CHECK_RELEASE_PREFLIGHT: &str =
 /// Returns an error when a file cannot be written, the database cannot be
 /// initialized, or `plans/invariants.json` does not match the decision-header
 /// schema.
+#[allow(clippy::too_many_lines)]
 pub async fn init_workspace(root: &Path, opts: &InitOpts) -> Result<InitReport> {
     let existing_language = if root.join("do-harness.toml").exists() {
         crate::config::load(root, None)
@@ -169,8 +181,16 @@ pub async fn init_workspace(root: &Path, opts: &InitOpts) -> Result<InitReport> 
             generate_rust_config(&sensors)?
         }
         Language::Node => {
-            let sensors = &detection.node_specs;
+            let sensors = &detection.specs;
             node::generate_node_config(sensors)?
+        }
+        Language::Python => {
+            let sensors = &detection.specs;
+            python::generate_python_config(sensors)?
+        }
+        Language::Go => {
+            let sensors = &detection.specs;
+            go::generate_go_config(sensors)?
         }
         Language::Generic => CONFIG_GENERIC.to_owned(),
         Language::Web => CONFIG_WEB.to_owned(),
@@ -182,7 +202,9 @@ pub async fn init_workspace(root: &Path, opts: &InitOpts) -> Result<InitReport> 
     write_if_absent(root, "do-harness.toml", &config, opts.force, &mut report)?;
     let invariants = match report.language {
         Language::Rust => INVARIANTS_RUST,
-        Language::Generic | Language::Web | Language::Node => INVARIANTS_GENERIC,
+        Language::Generic | Language::Web | Language::Node | Language::Python | Language::Go => {
+            INVARIANTS_GENERIC
+        }
     };
     write_if_absent(
         root,
@@ -209,6 +231,12 @@ pub async fn init_workspace(root: &Path, opts: &InitOpts) -> Result<InitReport> 
             &mut report,
         )?;
         scaffold_crate(root, &mut report)?;
+    }
+    if report.language == Language::Python {
+        scaffold_python_scripts(root, opts, &mut report)?;
+    }
+    if report.language == Language::Go {
+        scaffold_go_scripts(root, opts, &mut report)?;
     }
     if report.language == Language::Web {
         web::scaffold_web_scripts(root, opts, &mut report)?;

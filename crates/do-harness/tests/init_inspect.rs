@@ -210,7 +210,7 @@ fn test_explicit_language_node_inspection() {
 }
 
 #[test]
-fn test_python_and_go_fixtures_remain_honestly_unconfigured() {
+fn test_python_and_go_markers_select_a_pack() {
     let temp = tempfile::tempdir().unwrap();
     let root = temp.path();
 
@@ -224,35 +224,13 @@ fn test_python_and_go_fixtures_remain_honestly_unconfigured() {
 
     assert!(output.status.success());
     let parsed: Value = serde_json::from_slice(&output.stdout).unwrap();
-    assert_eq!(parsed["resolved_language"], "generic");
+    assert_eq!(parsed["resolved_language"], "python");
 
-    let candidates = parsed["candidates"].as_array().unwrap();
     assert!(
-        candidates.is_empty(),
-        "generic pack must not infer untrusted sensor commands for Python/Go without explicit policy"
+        parsed["candidates"].is_array(),
+        "a selected pack reports its probed candidates: {parsed}"
     );
-
-    let guidance = parsed["guidance"].as_str().unwrap();
-    assert!(guidance.contains("do-harness.toml") || guidance.contains("[[sensors]]"));
-    assert!(
-        parsed["diagnostics"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .any(|diagnostic| diagnostic["code"] == "generic_stack_selected"),
-        "unfamiliar stacks must carry a structured diagnostic: {parsed}"
-    );
-    let text = harness(root)
-        .args(["init", "--inspect"])
-        .output()
-        .expect("run init --inspect text");
-    assert!(text.status.success());
-    let text = String::from_utf8_lossy(&text.stdout);
-    assert!(
-        text.contains("generic_stack_selected"),
-        "text inspection must print diagnostics: {text}"
-    );
-
+    // `--inspect` is read-only: selecting a pack must not write a config.
     assert!(!root.join("do-harness.toml").exists());
 }
 
