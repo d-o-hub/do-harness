@@ -12,8 +12,8 @@ use clap::CommandFactory;
 use crate::cli::{Cli, Command, DoctorAction};
 use crate::{
     CliError, ci_explain, commands, config, distill, distill_strikes, doctor, dora, eval, exit,
-    explain, feedback, init, learn, loc, man, metrics, overlap, pr, report, sensors, skills, split,
-    status, telemetry, verify,
+    explain, feedback, init, learn, loc, man, metrics, overlap, pr, report, skills, split, status,
+    telemetry,
 };
 
 /// Executes the parsed CLI, classifying every failure into an exit code.
@@ -172,66 +172,17 @@ async fn route(root: &Path, config_path: Option<PathBuf>, cli: Cli) -> Result<()
                 Ok(())
             }
         }
-        Command::Verify {
-            fail_fast,
-            format,
-            set,
-            changed,
-            since,
-            only,
-            exclude,
-            jobs,
-            unchanged,
-            record,
-            task,
-            global,
-            evidence,
-            strict,
-            bless,
-            approver,
-            simulate,
-        } => {
-            let (task_id, raw_task) = match task.as_deref() {
-                Some("global") => (None, Some("global".to_string())),
-                Some(raw) => {
-                    let id = raw.parse::<i64>().map_err(|_| {
-                        CliError::Usage(anyhow::anyhow!(
-                            "invalid --task '{raw}': expected an integer task ID or 'global'"
-                        ))
-                    })?;
-                    (Some(id), Some(raw.to_string()))
-                }
-                None => (None, None),
-            };
-            // `--task global` names the namespace just as explicitly as
-            // `--global`, so it must not trigger the unscoped-record advisory.
-            let explicit_global = global || raw_task.as_deref() == Some("global");
-            let opts = sensors::VerifyOpts {
-                fail_fast,
-                dry_run: cli.dry_run,
-                simulate,
-                set,
-                changed,
-                since,
-                only,
-                exclude,
-                jobs,
-                unchanged,
-                record,
-                task: task_id,
-                raw_task,
-                global: explicit_global,
-                evidence,
-                strict,
-                bless,
-                approver,
-                format,
-                quiet: cli.quiet,
-                output: cli.output.clone(),
-                config: config_path,
-                ..Default::default()
-            };
-            verify::run(root, opts).await
+        verify_command @ Command::Verify { .. } => {
+            crate::verify_dispatch::run(
+                root,
+                config_path,
+                verify_command,
+                cli.dry_run,
+                cli.quiet,
+                cli.output,
+                cli.config.is_some(),
+            )
+            .await
         }
         Command::List(args) => {
             let (sets, format) = (args.sets, args.format);

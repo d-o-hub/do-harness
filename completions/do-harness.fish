@@ -89,7 +89,8 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand verify" -l set -d 
 complete -c do-harness -n "__fish_do_harness_using_subcommand verify" -l since -d 'Run only sensors applicable to the committed range `merge-base(<REF>, HEAD)..HEAD`; combine with `--changed` to union committed and uncommitted paths' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand verify" -l only -d 'Run only the named sensor (repeatable or comma-separated)' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand verify" -l exclude -d 'Exclude named sensors from the run' -r
-complete -c do-harness -n "__fish_do_harness_using_subcommand verify" -l jobs -d 'Maximum sensors in flight (overrides `jobs` in do-harness.toml)' -r
+complete -c do-harness -n "__fish_do_harness_using_subcommand verify" -l jobs -d 'Maximum workspace concurrency with `--workspaces`; otherwise the maximum sensors in flight (overrides `jobs` in do-harness.toml)' -r
+complete -c do-harness -n "__fish_do_harness_using_subcommand verify" -l workspaces -d 'Select workspace directories or configs matching this root-relative glob' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand verify" -l unchanged -d 'Reuse recorded passing beats for sensors whose declared inputs are unchanged: `warn` (default) executes and advises, `skip` reuses without executing (requires --record), `run` always executes' -r -f -a "warn\t'Execute the sensor, but print an advisory when a recorded pass is eligible for reuse (the conservative default: evidence stays fresh)'
 skip\t'Reuse the eligible recorded pass without executing the sensor'
 run\t'Execute unconditionally; no reuse lookup at all'"
@@ -117,7 +118,8 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand check" -l set -d '
 complete -c do-harness -n "__fish_do_harness_using_subcommand check" -l since -d 'Run only sensors applicable to the committed range `merge-base(<REF>, HEAD)..HEAD`; combine with `--changed` to union committed and uncommitted paths' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand check" -l only -d 'Run only the named sensor (repeatable or comma-separated)' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand check" -l exclude -d 'Exclude named sensors from the run' -r
-complete -c do-harness -n "__fish_do_harness_using_subcommand check" -l jobs -d 'Maximum sensors in flight (overrides `jobs` in do-harness.toml)' -r
+complete -c do-harness -n "__fish_do_harness_using_subcommand check" -l jobs -d 'Maximum workspace concurrency with `--workspaces`; otherwise the maximum sensors in flight (overrides `jobs` in do-harness.toml)' -r
+complete -c do-harness -n "__fish_do_harness_using_subcommand check" -l workspaces -d 'Select workspace directories or configs matching this root-relative glob' -r
 complete -c do-harness -n "__fish_do_harness_using_subcommand check" -l unchanged -d 'Reuse recorded passing beats for sensors whose declared inputs are unchanged: `warn` (default) executes and advises, `skip` reuses without executing (requires --record), `run` always executes' -r -f -a "warn\t'Execute the sensor, but print an advisory when a recorded pass is eligible for reuse (the conservative default: evidence stays fresh)'
 skip\t'Reuse the eligible recorded pass without executing the sensor'
 run\t'Execute unconditionally; no reuse lookup at all'"

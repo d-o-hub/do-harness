@@ -223,7 +223,7 @@ fn index_paths(root: &Path) -> Result<Vec<ChangedFile>, DiscoveryError> {
 
 /// Tracked staged and unstaged changes versus `HEAD`, NUL-separated.
 fn tracked_changes(root: &Path) -> Result<Vec<ChangedFile>, DiscoveryError> {
-    let args = ["diff", "--name-status", "-z", "HEAD"];
+    let args = ["diff", "--relative", "--name-status", "-z", "HEAD"];
     let output = git_output(root, &args)?;
     parse_name_status(&output.stdout, &git_label(&args))
 }

@@ -315,7 +315,23 @@
           "takes_value": true,
           "default_values": [],
           "possible_values": [],
-          "help": "Maximum sensors in flight (overrides `jobs` in do-harness.toml)",
+          "help": "Maximum workspace concurrency with `--workspaces`; otherwise the maximum sensors in flight (overrides `jobs` in do-harness.toml)",
+          "index": null
+        },
+        {
+          "id": "workspaces",
+          "kind": "option",
+          "short": null,
+          "long": "workspaces",
+          "value_names": [
+            "GLOB"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Select workspace directories or configs matching this root-relative glob",
           "index": null
         },
         {
