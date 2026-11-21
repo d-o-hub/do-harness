@@ -172,26 +172,8 @@ async fn route(root: &Path, config_path: Option<PathBuf>, cli: Cli) -> Result<()
                 Ok(())
             }
         }
-        Command::Verify {
-            fail_fast,
-            format,
-            set,
-            changed,
-            since,
-            only,
-            exclude,
-            jobs,
-            unchanged,
-            record,
-            task,
-            global,
-            evidence,
-            strict,
-            bless,
-            approver,
-            simulate,
-        } => {
-            let (task_id, raw_task) = match task.as_deref() {
+        Command::Verify(args) => {
+            let (task_id, raw_task) = match args.task.as_deref() {
                 Some("global") => (None, Some("global".to_string())),
                 Some(raw) => {
                     let id = raw.parse::<i64>().map_err(|_| {
@@ -205,27 +187,27 @@ async fn route(root: &Path, config_path: Option<PathBuf>, cli: Cli) -> Result<()
             };
             // `--task global` names the namespace just as explicitly as
             // `--global`, so it must not trigger the unscoped-record advisory.
-            let explicit_global = global || raw_task.as_deref() == Some("global");
+            let explicit_global = args.global || raw_task.as_deref() == Some("global");
             let opts = sensors::VerifyOpts {
-                fail_fast,
+                fail_fast: args.fail_fast,
                 dry_run: cli.dry_run,
-                simulate,
-                set,
-                changed,
-                since,
-                only,
-                exclude,
-                jobs,
-                unchanged,
-                record,
+                simulate: args.simulate,
+                set: args.set,
+                changed: args.changed,
+                since: args.since,
+                only: args.only,
+                exclude: args.exclude,
+                jobs: args.jobs,
+                unchanged: args.unchanged,
+                record: args.record,
                 task: task_id,
                 raw_task,
                 global: explicit_global,
-                evidence,
-                strict,
-                bless,
-                approver,
-                format,
+                evidence: args.evidence,
+                strict: args.strict,
+                bless: args.bless,
+                approver: args.approver,
+                format: args.format,
                 quiet: cli.quiet,
                 output: cli.output.clone(),
                 config: config_path,
