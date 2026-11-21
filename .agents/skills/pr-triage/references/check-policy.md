@@ -73,6 +73,18 @@ is plumbing — follow
 [gh-resilience.md](gh-resilience.md) (one empty retrigger commit, one cycle, then
 escalate), never a merge around the check.
 
+### macOS runner capacity
+
+A `runner not acquired` or capacity annotation before the first step means no
+test code ran. Treat it as provisioning failure, not a code failure; keep the
+required check fail-closed. After the single same-run retry above, do not keep
+rerunning the same saturated label.
+
+- Validate `runs-on` against [GitHub-hosted runner labels](https://docs.github.com/en/actions/reference/runners/github-hosted-runners). Use the [runner-images index](https://github.com/actions/runner-images/tree/main/images) and [macOS image tree](https://github.com/actions/runner-images/tree/main/images/macos) to inspect the README for the selected OS, architecture, and installed toolchain; those files describe image contents, not the full label catalogue.
+- Choose one currently supported label that matches the test contract. Check the `actionlint` version used by CI: if current GitHub docs list the label but the linter rejects it, update the linter or choose another documented label it accepts. Never bypass actionlint or make the required check optional.
+- If GitHub-hosted capacity remains unavailable, consider a provider such as [GetMac](https://getmac.io/docs/github-runners/getting-started) only after confirming it fits the runner contract. This is an access and cost change, not a label substitution.
+- Before installing or routing, review GitHub App repository scope, workflow-token and secret exposure, data retention, availability terms, and pricing; obtain repository-owner approval.
+
 ## Verdicts
 
 | Verdict | Meaning | Action |
