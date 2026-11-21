@@ -239,11 +239,11 @@ async fn missing_file_returns_rust_default() {
 async fn rejects_unknown_language_pack() {
     let dir = tempfile::tempdir().expect("tempdir");
     let path = dir.path().join("do-harness.toml");
-    std::fs::write(&path, "language = \"python\"\n").expect("write config");
+    std::fs::write(&path, "language = \"ruby\"\n").expect("write config");
     let err = load(dir.path(), Some(&path))
         .await
         .expect_err("load must fail");
-    assert!(format!("{err:#}").contains("unsupported language pack 'python'"));
+    assert!(format!("{err:#}").contains("unsupported language pack 'ruby'"));
 }
 
 /// The generic pack with no sensors yields an empty sensor list.

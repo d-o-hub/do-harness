@@ -3600,7 +3600,7 @@ _do__harness() {
             fi
             case "${prev}" in
                 --language)
-                    COMPREPLY=($(compgen -W "rust generic web node" -- "${cur}"))
+                    COMPREPLY=($(compgen -W "rust generic web node python go" -- "${cur}"))
                     return 0
                     ;;
                 --format)

@@ -326,8 +326,8 @@ fn unknown_stack_init_is_vacuous_and_diagnosed() {
     let root = dir.path();
     write(
         root,
-        "pyproject.toml",
-        "[project]\nname = \"fixture\"\nversion = \"1.0.0\"\n",
+        "pom.xml",
+        "<project><modelVersion>4.0.0</modelVersion></project>\n",
     );
     git_commit(root);
     let (code, report, stderr) = run_json(
@@ -349,8 +349,8 @@ fn unknown_stack_init_is_vacuous_and_diagnosed() {
     let text_root = text_dir.path();
     write(
         text_root,
-        "pyproject.toml",
-        "[project]\nname = \"fixture\"\nversion = \"1.0.0\"\n",
+        "pom.xml",
+        "<project><modelVersion>4.0.0</modelVersion></project>\n",
     );
     git_commit(text_root);
     let (_, text, _) = support::run(harness(text_root).args([

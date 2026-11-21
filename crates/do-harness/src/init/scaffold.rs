@@ -16,6 +16,10 @@ const CHECK_DEPS: &str = include_str!("../../templates/scripts/check-deps.sh");
 const CHECK_AUDIT: &str = include_str!("../../templates/scripts/check-audit.sh");
 const CHECK_COVERAGE: &str = include_str!("../../templates/scripts/check-coverage.sh");
 const CHECK_TEST: &str = include_str!("../../templates/scripts/check-test.sh");
+const CHECK_PYTHON_TEST: &str = include_str!("../../templates/scripts/check-python-test.sh");
+const CHECK_GO_VET: &str = include_str!("../../templates/scripts/check-go-vet.sh");
+const CHECK_GO_TEST: &str = include_str!("../../templates/scripts/check-go-test.sh");
+const CHECK_GO_STATICCHECK: &str = include_str!("../../templates/scripts/check-go-staticcheck.sh");
 const NEXTEST_CONFIG: &str = include_str!("../../assets/nextest.toml");
 const CRATE_MANIFEST: &str = include_str!("../../templates/crate/Cargo.toml.template");
 const CRATE_LIB: &str = include_str!("../../templates/crate/src/lib.rs");
@@ -36,6 +40,42 @@ pub(super) fn scaffold_scripts(
             "scripts/check-release-preflight.sh",
             CHECK_RELEASE_PREFLIGHT,
         ),
+    ] {
+        if write_if_absent(root, relative, body, opts.force, report)? {
+            crate::fs_perm::set_owner_exec(&root.join(relative))?;
+        }
+    }
+    Ok(())
+}
+
+/// Writes the Python-pack helper scripts and marks them executable.
+pub(super) fn scaffold_python_scripts(
+    root: &Path,
+    opts: &InitOpts,
+    report: &mut InitReport,
+) -> Result<()> {
+    if write_if_absent(
+        root,
+        "scripts/check-python-test.sh",
+        CHECK_PYTHON_TEST,
+        opts.force,
+        report,
+    )? {
+        crate::fs_perm::set_owner_exec(&root.join("scripts/check-python-test.sh"))?;
+    }
+    Ok(())
+}
+
+/// Writes the Go-pack helper scripts and marks them executable.
+pub(super) fn scaffold_go_scripts(
+    root: &Path,
+    opts: &InitOpts,
+    report: &mut InitReport,
+) -> Result<()> {
+    for (relative, body) in [
+        ("scripts/check-go-vet.sh", CHECK_GO_VET),
+        ("scripts/check-go-test.sh", CHECK_GO_TEST),
+        ("scripts/check-go-staticcheck.sh", CHECK_GO_STATICCHECK),
     ] {
         if write_if_absent(root, relative, body, opts.force, report)? {
             crate::fs_perm::set_owner_exec(&root.join(relative))?;
