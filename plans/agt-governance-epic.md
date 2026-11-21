@@ -35,6 +35,7 @@ Microsoft's Agent Governance Toolkit publishes `agent-governance` + `agent-gover
 | `feat-guardian-operability` | vertical slice | Example config + `--verify-audit` fail-closed CLI + `cargo test -p guardian-proxy` CI gate | **done task 12** |
 | `chore-agt-promotion` | decision | GA + surface satisfied → remove feature flag or keep off-by-default per invariants review | Decision memo §4 — **hold** (2026-09-15, re-confirmed 2026-09-16: all engineering gates pass, criterion (a) still `VERDICT=NOT_GA`; see Promotion review below) |
 | `chore-remove-doharness-policy` | refactor | Delete duplicated `do-harness/src/policy/` (`AgtGate`/`McpMediator`) now that `guardian-proxy` is the sole tool-call mediation surface; drop the `agt-governance` feature from the CLI crate | #34 item 10 — **done task 30** |
+| `feat-guardian-policy-as-code` | vertical slice | Declarative YAML policy layer: `policy.rs` engine, `ProxyConfig.policy_file` fail-closed startup load, `guardian-proxy policy test --fixtures` subcommand, policy SHA-256 digest bound into audit records, schema + migration docs | #584 — **done** |
 
 ## Non-goals
 
@@ -206,6 +207,23 @@ When the watch does report `GA`, the promotion work is larger than removing a fl
 | Repository verification | `do-harness verify --set verification --format json --strict` passed 12/12; `target/release/do-harness status --set verification` reported `green` |
 | Consequence | Default builds keep `agent-governance` absent, preserving the accepted RUSTSEC-2026-0097 scope and pre-GA dependency boundary |
 
+
+## Slice completion — feat-guardian-policy-as-code (2026-11-21, #584)
+
+Added the declarative policy layer to `guardian-proxy`: a versioned YAML
+policy (schema v1, `#[serde(deny_unknown_fields)]` everywhere) with
+allow/deny/ask rules over tool name, caller identity, and parameter matchers
+(`crates/guardian-proxy/src/policy.rs`). `ProxyMediator` loads the policy at
+startup via the new `ProxyConfig.policy_file` and fails closed into degraded
+mode on missing/unparseable files; with no path set the code-embedded
+defaults are unchanged. `guardian-proxy policy test --policy <file>
+--fixtures <dir>` evaluates allow/deny/ask fixture cases offline and exits
+non-zero on any mismatch. Each audit record binds the policy file's SHA-256
+digest (`policy_sha256`) into the chain hash. The YAML choice is documented
+(serde-native; the repo already parses YAML) in the crate README, which also
+carries the schema reference; `docs/guardian-proxy-migration.md` documents
+migration from code-embedded policies. YAML over Rego/OPA avoids a new
+runtime/tooling dependency.
 
 ## Slice completion — chore-remove-doharness-policy (2026-09-11, task 30)
 

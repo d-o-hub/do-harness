@@ -46,6 +46,12 @@ pub struct ProxyConfig {
     /// open, which is the loopback sidecar default.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ingress_token: Option<String>,
+    /// Optional declarative policy file (YAML, schema version 1) loaded at
+    /// startup. When set, parse errors or a missing file fail mediator
+    /// construction (fail-closed); when unset the code-embedded defaults
+    /// apply (backward compatible).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub policy_file: Option<String>,
     /// Browser origins allowed on the MCP endpoint, matched per RFC 6454
     /// `(scheme, host, port)`. Requests without an `Origin` header always
     /// pass; an empty list disables Origin validation.
@@ -116,6 +122,12 @@ pub const fn governance_mode() -> GovernanceMode {
 
 mod proxy;
 pub use proxy::{McpLikeToolCall, ProxyMediator, validate_upstream};
+
+mod policy;
+pub use policy::{
+    Fixture, FixtureSummary, LoadedPolicy, NO_RULE_MATCH_REASON, POLICY_FILE_VERSION, Policy,
+    PolicyDecision, Rule, RuleAction, load_policy, run_fixtures,
+};
 
 mod audit_log;
 pub use audit_log::{AuditLog, AuditRecord};

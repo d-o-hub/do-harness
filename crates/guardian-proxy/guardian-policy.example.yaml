@@ -1,0 +1,31 @@
+# Example declarative policy for guardian-proxy (schema version 1).
+#
+# Copy to your policy path and point `ProxyConfig.policy_file` at it.
+# Rules are evaluated in file order and the first match wins, so list more
+# specific rules before broader ones. A call matching no rule is denied by
+# default (fail-closed).
+#
+# `tool` and `caller` are glob patterns: `*` matches any run of characters.
+# When `params` is present, every key must match for the rule to apply —
+# string expectations are globs, anything else compares for JSON equality.
+# An absent parameter never matches.
+version: 1
+rules:
+  # Never remove files under /etc, whatever the caller claims.
+  - action: deny
+    tool: "fs.remove"
+    params:
+      path: "/etc/*"
+    reason: "never remove system files"
+
+  # Shell commands from the CI caller need human approval before they may
+  # run. The runtime maps `ask` to a deny; only `policy test` observes the
+  # ask outcome directly.
+  - action: ask
+    tool: "shell.exec"
+    caller: "ci"
+    reason: "shell commands from CI need review"
+
+  # Explicit allow for the read path used by every caller.
+  - action: allow
+    tool: "data.read"
