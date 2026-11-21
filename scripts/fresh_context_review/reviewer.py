@@ -83,9 +83,9 @@ def validate_findings(raw, max_findings):
         missing = [k for k in required if not isinstance(item.get(k), str) or not item[k].strip()]
         if missing:
             raise ValueError("finding %d missing fields: %s" % (i, ", ".join(missing)))
+        findings.append(item)
     truncated = len(findings) > max_findings
     return findings[:max_findings], truncated
-
 
 def probe_marker(output, marker):
     """Parent-only marker probe over captured reviewer output.
@@ -188,6 +188,10 @@ def run_reviewer(cmd, packet_json, *, repo, timeout_s, max_output_bytes,
     record["outcome"] = (
         OUTCOME_SUCCESS_FINDINGS if findings else OUTCOME_ZERO_FINDINGS
     )
+    if record.get("marker_leaked"):
+        record["outcome"] = OUTCOME_FAILURE
+        record["reason"] = "isolation marker leaked into reviewer output"
+        record["error_kind"] = "isolation_marker_leaked"
     return record
 
 

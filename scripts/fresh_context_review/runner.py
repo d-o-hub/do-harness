@@ -37,6 +37,8 @@ def build_parser():
     parser.add_argument("--revision", metavar="REV", default="HEAD")
     parser.add_argument("--record-out", metavar="FILE")
     parser.add_argument("--packet-out", metavar="FILE")
+    parser.add_argument("--objective")
+    parser.add_argument("--intended-behavior")
     parser.add_argument("--constraint", action="append", default=[])
     parser.add_argument("--proposed-contract")
     parser.add_argument("--open-question", action="append", default=[])

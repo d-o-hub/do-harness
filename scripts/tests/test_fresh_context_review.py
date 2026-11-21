@@ -8,7 +8,6 @@ sanitized records, and disposition workflow. No model is ever launched; all
 reviewer runs use the deterministic stub fixture.
 """
 import argparse
-import importlib.util
 import json
 import os
 import sys
@@ -18,6 +17,12 @@ from pathlib import Path
 
 SCRIPT_ROOT = Path(__file__).resolve().parent.parent
 REPO = SCRIPT_ROOT.parent
+sys.path.insert(0, str(SCRIPT_ROOT))
+
+import fresh_context_review.packet as packet_mod  # noqa: E402
+import fresh_context_review.reviewer as reviewer_mod  # noqa: E402
+import fresh_context_review.runner as runner_mod  # noqa: E402
+import fresh_context_review.stub_reviewer as stub_mod  # noqa: E402
 
 STUB_SCENARIOS = ("flawed", "sound", "fail", "timeout", "unavailable",
                   "leak", "huge")
@@ -34,20 +39,6 @@ OUTCOMES = (
 )
 
 
-def load(name):
-    path = SCRIPT_ROOT / "fresh_context_review" / name
-    spec = importlib.util.spec_from_file_location("fcr_" + name, path)
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return module
-
-
-packet_mod = load("packet.py")
-reviewer_mod = load("reviewer.py")
-runner_mod = load("runner.py")
-stub_mod = load("stub_reviewer.py")
-
 CASE = {
     "id": "ut-case",
     "scenario": "flawed",
@@ -63,13 +54,6 @@ CASE = {
 }
 
 
-def run_case(**overrides):
-    case = dict(CASE)
-    case.update(overrides)
-    args = argparse_namespace(case)
-    return runner_mod.run_one_review(str(REPO), args, case=case)
-
-
 def argparse_namespace(case):
     return argparse.Namespace(
         stub=case.get("scenario"),
@@ -79,6 +63,9 @@ def argparse_namespace(case):
         meta="{}",
         design_doc=None,
         revision=None,
+        record_out=None,
+        objective=None,
+        intended_behavior=None,
         constraint=[],
         proposed_contract=None,
         open_question=[],
@@ -91,8 +78,16 @@ def argparse_namespace(case):
     )
 
 
+def run_case(**overrides):
+    case = dict(CASE)
+    case.update(overrides)
+    args = argparse_namespace(case)
+    return runner_mod.run_one_review(str(REPO), args, case=case)
 
-
+def packet_kwargs():
+    kw = {k: v for k, v in CASE.items() if k not in ("id", "scenario")}
+    kw["review_id"] = "ut-packet"
+    return kw
 class FreshContextReviewTests(unittest.TestCase):
 
     def test_outcomes_are_distinct(self):
@@ -115,12 +110,12 @@ class FreshContextReviewTests(unittest.TestCase):
 
     def test_packet_hash_stable(self):
         p1 = packet_mod.build_packet(
-            repo=str(REPO), revision="HEAD", **CASE,
+            repo=str(REPO), revision="HEAD", **packet_kwargs(),
             source_paths=[], test_paths=[], intended_behavior="",
             timeout_s=300, max_findings=5, max_output_bytes=65536,
         )
         p2 = packet_mod.build_packet(
-            repo=str(REPO), revision="HEAD", **CASE,
+            repo=str(REPO), revision="HEAD", **packet_kwargs(),
             source_paths=[], test_paths=[], intended_behavior="",
             timeout_s=300, max_findings=5, max_output_bytes=65536,
         )
@@ -138,7 +133,7 @@ class FreshContextReviewTests(unittest.TestCase):
     def test_packet_hash_sensitive_to_input(self):
         def build(objective):
             return packet_mod.attach_hash(packet_mod.build_packet(
-                repo=str(REPO), revision="HEAD", **{**CASE, "objective": objective},
+                repo=str(REPO), revision="HEAD", **{**packet_kwargs(), "objective": objective},
                 source_paths=[], test_paths=[], intended_behavior="",
                 timeout_s=300, max_findings=5, max_output_bytes=65536,
             ))
@@ -148,7 +143,7 @@ class FreshContextReviewTests(unittest.TestCase):
     def test_revision_pinning_fails_closed(self):
         with self.assertRaises(ValueError):
             packet_mod.build_packet(
-                repo=str(REPO), revision="definitely-not-a-revision", **CASE,
+                repo=str(REPO), revision="definitely-not-a-revision", **packet_kwargs(),
                 source_paths=[], test_paths=[], intended_behavior="",
                 timeout_s=300, max_findings=5, max_output_bytes=65536,
             )
@@ -156,7 +151,7 @@ class FreshContextReviewTests(unittest.TestCase):
         # silently dropped input.
         with self.assertRaises(ValueError):
             packet_mod.build_packet(
-                repo=str(REPO), revision="HEAD", **CASE,
+                repo=str(REPO), revision="HEAD", **packet_kwargs(),
                 source_paths=["scripts/does-not-exist.py"], test_paths=[],
                 intended_behavior="", timeout_s=300, max_findings=5,
                 max_output_bytes=65536,
