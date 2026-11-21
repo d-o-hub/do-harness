@@ -66,10 +66,15 @@ Source builds on Windows need: the Visual Studio Build Tools C++ workload
 resolves to MSVC, not coreutils `/usr/bin/link` (which fails with a confusing
 "extra operand" error) — check with `command -v link` / `where link`.
 
-Sensor portability: `[[sensors]]` `argv` is shell-agnostic, but the shipped
-rust-pack helpers are POSIX shell scripts — run hooks and dogfood under Git
-Bash on Windows. Managed git hooks resolve `do-harness.exe` via the `.exe`
-fallback.
+Sensor portability: the shipped rust-pack helpers (`loc`, `deps`, `audit`,
+`commitlint`) are native `do-harness` subcommands (`do-harness loc`,
+`do-harness helpers deps|audit|commitlint`) — they run without Git Bash or
+WSL on Windows. The `scripts/check-*.sh` files remain as thin delegating
+wrappers so existing `[[sensors]]` argv rows keep working. Managed git hooks
+are POSIX `sh` bodies (no bash-isms) that call the `do-harness` binary
+directly; git-for-windows executes hooks through its bundled MSYS `sh`, so
+the hooks themselves need no Git Bash user shell (the binary resolves via
+`DO_HARNESS_BIN`, `PATH`, then `target/release/do-harness[.exe]`).
 
 Rust toolchains can fetch the prebuilt release artifact:
 

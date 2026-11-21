@@ -92,6 +92,16 @@ pub fn resolve_program(program: &str) -> PathBuf {
             return bash;
         }
     }
+    if stem == "do-harness" {
+        // A sensor argv naming the harness itself resolves to the running
+        // binary, so `["do-harness", "loc"]` works in a dev checkout where
+        // the binary is not on `PATH`.
+        if let Ok(exe) = std::env::current_exe() {
+            if exe.is_file() {
+                return exe;
+            }
+        }
+    }
     PathBuf::from(program)
 }
 

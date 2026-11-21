@@ -400,7 +400,7 @@ async fn strict_fails_when_declared_hooks_are_empty() {
 #[test]
 fn renders_delegated_and_unowned_hook_lines() {
     assert_eq!(
-        hook_line("pre-commit", HookOwner::PreCommit, false, None, false, true),
+        hook_line("pre-commit", HookOwner::PreCommit, false, None, true),
         "  [OK] pre-commit hook: delegated to pre-commit"
     );
     assert_eq!(
@@ -409,17 +409,16 @@ fn renders_delegated_and_unowned_hook_lines() {
             HookOwner::HooksPath,
             false,
             Some(".githooks"),
-            false,
             false
         ),
         "  [OK] pre-push hook: delegated to core.hooksPath=.githooks"
     );
-    let absent = hook_line("commit-msg", HookOwner::Absent, false, None, false, true);
+    let absent = hook_line("commit-msg", HookOwner::Absent, false, None, true);
     assert!(
         absent.contains("[WARN]") && absent.contains("pre-commit install"),
         "{absent}"
     );
-    let foreign = hook_line("pre-commit", HookOwner::Foreign, false, None, false, false);
+    let foreign = hook_line("pre-commit", HookOwner::Foreign, false, None, false);
     assert!(
         foreign.contains("[WARN]") && foreign.contains("foreign"),
         "{foreign}"
@@ -459,4 +458,37 @@ async fn fails_on_tampered_event_chain_json() {
         .unwrap_err()
         .to_string();
     assert!(message.contains("tampered"), "{message}");
+}
+/// The default pack (no config file) reports every native helper as native
+/// with the native argv, never as shell-routed.
+#[tokio::test(flavor = "current_thread")]
+async fn helper_portability_reports_native_defaults() {
+    let (_temp, root) = fake_repo_with_git();
+    let rows = super::checks::helper_portability(&root).await;
+    for row in &rows {
+        assert!(row.native, "{} must be native", row.name);
+        assert!(!row.shell, "{} must not route through the shell", row.name);
+        assert_eq!(row.argv[0], "do-harness");
+    }
+    let names: Vec<&str> = rows.iter().map(|row| row.name.as_str()).collect();
+    for name in ["commitlint", "deps", "audit", "loc"] {
+        assert!(names.contains(&name), "missing helper {name}");
+    }
+}
+
+/// A config that still routes a helper through `bash` is reported as shell-
+/// required, with the native alternative available.
+#[tokio::test(flavor = "current_thread")]
+async fn helper_portability_flags_shell_configured_sensors() {
+    let (_temp, root) = fake_repo_with_git();
+    std::fs::write(
+        root.join("do-harness.toml"),
+        "[[sensors]]\nname = \"commitlint\"\nargv = [\"bash\", \"scripts/check-commitlint.sh\"]\n",
+    )
+    .unwrap();
+    let rows = super::checks::helper_portability(&root).await;
+    let commitlint = rows.iter().find(|row| row.name == "commitlint").unwrap();
+    assert!(commitlint.native);
+    assert!(commitlint.shell);
+    assert_eq!(commitlint.argv, vec!["bash", "scripts/check-commitlint.sh"]);
 }

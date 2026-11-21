@@ -2,206 +2,32 @@
 # check-commitlint.sh — enforces conventional commits with lowercase subjects.
 #
 # Sensor: scripts/check-commitlint.sh
-# Fails if any inspected commit messages do not match:
-#   type(optional scope)!: lowercase subject
-# where type is one of feat/fix/docs/chore/refactor/test/build/ci/perf/revert
-# and the conventional-commits `!` breaking-change marker is optional.
+# Thin delegating wrapper: the implementation is the native
+# `do-harness helpers commitlint` subcommand. The wrapper keeps sensor argv
+# rows like ["bash", "scripts/check-commitlint.sh"] working in existing
+# adopter configs and resolves the same binary the managed hooks do
+# (DO_HARNESS_BIN, then PATH, then target/release/do-harness[.exe]).
 #
-# Modes:
-#   (no args)             lint the last COUNT commit subjects (sensor default).
-#   --count <N>           override the history window (env: DO_HARNESS_COMMITLINT_COUNT).
-#   --range <REV-RANGE>   lint every subject in a git rev-list range
-#                         (e.g. "origin/main...HEAD" for the full PR range in
-#                         CI, where fetch-depth: 0 makes both ends available).
-#                         Mutually exclusive with --count.
-#   --message <FILE>      lint the single subject in FILE (git commit-msg hook).
+# Exit codes match the native command: 0 pass, 1 a subject failed lint, 2
+# usage/environment errors.
 
 set -euo pipefail
 
-# These variables decide which repository and history `git` reads; git
-# exports them to hooks and `githooks(5)` documents clearing exactly
-# `git rev-parse --local-env-vars` before invoking git elsewhere. Left in
-# place, the `git log` calls below would read the caller's repository or a
-# truncated history instead of this work tree's. (`GIT_CONFIG*` stays
-# inherited: it carries the caller's `-c` configuration.)
-unset GIT_DIR GIT_WORK_TREE GIT_IMPLICIT_WORK_TREE GIT_INDEX_FILE \
-    GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES \
-    GIT_CEILING_DIRECTORIES GIT_DISCOVERY_ACROSS_FILESYSTEM GIT_NAMESPACE \
-    GIT_PREFIX GIT_COMMON_DIR GIT_SHALLOW_FILE GIT_GRAFT_FILE \
-    GIT_REPLACE_REF_BASE GIT_NO_REPLACE_OBJECTS GIT_INTERNAL_SUPER_PREFIX
-
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-# Lints a single subject line against the conventional-commit + lowercase rules.
-# Returns nonzero (and prints a FAIL line) when the subject is invalid.
-lint_subject() {
-    local subject="$1"
-    if [[ "$subject" =~ ^Merge[[:space:]] ]]; then
-        return 0
+BIN="${DO_HARNESS_BIN:-}"
+if [[ -z "$BIN" ]]; then
+    BIN="$(command -v do-harness 2>/dev/null || true)"
+fi
+if [[ -z "$BIN" ]]; then
+    BIN="$ROOT/target/release/do-harness"
+    if [[ ! -x "$BIN" && -x "$BIN.exe" ]]; then
+        BIN="$BIN.exe"
     fi
-    if ! [[ "$subject" =~ ^(feat|fix|docs|chore|refactor|test|build|ci|perf|revert)(\([a-z0-9._/-]+\))?!?:\ ?.+$ ]]; then
-        echo "FAIL: non-conventional commit subject: $subject"
-        return 1
-    fi
-    # Drop the "type(scope)!: " prefix, then require the subject to be lowercase.
-    local body="${subject#*: }"
-    if [[ "$body" != "${body,,}" ]]; then
-        echo "FAIL: commit subject is not lowercase: $subject"
-        return 1
-    fi
-}
-
-# commit-msg hook mode: lint a single prepared message file.
-if [[ "${1:-}" == "--message" ]]; then
-    MESSAGE_FILE="${2:-}"
-    if [[ -z "$MESSAGE_FILE" ]]; then
-        echo "check-commitlint: --message requires a file path" >&2
+    if [[ ! -x "$BIN" ]]; then
+        echo "check-commitlint: do-harness binary not found. Set DO_HARNESS_BIN, add do-harness to PATH, or build with: cargo build --release -p do-harness" >&2
         exit 2
     fi
-    # Commit-msg files may carry leading '#' comment lines (git's template);
-    # take the first non-comment, non-empty line as the subject.
-    subject="$(awk 'NF && $0 !~ /^#/ { print; exit }' "$MESSAGE_FILE" || true)"
-    if [[ -z "$subject" ]]; then
-        echo "check-commitlint: no commit message found in $MESSAGE_FILE" >&2
-        exit 2
-    fi
-    if ! lint_subject "$subject"; then
-        echo "Conventional-commit invariant violated."
-        echo "Use: 'type(scope): lowercase subject' e.g. 'fix: typo'"
-        exit 1
-    fi
-    echo "check-commitlint OK: subject is conventional and lowercase."
-    exit 0
 fi
 
-# A linked worktree carries a .git *file* pointing at the main repository, so
-# a directory test would skip — and silently pass — inside `git worktree add`.
-if [[ ! -e "$ROOT/.git" ]] || ! git -C "$ROOT" rev-parse --git-dir >/dev/null 2>&1; then
-    echo "check-commitlint skipped: no git repository"
-    exit 0
-fi
-
-# History window: --count <N> flag overrides the env default of 1,
-# --range <REV-RANGE> lints a git rev-list range instead (CI PR lint).
-COUNT="${DO_HARNESS_COMMITLINT_COUNT:-1}"
-COUNT_SET=0
-RANGE=""
-while (( $# )); do
-    case "$1" in
-        --count)
-            if [[ $# -lt 2 ]]; then
-                echo "check-commitlint: --count requires a positive integer" >&2
-                exit 2
-            fi
-            COUNT="$2"
-            COUNT_SET=1
-            shift 2
-            ;;
-        --count=*)
-            COUNT="${1#--count=}"
-            COUNT_SET=1
-            shift
-            ;;
-        --range)
-            if [[ $# -lt 2 || -z "${2:-}" ]]; then
-                echo "check-commitlint: --range requires a git rev-list range" >&2
-                exit 2
-            fi
-            RANGE="$2"
-            shift 2
-            ;;
-        --range=*)
-            RANGE="${1#--range=}"
-            if [[ -z "$RANGE" ]]; then
-                echo "check-commitlint: --range requires a git rev-list range" >&2
-                exit 2
-            fi
-            shift
-            ;;
-        *)
-            echo "check-commitlint: unknown argument: $1" >&2
-            exit 2
-            ;;
-    esac
-done
-if [[ -n "$RANGE" ]] && (( COUNT_SET )); then
-    echo "check-commitlint: --range and --count are mutually exclusive" >&2
-    exit 2
-fi
-if [[ -z "$RANGE" ]] && ! [[ "$COUNT" =~ ^[1-9][0-9]*$ ]]; then
-    echo "check-commitlint: count must be a positive integer, got: $COUNT" >&2
-    exit 2
-fi
-
-if [[ -z "$RANGE" ]] && ! git -C "$ROOT" rev-parse -q --verify HEAD >/dev/null 2>&1 &&
-    COMMIT_COUNT="$(git -C "$ROOT" rev-list --count --all 2>/dev/null)" && [[ "$COMMIT_COUNT" == "0" ]]; then
-    echo "check-commitlint OK: no commits to lint"
-    exit 0
-fi
-
-FAIL=0
-LINTED=0
-if [[ -n "$RANGE" ]]; then
-    LOG_SOURCE="range $RANGE"
-    LOG_CMD=(git -C "$ROOT" log --no-merges --pretty=format:%s "$RANGE")
-else
-    LOG_SOURCE="last $COUNT commit(s)"
-    # The window judges the commits a branch adds, so it must not wander into
-    # history that already exists on the base branch. Two shapes make that easy
-    # to get wrong, and they put the branch on OPPOSITE parent indices:
-    #
-    #   * a locally created merge -- branch is parent 1, base is parent 2;
-    #   * GitHub's test-merge (`refs/pull/<n>/merge`, what CI checks out) --
-    #     BASE is parent 1 and the branch is parent 2.
-    #
-    # So neither `--first-parent` nor `--not <parent>` is correct in general:
-    # each fixes one shape and breaks the other. Excluding the base branch by
-    # name expresses the intent directly and is stable across both. When no base
-    # branch is resolvable the plain window is the historical behavior.
-    BASE_REF=""
-    for candidate in origin/main main; do
-        if git -C "$ROOT" rev-parse -q --verify "$candidate" >/dev/null 2>&1; then
-            BASE_REF="$candidate"
-            break
-        fi
-    done
-    # Only exclude a base that is genuinely elsewhere. When the base ref IS the
-    # current tip (the common case of running on `main` itself, where `main`
-    # resolves to HEAD), `HEAD --not <base>` is empty and the window would
-    # silently lint nothing, which is exactly the vacuous pass this sensor must
-    # never produce. Requiring the base to differ from HEAD keeps the window
-    # non-empty there.
-    if [[ -n "$BASE_REF" ]] &&
-        [[ "$(git -C "$ROOT" rev-parse "$BASE_REF")" != "$(git -C "$ROOT" rev-parse HEAD)" ]]; then
-        LOG_CMD=(git -C "$ROOT" log --no-merges -n "$COUNT" --pretty=format:%s HEAD --not "$BASE_REF")
-        LOG_SOURCE="last $COUNT commit(s) not on $BASE_REF"
-    else
-        LOG_CMD=(git -C "$ROOT" log --no-merges -n "$COUNT" --pretty=format:%s)
-    fi
-fi
-# Capture first: an invalid range (or any git failure) must fail closed,
-# never silently lint zero subjects. Command substitution also strips the
-# missing trailing newline that made `while read` drop the newest subject.
-if ! LOG_OUTPUT="$("${LOG_CMD[@]}" 2>&1)"; then
-    echo "$LOG_OUTPUT" >&2
-    echo "check-commitlint: git log failed for the $LOG_SOURCE" >&2
-    exit 2
-fi
-# Read the subjects through a while loop (not mapfile) so this also runs on
-# bash 3.2 / macOS, and so an empty history simply lints nothing.
-if [[ -n "$LOG_OUTPUT" ]]; then
-    while IFS= read -r subject; do
-        LINTED=$((LINTED + 1))
-        if ! lint_subject "$subject"; then
-            FAIL=1
-        fi
-    done <<< "$LOG_OUTPUT"
-fi
-
-if (( FAIL )); then
-    echo "Conventional-commit invariant violated in the $LOG_SOURCE."
-    echo "Use: 'type(scope): lowercase subject' e.g. 'feat(workflow): gate advance on beats'"
-    exit 1
-fi
-
-echo "check-commitlint OK: $LINTED subject(s) in the $LOG_SOURCE use conventional lowercase subjects."
+exec "$BIN" --root "$ROOT" helpers commitlint "$@"

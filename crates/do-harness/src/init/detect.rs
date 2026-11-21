@@ -283,7 +283,6 @@ fn rust_candidates() -> Vec<Candidate> {
     let cargo_clippy = probe("cargo", &["clippy", "--version"]);
     let cargo_nextest = probe("cargo", &["nextest", "--version"]);
     let cargo_llvm_cov = probe("cargo", &["llvm-cov", "--version"]);
-    let bash = probe("bash", &["--version"]);
     let cargo_deny = probe("cargo", &["deny", "--version"]);
     let cargo_audit = probe("cargo", &["audit", "--version"]);
 
@@ -320,20 +319,24 @@ fn rust_candidates() -> Vec<Candidate> {
                 "cargo-llvm-cov not installed; omitted because a SKIP would fail --strict (install it, then re-run init --force)"
             },
         ),
-        candidate("loc", bash, bash, ""),
+        // loc/deps/audit/commitlint are native subcommands of the harness
+        // binary itself, so they need no external shell: they are included
+        // wherever the harness runs. Missing optional tools still degrade the
+        // sensors that fail open locally (cargo-deny/cargo-audit).
+        candidate("loc", true, true, ""),
         candidate(
             "deps",
-            bash,
-            bash,
+            true,
+            true,
             optional_detail(cargo_deny, "cargo-deny"),
         ),
         candidate(
             "audit",
-            bash,
-            bash,
+            true,
+            true,
             optional_detail(cargo_audit, "cargo-audit"),
         ),
-        candidate("commitlint", bash, bash, ""),
+        candidate("commitlint", true, true, ""),
     ]
 }
 

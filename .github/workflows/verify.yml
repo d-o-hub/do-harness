@@ -543,36 +543,80 @@ jobs:
         run: |
           ./target/release/do-harness.exe verify \
             --only fmt --only check --only clippy --only doctest --only loc
-      - name: Dogfood init + verify with the release binary
-        shell: bash
+      - name: Dogfood init + native-helper verify with the release binary
+        # The scaffolded pack's helper sensors (loc/deps/audit/commitlint) now
+        # run as native subcommands, so the dogfood gate itself needs no Git
+        # Bash: this step runs under the default PowerShell shell and proves
+        # the native-helper surface end to end (init scaffolds, verify drives
+        # the binary's own subcommands). The full `verification` set also
+        # contains tool shell-backed sensors (test wrapper, release-preflight)
+        # that adopters may configure; the native-helper gate is what this
+        # job can prove without a Git Bash prerequisite.
+        timeout-minutes: 15
         env:
           # The generated pack's deps/audit sensors fail closed under CI=true;
           # cargo-deny and cargo-audit are installed above.
           CI: "true"
           DO_HARNESS_REQUIRE_TOOLS: "1"
         run: |
-          tmp="$(mktemp -d)"
-          ./target/release/do-harness.exe --root "$tmp" init
-          ./target/release/do-harness.exe --root "$tmp" verify --format json --strict
+          $tmp = Join-Path $env:RUNNER_TEMP ("dh-dogfood-" + [guid]::NewGuid().ToString("N"))
+          New-Item -ItemType Directory -Path $tmp | Out-Null
+          & ./target/release/do-harness.exe --root $tmp init
+          if ($LASTEXITCODE -ne 0) { throw "init failed" }
+          & ./target/release/do-harness.exe --root $tmp verify `
+            --only fmt --only check --only clippy --only doctest `
+            --only loc --only commitlint --only deps --only audit --strict
+          if ($LASTEXITCODE -ne 0) { throw "native-helper verify failed" }
       - name: Test the installer (including the windows zip path)
         shell: bash
         run: bash scripts/test-install.sh --bin ./target/release/do-harness.exe
-      - name: Prove hook install + status and doctor on Windows
-        shell: bash
+      - name: Prove hook install, status and doctor on Windows
+        # PowerShell: the commands themselves must not depend on a Git Bash
+        # user shell (the hooks, proven in the next step, must).
         run: |
-          scratch="$(mktemp -d)"
-          git init -q "$scratch"
+          $scratch = Join-Path $env:RUNNER_TEMP ("dh-hooks-" + [guid]::NewGuid().ToString("N"))
+          New-Item -ItemType Directory -Path $scratch | Out-Null
+          git -C $scratch init -q
           # Seed one commit: the scaffolded commitlint sensor inspects the last
           # commit and fails in a repository with no commits, which makes init's
           # initial verification legitimately RED (exit 1).
-          git -C "$scratch" -c user.email=ci@example.com -c user.name=ci \
+          git -C $scratch -c user.email=ci@example.com -c user.name=ci `
             commit -q --allow-empty -m "chore: seed"
-          ./target/release/do-harness.exe --root "$scratch" init
-          bin="$PWD/target/release/do-harness.exe"
-          cd "$scratch"
-          DO_HARNESS_BIN="$bin" "$bin" hook install
-          DO_HARNESS_BIN="$bin" "$bin" hook status
-          DO_HARNESS_BIN="$bin" "$bin" doctor
+          & ./target/release/do-harness.exe --root $scratch init
+          if ($LASTEXITCODE -ne 0) { throw "init failed" }
+          $bin = (Resolve-Path ./target/release/do-harness.exe).Path
+          Push-Location $scratch
+          $env:DO_HARNESS_BIN = $bin
+          & $bin hook install
+          if ($LASTEXITCODE -ne 0) { throw "hook install failed" }
+          & $bin hook status
+          if ($LASTEXITCODE -ne 0) { throw "hook status failed" }
+          & $bin doctor
+          if ($LASTEXITCODE -ne 0) { throw "doctor failed" }
+          Pop-Location
+      - name: Prove installed native hooks run under git on Windows
+        # The generated hook bodies are POSIX sh (no bash-isms) and call the
+        # do-harness binary directly; git-for-windows executes them through its
+        # bundled sh. A non-conventional subject must be blocked, a
+        # conventional one must pass — this exercises the installed commit-msg
+        # hook through git itself, on the native binary.
+        run: |
+          $scratch = Join-Path $env:RUNNER_TEMP ("dh-hookexec-" + [guid]::NewGuid().ToString("N"))
+          New-Item -ItemType Directory -Path $scratch | Out-Null
+          git -C $scratch init -q
+          git -C $scratch config user.email ci@example.com
+          git -C $scratch config user.name ci
+          git -C $scratch commit -q --allow-empty -m "chore: seed"
+          & ./target/release/do-harness.exe --root $scratch init
+          if ($LASTEXITCODE -ne 0) { throw "init failed" }
+          $bin = (Resolve-Path ./target/release/do-harness.exe).Path
+          $env:DO_HARNESS_BIN = $bin
+          git -C $scratch -c core.hooksPath="$scratch/.git/hooks" `
+            commit -q --allow-empty -m "Bad: Subject" 2>$null
+          if ($LASTEXITCODE -eq 0) { throw "commit-msg hook did not block a non-conventional subject" }
+          git -C $scratch -c core.hooksPath="$scratch/.git/hooks" `
+            commit -q --allow-empty -m "fix: typo"
+          if ($LASTEXITCODE -ne 0) { throw "commit-msg hook blocked a conventional subject" }
       - name: Lint and test the npm wrapper
         shell: bash
         run: |

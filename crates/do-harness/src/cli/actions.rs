@@ -4,10 +4,9 @@
 
 use std::path::PathBuf;
 
-use clap::{Args, Subcommand, ValueHint};
+use clap::{ArgAction, Args, Subcommand, ValueHint};
 
 use crate::report::Format;
-
 /// Arguments for `do-harness cleanup`.
 #[derive(Debug, Args)]
 pub struct CleanupArgs {
@@ -419,5 +418,68 @@ pub enum DoctorAction {
     },
 }
 
+/// Arguments for `do-harness loc`.
+#[derive(Debug, Args)]
+pub struct LocArgs {
+    /// Scan directory, relative to workspace root (repeatable or comma-separated).
+    #[arg(long = "dir", value_name = "DIR", action = ArgAction::Append)]
+    pub dir: Vec<String>,
+    /// Scan extension (repeatable or comma-separated, e.g. rs, ts, tsx).
+    #[arg(long = "ext", value_name = "EXT", action = ArgAction::Append)]
+    pub ext: Vec<String>,
+    /// Output format.
+    #[arg(long, value_enum, default_value_t = Format::Text)]
+    pub format: Format,
+    /// Show only files at or above the 450-line decomposition threshold.
+    #[arg(long)]
+    pub warn: bool,
+    /// Files or directories to measure (default: scan workspace roots).
+    #[arg(value_hint = ValueHint::AnyPath, value_name = "PATH")]
+    pub paths: Vec<PathBuf>,
+}
+
+/// Arguments for `do-harness split`.
+#[derive(Debug, Args)]
+pub struct SplitArgs {
+    /// Source file to decompose.
+    #[arg(value_hint = ValueHint::FilePath, value_name = "FILE")]
+    pub file: PathBuf,
+    /// Print the plan without writing files.
+    #[arg(long)]
+    pub dry_run: bool,
+    /// Name the sibling module instead of deriving it from the item.
+    #[arg(long, value_name = "NAME")]
+    pub target: Option<String>,
+}
+
+/// Available native helper actions (the non-shell sensor implementations).
+#[derive(Debug, Subcommand)]
+pub enum HelpersAction {
+    /// Enforce conventional commits with lowercase subjects (commitlint sensor).
+    Commitlint {
+        /// Lint the single subject in FILE (git commit-msg hook).
+        #[arg(
+            long,
+            value_hint = ValueHint::FilePath,
+            value_name = "FILE",
+            conflicts_with_all = ["count", "range"]
+        )]
+        message: Option<PathBuf>,
+        /// History window size (default 1; env: DO_HARNESS_COMMITLINT_COUNT).
+        #[arg(long, value_name = "N")]
+        count: Option<usize>,
+        /// Lint every subject in a git rev-list range.
+        #[arg(long, value_name = "REV-RANGE")]
+        range: Option<String>,
+    },
+    /// Dependency-direction and cargo-deny gate (deps sensor).
+    Deps,
+    /// RustSec advisory scan via cargo-audit (audit sensor).
+    Audit {
+        /// Extra arguments passed through to cargo audit.
+        #[arg(last = true, value_name = "ARGS")]
+        args: Vec<String>,
+    },
+}
 mod arg_groups;
 pub use arg_groups::*;

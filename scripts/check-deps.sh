@@ -2,73 +2,32 @@
 # check-deps.sh — enforces dependency direction and runs cargo-deny.
 #
 # Sensor: scripts/check-deps.sh
-# Rules:
-#   1. do-harness-types (schema) must NOT depend on storage/adapters.
-#   2. guardian-proxy (adjacent adapter) must NOT depend on the do-harness CLI.
-# Both are checked over the real `cargo tree` closure, not just the manifest.
-# Also runs `cargo deny check` when cargo-deny is installed.
-# Enforcement policy (fail-open locally, fail-closed on demand), mirroring
-# scripts/check-audit.sh: a missing cargo-deny must not silently green-light
-# the sensor where real gates are required. Set DO_HARNESS_REQUIRE_TOOLS=1
-# (or CI=true) to turn a missing tool into a FAIL instead of a SKIP.
+# Thin delegating wrapper: the implementation is the native
+# `do-harness helpers deps` subcommand. The wrapper keeps sensor argv rows
+# like ["bash", "scripts/check-deps.sh"] working in existing adopter configs
+# and resolves the same binary the managed hooks do (DO_HARNESS_BIN, then
+# PATH, then target/release/do-harness[.exe]).
+#
+# Exit codes match the native command: 0 pass, 1 a check failed, 2
+# usage/environment errors.
 
 set -euo pipefail
 
-# Fail-closed when the caller demands real gates (CI or an explicit opt-in);
-# scripts/lib.sh owns that predicate, this script owns the SKIP/FAIL message.
-# shellcheck disable=SC1091 # resolved at runtime from this script's directory
-source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib.sh"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-ROOT="$(dh_repo_root)"
-TYPES_MANIFEST="$ROOT/crates/types/Cargo.toml"
-FAIL=0
-
-if grep -qE 'do-harness-(db|core|adapters|cli)' "$TYPES_MANIFEST"; then
-    echo "FAIL: do-harness-types must not depend on storage or adapters."
-    FAIL=1
+BIN="${DO_HARNESS_BIN:-}"
+if [[ -z "$BIN" ]]; then
+    BIN="$(command -v do-harness 2>/dev/null || true)"
 fi
-
-# Real closure check: cargo tree resolves the full normal-dependency graph.
-# A tree failure is a hard error under required-tools mode, a SKIP otherwise.
-if closure="$(cd "$ROOT" && cargo tree -p do-harness-types --edges normal --prefix none 2>/dev/null)"; then
-    if grep -qE '^(do-harness-db|do-harness|guardian-proxy|libsql|do-harness-libsql)( |$)' <<<"$closure"; then
-        echo "FAIL: do-harness-types closure must not contain storage or adapters."
-        FAIL=1
+if [[ -z "$BIN" ]]; then
+    BIN="$ROOT/target/release/do-harness"
+    if [[ ! -x "$BIN" && -x "$BIN.exe" ]]; then
+        BIN="$BIN.exe"
     fi
-elif dh_require_tools; then
-    echo "FAIL: cargo tree failed under required-tools mode."
-    FAIL=1
-else
-    echo "SKIP: cargo tree unavailable; skipping transitive closure check (ensure cargo is installed)."
-fi
-
-if closure="$(cd "$ROOT" && cargo tree -p guardian-proxy --edges normal --prefix none 2>/dev/null)"; then
-    if grep -qE '^do-harness( |$)' <<<"$closure"; then
-        echo "FAIL: guardian-proxy must not depend on the do-harness CLI."
-        FAIL=1
+    if [[ ! -x "$BIN" ]]; then
+        echo "check-deps: do-harness binary not found. Set DO_HARNESS_BIN, add do-harness to PATH, or build with: cargo build --release -p do-harness" >&2
+        exit 2
     fi
-elif dh_require_tools; then
-    echo "FAIL: cargo tree failed under required-tools mode."
-    FAIL=1
-else
-    echo "SKIP: cargo tree unavailable; skipping guardian-proxy closure check (ensure cargo is installed)."
 fi
 
-if command -v cargo-deny >/dev/null 2>&1; then
-    (cd "$ROOT" && cargo deny check) || FAIL=1
-elif dh_require_tools; then
-    echo "FAIL: cargo-deny is required when CI=true or DO_HARNESS_REQUIRE_TOOLS=1."
-    FAIL=1
-else
-    echo "SKIP: cargo-deny not installed; skipping deny check (cargo install cargo-deny --locked)."
-fi
-
-if [[ -f "$ROOT/scripts/check-package-contract.sh" ]]; then
-    bash "$ROOT/scripts/check-package-contract.sh" || FAIL=1
-fi
-
-if (( FAIL )); then
-    exit 1
-fi
-
-echo "check-deps OK."
+exec "$BIN" --root "$ROOT" helpers deps "$@"

@@ -177,7 +177,8 @@ fn expand_tilde_and_resolve(path_str: &str, repo_root: &Path, git_dir: &Path) ->
 ///
 /// `pre_commit` and `pre_push` are sensor name lists; an empty list means the
 /// full suite (no `--only` flags). The `commit-msg` hook needs no sensor
-/// arguments and runs the commitlint script against each prepared message. A
+/// arguments and runs the native `helpers commitlint` against each prepared
+/// message. A
 /// hook file that already exists without the [`MARKER`] is refused unless
 /// `force` is `true`, and the refusal names the pre-commit framework when the
 /// repository delegates its hooks to it; files carrying the [`MARKER`] are

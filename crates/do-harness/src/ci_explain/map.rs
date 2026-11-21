@@ -79,7 +79,7 @@ const TOOL_RULES: &[ToolRule] = &[
     ToolRule {
         keywords: &["check-loc", "loc ceiling", "500 loc"],
         sensor: "loc",
-        fallback: "bash scripts/check-loc.sh",
+        fallback: "do-harness loc",
     },
     ToolRule {
         keywords: &["markdownlint"],

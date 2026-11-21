@@ -52,6 +52,7 @@ mod feedback;
 mod fingerprint;
 mod fs_perm;
 mod gh;
+mod helpers;
 mod hook_script;
 mod hooks;
 mod init;

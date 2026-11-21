@@ -196,10 +196,10 @@ pub fn rust_pack() -> Vec<SensorSpec> {
             coverage_inputs: Vec::new(),
             inputs: Vec::new(),
         },
-        spec("loc", &["bash", "scripts/check-loc.sh"], &["**/*.rs"]),
-        spec("deps", &["bash", "scripts/check-deps.sh"], &[]),
-        spec("audit", &["bash", "scripts/check-audit.sh"], &[]),
-        spec("commitlint", &["bash", "scripts/check-commitlint.sh"], &[]),
+        spec("loc", &["do-harness", "loc"], &["**/*.rs"]),
+        spec("deps", &["do-harness", "helpers", "deps"], &[]),
+        spec("audit", &["do-harness", "helpers", "audit"], &[]),
+        spec("commitlint", &["do-harness", "helpers", "commitlint"], &[]),
     ]
 }
 
