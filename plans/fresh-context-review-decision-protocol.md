@@ -30,8 +30,7 @@ Until #498 lands and the pilot feasibility data pins every numeric threshold
 in `protocol.json` (`status: "pinned"`), the committed protocol state is
 `unpinned` and the decision machinery always yields `INCONCLUSIVE`. This
 document's thresholds are placeholders explicitly marked **to be pinned from
-#498 pilot data before held-out runs**.
-
+the #498 pilot data before held-out runs**.
 Reporting and usage provenance reuse the #458 runner contract
 (`scripts/workflow_benchmark/runner.py`): the same `token_cost`,
 `currency_cost`, `context_bytes`, `adapter_model`, and `usage_reason` labels
