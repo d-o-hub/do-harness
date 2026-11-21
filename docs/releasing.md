@@ -832,3 +832,54 @@ turned out wrong. Everything else is superseded, never rewritten:
 Each recovery ends with a new version, so the fix follows "Cutting a release"
 from step 1. A yanked or deprecated version stays installable for anyone who
 already pinned it, which is why the superseding release is the real fix.
+
+## Consumer Impact Matrix
+
+Every GitHub Release body carries a **Consumer Impact Matrix**: a table that
+tells each consumer group what the release does to it. The release job derives
+it automatically with `scripts/release-impact-matrix.sh matrix <tag>` and
+`release-notes.sh compose` places it between the curated header and the change
+list, so no manual paste is involved and a release cannot ship without one
+(`release-notes.sh check` refuses a body whose `## Consumer Impact` section is
+missing or empty).
+
+The matrix is derived offline and deterministically from the same range as the
+bump — the commits since the previous release tag. Each changed path maps to
+the single, most specific consumer group it feeds; each group's row carries the
+highest change class among the commits that touch its files:
+
+| Consumer group | Paths that feed it |
+|---|---|
+| CLI binaries (Linux x86_64/arm64, macOS x86_64/arm64, Windows x86_64) | `crates/**` (except templates), `vendor/**` |
+| npm packages (meta + platform packages) | `integrations/npm/**` |
+| Sensor packs (scaffolded by `do-harness init`) | `crates/do-harness/templates/**` |
+| Guides & skills | `docs/**`, `.agents/skills/**` |
+| `do-harness.toml` contract | `do-harness.toml` |
+
+Change classes come from the conventional commit type of the commits that touch
+a group's files: a `!` subject or a `BREAKING CHANGE:`/`BREAKING-CHANGE:`
+footer is **breaking**, `feat` is **feature**, `fix`/`perf` is **fix**, and
+everything else (docs, chore, test, refactor, …) is **none**. Breaking outranks
+feature, feature outranks fix, and a row is `none` when no commit in the range
+touched that group.
+
+**A patch release never implies zero consumer work.** The bump class describes
+the API contract, not the toil: a `fix` or `feat` that changes the scaffolded
+sensor packs, the configuration contract, or the guided workflow still demands
+an action, and the matrix says so. The "Action required" column is the
+convention's contract — keep it truthful, and expand it in the curated header
+when a migration or manual step goes beyond the generic wording.
+
+The derivation is hermetic — it reads only git — and fails closed: an
+unresolvable ref or an empty range (no commits since the previous tag) stops the
+release instead of publishing an empty or guessed matrix. Its `--self-test`
+mode pins the rules (a breaking commit touching the CLI marks the CLI row
+breaking; a sensor-pack-only change touches only the packs row; an empty range
+fails closed) as the `release-impact-matrix` sensor in
+`do-harness.toml`.
+
+The multi-artifact versioning foundation (issue #603) is not landed yet, so
+`docs/versioning.md` does not exist and this section is the canonical home of
+the matrix convention. When #603 lands, `docs/versioning.md` should link the
+per-artifact bump rules to this section and carry the sample release link the
+tracking issue asks for.
