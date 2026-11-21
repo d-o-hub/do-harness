@@ -253,9 +253,9 @@ time, plus the suite-level usage note (zero model/token usage in stub mode).
 ## Observations and limitations
 
 Filled in from the committed smoke record after the stub run (see the record
-for exact numbers). Local stub smoke (this branch, HEAD
-`4f31a1a02de8ee1a2943a1b4be5f4f4e33b603a6`) passed all six predeclared
-expectations. Findings F1/F2 were recovered for the flawed design; the sound
+for exact numbers). Local stub smoke on this branch (commit
+`f529824f0ea1c1946c0bc0a38e92c4dcd2ceaa57`, the snapshot that produced the
+committed record) passed all six predeclared
 design returned zero findings; fail/timeout/unavailable/leak paths produced
 `failure`/`timeout`/`not_run`/`failure` (leak) as declared. Elapsed per case
 is subsecond to a few seconds (the timeout case burns its 2 s budget).
