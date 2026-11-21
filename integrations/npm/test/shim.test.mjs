@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -7,10 +7,21 @@ import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
 import platform from "../lib/platform.js";
+import { deadPort, makeZip, sha256Hex, startFixtureServer } from "./helpers.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const npmRoot = path.resolve(here, "..");
 const isWindows = process.platform === "win32";
+
+const pkgJson = JSON.parse(
+  fs.readFileSync(path.join(npmRoot, "package.json"), "utf8"),
+);
+const version = pkgJson.version;
+test("the meta package has no install-time lifecycle scripts", () => {
+  const scripts = pkgJson.scripts || {};
+  assert.equal(scripts.postinstall, undefined);
+  assert.equal(scripts.preinstall, undefined);
+});
 
 test("platformPackage maps supported platforms", () => {
   assert.equal(platform.platformPackage("linux", "x64"), "do-harness-linux-x64");
@@ -55,6 +66,14 @@ function stage({ withPlatform, binary = null }) {
   fs.copyFileSync(
     path.join(npmRoot, "lib", "platform.js"),
     path.join(metaDir, "lib", "platform.js"),
+  );
+  fs.copyFileSync(
+    path.join(npmRoot, "package.json"),
+    path.join(metaDir, "package.json"),
+  );
+  fs.copyFileSync(
+    path.join(npmRoot, "lib", "win32-download.js"),
+    path.join(metaDir, "lib", "win32-download.js"),
   );
 
   const pkg = platform.platformPackage(process.platform, process.arch);
@@ -142,6 +161,9 @@ test("shim points unavailable npm platforms at the release channel", () => {
     env: {
       ...process.env,
       DO_HARNESS_TEST_PLATFORM_PACKAGE: "do-harness-win32-x64",
+      // The download path is exercised by the next tests; this one pins the
+      // pure release guidance that remains when the fetch is disabled.
+      DO_HARNESS_NO_DOWNLOAD: "1",
     },
   });
 
@@ -149,6 +171,67 @@ test("shim points unavailable npm platforms at the release channel", () => {
   assert.match(result.stderr, /is unavailable/);
   assert.match(result.stderr, /GitHub release/);
   assert.doesNotMatch(result.stderr, /--include=optional/);
+});
+
+test("shim reports Windows download failure and falls back to release guidance", async (t) => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "doh-shim-"));
+  t.after(() => fs.rmSync(tmp, { recursive: true, force: true }));
+  const port = await deadPort();
+  const { shim } = stage({ withPlatform: false });
+
+  const result = spawnSync(process.execPath, [shim, "version"], {
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      DO_HARNESS_TEST_PLATFORM_PACKAGE: "do-harness-win32-x64",
+      DO_HARNESS_CACHE_DIR: path.join(tmp, "cache"),
+      DO_HARNESS_RELEASE_BASE_URL: `http://127.0.0.1:${port}`,
+    },
+  });
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /cannot prepare the Windows binary/);
+  assert.match(result.stderr, /GitHub release/);
+  assert.match(result.stderr, /cargo install do-harness/);
+  assert.doesNotMatch(result.stderr, /--include=optional/);
+});
+
+test("shim downloads and runs the Windows binary when the platform package is missing", async (t) => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "doh-shim-"));
+  t.after(() => fs.rmSync(tmp, { recursive: true, force: true }));
+
+  const fixtureDir = path.join(tmp, "fixture");
+  const assetDir = `do-harness-v${version}-x86_64-pc-windows-msvc`;
+  const asset = `${assetDir}.zip`;
+  const zip = makeZip([
+    {
+      name: `${assetDir}/${platform.binaryName("win32")}`,
+      data: Buffer.from('#!/bin/sh\necho "args:$*"\nexit 7\n'),
+    },
+  ]);
+  fs.mkdirSync(path.join(fixtureDir, `v${version}`), { recursive: true });
+  fs.writeFileSync(
+    path.join(fixtureDir, `v${version}`, "checksums.txt"),
+    `${sha256Hex(zip)}  ${asset}\n`,
+  );
+  fs.writeFileSync(path.join(fixtureDir, `v${version}`, asset), zip);
+
+  const { child, baseUrl } = await startFixtureServer(fixtureDir);
+  t.after(() => child.kill());
+
+  const { shim } = stage({ withPlatform: false });
+  const result = spawnSync(process.execPath, [shim, "verify", "--changed"], {
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      DO_HARNESS_TEST_PLATFORM_PACKAGE: "do-harness-win32-x64",
+      DO_HARNESS_CACHE_DIR: path.join(tmp, "cache"),
+      DO_HARNESS_RELEASE_BASE_URL: baseUrl,
+    },
+  });
+
+  assert.equal(result.status, 7);
+  assert.match(result.stdout, /args:verify --changed/);
 });
 
 test("shim rejects unsupported platforms with release guidance", () => {
