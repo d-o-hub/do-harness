@@ -192,6 +192,7 @@ is the hermetic self-test suite (`scripts/tests/test_fresh_context_review.py`).
 
 Assemble and launch a real review:
 
+<!-- example: id=fresh_context_review_invocation classification=parser-check-only reason="Explicit opt-in adapter example; no model or network runs in documentation tests" -->
 ```bash
 python3 scripts/fresh-context-review.py \
   --design-doc docs/designs/authz-delegation.md \
@@ -280,12 +281,11 @@ Limitations:
 Issue #499 owns repeated-effectiveness measurement and the adoption
 decision. This pilot supplies: the packet/finding formats, the adapter, the
 deterministic fixtures, the smoke record, and the isolation-evidence rules.
-#499 should reuse the paired-run protocol from `docs/workflow-benchmarks.md`
+Issue #499 should reuse the paired-run protocol from `docs/workflow-benchmarks.md`
 (identical inputs, alternating order, predeclared tolerance and sample size)
 to measure whether a fresh-context reviewer reduces unresolved assumptions
 before implementation, and then decide adoption. This record deliberately
 states that comparative value and adoption remain undecided.
-
 ## Acceptance mapping
 
 - [x] Eligibility rules keep the pilot optional and focused on consequential design choices.
