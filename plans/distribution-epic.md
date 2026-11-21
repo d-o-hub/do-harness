@@ -326,3 +326,24 @@ Teardown fix (2026-10-12, #293): registry installs ship the libSQL teardown fix;
   `plans/invariants.json` (sensor: `do-harness eval`).
 - No auto-update and no version-bump tooling: releases are tag-driven per
   `docs/releasing.md`; `v0.1.1` shipped the first Windows zip.
+## Follow-up: Windows npx download-on-first-run (2026-11-21, issue #565)
+
+The npm wrapper now implements option 2 from the issue's spike for Windows
+x86_64: when the `do-harness-win32-x64` platform package cannot resolve
+(npm's name screening still refuses it), the shim downloads the release zip
+for the exact wrapper version, verifies its SHA-256 against the release
+`checksums.txt` (fails closed on a mismatch or a missing entry — nothing is
+executed), and caches the extracted binary under
+`%LOCALAPPDATA%\do-harness`. There is no `postinstall` script. Unit tests
+cover the fail-closed paths and the cache hit; the `windows` CI job runs the
+packed wrapper end-to-end against a local fixture release.
+
+Option 1 (scoped `@d-o-hub/do-harness-win32-x64`) remains unverified and is
+not executable offline: it needs a real npm publish plus a trusted-publisher
+grant. The npm name-screening evidence (HTTP 403 for the unscoped name; npm's
+guidance naming scopes as the safe namespace) is recorded in the
+`npm-github-publish` skill, the acceptance section above, and issue #565's
+comment. The unscoped pin stays inert in the meta manifest; if npm later
+clears the name, the platform package resolves and the download path goes
+unused.
+
