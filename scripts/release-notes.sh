@@ -78,7 +78,7 @@ usage() {
 Compose and validate the GitHub Release body.
 
 Usage:
-  release-notes.sh compose <tag> <generated-notes> <out> [<curated-notes>]
+  release-notes.sh compose <tag> <generated-notes> <out> [<impact-matrix>] [<curated-notes>]
   release-notes.sh check <tag> <file>
   release-notes.sh seed <tag> [<out>]
   release-notes.sh --self-test
@@ -168,10 +168,13 @@ count_bullets() {
 }
 
 compose() {
-    local tag="$1" generated="$2" out="$3" curated="${4:-}"
+    local tag="$1" generated="$2" out="$3" impact="${4:-}" curated="${5:-}"
     local version="${tag#v}" header changes="$WORK/changes.md" want have
 
     [[ -f "$generated" ]] || fail "generated notes not found: $generated"
+    if [[ -n "$impact" ]]; then
+        [[ -f "$impact" ]] || fail "impact matrix not found: $impact"
+    fi
     if [[ -n "$curated" ]]; then
         [[ -f "$curated" ]] || fail "curated notes not found: $curated"
         header="$curated"
@@ -189,6 +192,14 @@ compose() {
 
     {
         sed -e "s/{{TAG}}/$tag/g" -e "s/{{VERSION}}/$version/g" "$header"
+        if [[ -n "$impact" ]]; then
+            # The Consumer Impact Matrix sits between the curated header and the
+            # change list: it is the first thing a consumer reads after the
+            # curated sections. `release-impact-matrix.sh matrix` emits the
+            # whole section, heading included.
+            printf '\n'
+            cat "$impact"
+        fi
         printf '\n## Changes\n\n'
         cat "$changes"
     } >"$out"
@@ -199,7 +210,7 @@ compose() {
 check() {
     local tag="$1" file="$2"
     local version="${tag#v}" problems=0 section body
-    local required=("Breaking changes" "Install" "Verify the download" "Changes")
+    local required=("Breaking changes" "Install" "Verify the download" "Consumer Impact" "Changes")
 
     [[ -f "$file" ]] || fail "release notes not found: $file"
 
@@ -230,6 +241,18 @@ check() {
         if [[ -z "$body" ]]; then
             echo "FAIL: '## $section' is empty"
             problems=$((problems + 1))
+        fi
+        if [[ "$section" == "Consumer Impact" ]]; then
+            # The matrix is a table with the three fixed columns and at least
+            # one data row: a heading alone is the same empty-section failure.
+            if ! printf '%s\n' "$body" | grep -q '^| Consumer group | Impact | Action required |$'; then
+                echo "FAIL: '## Consumer Impact' lacks the '| Consumer group | Impact | Action required |' header"
+                problems=$((problems + 1))
+            fi
+            if [[ "$(printf '%s\n' "$body" | grep -c '^| ')" -lt 3 ]]; then
+                echo "FAIL: '## Consumer Impact' has no data rows"
+                problems=$((problems + 1))
+            fi
         fi
     done
 
@@ -264,6 +287,17 @@ self_test() {
     local generated="$WORK/generated" composed="$WORK/composed.md" dump="$WORK/dump.md"
     local expected reason
 
+    # The Consumer Impact Matrix fixture: what `release-impact-matrix.sh matrix`
+    # emits for a release. The compose/check contract is about placement and
+    # shape, so a fabricated file proves it without needing git history.
+    cat >"$WORK/impact.md" <<'EOF'
+## Consumer Impact
+
+| Consumer group | Impact | Action required |
+|---|---|---|
+| CLI binaries | Breaking | Required — breaking changes to this artifact are detailed above. |
+| npm packages | None | None. |
+EOF
     cat >"$generated" <<'EOF'
 <!-- Release notes generated using configuration in .github/release.yml at main -->
 
@@ -283,9 +317,19 @@ self_test() {
 **Full Changelog**: https://github.com/d-o-hub/do-harness/compare/v0.1.2...v0.1.3
 EOF
 
-    compose "v0.1.3" "$generated" "$composed"
+    compose "v0.1.3" "$generated" "$composed" "$WORK/impact.md"
     check "v0.1.3" "$composed" >/dev/null ||
         fail "self-test: notes composed from the template failed the check"
+
+    # The matrix sits between the curated header and the change list.
+    if ! grep -qxF '## Consumer Impact' "$composed"; then
+        fail "self-test: composed notes have no Consumer Impact section"
+    fi
+    impact_line="$(grep -n '^## Consumer Impact$' "$composed" | cut -d: -f1)"
+    changes_line="$(grep -n '^## Changes$' "$composed" | cut -d: -f1)"
+    if [[ -z "$impact_line" ]] || [[ -z "$changes_line" ]] || (( impact_line > changes_line )); then
+        fail "self-test: the Consumer Impact section is not before the change list"
+    fi
 
     for expected in \
         "### Breaking changes" "### Features" "### Fixes" "### Documentation" \
@@ -345,6 +389,34 @@ EOF
         *"'## Breaking changes' is empty"*) ;;
         *) fail "self-test: the rejection did not name the empty section" ;;
     esac
+    # Negative control: a body composed without the impact matrix is missing a
+    # required section, and the rejection names it.
+    compose "v0.1.3" "$generated" "$WORK/no-impact.md"
+    if check "v0.1.3" "$WORK/no-impact.md" >/dev/null 2>&1; then
+        fail "self-test: a body without the Consumer Impact matrix passed the check"
+    fi
+    reason="$(check "v0.1.3" "$WORK/no-impact.md" 2>&1 || true)"
+    case "$reason" in
+        *"## Consumer Impact"*) ;;
+        *) fail "self-test: the rejection did not name the missing matrix section" ;;
+    esac
+
+    # Negative control: a matrix heading with no data rows is not a matrix.
+    cat >"$WORK/empty-impact.md" <<'EOF'
+## Consumer Impact
+
+| Consumer group | Impact | Action required |
+|---|---|---|
+EOF
+    compose "v0.1.3" "$generated" "$WORK/empty-matrix.md" "$WORK/empty-impact.md"
+    if check "v0.1.3" "$WORK/empty-matrix.md" >/dev/null 2>&1; then
+        fail "self-test: a header-only impact matrix passed the check"
+    fi
+    reason="$(check "v0.1.3" "$WORK/empty-matrix.md" 2>&1 || true)"
+    case "$reason" in
+        *"has no data rows"*) ;;
+        *) fail "self-test: the rejection did not name the empty matrix" ;;
+    esac
 
     # `seed` controls: the stub is byte-identical to the template (an untouched
     # stub must publish the same body), a second seed cannot destroy an edit made
@@ -369,11 +441,11 @@ EOF
     if [[ -e "$WORK/no-v-prefix.md" ]]; then
         fail "self-test: a rejected tag still wrote a file"
     fi
-    compose "v0.1.3" "$generated" "$WORK/stubbed.md" "$stub"
+    compose "v0.1.3" "$generated" "$WORK/stubbed.md" "$WORK/impact.md" "$stub"
     check "v0.1.3" "$WORK/stubbed.md" >/dev/null ||
         fail "self-test: an unedited seeded stub failed the check"
 
-    echo "release-notes.sh self-test OK (regroups by type, files contributors apart, keeps every bullet, seeds without overwriting, rejects a bare dump and an empty section)"
+    echo "release-notes.sh self-test OK (regroups by type, files contributors apart, keeps every bullet, places the impact matrix before the changes, seeds without overwriting, rejects a bare dump, an empty section, and a missing or empty matrix)"
 }
 
 case "${1:-}" in
@@ -382,7 +454,7 @@ case "${1:-}" in
             usage
             exit 2
         }
-        compose "$2" "$3" "$4" "${5:-}"
+        compose "$2" "$3" "$4" "${5:-}" "${6:-}"
         ;;
     check)
         [[ $# -eq 3 ]] || {

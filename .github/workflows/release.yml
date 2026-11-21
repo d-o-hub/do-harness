@@ -464,8 +464,12 @@ jobs:
         # a curated header: `docs/releases/<tag>.md` when that file exists at the
         # tagged commit, otherwise `.github/release-notes-template.md`. Both live
         # in the repository, so the shipped body is reviewable before the tag.
-        # `check` refuses a body that is missing a section, so a release cannot
-        # ship a bare commit dump. See docs/releasing.md ("Release notes").
+        # The Consumer Impact Matrix is derived from the same range — the
+        # conventional commits and changed paths since the previous release tag —
+        # by `release-impact-matrix.sh`, and composed between the header and the
+        # change list. `check` refuses a body that is missing a section, so a
+        # release cannot ship a bare commit dump or a release without a matrix.
+        # See docs/releasing.md ("Release notes", "Consumer Impact Matrix").
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
@@ -479,7 +483,8 @@ jobs:
             api+=(-f "previous_tag_name=$previous")
           fi
           gh api "${api[@]}" --jq .body > generated-notes.md
-          bash scripts/release-notes.sh compose "${RELEASE_TAG}" generated-notes.md release-notes.md
+          bash scripts/release-impact-matrix.sh matrix "${RELEASE_TAG}" --out impact-matrix.md
+          bash scripts/release-notes.sh compose "${RELEASE_TAG}" generated-notes.md release-notes.md impact-matrix.md
           bash scripts/release-notes.sh check "${RELEASE_TAG}" release-notes.md
           echo "composed release notes ($(wc -l < release-notes.md) lines)"
       - name: Publish the GitHub Release

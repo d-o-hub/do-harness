@@ -5,7 +5,7 @@ language = "rust"
 pre-commit = ["fmt", "loc"]
 # Bounded to ordinary checks (matching signal-sets.verification) so heavy
 # scheduled checks (`coverage`, `powerset`) and release preflights never execute on local push.
-pre-push = ["fmt", "check", "clippy", "deps", "machete", "audit", "test", "doctest", "loc", "skills", "skills-docs", "shell", "markdownlint", "docs-sync", "docs-examples", "docs-links", "docs-pins", "yamllint", "actionlint", "action-pins", "workflow-shell", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "release-manager", "verify-published", "commitlint", "ci-concurrency-guardrails", "workflow-benchmark", "ci-workflow-costs", "repo-links", "latest-main-guardrails", "token-usage"]
+pre-push = ["fmt", "check", "clippy", "deps", "machete", "audit", "test", "doctest", "loc", "skills", "skills-docs", "shell", "markdownlint", "docs-sync", "docs-examples", "docs-links", "docs-pins", "yamllint", "actionlint", "action-pins", "workflow-shell", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "release-manager", "release-impact-matrix", "verify-published", "commitlint", "ci-concurrency-guardrails", "workflow-benchmark", "ci-workflow-costs", "repo-links", "latest-main-guardrails", "token-usage"]
 
 [signal-sets]
 # `feedback` is the fast loop, so it names the sensors the generated pre-commit
@@ -22,13 +22,13 @@ feedback = ["fmt", "check", "clippy", "loc"]
 # contract (`docs/documentation-contract.md`). Each one reads only git, the
 # working tree, and the local toolchain, and each fails closed on an empty
 # inventory, so the trio belongs to the PR-time set as well as `release`.
-verification = ["fmt", "check", "clippy", "deps", "machete", "audit", "test", "doctest", "loc", "skills", "skills-docs", "shell", "markdownlint", "docs-sync", "docs-examples", "docs-links", "docs-pins", "yamllint", "actionlint", "action-pins", "workflow-shell", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "release-manager", "verify-published", "commitlint", "ci-concurrency-guardrails", "workflow-benchmark", "ci-workflow-costs", "repo-links", "latest-main-guardrails", "token-usage"]
+verification = ["fmt", "check", "clippy", "deps", "machete", "audit", "test", "doctest", "loc", "skills", "skills-docs", "shell", "markdownlint", "docs-sync", "docs-examples", "docs-links", "docs-pins", "yamllint", "actionlint", "action-pins", "workflow-shell", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "release-manager", "release-impact-matrix", "verify-published", "commitlint", "ci-concurrency-guardrails", "workflow-benchmark", "ci-workflow-costs", "repo-links", "latest-main-guardrails", "token-usage"]
 # `main` is the post-merge release gate. It is the strict ordinary verification
 # surface, named separately so release automation consumes one green result for
 # one exact main commit. The expensive coverage and feature-powerset checks run
 # in `scheduled` and the final `release` gate rather than charging every push.
-main = ["fmt", "check", "clippy", "deps", "machete", "audit", "test", "doctest", "loc", "skills", "skills-docs", "shell", "markdownlint", "docs-sync", "docs-examples", "docs-links", "docs-pins", "yamllint", "actionlint", "action-pins", "workflow-shell", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "release-manager", "verify-published", "commitlint", "ci-concurrency-guardrails", "workflow-benchmark", "ci-workflow-costs", "repo-links", "latest-main-guardrails", "token-usage"]
-release = ["fmt", "check", "clippy", "deps", "audit", "test", "doctest", "coverage", "powerset", "loc", "skills", "skills-docs", "shell", "markdownlint", "docs-sync", "docs-examples", "docs-links", "docs-pins", "yamllint", "actionlint", "action-pins", "workflow-shell", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "release-manager", "release-manager-e2e", "publish-npm", "verify-published", "commitlint", "ci-concurrency-guardrails", "workflow-benchmark", "ci-workflow-costs", "repo-links", "latest-main-guardrails", "token-usage"]
+main = ["fmt", "check", "clippy", "deps", "machete", "audit", "test", "doctest", "loc", "skills", "skills-docs", "shell", "markdownlint", "docs-sync", "docs-examples", "docs-links", "docs-pins", "yamllint", "actionlint", "action-pins", "workflow-shell", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "release-manager", "release-impact-matrix", "verify-published", "commitlint", "ci-concurrency-guardrails", "workflow-benchmark", "ci-workflow-costs", "repo-links", "latest-main-guardrails", "token-usage"]
+release = ["fmt", "check", "clippy", "deps", "audit", "test", "doctest", "coverage", "powerset", "loc", "skills", "skills-docs", "shell", "markdownlint", "docs-sync", "docs-examples", "docs-links", "docs-pins", "yamllint", "actionlint", "action-pins", "workflow-shell", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "release-manager", "release-impact-matrix", "release-manager-e2e", "publish-npm", "verify-published", "commitlint", "ci-concurrency-guardrails", "workflow-benchmark", "ci-workflow-costs", "repo-links", "latest-main-guardrails", "token-usage"]
 # DORA gets its own set so its evidence is addressable (`status --set metrics`)
 # without joining the gating sets. A no-`--set` status check compares against
 # every configured sensor, so a dora-only run's artifact would report
@@ -501,3 +501,14 @@ when-changed = [
 name = "token-usage"
 argv = ["python3", "scripts/tests/test_token_usage.py"]
 when-changed = ["scripts/token-usage.py", "scripts/tests/test_token_usage.py", "do-harness.toml"]
+
+[[sensors]]
+# Executable half of the consumer-impact contract: every release body carries a
+# matrix mapping each shipped consumer group against the change class that
+# touches it. The release job derives it (`release-impact-matrix.sh matrix`)
+# before composing the notes; this entry pins the derivation rules and the
+# fail-closed guards around them (an empty range or an unresolvable ref fails
+# closed, and a sensor-pack-only change touches only the packs row).
+name = "release-impact-matrix"
+argv = ["bash", "scripts/release-impact-matrix.sh", "--self-test"]
+when-changed = [".github/workflows/release.yml", "docs/releasing.md", "scripts/release-impact-matrix.sh", "scripts/release-notes.sh", "scripts/lib.sh"]
