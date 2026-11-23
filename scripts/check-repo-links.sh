@@ -54,6 +54,9 @@ ALLOWED=(
   "scripts/release-notes.sh"
   # This check, whose comments and self-test fixtures name the literal it hunts.
   "scripts/check-repo-links.sh"
+  # The reference plugin crate's own docs landing and protocol-doc links: the
+  # tool's identity on crates.io/docs.rs, never the caller's repository.
+  "crates/do-harness-sensor-ruff/src/lib.rs"
 )
 
 self_test=0
