@@ -21,6 +21,7 @@ fn config_with(specs: &[(&str, &[&str])]) -> Config {
             pre_commit: vec![],
             pre_push: vec![],
         },
+        env: BTreeMap::new(),
         signal_sets: BTreeMap::new(),
         sensors: specs
             .iter()

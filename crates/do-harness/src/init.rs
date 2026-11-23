@@ -387,6 +387,7 @@ fn generate_rust_config(sensors: &[crate::config::SensorSpec]) -> Result<String>
             pre_push: Vec::new(),
         },
         signal_sets,
+        env: std::collections::BTreeMap::new(),
         sensors,
         jobs: None,
         repairs: Vec::new(),
