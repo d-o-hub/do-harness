@@ -466,9 +466,11 @@ when-changed = [
 [[sensors]]
 name = "workflow-benchmark"
 argv = ["python3", "scripts/workflow-benchmark.py", "--self-test"]
-# Measured 19.8s for the 12 self-tests on an idle machine (each of the six
-# synthetic cases runs the harness), so the previous 30s ceiling left 10s of
-# headroom and failed the pre-push gate whenever a build shared the box.
+# Self-tests now also cover usage-provenance fail-closed validation, budget
+# profile bounds, resume sessions, per-arm identity reproducibility, and the
+# adopter grader failure detection (18 tests). Measured ~81s on an 8-core
+# box, leaving ~40s of headroom under the 120s ceiling; profile and full
+# fixture-mode suites run separately outside this sensor.
 timeout = 120
 when-changed = ["benchmarks/**", "scripts/workflow-benchmark.py", "scripts/workflow_benchmark/**", "do-harness.toml"]
 
