@@ -74,6 +74,7 @@ mod reports;
 mod sensor_inputs;
 mod sensor_new;
 mod sensors;
+mod setup;
 mod shell;
 mod signals;
 mod simulate;

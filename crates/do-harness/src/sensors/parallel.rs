@@ -107,6 +107,7 @@ fn run_chunk(
     root: &Path,
     opts: &VerifyOpts,
     cancel: &AtomicBool,
+    env: &std::collections::BTreeMap<String, String>,
 ) -> Vec<(usize, SensorResult)> {
     std::thread::scope(|scope| {
         let handles: Vec<_> = chunk
@@ -127,7 +128,7 @@ fn run_chunk(
                             super::sensor_quarantined(item.spec, opts.scope_key.as_deref())
                         }
                         Verdict::Run => {
-                            let result = run_sensor(item.spec, root, cancel, &opts.baselines);
+                            let result = run_sensor(item.spec, root, cancel, &opts.baselines, env);
                             if opts.fail_fast && !result.ok && !result.allow_failure {
                                 cancel.store(true, Ordering::SeqCst);
                             }
@@ -166,6 +167,7 @@ fn run_sequential(
     root: &Path,
     opts: &VerifyOpts,
     cancel: &AtomicBool,
+    env: &std::collections::BTreeMap<String, String>,
 ) -> Vec<SensorResult> {
     let mut results = Vec::with_capacity(specs.len());
     for spec in specs {
@@ -173,7 +175,7 @@ fn run_sequential(
             Verdict::Reused(beat_id) => super::sensor_reused(spec, beat_id),
             Verdict::Blocked => sensor_blocked(spec, opts.scope_key.as_deref()),
             Verdict::Quarantined => super::sensor_quarantined(spec, opts.scope_key.as_deref()),
-            Verdict::Run => run_sensor(spec, root, cancel, &opts.baselines),
+            Verdict::Run => run_sensor(spec, root, cancel, &opts.baselines, env),
         };
         let hard_failed = !result.ok && !result.allow_failure;
         results.push(result);
@@ -197,10 +199,11 @@ pub fn run_parallel(
     opts: &VerifyOpts,
     jobs: usize,
     cancel: &AtomicBool,
+    env: &std::collections::BTreeMap<String, String>,
 ) -> Vec<SensorResult> {
     let bound = jobs.max(1);
     if bound == 1 {
-        return run_sequential(specs, root, opts, cancel);
+        return run_sequential(specs, root, opts, cancel, env);
     }
     let indexed: Vec<IndexedSpec<'_>> = specs
         .into_iter()
@@ -212,7 +215,7 @@ pub fn run_parallel(
         if opts.fail_fast && cancel.load(Ordering::SeqCst) {
             break;
         }
-        let chunk_results = run_chunk(chunk, root, opts, cancel);
+        let chunk_results = run_chunk(chunk, root, opts, cancel, env);
         let hard_failed = chunk_results
             .iter()
             .any(|(_, result)| !result.ok && !result.allow_failure);
@@ -266,6 +269,7 @@ mod tests {
                 pre_commit: vec![],
                 pre_push: vec![],
             },
+            env: BTreeMap::new(),
             signal_sets: BTreeMap::new(),
             sensors: specs,
             jobs: None,
@@ -287,7 +291,7 @@ mod tests {
             ..Default::default()
         };
         let cancel = AtomicBool::new(false);
-        let results = run_parallel(specs, dir.path(), &opts, 3, &cancel);
+        let results = run_parallel(specs, dir.path(), &opts, 3, &cancel, &BTreeMap::new());
         let names: Vec<&str> = results.iter().map(|r| r.name.as_str()).collect();
         assert_eq!(names, vec!["slow", "mid", "fast"]);
         assert!(results.iter().all(|r| r.ok));
@@ -307,7 +311,7 @@ mod tests {
             ..Default::default()
         };
         let cancel = AtomicBool::new(false);
-        let results = run_parallel(specs, dir.path(), &opts, 2, &cancel);
+        let results = run_parallel(specs, dir.path(), &opts, 2, &cancel, &BTreeMap::new());
         assert_eq!(results.len(), 2);
         assert_eq!(results[0].name, "fail");
         assert!(!results[0].ok);
@@ -340,7 +344,7 @@ mod tests {
             ..Default::default()
         };
         let cancel = AtomicBool::new(false);
-        let results = run_parallel(specs, dir.path(), &opts, 2, &cancel);
+        let results = run_parallel(specs, dir.path(), &opts, 2, &cancel, &BTreeMap::new());
         let names: Vec<&str> = results.iter().map(|r| r.name.as_str()).collect();
         // The failed chunk always reports; the later chunk never starts.
         // Whether `pass` ran or lost the spawn race to the cancel flag is

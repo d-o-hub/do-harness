@@ -26,43 +26,49 @@ pub struct NodeProbe {
 #[allow(clippy::too_many_lines)]
 pub fn probe_node_full(root: &Path) -> NodeProbe {
     let analysis = super::node_manifest::analyze_node_manifest(root);
-    let has_pnpm_lock = root.join("pnpm-lock.yaml").exists();
-    let has_pnpm_ws = root.join("pnpm-workspace.yaml").exists();
-    let has_yarn_lock = root.join("yarn.lock").exists();
-    let has_package_lock = root.join("package-lock.json").exists();
+    let detected = super::node_manifest::detect_package_manager(root);
 
     let pnpm_ok = probe("pnpm", &["--version"]);
     let yarn_ok = probe("yarn", &["--version"]);
     let npm_ok = probe("npm", &["--version"]);
+    let bun_ok = probe("bun", &["--version"]);
 
-    let pm = if pnpm_ok && (has_pnpm_lock || has_pnpm_ws) {
-        "pnpm"
-    } else if yarn_ok && has_yarn_lock {
-        "yarn"
-    } else if npm_ok && has_package_lock {
-        "npm"
-    } else if pnpm_ok {
-        "pnpm"
-    } else if yarn_ok {
-        "yarn"
-    } else {
-        "npm"
+    // The lockfile marker (if any) names the intended package manager; its
+    // binary must also be on PATH. Otherwise fall back to the first available
+    // tool, npm last — the historical behavior, extended with bun.
+    let pm = match detected {
+        super::node_manifest::PackageManager::Pnpm if pnpm_ok => "pnpm",
+        super::node_manifest::PackageManager::Yarn if yarn_ok => "yarn",
+        super::node_manifest::PackageManager::Bun if bun_ok => "bun",
+        super::node_manifest::PackageManager::Npm if npm_ok => "npm",
+        _ => {
+            if pnpm_ok {
+                "pnpm"
+            } else if yarn_ok {
+                "yarn"
+            } else {
+                "npm"
+            }
+        }
     };
     let pm_present = match pm {
         "pnpm" => pnpm_ok,
         "yarn" => yarn_ok,
+        "bun" => bun_ok,
         _ => npm_ok,
     };
 
     let lockfile = match pm {
         "pnpm" => "pnpm-lock.yaml",
         "yarn" => "yarn.lock",
+        "bun" => "bun.lockb",
         _ => "package-lock.json",
     };
 
     let pm_exec: Vec<String> = match pm {
         "pnpm" => vec!["pnpm".into(), "exec".into()],
         "yarn" => vec!["yarn".into(), "exec".into()],
+        "bun" => vec!["bunx".into()],
         _ => vec!["npx".into()],
     };
 
@@ -398,6 +404,7 @@ pub fn generate_node_config(sensors: &[SensorSpec]) -> Result<String> {
             pre_commit,
             pre_push: Vec::new(),
         },
+        env: BTreeMap::new(),
         signal_sets,
         sensors: sensors.to_vec(),
         jobs: None,

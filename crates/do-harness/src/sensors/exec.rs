@@ -6,6 +6,7 @@
 //! lets the parallel driver kill in-flight siblings; the flag is never set on
 //! sequential non-fail-fast runs, so that path is unaffected.
 
+use std::collections::BTreeMap;
 use std::ffi::OsString;
 use std::path::Path;
 use std::process::{Child, Command, Stdio};
@@ -170,6 +171,7 @@ fn spawn_sensor(
     program: &str,
     rest: &[String],
     start: Instant,
+    env: &BTreeMap<String, String>,
 ) -> Result<Child, SensorResult> {
     let mut command = crate::shell::command(program, rest);
     if let Some(keys) = &spec.environment_allowlist {
@@ -179,6 +181,9 @@ fn spawn_sensor(
                 command.env(key, value);
             }
         }
+    }
+    for (key, value) in env {
+        command.env(key, value);
     }
     crate::shell::configure_process_group(&mut command);
     command
@@ -205,6 +210,7 @@ pub(crate) fn run_sensor_attempt(
     spec: &SensorSpec,
     root: &Path,
     cancel: &AtomicBool,
+    env: &BTreeMap<String, String>,
 ) -> SensorResult {
     let start = Instant::now();
     let Some((program, rest)) = spec.argv.split_first() else {
@@ -219,7 +225,7 @@ pub(crate) fn run_sensor_attempt(
         result.details.reason = Some(crate::report::FailureReason::Spawn);
         return result;
     };
-    let child = match spawn_sensor(spec, root, program, rest, start) {
+    let child = match spawn_sensor(spec, root, program, rest, start, env) {
         Ok(child) => child,
         Err(result) => return result,
     };
@@ -261,6 +267,7 @@ pub(crate) fn run_sensor(
     root: &Path,
     cancel: &AtomicBool,
     baselines: &Baselines,
+    env: &BTreeMap<String, String>,
 ) -> SensorResult {
     if let Some(result) = missing_argv_path_result(spec, root) {
         return result;
@@ -276,7 +283,7 @@ pub(crate) fn run_sensor(
 
     let mut attempts = 0;
     loop {
-        let result = run_sensor_attempt(spec, root, cancel);
+        let result = run_sensor_attempt(spec, root, cancel, env);
         if result.ok {
             return apply_ratchet(result, spec, baselines);
         }

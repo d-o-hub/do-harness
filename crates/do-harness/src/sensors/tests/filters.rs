@@ -113,6 +113,7 @@ fn verify_with_no_effective_sensors_succeeds() {
         },
         sensors: vec![],
         signal_sets: BTreeMap::new(),
+        env: BTreeMap::new(),
         jobs: None,
         repairs: Vec::new(),
     };
