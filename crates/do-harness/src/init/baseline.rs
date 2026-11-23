@@ -126,6 +126,7 @@ mod tests {
             pr: crate::pr::author_policy::PrConfig::default(),
             language: Some("generic".to_owned()),
             hooks: crate::config::HooksConfig::default(),
+            env: std::collections::BTreeMap::new(),
             signal_sets: std::collections::BTreeMap::new(),
             sensors,
             jobs: None,
