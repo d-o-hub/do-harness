@@ -17,5 +17,4 @@ categories = [
 workspace = true
 
 [dev-dependencies]
-do-harness-sensor = { path = "../do-harness-sensor", version = "0.4.8" }
 toml.workspace = true
