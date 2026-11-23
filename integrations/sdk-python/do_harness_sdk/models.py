@@ -9,7 +9,7 @@ reports as :class:`~do_harness_sdk.client.ParseError`.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Optional
 
 #: Envelope contract revision this SDK parses. Bumped only when a breaking

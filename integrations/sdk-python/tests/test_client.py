@@ -17,7 +17,7 @@ from do_harness_sdk import (
 from do_harness_sdk.client import SCHEMA_VERSION
 from do_harness_sdk.models import StatusResult, StrikeInfo, TaskList, VerifyResult
 
-from .fixtures_json import ERRORS, EXPLAIN, STATUS_GREEN, VERIFY_FAIL, VERIFY_OK, VERSION
+from .fixtures_json import EXPLAIN, STATUS_GREEN, VERIFY_FAIL, VERIFY_OK, VERSION
 
 
 @pytest.fixture

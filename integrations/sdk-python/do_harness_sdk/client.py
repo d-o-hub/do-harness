@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
-import subprocess
+import subprocess  # nosec B404 -- argv-array CLI invocation is this client's purpose
 from typing import Any, Iterable, Optional, Sequence
 
 from ._version import __version__
@@ -135,7 +135,9 @@ class HarnessClient:
         if self.root is not None:
             argv += ["--root", self.root]
         try:
-            proc = subprocess.run(
+            # argv is an explicit array (never a shell): the binary path is
+            # caller-configured and args are SDK-controlled command words.
+            proc = subprocess.run(  # nosec B603  # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit.dangerous-subprocess-use-audit
                 argv,
                 capture_output=True,
                 text=True,
