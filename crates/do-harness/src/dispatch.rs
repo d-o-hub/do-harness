@@ -173,9 +173,9 @@ async fn route(root: &Path, config_path: Option<PathBuf>, cli: Cli) -> Result<()
             }
         }
         Command::Setup { action } => match action {
-            crate::cli::SetupAction::Web { yes } => crate::setup::web::run(root, yes, cli.dry_run)
-                .await
-                .map_err(CliError::Usage),
+            crate::cli::SetupAction::Web { yes } => {
+                crate::setup::web::run(root, yes, cli.dry_run).map_err(CliError::Usage)
+            }
         },
         Command::Verify {
             fail_fast,

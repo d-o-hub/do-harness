@@ -41,9 +41,15 @@ pub fn probe_node_full(root: &Path) -> NodeProbe {
         super::node_manifest::PackageManager::Yarn if yarn_ok => "yarn",
         super::node_manifest::PackageManager::Bun if bun_ok => "bun",
         super::node_manifest::PackageManager::Npm if npm_ok => "npm",
-        _ if pnpm_ok => "pnpm",
-        _ if yarn_ok => "yarn",
-        _ => "npm",
+        _ => {
+            if pnpm_ok {
+                "pnpm"
+            } else if yarn_ok {
+                "yarn"
+            } else {
+                "npm"
+            }
+        }
     };
     let pm_present = match pm {
         "pnpm" => pnpm_ok,

@@ -40,16 +40,13 @@ const WEB_SENSORS: &str = "viewport-ux,a11y,console,perf,visual,i18n,web-ui-test
 ///
 /// `yes` skips the interactive install prompt; `dry_run` reports without
 /// installing or writing files.
-pub async fn run(root: &Path, yes: bool, dry_run: bool) -> Result<()> {
+pub fn run(root: &Path, yes: bool, dry_run: bool) -> Result<()> {
     let config_path = root.join("do-harness.toml");
-    let config_text = match std::fs::read_to_string(&config_path) {
-        Ok(text) => text,
-        Err(_) => {
-            bail!(
-                "{} does not exist; scaffold it first with `do-harness init --language web`",
-                config_path.display()
-            )
-        }
+    let Ok(config_text) = std::fs::read_to_string(&config_path) else {
+        bail!(
+            "{} does not exist; scaffold it first with `do-harness init --language web`",
+            config_path.display()
+        )
     };
 
     let pm = crate::init::node_manifest::detect_package_manager(root);
@@ -113,13 +110,13 @@ pub async fn run(root: &Path, yes: bool, dry_run: bool) -> Result<()> {
         println!("\nconfirm the web pack with:\n  do-harness verify --only {WEB_SENSORS}");
         return Ok(());
     }
-    if patched != config_text {
+    if patched == config_text {
+        println!("do-harness.toml already carries the web audit environment");
+    } else {
         std::fs::write(&config_path, &patched)
             .with_context(|| format!("failed to write {}", config_path.display()))?;
         println!("patched {} with:", config_path.display());
         println!("{}", describe_env(&additions));
-    } else {
-        println!("do-harness.toml already carries the web audit environment");
     }
 
     if !missing.is_empty() && !install && !prompted {
@@ -273,16 +270,16 @@ fn find_env_table_lines(text: &str) -> Option<(usize, usize)> {
     let end = lines[start + 1..]
         .iter()
         .position(|line| line.starts_with('[') && !line.starts_with(' '))
-        .map(|offset| start + 1 + offset)
-        .unwrap_or(lines.len());
+        .map_or(lines.len(), |offset| start + 1 + offset);
     Some((start, end))
 }
 
 /// Renders a `[env]` table from `vars`, keys sorted.
 fn render_env_table(vars: &BTreeMap<String, String>) -> String {
+    use std::fmt::Write as _;
     let mut out = String::from("[env]\n");
     for (key, value) in vars {
-        out.push_str(&format!("{key} = {value:?}\n"));
+        let _ = writeln!(out, "{key} = {value:?}");
     }
     out
 }

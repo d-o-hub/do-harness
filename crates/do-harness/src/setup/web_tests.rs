@@ -67,7 +67,7 @@ fn missing_peer_deps_checks_floors() {
     stub("playwright", "1.40.0");
     stub("@axe-core/playwright", "4.8.0");
     stub("lighthouse", "11.0.0");
-    assert!(missing_peer_deps(root).is_empty());
+    assert_eq!(missing_peer_deps(root), [] as [&str; 0]);
 
     // Below floor => treated as missing.
     stub("lighthouse", "10.9.0");
