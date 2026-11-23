@@ -408,3 +408,76 @@ async fn parses_jobs_bound() {
     let cfg = load(dir.path(), Some(&path)).await.expect("load");
     assert_eq!(cfg.jobs, Some(4));
 }
+/// A declared `contract_version` parses and reaches the loaded config.
+#[tokio::test(flavor = "current_thread")]
+async fn parses_declared_contract_version() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let path = dir.path().join("do-harness.toml");
+    let text = r#"
+            contract_version = "0.1.0"
+
+            [[sensors]]
+            name = "real"
+            argv = ["true"]
+        "#;
+    std::fs::write(&path, text).expect("write config");
+    let cfg = load(dir.path(), Some(&path)).await.expect("load");
+    assert_eq!(cfg.contract_version.as_deref(), Some("0.1.0"));
+}
+
+/// An absent `contract_version` is the pre-versioning contract (backward
+/// compatible): it parses and reads as `None` (`0.0.0`).
+#[tokio::test(flavor = "current_thread")]
+async fn accepts_missing_contract_version() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let path = dir.path().join("do-harness.toml");
+    let text = r#"
+            language = "rust"
+
+            [[sensors]]
+            name = "real"
+            argv = ["true"]
+        "#;
+    std::fs::write(&path, text).expect("write config");
+    let cfg = load(dir.path(), Some(&path)).await.expect("load");
+    assert!(cfg.contract_version.is_none());
+}
+
+/// A malformed `contract_version` is rejected at config load, so an adopter
+/// cannot pin a contract version the tool cannot compare.
+#[tokio::test(flavor = "current_thread")]
+async fn rejects_invalid_contract_version() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let path = dir.path().join("do-harness.toml");
+    for bad in ["banana", "1.2", "1.2.3.4", "1.2.x", "0.0.0-beta", ""] {
+        let text = format!("contract_version = \"{bad}\"\n");
+        std::fs::write(&path, text).expect("write config");
+        let err = load(dir.path(), Some(&path))
+            .await
+            .expect_err("load must fail for a malformed contract_version");
+        assert!(
+            format!("{err:#}").contains("contract_version must be MAJOR.MINOR.PATCH"),
+            "unexpected error for {bad:?}: {err:#}"
+        );
+    }
+}
+
+/// The `contract_version` key is distinct from the internal `schema-version`;
+/// both parse together.
+#[tokio::test(flavor = "current_thread")]
+async fn parses_contract_version_alongside_schema_version() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let path = dir.path().join("do-harness.toml");
+    let text = r#"
+            schema-version = 1
+            contract_version = "0.1.0"
+
+            [[sensors]]
+            name = "real"
+            argv = ["true"]
+        "#;
+    std::fs::write(&path, text).expect("write config");
+    let cfg = load(dir.path(), Some(&path)).await.expect("load");
+    assert_eq!(cfg.schema_version, 1);
+    assert_eq!(cfg.contract_version.as_deref(), Some("0.1.0"));
+}

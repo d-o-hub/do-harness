@@ -117,6 +117,7 @@ mod tests {
     fn sets_config() -> Config {
         Config {
             schema_version: crate::config::CONFIG_SCHEMA_VERSION,
+            contract_version: None,
             pr: crate::pr::author_policy::PrConfig::default(),
             language: None,
             hooks: crate::config::HooksConfig::default(),

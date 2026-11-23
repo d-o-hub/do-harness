@@ -278,6 +278,7 @@ mod tests {
         Config {
             schema_version: crate::config::CONFIG_SCHEMA_VERSION,
             pr: crate::pr::author_policy::PrConfig::default(),
+            contract_version: None,
             language: None,
             hooks: crate::config::HooksConfig::default(),
             signal_sets: std::collections::BTreeMap::new(),

@@ -167,6 +167,11 @@ count_bullets() {
     grep -c '^\* ' "$1" || true
 }
 
+# Artifact-version readers (adoption contract, sensor packs, guides) live in
+# release-artifacts.sh so this file stays under the 500-LOC ceiling.
+# shellcheck disable=SC1091 # resolved at runtime from this script's directory
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/release-artifacts.sh"
+
 compose() {
     local tag="$1" generated="$2" out="$3" curated="${4:-}" impact="${5:-}"
     local version="${tag#v}" header changes="$WORK/changes.md" want have
@@ -200,17 +205,22 @@ compose() {
             printf '\n'
             cat "$impact"
         fi
+        # Every independently-versioned artifact ships its version in the body:
+        # the CLI tag, the adoption contract, each sensor pack, and the guides.
+        # A version file missing from the tree prints `not declared`.
+        printf '\n## Artifacts\n\n'
+        printf '| Artifact | Version |\n| :--- | :--- |\n'
+        artifact_version_table "$tag"
         printf '\n## Changes\n\n'
         cat "$changes"
     } >"$out"
 }
-
 # Fails when a section a reader needs is missing or empty. Reports every problem,
 # not just the first, so one release run names all of them.
 check() {
     local tag="$1" file="$2"
     local version="${tag#v}" problems=0 section body
-    local required=("Breaking changes" "Install" "Verify the download" "Consumer Impact" "Changes")
+    local required=("Breaking changes" "Install" "Verify the download" "Consumer Impact" "Artifacts" "Changes")
 
     [[ -f "$file" ]] || fail "release notes not found: $file"
 
@@ -337,6 +347,25 @@ EOF
         grep -qxF "$expected" "$composed" ||
             fail "self-test: composed notes are missing '$expected'"
     done
+    # The artifacts table must surface every independently-versioned artifact,
+    # starting with the CLI release itself.
+    grep -qxF "## Artifacts" "$composed" ||
+        fail "self-test: composed notes are missing the Artifacts section"
+    grep -qF "| CLI (binary, release tag) | v0.1.3 |" "$composed" ||
+        fail "self-test: the artifacts table does not name the CLI release"
+    grep -qF "| Adoption contract (do-harness.toml) |" "$composed" ||
+        fail "self-test: the artifacts table does not name the adoption contract"
+    grep -qF "| Sensor pack: rust |" "$composed" ||
+        fail "self-test: the artifacts table does not name the sensor packs"
+    grep -qF "| Guide: AGENTS.md (root) |" "$composed" ||
+        fail "self-test: the artifacts table does not name the guides"
+    # The artifacts section must sit before the change list, not inside it.
+    local changes_at artifacts_at
+    changes_at="$(grep -n '^## Changes$' "$composed" | head -n 1 | cut -d: -f1)"
+    artifacts_at="$(grep -n '^## Artifacts$' "$composed" | head -n 1 | cut -d: -f1)"
+    if (( artifacts_at >= changes_at )); then
+        fail "self-test: the artifacts section follows the change list"
+    fi
     grep -q '^\* feat(api)!: drop the legacy sensor name by @d-o-hub' "$composed" ||
         fail "self-test: a breaking bullet lost its title, author, or link"
     if awk '/^### Features$/,/^$/' "$composed" | grep -q 'api)!'; then
@@ -418,6 +447,22 @@ EOF
         *) fail "self-test: the rejection did not name the empty matrix" ;;
     esac
 
+    # Negative control: a body without the Artifacts section is rejected and
+    # the rejection names it — the table is part of the release contract.
+    awk '
+        $0 == "## Artifacts" { skip = 1; next }
+        skip && /^## / { skip = 0 }
+        skip { next }
+        { print }
+    ' "$composed" >"$WORK/no-artifacts.md"
+    if check "v0.1.3" "$WORK/no-artifacts.md" >/dev/null 2>&1; then
+        fail "self-test: a body without the Artifacts section passed the check"
+    fi
+    reason="$(check "v0.1.3" "$WORK/no-artifacts.md" 2>&1 || true)"
+    case "$reason" in
+        *"have no '## Artifacts' section"*) ;;
+        *) fail "self-test: the rejection did not name the empty Artifacts section" ;;
+    esac
     # `seed` controls: the stub is byte-identical to the template (an untouched
     # stub must publish the same body), a second seed cannot destroy an edit made
     # while the release pull request is open, a malformed tag is rejected without

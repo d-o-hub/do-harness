@@ -1,3 +1,7 @@
+---
+version: 0.1.0
+---
+
 # AGENTS.md — Autonomous & Interactive Agent Execution Harness
 
 ## 1. System Operating Invariants (Hard Constraints)
