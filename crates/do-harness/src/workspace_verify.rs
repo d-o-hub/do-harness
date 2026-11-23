@@ -204,6 +204,9 @@ async fn run_selected_workspaces(
         .count();
     let concurrency = requested_jobs.unwrap_or(1).min(affected_count);
     let semaphore = Arc::new(Semaphore::new(concurrency));
+    // Re-invoking our own binary for child workspace verifies is the intended
+    // use (same pattern as eval_walk), not a security decision.
+    // nosemgrep: rust.lang.security.current-exe.current-exe
     let executable = std::env::current_exe()
         .context("failed to locate do-harness executable")
         .map_err(CliError::Usage)?;
