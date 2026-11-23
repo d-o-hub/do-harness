@@ -22,6 +22,7 @@
 /// The reference plugin manifest, verbatim as shipped on crates.io.
 pub const MANIFEST: &str = include_str!("../sensor-plugin.toml");
 
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -39,7 +40,7 @@ mod tests {
             }),
             Some(vec!["ruff", "check", "."])
         );
-        assert_eq!(sensor["when-changed"].as_array().map(|a| a.len()), Some(1));
+        assert_eq!(sensor["when-changed"].as_array().map(Vec::len), Some(1));
         // The harness sets `plugin` during resolution; a manifest must not.
         assert!(sensor.get("plugin").is_none());
     }
