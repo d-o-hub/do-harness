@@ -804,6 +804,27 @@ The harness enforces strict fail-closed contract rules across all supported pack
 5. **Non-Destructive Adoption**:
    - `init` never overwrites existing application code or configuration files without explicit `--force`.
 
+## Sensor plugins
+
+Reusable sensor packages are distributed as *plugins*: versioned
+`sensor-plugin.toml` manifests under the repository's `plugins/` directory.
+An adopter references a plugin from `[[sensors]]` by name instead of writing
+an `argv` wrapper by hand:
+
+<!-- example: id=adoption-sensor-plugin-reference classification=parser-check-only reason="Adoption plugin reference example" -->
+```toml
+[[sensors]]
+name = "ruff"
+plugin = "ruff"
+```
+
+The harness discovers manifests, validates them fail-closed, and runs the
+plugin's `argv` exactly like an inline sensor. The manifest schema and the
+merge/collision rules are documented in
+[sensor-plugins.md](sensor-plugins.md); the repository ships a reference
+Python/Ruff plugin at `plugins/ruff/` and on crates.io as
+`do-harness-sensor-ruff`.
+
 ## Troubleshooting
 
 - `unsupported platform`: install from source, or use a release target above.

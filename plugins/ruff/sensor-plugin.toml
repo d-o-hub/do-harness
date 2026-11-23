@@ -1,0 +1,35 @@
+# Reference sensor plugin: Ruff (Python lint gate).
+#
+# This is the shipped reference plugin for the do-harness sensor plugin
+# protocol (issue #575): it validates the interface in a non-Rust ecosystem.
+# It is discovered by the harness under <root>/plugins and referenced from
+# `[[sensors]]`:
+#
+#   [[sensors]]
+#   name = "ruff"
+#   plugin = "ruff"
+#
+# The same manifest is distributed on crates.io as the
+# `do-harness-sensor-ruff` crate; keep the copy under `plugins/ruff/` in this
+# repository byte-identical to the one in `crates/do-harness-sensor-ruff/`
+# (the harness test suite enforces it). See docs/sensor-plugins.md for the
+# contract. `schema-version` must equal 1; a newer version fails closed.
+
+schema-version = 1
+version = "0.1.0"
+description = "Ruff lint gate (fast Python linter)"
+
+[sensor]
+name = "ruff"
+argv = ["ruff", "check", "."]
+when-changed = ["**/*.py"]
+inputs = [
+    "**/*.py",
+    "pyproject.toml",
+    "requirements*.txt",
+    "setup.cfg",
+    "setup.py",
+    "ruff.toml",
+    ".ruff.toml",
+]
+severity = "error"

@@ -21,14 +21,21 @@ release"). Nothing publishes unless the tagged commit passes the full release se
   asks for.
 - **crates.io publishes through Trusted Publishing (OIDC); there is no publish
   secret.** Each published crate — `do-harness-libsql`, `do-harness-types`,
-  `do-harness-db`, `do-harness` — needs a GitHub publisher with repository
+  `do-harness-db`, `do-harness-sensor`, `do-harness-sensor-ruff`,
+  `do-harness` — needs a GitHub publisher with repository
   `d-o-hub/do-harness` and workflow filename `release.yml`, under the crate's
   **Settings → Trusted Publishing** page on <https://crates.io>. Leave
   *environment* empty: the `publish` job declares none, and an environment
-  recorded here but absent from the job fails the exchange. All four crates are
+  recorded here but absent from the job fails the exchange. The original four
+  crates are
   configured, verified on 2026-11-11 through the crates.io trusted-publishing
   API; the three workspace crates also published through the `v0.4.3` release
-  run, and `do-harness-libsql` through the `v0.4.5` run — see the next item. The
+  run, and `do-harness-libsql` through the `v0.4.5` run — see the next item.
+  `do-harness-sensor` and `do-harness-sensor-ruff` are the crates added for the
+  sensor plugin architecture (issue #575): they are on the release publish list
+  but have not been published yet, so they still need the bootstrap and trusted
+  publisher setup under "Adding a publishable crate" below before the next
+  release. The
   job takes
   `id-token: write`, exchanges its OIDC token with
   `rust-lang/crates-io-auth-action`, and passes the short-lived token to
