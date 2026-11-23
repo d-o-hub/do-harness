@@ -1,6 +1,13 @@
 [workspace]
 resolver = "3"
-members = ["crates/db", "crates/types", "crates/do-harness", "crates/guardian-proxy"]
+members = [
+    "crates/db",
+    "crates/types",
+    "crates/do-harness",
+    "crates/do-harness-sensor",
+    "crates/do-harness-sensor-ruff",
+    "crates/guardian-proxy",
+]
 # Third-party code retains its own lint/test baseline and release version.
 exclude = ["vendor/libsql"]
 

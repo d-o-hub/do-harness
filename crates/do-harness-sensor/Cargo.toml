@@ -1,0 +1,23 @@
+[package]
+name = "do-harness-sensor"
+description = "Sensor plugin protocol types for do-harness"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+readme = "README.md"
+keywords = ["sensors", "plugins", "harness", "verification", "ci"]
+categories = [
+    "development-tools",
+    "development-tools::testing",
+]
+
+[lints]
+workspace = true
+
+[dependencies]
+serde = { workspace = true, features = ["derive"] }
+
+[dev-dependencies]
+toml.workspace = true

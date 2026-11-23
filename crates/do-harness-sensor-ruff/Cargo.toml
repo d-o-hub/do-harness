@@ -1,0 +1,21 @@
+[package]
+name = "do-harness-sensor-ruff"
+description = "Reference Ruff (Python) sensor plugin manifest for do-harness"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+readme = "README.md"
+keywords = ["sensors", "plugins", "harness", "ruff", "python"]
+categories = [
+    "development-tools",
+    "development-tools::testing",
+]
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+do-harness-sensor = { path = "../do-harness-sensor", version = "0.4.8" }
+toml.workspace = true

@@ -575,6 +575,7 @@ dependencies = [
  "clap_complete",
  "clap_mangen",
  "do-harness-db",
+ "do-harness-sensor",
  "do-harness-types",
  "fs2",
  "globset",
@@ -616,6 +617,22 @@ dependencies = [
  "parking_lot",
  "thiserror 1.0.69",
  "tracing",
+]
+
+[[package]]
+name = "do-harness-sensor"
+version = "0.4.8"
+dependencies = [
+ "serde",
+ "toml",
+]
+
+[[package]]
+name = "do-harness-sensor-ruff"
+version = "0.4.8"
+dependencies = [
+ "do-harness-sensor",
+ "toml",
 ]
 
 [[package]]
