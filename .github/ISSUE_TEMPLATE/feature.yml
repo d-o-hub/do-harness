@@ -1,0 +1,40 @@
+name: Feature request
+description: Propose a new capability or improvement for do-harness
+title: "[feature] "
+labels: ["enhancement", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for proposing a feature. Issues are triaged before work starts;
+        a PR must reference a triaged issue (see CONTRIBUTING.md).
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem statement
+      description: What gap or limitation motivates this feature?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: How should the feature behave? Sketch the interface or behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Workarounds or alternate designs you considered.
+    validations:
+      required: false
+  - type: checkboxes
+    id: triage
+    attributes:
+      label: Triage checklist
+      options:
+        - label: This is a feature request, not a bug report.
+          required: true
+        - label: I searched open issues and this is not a duplicate.
+          required: true
