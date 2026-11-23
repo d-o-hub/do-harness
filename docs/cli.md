@@ -596,6 +596,22 @@ projects.
 - `--minimal`: Skip skill scaffolding.
 - `--no-gitignore`: Skip creating/modifying `.gitignore`.
 
+### `setup`
+<!-- BEGIN GENERATED: cli-contract setup -->
+`do-harness setup [OPTIONS] <COMMAND>`
+
+Subcommands: `web`.
+<!-- END GENERATED: cli-contract setup -->
+
+### `setup web`
+<!-- BEGIN GENERATED: cli-contract setup web -->
+`do-harness setup web [OPTIONS]`
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `-y, --yes` | no | — | — | Skip the interactive install prompt and install missing dependencies |
+<!-- END GENERATED: cli-contract setup web -->
+
 ### `migrate`
 <!-- BEGIN GENERATED: cli-contract migrate -->
 `do-harness migrate [OPTIONS]`

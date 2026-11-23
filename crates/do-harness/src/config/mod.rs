@@ -37,6 +37,11 @@ pub struct Config {
     pub schema_version: u32,
     /// Optional host language tag (informational; reserved for language packs).
     pub language: Option<String>,
+    /// Environment variables applied to every sensor process (a top-level
+    /// `[env]` table). Values here override inherited variables of the same
+    /// name; the table is empty (omitted) for configs that set none.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub env: BTreeMap<String, String>,
     /// Hook sensor selection.
     #[serde(default)]
     pub hooks: HooksConfig,
@@ -303,6 +308,7 @@ pub fn rust_default() -> Config {
             pre_commit: vec!["fmt".to_owned(), "loc".to_owned()],
             pre_push: vec![],
         },
+        env: BTreeMap::new(),
         signal_sets,
         sensors,
         jobs: None,
