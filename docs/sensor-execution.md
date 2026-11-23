@@ -61,6 +61,12 @@ copies only the listed inherited keys. Include executable/runtime selectors
 such as PATH and, on Windows, SystemRoot where needed. Stdin is closed;
 sensors are noninteractive. No environment dump is recorded.
 
+The top-level `[env]` table in `do-harness.toml` sets variables applied to
+every sensor process; values override inherited variables of the same name.
+`do-harness setup web` writes the web pack's `WEB_AUDIT_*` values there. As
+with any environment, values that reach retained output are redacted per the
+secret-name rules below.
+
 Nonempty values of secret-like environment names (token, secret, password,
 passwd, API key, private key and credential) and `redact-env` keys are replaced
 before output retention, across read boundaries and before clipping. Known

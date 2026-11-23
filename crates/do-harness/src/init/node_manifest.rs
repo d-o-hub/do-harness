@@ -94,6 +94,48 @@ impl NodeManifestAnalysis {
         }
     }
 }
+/// Package managers detectable from a repository's lockfile markers.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PackageManager {
+    /// `npm` (default when no lockfile marker exists).
+    Npm,
+    /// `pnpm` (`pnpm-lock.yaml` or `pnpm-workspace.yaml`).
+    Pnpm,
+    /// `yarn` (`yarn.lock`).
+    Yarn,
+    /// `bun` (`bun.lockb` or `bun.lock`).
+    Bun,
+}
+
+impl PackageManager {
+    /// The package-manager binary name.
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Npm => "npm",
+            Self::Pnpm => "pnpm",
+            Self::Yarn => "yarn",
+            Self::Bun => "bun",
+        }
+    }
+}
+
+/// Detects the package manager from lockfile precedence, highest first:
+/// `pnpm-lock.yaml`/`pnpm-workspace.yaml` > `yarn.lock` > `bun.lockb`/
+/// `bun.lock` > `package-lock.json`. Falls back to [`PackageManager::Npm`]
+/// when no lockfile exists (npm is the default package manager).
+#[must_use]
+pub fn detect_package_manager(root: &Path) -> PackageManager {
+    if root.join("pnpm-lock.yaml").exists() || root.join("pnpm-workspace.yaml").exists() {
+        PackageManager::Pnpm
+    } else if root.join("yarn.lock").exists() {
+        PackageManager::Yarn
+    } else if root.join("bun.lockb").exists() || root.join("bun.lock").exists() {
+        PackageManager::Bun
+    } else {
+        PackageManager::Npm
+    }
+}
 
 /// Analyzes `root`'s Node metadata without probing or executing tools.
 #[must_use]
@@ -228,5 +270,49 @@ mod tests {
         .unwrap();
         let analysis = analyze_node_manifest(dir.path());
         assert_eq!(analysis.supported_commands(), vec!["typecheck", "lint"]);
+    }
+
+    #[test]
+    fn detect_package_manager_prefers_pnpm_workspace_over_other_lockfiles() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(dir.path().join("yarn.lock"), "").unwrap();
+        fs::write(dir.path().join("pnpm-workspace.yaml"), "").unwrap();
+        assert_eq!(detect_package_manager(dir.path()), PackageManager::Pnpm);
+    }
+
+    #[test]
+    fn detect_package_manager_lockfile_precedence() {
+        // pnpm > yarn > bun > npm.
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(dir.path().join("package-lock.json"), "").unwrap();
+        fs::write(dir.path().join("bun.lockb"), "").unwrap();
+        fs::write(dir.path().join("yarn.lock"), "").unwrap();
+        fs::write(dir.path().join("pnpm-lock.yaml"), "").unwrap();
+        assert_eq!(detect_package_manager(dir.path()), PackageManager::Pnpm);
+
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(dir.path().join("package-lock.json"), "").unwrap();
+        fs::write(dir.path().join("bun.lock"), "").unwrap();
+        fs::write(dir.path().join("yarn.lock"), "").unwrap();
+        assert_eq!(detect_package_manager(dir.path()), PackageManager::Yarn);
+
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(dir.path().join("package-lock.json"), "").unwrap();
+        fs::write(dir.path().join("bun.lockb"), "").unwrap();
+        assert_eq!(detect_package_manager(dir.path()), PackageManager::Bun);
+
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(dir.path().join("package-lock.json"), "").unwrap();
+        assert_eq!(detect_package_manager(dir.path()), PackageManager::Npm);
+    }
+
+    #[test]
+    fn detect_package_manager_defaults_to_npm_without_lockfiles() {
+        let dir = tempfile::tempdir().unwrap();
+        assert_eq!(detect_package_manager(dir.path()), PackageManager::Npm);
+        assert_eq!(PackageManager::Npm.as_str(), "npm");
+        assert_eq!(PackageManager::Pnpm.as_str(), "pnpm");
+        assert_eq!(PackageManager::Yarn.as_str(), "yarn");
+        assert_eq!(PackageManager::Bun.as_str(), "bun");
     }
 }

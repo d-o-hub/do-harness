@@ -267,6 +267,7 @@ export PATH="$HOME/.local/bin:$PATH"
 | `init-db [OPTIONS]` | Apply pending database migrations — flags: `--check`, `-y, --yes` |
 | `seed [OPTIONS]` | Seed invariants from plans/invariants.json — flags: `--prune` |
 | `init [OPTIONS]` | Scaffold a harness workspace in a target directory — flags: `--language <LANG>`, `--force`, `--format <FORMAT>`, `--no-seed`, `--minimal`, `--no-gitignore`, `--inspect` |
+| `setup web [OPTIONS]` | Bootstrap the web audit pack: check the playwright/@axe-core/playwright/ lighthouse peer dependencies, install what is missing, and patch `do-harness.toml` with the `WEB_AUDIT_*` environment block — flags: `-y, --yes` |
 | `task export [OPTIONS]` | Write the task list to plans/tasks.json or specified output — flags: `--stdout`, `--format <FORMAT>` |
 | `task import [OPTIONS]` | Validate plans/tasks.json against the state database — flags: `--file <FILE>`, `--check` |
 | `task list [OPTIONS]` | Print tasks from the state database — flags: `--status <STATUS>`, `--method <METHOD>`, `--parent <ID>`, `--format <FORMAT>` |
@@ -485,6 +486,14 @@ environment allowlist. Local commands retain the caller's permissions.
   `verification`/`release` mean the full list and `feedback` is rejected.
 
 When no config is found, the CLI falls back to the built-in Rust sensor pack. The config file is also the workspace-root marker used for discovery.
+
+## Contributing
+
+Contributions follow an issue-first workflow: open or claim a triaged issue
+before opening a PR, link the issue from the PR, and follow the documented
+branch and commit conventions. See
+[CONTRIBUTING.md](https://github.com/d-o-hub/do-harness/blob/main/CONTRIBUTING.md)
+for the full guide, including sensor expectations and what maintainers gate on.
 
 ## License
 
