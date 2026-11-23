@@ -539,6 +539,34 @@ Peer dependencies must be installed in the adopting repository's `node_modules`
 See [`integrations/web-ui/README.md`](../integrations/web-ui/README.md) for the
 audit stages, matrix contract, and visual-baseline semantics.
 
+### Wiring the pack: `do-harness setup web`
+
+`do-harness setup web` bootstraps the peer dependencies and the environment in
+one step. It detects the package manager from the lockfile (`pnpm-lock.yaml`,
+`yarn.lock`, `bun.lockb`/`bun.lock`, else `package-lock.json`/npm), checks
+that `playwright` (>= 1.40), `@axe-core/playwright` (>= 4.8), and
+`lighthouse` (>= 11.0) are installed at compatible versions, offers to install
+what is missing (interactive prompt on a TTY; pass `--yes`/`-y` to skip it),
+and appends a `[env]` table to `do-harness.toml` with the
+`WEB_AUDIT_ROUTES` placeholder and the documented defaults. `[env]` values are
+applied to every sensor process, so the web sensors stop SKIPping once the
+dependencies are installed.
+
+Non-interactive runs without `--yes` print the exact install command and exit
+2 instead of prompting or installing; `--dry-run` reports what would change
+without writing. The `[env]` block is written even when dependencies remain
+missing, so the pack is configured as soon as they are installed.
+
+After setup, confirm the pack with:
+
+<!-- example: id=adoption_setup_web_confirm classification=illustrative reason="Post-setup web pack confirmation command" -->
+```bash
+do-harness verify --only viewport-ux,a11y,console,perf,visual,i18n,web-ui-tests
+```
+
+See [`integrations/web-ui/README.md`](../integrations/web-ui/README.md) for the
+audit stages, matrix contract, and visual-baseline semantics.
+
 ## The agent loop
 
 Use the [workflow benchmark](workflow-benchmarks.md) to compare a pinned skill

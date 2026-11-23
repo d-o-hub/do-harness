@@ -172,6 +172,11 @@ async fn route(root: &Path, config_path: Option<PathBuf>, cli: Cli) -> Result<()
                 Ok(())
             }
         }
+        Command::Setup { action } => match action {
+            crate::cli::SetupAction::Web { yes } => crate::setup::web::run(root, yes, cli.dry_run)
+                .await
+                .map_err(CliError::Usage),
+        },
         Command::Verify {
             fail_fast,
             format,
@@ -302,42 +307,31 @@ async fn route(root: &Path, config_path: Option<PathBuf>, cli: Cli) -> Result<()
         Command::Trace { action } => commands::trace_cmd(root, action)
             .await
             .map_err(CliError::Usage),
-        Command::Distill {
-            skill,
-            pattern,
-            description,
-            from_trace,
-            from_strikes,
-            min_strikes,
-            task,
-            to_fixture,
-            dry_run,
-            format,
-        } => {
-            if from_strikes {
+        Command::Distill(args) => {
+            if args.from_strikes {
                 distill_strikes::scaffold_from_strikes(
                     root,
-                    skill.as_deref(),
-                    task,
-                    min_strikes.unwrap_or(telemetry::FAIL_FAST_STRIKES),
-                    dry_run,
-                    format,
+                    args.skill.as_deref(),
+                    args.task,
+                    args.min_strikes.unwrap_or(telemetry::FAIL_FAST_STRIKES),
+                    args.dry_run,
+                    args.format,
                 )
                 .await
                 .map_err(CliError::Usage)?;
                 return Ok(());
             }
-            let Some(skill) = skill else {
+            let Some(skill) = args.skill else {
                 return Err(CliError::Usage(anyhow::anyhow!(
                     "distill requires --skill (or --from-strikes to scaffold from recorded strikes)"
                 )));
             };
-            let Some(pattern) = pattern else {
+            let Some(pattern) = args.pattern else {
                 return Err(CliError::Usage(anyhow::anyhow!(
                     "distill requires --pattern describing the generalized fix"
                 )));
             };
-            let Some(from_trace) = from_trace else {
+            let Some(from_trace) = args.from_trace else {
                 return Err(CliError::Usage(anyhow::anyhow!(
                     "distill requires evidence: pass --from-trace <id> of a resolved trace (see do-harness trace add)"
                 )));
@@ -346,11 +340,11 @@ async fn route(root: &Path, config_path: Option<PathBuf>, cli: Cli) -> Result<()
                 root,
                 &skill,
                 &pattern,
-                description.as_deref(),
+                args.description.as_deref(),
                 Some(from_trace),
-                to_fixture,
-                dry_run,
-                format,
+                args.to_fixture,
+                args.dry_run,
+                args.format,
             )
             .await
             .map_err(CliError::Usage)
