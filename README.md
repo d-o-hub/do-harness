@@ -480,6 +480,14 @@ environment allowlist. Local commands retain the caller's permissions.
 
 When no config is found, the CLI falls back to the built-in Rust sensor pack. The config file is also the workspace-root marker used for discovery.
 
+## Contributing
+
+Contributions follow an issue-first workflow: open or claim a triaged issue
+before opening a PR, link the issue from the PR, and follow the documented
+branch and commit conventions. See
+[CONTRIBUTING.md](https://github.com/d-o-hub/do-harness/blob/main/CONTRIBUTING.md)
+for the full guide, including sensor expectations and what maintainers gate on.
+
 ## License
 
 MIT. See `LICENSE`.

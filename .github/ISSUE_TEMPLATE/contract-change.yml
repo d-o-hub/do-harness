@@ -1,0 +1,38 @@
+name: Contract change
+description: Propose a change to the adoption contract (do-harness.toml)
+title: "[contract] "
+labels: ["contract", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Contract changes affect adopting repositories and require a migration
+        note and contract-owner review (see CONTRIBUTING.md).
+  - type: textarea
+    id: change
+    attributes:
+      label: Contract change
+      description: What schema or semantics change, and why?
+    validations:
+      required: true
+  - type: textarea
+    id: compatibility
+    attributes:
+      label: Compatibility impact
+      description: Does an existing adopter's do-harness.toml keep parsing? What is affected?
+    validations:
+      required: true
+  - type: textarea
+    id: migration
+    attributes:
+      label: Migration note
+      description: Exact steps for adopters to migrate.
+    validations:
+      required: true
+  - type: checkboxes
+    id: triage
+    attributes:
+      label: Triage checklist
+      options:
+        - label: The migration note above is complete and actionable.
+          required: true
