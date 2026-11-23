@@ -617,6 +617,8 @@ jobs:
           publish do-harness-libsql "$fork_version" vendor/libsql/Cargo.toml
           publish do-harness-types "$version" crates/types/Cargo.toml
           publish do-harness-db "$version" crates/db/Cargo.toml
+          publish do-harness-sensor "$version" crates/do-harness-sensor/Cargo.toml
+          publish do-harness-sensor-ruff "$version" crates/do-harness-sensor-ruff/Cargo.toml
           publish do-harness "$version" crates/do-harness/Cargo.toml
 
   registry-validation:

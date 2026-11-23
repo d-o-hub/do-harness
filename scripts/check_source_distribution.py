@@ -169,6 +169,7 @@ def main():
             check_fork(fork, policy)
             for crate, manifest in (("do-harness-types", "crates/types/Cargo.toml"),
                                     ("do-harness-db", "crates/db/Cargo.toml"),
+                                    ("do-harness-sensor", "crates/do-harness-sensor/Cargo.toml"),
                                     ("do-harness", "crates/do-harness/Cargo.toml")):
                 run(["cargo", "package", "--manifest-path", ROOT / manifest, "--locked",
                      "--allow-dirty", "--no-verify"], work, isolated)

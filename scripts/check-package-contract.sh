@@ -88,6 +88,8 @@ python3 "$ROOT/scripts/check_source_distribution.py" --check-policy || FAIL=1
 python3 "$ROOT/scripts/test_source_distribution.py" || FAIL=1
 check_crate_package do-harness-types LICENSE
 check_crate_package do-harness-db LICENSE
+check_crate_package do-harness-sensor LICENSE README.md
+check_crate_package do-harness-sensor-ruff LICENSE README.md
 check_crate_package do-harness LICENSE README.md assets/compliance.md assets/methods.json assets/nextest.toml templates/AGENTS.md templates/USE_RESTRICTIONS.md
 
 # 2. npm wrapper manifests: the publish job stamps the workspace version into
