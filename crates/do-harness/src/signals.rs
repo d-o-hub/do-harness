@@ -133,6 +133,7 @@ mod tests {
                 .iter()
                 .map(|name| SensorSpec {
                     kind: None,
+                    plugin: None,
                     fix: None,
                     name: (*name).to_owned(),
                     argv: vec!["true".to_owned()],

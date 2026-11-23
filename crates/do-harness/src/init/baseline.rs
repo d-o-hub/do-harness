@@ -137,6 +137,7 @@ mod tests {
     fn spec(name: &str, argv: &[&str]) -> crate::config::SensorSpec {
         crate::config::SensorSpec {
             kind: None,
+            plugin: None,
             fix: None,
             name: name.to_owned(),
             argv: argv.iter().map(ToString::to_string).collect(),

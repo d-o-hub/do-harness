@@ -73,6 +73,7 @@ pub fn explain_report(
             .map(|spec| Selected {
                 name: spec.name.clone(),
                 reason: crate::applicability::UNFILTERED_REASON.to_owned(),
+                plugin: spec.plugin.clone(),
             })
             .collect();
         (
@@ -144,7 +145,11 @@ pub(crate) async fn run(
                 println!("selected:");
             }
             for sensor in &report.selected {
-                println!("  {} ({})", sensor.name, sensor.reason);
+                if let Some(plugin) = &sensor.plugin {
+                    println!("  {} (plugin: {plugin}) ({})", sensor.name, sensor.reason);
+                } else {
+                    println!("  {} ({})", sensor.name, sensor.reason);
+                }
             }
             println!("skipped:");
             for sensor in &report.skipped {

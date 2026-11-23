@@ -77,6 +77,7 @@ fn soft_failure_is_recorded_as_warn_not_pass() {
     let mut cfg = crate::config::rust_default();
     cfg.sensors = vec![crate::config::SensorSpec {
         kind: None,
+        plugin: None,
         fix: None,
         name: "links".into(),
         argv: vec!["true".into()],
@@ -156,6 +157,7 @@ fn warned_sensor_is_recorded_as_warn_and_fails_summary() {
     let mut cfg = crate::config::rust_default();
     cfg.sensors = vec![crate::config::SensorSpec {
         kind: None,
+        plugin: None,
         fix: None,
         name: "tool".into(),
         argv: vec!["true".into()],

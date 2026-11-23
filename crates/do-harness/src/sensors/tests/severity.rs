@@ -22,6 +22,7 @@ fn severity_config(name: &str, argv: &[&str], severity: SensorSeverity) -> Confi
         signal_sets,
         sensors: vec![SensorSpec {
             kind: None,
+            plugin: None,
             fix: None,
             name: name.to_owned(),
             argv: argv.iter().map(|a| (*a).to_owned()).collect(),

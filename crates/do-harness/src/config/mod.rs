@@ -89,8 +89,8 @@ pub struct HooksConfig {
     pub pre_push: Vec<String>,
 }
 
-mod sensor;
-pub use sensor::{SensorSeverity, SensorSpec};
+pub use do_harness_sensor::{SensorSeverity, SensorSpec};
+pub(crate) use validate::validate_sensor;
 
 /// Language pack identifiers accepted in `Config.language`.
 pub const SUPPORTED_LANGUAGES: &[&str] = &["rust", "generic", "web", "node", "python", "go"];
@@ -110,6 +110,7 @@ fn spec(name: &str, argv: &[&str], when_changed: &[&str]) -> SensorSpec {
     SensorSpec {
         name: name.to_owned(),
         kind: None,
+        plugin: None,
         argv: argv.iter().map(|arg| (*arg).to_owned()).collect(),
         retry: None,
         timeout_justification: None,
@@ -178,6 +179,7 @@ pub fn rust_pack() -> Vec<SensorSpec> {
         ),
         SensorSpec {
             kind: None,
+            plugin: None,
             fix: None,
             name: "coverage".to_owned(),
             argv: vec!["bash".to_owned(), "scripts/check-coverage.sh".to_owned()],
@@ -245,8 +247,10 @@ pub fn load_sync(root: &Path) -> Result<Config> {
     let Ok(text) = std::fs::read_to_string(&path) else {
         return Ok(rust_default());
     };
-    let cfg: Config =
+    let mut cfg: Config =
         toml::from_str(&text).with_context(|| format!("invalid config file {}", path.display()))?;
+    crate::plugins::resolve(&mut cfg.sensors, root)
+        .with_context(|| format!("failed to resolve sensor plugins for {}", path.display()))?;
     cfg.validate()?;
     Ok(cfg)
 }
@@ -273,8 +277,10 @@ pub async fn load_raw(root: &Path, explicit: Option<&Path>) -> Result<(Config, O
     let text = tokio::fs::read_to_string(&path)
         .await
         .with_context(|| format!("failed to read config file {}", path.display()))?;
-    let cfg: Config =
+    let mut cfg: Config =
         toml::from_str(&text).with_context(|| format!("invalid config file {}", path.display()))?;
+    crate::plugins::resolve(&mut cfg.sensors, root)
+        .with_context(|| format!("failed to resolve sensor plugins for {}", path.display()))?;
     cfg.validate()?;
     Ok((cfg, Some(text.into_bytes())))
 }

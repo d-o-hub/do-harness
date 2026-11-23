@@ -20,6 +20,7 @@ fn allow_failure_sensor_does_not_fail_gate_but_surfaces_output() {
         signal_sets: BTreeMap::new(),
         sensors: vec![SensorSpec {
             kind: None,
+            plugin: None,
             fix: None,
             name: "advisory".to_owned(),
             argv: vec![

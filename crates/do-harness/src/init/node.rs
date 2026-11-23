@@ -150,6 +150,7 @@ pub fn probe_node_full(root: &Path) -> NodeProbe {
         if include {
             specs.push(SensorSpec {
                 kind: None,
+                plugin: None,
                 fix: None,
                 name: "typecheck".to_string(),
                 argv,
@@ -206,6 +207,7 @@ pub fn probe_node_full(root: &Path) -> NodeProbe {
         if include {
             specs.push(SensorSpec {
                 kind: None,
+                plugin: None,
                 fix: None,
                 name: "lint".to_string(),
                 argv,
@@ -268,6 +270,7 @@ pub fn probe_node_full(root: &Path) -> NodeProbe {
         if include {
             specs.push(SensorSpec {
                 kind: None,
+                plugin: None,
                 fix: None,
                 name: "test".to_string(),
                 argv,
@@ -317,6 +320,7 @@ pub fn probe_node_full(root: &Path) -> NodeProbe {
         if include {
             specs.push(SensorSpec {
                 kind: None,
+                plugin: None,
                 fix: None,
                 name: "build".to_string(),
                 argv,

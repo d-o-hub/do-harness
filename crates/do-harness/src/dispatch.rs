@@ -1,8 +1,7 @@
 //! CLI dispatch: resolve the workspace root and route each subcommand.
 //!
-//! Extracted from `main.rs` so the binary's entrypoint stays a thin shell and
-//! the dispatch table is not a second, unrelated responsibility on the same
-//! file.
+//! Extracted from `main.rs` so the binary entrypoint stays a thin shell and the
+//! dispatch table is not a second responsibility on the same file.
 
 use anyhow::Context;
 use std::path::{Path, PathBuf};
@@ -234,15 +233,15 @@ async fn route(root: &Path, config_path: Option<PathBuf>, cli: Cli) -> Result<()
             verify::run(root, opts).await
         }
         Command::List(args) => {
-            let (sets, format) = (args.sets, args.format);
             let cfg = config::load(root, config_path.as_deref())
                 .await
                 .map_err(CliError::Usage)?;
-            if sets {
-                report::print_names(&crate::signals::available(&cfg), format)
+            if args.sets {
+                report::print_names(&crate::signals::available(&cfg), args.format)
                     .map_err(CliError::Usage)?;
             } else {
-                report::print_names(&cfg.sensor_names(), format).map_err(CliError::Usage)?;
+                report::print_effective_sensors(cfg.effective_sensors(), args.format)
+                    .map_err(CliError::Usage)?;
             }
             Ok(())
         }

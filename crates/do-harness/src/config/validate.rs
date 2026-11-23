@@ -26,55 +26,7 @@ impl Config {
             .map(|s| s.name.as_str())
             .collect();
         for sensor in &self.sensors {
-            if sensor.timeout == Some(0)
-                && sensor
-                    .timeout_justification
-                    .as_deref()
-                    .is_none_or(|reason| reason.trim().is_empty())
-            {
-                anyhow::bail!(
-                    "sensor '{}' timeout=0 requires timeout-justification",
-                    sensor.name
-                );
-            }
-            if let Some(bytes) = sensor.max_output_bytes {
-                if !(super::MIN_OUTPUT_BYTES..=super::MAX_OUTPUT_BYTES).contains(&bytes) {
-                    anyhow::bail!(
-                        "sensor '{}' max-output-bytes must be between {} and {}",
-                        sensor.name,
-                        super::MIN_OUTPUT_BYTES,
-                        super::MAX_OUTPUT_BYTES
-                    );
-                }
-            }
-            for key in sensor
-                .redact_env
-                .iter()
-                .chain(sensor.environment_allowlist.iter().flatten())
-                .chain(&sensor.environment_inputs)
-            {
-                if key.is_empty()
-                    || !key.bytes().enumerate().all(|(i, b)| {
-                        b == b'_' || b.is_ascii_alphabetic() || (i > 0 && b.is_ascii_digit())
-                    })
-                {
-                    anyhow::bail!(
-                        "sensor '{}' has an invalid environment policy key",
-                        sensor.name
-                    );
-                }
-            }
-            validate_globs(&sensor.name, "when-changed", &sensor.when_changed)?;
-            validate_globs(&sensor.name, "artifacts", &sensor.artifacts)?;
-            validate_globs(&sensor.name, "coverage-inputs", &sensor.coverage_inputs)?;
-            validate_globs(&sensor.name, "inputs", &sensor.inputs)?;
-            if sensor.allow_failure && sensor.severity == Some(SensorSeverity::Error) {
-                anyhow::bail!(
-                    "sensor '{}' sets both allow_failure = true and severity = \"error\"; \
-                     use one severity source",
-                    sensor.name
-                );
-            }
+            validate_sensor(sensor)?;
         }
         validate_repairs(&self.repairs, &known)?;
         for (set, names) in &self.signal_sets {
@@ -100,6 +52,62 @@ impl Config {
         validate_hook_references("hooks.pre-push", &self.hooks.pre_push, &known)?;
         Ok(())
     }
+}
+/// Validates one sensor definition's self-contained policy fields, shared by
+/// `do-harness.toml` `[[sensors]]` entries and plugin manifest `[sensor]`
+/// tables.
+pub(crate) fn validate_sensor(sensor: &do_harness_sensor::SensorSpec) -> Result<()> {
+    if sensor.timeout == Some(0)
+        && sensor
+            .timeout_justification
+            .as_deref()
+            .is_none_or(|reason| reason.trim().is_empty())
+    {
+        anyhow::bail!(
+            "sensor '{}' timeout=0 requires timeout-justification",
+            sensor.name
+        );
+    }
+    if let Some(bytes) = sensor.max_output_bytes {
+        if !(super::MIN_OUTPUT_BYTES..=super::MAX_OUTPUT_BYTES).contains(&bytes) {
+            anyhow::bail!(
+                "sensor '{}' max-output-bytes must be between {} and {}",
+                sensor.name,
+                super::MIN_OUTPUT_BYTES,
+                super::MAX_OUTPUT_BYTES
+            );
+        }
+    }
+    for key in sensor
+        .redact_env
+        .iter()
+        .chain(sensor.environment_allowlist.iter().flatten())
+        .chain(&sensor.environment_inputs)
+    {
+        if key.is_empty()
+            || !key
+                .bytes()
+                .enumerate()
+                .all(|(i, b)| b == b'_' || b.is_ascii_alphabetic() || (i > 0 && b.is_ascii_digit()))
+        {
+            anyhow::bail!(
+                "sensor '{}' has an invalid environment policy key",
+                sensor.name
+            );
+        }
+    }
+    validate_globs(&sensor.name, "when-changed", &sensor.when_changed)?;
+    validate_globs(&sensor.name, "artifacts", &sensor.artifacts)?;
+    validate_globs(&sensor.name, "coverage-inputs", &sensor.coverage_inputs)?;
+    validate_globs(&sensor.name, "inputs", &sensor.inputs)?;
+    if sensor.allow_failure && sensor.severity == Some(SensorSeverity::Error) {
+        anyhow::bail!(
+            "sensor '{}' sets both allow_failure = true and severity = \"error\"; \
+             use one severity source",
+            sensor.name
+        );
+    }
+    Ok(())
 }
 
 /// Validates project-policy mechanical repairs against the known sensors.

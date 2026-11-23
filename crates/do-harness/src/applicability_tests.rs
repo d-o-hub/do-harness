@@ -9,6 +9,7 @@ use std::path::Path;
 fn spec(name: &str, when_changed: &[&str]) -> SensorSpec {
     SensorSpec {
         kind: None,
+        plugin: None,
         fix: None,
         name: name.to_owned(),
         argv: vec!["true".to_owned()],

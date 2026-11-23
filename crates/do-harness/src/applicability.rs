@@ -17,6 +17,9 @@ pub struct Selected {
     pub name: String,
     /// Why it was selected (matching pattern, no constraint, fail-closed).
     pub reason: String,
+    /// Plugin this sensor resolved from, when it is a plugin sensor.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub plugin: Option<String>,
 }
 
 /// A sensor the current change does not require, with its skip reason.
@@ -70,6 +73,7 @@ pub fn select(candidates: &[&SensorSpec], changed: &ChangedFiles) -> Selection {
             selection.selected.push(Selected {
                 name: spec.name.clone(),
                 reason: reason.clone(),
+                plugin: spec.plugin.clone(),
             });
         }
         return selection;
@@ -96,6 +100,7 @@ pub fn select(candidates: &[&SensorSpec], changed: &ChangedFiles) -> Selection {
             selection.selected.push(Selected {
                 name: spec.name.clone(),
                 reason: "no applicability constraint (`when-changed` unset)".to_owned(),
+                plugin: spec.plugin.clone(),
             });
             continue;
         }
@@ -105,6 +110,7 @@ pub fn select(candidates: &[&SensorSpec], changed: &ChangedFiles) -> Selection {
             selection.selected.push(Selected {
                 name: spec.name.clone(),
                 reason: FAIL_CLOSED_REASON.to_owned(),
+                plugin: spec.plugin.clone(),
             });
             continue;
         }
@@ -116,6 +122,7 @@ pub fn select(candidates: &[&SensorSpec], changed: &ChangedFiles) -> Selection {
             Some((pattern, _)) => selection.selected.push(Selected {
                 name: spec.name.clone(),
                 reason: format!("matched `{pattern}`"),
+                plugin: spec.plugin.clone(),
             }),
             None => selection.skipped.push(Skipped {
                 name: spec.name.clone(),

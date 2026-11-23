@@ -413,6 +413,27 @@ pub fn print_names(names: &[String], format: Format) -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Prints effective sensor names, annotating plugin sensors with `(plugin)`
+/// in text output; JSON stays the plain name list so structured consumers are
+/// unaffected.
+pub fn print_effective_sensors(
+    sensors: &[do_harness_sensor::SensorSpec],
+    format: Format,
+) -> anyhow::Result<()> {
+    if matches!(format, Format::Text) {
+        for spec in sensors {
+            if spec.plugin.is_some() {
+                println!("{} (plugin)", spec.name);
+            } else {
+                println!("{}", spec.name);
+            }
+        }
+        return Ok(());
+    }
+    let names: Vec<String> = sensors.iter().map(|s| s.name.clone()).collect();
+    println!("{}", json_compact(&names)?);
+    Ok(())
+}
 #[cfg(test)]
 mod tests {
     #![allow(clippy::unwrap_used, clippy::expect_used)]

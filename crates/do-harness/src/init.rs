@@ -310,6 +310,7 @@ const RELEASE_PIN_GLOBS: &[&str] = &["VERSION", "Cargo.toml", "**/Cargo.toml", "
 fn release_preflight_spec() -> crate::config::SensorSpec {
     crate::config::SensorSpec {
         kind: None,
+        plugin: None,
         fix: None,
         name: "release-preflight".to_owned(),
         argv: vec![

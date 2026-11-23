@@ -26,6 +26,7 @@ fn retries_failing_sensor_until_success() {
         signal_sets: BTreeMap::new(),
         sensors: vec![SensorSpec {
             kind: None,
+            plugin: None,
             fix: None,
             name: "flaky".to_owned(),
             argv: vec!["sh".to_owned(), "-c".to_owned(), script],
@@ -84,6 +85,7 @@ fn times_out_hanging_sensor() {
         signal_sets: BTreeMap::new(),
         sensors: vec![SensorSpec {
             kind: None,
+            plugin: None,
             fix: None,
             name: "hang".to_owned(),
             argv: vec!["sleep".to_owned(), "10".to_owned()],
@@ -146,6 +148,7 @@ fn transient_exit_codes_restricts_retries() {
         signal_sets: BTreeMap::new(),
         sensors: vec![SensorSpec {
             kind: None,
+            plugin: None,
             fix: None,
             name: "transient_check".to_owned(),
             argv: vec!["sh".to_owned(), "-c".to_owned(), script],

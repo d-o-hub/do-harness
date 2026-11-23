@@ -66,6 +66,7 @@ mod methods;
 mod metrics;
 mod migrate;
 mod overlap;
+mod plugins;
 mod pr;
 mod provenance;
 mod redaction;

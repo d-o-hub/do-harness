@@ -218,6 +218,7 @@ mod tests {
     fn spec(name: &str) -> SensorSpec {
         SensorSpec {
             kind: None,
+            plugin: None,
             fix: None,
             name: name.to_owned(),
             argv: vec!["true".to_owned()],
@@ -272,6 +273,7 @@ mod tests {
             selected: vec![crate::applicability::Selected {
                 name: "fmt".to_owned(),
                 reason: "matched src/**".to_owned(),
+                plugin: None,
             }],
             skipped: vec![],
             changes: crate::changes::ChangeSelection::default(),

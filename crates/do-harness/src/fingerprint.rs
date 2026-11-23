@@ -283,6 +283,7 @@ mod tests {
             signal_sets: std::collections::BTreeMap::new(),
             sensors: vec![SensorSpec {
                 kind: None,
+                plugin: None,
                 fix: None,
                 name: "a".to_owned(),
                 argv: vec!["true".to_owned()],

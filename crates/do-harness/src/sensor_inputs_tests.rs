@@ -7,6 +7,7 @@ use super::*;
 fn spec(inputs: &[&str]) -> SensorSpec {
     SensorSpec {
         kind: None,
+        plugin: None,
         fix: None,
         name: "probe".to_owned(),
         argv: vec!["true".to_owned()],

@@ -6,6 +6,7 @@ use std::fs;
 fn spec(argv: &[&str]) -> SensorSpec {
     SensorSpec {
         kind: None,
+        plugin: None,
         fix: None,
         name: "probe".to_owned(),
         argv: argv.iter().map(|a| (*a).to_owned()).collect(),

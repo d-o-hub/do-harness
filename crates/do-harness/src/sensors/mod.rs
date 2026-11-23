@@ -455,6 +455,7 @@ pub fn resolve_selection<'a>(
         .map(|spec| crate::applicability::Selected {
             name: spec.name.clone(),
             reason: crate::applicability::UNFILTERED_REASON.to_owned(),
+            plugin: spec.plugin.clone(),
         })
         .collect();
     Ok(ResolvedSelection {

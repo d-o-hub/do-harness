@@ -199,6 +199,7 @@ fn go_spec(name: &str, argv: Vec<String>, globs: &[String]) -> SensorSpec {
     SensorSpec {
         name: name.to_owned(),
         kind: None,
+        plugin: None,
         argv,
         retry: None,
         timeout_justification: None,

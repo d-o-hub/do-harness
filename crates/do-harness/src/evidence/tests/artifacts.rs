@@ -15,6 +15,7 @@ fn artifacts_and_coverage_are_recorded() {
     let mut cfg = crate::config::rust_default();
     cfg.sensors = vec![crate::config::SensorSpec {
         kind: None,
+        plugin: None,
         fix: None,
         name: "web".into(),
         argv: vec!["true".into()],
@@ -101,6 +102,7 @@ fn missing_declared_artifact_records_warn() {
     let mut cfg = crate::config::rust_default();
     cfg.sensors = vec![crate::config::SensorSpec {
         kind: None,
+        plugin: None,
         fix: None,
         name: "web".into(),
         argv: vec!["true".into()],

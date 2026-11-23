@@ -237,6 +237,7 @@ mod tests {
     fn spec(name: &str, argv: &[&str]) -> SensorSpec {
         SensorSpec {
             kind: None,
+            plugin: None,
             fix: None,
             name: name.to_owned(),
             argv: argv.iter().map(|a| (*a).to_owned()).collect(),
