@@ -101,7 +101,7 @@ def run_resume_case(case, workflow, command, budgets, allowed, shared_target=Non
     budget; the next session continues from that state instead of restarting,
     and the shared wall budget is never renewed.
     """
-    from .runner import (EXIT_ACTION, environment, grade, parse_adapter_usage,
+    from .runner import (EXIT_ACTION, grade, parse_adapter_usage,
                          write_files, workspace_digest)
 
     started = time.monotonic()
