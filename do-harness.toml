@@ -467,11 +467,23 @@ name = "workflow-benchmark"
 argv = ["python3", "scripts/workflow-benchmark.py", "--self-test"]
 # Self-tests now also cover usage-provenance fail-closed validation, budget
 # profile bounds, resume sessions, per-arm identity reproducibility, and the
-# adopter grader failure detection (18 tests). Measured ~81s on an 8-core
-# box, leaving ~40s of headroom under the 120s ceiling; profile and full
-# fixture-mode suites run separately outside this sensor.
+# adopter grader failure detection. Measured ~81s on an 8-core
+# box, leaving ~40s under the 120s ceiling. The complete adopter
+# corpus runs in the dedicated `workflow-adopter-benchmark` sensor.
 timeout = 120
 when-changed = ["benchmarks/**", "scripts/workflow-benchmark.py", "scripts/workflow_benchmark/**", "do-harness.toml"]
+
+[[sensors]]
+name = "workflow-adopter-benchmark"
+argv = ["python3", "scripts/workflow-benchmark.py", "--corpus", "benchmarks/adopter-v1.json"]
+timeout = 300
+when-changed = [
+    "benchmarks/adopter-v1.json",
+    "benchmarks/fixtures/adopter-v1/**",
+    "scripts/workflow-benchmark.py",
+    "scripts/workflow_benchmark/**",
+    "do-harness.toml",
+]
 
 [[sensors]]
 name = "fresh-context-decision"

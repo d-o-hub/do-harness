@@ -178,7 +178,7 @@
   },
   "protocol": {
     "counterbalancing": "alternating per-case pair order (control first on even case index)",
-    "decision_rule": "go if the treatment advantage exceeds tolerance with a 95% confidence interval excluding zero; no-go if the interval favors control; otherwise inconclusive",
+    "decision_rule": "go only if the treatment advantage's 95% confidence interval lies entirely above max(tolerance, minimum_effect); no-go if the interval favors control (upper bound below zero); otherwise inconclusive",
     "design": "paired comparison; arms differ by exactly one declared feature",
     "effect": {
       "metric": "final_success_rate",

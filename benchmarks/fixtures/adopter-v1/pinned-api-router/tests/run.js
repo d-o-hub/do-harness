@@ -1,7 +1,7 @@
 // Test runner for the adopter corpus. Prints one JSON object with a boolean
 // for each case target plus the shared regression result.
 import { Router } from "../src/router.js";
-import { normalize } from "../src/validate.js";
+import { validate, normalize } from "../src/validate.js";
 import { Cache } from "../src/cache.js";
 
 const routes = [

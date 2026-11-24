@@ -27,6 +27,8 @@ MAX_FILES = 128
 MAX_FILE_BYTES = 1048576
 USAGE_CAPS = {"token_cost": 10**12, "currency_cost": 10**9, "context_bytes": 10**12}
 MAX_MODEL_LEN = 128
+MAX_PROTOCOL_REPEATS = 30
+PROFILE_CAPS = {"wall_seconds": 3600, "max_attempts": 10, "output_bytes": MAX_FILE_BYTES}
 
 
 def digest(value):
@@ -39,14 +41,9 @@ def load_corpus(path, profile=None):
         raise ValueError("invalid budget types")
     if profile is not None:
         profiles = data.get("profiles", {})
-        if profile not in profiles:
+        if not isinstance(profiles, dict) or profile not in profiles:
             raise ValueError("unknown budget profile")
         budget = dict(profiles[profile])
-        authorized = profiles[profile].get("max_authorized", {})
-        for key in ("wall_seconds", "max_attempts", "output_bytes"):
-            if (type(budget[key]) is not int or not 1 <= budget[key]
-                    or budget[key] > authorized.get(key, budget[key])):
-                raise ValueError("profile exceeds authorized bounds")
     if (data["schema_version"] != 1 or data["rubric_version"] != 1
             or not 1 <= len(data["cases"]) <= 64):
         raise ValueError("invalid corpus")
@@ -56,38 +53,57 @@ def load_corpus(path, profile=None):
             or not 512 <= budget["output_bytes"] <= MAX_FILE_BYTES):
         raise ValueError("invalid corpus")
     if "profiles" in data:
+        if not isinstance(data["profiles"], dict):
+            raise ValueError("invalid budget profile")
         for name, spec in data["profiles"].items():
-            if (type(spec.get("wall_seconds")) is not int
+            authorized = spec.get("max_authorized") if isinstance(spec, dict) else None
+            if (not isinstance(spec, dict)
+                    or type(spec.get("wall_seconds")) is not int
                     or type(spec.get("max_attempts")) is not int
                     or type(spec.get("output_bytes")) is not int
                     or spec["wall_seconds"] <= 0
                     or spec["max_attempts"] <= 0
                     or spec["output_bytes"] <= 0
                     or not isinstance(spec.get("recorded_from"), str)
-                    or not isinstance(spec.get("max_authorized"), dict)):
+                    or not isinstance(authorized, dict)
+                    or any(type(authorized.get(key)) is not int or authorized[key] <= 0
+                           for key in PROFILE_CAPS)):
                 raise ValueError("invalid budget profile")
+            if any(spec[key] > min(authorized[key], PROFILE_CAPS[key])
+                   for key in PROFILE_CAPS):
+                raise ValueError("profile exceeds authorized bounds")
     protocol = data.get("protocol")
     if protocol is not None:
         effect = protocol.get("effect", {})
         sample = protocol.get("sample_size", {})
-        if (not isinstance(protocol.get("repeats"), int) or protocol["repeats"] < 1
+        if (type(protocol.get("repeats")) is not int
+                or not 1 <= protocol["repeats"] <= MAX_PROTOCOL_REPEATS
                 or not isinstance(effect.get("tolerance"), (int, float))
                 or not 0 <= effect["tolerance"] <= 1
                 or not isinstance(effect.get("minimum_effect"), (int, float))
+                or not 0 <= effect["minimum_effect"] <= 1
                 or not isinstance(protocol.get("stopping_rule"), str)
                 or not isinstance(protocol.get("decision_rule"), str)
                 or not isinstance(protocol.get("exclusions"), list)
-                or not isinstance(sample.get("planned_per_arm"), int)):
+                or any(not isinstance(exclusion, str) or not exclusion
+                       for exclusion in protocol["exclusions"])
+                or type(sample.get("planned_per_arm")) is not int
+                or sample["planned_per_arm"] < 1):
             raise ValueError("invalid protocol")
+    repos = set()
     if "fixtures" in data:
         if not verify_fixture_manifest():
             raise ValueError("fixture manifest mismatch")
         repos = manifest_repos()
     ids = set()
     for case in data["cases"]:
-        if case["id"] in ids or case["expected"] not in EXIT_ACTION:
+        case_id = case.get("id")
+        if (not isinstance(case_id, str) or not case_id
+                or any(char not in "abcdefghijklmnopqrstuvwxyz0123456789-" for char in case_id)
+                or case_id.startswith("-") or case_id.endswith("-")
+                or case_id in ids or case["expected"] not in EXIT_ACTION):
             raise ValueError("invalid case")
-        ids.add(case["id"])
+        ids.add(case_id)
         if len(case["description"]) > 2000:
             raise ValueError("oversized task")
         if not case["control"] or not case["treatment"]:
@@ -120,14 +136,16 @@ def parse_adapter_usage(raw_output):
     if not isinstance(obj, dict):
         return None, "provider usage unavailable in adapter protocol"
     numeric = {"token_cost": int, "currency_cost": float, "context_bytes": int}
+    integer_fields = {"token_cost", "context_bytes"}
     usage = {}
     for name, cast in numeric.items():
         if name not in obj:
             continue
         value = obj[name]
-        if isinstance(value, bool) or not isinstance(value, (int, float)):
-            return None, "invalid adapter usage payload"
-        if not math.isfinite(float(value)) or value < 0 or value > USAGE_CAPS[name]:
+        if (isinstance(value, bool) or not isinstance(value, (int, float))
+                or (name in integer_fields and type(value) is not int)
+                or value < 0 or value > USAGE_CAPS[name]
+                or (isinstance(value, float) and not math.isfinite(value))):
             return None, "invalid adapter usage payload"
         usage[name] = cast(value) if name != "currency_cost" else float(value)
     model = obj.get("model")
@@ -226,7 +244,8 @@ def run_case(case, workflow, command, budgets, allowed, shared_target=None):
         case_context_bytes = None
         case_model = None
         usage_reason = None
-        build_ms = None
+        unsupported_before_interaction = False
+        build_ms = prior["build_ms"]
         for attempt in range(1, budgets["max_attempts"] + 1):
             if command is None:
                 patches = case[workflow]
@@ -255,8 +274,13 @@ def run_case(case, workflow, command, budgets, allowed, shared_target=None):
                     elif usage_reason is None:
                         usage_reason = reason_usage
             verification_started = time.monotonic()
-            result = grade(case, root, deadline - time.monotonic(), budgets["output_bytes"],
-                           shared_target)
+            result = grade(case, root, deadline - time.monotonic(),
+                           budgets["output_bytes"], shared_target)
+            if (command is not None and code == EXIT_ACTION["unsupported"]
+                    and initial is not None and workspace_digest(root) == initial):
+                unsupported_before_interaction = True
+            if result["build_ms"] is not None:
+                build_ms = (build_ms or 0) + result["build_ms"]
             verification_seconds += time.monotonic() - verification_started
             checks += 1
             regression |= not result["regressions"]
@@ -272,7 +296,8 @@ def run_case(case, workflow, command, budgets, allowed, shared_target=None):
             if failure:
                 reason = failure
                 break
-            feedback = [key + "-failed" for key, ok in result.items() if not ok]
+            feedback = [key + "-failed" for key in ("target", "regressions")
+                        if result[key] is False]
         if usage_reason is None and command is None:
             usage_reason = "unmeasured-fixture"
         elif usage_reason is None and case_token_cost is None:
@@ -297,6 +322,7 @@ def run_case(case, workflow, command, budgets, allowed, shared_target=None):
                 "usage_reason": usage_reason,
                 "usage_provenance": provenance,
                 "build_ms": build_ms,
+                "unsupported_before_interaction": unsupported_before_interaction,
                 "sessions": 1, "resumed": False}
 
 
@@ -310,16 +336,28 @@ def benchmark(data, baseline=None, treatment=None, allowed=(), model_version=Non
     if any(case.get("repo") for case in data["cases"]):
         shared_target = tempfile.TemporaryDirectory(prefix="adopter-target-")
     # Alternate paired order to avoid always assigning the first run to control.
+    repeat_count = (data.get("protocol", {}).get("repeats", 1)
+                    if baseline is not None else 1)
+    if resume_dir is not None:
+        Path(resume_dir).mkdir(parents=True, exist_ok=True)
     for index, case in enumerate(data["cases"]):
-        order = ("control", "treatment") if index % 2 == 0 else ("treatment", "control")
-        for workflow in order:
-            runner_fn = run_resume_case if case.get("resume") else run_case
-            row = runner_fn(case, workflow, commands[workflow], data["budgets"], allowed,
-                            shared_target.name if shared_target else None, resume_dir) \
-                if case.get("resume") else run_case(case, workflow, commands[workflow],
-                                                    data["budgets"], allowed,
-                                                    shared_target.name if shared_target else None)
-            rows[workflow].append(row)
+        for repeat in range(1, repeat_count + 1):
+            order = (("control", "treatment")
+                     if (index + repeat - 1) % 2 == 0 else ("treatment", "control"))
+            for workflow in order:
+                case_resume_dir = resume_dir
+                if case.get("resume") and resume_dir is not None and repeat_count > 1:
+                    case_resume_dir = Path(resume_dir) / f"repeat-{repeat}"
+                    case_resume_dir.mkdir(parents=True, exist_ok=True)
+                if case.get("resume"):
+                    row = run_resume_case(case, workflow, commands[workflow], data["budgets"],
+                                          allowed, shared_target.name if shared_target else None,
+                                          case_resume_dir)
+                else:
+                    row = run_case(case, workflow, commands[workflow], data["budgets"],
+                                   allowed, shared_target.name if shared_target else None)
+                row["repeat"] = repeat
+                rows[workflow].append(row)
     if shared_target is not None:
         shared_target.cleanup()
     env = environment()
@@ -384,8 +422,37 @@ def benchmark(data, baseline=None, treatment=None, allowed=(), model_version=Non
     if data.get("protocol"):
         report["protocol"] = data["protocol"]
         if baseline is not None:
-            report["decision"] = decide(data["protocol"], report["workflows"]["control"],
-                                        report["workflows"]["treatment"])
+            treatment_by_key = {
+                (row["case_id"], row["repeat"]): row for row in rows["treatment"]
+            }
+            paired = {"control": [], "treatment": []}
+            for control_row in rows["control"]:
+                key = (control_row["case_id"], control_row["repeat"])
+                treatment_row = treatment_by_key.get(key)
+                if (treatment_row is None
+                        or control_row["unsupported_before_interaction"]
+                        or treatment_row["unsupported_before_interaction"]):
+                    continue
+                paired["control"].append(control_row)
+                paired["treatment"].append(treatment_row)
+            if paired["control"]:
+                decision = decide(
+                    data["protocol"],
+                    {"summary": summarize(paired["control"])},
+                    {"summary": summarize(paired["treatment"])},
+                )
+            else:
+                effect = data["protocol"]["effect"]
+                decision = {
+                    "decision": "inconclusive",
+                    "rationale": "all paired cases were excluded as unsupported before interaction",
+                    "estimated_delta_95_interval": None,
+                    "tolerance": effect["tolerance"],
+                    "minimum_effect": effect["minimum_effect"],
+                }
+            decision["repeats"] = repeat_count
+            decision["paired_samples"] = len(paired["control"])
+            report["decision"] = decision
     if data.get("fixtures"):
         try:
             report["fixture_manifest_sha256"] = json.loads(

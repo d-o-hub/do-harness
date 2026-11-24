@@ -170,9 +170,10 @@ def build_corpus():
                 "ambiguity with the predeclared tolerance"
             ),
             "decision_rule": (
-                "go if the treatment advantage exceeds tolerance with a 95% "
-                "confidence interval excluding zero; no-go if the interval "
-                "favors control; otherwise inconclusive"
+                "go only if the treatment advantage's 95% confidence interval "
+                "lies entirely above max(tolerance, minimum_effect); no-go if "
+                "the interval favors control (upper bound below zero); "
+                "otherwise inconclusive"
             ),
         },
         "fixtures": {

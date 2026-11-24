@@ -35,7 +35,7 @@ CASES = {
     "adopter-node-unsupported": {"kind": "node-trivial"},
 }
 
-POLICY_BANNED = "#[allow("
+POLICY_BANNED = ("#[allow(", "legacy_fallback")
 
 
 def rust_grade(root, target, shared_target):
@@ -58,7 +58,8 @@ def rust_grade(root, target, shared_target):
 
 def policy_scan(root):
     for path in sorted((root / "src").rglob("*.rs")):
-        if POLICY_BANNED in path.read_text():
+        source = path.read_text()
+        if any(banned in source for banned in POLICY_BANNED):
             return False
     return True
 

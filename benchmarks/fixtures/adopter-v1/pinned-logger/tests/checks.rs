@@ -102,15 +102,20 @@ mod target_edit_after_green {
         let second = format::timestamp(123456);
         assert_eq!(first, second);
     }
-    fn legacy_fallback_is_removed_under_new_policy() {
-        // The new policy bans `#[allow(dead_code)]` blocks. The runner's
-        // grader additionally scans the source tree for `#[allow(`. The
-        // behavioral contract under the policy: the legacy helper is gone
-        // and the crate still builds with no allow-attributes.
-        let _ = level::is_allowed('E', 'E');
+}
+
+mod target_policy_invalidation {
+    use super::*;
+
+    #[test]
+    fn policy_cleanup_preserves_logging_behavior() {
+        assert!(level::is_allowed('E', 'E'));
         let mut sink = Sink::new(Format::Text);
         sink.emit("[0000-00:00:00] E gone".to_string());
-        assert_eq!(sink.drain().len(), 1);
+        assert_eq!(
+            sink.drain(),
+            vec!["[0000-00:00:00] E gone".to_string()]
+        );
     }
 }
 
