@@ -34,7 +34,8 @@ detect corruption, not a compromised origin; verify them out of band when that
 matters.
 
 Supported platforms: Linux x86_64/aarch64 (static musl), macOS x86_64/arm64,
-and Windows x86_64. **Windows is not installable through npm** — see below.
+and Windows x86_64. **Windows npm installs download the release binary on
+first run** — see below.
 Other platforms install from source: `cargo install --path crates/do-harness`
 (Rust 1.85+).
 
@@ -47,18 +48,30 @@ tarballs only. `install.sh` detects Git Bash (`MINGW*`/`MSYS*`/
 to extract). The `windows-latest` CI job proves the installer (including the
 zip path), `hook install`/`status`, and `doctor` on every push.
 
-**Windows via npm is unavailable.** The `do-harness-win32-x64` platform
-package is rejected by the npm registry's name screening (HTTP 403, "Package
-name triggered spam detection"), so `npx do-harness` and
-`npm install do-harness` cannot resolve a Windows binary. Two consequences
-worth knowing, because neither is obvious:
+**Windows via npm downloads the release binary.** The `do-harness-win32-x64`
+platform package is rejected by the npm registry's name screening (HTTP 403,
+"Package name triggered spam detection"), so the wrapper's pinned platform
+package never resolves. Instead, the first `npx do-harness ...` run on
+Windows x64:
 
-- `npm install do-harness` still **succeeds** on Windows. An absent optional
-  dependency is not an install error, so the meta package installs and then
-  fails at run time with guidance pointing at the release zip.
-- The channel that works is a GitHub release: either the installer above, or
-  download `do-harness-v<version>-x86_64-pc-windows-msvc.zip` plus
-  `checksums.txt` and unzip `do-harness.exe` yourself.
+- fetches `checksums.txt` and
+  `do-harness-v<version>-x86_64-pc-windows-msvc.zip` from the GitHub release
+  matching the wrapper's own version;
+- verifies the zip's SHA-256 against its `checksums.txt` entry and fails
+  closed on a mismatch or a missing entry — nothing is executed;
+- extracts `do-harness.exe` and caches it under
+  `%LOCALAPPDATA%\do-harness\do-harness\v<version>\`;
+- reuses the verified cache on later runs (no re-download).
+
+There is no `postinstall` script: nothing runs at install time, so
+`npm install do-harness` still just **succeeds** on Windows (an absent
+optional dependency is not an install error) — the fetch happens at the first
+invocation instead. Set `DO_HARNESS_NO_DOWNLOAD=1` to disable the fetch and
+get the release-zip guidance below. If you prefer a fully offline install, or
+the fetch is unavailable, the release zip remains supported: either the
+installer above, or download
+`do-harness-v<version>-x86_64-pc-windows-msvc.zip` plus `checksums.txt` and
+unzip `do-harness.exe` yourself.
 
 Source builds on Windows need: the Visual Studio Build Tools C++ workload
 (MSVC `link.exe` + Windows SDK libraries) and LLVM/Clang (`libclang` for the

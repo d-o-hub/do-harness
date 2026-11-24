@@ -54,18 +54,22 @@ release"). Nothing publishes unless the tagged commit passes the full release se
 - npm Trusted Publisher setup is per existing package. If a package has not
   been published yet, perform a one-time authenticated bootstrap publish first;
   npm exposes its **Settings → Trusted Publisher** page only afterward.
-- **Windows ships through GitHub Releases only, not npm.**
+- **Windows ships through GitHub Releases, not an npm platform package.**
   `do-harness-win32-x64` is rejected by npm's registry name screening (HTTP
   403, "Package name triggered spam detection"), so no Windows package exists
-  and `npx do-harness` cannot resolve a binary on Windows. The `v0.1.1` release
-  ships `do-harness-v<version>-x86_64-pc-windows-msvc.zip`; that zip (or the
-  installer, or `cargo install`) is the Windows install path.
-  `integrations/npm/lib/platform.js` records the unavailable package so the
-  shim exits with release guidance. The meta package is still published: its
-  Windows pin is inert elsewhere (npm filters an `optionalDependency` by
+  on npm. The wrapper therefore downloads the release binary on first run:
+  the shim fetches `do-harness-v<version>-x86_64-pc-windows-msvc.zip` and
+  `checksums.txt` from the matching release, verifies the zip's SHA-256
+  (fails closed on a mismatch or a missing entry), and caches the extracted
+  `do-harness.exe` under `%LOCALAPPDATA%\do-harness`; there is no
+  `postinstall` script. `integrations/npm/lib/platform.js` records the
+  unavailable package so the shim can distinguish this case and still fall
+  back to release guidance when the fetch is disabled
+  (`DO_HARNESS_NO_DOWNLOAD=1`) or fails. The meta package is still published:
+  its Windows pin is inert elsewhere (npm filters an `optionalDependency` by
   `os`/`cpu` before fetching) and a Windows `npm install` succeeds silently,
-  leaving the shim to print the actionable error. Revisit only if npm clears
-  the name; a coordinated rename is the fallback.
+  leaving the shim to download or print the actionable error. Revisit only if
+  npm clears the name; a coordinated rename is the fallback.
 - **Bootstrap is done for `do-harness` (2026-09-17).** A package must exist
   before npm exposes its Trusted Publisher, and OIDC cannot create a new name,
   so the first publish of any *new* package needs one authenticated publish.
@@ -381,7 +385,7 @@ completions change when the CLI surface does, and `prepare` regenerates the page
       meta package would break `npx do-harness` for every Linux/macOS user. A
       trusted publisher whose permissions lack `npm publish` fails the job at
       the first package instead, naming the package and the remedy. See
-      "Windows has no npm channel" above.
+      "Windows has no platform package on npm" above.
     - `release` — publishes the tarballs, the Windows zip, and `checksums.txt`
       via `gh release create --notes-file`; an existing Release has its assets and
       body replaced, so a repeated run is idempotent. It runs only after `publish`
@@ -828,17 +832,20 @@ missing/unsupported-platform diagnostics.
 
 | Channel | Command | Windows |
 |---------|---------|---------|
-| npx (zero install) | `npx do-harness init` | no (package unavailable) |
-| npm dev dependency | `npm install -D do-harness && npx do-harness verify` | no |
+| npx (zero install) | `npx do-harness init` | yes (first-run download, fail-closed checksum verification) |
+| npm dev dependency | `npm install -D do-harness && npx do-harness verify` | yes (same wrapper path) |
 | Prebuilt installer | `curl -fsSL .../scripts/install.sh \| sh -s -- --version v0.2.1` | yes (Git Bash) |
 | Release zip | unzip `do-harness-v<version>-x86_64-pc-windows-msvc.zip` | yes |
 | cargo-binstall | `cargo binstall do-harness` | yes |
 | crates.io source build | `cargo install do-harness --version 0.3.0 --locked` | yes |
 | Vendored source | `cargo install --path vendor/do-harness/crates/do-harness` | yes |
 
-Windows has no npm channel: the `do-harness-win32-x64` platform package is
-blocked at the registry (HTTP 403 name screening), so both npm rows above are
-Linux/macOS-only. Use the installer, the release zip, or a cargo channel.
+Windows has no platform package on npm: the `do-harness-win32-x64` name is
+blocked at the registry (HTTP 403 name screening). The npm rows above still
+work on Windows because the wrapper downloads the release binary on first run
+(fail-closed SHA-256 verification against the release `checksums.txt`, cached
+under `%LOCALAPPDATA%\do-harness`); see docs/adoption.md#windows. Use the
+installer, the release zip, or a cargo channel for fully offline installs.
 
 For git hooks with an npm install, point `DO_HARNESS_BIN` at
 `node_modules/.bin/do-harness` (the shim forwards arguments to the platform
