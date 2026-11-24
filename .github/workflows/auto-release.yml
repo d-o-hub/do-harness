@@ -10,7 +10,7 @@ name: auto-release
 #                   -> ship:    once that version is on main with no tag, create
 #                      the tag and start the release pipeline.
 #
-# A derivation can change while a proposal is open: a breaking change turns a
+# A derivation can change while a proposal is open: a feature can turn a
 # patch proposal into a minor one. The proposed version is in the branch name, so
 # a proposal the derivation no longer produces is closed as superseded instead of
 # being left beside the live one — at most one automation-owned proposal is open.
@@ -218,6 +218,7 @@ jobs:
           # does not belong inside the script text (the same rule
           # `.github/workflows/contributor-check.yml` states for its inputs).
           BASIS: ${{ steps.derive.outputs.basis }}
+          BREAKING: ${{ steps.derive.outputs.breaking }}
         run: |
           set -euo pipefail
           version="${{ steps.derive.outputs.next }}"
@@ -242,6 +243,9 @@ jobs:
             printf "Derived from %s release-worthy commits (%s total) since the last release tag \`%s\`, per " \
               "${{ steps.derive.outputs.release_worthy }}" "${{ steps.derive.outputs.commits }}" "$BASIS"
             printf "[the version-derivation policy](docs/releasing.md#cutting-a-release).\n\n"
+            if [ "$BREAKING" = true ]; then
+              printf 'The commit range declares breaking changes. Record migration steps in the release notes.\n\n'
+            fi
             printf "The version is derived, not hand-picked: edit the version in this pull "
             printf "request to override it, because \`ship\` tags whatever version is on \`main\`.\n"
             printf "The override lives in the open pull request, not on the branch: a later "
