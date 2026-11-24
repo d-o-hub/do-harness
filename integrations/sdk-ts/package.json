@@ -1,0 +1,40 @@
+{
+  "name": "do-harness-sdk",
+  "version": "0.4.8",
+  "description": "Typed TypeScript/JavaScript bindings for the do-harness agent harness CLI",
+  "license": "MIT",
+  "type": "module",
+  "main": "./lib/sdk.mjs",
+  "types": "./index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "import": "./lib/sdk.mjs"
+    }
+  },
+  "files": [
+    "lib/",
+    "index.d.ts",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node --test \"test/**/*.test.mjs\""
+  },
+  "keywords": [
+    "agent",
+    "harness",
+    "verification",
+    "sdk"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/d-o-hub/do-harness.git"
+  },
+  "bugs": {
+    "url": "https://github.com/d-o-hub/do-harness/issues"
+  },
+  "homepage": "https://github.com/d-o-hub/do-harness"
+}

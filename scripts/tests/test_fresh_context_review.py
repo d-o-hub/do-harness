@@ -182,6 +182,27 @@ class FreshContextReviewTests(unittest.TestCase):
         record = run_case(scenario="timeout", limit_timeout=2)
         self.assertEqual(record["outcome"], "timeout")
 
+    def test_external_response_requires_findings_array(self):
+        for response in ("{}", "[]", '{"findings": null}'):
+            with self.subTest(response=response):
+                record = reviewer_mod.run_reviewer(
+                    [sys.executable, "-c", f"print({response!r})"], "{}",
+                    repo=REPO, timeout_s=5, max_output_bytes=1024,
+                    max_findings=3, marker=LEAK_MARKER,
+                )
+                self.assertEqual(record["outcome"], "failure")
+                self.assertEqual(record["error_kind"], "invalid_findings")
+
+    def test_timeout_records_partial_output_without_crashing(self):
+        program = f"import time; print({LEAK_MARKER!r}, flush=True); time.sleep(5)"
+        record = reviewer_mod.run_reviewer(
+            [sys.executable, "-c", program], "{}",
+            repo=REPO, timeout_s=1, max_output_bytes=1024,
+            max_findings=3, marker=LEAK_MARKER,
+        )
+        self.assertEqual(record["outcome"], "timeout")
+        self.assertTrue(record["marker_leaked"])
+
     def test_unavailable_capability_is_not_run(self):
         record = run_case(scenario="unavailable")
         self.assertEqual(record["outcome"], "not_run")

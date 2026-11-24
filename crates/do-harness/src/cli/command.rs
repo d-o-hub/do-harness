@@ -13,7 +13,7 @@ use crate::report::Format;
 use super::LearnArgs;
 use super::actions::{
     CleanupArgs, DoctorAction, ErrorsAction, FeedbackAction, HookAction, JobAction, MetricsAction,
-    PrAction, SkillsAction, TaskAction, TraceAction,
+    PrAction, SetupAction, SkillsAction, TaskAction, TraceAction,
 };
 
 /// Available subcommands.
@@ -62,9 +62,13 @@ pub enum Command {
         /// Exclude named sensors from the run.
         #[arg(long = "exclude", action = ArgAction::Append, value_name = "SENSOR")]
         exclude: Vec<String>,
-        /// Maximum sensors in flight (overrides `jobs` in do-harness.toml).
+        /// Maximum workspace concurrency with `--workspaces`; otherwise the
+        /// maximum sensors in flight (overrides `jobs` in do-harness.toml).
         #[arg(long, value_name = "N")]
         jobs: Option<usize>,
+        /// Select workspace directories or configs matching this root-relative glob.
+        #[arg(long, value_name = "GLOB")]
+        workspaces: Option<String>,
         /// Reuse recorded passing beats for sensors whose declared inputs are
         /// unchanged: `warn` (default) executes and advises, `skip` reuses
         /// without executing (requires --record), `run` always executes.
@@ -209,6 +213,11 @@ pub enum Command {
         #[arg(long)]
         inspect: bool,
     },
+    /// Configure optional web pack dependencies and environment after `init`.
+    Setup {
+        #[command(subcommand)]
+        action: SetupAction,
+    },
     /// Inspect and export task state.
     Task {
         #[command(subcommand)]
@@ -221,40 +230,7 @@ pub enum Command {
     },
     /// Extract a heuristic from a resolved trace into a skill.
     /// Review output against the anti-AI-slop checklist (.agents/skills/skill-creator/references/anti_ai_slop.md).
-    Distill {
-        /// Skill the heuristic belongs to.
-        #[arg(long, value_name = "SKILL")]
-        skill: Option<String>,
-        /// Generalized pattern to record.
-        #[arg(long)]
-        pattern: Option<String>,
-        /// When the pattern applies.
-        #[arg(long)]
-        description: Option<String>,
-        /// Source trace id; required as evidence of a resolved fix.
-        #[arg(long = "from-trace", value_name = "ID")]
-        from_trace: Option<i64>,
-        /// Generate a starter skill scaffold from recorded sensor strikes
-        /// (AGENTS.md §6 steering loop) instead of distilling from a trace.
-        #[arg(long = "from-strikes")]
-        from_strikes: bool,
-        /// Strike count at or above which a signature sculpts a scaffold
-        /// (default: the fail-fast threshold).
-        #[arg(long = "min-strikes", value_name = "N")]
-        min_strikes: Option<i64>,
-        /// Scope strike lookup to this task id.
-        #[arg(long, value_name = "ID", requires = "from_strikes")]
-        task: Option<i64>,
-        /// Raise the skill's pass-rate bar after this recovery (review ticks anti-AI-slop checklist first).
-        #[arg(long = "to-fixture")]
-        to_fixture: bool,
-        /// Perform dry run without modifying skill files.
-        #[arg(long)]
-        dry_run: bool,
-        /// Output format.
-        #[arg(long, value_enum, default_value_t = Format::Text)]
-        format: Format,
-    },
+    Distill(#[command(flatten)] super::actions::DistillArgs),
     /// Inspect and clear fail-fast error signatures.
     Errors {
         #[command(subcommand)]

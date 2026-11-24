@@ -1,0 +1,11 @@
+# Contract changes are reviewed by the designated contract owner.
+# The adoption contract is the `do-harness.toml` schema (see docs/versioning.md);
+# its definition files are the parser, migrations, doctor checks, templates,
+# and the version/migration docs.
+crates/do-harness/src/config/** @d-o-hub
+crates/do-harness/src/migrate.rs @d-o-hub
+crates/do-harness/src/doctor/checks.rs @d-o-hub
+crates/do-harness/templates/do-harness.toml.* @d-o-hub
+do-harness.toml @d-o-hub
+docs/versioning.md @d-o-hub
+docs/contract-migrations.md @d-o-hub

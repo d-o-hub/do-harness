@@ -1,6 +1,7 @@
 //! Mediation logic: fail-closed gate for proxied tool calls.
 
 use crate::error::Result;
+use crate::policy::{LoadedPolicy, PolicyDecision, load_policy};
 use crate::{ForwardDecision, ProxyConfig};
 
 use serde_json::Value;
@@ -13,21 +14,37 @@ pub struct McpLikeToolCall {
     pub tool: String,
     /// Optional JSON params.
     pub params: Option<Value>,
+    /// Caller identity attribute, set by the transport from the
+    /// `X-Do-Harness-Caller-Id` header on the HTTP ingress. Policy `caller`
+    /// rules match against it; `None` means an unnamed caller.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub caller: Option<String>,
 }
 
 impl McpLikeToolCall {
-    /// Creates a new call.
+    /// Creates a new call for an unnamed caller.
     pub fn new(tool: impl Into<String>, params: Option<Value>) -> Self {
         Self {
             tool: tool.into(),
             params,
+            caller: None,
         }
+    }
+
+    /// Sets the caller identity attribute.
+    #[must_use]
+    pub fn with_caller(mut self, caller: Option<String>) -> Self {
+        self.caller = caller;
+        self
     }
 }
 
 /// Mediator that decides whether to forward a call.
 pub struct ProxyMediator {
     config: ProxyConfig,
+    /// Optional declarative policy loaded at startup; `None` keeps the
+    /// code-embedded defaults (backward compatible).
+    policy: Option<LoadedPolicy>,
     #[cfg(feature = "agt-governance")]
     gate: AgtGateWrapper,
 }
@@ -71,22 +88,36 @@ impl ProxyMediator {
     /// # Errors
     ///
     /// Returns an error if the upstream is denied by the SSRF policy, a
-    /// configured credential is empty, or the governance client cannot be
-    /// initialized.
+    /// configured credential is empty, the policy file (when configured)
+    /// cannot be loaded, or the governance client cannot be initialized.
     pub fn new(config: ProxyConfig) -> Result<Self> {
         validate_upstream(&config)?;
         validate_credentials(&config)?;
+        let policy = match &config.policy_file {
+            Some(path) => Some(load_policy(std::path::Path::new(path))?),
+            None => None,
+        };
         #[cfg(feature = "agt-governance")]
         {
             let gate = AgtGateWrapper::new(&config.agent_id)?;
-            Ok(Self { config, gate })
+            Ok(Self {
+                config,
+                policy,
+                gate,
+            })
         }
         #[cfg(not(feature = "agt-governance"))]
         {
-            Ok(Self { config })
+            Ok(Self { config, policy })
         }
     }
 
+    /// Returns the SHA-256 digest of the loaded policy file, when one is
+    /// configured.
+    #[must_use]
+    pub fn policy_sha256(&self) -> Option<&str> {
+        self.policy.as_ref().map(|policy| policy.sha256.as_str())
+    }
     /// Returns the bind address from config.
     #[must_use]
     pub fn bind(&self) -> &str {
@@ -107,9 +138,12 @@ impl ProxyMediator {
 
     /// Decides whether to allow the call (fail-closed).
     ///
-    /// Decision mapping is explicit: only an explicit governance allow maps to
-    /// [`ForwardDecision::Allow`]; denials, invalid params, and every error map
-    /// to [`ForwardDecision::Deny`].
+    /// When a declarative policy is loaded it is evaluated first; only an
+    /// explicit policy allow reaches the governance gate. An `ask` outcome
+    /// maps to a deny (there is no interactive approval channel). Decision
+    /// mapping is explicit: only an explicit allow maps to
+    /// [`ForwardDecision::Allow`]; denials, invalid params, and every error
+    /// map to [`ForwardDecision::Deny`].
     ///
     /// # Errors
     ///
@@ -120,6 +154,17 @@ impl ProxyMediator {
     // here, and callers already fail closed on `Err`.
     #[allow(clippy::unnecessary_wraps)]
     pub fn decide(&self, call: &McpLikeToolCall) -> Result<ForwardDecision> {
+        if let Some(policy) = &self.policy {
+            match policy.policy.evaluate(call) {
+                PolicyDecision::Allow => {}
+                PolicyDecision::Deny { reason } => return Ok(ForwardDecision::Deny { reason }),
+                PolicyDecision::Ask { reason } => {
+                    return Ok(ForwardDecision::Deny {
+                        reason: format!("ask: {reason}"),
+                    });
+                }
+            }
+        }
         #[cfg(feature = "agt-governance")]
         {
             let allowed = self.gate.check(&call.tool, call.params.clone())?;
@@ -133,7 +178,7 @@ impl ProxyMediator {
         }
         #[cfg(not(feature = "agt-governance"))]
         {
-            if let Some(ref v) = call.params {
+            if let Some(v) = &call.params {
                 if !v.is_null() && !v.is_object() {
                     return Ok(ForwardDecision::Deny {
                         reason: "invalid params: expected object".to_string(),

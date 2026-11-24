@@ -108,12 +108,12 @@ def run_reviewer(cmd, packet_json, *, repo, timeout_s, max_output_bytes,
     """
     spawn_time = time.time()
     started = time.monotonic()
+    launch_failed = False
     try:
         proc = subprocess.run(
             cmd,
-            input=packet_json,
+            input=packet_json.encode("utf-8"),
             capture_output=True,
-            text=True,
             timeout=timeout_s,
             env=clean_env(),
             cwd=repo,
@@ -122,14 +122,18 @@ def run_reviewer(cmd, packet_json, *, repo, timeout_s, max_output_bytes,
     except subprocess.TimeoutExpired as exc:
         timed_out = True
         proc = None
-        partial = (exc.stdout or "")[:max_output_bytes]
-        partial_err = (exc.stderr or "")[:max_output_bytes]
+        partial = (exc.stdout or b"")[:max_output_bytes].decode("utf-8", errors="replace")
+        partial_err = (exc.stderr or b"")[:max_output_bytes].decode("utf-8", errors="replace")
+    except OSError:
+        launch_failed = True
+        timed_out = False
+        proc = None
     elapsed = time.monotonic() - started
 
     record = {
         "reviewer_cmd_hash": sha256_hex(json.dumps(cmd, sort_keys=True)),
         "launch_evidence": {
-            "fresh_process": True,
+            "fresh_process": not launch_failed,
             "spawn_time_unix": int(spawn_time),
             "environment_scrubbed": True,
             "environment_keys_inherited": sorted(clean_env().keys()),
@@ -143,14 +147,18 @@ def run_reviewer(cmd, packet_json, *, repo, timeout_s, max_output_bytes,
     }
 
 
+    if launch_failed:
+        record.update(outcome=OUTCOME_FAILURE, reason="reviewer could not start",
+                      error_kind="reviewer_launch")
+        return record
     if timed_out:
         record["outcome"] = OUTCOME_TIMEOUT
         record["reason"] = "reviewer exceeded the predeclared timeout"
         record["marker_leaked"] = probe_marker(partial + partial_err, marker)
         return record
 
-    output = (proc.stdout or "")[:max_output_bytes]
-    err = (proc.stderr or "")[:max_output_bytes]
+    output = proc.stdout[:max_output_bytes].decode("utf-8", errors="replace")
+    err = proc.stderr[:max_output_bytes].decode("utf-8", errors="replace")
     record["reviewer_exit_code"] = proc.returncode
     record["marker_leaked"] = probe_marker(output + err, marker)
 
@@ -165,6 +173,8 @@ def run_reviewer(cmd, packet_json, *, repo, timeout_s, max_output_bytes,
         return record
 
     try:
+        if len(proc.stdout) > max_output_bytes:
+            raise ValueError("reviewer response exceeds the output limit")
         payload = json.loads(output)
     except ValueError:
         record["outcome"] = OUTCOME_FAILURE
@@ -173,9 +183,9 @@ def run_reviewer(cmd, packet_json, *, repo, timeout_s, max_output_bytes,
         return record
 
     try:
-        findings, truncated = validate_findings(
-            payload.get("findings", []), max_findings
-        )
+        if not isinstance(payload, dict) or "findings" not in payload:
+            raise ValueError("reviewer response must be an object with a findings array")
+        findings, truncated = validate_findings(payload["findings"], max_findings)
     except ValueError as exc:
         record["outcome"] = OUTCOME_FAILURE
         record["reason"] = str(exc)

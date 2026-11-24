@@ -15,6 +15,7 @@ fn test_config() -> ProxyConfig {
         allow_private_upstreams: true,
         metrics_token: None,
         ingress_token: None,
+        policy_file: None,
         allowed_origins: vec![],
     }
 }
@@ -279,6 +280,151 @@ fn test_bind_upstream_accessors() {
     let mediator = ProxyMediator::new(test_config()).expect("create mediator");
     assert_eq!(mediator.bind(), "127.0.0.1:0");
     assert_eq!(mediator.upstream(), "http://127.0.0.1:9000");
+}
+
+/// A policy file that denies `fs.remove` under `/etc`, asks for `shell.exec`
+/// from the `ci` caller, and allows everything else.
+fn policy_yaml() -> &'static str {
+    r#"
+version: 1
+rules:
+  - action: deny
+    tool: "fs.remove"
+    params:
+      path: "/etc/*"
+    reason: "never remove system files"
+  - action: ask
+    tool: "shell.exec"
+    caller: "ci"
+  - action: allow
+    tool: "data.read"
+"#
+}
+
+fn mediator_with_policy(policy_yaml: &str) -> ProxyMediator {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let policy_path = dir.path().join("policy.yaml");
+    std::fs::write(&policy_path, policy_yaml).expect("write policy");
+    let mut cfg = test_config();
+    cfg.policy_file = Some(policy_path.display().to_string());
+    ProxyMediator::new(cfg).expect("create mediator")
+}
+
+#[test]
+fn test_mediator_no_policy_reports_no_digest() {
+    let mediator = ProxyMediator::new(test_config()).expect("create mediator");
+    assert_eq!(mediator.policy_sha256(), None);
+}
+
+#[test]
+fn test_mediator_loads_policy_and_records_digest() {
+    let mediator = mediator_with_policy(policy_yaml());
+    let digest = mediator.policy_sha256().expect("digest");
+    assert_eq!(digest.len(), 64);
+    assert!(digest.chars().all(|c| c.is_ascii_hexdigit()));
+}
+
+#[test]
+fn test_mediator_fails_closed_on_missing_policy_file() {
+    let mut cfg = test_config();
+    cfg.policy_file = Some("/nonexistent/policy.yaml".to_string());
+    match ProxyMediator::new(cfg) {
+        Ok(_) => panic!("missing policy must fail closed"),
+        Err(err) => assert!(err.to_string().contains("policy"), "{err}"),
+    }
+}
+
+#[test]
+fn test_mediator_fails_closed_on_invalid_policy() {
+    let mut cfg = test_config();
+    cfg.policy_file = Some("this is not yaml: [".to_string());
+    match ProxyMediator::new(cfg) {
+        Ok(_) => panic!("invalid policy must fail closed"),
+        Err(err) => assert!(err.to_string().contains("policy"), "{err}"),
+    }
+}
+
+#[test]
+fn test_mediator_fails_closed_on_unknown_policy_field() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let policy_path = dir.path().join("policy.yaml");
+    std::fs::write(&policy_path, "version: 1\nbogus: true\n").expect("write policy");
+    let mut cfg = test_config();
+    cfg.policy_file = Some(policy_path.display().to_string());
+    match ProxyMediator::new(cfg) {
+        Ok(_) => panic!("unknown field must fail closed"),
+        Err(err) => assert!(err.to_string().contains("policy"), "{err}"),
+    }
+}
+
+#[test]
+fn test_decide_policy_denies_matching_rule() {
+    let mediator = mediator_with_policy(policy_yaml());
+    let call = McpLikeToolCall::new("fs.remove", Some(json!({"path": "/etc/passwd"})));
+    let decision = mediator.decide(&call).expect("decide");
+    assert_eq!(
+        decision,
+        ForwardDecision::Deny {
+            reason: "never remove system files".to_string(),
+        }
+    );
+}
+
+#[test]
+fn test_decide_policy_deny_rule_does_not_catch_other_params() {
+    let mediator = mediator_with_policy(policy_yaml());
+    let call = McpLikeToolCall::new("fs.remove", Some(json!({"path": "/home/me.txt"})));
+    let decision = mediator.decide(&call).expect("decide");
+    // No rule matches, so the fail-closed default denies; the deny rule is
+    // scoped to its parameter matcher, not a blanket tool deny.
+    match decision {
+        ForwardDecision::Deny { reason } => {
+            assert!(reason.contains("default deny"), "{reason}");
+        }
+        ForwardDecision::Allow => panic!("default deny expected"),
+    }
+}
+
+#[test]
+fn test_decide_policy_ask_maps_to_deny() {
+    let mediator = mediator_with_policy(policy_yaml());
+    let call = McpLikeToolCall::new("shell.exec", None).with_caller(Some("ci".to_string()));
+    let decision = mediator.decide(&call).expect("decide");
+    match decision {
+        ForwardDecision::Deny { reason } => assert!(reason.starts_with("ask:"), "{reason}"),
+        ForwardDecision::Allow => panic!("ask must not forward"),
+    }
+}
+
+#[test]
+fn test_decide_policy_caller_pattern_limits_ask() {
+    let mediator = mediator_with_policy(policy_yaml());
+    // Without the "ci" caller, the ask rule does not match and the default
+    // deny applies (the policy has no blanket shell.exec allow).
+    let call = McpLikeToolCall::new("shell.exec", None);
+    let decision = mediator.decide(&call).expect("decide");
+    match decision {
+        ForwardDecision::Deny { reason } => {
+            assert!(reason.contains("default deny"), "{reason}");
+        }
+        ForwardDecision::Allow => panic!("default deny expected"),
+    }
+}
+#[test]
+fn test_decide_policy_default_denies_when_no_rule_matches() {
+    let mediator = mediator_with_policy(policy_yaml());
+    let call = McpLikeToolCall::new("unlisted.tool", None);
+    let decision = mediator.decide(&call).expect("decide");
+    assert!(matches!(decision, ForwardDecision::Deny { .. }));
+}
+
+#[cfg(feature = "agt-governance")]
+#[test]
+fn test_decide_policy_allow_reaches_governance_gate() {
+    let mediator = mediator_with_policy(policy_yaml());
+    let call = McpLikeToolCall::new("data.read", None);
+    let decision = mediator.decide(&call).expect("decide");
+    assert_eq!(decision, ForwardDecision::Allow);
 }
 
 #[cfg(feature = "agt-governance")]
