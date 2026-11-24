@@ -1,0 +1,10 @@
+{
+  "name": "pinned-api-router",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build-check.js",
+    "test": "node tests/run.js"
+  }
+}
