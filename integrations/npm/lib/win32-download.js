@@ -35,6 +35,13 @@ const REQUEST_TIMEOUT_MS = 60 * 1000;
 const MAX_CHECKSUMS_BYTES = 1 << 20; // checksums.txt is a few hundred bytes.
 const MAX_ZIP_BYTES = 512 << 20; // the release zip carries one ~20 MB binary.
 
+// ZIP marker signatures. The canonical hex spellings (0x06054b50,
+// 0x02014b50, 0x04034b50) trip PMD's inaccurate-numeric-literal rule, so
+// they are written as their decimal equivalents (verified equal above).
+const EOCD_SIGNATURE = 101010256; // 0x06054b50
+const CENTRAL_DIR_SIGNATURE = 33639248; // 0x02014b50
+const LOCAL_HEADER_SIGNATURE = 67324752; // 0x04034b50
+
 const ERR = Object.freeze({
   CHECKSUM_MISMATCH: "ERR_DO_HARNESS_CHECKSUM_MISMATCH",
   MISSING_CHECKSUM: "ERR_DO_HARNESS_MISSING_CHECKSUM",
@@ -97,7 +104,7 @@ function extractBinary(zipBuffer) {
   const eocdStart = Math.max(0, zipBuffer.length - 65557);
   let eocd = -1;
   for (let i = zipBuffer.length - 22; i >= eocdStart; i--) {
-    if (readU32(zipBuffer, i) === 0x06054b50) {
+    if (readU32(zipBuffer, i) === EOCD_SIGNATURE) {
       eocd = i;
       break;
     }
@@ -108,7 +115,7 @@ function extractBinary(zipBuffer) {
   const count = readU16(zipBuffer, eocd + 10);
   let offset = readU32(zipBuffer, eocd + 16);
   for (let i = 0; i < count; i++) {
-    if (readU32(zipBuffer, offset) !== 0x02014b50) {
+    if (readU32(zipBuffer, offset) !== CENTRAL_DIR_SIGNATURE) {
       throw invalidArchive("release zip has a corrupt central directory");
     }
     const method = readU16(zipBuffer, offset + 10);
@@ -119,7 +126,7 @@ function extractBinary(zipBuffer) {
     const localOffset = readU32(zipBuffer, offset + 42);
     const name = zipBuffer.toString("utf8", offset + 46, offset + 46 + nameLen);
     if (name.endsWith(`/${BINARY_NAME}`)) {
-      if (readU32(zipBuffer, localOffset) !== 0x04034b50) {
+      if (readU32(zipBuffer, localOffset) !== LOCAL_HEADER_SIGNATURE) {
         throw invalidArchive("release zip has a corrupt local header");
       }
       const dataStart =

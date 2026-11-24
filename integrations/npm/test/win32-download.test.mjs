@@ -88,7 +88,7 @@ test("ensureWindowsBinary downloads, verifies, and caches once", async (t) => {
   assert.equal(first, expected);
   assert.ok(fs.existsSync(first));
 
-  const second = await dl.ensureWindowsBinary({ version, baseUrl, cacheDir });
+  await dl.ensureWindowsBinary({ version, baseUrl, cacheDir });
   // The sidecar records the verified extracted binary's digest for offline
   // cache verification.
   assert.equal(
