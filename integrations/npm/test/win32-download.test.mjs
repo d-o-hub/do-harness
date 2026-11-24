@@ -140,6 +140,19 @@ test("ensureWindowsBinary fails closed on a missing checksum entry", async (t) =
   assert.equal(hits.get(`/v${version}/${asset}`), undefined, "zip never fetched");
 });
 
+test("ensureWindowsBinary rejects path traversal in version", async (t) => {
+  const cacheDir = tempCache(t);
+  const port = await deadPort();
+  await assert.rejects(
+    dl.ensureWindowsBinary({
+      version: "../../escape",
+      baseUrl: `http://127.0.0.1:${port}`,
+      cacheDir,
+    }),
+    { code: dl.ERR.INVALID_VERSION },
+  );
+});
+
 test("ensureWindowsBinary reports a download failure", async (t) => {
   const cacheDir = tempCache(t);
   const port = await deadPort();

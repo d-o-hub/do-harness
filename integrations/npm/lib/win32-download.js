@@ -34,13 +34,15 @@ const MAX_REDIRECTS = 10;
 const REQUEST_TIMEOUT_MS = 60 * 1000;
 const MAX_CHECKSUMS_BYTES = 1 << 20; // checksums.txt is a few hundred bytes.
 const MAX_ZIP_BYTES = 512 << 20; // the release zip carries one ~20 MB binary.
+const RELEASE_VERSION_PATTERN = /^\d+\.\d+\.\d+$/;
 
-// ZIP marker signatures. The canonical hex spellings (0x06054b50,
-// 0x02014b50, 0x04034b50) trip PMD's inaccurate-numeric-literal rule, so
-// they are written as their decimal equivalents (verified equal above).
-const EOCD_SIGNATURE = 101010256; // 0x06054b50
-const CENTRAL_DIR_SIGNATURE = 33639248; // 0x02014b50
-const LOCAL_HEADER_SIGNATURE = 67324752; // 0x04034b50
+// ZIP record signatures in little-endian byte order, compared without packing
+// them into a JavaScript number.
+const ZIP_SIGNATURES = Object.freeze({
+  EOCD: Object.freeze([0x50, 0x4b, 0x05, 0x06]),
+  CENTRAL_DIRECTORY: Object.freeze([0x50, 0x4b, 0x01, 0x02]),
+  LOCAL_HEADER: Object.freeze([0x50, 0x4b, 0x03, 0x04]),
+});
 
 const ERR = Object.freeze({
   CHECKSUM_MISMATCH: "ERR_DO_HARNESS_CHECKSUM_MISMATCH",
@@ -48,6 +50,7 @@ const ERR = Object.freeze({
   DOWNLOAD_FAILED: "ERR_DO_HARNESS_DOWNLOAD",
   BAD_RESPONSE: "ERR_DO_HARNESS_BAD_RESPONSE",
   INVALID_ARCHIVE: "ERR_DO_HARNESS_INVALID_ARCHIVE",
+  INVALID_VERSION: "ERR_DO_HARNESS_INVALID_VERSION",
 });
 
 /**
@@ -92,6 +95,15 @@ function readU32(buf, offset) {
   return buf.readUInt32LE(offset);
 }
 
+function matchesSignature(buf, offset, signature) {
+  return (
+    buf[offset] === signature[0] &&
+    buf[offset + 1] === signature[1] &&
+    buf[offset + 2] === signature[2] &&
+    buf[offset + 3] === signature[3]
+  );
+}
+
 /**
  * Minimal ZIP reader for the release archive. 7z stores the exe with
  * DEFLATE (method 8) or stored (method 0); only those two methods are
@@ -104,7 +116,7 @@ function extractBinary(zipBuffer) {
   const eocdStart = Math.max(0, zipBuffer.length - 65557);
   let eocd = -1;
   for (let i = zipBuffer.length - 22; i >= eocdStart; i--) {
-    if (readU32(zipBuffer, i) === EOCD_SIGNATURE) {
+    if (matchesSignature(zipBuffer, i, ZIP_SIGNATURES.EOCD)) {
       eocd = i;
       break;
     }
@@ -115,7 +127,7 @@ function extractBinary(zipBuffer) {
   const count = readU16(zipBuffer, eocd + 10);
   let offset = readU32(zipBuffer, eocd + 16);
   for (let i = 0; i < count; i++) {
-    if (readU32(zipBuffer, offset) !== CENTRAL_DIR_SIGNATURE) {
+    if (!matchesSignature(zipBuffer, offset, ZIP_SIGNATURES.CENTRAL_DIRECTORY)) {
       throw invalidArchive("release zip has a corrupt central directory");
     }
     const method = readU16(zipBuffer, offset + 10);
@@ -126,7 +138,7 @@ function extractBinary(zipBuffer) {
     const localOffset = readU32(zipBuffer, offset + 42);
     const name = zipBuffer.toString("utf8", offset + 46, offset + 46 + nameLen);
     if (name.endsWith(`/${BINARY_NAME}`)) {
-      if (readU32(zipBuffer, localOffset) !== LOCAL_HEADER_SIGNATURE) {
+      if (!matchesSignature(zipBuffer, localOffset, ZIP_SIGNATURES.LOCAL_HEADER)) {
         throw invalidArchive("release zip has a corrupt local header");
       }
       const dataStart =
@@ -294,6 +306,12 @@ function cachedBinary(exePath, sidecarPath) {
  * mismatch, a missing checksum entry, or a failed download (no execution).
  */
 async function ensureWindowsBinary({ version, baseUrl, cacheDir }) {
+  if (typeof version !== "string" || !RELEASE_VERSION_PATTERN.test(version)) {
+    throw Object.assign(
+      new Error("release version must be plain MAJOR.MINOR.PATCH"),
+      { code: ERR.INVALID_VERSION },
+    );
+  }
   const asset = zipAssetName(version);
   const base = baseUrl ?? releaseBaseUrl();
   const root = cacheDir ?? cacheRoot();
