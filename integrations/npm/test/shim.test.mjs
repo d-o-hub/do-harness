@@ -206,7 +206,7 @@ test("shim downloads and runs the Windows binary when the platform package is mi
   const zip = makeZip([
     {
       name: `${assetDir}/${platform.binaryName("win32")}`,
-      data: Buffer.from('#!/bin/sh\necho "args:$*"\nexit 7\n'),
+      data: fs.readFileSync(process.execPath),
     },
   ]);
   fs.mkdirSync(path.join(fixtureDir, `v${version}`), { recursive: true });
@@ -220,7 +220,16 @@ test("shim downloads and runs the Windows binary when the platform package is mi
   t.after(() => child.kill());
 
   const { shim } = stage({ withPlatform: false });
-  const result = spawnSync(process.execPath, [shim, "verify", "--changed"], {
+  const result = spawnSync(
+    process.execPath,
+    [
+      shim,
+      "-e",
+      'process.stdout.write("args:" + process.argv.slice(1).join(" ")); process.exit(7);',
+      "verify",
+      "--changed",
+    ],
+    {
     encoding: "utf8",
     env: {
       ...process.env,
