@@ -12,7 +12,6 @@ from unittest import mock
 from . import process
 from .process import execute
 from .adopter import run_resume_case, seed_repo
-from .adopter_templates_node import NODE_VALIDATE_FIXED
 from .runner import (CORPUS, GRADER_ADOPTER, MAX_MODEL_LEN, USAGE_CAPS, benchmark,
                      digest, environment, load_corpus, parse_adapter_usage, run_case)
 ROOT = Path(__file__).resolve().parents[2]
