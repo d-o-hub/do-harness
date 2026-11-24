@@ -349,6 +349,37 @@ printf '%s\n' "$out"
 ! grep -q '\[no test files\]' <<<"$out"
 ```
 
+## SDK packages
+
+For agent frameworks that want a typed interface instead of shelling out to
+the CLI, the repository ships two lightweight SDK packages under
+[`integrations/sdk-python/README.md`](../integrations/sdk-python/README.md) and
+[`integrations/sdk-ts/README.md`](../integrations/sdk-ts/README.md):
+
+- **Python** — `do-harness-sdk` (PyPI): standard-library-only dataclass
+  models; wraps `verify`, `status`, `explain`, `errors list`, `task list`,
+  `task export`, and `version`. Includes an optional LangChain `Tool` adapter
+  (`pip install 'do-harness-sdk[langchain]'`).
+- **TypeScript** — `do-harness-sdk` (npm): zero-dependency ESM with
+  TypeScript declarations; same command surface.
+
+Both SDKs share the same contract:
+
+- They spawn the harness binary with argv arrays (never a shell) and parse
+  its `--format json` documents into typed models.
+- They fail closed: a missing binary, unparseable output, or a non-zero exit
+  raises an SDK error (red `verify`/`status` runs raise typed errors that
+  carry the parsed report).
+- Their package versions mirror the CLI release they target (`0.4.8` ↔ CLI
+  `0.4.x`); `HarnessClient.assert_schema_compatible()` / `assertSchemaCompatible()`
+  verify the installed CLI's release line.
+
+Publishing to PyPI/npm requires registry credentials and runs outside the
+repository. The offline gate `sdk-pack` (scripts/check-sdk-pack.sh) builds
+the Python sdist+wheel and runs `npm pack --dry-run` on every change to the
+SDK trees, so the packages are always publish-ready from a green tree. The
+exact publish steps are documented in each SDK README.
+
 ## Onboarding outcomes
 
 `init` reports one baseline state per run. Configuration is written before the
@@ -539,6 +570,34 @@ Peer dependencies must be installed in the adopting repository's `node_modules`
 See [`integrations/web-ui/README.md`](../integrations/web-ui/README.md) for the
 audit stages, matrix contract, and visual-baseline semantics.
 
+### Wiring the pack: `do-harness setup web`
+
+`do-harness setup web` bootstraps the peer dependencies and the environment in
+one step. It detects the package manager from the lockfile (`pnpm-lock.yaml`,
+`yarn.lock`, `bun.lockb`/`bun.lock`, else `package-lock.json`/npm), checks
+that `playwright` (>= 1.40), `@axe-core/playwright` (>= 4.8), and
+`lighthouse` (>= 11.0) are installed at compatible versions, offers to install
+what is missing (interactive prompt on a TTY; pass `--yes`/`-y` to skip it),
+and appends a `[env]` table to `do-harness.toml` with the
+`WEB_AUDIT_ROUTES` placeholder and the documented defaults. `[env]` values are
+applied to every sensor process, so the web sensors stop SKIPping once the
+dependencies are installed.
+
+Non-interactive runs without `--yes` print the exact install command and exit
+2 instead of prompting or installing; `--dry-run` reports what would change
+without writing. The `[env]` block is written even when dependencies remain
+missing, so the pack is configured as soon as they are installed.
+
+After setup, confirm the pack with:
+
+<!-- example: id=adoption_setup_web_confirm classification=illustrative reason="Post-setup web pack confirmation command" -->
+```bash
+do-harness verify --only viewport-ux,a11y,console,perf,visual,i18n,web-ui-tests
+```
+
+See [`integrations/web-ui/README.md`](../integrations/web-ui/README.md) for the
+audit stages, matrix contract, and visual-baseline semantics.
+
 ## The agent loop
 
 Use the [workflow benchmark](workflow-benchmarks.md) to compare a pinned skill
@@ -625,6 +684,33 @@ facts, not a memory service: it cannot supply product acceptance criteria the
 task record does not carry, and a complete-looking context packet is never
 evidence that the task is done. Completion still requires the sensor gates
 (`task done`) or an explicit human decision.
+
+### Multi-workspace verification
+
+For a monorepo with independently configured packages, pass a root-relative
+glob. The root policy is validated, then each matched directory loads its own
+`do-harness.toml`, runs from that directory, and writes any recorded beats or
+evidence under its own `.do-harness/` state. The glob may match a workspace
+directory or its `do-harness.toml`; generated directories are pruned.
+
+`--jobs` bounds concurrent workspace processes (default: `1`). When set, each
+workspace runs its sensors sequentially so the total process limit is explicit.
+Without it, each workspace keeps its configured sensor concurrency. `--changed`
+and `--since` compute one change set at the monorepo root, scope it to each
+workspace, and report unaffected workspaces as skipped. An empty global change
+set still exits `2`; a root or workspace policy-file change runs all selected
+sensors in the affected workspaces.
+
+`--output` and `--evidence` paths are relative to each workspace; absolute paths
+and `..` escapes are rejected. Each JSON result includes the aggregate verdict,
+exit code, workspace status, and the nested per-workspace verify report.
+`--config` is not accepted because each workspace supplies its own config;
+`--format junit` is not supported for aggregate reports.
+
+<!-- example: id=adoption_workspaces classification=illustrative reason="Multi-workspace verification invocation" -->
+```bash
+do-harness verify --workspaces 'packages/*' --jobs 4 --set verification --changed --strict --format json
+```
 
 ## CI snippets
 

@@ -421,3 +421,53 @@ pub enum DoctorAction {
 
 mod arg_groups;
 pub use arg_groups::*;
+
+/// Available `do-harness setup` actions.
+#[derive(Debug, Subcommand)]
+pub enum SetupAction {
+    /// Bootstrap the web audit pack: check the playwright/@axe-core/playwright/
+    /// lighthouse peer dependencies, install what is missing, and patch
+    /// `do-harness.toml` with the `WEB_AUDIT_*` environment block.
+    Web {
+        /// Skip the interactive install prompt and install missing dependencies.
+        #[arg(long, short = 'y')]
+        yes: bool,
+    },
+}
+
+/// Arguments for `do-harness distill`.
+#[derive(Debug, Args)]
+pub struct DistillArgs {
+    /// Skill the heuristic belongs to.
+    #[arg(long, value_name = "SKILL")]
+    pub skill: Option<String>,
+    /// Generalized pattern to record.
+    #[arg(long)]
+    pub pattern: Option<String>,
+    /// When the pattern applies.
+    #[arg(long)]
+    pub description: Option<String>,
+    /// Source trace id; required as evidence of a resolved fix.
+    #[arg(long = "from-trace", value_name = "ID")]
+    pub from_trace: Option<i64>,
+    /// Generate a starter skill scaffold from recorded sensor strikes
+    /// (AGENTS.md §6 steering loop) instead of distilling from a trace.
+    #[arg(long = "from-strikes")]
+    pub from_strikes: bool,
+    /// Strike count at or above which a signature sculpts a scaffold
+    /// (default: the fail-fast threshold).
+    #[arg(long = "min-strikes", value_name = "N")]
+    pub min_strikes: Option<i64>,
+    /// Scope strike lookup to this task id.
+    #[arg(long, value_name = "ID", requires = "from_strikes")]
+    pub task: Option<i64>,
+    /// Raise the skill's pass-rate bar after this recovery (review ticks anti-AI-slop checklist first).
+    #[arg(long = "to-fixture")]
+    pub to_fixture: bool,
+    /// Perform dry run without modifying skill files.
+    #[arg(long)]
+    pub dry_run: bool,
+    /// Output format.
+    #[arg(long, value_enum, default_value_t = Format::Text)]
+    pub format: Format,
+}

@@ -208,6 +208,9 @@ deriving from a guess. The bump policy mirrors the Rust ecosystem's release tool
 | a subject that is not a conventional commit | patch |
 | docs, chore, test, refactor, ci, build, style, revert | nothing on its own |
 | a merge commit | nothing — the log is read with `--no-merges`, so a merge subject is never classified |
+| a rename of a shipped surface (an exported CLI command file, sensor/config-key bundle, or published artifact path) with no `Rename-Confirmed:` trailer and no breaking marker in the range | `held-rename`: auto-release proposes nothing until a human confirms; once confirmed it is breaking → major at >= 1.0, minor at 0.x |
+| the same rename confirmed by a `Rename-Confirmed:` trailer or a `!`/`BREAKING CHANGE:` marker | breaking → major at >= 1.0, minor at 0.x |
+| an internal rename (tests, docs, plans, examples, scripts, vendor) | nothing on its own |
 
 Pre-1.0 comes from the same tool rather than a local rule: `0.(x+1).0` is how a
 breaking change is signalled while the crate is still `0.x`, so a feature cannot
@@ -222,6 +225,40 @@ the release pull request overrides it, because `ship` tags whatever version is o
 `main`. The override is a property of the open pull request, not of the branch:
 a later push to `main` re-derives and force-pushes the branch, discarding the
 edit, so merge an overridden proposal before new commits land.
+### Ambiguous changes: renames
+
+A rename can be read as either a breaking change or a harmless move depending on
+who reviews it, and a `refactor` or `fix` subject will not say which. The safe
+default (issue #606) is to treat a rename of a **shipped surface** as ambiguous
+until a human confirms it. Git's own rename detection (`git log -M`) over the
+same commit range as the bump finds the candidates; internal files (tests, docs,
+plans, examples, scripts, tooling, vendored code) are never considered. A
+candidate is classed by what moved, not by what the subject claims:
+
+- **Shipped surfaces:** the exported CLI command tree
+  (`crates/do-harness/src/commands/` and `crates/do-harness/src/cli/`), the
+  sensor/config-key schema (`do-harness.toml` and `crates/types/`), and
+  published artifacts (the workspace and member manifests, `integrations/npm/`,
+  `man/do-harness.1`, `completions/`).
+- **Unconfirmed rename** → `bump=held-rename`: auto-release opens no release
+  pull request, retires any stale proposal, and `ship` refuses to tag until the
+  rename is confirmed. A range that already derives as breaking is not held —
+  the rename then ships under the breaking bump.
+- **Confirmation** is a commit-level signal the hermetic derivation can see: a
+  `Rename-Confirmed:` trailer anywhere in the range, or a `!` breaking subject /
+  `BREAKING CHANGE:` footer on the renaming commit itself. Confirmed renames are
+  breaking: they force the major (minor at 0.x) bump exactly as a `!` subject
+  would. The `rename-confirmed` GitHub label exists for pull-request review (see
+  issue #606); the derivation itself reads commits, because it never touches the
+  network.
+- To unblock a held release, push a commit adding `Rename-Confirmed:` to the
+  commit that performed the rename (or to a follow-up review commit); the next
+  main gate re-derives and proposes the breaking bump.
+
+The shipped-surface list lives in `shipped_surface_path` in
+`scripts/release-manager.sh` — extend it there when a new surface becomes public.
+When tracking issue #607 lands its per-artifact versioning document
+(`docs/versioning.md`), this policy moves there under "Ambiguous changes".
 
 ### What the automation does
 
@@ -233,7 +270,11 @@ edit, so merge an overridden proposal before new commits land.
   derives no version at all: `ship` creates the tag, and crates.io, npm and the
   GitHub Release are created afterwards by `release.yml`, so "tagged" is not
   "released", and proposing a version on top of an unfinished release is how
-  `v0.3.2` came to be proposed while `v0.3.1` had no npm package and no Release. Otherwise it
+  `v0.3.2` came to be proposed while `v0.3.1` had no npm package and no Release.
+  A bump of `held-rename` — a shipped-surface rename since the last tag awaits
+  human confirmation — also proposes nothing; it resolves into a breaking bump
+  once a `Rename-Confirmed:` trailer or breaking marker lands (see "Ambiguous
+  changes: renames"). Otherwise it
   applies the version with `release-manager.sh prepare`, pushes `release/vX.Y.Z`,
   and opens the pull request with the derived basis in its body. The branch and the
   body are refreshed after each successful main gate, and a still-open
