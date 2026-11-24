@@ -9,7 +9,6 @@ primary outcome.
 """
 
 from .record import COMPLETED_OUTCOMES
-from .corpus import load_oracle
 
 
 def adjudicate_run(record, oracle):

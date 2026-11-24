@@ -12,7 +12,7 @@ import math
 from pathlib import Path
 
 from .adjudicate import adjudicate_records
-from .corpus import EXPERIMENT, load_corpus
+from .corpus import EXPERIMENT
 from .record import COMPLETED_OUTCOMES, validate_run_record
 
 THRESHOLD_KEYS = (
@@ -172,7 +172,6 @@ def summarize_designs(adjudicated, records, corpus):
 def decide(designs, protocol):
     """Compute the verdict from complete designs and pinned thresholds."""
     thresholds = pinned_thresholds(protocol)
-    reasons = []
     if thresholds is None:
         return {
             "verdict": "INCONCLUSIVE",

@@ -104,7 +104,7 @@ def make_record(case_id, arm, *, findings=None, dispositions=None,
             "total": total_ms,
         },
         "usage": {
-            "token_cost": 8000,
+            "token_cost": 8000,  # nosec B105 -- synthetic usage count, not a credential
             "currency_cost": currency,
             "context_bytes": 200000,
             "provenance": provenance,
