@@ -17,9 +17,6 @@ from do_harness_sdk import (
 from do_harness_sdk.client import SCHEMA_VERSION
 from do_harness_sdk.models import StatusResult, StrikeInfo, TaskList, VerifyResult
 
-from .fixtures_json import VERIFY_FAIL, VERIFY_OK, VERSION
-
-
 @pytest.fixture
 def client(fake_harness) -> HarnessClient:
     return HarnessClient()
