@@ -1,0 +1,33 @@
+{
+  "case_id": "api-defaults-compat-flawed",
+  "predeclared_expected_findings": ["D1", "D2"],
+  "defects": [
+    {
+      "id": "D1",
+      "severity": "material",
+      "class": "api-compat",
+      "summary": "Silent behavior change for existing callers: the default timeout changes from 30 to 5 seconds, so callers that do not pass timeout now time out earlier without any opt-in or signal, violating the 'existing callers observe no silent change' constraint.",
+      "trigger": "connect() default changes from the legacy 30 seconds to 5 seconds in the same release.",
+      "consequence": "Existing deployments see new timeouts without changing code or config.",
+      "evidence": "config.py: _DEFAULT_TIMEOUT_S; design.md 'Default change' section.",
+      "smallest_correction": "Keep the legacy default (30s) and add the parameter as additive, or introduce the new default behind an explicit opt-in flag with a documented migration."
+    },
+    {
+      "id": "D2",
+      "severity": "material",
+      "class": "api-compat",
+      "summary": "Breaking removal of a public alias: timeout_seconds is removed with no deprecation window, so existing callers that use it fail with TypeError, violating the 'no public symbol is removed without a deprecation window' constraint.",
+      "trigger": "connect() no longer accepts timeout_seconds; the alias is deleted in the same release.",
+      "consequence": "Existing callers break at runtime without a migration path.",
+      "evidence": "config.py: connect() signature comment; design.md 'Deprecated alias' section.",
+      "smallest_correction": "Keep timeout_seconds as a deprecated alias that forwards to timeout and logs a deprecation warning for at least one release window."
+    }
+  ],
+  "new_beyond_baseline": ["D1", "D2"],
+  "false_positive_pool": [
+    {
+      "id": "FP1",
+      "summary": "Suggest renaming the timeout parameter to timeout_seconds for consistency with the old alias."
+    }
+  ]
+}

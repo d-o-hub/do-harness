@@ -137,9 +137,9 @@ jobs:
         # DO_HARNESS_REQUIRE_TOOLS instead of a SKIP: yamllint for workflow/yaml
         # lint, markdown-it-py (scripts/requirements-docs.txt) for docs checks,
         # and PyYAML (.agents/skills/skill-creator/scripts/requirements.txt) for
-        # action-pins and eval frontmatter.
+        # action-pins and eval frontmatter, plus pytest for the SDK regression suite.
         run: |
-          python3 -m pip install --disable-pip-version-check yamllint -r .agents/skills/skill-creator/scripts/requirements.txt -r scripts/requirements-docs.txt
+          python3 -m pip install --disable-pip-version-check yamllint -r .agents/skills/skill-creator/scripts/requirements.txt -r scripts/requirements-docs.txt -e 'integrations/sdk-python[test]'
           npm install -g markdownlint-cli2
       # Pin maintenance note: agent-governance is pinned to =3.2.2 in workspace dependencies
       # until GA. Upstream renamed this crate to `agentmesh`; the pin stays on the

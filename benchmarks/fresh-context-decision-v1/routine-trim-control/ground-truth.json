@@ -1,0 +1,12 @@
+{
+  "case_id": "routine-trim-control",
+  "predeclared_expected_findings": [],
+  "defects": [],
+  "new_beyond_baseline": [],
+  "false_positive_pool": [
+    {
+      "id": "FP1",
+      "summary": "Suggest adding a policy document governing label trimming before merging."
+    }
+  ]
+}

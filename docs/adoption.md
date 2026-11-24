@@ -362,6 +362,37 @@ printf '%s\n' "$out"
 ! grep -q '\[no test files\]' <<<"$out"
 ```
 
+## SDK packages
+
+For agent frameworks that want a typed interface instead of shelling out to
+the CLI, the repository ships two lightweight SDK packages under
+[`integrations/sdk-python/README.md`](../integrations/sdk-python/README.md) and
+[`integrations/sdk-ts/README.md`](../integrations/sdk-ts/README.md):
+
+- **Python** — `do-harness-sdk` (PyPI): standard-library-only dataclass
+  models; wraps `verify`, `status`, `explain`, `errors list`, `task list`,
+  `task export`, and `version`. Includes an optional LangChain `Tool` adapter
+  (`pip install 'do-harness-sdk[langchain]'`).
+- **TypeScript** — `do-harness-sdk` (npm): zero-dependency ESM with
+  TypeScript declarations; same command surface.
+
+Both SDKs share the same contract:
+
+- They spawn the harness binary with argv arrays (never a shell) and parse
+  its `--format json` documents into typed models.
+- They fail closed: a missing binary, unparseable output, or a non-zero exit
+  raises an SDK error (red `verify`/`status` runs raise typed errors that
+  carry the parsed report).
+- Their package versions mirror the CLI release they target (`0.4.8` ↔ CLI
+  `0.4.x`); `HarnessClient.assert_schema_compatible()` / `assertSchemaCompatible()`
+  verify the installed CLI's release line.
+
+Publishing to PyPI/npm requires registry credentials and runs outside the
+repository. The offline gate `sdk-pack` (scripts/check-sdk-pack.sh) builds
+the Python sdist+wheel and runs `npm pack --dry-run` on every change to the
+SDK trees, so the packages are always publish-ready from a green tree. The
+exact publish steps are documented in each SDK README.
+
 ## Onboarding outcomes
 
 `init` reports one baseline state per run. Configuration is written before the

@@ -1,0 +1,12 @@
+{
+  "case_id": "authz-group-delegation-sound",
+  "predeclared_expected_findings": [],
+  "defects": [],
+  "new_beyond_baseline": [],
+  "false_positive_pool": [
+    {
+      "id": "FP1",
+      "summary": "Suggest adding a 5-minute authorization cache to reduce latency."
+    }
+  ]
+}

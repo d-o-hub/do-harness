@@ -1,0 +1,12 @@
+{
+  "case_id": "migration-retention-backfill-sound",
+  "predeclared_expected_findings": [],
+  "defects": [],
+  "new_beyond_baseline": [],
+  "false_positive_pool": [
+    {
+      "id": "FP1",
+      "summary": "Suggest wrapping every row in its own transaction to keep locks tiny."
+    }
+  ]
+}
