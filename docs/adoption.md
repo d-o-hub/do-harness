@@ -685,6 +685,33 @@ task record does not carry, and a complete-looking context packet is never
 evidence that the task is done. Completion still requires the sensor gates
 (`task done`) or an explicit human decision.
 
+### Multi-workspace verification
+
+For a monorepo with independently configured packages, pass a root-relative
+glob. The root policy is validated, then each matched directory loads its own
+`do-harness.toml`, runs from that directory, and writes any recorded beats or
+evidence under its own `.do-harness/` state. The glob may match a workspace
+directory or its `do-harness.toml`; generated directories are pruned.
+
+`--jobs` bounds concurrent workspace processes (default: `1`). When set, each
+workspace runs its sensors sequentially so the total process limit is explicit.
+Without it, each workspace keeps its configured sensor concurrency. `--changed`
+and `--since` compute one change set at the monorepo root, scope it to each
+workspace, and report unaffected workspaces as skipped. An empty global change
+set still exits `2`; a root or workspace policy-file change runs all selected
+sensors in the affected workspaces.
+
+`--output` and `--evidence` paths are relative to each workspace; absolute paths
+and `..` escapes are rejected. Each JSON result includes the aggregate verdict,
+exit code, workspace status, and the nested per-workspace verify report.
+`--config` is not accepted because each workspace supplies its own config;
+`--format junit` is not supported for aggregate reports.
+
+<!-- example: id=adoption_workspaces classification=illustrative reason="Multi-workspace verification invocation" -->
+```bash
+do-harness verify --workspaces 'packages/*' --jobs 4 --set verification --changed --strict --format json
+```
+
 ## CI snippets
 
 GitHub Actions:

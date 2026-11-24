@@ -67,7 +67,8 @@ Aliases: `check`.
 | `--since <REF>` | no | — | — | Run only sensors applicable to the committed range `merge-base(<REF>, HEAD)..HEAD`; combine with `--changed` to union committed and uncommitted paths |
 | `--only <SENSOR>` (repeatable) | no | — | — | Run only the named sensor (repeatable or comma-separated) |
 | `--exclude <SENSOR>` (repeatable) | no | — | — | Exclude named sensors from the run |
-| `--jobs <N>` | no | — | — | Maximum sensors in flight (overrides `jobs` in do-harness.toml) |
+| `--jobs <N>` | no | — | — | Maximum workspace concurrency with `--workspaces`; otherwise the maximum sensors in flight (overrides `jobs` in do-harness.toml) |
+| `--workspaces <GLOB>` | no | — | — | Select workspace directories or configs matching this root-relative glob |
 | `--unchanged <MODE>` | no | `warn` | `warn`, `skip`, `run` | Reuse recorded passing beats for sensors whose declared inputs are unchanged: `warn` (default) executes and advises, `skip` reuses without executing (requires --record), `run` always executes |
 | `--record` | no | — | — | Persist beats and error signatures into the state database |
 | `--task <ID>` | no | — | — | Scope records and fail-fast strikes to this task id (or 'global') |
