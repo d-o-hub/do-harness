@@ -348,10 +348,9 @@ when-changed = [".github/release-notes-template.md", ".github/release.yml", ".gi
 
 [[sensors]]
 # Executable half of the release-derivation contract: the version a merge cuts
-# is a function of the conventional commits since the last tag, and the policy
-# (pre-1.0 breaking changes take the minor, features take a patch, a merge commit
-# counts for nothing) is mirrored from the Rust ecosystem's release tooling
-# rather than invented here. `auto-release.yml` calls `release-manager.sh next`
+# is a function of the conventional commits since the last tag. Features take
+# the minor from 0.1.0 onward. Breaking changes take the minor at 0.x and the
+# major from 1.0 onward. `auto-release.yml` calls `release-manager.sh next`
 # on every push to main, so a classifier regression decides the wrong version
 # silently; this entry pins the rules and the fail-closed guards around them.
 name = "release-manager"

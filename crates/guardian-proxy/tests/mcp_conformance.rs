@@ -38,6 +38,7 @@ fn mediator(upstream: &str) -> Arc<ProxyMediator> {
         allow_private_upstreams: true,
         metrics_token: None,
         ingress_token: None,
+        policy_file: None,
         allowed_origins: vec![],
     };
     Arc::new(ProxyMediator::new(config).expect("mediator"))
@@ -147,6 +148,7 @@ async fn ingress_token_gates_the_mcp_endpoint() {
         allow_private_upstreams: true,
         metrics_token: None,
         ingress_token: Some("s3cret".to_string()),
+        policy_file: None,
         allowed_origins: vec![],
     };
     let mediator = Arc::new(ProxyMediator::new(config).expect("mediator"));

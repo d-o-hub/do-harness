@@ -196,14 +196,14 @@ missing step is finishing that release. An absent flag means *not told* and leav
 the derivation as it was; a present-but-empty list means *nothing has published* and
 blocks every bump. The two are different facts and stay apart: `auto-release.yml`
 always passes the flag, and a failing `gh release list` fails its step instead of
-deriving from a guess. The bump policy mirrors the Rust ecosystem's release tooling
-(`next_version`, the crate release-plz uses) rather than inventing one here:
+deriving from a guess. The highest applicable bump for the range determines the
+version. The batch threshold controls when to open a proposal.
 
 | Commits since the last tag | Bump |
 |---|---|
 | any range while the version is `0.0.x` (a breaking change included) | patch |
 | `!` subject or a `BREAKING CHANGE:`/`BREAKING-CHANGE:` footer | major at >= 1.0, minor at 0.x |
-| `feat` | minor at >= 1.0, patch at 0.x |
+| `feat` | minor (except the `0.0.x` rule above) |
 | `fix`, `perf` | patch |
 | a subject that is not a conventional commit | patch |
 | docs, chore, test, refactor, ci, build, style, revert | nothing on its own |
@@ -212,15 +212,15 @@ deriving from a guess. The bump policy mirrors the Rust ecosystem's release tool
 | the same rename confirmed by a `Rename-Confirmed:` trailer or a `!`/`BREAKING CHANGE:` marker | breaking → major at >= 1.0, minor at 0.x |
 | an internal rename (tests, docs, plans, examples, scripts, vendor) | nothing on its own |
 
-Pre-1.0 comes from the same tool rather than a local rule: `0.(x+1).0` is how a
-breaking change is signalled while the crate is still `0.x`, so a feature cannot
-spend the minor and a breaking change is visible when it does. `0.0.x` is the one
-exception `next_version` carves out of that rule: it stays on patch releases
-whatever the commits, so the step to `0.1.0` remains a deliberate decision rather
-than the automatic effect of a single breaking change. semantic-release makes no
-such pre-1.0 distinction — its standard major/minor rule applies at any version —
-which is the concrete reason this pipeline follows `next_version` and deliberately
-not semantic-release. The derived version is a proposal — editing the version in
+Under [SemVer 2.0.0 §4](https://semver.org/spec/v2.0.0.html), version zero is
+initial development. This project uses `0.(y+1).0` for features and breaking
+changes once it reaches `0.1.0`. The proposal flags breaking changes declared
+in the commit range. Document the upgrade steps in the **Breaking changes**
+section of the release notes. The move from `0.0.x` to `0.1.0` remains a
+deliberate decision, as does the declaration of a stable public API at `1.0.0`.
+
+For example, a feature and a fix after `v0.4.8` derive `v0.5.0`. A fix-only
+range derives `v0.4.9`. Editing the version in
 the release pull request overrides it, because `ship` tags whatever version is on
 `main`. The override is a property of the open pull request, not of the branch:
 a later push to `main` re-derives and force-pushes the branch, discarding the
