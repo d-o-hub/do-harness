@@ -1,0 +1,33 @@
+{
+  "case_id": "migration-retention-backfill-flawed",
+  "predeclared_expected_findings": ["D1", "D2"],
+  "defects": [
+    {
+      "id": "D1",
+      "severity": "material",
+      "class": "migration",
+      "summary": "Backfill is not idempotent and does not terminate: the batch selector has no WHERE retention_hours IS NULL guard, so after all rows are set the next batch reselects the same first 1000 rows, overwrites them, and never reaches zero rowcount (infinite loop; repeated overwrites of already-set values).",
+      "trigger": "backfill() selects rows by id LIMIT without filtering on retention_hours IS NULL; the stop condition is an UPDATE affecting zero rows, which never occurs.",
+      "consequence": "The backfill daemon loops forever and repeatedly rewrites rows, violating idempotence and blocking the migration completion signal.",
+      "evidence": "backfill.py: backfill() body; design.md 'Idempotence' section.",
+      "smallest_correction": "Add WHERE retention_hours IS NULL to the UPDATE and select only still-NULL ids (idempotent and terminating)."
+    },
+    {
+      "id": "D2",
+      "severity": "material",
+      "class": "migration",
+      "summary": "Rollback destructively drops the column, losing backfilled retention_hours values and any data written to the new column, violating the 'no destructive step; rollback must not lose data for existing columns' constraint.",
+      "trigger": "rollback() runs ALTER TABLE jobs DROP COLUMN retention_hours.",
+      "consequence": "Rollback after partial or full backfill loses data.",
+      "evidence": "backfill.py: rollback() body; design.md 'Rollback' section.",
+      "smallest_correction": "Keep an additive rollback (additive column stays; backfill writes are restorable) and never drop the column without an explicit data-loss decision."
+    }
+  ],
+  "new_beyond_baseline": ["D1", "D2"],
+  "false_positive_pool": [
+    {
+      "id": "FP1",
+      "summary": "Suggest adding an index on jobs.id to speed up the batch select."
+    }
+  ]
+}
