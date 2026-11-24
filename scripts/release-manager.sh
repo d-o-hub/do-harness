@@ -47,7 +47,7 @@
 # in docs/releasing.md ("Cutting a release"):
 #
 #   breaking                 -> major at >=1.0, minor at 0.x, patch at 0.0.x
-#   feat                     -> minor at >=1.0, patch at 0.x
+#   feat                     -> minor, patch at 0.0.x
 #   fix, perf                -> patch
 #   another conventional type (docs, chore, test, refactor, style, ci, build)
 #                            -> nothing on its own
@@ -60,19 +60,13 @@
 #   an internal rename (tests, docs, plans, examples, scripts, vendor)
 #                            -> nothing on its own
 #
-# Mirrored from `next_version`, the crate release-plz uses
-# (<https://docs.rs/next_version>), rather than invented here. Pre-1.0 it takes a
-# breaking change as the *minor* because "the bump from 0.x.y to 0.(x+1).0
-# indicates a breaking change", and SemVer §4 is what permits the choice ("Major
-# version zero (0.y.z) is for initial development. Anything MAY change at any
-# time.") — a feature-driven minor would make breaking changes invisible. It
-# takes a patch for a subject that is not a conventional commit, because a missed
-# release is the failure this pipeline exists to prevent. `feat` -> minor and
-# `fix` -> patch otherwise follow Conventional Commits, and §15's case rule is
-# honoured: the type is matched case-insensitively while the `BREAKING CHANGE`
-# footer token stays uppercase (§16's BREAKING-CHANGE synonym included). Merge
-# commits are excluded — their subject is git's ("Merge branch 'x'"), so counting
-# it would cut a release per merge.
+# SemVer §4 leaves pre-1.0 compatibility policy to the project. At 0.y.z
+# (y > 0), both features and breaking changes take the minor. The report
+# carries a separate breaking flag so reviewers can identify migration work.
+# At 0.0.x, advancing to 0.1.0 is a deliberate decision. Non-conventional
+# subjects take a patch so an unclassified change can still ship. Conventional
+# Commit types are case-insensitive (§15), with uppercase BREAKING CHANGE and
+# BREAKING-CHANGE footer tokens (§15–16). Merge commits are excluded.
 #
 # Tagging is deliberately not here: `main` requires pull requests, so the bump
 # lands as a reviewed PR and the tag is created by
@@ -373,7 +367,7 @@ decide_bump() {
     major="${current%%.*}"
     minor="${current#*.}"
     minor="${minor%%.*}"
-    # `0.0.x` is the pre-API phase: next_version keeps it on patches so that the
+    # `0.0.x` is the pre-API phase: keep it on patches so that the
     # step to 0.1.0 stays a decision rather than an automatic side effect.
     if [ "$major" -eq 0 ] && [ "$minor" -eq 0 ]; then
         printf 'patch'
@@ -388,11 +382,7 @@ decide_bump() {
         return 0
     fi
     if [ "$FEATURE" = true ]; then
-        if [ "$major" -ge 1 ]; then
-            printf 'minor'
-        else
-            printf 'patch'
-        fi
+        printf 'minor'
         return 0
     fi
     if [ "$FIX" = true ] || [ "$NONCONVENTIONAL" = true ]; then
@@ -1021,29 +1011,31 @@ EOF
     release 0.3.1
 
     commit 'feat(cli): add a status command'
-    expect patch 0.3.2 'pre-1.0 a feature cuts a patch, not the minor'
-    release 0.3.2
+    expect minor 0.4.0 'a feature in a 0.y.z release cuts the minor'
+    commit 'fix(cli): handle an empty status'
+    expect minor 0.4.0 'a feature and a fix together cut the minor'
+    release 0.4.0
 
     commit 'perf(core): drop a full-tree scan'
-    expect patch 0.3.3 'perf cuts a patch'
-    release 0.3.3
+    expect patch 0.4.1 'perf cuts a patch'
+    release 0.4.1
 
     commit 'Revert "feat(cli): add a status command"'
-    expect patch 0.3.4 'a non-conventional subject cuts a patch'
-    release 0.3.4
+    expect patch 0.4.2 'a non-conventional subject cuts a patch'
+    release 0.4.2
 
     commit 'FIX(core): mixed-case types still count'
-    expect patch 0.3.5 'the type is case-insensitive (spec §15)'
-    release 0.3.5
+    expect patch 0.4.3 'the type is case-insensitive (spec §15)'
+    release 0.4.3
 
     commit 'docs: another note'
-    expect none 0.3.5 'a conventional non-bumping type still cuts nothing'
+    expect none 0.4.3 'a conventional non-bumping type still cuts nothing'
 
     # The gate must not invent a state of its own: with nothing releasable the
     # answer stays `none`, and a version already on `main` stays `pending`.
     PUBLISHED="v9.9.9"
     PUBLISHED_KNOWN=true
-    expect none 0.3.5 'nothing releasable stays none, even with an unpublished basis'
+    expect none 0.4.3 'nothing releasable stays none, even with an unpublished basis'
     PUBLISHED=""
     PUBLISHED_KNOWN=false
 
@@ -1052,16 +1044,16 @@ EOF
     commit 'docs: side note'
     git -C "$repo" checkout -q main
     git -C "$repo" merge -q --no-ff -m "Merge branch 'side'" side
-    expect none 0.3.5 'a merge commit is not a release change'
+    expect none 0.4.3 'a merge commit is not a release change'
 
     commit 'refactor(core)!: drop the legacy payload'
-    expect minor 0.4.0 'pre-1.0 breaking cuts the minor, not the major'
-    release 0.4.0
+    expect minor 0.5.0 'a breaking change in a 0.y.z release cuts the minor'
+    release 0.5.0
 
     commit 'fix(core): repair the payload decoder'
     commit "$(printf 'fix(core): tighten the decoder\n\nBREAKING CHANGE: the decoder rejects truncated payloads')"
-    expect minor 0.5.0 'a BREAKING CHANGE footer is breaking'
-    release 0.5.0
+    expect minor 0.6.0 'a BREAKING CHANGE footer is breaking'
+    release 0.6.0
 
     release 1.2.3
     commit 'feat(core): add a payload format'
