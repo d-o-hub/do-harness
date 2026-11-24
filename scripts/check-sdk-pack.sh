@@ -75,9 +75,12 @@ PY
 
 node - "$TMP/npm.json" <<'JS'
 const fs = require("fs");
-const out = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
-const pkg = out["do-harness-sdk"];
-if (!pkg) throw new Error("pack result missing do-harness-sdk");
+const packages = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+if (!Array.isArray(packages) || packages.length !== 1) {
+  throw new Error("pack result must contain exactly one package");
+}
+const [pkg] = packages;
+if (pkg.name !== "do-harness-sdk") throw new Error(`unexpected package: ${pkg.name}`);
 if (pkg.version !== "0.4.8") throw new Error(`unexpected version: ${pkg.version}`);
 const paths = pkg.files.map((f) => f.path);
 for (const file of ["lib/sdk.mjs", "index.d.ts", "README.md"]) {
