@@ -22,3 +22,8 @@ exclude_paths:
   # adapter sources under lib/ remain analyzed.
   - "integrations/deepseek-harness/conformance/**"
   - "integrations/deepseek-harness/test/conformance.test.mjs"
+  # The fresh-context decision corpus is frozen pre-implementation review
+  # material: its flawed variants deliberately contain the planted defects the
+  # experiment measures, so static findings there are oracle fixtures, not
+  # gate failures. The packet-building machinery remains analyzed.
+  - "benchmarks/fresh-context-decision-v1/**"

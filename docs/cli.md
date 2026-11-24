@@ -67,7 +67,8 @@ Aliases: `check`.
 | `--since <REF>` | no | — | — | Run only sensors applicable to the committed range `merge-base(<REF>, HEAD)..HEAD`; combine with `--changed` to union committed and uncommitted paths |
 | `--only <SENSOR>` (repeatable) | no | — | — | Run only the named sensor (repeatable or comma-separated) |
 | `--exclude <SENSOR>` (repeatable) | no | — | — | Exclude named sensors from the run |
-| `--jobs <N>` | no | — | — | Maximum sensors in flight (overrides `jobs` in do-harness.toml) |
+| `--jobs <N>` | no | — | — | Maximum workspace concurrency with `--workspaces`; otherwise the maximum sensors in flight (overrides `jobs` in do-harness.toml) |
+| `--workspaces <GLOB>` | no | — | — | Select workspace directories or configs matching this root-relative glob |
 | `--unchanged <MODE>` | no | `warn` | `warn`, `skip`, `run` | Reuse recorded passing beats for sensors whose declared inputs are unchanged: `warn` (default) executes and advises, `skip` reuses without executing (requires --record), `run` always executes |
 | `--record` | no | — | — | Persist beats and error signatures into the state database |
 | `--task <ID>` | no | — | — | Scope records and fail-fast strikes to this task id (or 'global') |
@@ -595,6 +596,22 @@ projects.
 - `--no-seed`: Skip seeding `plans/invariants.json`.
 - `--minimal`: Skip skill scaffolding.
 - `--no-gitignore`: Skip creating/modifying `.gitignore`.
+
+### `setup`
+<!-- BEGIN GENERATED: cli-contract setup -->
+`do-harness setup [OPTIONS] <COMMAND>`
+
+Subcommands: `web`.
+<!-- END GENERATED: cli-contract setup -->
+
+### `setup web`
+<!-- BEGIN GENERATED: cli-contract setup web -->
+`do-harness setup web [OPTIONS]`
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `-y, --yes` | no | — | — | Skip the interactive install prompt and install missing dependencies |
+<!-- END GENERATED: cli-contract setup web -->
 
 ### `migrate`
 <!-- BEGIN GENERATED: cli-contract migrate -->

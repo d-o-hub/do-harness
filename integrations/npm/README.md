@@ -22,17 +22,22 @@ shell installer:
 curl -fsSL https://raw.githubusercontent.com/d-o-hub/do-harness/main/scripts/install.sh | sh
 ```
 
-**Windows x64 is not available through npm.** The `do-harness-win32-x64`
-platform package is rejected by the npm registry's name screening (HTTP 403,
-"Package name triggered spam detection"), so the meta package's pinned
-`optionalDependency` cannot resolve and `npx do-harness` has no Windows binary
-to run. The Windows binary ships as a GitHub release zip instead — see the
-Windows section of [docs/adoption.md](../../docs/adoption.md).
+**Windows x64 downloads the release binary on first run.** The
+`do-harness-win32-x64` platform package is rejected by the npm registry's
+name screening (HTTP 403, "Package name triggered spam detection"), so the
+meta package's pinned `optionalDependency` cannot resolve. The shim then
+fetches the matching GitHub release zip, verifies its SHA-256 against the
+release `checksums.txt`, and caches the extracted `do-harness.exe` under
+`%LOCALAPPDATA%\do-harness`; it fails closed on a checksum mismatch or a
+missing entry, and there is no `postinstall` script. Disable the fetch with
+`DO_HARNESS_NO_DOWNLOAD=1`. See the Windows section of
+[docs/adoption.md](../../docs/adoption.md).
 
 Note that `npm install do-harness` **succeeds** on Windows anyway: an absent
-optional dependency is not an install error. The failure appears at run time,
-where the shim exits 1 and points at the release zip rather than suggesting
-`--include=optional`, which cannot help.
+optional dependency is not an install error. The binary is fetched at the
+first invocation (above); when the fetch is disabled or fails, the shim exits
+1 and points at the release zip rather than suggesting `--include=optional`,
+which cannot help.
 
 ## Notes
 

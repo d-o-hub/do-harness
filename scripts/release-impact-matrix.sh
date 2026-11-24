@@ -18,28 +18,11 @@
 #       the CLI marks the CLI row breaking, a sensor-pack-only change touches
 #       only the packs row, and an empty range fails closed.
 #
-# Consumer groups and the paths that feed them. Each changed path maps to the
-# most specific matching group — `crates/do-harness/templates/**` feeds the
-# scaffolded sensor packs, not the CLI source, even though the templates are
-# embedded in the binary too:
+# One path can feed multiple shipped groups, such as a config template that
+# feeds both the adoption contract and the sensor packs. Explicit PR metadata
+# adds consumer upgrade instructions to the Markdown report.
 #
-#   CLI binaries        crates/** (except templates), vendor/**
-#   npm packages        integrations/npm/**
-#   Sensor packs        crates/do-harness/templates/**
-#   Guides & skills     docs/**, .agents/skills/**
-#   do-harness.toml    do-harness.toml
-#
-# Change classes come from the conventional commit type of the commits that
-# touch a group's files, with breaking outranking feature > fix > none:
-#
-#   breaking   a `!` subject or a BREAKING CHANGE:/BREAKING-CHANGE: footer
-#   feature    `feat` subjects
-#   fix        `fix`/`perf` subjects
-#   none       every other conventional type (docs, chore, test, refactor, …)
-#
-# "None" means no commit in the range touched that group; a patch release can
-# still carry a non-none row (a fix is a patch), which is exactly why the
-# matrix exists — a patch bumps never implies zero consumer work.
+# Impact precedence: breaking > feature > fix > updated > none.
 
 set -euo pipefail
 
@@ -57,6 +40,9 @@ readonly REPO_ROOT
 ROOT="$REPO_ROOT"
 FORMAT="plain"
 OUT=""
+ACTIONS=""
+PREVIOUS_TAG=""
+PREVIOUS_SET=false
 
 # The consumer groups, in table row order. The row label is what a reader sees;
 # the `group` id is the JSON key and the lookup key for per-group results.
@@ -75,6 +61,7 @@ impact_action() {
     case "$1" in
         breaking) printf 'Required — breaking changes to this artifact are detailed above.' ;;
         feature) printf 'Optional — new capability; upgrade when you want it.' ;;
+        updated) printf 'Review the updated guidance.' ;;
         fix) printf 'Recommended — upgrade to receive the fixes.' ;;
         *) printf 'None.' ;;
     esac
@@ -86,6 +73,7 @@ impact_action() {
 # type is `none`.
 readonly RE_BREAKING='^[a-zA-Z]+(\([^)]*\))?!:'      # feat(cli)!:
 readonly RE_FEAT='^feat(\([^)]*\))?:'                # feat(cli):
+readonly RE_DOCS='^docs(\([^)]*\))?:'
 readonly RE_FIX='^(fix|perf)(\([^)]*\))?:'           # fix(cli):, perf(core):
 class_of() {
     local subject="$1" body="$2" lowered line
@@ -110,6 +98,10 @@ class_of() {
         printf 'fix'
         return 0
     fi
+    if [[ "$lowered" =~ $RE_DOCS ]]; then
+        printf 'updated'
+        return 0
+    fi
     printf 'none'
 }
 
@@ -120,6 +112,7 @@ max_class() {
         breaking:* | *:breaking) printf 'breaking' ;;
         feature:* | *:feature) printf 'feature' ;;
         fix:* | *:fix) printf 'fix' ;;
+        updated:* | *:updated) printf 'updated' ;;
         *) printf 'none' ;;
     esac
 }
@@ -139,6 +132,8 @@ usage: release-impact-matrix.sh <command> [options]
 
 options:
   --root <dir>            repository to operate on (default: this checkout)
+  --previous <tag>           use the same basis as the generated changelog
+  --actions <file>           inputs containing Consumer-Impact metadata
   --out <file>            write the matrix to <file> instead of stdout
   --format plain|json     output shape (default: plain)
 EOF
@@ -179,23 +174,23 @@ impact_title() {
         breaking) printf 'Breaking' ;;
         feature) printf 'Feature' ;;
         fix) printf 'Fix' ;;
+        updated) printf 'Updated' ;;
         *) printf 'None' ;;
     esac
 }
 
-# Assigns one changed path to its consumer group. The order is specificity:
-# the templates subtree is a sensor pack before it is a CLI source, and every
-# other path falls to the broadest group that owns it (crates/vendor build the
-# binaries; docs and skills are the guides). Unassigned paths (scripts/, .github/,
-# Cargo.lock, …) are not shipped artifacts and feed no row.
-group_for_path() {
+# Some shipped inputs feed multiple consumers. Repository-local configuration
+# is an instance of the adoption contract, whose definitions are listed here.
+groups_for_path() {
     case "$1" in
-        crates/do-harness/templates/*) printf 'packs' ;;
-        integrations/npm/*) printf 'npm' ;;
-        crates/* | vendor/*) printf 'cli' ;;
-        docs/* | .agents/skills/*) printf 'guides' ;;
-        do-harness.toml) printf 'contract' ;;
-        *) printf '' ;;
+        crates/do-harness/templates/do-harness.toml.*) printf '%s\n' packs contract ;;
+        crates/do-harness/templates/*) printf '%s\n' packs ;;
+        crates/do-harness/src/config/* | crates/do-harness/src/migrate.rs | crates/do-harness/src/doctor/checks.rs)
+            printf '%s\n' cli contract ;;
+        Cargo.lock) printf '%s\n' cli npm ;;
+        integrations/npm/*) printf '%s\n' npm ;;
+        crates/* | vendor/*) printf '%s\n' cli ;;
+        AGENTS.md | docs/* | .agents/skills/*) printf '%s\n' guides ;;
     esac
 }
 
@@ -223,16 +218,38 @@ classify_range() {
 
 # Runs `matrix` with the current ROOT/REF/FORMAT/OUT and prints the result.
 matrix() {
-    local ref="$1" basis range group hash impact
-    local -A GROUP_FILES IMPACT
+    local ref="$1" basis range group hash impact path paths hashes line action i
+    local -A GROUP_FILES IMPACT REQUIRED_ACTION
+    local action_pattern='^Consumer-Impact: (cli|npm|packs|guides|contract) [|] ([^|<>]+)$'
+    if [ -n "$ACTIONS" ]; then
+        while IFS= read -r line || [ -n "$line" ]; do
+            line="${line%$'\r'}"
+            case "$line" in
+                'Consumer-Impact:'*)
+                    [[ "$line" =~ $action_pattern ]] || die "invalid Consumer-Impact entry"
+                    group="${BASH_REMATCH[1]}"
+                    action="${BASH_REMATCH[2]}"
+                    REQUIRED_ACTION["$group"]="${REQUIRED_ACTION[$group]:+${REQUIRED_ACTION[$group]}<br>}$action"
+                    ;;
+            esac
+        done <"$ACTIONS"
+    fi
     # A ref that does not resolve makes every git query below fail in a way
     # that reads as "no commits": refuse it before anything is read.
     git -C "$ROOT" rev-parse --verify --quiet "$ref^{commit}" >/dev/null ||
         die "cannot resolve ref '$ref' as a commit in $ROOT"
-    basis="$(latest_tag "$ref")"
+    if [ "$PREVIOUS_SET" = true ]; then
+        basis="$PREVIOUS_TAG"
+        if [ -n "$basis" ]; then
+            git -C "$ROOT" merge-base --is-ancestor "refs/tags/$basis" "$ref" ||
+                die "previous tag is missing or outside the release history: $basis"
+        fi
+    else
+        basis="$(latest_tag "$ref")"
+    fi
     # When <ref> is itself a release tag, `tag --merged` counts it as merged
     # into itself; the basis is the next release tag strictly below it.
-    if [ -n "$basis" ] && [ "$basis" = "$ref" ]; then
+    if [ "$PREVIOUS_SET" = false ] && [ -n "$basis" ] && [ "$basis" = "$ref" ]; then
         basis="$(git -C "$ROOT" tag --merged "$ref" --list 'v[0-9]*' --sort=-v:refname 2>/dev/null \
             | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | grep -vxF "$ref" | head -1 || true)"
     fi
@@ -248,12 +265,14 @@ matrix() {
     fi
     classify_range "$range"
     # Partition the changed paths into per-group file lists.
+    paths="$(changed_paths "$ref" "$basis")" || return 1
     while IFS= read -r path; do
         [ -n "$path" ] || continue
-        group="$(group_for_path "$path")"
-        [ -n "$group" ] || continue
-        GROUP_FILES["$group"]+=$'\n'"$path"
-    done <<<"$(changed_paths "$ref" "$basis")"
+        while IFS= read -r group; do
+            [ -n "$group" ] || continue
+            GROUP_FILES["$group"]+=$'\n'"$path"
+        done <<<"$(groups_for_path "$path")"
+    done <<<"$paths"
     # One row per group: the highest change class among the commits that touch
     # its files. A group no commit touches is `none`.
     for i in "${!GROUP_IDS[@]}"; do
@@ -271,10 +290,16 @@ matrix() {
         fi
         impact=none
         if [ "${#files[@]}" -gt 0 ]; then
+            if ! hashes="$(git -C "$ROOT" --literal-pathspecs log --no-merges --format='%H' "$range" -- "${files[@]}")"; then
+                die "cannot read impact history for $group"
+            fi
             while IFS= read -r hash; do
                 [ -n "$hash" ] || continue
                 impact="$(max_class "$impact" "${CLASS_OF[$hash]:-none}")"
-            done < <(git -C "$ROOT" log --no-merges --format='%H' "$range" -- "${files[@]}")
+            done <<<"$hashes"
+        fi
+        if [ "$impact" = none ] && [ -n "${REQUIRED_ACTION[$group]:-}" ]; then
+            impact=updated
         fi
         IMPACT["$group"]="$impact"
     done
@@ -296,119 +321,16 @@ matrix() {
         printf '|---|---|---|\n'
         for i in "${!GROUP_IDS[@]}"; do
             group="${GROUP_IDS[i]}"
+            action="$(impact_action "${IMPACT[$group]}")"
+            if [ -n "${REQUIRED_ACTION[$group]:-}" ]; then
+                action="Required — ${REQUIRED_ACTION[$group]}"
+            fi
             printf '| %s | %s | %s |\n' \
                 "${GROUP_LABELS[i]}" \
                 "$(impact_title "${IMPACT[$group]}")" \
-                "$(impact_action "${IMPACT[$group]}")"
+                "$action"
         done
     fi
-}
-
-# The self-test's sandbox; a global because the EXIT trap runs after the
-# function has returned and a `local` would already be out of scope.
-WORK=""
-self_test() {
-    local repo failures=0
-    WORK="$(mktemp -d)"
-    repo="$WORK/repo"
-    trap 'rm -rf "$WORK"' EXIT
-
-    expect_die() {
-        local want="$1" description="$2" out
-        shift 2
-        if out="$("$@" 2>&1)"; then
-            printf 'FAIL %s: exited 0\n' "$description" >&2
-            failures=$((failures + 1))
-        elif [[ "$out" == *"$want"* ]]; then
-            printf 'ok   %s\n' "$description"
-        else
-            printf 'FAIL %s: failed without "%s": %s\n' "$description" "$want" "$out" >&2
-            failures=$((failures + 1))
-        fi
-    }
-    expect_matrix() { # expect_matrix <tag> <group> <expected-impact> <description>
-        local tag="$1" group="$2" want="$3" description="$4" out row
-        out="$(matrix "$tag")" || {
-            printf 'FAIL %s: matrix exited %s\n' "$description" "$?" >&2
-            failures=$((failures + 1))
-            return
-        }
-        row="$(printf '%s' "$out" | grep -o "\"group\":\"$group\"[^}]*}" || true)"
-        if [[ "$row" == *"\"impact\":\"$want\""* ]]; then
-            printf 'ok   %s (%s=%s)\n' "$description" "$group" "$want"
-        else
-            printf 'FAIL %s: %s row expected %s, got %s\n' "$description" "$group" "$want" "$row" >&2
-            failures=$((failures + 1))
-        fi
-        for g in "${GROUP_IDS[@]}"; do
-            printf '%s' "$out" | grep -q "\"group\":\"$g\"" || {
-                printf 'FAIL %s: the matrix is missing the %s row\n' "$description" "$g" >&2
-                failures=$((failures + 1))
-            }
-        done
-    }
-
-    # A fixture repository with one file per consumer group. Commit bodies are
-    # written to real files so each commit carries changed paths.
-    mkdir -p "$repo/crates/do-harness/src/cli" \
-        "$repo/crates/do-harness/templates/scripts" \
-        "$repo/integrations/npm/platforms" \
-        "$repo/docs" \
-        "$repo/.agents/skills/harness"
-    : >"$repo/crates/do-harness/src/cli/status.rs"
-    : >"$repo/crates/do-harness/templates/scripts/check-python-test.sh"
-    : >"$repo/integrations/npm/package.json"
-    : >"$repo/docs/releasing.md"
-    : >"$repo/.agents/skills/harness/SKILL.md"
-    : >"$repo/do-harness.toml"
-    git -C "$repo" init -q -b main
-    git -C "$repo" config user.email self-test@example.invalid
-    git -C "$repo" config user.name self-test
-    git -C "$repo" add -A
-    git -C "$repo" commit -qm 'chore: seed'
-    git -C "$repo" tag v0.4.5
-
-    # Every derivation below reads the fixture repository, never this checkout.
-    ROOT="$repo"
-    # The assertions parse the JSON shape.
-    FORMAT=json
-
-    edit() { # edit <path> <content> <subject>
-        printf '%s\n' "$2" >>"$repo/$1"
-        git -C "$repo" add "$1"
-        git -C "$repo" commit -q -m "$3"
-    }
-
-    # A breaking commit touching the CLI marks the CLI row breaking.
-    edit crates/do-harness/src/cli/status.rs 'cmd' 'feat(cli)!: drop the legacy status flag'
-    git -C "$repo" tag v0.4.6
-    expect_matrix v0.4.6 cli breaking 'a breaking commit touching the CLI marks the CLI row breaking'
-    expect_matrix v0.4.6 packs none 'the breaking CLI commit left the sensor-pack row untouched'
-    expect_matrix v0.4.6 npm none 'the breaking CLI commit left the npm row untouched'
-
-    # A sensor-pack-only change touches only the packs row.
-    edit crates/do-harness/templates/scripts/check-python-test.sh 'ruff' 'fix(init): bump the python pack'
-    git -C "$repo" tag v0.4.7
-    expect_matrix v0.4.7 packs fix 'a sensor-pack-only change marks the packs row fix'
-    expect_matrix v0.4.7 cli none 'a sensor-pack-only change left the CLI row untouched'
-    expect_matrix v0.4.7 guides none 'a sensor-pack-only change left the guides row untouched'
-
-    # A docs-only commit marks the guides row, not anything else.
-    edit docs/releasing.md 'note' 'docs: explain the release gate'
-    git -C "$repo" tag v0.4.8
-    expect_matrix v0.4.8 guides none 'a docs-only change marks the guides row none'
-    expect_matrix v0.4.8 contract none 'a docs-only change left the contract row untouched'
-
-    # An empty range fails closed, and so does an unresolvable ref.
-    git -C "$repo" tag v0.4.9
-    expect_die 'empty range' 'an empty range fails closed' matrix v0.4.9
-    expect_die 'cannot resolve ref' 'an unresolvable ref fails closed' matrix no-such-ref
-
-    if [ "$failures" -ne 0 ]; then
-        printf 'release-impact-matrix: %s self-test failures\n' "$failures" >&2
-        exit 1
-    fi
-    printf 'release-impact-matrix: self-test passed\n'
 }
 
 main() {
@@ -424,6 +346,17 @@ main() {
             --root)
                 require_arg "$@"
                 ROOT="${2:-}"
+                shift 2
+                ;;
+            --previous)
+                require_arg "$@"
+                PREVIOUS_TAG="$2"
+                PREVIOUS_SET=true
+                shift 2
+                ;;
+            --actions)
+                require_arg "$@"
+                ACTIONS="$2"
                 shift 2
                 ;;
             --out)
@@ -468,6 +401,8 @@ main() {
             fi
             ;;
         --self-test)
+            # shellcheck source=scripts/release-impact-matrix-self-test.sh
+            source "$SCRIPT_DIR/release-impact-matrix-self-test.sh"
             self_test
             ;;
         "")

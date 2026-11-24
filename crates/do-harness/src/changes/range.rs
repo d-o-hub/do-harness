@@ -252,7 +252,7 @@ fn range_inner(
 /// A committed range uses the same record format as the working-tree diff, so
 /// renames and deletions are reported identically on both sides.
 fn diff_range(root: &Path, from: &str, to: &str) -> Result<Vec<ChangedFile>, DiscoveryError> {
-    let args = ["diff", "--name-status", "-z", from, to];
+    let args = ["diff", "--relative", "--name-status", "-z", from, to];
     let output = git_output(root, &args)?;
     parse_name_status(&output.stdout, &git_label(&args))
 }

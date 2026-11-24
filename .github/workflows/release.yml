@@ -421,6 +421,7 @@ jobs:
     permissions:
       # Least privilege: read source, write the release and its assets.
       contents: write
+      pull-requests: read
     steps:
       # actions/checkout@v7.0.1
       #
@@ -483,8 +484,24 @@ jobs:
             api+=(-f "previous_tag_name=$previous")
           fi
           gh api "${api[@]}" --jq .body > generated-notes.md
-          bash scripts/release-impact-matrix.sh matrix "${RELEASE_TAG}" --out impact-matrix.md
-          bash scripts/release-notes.sh compose "${RELEASE_TAG}" generated-notes.md release-notes.md impact-matrix.md
+          if [ -f scripts/release-impact-matrix.sh ]; then
+            range="$RELEASE_TAG"
+            if [ -n "$previous" ]; then range="$previous..$RELEASE_TAG"; fi
+            prs="$(git log --first-parent --format=%s "$range" |
+              sed -nE 's/.* \(#([0-9]+)\)$/\1/p' | sort -u)"
+            : > consumer-actions.txt
+            while read -r pr; do
+              [ -n "$pr" ] || continue
+              gh pr view "$pr" --json body --jq '.body // ""' >> consumer-actions.txt
+              printf '\n' >> consumer-actions.txt
+            done <<< "$prs"
+            bash scripts/release-impact-matrix.sh matrix "$RELEASE_TAG" \
+              --previous "$previous" --actions consumer-actions.txt --out impact-matrix.md
+            bash scripts/release-notes.sh compose "$RELEASE_TAG" generated-notes.md release-notes.md "" impact-matrix.md
+          else
+            # A recovery dispatch can check out a tag from before the matrix.
+            bash scripts/release-notes.sh compose "$RELEASE_TAG" generated-notes.md release-notes.md
+          fi
           bash scripts/release-notes.sh check "${RELEASE_TAG}" release-notes.md
           echo "composed release notes ($(wc -l < release-notes.md) lines)"
       - name: Publish the GitHub Release

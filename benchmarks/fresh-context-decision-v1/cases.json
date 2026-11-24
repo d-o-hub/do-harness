@@ -1,0 +1,156 @@
+{
+  "schema_version": 1,
+  "experiment": "fresh-context-review-decision-v1",
+  "corpus_version": "fresh-context-decision-v1",
+  "note": "Reviewer-facing case table only. Expected findings live in ground-truth/ and are never referenced by packet assembly (see scripts/fresh_context_decision/corpus.py).",
+  "cases": [
+    {
+      "id": "authz-group-delegation-flawed",
+      "class": "authorization",
+      "variant": "flawed",
+      "objective": "Add group-based delegated administration: an administrator can delegate a permission to a group; members of the group, including members of nested subgroups, receive that permission; a delegation can be revoked and must take effect immediately.",
+      "intended_behavior": "grant_delegation(delegator, group_id, perms) grants perms to the group and its transitive members; revoke_delegation(delegator, group_id, perms) withdraws them transitively; effective_permissions(subject_id) reflects both at authorization time.",
+      "constraints": [
+        "revocation must be immediate, never stale",
+        "cache use is allowed but must not serve stale data",
+        "a delegator may only delegate permissions the delegator currently holds",
+        "no new schema in scope"
+      ],
+      "proposed_contract": "grant_delegation(delegator, group_id, perms); revoke_delegation(delegator, group_id, perms); effective_permissions(subject_id) -> set[perm]",
+      "open_questions": [
+        "Is a 5-minute cache refresh acceptable for group membership?",
+        "Should delegation power be checked at grant time or at authorization time?"
+      ],
+      "design_doc": "authz-group-delegation-flawed/design.md",
+      "source_files": [
+        "authz-group-delegation-flawed/acl.py"
+      ],
+      "parent_marker": "FRESHCTX-AUTHZ-FLAWED-4471"
+    },
+    {
+      "id": "authz-group-delegation-sound",
+      "class": "authorization",
+      "variant": "sound",
+      "objective": "Add group-based delegated administration: an administrator can delegate a permission to a group; members of the group, including members of nested subgroups, receive that permission; a delegation can be revoked and must take effect immediately.",
+      "intended_behavior": "grant_delegation(delegator, group_id, perms) grants perms to the group and its transitive members; revoke_delegation(delegator, group_id, perms) withdraws them transitively; effective_permissions(subject_id) reflects both at authorization time.",
+      "constraints": [
+        "revocation must be immediate, never stale",
+        "cache use is allowed but must not serve stale data",
+        "a delegator may only delegate permissions the delegator currently holds",
+        "no new schema in scope"
+      ],
+      "proposed_contract": "grant_delegation(delegator, group_id, perms); revoke_delegation(delegator, group_id, perms); effective_permissions(subject_id) -> set[perm]",
+      "open_questions": [
+        "Should nested group cycles be rejected or resolved by visited-set traversal?"
+      ],
+      "design_doc": "authz-group-delegation-sound/design.md",
+      "source_files": [
+        "authz-group-delegation-sound/acl.py"
+      ],
+      "parent_marker": "FRESHCTX-AUTHZ-SOUND-4472"
+    },
+    {
+      "id": "migration-retention-backfill-flawed",
+      "class": "migration",
+      "variant": "flawed",
+      "objective": "Add a nullable retention_hours column to the jobs table and backfill existing rows online without blocking writers.",
+      "intended_behavior": "Migration 0017 adds the nullable column; a backfill assigns retention_hours where it is still NULL in bounded batches; writers are never blocked; the migration is rollback-safe for existing data.",
+      "constraints": [
+        "migration and backfill must be idempotent",
+        "no destructive step; rollback must not lose data for existing columns",
+        "backfill must run in bounded batches without blocking writers"
+      ],
+      "proposed_contract": "ALTER TABLE jobs ADD COLUMN retention_hours INTEGER NULL; UPDATE jobs SET retention_hours = ? WHERE id IN (SELECT id FROM jobs ORDER BY id LIMIT 1000)",
+      "open_questions": [
+        "Should backfill process one batch per transaction or one transaction per row?",
+        "Is a maintenance-window backfill acceptable, or must it be online-safe?"
+      ],
+      "design_doc": "migration-retention-backfill-flawed/design.md",
+      "source_files": [
+        "migration-retention-backfill-flawed/backfill.py"
+      ],
+      "parent_marker": "FRESHCTX-MIGR-FLAWED-4473"
+    },
+    {
+      "id": "migration-retention-backfill-sound",
+      "class": "migration",
+      "variant": "sound",
+      "objective": "Add a nullable retention_hours column to the jobs table and backfill existing rows online without blocking writers.",
+      "intended_behavior": "Migration 0017 adds the nullable column; a backfill assigns retention_hours where it is still NULL in bounded batches; writers are never blocked; the migration is rollback-safe for existing data.",
+      "constraints": [
+        "migration and backfill must be idempotent",
+        "no destructive step; rollback must not lose data for existing columns",
+        "backfill must run in bounded batches without blocking writers"
+      ],
+      "proposed_contract": "ALTER TABLE jobs ADD COLUMN retention_hours INTEGER NULL; UPDATE jobs SET retention_hours = ? WHERE retention_hours IS NULL AND id IN (SELECT id FROM jobs ORDER BY id LIMIT 1000)",
+      "open_questions": [
+        "Should the backfill claim batches with an advisory lock or a lease column?"
+      ],
+      "design_doc": "migration-retention-backfill-sound/design.md",
+      "source_files": [
+        "migration-retention-backfill-sound/backfill.py"
+      ],
+      "parent_marker": "FRESHCTX-MIGR-SOUND-4474"
+    },
+    {
+      "id": "api-defaults-compat-flawed",
+      "class": "api-compat",
+      "variant": "flawed",
+      "objective": "Extend the public client configuration API with a timeout option while preserving behavior for existing callers.",
+      "intended_behavior": "connect() gains an optional timeout parameter; callers that do not pass it keep the previous effective timeout; the deprecated timeout_seconds alias remains functional during a deprecation window.",
+      "constraints": [
+        "existing callers observe no silent change in effective behavior",
+        "no public symbol is removed without a deprecation window",
+        "new parameter is additive and optional"
+      ],
+      "proposed_contract": "connect(host, port, timeout=30) -> Connection; connect(timeout_seconds=... ) remains accepted and logs a deprecation warning",
+      "open_questions": [
+        "Should the deprecation warning be emitted once per process or per call?"
+      ],
+      "design_doc": "api-defaults-compat-flawed/design.md",
+      "source_files": [
+        "api-defaults-compat-flawed/config.py"
+      ],
+      "parent_marker": "FRESHCTX-API-FLAWED-4475"
+    },
+    {
+      "id": "api-defaults-compat-sound",
+      "class": "api-compat",
+      "variant": "sound",
+      "objective": "Extend the public client configuration API with a timeout option while preserving behavior for existing callers.",
+      "intended_behavior": "connect() gains an optional timeout parameter; callers that do not pass it keep the previous effective timeout; the deprecated timeout_seconds alias remains functional during a deprecation window.",
+      "constraints": [
+        "existing callers observe no silent change in effective behavior",
+        "no public symbol is removed without a deprecation window",
+        "new parameter is additive and optional"
+      ],
+      "proposed_contract": "connect(host, port, timeout=30) -> Connection; connect(timeout_seconds=... ) remains accepted and logs a deprecation warning",
+      "open_questions": [
+        "Should the deprecation warning be emitted once per process or per call?"
+      ],
+      "design_doc": "api-defaults-compat-sound/design.md",
+      "source_files": [
+        "api-defaults-compat-sound/config.py"
+      ],
+      "parent_marker": "FRESHCTX-API-SOUND-4476"
+    },
+    {
+      "id": "routine-trim-control",
+      "class": "routine-control",
+      "variant": "control",
+      "objective": "Normalize label trimming in the public text helper: strip surrounding whitespace from label inputs before they are returned.",
+      "intended_behavior": "strip_label(value) returns value with leading and trailing whitespace removed; None passes through unchanged.",
+      "constraints": [
+        "no public behavior change beyond whitespace normalization",
+        "None input behavior is preserved"
+      ],
+      "proposed_contract": "strip_label(value) -> str | None",
+      "open_questions": [],
+      "design_doc": "routine-trim-control/design.md",
+      "source_files": [
+        "routine-trim-control/textutil.py"
+      ],
+      "parent_marker": "FRESHCTX-ROUTINE-CONTROL-4477"
+    }
+  ]
+}

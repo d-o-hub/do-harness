@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "do-harness-sdk"
+# Mirrors the do-harness CLI release this SDK targets (see README.md).
+version = "0.4.8"
+description = "Typed Python bindings for the do-harness agent harness CLI"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "do-harness contributors" }]
+keywords = ["agent", "harness", "verification", "sdk"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries",
+]
+dependencies = []
+
+[project.optional-dependencies]
+langchain = ["langchain-core>=0.1"]
+test = ["pytest>=8"]
+
+[project.urls]
+Homepage = "https://github.com/d-o-hub/do-harness"
+Documentation = "https://github.com/d-o-hub/do-harness/blob/main/integrations/sdk-python/README.md"
+Repository = "https://github.com/d-o-hub/do-harness"
+Issues = "https://github.com/d-o-hub/do-harness/issues"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["do_harness_sdk*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

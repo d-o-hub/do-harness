@@ -78,7 +78,7 @@ usage() {
 Compose and validate the GitHub Release body.
 
 Usage:
-  release-notes.sh compose <tag> <generated-notes> <out> [<impact-matrix>] [<curated-notes>]
+  release-notes.sh compose <tag> <generated-notes> <out> [<curated-notes>] [<impact-matrix>]
   release-notes.sh check <tag> <file>
   release-notes.sh seed <tag> [<out>]
   release-notes.sh --self-test
@@ -168,7 +168,7 @@ count_bullets() {
 }
 
 compose() {
-    local tag="$1" generated="$2" out="$3" impact="${4:-}" curated="${5:-}"
+    local tag="$1" generated="$2" out="$3" curated="${4:-}" impact="${5:-}"
     local version="${tag#v}" header changes="$WORK/changes.md" want have
 
     [[ -f "$generated" ]] || fail "generated notes not found: $generated"
@@ -317,7 +317,7 @@ EOF
 **Full Changelog**: https://github.com/d-o-hub/do-harness/compare/v0.1.2...v0.1.3
 EOF
 
-    compose "v0.1.3" "$generated" "$composed" "$WORK/impact.md"
+    compose "v0.1.3" "$generated" "$composed" "" "$WORK/impact.md"
     check "v0.1.3" "$composed" >/dev/null ||
         fail "self-test: notes composed from the template failed the check"
 
@@ -408,7 +408,7 @@ EOF
 | Consumer group | Impact | Action required |
 |---|---|---|
 EOF
-    compose "v0.1.3" "$generated" "$WORK/empty-matrix.md" "$WORK/empty-impact.md"
+    compose "v0.1.3" "$generated" "$WORK/empty-matrix.md" "" "$WORK/empty-impact.md"
     if check "v0.1.3" "$WORK/empty-matrix.md" >/dev/null 2>&1; then
         fail "self-test: a header-only impact matrix passed the check"
     fi
@@ -441,7 +441,7 @@ EOF
     if [[ -e "$WORK/no-v-prefix.md" ]]; then
         fail "self-test: a rejected tag still wrote a file"
     fi
-    compose "v0.1.3" "$generated" "$WORK/stubbed.md" "$WORK/impact.md" "$stub"
+    compose "v0.1.3" "$generated" "$WORK/stubbed.md" "$stub" "$WORK/impact.md"
     check "v0.1.3" "$WORK/stubbed.md" >/dev/null ||
         fail "self-test: an unedited seeded stub failed the check"
 
