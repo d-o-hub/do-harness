@@ -5,7 +5,7 @@ language = "rust"
 pre-commit = ["fmt", "loc"]
 # Bounded to ordinary checks (matching signal-sets.verification) so heavy
 # scheduled checks (`coverage`, `powerset`) and release preflights never execute on local push.
-pre-push = ["fmt", "check", "clippy", "deps", "machete", "audit", "test", "doctest", "loc", "skills", "skills-docs", "shell", "markdownlint", "docs-sync", "docs-examples", "docs-links", "docs-pins", "yamllint", "actionlint", "action-pins", "workflow-shell", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "release-manager", "verify-published", "commitlint", "contract-first", "ci-concurrency-guardrails", "workflow-benchmark", "ci-workflow-costs", "repo-links", "latest-main-guardrails", "token-usage"]
+pre-push = ["fmt", "check", "clippy", "deps", "machete", "audit", "test", "doctest", "loc", "skills", "skills-docs", "shell", "markdownlint", "docs-sync", "docs-examples", "docs-links", "docs-pins", "yamllint", "actionlint", "action-pins", "workflow-shell", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "release-manager", "verify-published", "commitlint", "contract-first", "ci-concurrency-guardrails", "workflow-benchmark", "fresh-context-decision", "ci-workflow-costs", "repo-links", "latest-main-guardrails", "token-usage"]
 
 [signal-sets]
 # `feedback` is the fast loop, so it names the sensors the generated pre-commit
@@ -22,13 +22,13 @@ feedback = ["fmt", "check", "clippy", "loc"]
 # contract (`docs/documentation-contract.md`). Each one reads only git, the
 # working tree, and the local toolchain, and each fails closed on an empty
 # inventory, so the trio belongs to the PR-time set as well as `release`.
-verification = ["fmt", "check", "clippy", "deps", "machete", "audit", "test", "doctest", "loc", "skills", "skills-docs", "shell", "markdownlint", "docs-sync", "docs-examples", "docs-links", "docs-pins", "yamllint", "actionlint", "action-pins", "workflow-shell", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "release-manager", "verify-published", "commitlint", "contract-first", "ci-concurrency-guardrails", "workflow-benchmark", "ci-workflow-costs", "repo-links", "latest-main-guardrails", "token-usage"]
+verification = ["fmt", "check", "clippy", "deps", "machete", "audit", "test", "doctest", "loc", "skills", "skills-docs", "shell", "markdownlint", "docs-sync", "docs-examples", "docs-links", "docs-pins", "yamllint", "actionlint", "action-pins", "workflow-shell", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "release-manager", "verify-published", "commitlint", "contract-first", "ci-concurrency-guardrails", "workflow-benchmark", "fresh-context-decision", "ci-workflow-costs", "repo-links", "latest-main-guardrails", "token-usage"]
 # `main` is the post-merge release gate. It is the strict ordinary verification
 # surface, named separately so release automation consumes one green result for
 # one exact main commit. The expensive coverage and feature-powerset checks run
 # in `scheduled` and the final `release` gate rather than charging every push.
-main = ["fmt", "check", "clippy", "deps", "machete", "audit", "test", "doctest", "loc", "skills", "skills-docs", "shell", "markdownlint", "docs-sync", "docs-examples", "docs-links", "docs-pins", "yamllint", "actionlint", "action-pins", "workflow-shell", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "release-manager", "verify-published", "commitlint", "contract-first", "ci-concurrency-guardrails", "workflow-benchmark", "ci-workflow-costs", "repo-links", "latest-main-guardrails", "token-usage"]
-release = ["fmt", "check", "clippy", "deps", "audit", "test", "doctest", "coverage", "powerset", "loc", "skills", "skills-docs", "shell", "markdownlint", "docs-sync", "docs-examples", "docs-links", "docs-pins", "yamllint", "actionlint", "action-pins", "workflow-shell", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "release-manager", "release-manager-e2e", "publish-npm", "verify-published", "commitlint", "contract-first", "ci-concurrency-guardrails", "workflow-benchmark", "ci-workflow-costs", "repo-links", "latest-main-guardrails", "token-usage"]
+main = ["fmt", "check", "clippy", "deps", "machete", "audit", "test", "doctest", "loc", "skills", "skills-docs", "shell", "markdownlint", "docs-sync", "docs-examples", "docs-links", "docs-pins", "yamllint", "actionlint", "action-pins", "workflow-shell", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "release-manager", "verify-published", "commitlint", "contract-first", "ci-concurrency-guardrails", "workflow-benchmark", "fresh-context-decision", "ci-workflow-costs", "repo-links", "latest-main-guardrails", "token-usage"]
+release = ["fmt", "check", "clippy", "deps", "audit", "test", "doctest", "coverage", "powerset", "loc", "skills", "skills-docs", "shell", "markdownlint", "docs-sync", "docs-examples", "docs-links", "docs-pins", "yamllint", "actionlint", "action-pins", "workflow-shell", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "release-manager", "release-manager-e2e", "publish-npm", "verify-published", "commitlint", "contract-first", "ci-concurrency-guardrails", "workflow-benchmark", "fresh-context-decision", "ci-workflow-costs", "repo-links", "latest-main-guardrails", "token-usage"]
 # DORA gets its own set so its evidence is addressable (`status --set metrics`)
 # without joining the gating sets. A no-`--set` status check compares against
 # every configured sensor, so a dora-only run's artifact would report
@@ -471,6 +471,12 @@ argv = ["python3", "scripts/workflow-benchmark.py", "--self-test"]
 # headroom and failed the pre-push gate whenever a build shared the box.
 timeout = 120
 when-changed = ["benchmarks/**", "scripts/workflow-benchmark.py", "scripts/workflow_benchmark/**", "do-harness.toml"]
+
+[[sensors]]
+name = "fresh-context-decision"
+argv = ["python3", "scripts/fresh-context-decision.py", "--self-test"]
+timeout = 60
+when-changed = ["benchmarks/fresh-context-decision-v1/**", "scripts/fresh-context-decision.py", "scripts/fresh_context_decision/**", "do-harness.toml"]
 
 [[sensors]]
 name = "ci-workflow-costs"
