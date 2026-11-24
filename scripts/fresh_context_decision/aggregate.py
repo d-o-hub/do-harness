@@ -47,6 +47,8 @@ def pinned_thresholds(protocol):
         return None
     if protocol["sample"]["min_complete_designs"] is None:
         return None
+    if protocol["sample"]["repeated_runs_per_design_per_arm"] is None:
+        return None
     return thresholds
 
 
@@ -84,7 +86,7 @@ def load_protocol(path):
     return validate_protocol(
         json.loads(Path(path).read_text(encoding="utf-8"))
     )
-def summarize_designs(adjudicated, records, corpus):
+def summarize_designs(adjudicated, records, corpus, required_repeats):
     """Summarize per-design completeness and treatment measurements."""
     record_map = {}
     for record in records:
@@ -100,7 +102,10 @@ def summarize_designs(adjudicated, records, corpus):
                               if r["review"]["outcome"] in COMPLETED_OUTCOMES]
         treatment_completed = [r for r in treatment
                                if r["review"]["outcome"] in COMPLETED_OUTCOMES]
-        complete = bool(baseline_completed and treatment_completed)
+        complete = (
+            len(baseline_completed) >= required_repeats
+            and len(treatment_completed) >= required_repeats
+        )
         unit = {
             "case_id": case_id,
             "class": case["class"],
@@ -264,7 +269,11 @@ def aggregate(records, corpus, protocol):
     """Full pipeline: validate, adjudicate, summarize, decide."""
     validated = [validate_run_record(record) for record in records]
     adjudicated = adjudicate_records(validated, corpus)
-    designs = summarize_designs(adjudicated, validated, corpus)
+    required_repeats = protocol["sample"]["repeated_runs_per_design_per_arm"]
+    if required_repeats is None:
+        # Unpinned protocols remain reportable, but decide() stays INCONCLUSIVE.
+        required_repeats = 1
+    designs = summarize_designs(adjudicated, validated, corpus, required_repeats)
     verdict = decide(designs, protocol)
     return {
         "schema_version": 1,

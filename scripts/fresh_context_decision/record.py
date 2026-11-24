@@ -41,7 +41,8 @@ def _require(condition, message):
 def validate_run_record(record):
     """Validate a run record; raise ValueError with a precise message."""
     _require(isinstance(record, dict), "record must be a JSON object")
-    _require(record.get("schema_version") == SCHEMA_VERSION,
+    _require(type(record.get("schema_version")) is int
+             and record["schema_version"] == SCHEMA_VERSION,
              "invalid schema_version")
     _require(record.get("experiment") == EXPERIMENT, "invalid experiment")
     _require(record.get("record_type") == "run", "invalid record_type")
@@ -49,9 +50,10 @@ def validate_run_record(record):
         _require(isinstance(record.get(key), str) and record[key].strip(),
                  "missing %s" % key)
     _require(record.get("arm") in ARMS, "invalid arm")
-    _require(isinstance(record.get("pair_index"), int) and record["pair_index"] >= 0,
+    _require(type(record.get("pair_index")) is int and record["pair_index"] >= 0,
              "invalid pair_index")
-    _require(record.get("order_in_pair") in (0, 1), "invalid order_in_pair")
+    _require(type(record.get("order_in_pair")) is int
+             and record["order_in_pair"] in (0, 1), "invalid order_in_pair")
 
     review = record.get("review")
     _require(isinstance(review, dict), "missing review")
@@ -86,9 +88,9 @@ def validate_run_record(record):
     if impl["ran"]:
         for key in ("final_task_success", "regression_seen"):
             _require(isinstance(impl.get(key), bool), "implementation.%s must be boolean" % key)
-        _require(isinstance(impl.get("repair_cycles"), int)
+        _require(type(impl.get("repair_cycles")) is int
                  and impl["repair_cycles"] >= 0, "invalid repair_cycles")
-        _require(isinstance(impl.get("verification_cost"), int)
+        _require(type(impl.get("verification_cost")) is int
                  and impl["verification_cost"] >= 0, "invalid verification_cost")
         _require(isinstance(impl.get("escaped_defects"), list),
                  "escaped_defects must be a list")
@@ -97,7 +99,7 @@ def validate_run_record(record):
     _require(isinstance(timing, dict) and "total" in timing, "missing timing_ms.total")
     for key, value in timing.items():
         _require(key in TIMING_FIELDS, "unknown timing field %r" % key)
-        _require(isinstance(value, int) and value >= 0, "invalid timing %s" % key)
+        _require(type(value) is int and value >= 0, "invalid timing %s" % key)
 
     usage = record.get("usage")
     _require(isinstance(usage, dict), "missing usage")
@@ -105,10 +107,10 @@ def validate_run_record(record):
     _require(usage.get("coverage") in COVERAGE_VALUES, "invalid usage coverage")
     for key in ("token_cost", "context_bytes"):
         value = usage.get(key)
-        _require(value is None or (isinstance(value, int) and value >= 0),
+        _require(value is None or (type(value) is int and value >= 0),
                  "invalid %s" % key)
     value = usage.get("currency_cost")
-    _require(value is None or (isinstance(value, (int, float)) and value >= 0),
+    _require(value is None or (type(value) in (int, float) and value >= 0),
              "invalid currency_cost")
 
     ident = record.get("identities")

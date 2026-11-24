@@ -243,6 +243,29 @@ class RecordTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             record_mod.validate_run_record(bad)
 
+    def test_boolean_values_are_not_accepted_as_integers(self):
+        invalid_fields = (
+            (("schema_version",), True),
+            (("pair_index",), True),
+            (("order_in_pair",), True),
+            (("implementation", "repair_cycles"), True),
+            (("implementation", "verification_cost"), True),
+            (("timing_ms", "review"), True),
+            (("usage", "token_cost"), True),
+            (("usage", "context_bytes"), True),
+            (("usage", "currency_cost"), True),
+        )
+        for path, value in invalid_fields:
+            with self.subTest(field=path):
+                record = make_record(FLAWED[0], "treatment")
+                target = record
+                for key in path[:-1]:
+                    target = target[key]
+                target[path[-1]] = value
+                with self.assertRaises(ValueError):
+                    record_mod.validate_run_record(record)
+
+
 
 class AdjudicationTests(unittest.TestCase):
     def test_confirmed_missed_false_positive_duplicate(self):
@@ -287,6 +310,22 @@ class AdjudicationTests(unittest.TestCase):
 class VerdictTests(unittest.TestCase):
     def _corpus(self):
         return load_corpus(CORPUS_DIR)
+
+
+    def test_sample_requires_all_repeated_runs_per_arm(self):
+        protocol = pinned_protocol()
+        protocol["sample"]["repeated_runs_per_design_per_arm"] = 2
+        report = aggregate(six_design_records(), self._corpus(), protocol)
+        self.assertEqual(report["complete_design_count"], 0)
+        self.assertEqual(report["verdict"], "INCONCLUSIVE")
+
+    def test_pinned_protocol_requires_repeated_run_count(self):
+        protocol = pinned_protocol()
+        protocol["sample"]["repeated_runs_per_design_per_arm"] = None
+        report = aggregate(six_design_records(), self._corpus(), protocol)
+        self.assertEqual(report["verdict"], "INCONCLUSIVE")
+        self.assertTrue(any("not pinned" in reason
+                            for reason in report["decision_reasons"]))
 
     def test_go_path(self):
         records = six_design_records()
