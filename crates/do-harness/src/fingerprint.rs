@@ -281,6 +281,7 @@ mod tests {
             language: None,
             hooks: crate::config::HooksConfig::default(),
             signal_sets: std::collections::BTreeMap::new(),
+            env: std::collections::BTreeMap::new(),
             sensors: vec![SensorSpec {
                 kind: None,
                 fix: None,

@@ -97,6 +97,7 @@ fn test_mediator_with_origins(upstream: &str, allowed_origins: Vec<String>) -> A
         allow_private_upstreams: true,
         metrics_token: None,
         ingress_token: None,
+        policy_file: None,
         allowed_origins,
     };
     Arc::new(ProxyMediator::new(config).expect("mediator"))

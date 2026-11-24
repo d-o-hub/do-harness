@@ -1,0 +1,12 @@
+{
+  "case_id": "api-defaults-compat-sound",
+  "predeclared_expected_findings": [],
+  "defects": [],
+  "new_beyond_baseline": [],
+  "false_positive_pool": [
+    {
+      "id": "FP1",
+      "summary": "Suggest removing timeout_seconds immediately to shrink the API surface."
+    }
+  ]
+}

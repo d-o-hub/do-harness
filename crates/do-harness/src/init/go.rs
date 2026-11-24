@@ -172,6 +172,7 @@ pub fn generate_go_config(sensors: &[SensorSpec]) -> Result<String> {
             pre_commit,
             pre_push: Vec::new(),
         },
+        env: BTreeMap::new(),
         signal_sets,
         sensors: sensors.to_vec(),
         jobs: None,

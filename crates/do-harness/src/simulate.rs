@@ -246,6 +246,7 @@ mod tests {
                 pre_commit: vec![],
                 pre_push: vec![],
             },
+            env: std::collections::BTreeMap::new(),
             signal_sets: sets
                 .iter()
                 .map(|(set, names)| {

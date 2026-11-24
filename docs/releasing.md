@@ -54,18 +54,22 @@ release"). Nothing publishes unless the tagged commit passes the full release se
 - npm Trusted Publisher setup is per existing package. If a package has not
   been published yet, perform a one-time authenticated bootstrap publish first;
   npm exposes its **Settings → Trusted Publisher** page only afterward.
-- **Windows ships through GitHub Releases only, not npm.**
+- **Windows ships through GitHub Releases, not an npm platform package.**
   `do-harness-win32-x64` is rejected by npm's registry name screening (HTTP
   403, "Package name triggered spam detection"), so no Windows package exists
-  and `npx do-harness` cannot resolve a binary on Windows. The `v0.1.1` release
-  ships `do-harness-v<version>-x86_64-pc-windows-msvc.zip`; that zip (or the
-  installer, or `cargo install`) is the Windows install path.
-  `integrations/npm/lib/platform.js` records the unavailable package so the
-  shim exits with release guidance. The meta package is still published: its
-  Windows pin is inert elsewhere (npm filters an `optionalDependency` by
+  on npm. The wrapper therefore downloads the release binary on first run:
+  the shim fetches `do-harness-v<version>-x86_64-pc-windows-msvc.zip` and
+  `checksums.txt` from the matching release, verifies the zip's SHA-256
+  (fails closed on a mismatch or a missing entry), and caches the extracted
+  `do-harness.exe` under `%LOCALAPPDATA%\do-harness`; there is no
+  `postinstall` script. `integrations/npm/lib/platform.js` records the
+  unavailable package so the shim can distinguish this case and still fall
+  back to release guidance when the fetch is disabled
+  (`DO_HARNESS_NO_DOWNLOAD=1`) or fails. The meta package is still published:
+  its Windows pin is inert elsewhere (npm filters an `optionalDependency` by
   `os`/`cpu` before fetching) and a Windows `npm install` succeeds silently,
-  leaving the shim to print the actionable error. Revisit only if npm clears
-  the name; a coordinated rename is the fallback.
+  leaving the shim to download or print the actionable error. Revisit only if
+  npm clears the name; a coordinated rename is the fallback.
 - **Bootstrap is done for `do-harness` (2026-09-17).** A package must exist
   before npm exposes its Trusted Publisher, and OIDC cannot create a new name,
   so the first publish of any *new* package needs one authenticated publish.
@@ -196,32 +200,69 @@ missing step is finishing that release. An absent flag means *not told* and leav
 the derivation as it was; a present-but-empty list means *nothing has published* and
 blocks every bump. The two are different facts and stay apart: `auto-release.yml`
 always passes the flag, and a failing `gh release list` fails its step instead of
-deriving from a guess. The bump policy mirrors the Rust ecosystem's release tooling
-(`next_version`, the crate release-plz uses) rather than inventing one here:
+deriving from a guess. The highest applicable bump for the range determines the
+version. The batch threshold controls when to open a proposal.
 
 | Commits since the last tag | Bump |
 |---|---|
 | any range while the version is `0.0.x` (a breaking change included) | patch |
 | `!` subject or a `BREAKING CHANGE:`/`BREAKING-CHANGE:` footer | major at >= 1.0, minor at 0.x |
-| `feat` | minor at >= 1.0, patch at 0.x |
+| `feat` | minor (except the `0.0.x` rule above) |
 | `fix`, `perf` | patch |
 | a subject that is not a conventional commit | patch |
 | docs, chore, test, refactor, ci, build, style, revert | nothing on its own |
 | a merge commit | nothing — the log is read with `--no-merges`, so a merge subject is never classified |
+| a rename of a shipped surface (an exported CLI command file, sensor/config-key bundle, or published artifact path) with no `Rename-Confirmed:` trailer and no breaking marker in the range | `held-rename`: auto-release proposes nothing until a human confirms; once confirmed it is breaking → major at >= 1.0, minor at 0.x |
+| the same rename confirmed by a `Rename-Confirmed:` trailer or a `!`/`BREAKING CHANGE:` marker | breaking → major at >= 1.0, minor at 0.x |
+| an internal rename (tests, docs, plans, examples, scripts, vendor) | nothing on its own |
 
-Pre-1.0 comes from the same tool rather than a local rule: `0.(x+1).0` is how a
-breaking change is signalled while the crate is still `0.x`, so a feature cannot
-spend the minor and a breaking change is visible when it does. `0.0.x` is the one
-exception `next_version` carves out of that rule: it stays on patch releases
-whatever the commits, so the step to `0.1.0` remains a deliberate decision rather
-than the automatic effect of a single breaking change. semantic-release makes no
-such pre-1.0 distinction — its standard major/minor rule applies at any version —
-which is the concrete reason this pipeline follows `next_version` and deliberately
-not semantic-release. The derived version is a proposal — editing the version in
+Under [SemVer 2.0.0 §4](https://semver.org/spec/v2.0.0.html), version zero is
+initial development. This project uses `0.(y+1).0` for features and breaking
+changes once it reaches `0.1.0`. The proposal flags breaking changes declared
+in the commit range. Document the upgrade steps in the **Breaking changes**
+section of the release notes. The move from `0.0.x` to `0.1.0` remains a
+deliberate decision, as does the declaration of a stable public API at `1.0.0`.
+
+For example, a feature and a fix after `v0.4.8` derive `v0.5.0`. A fix-only
+range derives `v0.4.9`. Editing the version in
 the release pull request overrides it, because `ship` tags whatever version is on
 `main`. The override is a property of the open pull request, not of the branch:
 a later push to `main` re-derives and force-pushes the branch, discarding the
 edit, so merge an overridden proposal before new commits land.
+### Ambiguous changes: renames
+
+A rename can be read as either a breaking change or a harmless move depending on
+who reviews it, and a `refactor` or `fix` subject will not say which. The safe
+default (issue #606) is to treat a rename of a **shipped surface** as ambiguous
+until a human confirms it. Git's own rename detection (`git log -M`) over the
+same commit range as the bump finds the candidates; internal files (tests, docs,
+plans, examples, scripts, tooling, vendored code) are never considered. A
+candidate is classed by what moved, not by what the subject claims:
+
+- **Shipped surfaces:** the exported CLI command tree
+  (`crates/do-harness/src/commands/` and `crates/do-harness/src/cli/`), the
+  sensor/config-key schema (`do-harness.toml` and `crates/types/`), and
+  published artifacts (the workspace and member manifests, `integrations/npm/`,
+  `man/do-harness.1`, `completions/`).
+- **Unconfirmed rename** → `bump=held-rename`: auto-release opens no release
+  pull request, retires any stale proposal, and `ship` refuses to tag until the
+  rename is confirmed. A range that already derives as breaking is not held —
+  the rename then ships under the breaking bump.
+- **Confirmation** is a commit-level signal the hermetic derivation can see: a
+  `Rename-Confirmed:` trailer anywhere in the range, or a `!` breaking subject /
+  `BREAKING CHANGE:` footer on the renaming commit itself. Confirmed renames are
+  breaking: they force the major (minor at 0.x) bump exactly as a `!` subject
+  would. The `rename-confirmed` GitHub label exists for pull-request review (see
+  issue #606); the derivation itself reads commits, because it never touches the
+  network.
+- To unblock a held release, push a commit adding `Rename-Confirmed:` to the
+  commit that performed the rename (or to a follow-up review commit); the next
+  main gate re-derives and proposes the breaking bump.
+
+The shipped-surface list lives in `shipped_surface_path` in
+`scripts/release-manager.sh` — extend it there when a new surface becomes public.
+When tracking issue #607 lands its per-artifact versioning document
+(`docs/versioning.md`), this policy moves there under "Ambiguous changes".
 
 ### What the automation does
 
@@ -233,7 +274,11 @@ edit, so merge an overridden proposal before new commits land.
   derives no version at all: `ship` creates the tag, and crates.io, npm and the
   GitHub Release are created afterwards by `release.yml`, so "tagged" is not
   "released", and proposing a version on top of an unfinished release is how
-  `v0.3.2` came to be proposed while `v0.3.1` had no npm package and no Release. Otherwise it
+  `v0.3.2` came to be proposed while `v0.3.1` had no npm package and no Release.
+  A bump of `held-rename` — a shipped-surface rename since the last tag awaits
+  human confirmation — also proposes nothing; it resolves into a breaking bump
+  once a `Rename-Confirmed:` trailer or breaking marker lands (see "Ambiguous
+  changes: renames"). Otherwise it
   applies the version with `release-manager.sh prepare`, pushes `release/vX.Y.Z`,
   and opens the pull request with the derived basis in its body. The branch and the
   body are refreshed after each successful main gate, and a still-open
@@ -340,7 +385,7 @@ completions change when the CLI surface does, and `prepare` regenerates the page
       meta package would break `npx do-harness` for every Linux/macOS user. A
       trusted publisher whose permissions lack `npm publish` fails the job at
       the first package instead, naming the package and the remedy. See
-      "Windows has no npm channel" above.
+      "Windows has no platform package on npm" above.
     - `release` — publishes the tarballs, the Windows zip, and `checksums.txt`
       via `gh release create --notes-file`; an existing Release has its assets and
       body replaced, so a repeated run is idempotent. It runs only after `publish`
@@ -787,17 +832,20 @@ missing/unsupported-platform diagnostics.
 
 | Channel | Command | Windows |
 |---------|---------|---------|
-| npx (zero install) | `npx do-harness init` | no (package unavailable) |
-| npm dev dependency | `npm install -D do-harness && npx do-harness verify` | no |
+| npx (zero install) | `npx do-harness init` | yes (first-run download, fail-closed checksum verification) |
+| npm dev dependency | `npm install -D do-harness && npx do-harness verify` | yes (same wrapper path) |
 | Prebuilt installer | `curl -fsSL .../scripts/install.sh \| sh -s -- --version v0.2.1` | yes (Git Bash) |
 | Release zip | unzip `do-harness-v<version>-x86_64-pc-windows-msvc.zip` | yes |
 | cargo-binstall | `cargo binstall do-harness` | yes |
 | crates.io source build | `cargo install do-harness --version 0.3.0 --locked` | yes |
 | Vendored source | `cargo install --path vendor/do-harness/crates/do-harness` | yes |
 
-Windows has no npm channel: the `do-harness-win32-x64` platform package is
-blocked at the registry (HTTP 403 name screening), so both npm rows above are
-Linux/macOS-only. Use the installer, the release zip, or a cargo channel.
+Windows has no platform package on npm: the `do-harness-win32-x64` name is
+blocked at the registry (HTTP 403 name screening). The npm rows above still
+work on Windows because the wrapper downloads the release binary on first run
+(fail-closed SHA-256 verification against the release `checksums.txt`, cached
+under `%LOCALAPPDATA%\do-harness`); see docs/adoption.md#windows. Use the
+installer, the release zip, or a cargo channel for fully offline installs.
 
 For git hooks with an npm install, point `DO_HARNESS_BIN` at
 `node_modules/.bin/do-harness` (the shim forwards arguments to the platform

@@ -22,21 +22,23 @@ axum.workspace = true
 clap = { workspace = true, features = ["derive"] }
 do-harness-types = { path = "../types", version = "0.4.8" }
 fs2.workspace = true
+hex.workspace = true
 reqwest.workspace = true
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
+serde_yaml.workspace = true
+sha2.workspace = true
 tempfile.workspace = true
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "net", "sync"] }
 toml.workspace = true
 tower.workspace = true
 agent-governance = { workspace = true, optional = true }
-serde_yaml = { workspace = true, optional = true }
 rmcp = { workspace = true, optional = true }
 thiserror.workspace = true
 
 [features]
 default = []
-agt-governance = ["dep:agent-governance", "dep:serde_yaml"]
+agt-governance = ["dep:agent-governance"]
 # rmcp requires Rust 1.88; default builds and the MSRV job stay on 1.85.
 mcp-surface = ["dep:rmcp"]
 

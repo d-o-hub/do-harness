@@ -144,7 +144,10 @@ fn discover_fails_closed_when_git_diff_fails() {
     assert!(changed.discovery_failed);
     assert_eq!(changed.files.len(), 0);
     let error = changed.discovery_error.expect("diagnostic");
-    assert!(error.contains("git diff --name-status -z HEAD"), "{error}");
+    assert!(
+        error.contains("git diff --relative --name-status -z HEAD"),
+        "{error}"
+    );
     assert!(error.contains("index"), "{error}");
 }
 

@@ -1,0 +1,5 @@
+{
+  "name": "allow-read",
+  "request": {"tool": "data.read", "params": {"path": "/tmp/x"}},
+  "expected": "allow"
+}

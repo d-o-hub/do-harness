@@ -143,9 +143,13 @@ pub struct VerifyArgs {
     /// Exclude named sensors from the run.
     #[arg(long = "exclude", action = ArgAction::Append, value_name = "SENSOR")]
     pub exclude: Vec<String>,
-    /// Maximum sensors in flight (overrides `jobs` in do-harness.toml).
+    /// Maximum workspace concurrency with `--workspaces`; otherwise the
+    /// maximum sensors in flight (overrides `jobs` in do-harness.toml).
     #[arg(long, value_name = "N")]
     pub jobs: Option<usize>,
+    /// Select workspace directories or configs matching this root-relative glob.
+    #[arg(long, value_name = "GLOB")]
+    pub workspaces: Option<String>,
     /// Reuse recorded passing beats for sensors whose declared inputs are
     /// unchanged: `warn` (default) executes and advises, `skip` reuses
     /// without executing (requires --record), `run` always executes.

@@ -101,6 +101,7 @@
       "init-db",
       "seed",
       "init",
+      "setup",
       "task",
       "trace",
       "distill",
@@ -315,7 +316,23 @@
           "takes_value": true,
           "default_values": [],
           "possible_values": [],
-          "help": "Maximum sensors in flight (overrides `jobs` in do-harness.toml)",
+          "help": "Maximum workspace concurrency with `--workspaces`; otherwise the maximum sensors in flight (overrides `jobs` in do-harness.toml)",
+          "index": null
+        },
+        {
+          "id": "workspaces",
+          "kind": "option",
+          "short": null,
+          "long": "workspaces",
+          "value_names": [
+            "GLOB"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Select workspace directories or configs matching this root-relative glob",
           "index": null
         },
         {
@@ -2064,6 +2081,43 @@
           "default_values": [],
           "possible_values": [],
           "help": "Inspect repository and report candidate signals without writing files",
+          "index": null
+        }
+      ],
+      "subcommands": [],
+      "invocable": true
+    },
+    {
+      "path": "setup",
+      "about": "Configure optional web pack dependencies and environment after `init`",
+      "usage": "do-harness setup [OPTIONS] <COMMAND>",
+      "aliases": [],
+      "args": [],
+      "subcommands": [
+        "web"
+      ],
+      "invocable": false
+    },
+    {
+      "path": "setup web",
+      "about": "Bootstrap the web audit pack: check the playwright/@axe-core/playwright/ lighthouse peer dependencies, install what is missing, and patch `do-harness.toml` with the `WEB_AUDIT_*` environment block",
+      "usage": "do-harness setup web [OPTIONS]",
+      "aliases": [],
+      "args": [
+        {
+          "id": "yes",
+          "kind": "option",
+          "short": "y",
+          "long": "yes",
+          "value_names": [
+            "YES"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": false,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Skip the interactive install prompt and install missing dependencies",
           "index": null
         }
       ],

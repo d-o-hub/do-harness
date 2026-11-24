@@ -47,6 +47,7 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('init-db', 'init-db', [CompletionResultType]::ParameterValue, 'Apply pending database migrations')
             [CompletionResult]::new('seed', 'seed', [CompletionResultType]::ParameterValue, 'Seed invariants from plans/invariants.json')
             [CompletionResult]::new('init', 'init', [CompletionResultType]::ParameterValue, 'Scaffold a harness workspace in a target directory')
+            [CompletionResult]::new('setup', 'setup', [CompletionResultType]::ParameterValue, 'Configure optional web pack dependencies and environment after `init`')
             [CompletionResult]::new('task', 'task', [CompletionResultType]::ParameterValue, 'Inspect and export task state')
             [CompletionResult]::new('trace', 'trace', [CompletionResultType]::ParameterValue, 'Record and list interaction traces')
             [CompletionResult]::new('distill', 'distill', [CompletionResultType]::ParameterValue, 'Extract a heuristic from a resolved trace into a skill. Review output against the anti-AI-slop checklist (.agents/skills/skill-creator/references/anti_ai_slop.md)')
@@ -95,7 +96,8 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('--since', '--since', [CompletionResultType]::ParameterName, 'Run only sensors applicable to the committed range `merge-base(<REF>, HEAD)..HEAD`; combine with `--changed` to union committed and uncommitted paths')
             [CompletionResult]::new('--only', '--only', [CompletionResultType]::ParameterName, 'Run only the named sensor (repeatable or comma-separated)')
             [CompletionResult]::new('--exclude', '--exclude', [CompletionResultType]::ParameterName, 'Exclude named sensors from the run')
-            [CompletionResult]::new('--jobs', '--jobs', [CompletionResultType]::ParameterName, 'Maximum sensors in flight (overrides `jobs` in do-harness.toml)')
+            [CompletionResult]::new('--jobs', '--jobs', [CompletionResultType]::ParameterName, 'Maximum workspace concurrency with `--workspaces`; otherwise the maximum sensors in flight (overrides `jobs` in do-harness.toml)')
+            [CompletionResult]::new('--workspaces', '--workspaces', [CompletionResultType]::ParameterName, 'Select workspace directories or configs matching this root-relative glob')
             [CompletionResult]::new('--unchanged', '--unchanged', [CompletionResultType]::ParameterName, 'Reuse recorded passing beats for sensors whose declared inputs are unchanged: `warn` (default) executes and advises, `skip` reuses without executing (requires --record), `run` always executes')
             [CompletionResult]::new('--task', '--task', [CompletionResultType]::ParameterName, 'Scope records and fail-fast strikes to this task id (or ''global'')')
             [CompletionResult]::new('--evidence', '--evidence', [CompletionResultType]::ParameterName, 'Write a machine-readable evidence artifact to path')
@@ -125,7 +127,8 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('--since', '--since', [CompletionResultType]::ParameterName, 'Run only sensors applicable to the committed range `merge-base(<REF>, HEAD)..HEAD`; combine with `--changed` to union committed and uncommitted paths')
             [CompletionResult]::new('--only', '--only', [CompletionResultType]::ParameterName, 'Run only the named sensor (repeatable or comma-separated)')
             [CompletionResult]::new('--exclude', '--exclude', [CompletionResultType]::ParameterName, 'Exclude named sensors from the run')
-            [CompletionResult]::new('--jobs', '--jobs', [CompletionResultType]::ParameterName, 'Maximum sensors in flight (overrides `jobs` in do-harness.toml)')
+            [CompletionResult]::new('--jobs', '--jobs', [CompletionResultType]::ParameterName, 'Maximum workspace concurrency with `--workspaces`; otherwise the maximum sensors in flight (overrides `jobs` in do-harness.toml)')
+            [CompletionResult]::new('--workspaces', '--workspaces', [CompletionResultType]::ParameterName, 'Select workspace directories or configs matching this root-relative glob')
             [CompletionResult]::new('--unchanged', '--unchanged', [CompletionResultType]::ParameterName, 'Reuse recorded passing beats for sensors whose declared inputs are unchanged: `warn` (default) executes and advises, `skip` reuses without executing (requires --record), `run` always executes')
             [CompletionResult]::new('--task', '--task', [CompletionResultType]::ParameterName, 'Scope records and fail-fast strikes to this task id (or ''global'')')
             [CompletionResult]::new('--evidence', '--evidence', [CompletionResultType]::ParameterName, 'Write a machine-readable evidence artifact to path')
@@ -657,6 +660,47 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
             [CompletionResult]::new('-V', '-V ', [CompletionResultType]::ParameterName, 'Print version')
             [CompletionResult]::new('--version', '--version', [CompletionResultType]::ParameterName, 'Print version')
+            break
+        }
+        'do-harness;setup' {
+            [CompletionResult]::new('--root', '--root', [CompletionResultType]::ParameterName, 'Workspace root override (default: walk up from cwd)')
+            [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Explicit path to do-harness.toml')
+            [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)')
+            [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Suppress PASS/WARN verdict lines and the success footer')
+            [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Suppress PASS/WARN verdict lines and the success footer')
+            [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Dry run without side effects')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('-V', '-V ', [CompletionResultType]::ParameterName, 'Print version')
+            [CompletionResult]::new('--version', '--version', [CompletionResultType]::ParameterName, 'Print version')
+            [CompletionResult]::new('web', 'web', [CompletionResultType]::ParameterValue, 'Bootstrap the web audit pack: check the playwright/@axe-core/playwright/ lighthouse peer dependencies, install what is missing, and patch `do-harness.toml` with the `WEB_AUDIT_*` environment block')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'do-harness;setup;web' {
+            [CompletionResult]::new('--root', '--root', [CompletionResultType]::ParameterName, 'Workspace root override (default: walk up from cwd)')
+            [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Explicit path to do-harness.toml')
+            [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)')
+            [CompletionResult]::new('-y', '-y', [CompletionResultType]::ParameterName, 'Skip the interactive install prompt and install missing dependencies')
+            [CompletionResult]::new('--yes', '--yes', [CompletionResultType]::ParameterName, 'Skip the interactive install prompt and install missing dependencies')
+            [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Suppress PASS/WARN verdict lines and the success footer')
+            [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Suppress PASS/WARN verdict lines and the success footer')
+            [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Dry run without side effects')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('-V', '-V ', [CompletionResultType]::ParameterName, 'Print version')
+            [CompletionResult]::new('--version', '--version', [CompletionResultType]::ParameterName, 'Print version')
+            break
+        }
+        'do-harness;setup;help' {
+            [CompletionResult]::new('web', 'web', [CompletionResultType]::ParameterValue, 'Bootstrap the web audit pack: check the playwright/@axe-core/playwright/ lighthouse peer dependencies, install what is missing, and patch `do-harness.toml` with the `WEB_AUDIT_*` environment block')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'do-harness;setup;help;web' {
+            break
+        }
+        'do-harness;setup;help;help' {
             break
         }
         'do-harness;task' {
@@ -1708,6 +1752,7 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('init-db', 'init-db', [CompletionResultType]::ParameterValue, 'Apply pending database migrations')
             [CompletionResult]::new('seed', 'seed', [CompletionResultType]::ParameterValue, 'Seed invariants from plans/invariants.json')
             [CompletionResult]::new('init', 'init', [CompletionResultType]::ParameterValue, 'Scaffold a harness workspace in a target directory')
+            [CompletionResult]::new('setup', 'setup', [CompletionResultType]::ParameterValue, 'Configure optional web pack dependencies and environment after `init`')
             [CompletionResult]::new('task', 'task', [CompletionResultType]::ParameterValue, 'Inspect and export task state')
             [CompletionResult]::new('trace', 'trace', [CompletionResultType]::ParameterValue, 'Record and list interaction traces')
             [CompletionResult]::new('distill', 'distill', [CompletionResultType]::ParameterValue, 'Extract a heuristic from a resolved trace into a skill. Review output against the anti-AI-slop checklist (.agents/skills/skill-creator/references/anti_ai_slop.md)')
@@ -1820,6 +1865,13 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             break
         }
         'do-harness;help;init' {
+            break
+        }
+        'do-harness;help;setup' {
+            [CompletionResult]::new('web', 'web', [CompletionResultType]::ParameterValue, 'Bootstrap the web audit pack: check the playwright/@axe-core/playwright/ lighthouse peer dependencies, install what is missing, and patch `do-harness.toml` with the `WEB_AUDIT_*` environment block')
+            break
+        }
+        'do-harness;help;setup;web' {
             break
         }
         'do-harness;help;task' {

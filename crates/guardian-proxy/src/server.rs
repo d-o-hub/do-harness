@@ -23,6 +23,11 @@ pub(crate) const MAX_REQUEST_BYTES: usize = 1024 * 1024;
 pub(crate) const MAX_UPSTREAM_BYTES: usize = 1024 * 1024;
 /// Response header advertising whether governance is enforced or stubbed.
 const GOVERNANCE_HEADER: &str = "x-do-harness-governance";
+/// Request header carrying the caller identity attribute used by policy
+/// `caller` rules on the deprecated flat route. The value is client-supplied
+/// and should be stripped/replaced by an authenticating gateway in front of
+/// the proxy.
+const CALLER_HEADER: &str = "x-do-harness-caller-id";
 /// Response header marking the flat REST route as deprecated.
 const DEPRECATION_HEADER: &str = "deprecation";
 /// Successor link header name, advertised while `mcp-surface` is enabled.
@@ -178,9 +183,14 @@ pub(crate) async fn record_audit(
     // so the current-thread executor is never stalled by disk I/O.
     let call = call.clone();
     let decision = decision.clone();
+    let policy_sha256 = state
+        .mediator
+        .as_ref()
+        .and_then(|mediator| mediator.policy_sha256())
+        .map(str::to_owned);
     let written = tokio::task::spawn_blocking(move || {
         let mut guard = audit.blocking_lock();
-        guard.append(&call, &decision)
+        guard.append(&call, &decision, policy_sha256.as_deref())
     })
     .await;
     match written {
@@ -209,6 +219,7 @@ async fn tool_call_handler(
         let body = serde_json::json!({"error": "mediator unavailable"});
         return tag_response((StatusCode::SERVICE_UNAVAILABLE, Json(body)).into_response());
     };
+    let call = call.with_caller(caller_from_headers(&headers));
 
     // Decision mapping is explicit and fail-closed: only an explicit Allow is
     // forwarded; denials and errors are returned as 403.
@@ -243,6 +254,16 @@ async fn tool_call_handler(
         crate::ForwardDecision::Allow => forward_to_upstream(&state, &call, &headers).await,
     };
     tag_response(response)
+}
+
+/// Extracts the caller identity attribute from the `X-Do-Harness-Caller-Id`
+/// request header, if present and non-empty.
+fn caller_from_headers(headers: &HeaderMap) -> Option<String> {
+    headers
+        .get(CALLER_HEADER)
+        .and_then(|value| value.to_str().ok())
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
 }
 
 /// Tags a legacy tool-call response with governance mode and deprecation.

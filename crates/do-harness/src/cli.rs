@@ -9,9 +9,10 @@ use clap::{Parser, ValueHint};
 mod actions;
 mod command;
 mod learn;
+pub use actions::VerifyArgs;
 pub use actions::{
     DoctorAction, ErrorsAction, FeedbackAction, HookAction, JobAction, MetricsAction,
-    NewSensorArgs, PrAction, SensorAction, SkillsAction, TaskAction, TraceAction,
+    NewSensorArgs, PrAction, SensorAction, SetupAction, SkillsAction, TaskAction, TraceAction,
 };
 pub use command::Command;
 pub use learn::LearnArgs;

@@ -137,9 +137,9 @@ jobs:
         # DO_HARNESS_REQUIRE_TOOLS instead of a SKIP: yamllint for workflow/yaml
         # lint, markdown-it-py (scripts/requirements-docs.txt) for docs checks,
         # and PyYAML (.agents/skills/skill-creator/scripts/requirements.txt) for
-        # action-pins and eval frontmatter.
+        # action-pins and eval frontmatter, plus pytest for the SDK regression suite.
         run: |
-          python3 -m pip install --disable-pip-version-check yamllint -r .agents/skills/skill-creator/scripts/requirements.txt -r scripts/requirements-docs.txt
+          python3 -m pip install --disable-pip-version-check yamllint -r .agents/skills/skill-creator/scripts/requirements.txt -r scripts/requirements-docs.txt -e 'integrations/sdk-python[test]'
           npm install -g markdownlint-cli2
       # Pin maintenance note: agent-governance is pinned to =3.2.2 in workspace dependencies
       # until GA. Upstream renamed this crate to `agentmesh`; the pin stays on the
@@ -578,7 +578,84 @@ jobs:
         run: |
           node --check integrations/npm/bin/do-harness.js
           node --check integrations/npm/lib/platform.js
+          node --check integrations/npm/lib/win32-download.js
           node --test integrations/npm/test/*.test.mjs
+      - name: Prove the npm wrapper's Windows download path
+        # The win32-x64 platform package is not on npm, so the shim must be
+        # able to fetch the release binary on first run and exec it. This
+        # packs the wrapper meta package, installs the tarball in a scratch
+        # dir (no win32 platform package present), and runs
+        # `npx do-harness version` against a local fixture release (the real
+        # binary, zipped exactly like a GitHub release asset, with
+        # checksums.txt served over loopback HTTP). It proves the full
+        # download -> verify -> extract -> cache -> exec path on Windows
+        # without touching the network; the real-release verification step
+        # is the next `npx do-harness version` after the next release.
+        shell: bash
+        env:
+          FIXTURE_PORT_FILE: ${{ runner.temp }}/fixture-port.txt
+          NPM_CACHE_ROOT: ${{ runner.temp }}/do-harness-cache
+        run: |
+          set -euo pipefail
+          version="$(node -p "require('./integrations/npm/package.json').version")"
+          # Assemble a fixture release: the real binary, zipped exactly like
+          # the release workflow, with checksums.txt.
+          fixture="$RUNNER_TEMP/release-fixture"
+          asset="do-harness-v$version-x86_64-pc-windows-msvc"
+          mkdir -p "$fixture/v$version/$asset"
+          cp ./target/release/do-harness.exe "$fixture/v$version/$asset/"
+          (cd "$fixture/v$version" && 7z a "$asset.zip" "$asset" >/dev/null)
+          (cd "$fixture/v$version" && rm -rf "$asset")
+          node - "$fixture/v$version" <<'JS'
+          const fs = require("fs");
+          const crypto = require("crypto");
+          const dir = process.argv[2];
+          const lines = fs.readdirSync(dir)
+            .filter((f) => f.startsWith("do-harness-"))
+            .map((f) => {
+              const hex = crypto.createHash("sha256")
+                .update(fs.readFileSync(`${dir}/${f}`))
+                .digest("hex");
+              return `${hex}  ${f}`;
+            });
+          fs.writeFileSync(`${dir}/checksums.txt`, lines.join("\n") + "\n");
+          JS
+          cat "$fixture/v$version/checksums.txt"
+          # Serve the fixture release over loopback HTTP (no real network).
+          python - "$fixture" <<'PY' > "$FIXTURE_PORT_FILE" 2>&1 &
+          import http.server, os, socketserver, sys
+          os.chdir(sys.argv[1])
+          class Quiet(http.server.SimpleHTTPRequestHandler):
+              def log_message(self, *args):
+                  pass
+          with socketserver.TCPServer(("127.0.0.1", 0), Quiet) as httpd:
+              print(httpd.server_address[1], flush=True)
+              httpd.serve_forever()
+          PY
+          server_pid=$!
+          for _ in $(seq 1 50); do
+            [ -s "$FIXTURE_PORT_FILE" ] && break
+            sleep 0.2
+          done
+          port="$(cat "$FIXTURE_PORT_FILE")"
+          test -n "$port"
+          # Pack the wrapper and install it from the tarball (no win32
+          # platform package resolves; the shim must fall back to download).
+          scratch="$RUNNER_TEMP/npm-wrapper-e2e"
+          mkdir -p "$scratch"
+          (cd integrations/npm && npm pack --pack-destination "$scratch" >/dev/null)
+          tarball="$(ls "$scratch"/do-harness-*.tgz)"
+          (cd "$scratch" && npm install --no-audit --no-fund "$tarball")
+          export DO_HARNESS_RELEASE_BASE_URL="http://127.0.0.1:$port"
+          export DO_HARNESS_CACHE_DIR="$NPM_CACHE_ROOT"
+          output="$(cd "$scratch" && npx --no-install do-harness version)"
+          echo "$output"
+          case "$output" in
+            *"$version"*) ;;
+            *) echo "unexpected version output: $output" >&2; exit 1 ;;
+          esac
+          test -x "$NPM_CACHE_ROOT/do-harness/v$version/do-harness.exe"
+          kill "$server_pid" 2>/dev/null || true
 
   selection-portability:
     # Pin a GitHub-hosted Intel macOS runner: macos-latest maps to arm64, and

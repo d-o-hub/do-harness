@@ -1,0 +1,102 @@
+name: issue-link-check
+
+# Gate pull requests on the issue-first workflow: every PR must reference a
+# triaged issue, and external (fork) PR branches must follow the documented
+# naming conventions. This is deliberately a separate lightweight workflow
+# rather than part of the heavy `verify` pipeline: it reads PR metadata only,
+# needs no checkout, and answers in seconds. It uses no external actions, so
+# there are no action pins to keep immutable.
+on:
+  pull_request_target:
+    types: [opened, reopened, edited]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+# One run per pull request; a newer edit supersedes an in-flight evaluation.
+concurrency:
+  group: issue-link-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  issue-link:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify issue reference and branch naming
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          pr_json="$(gh pr view "$PR_NUMBER" --repo "$REPO" \
+            --json body,headRefName,isCrossRepository)"
+          body="$(printf '%s' "$pr_json" | jq -r '.body // ""')"
+          head_ref="$(printf '%s' "$pr_json" | jq -r '.headRefName')"
+          cross_repo="$(printf '%s' "$pr_json" | jq -r '.isCrossRepository')"
+
+          # 1. Issue reference. Accept the standard GitHub closing keywords plus
+          #    `Refs` (used for partial implementation), for this repo or as
+          #    `owner/repo#<n>` for a cross-repo reference.
+          issue_ref_found=0
+          if printf '%s' "$body" \
+              | grep -Eiq '(closes|fixes|resolves|refs)[[:space:]]+#[0-9]+'; then
+            issue_ref_found=1
+          elif printf '%s' "$body" \
+              | grep -Eiq '(closes|fixes|resolves|refs)[[:space:]]+[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+#[0-9]+'; then
+            issue_ref_found=1
+          fi
+
+          if [ "$issue_ref_found" -ne 1 ]; then
+            marker="### Issue link required"
+            if ! gh pr view "$PR_NUMBER" --repo "$REPO" --json comments \
+                | jq -e --arg m "$marker" \
+                  '[.comments[] | select(.body | contains($m))] | length > 0' \
+                >/dev/null; then
+              gh pr comment "$PR_NUMBER" --repo "$REPO" --body \
+                "$marker
+
+          This PR does not reference an issue. Per CONTRIBUTING.md the project
+          follows an issue-first workflow: every PR must link a triaged issue.
+
+          Add a trailer to the PR body, e.g. \`Closes #123\` (completed work) or
+          \`Refs #123\` (partial work), then update the PR."
+            fi
+            echo "issue-link-check: PR #${PR_NUMBER} has no issue reference" >&2
+            exit 1
+          fi
+
+          # The same-repo referenced issue must exist.
+          ref_num="$(printf '%s' "$body" \
+            | grep -Eio '(closes|fixes|resolves|refs)[[:space:]]+#[0-9]+' \
+            | head -1 | grep -Eo '[0-9]+' || true)"
+          if [ -n "$ref_num" ]; then
+            if ! gh api "repos/$REPO/issues/$ref_num" --jq '.number' \
+                >/dev/null 2>&1; then
+              echo "issue-link-check: referenced issue #${ref_num} does not exist" >&2
+              exit 1
+            fi
+          fi
+          echo "issue-link-check: issue reference present."
+
+          # 2. Branch naming — enforced for external (fork) PRs, whose authors
+          #    cannot know internal tooling conventions. Accepted patterns:
+          #    feat/ fix/ chore/ docs/ (with an optional issue-<n> segment) and
+          #    the harness tooling branches issue-<n>-<slug> /
+          #    task-<n>-<slug>.
+          if [ "$cross_repo" = "true" ]; then
+            case "$head_ref" in
+              feat/*|fix/*|chore/*|docs/*) ;;
+              issue-[0-9]*-*|task-[0-9]*-*) ;;
+              *)
+                echo "issue-link-check: fork branch '$head_ref' violates documented naming" >&2
+                echo "Accepted: feat/, fix/, chore/, docs/ (optionally feat/<n>-<slug>), or issue-<n>-<slug>/task-<n>-<slug>." >&2
+                exit 1
+                ;;
+            esac
+            echo "issue-link-check: branch naming ok."
+          fi

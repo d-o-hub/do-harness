@@ -120,6 +120,7 @@ mod tests {
             pr: crate::pr::author_policy::PrConfig::default(),
             language: None,
             hooks: crate::config::HooksConfig::default(),
+            env: std::collections::BTreeMap::new(),
             signal_sets: [
                 ("feedback".to_owned(), vec!["a".to_owned()]),
                 (
