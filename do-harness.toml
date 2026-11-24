@@ -527,4 +527,3 @@ when-changed = [
     "scripts/check-contract-first.sh",
     "scripts/lib.sh",
 ]
-
