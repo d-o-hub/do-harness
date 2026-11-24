@@ -162,10 +162,10 @@ def run_resume_case(case, workflow, command, budgets, allowed, shared_target=Non
                                   - (time.monotonic() - started)),
             "verification_seconds": verification_seconds, "checks": 1,
             "elapsed_seconds": 0.0,
-            "build_ms": prior["build_ms"], "token_cost": None,
+            "build_ms": prior["build_ms"], "token_cost": None,  # nosec B105 - usage metric
             "currency_cost": None, "context_bytes": None, "adapter_model": None,
             "usage_reason": None, "reason": "attempt-budget",
-            "first_attempt_pass": False, "regression_seen": False,
+            "first_attempt_pass": False, "regression_seen": False,  # nosec B105 - pass = success
             "unsupported_before_interaction": False,
         }
     else:
