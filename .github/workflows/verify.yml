@@ -555,15 +555,17 @@ jobs:
         timeout-minutes: 15
         env:
           # The generated pack's deps/audit sensors fail closed under CI=true;
-          # cargo-deny and cargo-audit are installed above.
+          # cargo-deny and cargo-audit are installed above. RUNNER_TEMP is
+          # declared so the PowerShell step reads it without shellcheck's
+          # SC2154 (the workflow-shell gate lints every run block as bash).
           CI: "true"
           DO_HARNESS_REQUIRE_TOOLS: "1"
+          RUNNER_TEMP: ${{ runner.temp }}
         run: |
-          $tmp = Join-Path $env:RUNNER_TEMP ("dh-dogfood-" + [guid]::NewGuid().ToString("N"))
-          New-Item -ItemType Directory -Path $tmp | Out-Null
-          & ./target/release/do-harness.exe --root $tmp init
+          New-Item -ItemType Directory -Force -Path (Join-Path $env:RUNNER_TEMP "dh-dogfood") | Out-Null
+          & ./target/release/do-harness.exe --root (Join-Path $env:RUNNER_TEMP "dh-dogfood") init
           if ($LASTEXITCODE -ne 0) { throw "init failed" }
-          & ./target/release/do-harness.exe --root $tmp verify `
+          & ./target/release/do-harness.exe --root (Join-Path $env:RUNNER_TEMP "dh-dogfood") verify `
             --only fmt --only check --only clippy --only doctest `
             --only loc --only commitlint --only deps --only audit --strict
           if ($LASTEXITCODE -ne 0) { throw "native-helper verify failed" }
@@ -572,26 +574,28 @@ jobs:
         run: bash scripts/test-install.sh --bin ./target/release/do-harness.exe
       - name: Prove hook install, status and doctor on Windows
         # PowerShell: the commands themselves must not depend on a Git Bash
-        # user shell (the hooks, proven in the next step, must).
+        # user shell (the hooks, proven in the next step, must). The binary
+        # path and RUNNER_TEMP are declared so shellcheck's SC2154 stays
+        # silent on the $env: reads.
+        env:
+          RUNNER_TEMP: ${{ runner.temp }}
+          DO_HARNESS_BIN: ${{ github.workspace }}/target/release/do-harness.exe
         run: |
-          $scratch = Join-Path $env:RUNNER_TEMP ("dh-hooks-" + [guid]::NewGuid().ToString("N"))
-          New-Item -ItemType Directory -Path $scratch | Out-Null
-          git -C $scratch init -q
+          New-Item -ItemType Directory -Force -Path (Join-Path $env:RUNNER_TEMP "dh-hooks") | Out-Null
+          git -C (Join-Path $env:RUNNER_TEMP "dh-hooks") init -q
           # Seed one commit: the scaffolded commitlint sensor inspects the last
           # commit and fails in a repository with no commits, which makes init's
           # initial verification legitimately RED (exit 1).
-          git -C $scratch -c user.email=ci@example.com -c user.name=ci `
+          git -C (Join-Path $env:RUNNER_TEMP "dh-hooks") -c user.email=ci@example.com -c user.name=ci `
             commit -q --allow-empty -m "chore: seed"
-          & ./target/release/do-harness.exe --root $scratch init
+          & ./target/release/do-harness.exe --root (Join-Path $env:RUNNER_TEMP "dh-hooks") init
           if ($LASTEXITCODE -ne 0) { throw "init failed" }
-          $bin = (Resolve-Path ./target/release/do-harness.exe).Path
-          Push-Location $scratch
-          $env:DO_HARNESS_BIN = $bin
-          & $bin hook install
+          Push-Location (Join-Path $env:RUNNER_TEMP "dh-hooks")
+          & $env:DO_HARNESS_BIN hook install
           if ($LASTEXITCODE -ne 0) { throw "hook install failed" }
-          & $bin hook status
+          & $env:DO_HARNESS_BIN hook status
           if ($LASTEXITCODE -ne 0) { throw "hook status failed" }
-          & $bin doctor
+          & $env:DO_HARNESS_BIN doctor
           if ($LASTEXITCODE -ne 0) { throw "doctor failed" }
           Pop-Location
       - name: Prove installed native hooks run under git on Windows
@@ -599,23 +603,22 @@ jobs:
         # do-harness binary directly; git-for-windows executes them through its
         # bundled sh. A non-conventional subject must be blocked, a
         # conventional one must pass — this exercises the installed commit-msg
-        # hook through git itself, on the native binary.
+        # hook through git itself, on the native binary. The hooks are proven
+        # at their default location, so no core.hooksPath override is needed.
+        env:
+          RUNNER_TEMP: ${{ runner.temp }}
+          DO_HARNESS_BIN: ${{ github.workspace }}/target/release/do-harness.exe
         run: |
-          $scratch = Join-Path $env:RUNNER_TEMP ("dh-hookexec-" + [guid]::NewGuid().ToString("N"))
-          New-Item -ItemType Directory -Path $scratch | Out-Null
-          git -C $scratch init -q
-          git -C $scratch config user.email ci@example.com
-          git -C $scratch config user.name ci
-          git -C $scratch commit -q --allow-empty -m "chore: seed"
-          & ./target/release/do-harness.exe --root $scratch init
+          New-Item -ItemType Directory -Force -Path (Join-Path $env:RUNNER_TEMP "dh-hookexec") | Out-Null
+          git -C (Join-Path $env:RUNNER_TEMP "dh-hookexec") init -q
+          git -C (Join-Path $env:RUNNER_TEMP "dh-hookexec") config user.email ci@example.com
+          git -C (Join-Path $env:RUNNER_TEMP "dh-hookexec") config user.name ci
+          git -C (Join-Path $env:RUNNER_TEMP "dh-hookexec") commit -q --allow-empty -m "chore: seed"
+          & ./target/release/do-harness.exe --root (Join-Path $env:RUNNER_TEMP "dh-hookexec") init
           if ($LASTEXITCODE -ne 0) { throw "init failed" }
-          $bin = (Resolve-Path ./target/release/do-harness.exe).Path
-          $env:DO_HARNESS_BIN = $bin
-          git -C $scratch -c core.hooksPath="$scratch/.git/hooks" `
-            commit -q --allow-empty -m "Bad: Subject" 2>$null
+          git -C (Join-Path $env:RUNNER_TEMP "dh-hookexec") commit -q --allow-empty -m "Bad: Subject" 2>$null
           if ($LASTEXITCODE -eq 0) { throw "commit-msg hook did not block a non-conventional subject" }
-          git -C $scratch -c core.hooksPath="$scratch/.git/hooks" `
-            commit -q --allow-empty -m "fix: typo"
+          git -C (Join-Path $env:RUNNER_TEMP "dh-hookexec") commit -q --allow-empty -m "fix: typo"
           if ($LASTEXITCODE -ne 0) { throw "commit-msg hook blocked a conventional subject" }
       - name: Lint and test the npm wrapper
         shell: bash

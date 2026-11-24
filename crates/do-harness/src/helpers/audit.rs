@@ -1,4 +1,4 @@
-//! `do-harness helpers audit`: RustSec advisory scan via cargo-audit,
+//! `do-harness helpers audit`: `RustSec` advisory scan via cargo-audit,
 //! natively.
 //!
 //! This is the Rust implementation of `scripts/check-audit.sh`; the script is

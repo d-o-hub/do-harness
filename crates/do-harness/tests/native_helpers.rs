@@ -136,7 +136,7 @@ fn native_and_shell_commitlint_reject_non_conventional() {
     assert_eq!(shell.0, Some(1));
     assert!(
         shell
-            .2
+            .1
             .contains("FAIL: non-conventional commit subject: not conventional at all")
     );
 }
@@ -157,7 +157,7 @@ fn native_and_shell_commitlint_enforce_lowercase_scope() {
     assert_eq!(shell.0, Some(1));
     assert!(
         shell
-            .2
+            .1
             .contains("FAIL: commit subject is not lowercase: fix(scope): Typo in Scope")
     );
 }

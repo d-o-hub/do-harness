@@ -128,19 +128,20 @@ async fn warns_when_sensor_argv_path_is_missing() {
         .to_string();
     assert!(message.contains("scripts/does-not-exist.sh"), "{message}");
 }
-
-/// An installed commit-msg hook whose script is missing blocks every commit;
-/// doctor must report that instead of `[OK] commit-msg hook: installed`.
+/// The managed commit-msg hook invokes the native `helpers commitlint`
+/// subcommand, not the shell wrapper, so it has no script dependency to
+/// report: an installed hook with a present binary is healthy even when
+/// `scripts/check-commitlint.sh` does not exist.
 #[tokio::test(flavor = "current_thread")]
-async fn fails_when_commit_msg_hook_lacks_its_script() {
+async fn managed_commit_msg_hook_needs_only_the_binary() {
     let (_temp, root) = fake_repo_with_git();
     stub_binary(&root);
 
-    let message = run_with_status(&root, Format::Text, false, &repo_status(&root), None, false)
-        .await
-        .unwrap_err()
-        .to_string();
-    assert!(message.contains("scripts/check-commitlint.sh"), "{message}");
+    assert!(
+        run_with_status(&root, Format::Text, false, &repo_status(&root), None, false)
+            .await
+            .is_ok()
+    );
 }
 
 /// Without the managed hook there is no dependency to check.

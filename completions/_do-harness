@@ -1243,6 +1243,110 @@ _arguments "${_arguments_options[@]}" : \
 ':file -- Source file to decompose:_files' \
 && ret=0
 ;;
+(helpers)
+_arguments "${_arguments_options[@]}" : \
+'--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
+'--config=[Explicit path to do-harness.toml]:FILE:_files' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
+'--dry-run[Dry run without side effects]' \
+'-h[Print help]' \
+'--help[Print help]' \
+'-V[Print version]' \
+'--version[Print version]' \
+":: :_do-harness__subcmd__helpers_commands" \
+"*::: :->helpers" \
+&& ret=0
+
+    case $state in
+    (helpers)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:do-harness-helpers-command-$line[1]:"
+        case $line[1] in
+            (commitlint)
+_arguments "${_arguments_options[@]}" : \
+'(--count --range)--message=[Lint the single subject in FILE (git commit-msg hook)]:FILE:_files' \
+'--count=[History window size (default 1; env\: \`DO_HARNESS_COMMITLINT_COUNT\`)]:N:_default' \
+'--range=[Lint every subject in a git rev-list range]:REV-RANGE:_default' \
+'--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
+'--config=[Explicit path to do-harness.toml]:FILE:_files' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
+'--dry-run[Dry run without side effects]' \
+'-h[Print help]' \
+'--help[Print help]' \
+'-V[Print version]' \
+'--version[Print version]' \
+&& ret=0
+;;
+(deps)
+_arguments "${_arguments_options[@]}" : \
+'--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
+'--config=[Explicit path to do-harness.toml]:FILE:_files' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
+'--dry-run[Dry run without side effects]' \
+'-h[Print help]' \
+'--help[Print help]' \
+'-V[Print version]' \
+'--version[Print version]' \
+&& ret=0
+;;
+(audit)
+_arguments "${_arguments_options[@]}" : \
+'--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
+'--config=[Explicit path to do-harness.toml]:FILE:_files' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
+'--dry-run[Dry run without side effects]' \
+'-h[Print help]' \
+'--help[Print help]' \
+'-V[Print version]' \
+'--version[Print version]' \
+'*::args -- Extra arguments passed through to cargo audit:_default' \
+&& ret=0
+;;
+(help)
+_arguments "${_arguments_options[@]}" : \
+":: :_do-harness__subcmd__helpers__subcmd__help_commands" \
+"*::: :->help" \
+&& ret=0
+
+    case $state in
+    (help)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:do-harness-helpers-help-command-$line[1]:"
+        case $line[1] in
+            (commitlint)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(deps)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(audit)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(help)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+        esac
+    ;;
+esac
+;;
+        esac
+    ;;
+esac
+;;
 (eval)
 _arguments "${_arguments_options[@]}" : \
 '--skill=[Restrict evaluation to this skill directory name]:SKILL:_default' \
@@ -2308,6 +2412,34 @@ _arguments "${_arguments_options[@]}" : \
 _arguments "${_arguments_options[@]}" : \
 && ret=0
 ;;
+(helpers)
+_arguments "${_arguments_options[@]}" : \
+":: :_do-harness__subcmd__help__subcmd__helpers_commands" \
+"*::: :->helpers" \
+&& ret=0
+
+    case $state in
+    (helpers)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:do-harness-help-helpers-command-$line[1]:"
+        case $line[1] in
+            (commitlint)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(deps)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(audit)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+        esac
+    ;;
+esac
+;;
 (eval)
 _arguments "${_arguments_options[@]}" : \
 && ret=0
@@ -2542,6 +2674,7 @@ _do-harness_commands() {
 'errors:Inspect and clear fail-fast error signatures' \
 'loc:Report line-of-code state for the 500-LOC invariant' \
 'split:Extract a large top-level item into a sibling module' \
+'helpers:Run the shipped helper sensors natively (commitlint/deps/audit)' \
 'eval:Validate skill structure and benchmark skill evals' \
 'hook:Manage git hooks that run \`do-harness verify\`' \
 'doctor:Run diagnostic checks on binary resolution and git hook health' \
@@ -2773,6 +2906,7 @@ _do-harness__subcmd__help_commands() {
 'errors:Inspect and clear fail-fast error signatures' \
 'loc:Report line-of-code state for the 500-LOC invariant' \
 'split:Extract a large top-level item into a sibling module' \
+'helpers:Run the shipped helper sensors natively (commitlint/deps/audit)' \
 'eval:Validate skill structure and benchmark skill evals' \
 'hook:Manage git hooks that run \`do-harness verify\`' \
 'doctor:Run diagnostic checks on binary resolution and git hook health' \
@@ -2904,6 +3038,30 @@ _do-harness__subcmd__help__subcmd__feedback__subcmd__submit_commands() {
 _do-harness__subcmd__help__subcmd__help_commands() {
     local commands; commands=()
     _describe -t commands 'do-harness help help commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__help__subcmd__helpers_commands] )) ||
+_do-harness__subcmd__help__subcmd__helpers_commands() {
+    local commands; commands=(
+'commitlint:Enforce conventional commits with lowercase subjects (commitlint sensor)' \
+'deps:Dependency-direction and cargo-deny gate (deps sensor)' \
+'audit:\`RustSec\` advisory scan via cargo-audit (audit sensor)' \
+    )
+    _describe -t commands 'do-harness help helpers commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__help__subcmd__helpers__subcmd__audit_commands] )) ||
+_do-harness__subcmd__help__subcmd__helpers__subcmd__audit_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness help helpers audit commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__help__subcmd__helpers__subcmd__commitlint_commands] )) ||
+_do-harness__subcmd__help__subcmd__helpers__subcmd__commitlint_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness help helpers commitlint commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__help__subcmd__helpers__subcmd__deps_commands] )) ||
+_do-harness__subcmd__help__subcmd__helpers__subcmd__deps_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness help helpers deps commands' commands "$@"
 }
 (( $+functions[_do-harness__subcmd__help__subcmd__hook_commands] )) ||
 _do-harness__subcmd__help__subcmd__hook_commands() {
@@ -3235,6 +3393,61 @@ _do-harness__subcmd__help__subcmd__verify_commands() {
 _do-harness__subcmd__help__subcmd__version_commands() {
     local commands; commands=()
     _describe -t commands 'do-harness help version commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__helpers_commands] )) ||
+_do-harness__subcmd__helpers_commands() {
+    local commands; commands=(
+'commitlint:Enforce conventional commits with lowercase subjects (commitlint sensor)' \
+'deps:Dependency-direction and cargo-deny gate (deps sensor)' \
+'audit:\`RustSec\` advisory scan via cargo-audit (audit sensor)' \
+'help:Print this message or the help of the given subcommand(s)' \
+    )
+    _describe -t commands 'do-harness helpers commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__helpers__subcmd__audit_commands] )) ||
+_do-harness__subcmd__helpers__subcmd__audit_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness helpers audit commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__helpers__subcmd__commitlint_commands] )) ||
+_do-harness__subcmd__helpers__subcmd__commitlint_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness helpers commitlint commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__helpers__subcmd__deps_commands] )) ||
+_do-harness__subcmd__helpers__subcmd__deps_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness helpers deps commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__helpers__subcmd__help_commands] )) ||
+_do-harness__subcmd__helpers__subcmd__help_commands() {
+    local commands; commands=(
+'commitlint:Enforce conventional commits with lowercase subjects (commitlint sensor)' \
+'deps:Dependency-direction and cargo-deny gate (deps sensor)' \
+'audit:\`RustSec\` advisory scan via cargo-audit (audit sensor)' \
+'help:Print this message or the help of the given subcommand(s)' \
+    )
+    _describe -t commands 'do-harness helpers help commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__helpers__subcmd__help__subcmd__audit_commands] )) ||
+_do-harness__subcmd__helpers__subcmd__help__subcmd__audit_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness helpers help audit commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__helpers__subcmd__help__subcmd__commitlint_commands] )) ||
+_do-harness__subcmd__helpers__subcmd__help__subcmd__commitlint_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness helpers help commitlint commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__helpers__subcmd__help__subcmd__deps_commands] )) ||
+_do-harness__subcmd__helpers__subcmd__help__subcmd__deps_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness helpers help deps commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__helpers__subcmd__help__subcmd__help_commands] )) ||
+_do-harness__subcmd__helpers__subcmd__help__subcmd__help_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness helpers help help commands' commands "$@"
 }
 (( $+functions[_do-harness__subcmd__hook_commands] )) ||
 _do-harness__subcmd__hook_commands() {

@@ -280,6 +280,9 @@ export PATH="$HOME/.local/bin:$PATH"
 | `errors clear [OPTIONS]` | Clear fail-fast error signatures (`--sensor sensor:<name>`) — flags: `--sensor <SENSOR>`, `--task <ID>`, `--scope <SCOPE>`, `--force` |
 | `loc [OPTIONS] [PATH]...` | Report line-of-code state for the 500-LOC invariant — flags: `--dir <DIR>`, `--ext <EXT>`, `--format <FORMAT>`, `--warn` |
 | `split [OPTIONS] <FILE>` | Extract a large top-level item into a sibling module — flags: `--target <NAME>` |
+| `helpers commitlint [OPTIONS]` | Enforce conventional commits with lowercase subjects (commitlint sensor) — flags: `--message <FILE>`, `--count <N>`, `--range <REV-RANGE>` |
+| `helpers deps [OPTIONS]` | Dependency-direction and cargo-deny gate (deps sensor) |
+| `helpers audit [OPTIONS] [-- <ARGS>...]` | `RustSec` advisory scan via cargo-audit (audit sensor) |
 | `eval [OPTIONS]` | Validate skill structure and benchmark skill evals — flags: `--skill <SKILL>`, `--bless`, `--list-skills`, `--fail-fast`, `--format <FORMAT>`, `--approver <NAME>`, `--no-lift`, `--agent-cmd <COMMAND>`, `--agent-timeout <SECS>`, `--strict-fixtures`, `--trials <N>` |
 | `hook install [OPTIONS]` | Write pre-commit and pre-push hooks into `.git/hooks/` — flags: `--force` |
 | `hook uninstall [OPTIONS]` | Remove managed hooks, leaving foreign hook files untouched |

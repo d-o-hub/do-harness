@@ -63,7 +63,8 @@ fn check_closure(
     fail_message: &str,
     skip_message: &str,
     fail_message_required: &str,
-) -> Result<bool, HelperError> {
+    absent_message: &str,
+) -> bool {
     let (ok, output) = run_cargo(
         root,
         &[
@@ -73,16 +74,24 @@ fn check_closure(
     if ok {
         if output.lines().any(|line| first_token_in(line, forbidden)) {
             println!("FAIL: {fail_message}");
-            return Ok(false);
+            return false;
         }
-        return Ok(true);
+        return true;
+    }
+    // The closure rules target the harness's own repository layout; a
+    // workspace that does not contain the package has no closure to audit.
+    // Treat that as a skip, not a failure: a fresh `init` scaffold must not
+    // be RED because it is not the do-harness monorepo.
+    if output.contains("did not match any packages") {
+        println!("note: {absent_message}");
+        return true;
     }
     if require_tools() {
         println!("FAIL: {fail_message_required}");
-        return Ok(false);
+        return false;
     }
     println!("SKIP: {skip_message}");
-    Ok(true)
+    true
 }
 
 /// Runs the package-contract bolt-on when the repository ships it.
@@ -122,29 +131,29 @@ pub fn run(root: &Path) -> Result<(), HelperError> {
     }
 
     // Rule 2a: real closure check over `cargo tree`, not just the manifest.
-    match check_closure(
+    if !check_closure(
         root,
         "do-harness-types",
         &FORBIDDEN_TYPES_CLOSURE,
         "do-harness-types closure must not contain storage or adapters.",
         "cargo tree unavailable; skipping transitive closure check (ensure cargo is installed).",
         "cargo tree failed under required-tools mode.",
-    )? {
-        true => {}
-        false => failed = true,
+        "workspace has no do-harness-types package; skipping types closure check.",
+    ) {
+        failed = true;
     }
 
     // Rule 2b: guardian-proxy (adjacent adapter) must NOT depend on the CLI.
-    match check_closure(
+    if !check_closure(
         root,
         "guardian-proxy",
         &FORBIDDEN_PROXY_CLOSURE,
         "guardian-proxy must not depend on the do-harness CLI.",
         "cargo tree unavailable; skipping guardian-proxy closure check (ensure cargo is installed).",
         "cargo tree failed under required-tools mode.",
-    )? {
-        true => {}
-        false => failed = true,
+        "workspace has no guardian-proxy package; skipping proxy closure check.",
+    ) {
+        failed = true;
     }
 
     // cargo-deny: fails open locally, fails closed on demand.
@@ -153,10 +162,22 @@ pub fn run(root: &Path) -> Result<(), HelperError> {
         .status()
         .is_ok_and(|status| status.success());
     if deny {
-        let (ok, output) = run_cargo(root, &["deny", "check"]);
-        if !ok {
-            print!("{output}");
-            failed = true;
+        // A deny run with no policy file is not evidence: cargo-deny's
+        // fallback config rejects every license (including the scaffolded
+        // MIT crate), so a fresh workspace would fail without ever opting
+        // into a policy. Only enforce when the repository ships one.
+        let has_policy =
+            root.join("deny.toml").is_file() || root.join(".cargo/deny.toml").is_file();
+        if has_policy {
+            let (ok, output) = run_cargo(root, &["deny", "check"]);
+            if !ok {
+                print!("{output}");
+                failed = true;
+            }
+        } else {
+            println!(
+                "note: no deny.toml policy found; deny check skipped (add one to enforce license/bans)."
+            );
         }
     } else if require_tools() {
         println!("FAIL: cargo-deny is required when CI=true or DO_HARNESS_REQUIRE_TOOLS=1.");

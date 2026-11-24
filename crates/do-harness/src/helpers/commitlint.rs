@@ -59,8 +59,7 @@ fn conventional_subject(subject: &str) -> bool {
     let type_end = bytes[cursor..]
         .iter()
         .position(|b| matches!(b, b'(' | b'!' | b':'))
-        .map(|idx| cursor + idx)
-        .unwrap_or(bytes.len());
+        .map_or(bytes.len(), |idx| cursor + idx);
     if cursor == type_end || !TYPES.iter().any(|&t| t == &subject[cursor..type_end]) {
         return false;
     }
@@ -120,9 +119,9 @@ fn lint_message(message_file: &Path) -> Result<(), HelperError> {
         )));
     };
     if let Err(msg) = lint_subject(subject) {
-        eprintln!("{msg}");
-        eprintln!("Conventional-commit invariant violated.");
-        eprintln!("Use: 'type(scope): lowercase subject' e.g. 'fix: typo'");
+        println!("{msg}");
+        println!("Conventional-commit invariant violated.");
+        println!("Use: 'type(scope): lowercase subject' e.g. 'fix: typo'");
         return Err(HelperError::Violation(String::new()));
     }
     println!("check-commitlint OK: subject is conventional and lowercase.");
@@ -216,13 +215,10 @@ fn lint_window(root: &Path, count: usize, range: Option<&str>) -> Result<(), Hel
         }
     };
 
-    let output = match git_command(root).args(&log_args).output() {
-        Ok(out) => out,
-        Err(_) => {
-            return Err(HelperError::Usage(format!(
-                "check-commitlint: git log failed for the {log_source}"
-            )));
-        }
+    let Ok(output) = git_command(root).args(&log_args).output() else {
+        return Err(HelperError::Usage(format!(
+            "check-commitlint: git log failed for the {log_source}"
+        )));
     };
     if !output.status.success() {
         eprintln!("{}", String::from_utf8_lossy(&output.stderr));
@@ -232,6 +228,12 @@ fn lint_window(root: &Path, count: usize, range: Option<&str>) -> Result<(), Hel
     }
 
     let subjects = String::from_utf8_lossy(&output.stdout);
+    lint_subjects(&subjects, &log_source)
+}
+
+/// Lints every non-empty subject in `subjects`, printing FAIL lines to stdout
+/// like the shell script it ports, and summarizing the window verdict.
+fn lint_subjects(subjects: &str, log_source: &str) -> Result<(), HelperError> {
     let mut failures = 0usize;
     let mut linted = 0usize;
     for subject in subjects.lines() {
@@ -240,13 +242,13 @@ fn lint_window(root: &Path, count: usize, range: Option<&str>) -> Result<(), Hel
         }
         linted += 1;
         if let Err(msg) = lint_subject(subject) {
-            eprintln!("{msg}");
+            println!("{msg}");
             failures += 1;
         }
     }
     if failures > 0 {
-        eprintln!("Conventional-commit invariant violated in the {log_source}.");
-        eprintln!(
+        println!("Conventional-commit invariant violated in the {log_source}.");
+        println!(
             "Use: 'type(scope): lowercase subject' e.g. 'feat(workflow): gate advance on beats'"
         );
         return Err(HelperError::Violation(String::new()));

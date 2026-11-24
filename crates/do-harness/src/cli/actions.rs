@@ -465,7 +465,7 @@ pub enum HelpersAction {
             conflicts_with_all = ["count", "range"]
         )]
         message: Option<PathBuf>,
-        /// History window size (default 1; env: DO_HARNESS_COMMITLINT_COUNT).
+        /// History window size (default 1; env: `DO_HARNESS_COMMITLINT_COUNT`).
         #[arg(long, value_name = "N")]
         count: Option<usize>,
         /// Lint every subject in a git rev-list range.
@@ -474,7 +474,7 @@ pub enum HelpersAction {
     },
     /// Dependency-direction and cargo-deny gate (deps sensor).
     Deps,
-    /// RustSec advisory scan via cargo-audit (audit sensor).
+    /// `RustSec` advisory scan via cargo-audit (audit sensor).
     Audit {
         /// Extra arguments passed through to cargo audit.
         #[arg(last = true, value_name = "ARGS")]

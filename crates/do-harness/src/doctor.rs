@@ -347,7 +347,7 @@ pub(crate) async fn run_with_status(
         for helper in &helper_status {
             let argv = helper.argv.join(" ");
             if helper.shell {
-                let wrapper = helper.argv.last().map(String::as_str).unwrap_or("(none)");
+                let wrapper = helper.argv.last().map_or("(none)", String::as_str);
                 println!(
                     "  [WARN] helper portability: {} configured to run POSIX shell {}; native: do-harness {argv}",
                     helper.name, wrapper

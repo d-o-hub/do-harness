@@ -53,6 +53,7 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('errors', 'errors', [CompletionResultType]::ParameterValue, 'Inspect and clear fail-fast error signatures')
             [CompletionResult]::new('loc', 'loc', [CompletionResultType]::ParameterValue, 'Report line-of-code state for the 500-LOC invariant')
             [CompletionResult]::new('split', 'split', [CompletionResultType]::ParameterValue, 'Extract a large top-level item into a sibling module')
+            [CompletionResult]::new('helpers', 'helpers', [CompletionResultType]::ParameterValue, 'Run the shipped helper sensors natively (commitlint/deps/audit)')
             [CompletionResult]::new('eval', 'eval', [CompletionResultType]::ParameterValue, 'Validate skill structure and benchmark skill evals')
             [CompletionResult]::new('hook', 'hook', [CompletionResultType]::ParameterValue, 'Manage git hooks that run `do-harness verify`')
             [CompletionResult]::new('doctor', 'doctor', [CompletionResultType]::ParameterValue, 'Run diagnostic checks on binary resolution and git hook health')
@@ -1075,6 +1076,84 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('--version', '--version', [CompletionResultType]::ParameterName, 'Print version')
             break
         }
+        'do-harness;helpers' {
+            [CompletionResult]::new('--root', '--root', [CompletionResultType]::ParameterName, 'Workspace root override (default: walk up from cwd)')
+            [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Explicit path to do-harness.toml')
+            [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)')
+            [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Suppress PASS/WARN verdict lines and the success footer')
+            [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Suppress PASS/WARN verdict lines and the success footer')
+            [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Dry run without side effects')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('-V', '-V ', [CompletionResultType]::ParameterName, 'Print version')
+            [CompletionResult]::new('--version', '--version', [CompletionResultType]::ParameterName, 'Print version')
+            [CompletionResult]::new('commitlint', 'commitlint', [CompletionResultType]::ParameterValue, 'Enforce conventional commits with lowercase subjects (commitlint sensor)')
+            [CompletionResult]::new('deps', 'deps', [CompletionResultType]::ParameterValue, 'Dependency-direction and cargo-deny gate (deps sensor)')
+            [CompletionResult]::new('audit', 'audit', [CompletionResultType]::ParameterValue, '`RustSec` advisory scan via cargo-audit (audit sensor)')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'do-harness;helpers;commitlint' {
+            [CompletionResult]::new('--message', '--message', [CompletionResultType]::ParameterName, 'Lint the single subject in FILE (git commit-msg hook)')
+            [CompletionResult]::new('--count', '--count', [CompletionResultType]::ParameterName, 'History window size (default 1; env: `DO_HARNESS_COMMITLINT_COUNT`)')
+            [CompletionResult]::new('--range', '--range', [CompletionResultType]::ParameterName, 'Lint every subject in a git rev-list range')
+            [CompletionResult]::new('--root', '--root', [CompletionResultType]::ParameterName, 'Workspace root override (default: walk up from cwd)')
+            [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Explicit path to do-harness.toml')
+            [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)')
+            [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Suppress PASS/WARN verdict lines and the success footer')
+            [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Suppress PASS/WARN verdict lines and the success footer')
+            [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Dry run without side effects')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('-V', '-V ', [CompletionResultType]::ParameterName, 'Print version')
+            [CompletionResult]::new('--version', '--version', [CompletionResultType]::ParameterName, 'Print version')
+            break
+        }
+        'do-harness;helpers;deps' {
+            [CompletionResult]::new('--root', '--root', [CompletionResultType]::ParameterName, 'Workspace root override (default: walk up from cwd)')
+            [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Explicit path to do-harness.toml')
+            [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)')
+            [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Suppress PASS/WARN verdict lines and the success footer')
+            [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Suppress PASS/WARN verdict lines and the success footer')
+            [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Dry run without side effects')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('-V', '-V ', [CompletionResultType]::ParameterName, 'Print version')
+            [CompletionResult]::new('--version', '--version', [CompletionResultType]::ParameterName, 'Print version')
+            break
+        }
+        'do-harness;helpers;audit' {
+            [CompletionResult]::new('--root', '--root', [CompletionResultType]::ParameterName, 'Workspace root override (default: walk up from cwd)')
+            [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Explicit path to do-harness.toml')
+            [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)')
+            [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Suppress PASS/WARN verdict lines and the success footer')
+            [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Suppress PASS/WARN verdict lines and the success footer')
+            [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Dry run without side effects')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('-V', '-V ', [CompletionResultType]::ParameterName, 'Print version')
+            [CompletionResult]::new('--version', '--version', [CompletionResultType]::ParameterName, 'Print version')
+            break
+        }
+        'do-harness;helpers;help' {
+            [CompletionResult]::new('commitlint', 'commitlint', [CompletionResultType]::ParameterValue, 'Enforce conventional commits with lowercase subjects (commitlint sensor)')
+            [CompletionResult]::new('deps', 'deps', [CompletionResultType]::ParameterValue, 'Dependency-direction and cargo-deny gate (deps sensor)')
+            [CompletionResult]::new('audit', 'audit', [CompletionResultType]::ParameterValue, '`RustSec` advisory scan via cargo-audit (audit sensor)')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'do-harness;helpers;help;commitlint' {
+            break
+        }
+        'do-harness;helpers;help;deps' {
+            break
+        }
+        'do-harness;helpers;help;audit' {
+            break
+        }
+        'do-harness;helpers;help;help' {
+            break
+        }
         'do-harness;eval' {
             [CompletionResult]::new('--skill', '--skill', [CompletionResultType]::ParameterName, 'Restrict evaluation to this skill directory name')
             [CompletionResult]::new('--format', '--format', [CompletionResultType]::ParameterName, 'Output format')
@@ -1714,6 +1793,7 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('errors', 'errors', [CompletionResultType]::ParameterValue, 'Inspect and clear fail-fast error signatures')
             [CompletionResult]::new('loc', 'loc', [CompletionResultType]::ParameterValue, 'Report line-of-code state for the 500-LOC invariant')
             [CompletionResult]::new('split', 'split', [CompletionResultType]::ParameterValue, 'Extract a large top-level item into a sibling module')
+            [CompletionResult]::new('helpers', 'helpers', [CompletionResultType]::ParameterValue, 'Run the shipped helper sensors natively (commitlint/deps/audit)')
             [CompletionResult]::new('eval', 'eval', [CompletionResultType]::ParameterValue, 'Validate skill structure and benchmark skill evals')
             [CompletionResult]::new('hook', 'hook', [CompletionResultType]::ParameterValue, 'Manage git hooks that run `do-harness verify`')
             [CompletionResult]::new('doctor', 'doctor', [CompletionResultType]::ParameterValue, 'Run diagnostic checks on binary resolution and git hook health')
@@ -1898,6 +1978,21 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             break
         }
         'do-harness;help;split' {
+            break
+        }
+        'do-harness;help;helpers' {
+            [CompletionResult]::new('commitlint', 'commitlint', [CompletionResultType]::ParameterValue, 'Enforce conventional commits with lowercase subjects (commitlint sensor)')
+            [CompletionResult]::new('deps', 'deps', [CompletionResultType]::ParameterValue, 'Dependency-direction and cargo-deny gate (deps sensor)')
+            [CompletionResult]::new('audit', 'audit', [CompletionResultType]::ParameterValue, '`RustSec` advisory scan via cargo-audit (audit sensor)')
+            break
+        }
+        'do-harness;help;helpers;commitlint' {
+            break
+        }
+        'do-harness;help;helpers;deps' {
+            break
+        }
+        'do-harness;help;helpers;audit' {
             break
         }
         'do-harness;help;eval' {

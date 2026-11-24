@@ -107,6 +107,7 @@
       "errors",
       "loc",
       "split",
+      "helpers",
       "eval",
       "hook",
       "doctor",
@@ -3169,6 +3170,112 @@
           "possible_values": [],
           "help": "Name the sibling module instead of deriving it from the item",
           "index": null
+        }
+      ],
+      "subcommands": [],
+      "invocable": true
+    },
+    {
+      "path": "helpers",
+      "about": "Run the shipped helper sensors natively (commitlint/deps/audit)",
+      "usage": "do-harness helpers [OPTIONS] <COMMAND>",
+      "aliases": [],
+      "args": [],
+      "subcommands": [
+        "commitlint",
+        "deps",
+        "audit"
+      ],
+      "invocable": false
+    },
+    {
+      "path": "helpers commitlint",
+      "about": "Enforce conventional commits with lowercase subjects (commitlint sensor)",
+      "usage": "do-harness helpers commitlint [OPTIONS]",
+      "aliases": [],
+      "args": [
+        {
+          "id": "message",
+          "kind": "option",
+          "short": null,
+          "long": "message",
+          "value_names": [
+            "FILE"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Lint the single subject in FILE (git commit-msg hook)",
+          "index": null
+        },
+        {
+          "id": "count",
+          "kind": "option",
+          "short": null,
+          "long": "count",
+          "value_names": [
+            "N"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "History window size (default 1; env: `DO_HARNESS_COMMITLINT_COUNT`)",
+          "index": null
+        },
+        {
+          "id": "range",
+          "kind": "option",
+          "short": null,
+          "long": "range",
+          "value_names": [
+            "REV-RANGE"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Lint every subject in a git rev-list range",
+          "index": null
+        }
+      ],
+      "subcommands": [],
+      "invocable": true
+    },
+    {
+      "path": "helpers deps",
+      "about": "Dependency-direction and cargo-deny gate (deps sensor)",
+      "usage": "do-harness helpers deps [OPTIONS]",
+      "aliases": [],
+      "args": [],
+      "subcommands": [],
+      "invocable": true
+    },
+    {
+      "path": "helpers audit",
+      "about": "`RustSec` advisory scan via cargo-audit (audit sensor)",
+      "usage": "do-harness helpers audit [OPTIONS] [-- <ARGS>...]",
+      "aliases": [],
+      "args": [
+        {
+          "id": "args",
+          "kind": "positional",
+          "short": null,
+          "long": null,
+          "value_names": [
+            "ARGS"
+          ],
+          "required": false,
+          "repeatable": true,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Extra arguments passed through to cargo audit",
+          "index": 1
         }
       ],
       "subcommands": [],

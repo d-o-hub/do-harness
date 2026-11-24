@@ -322,12 +322,12 @@ async fn init_generic_has_no_release_scaffold() {
 
 #[test]
 fn generated_rust_config_scopes_release_preflight() {
-    // `loc` stands in for the pack's shell-probed sensors: the preflight is
-    // only generated where a shell was proven, because `init` writes its
-    // script.
+    // `coverage` is the pack's shell-backed sensor (it runs
+    // scripts/check-coverage.sh): the preflight is only generated where a
+    // shell was proven, because `init` writes its script.
     let shell_proven: Vec<_> = crate::config::rust_pack()
         .into_iter()
-        .filter(|spec| spec.name == "loc")
+        .filter(|spec| spec.name == "coverage")
         .collect();
     let text = generate_rust_config(&shell_proven).unwrap();
 
