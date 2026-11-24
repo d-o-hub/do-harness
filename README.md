@@ -8,9 +8,14 @@ observations. A passing fixture alone never proves client mediation.
 
 ## Install
 
-Zero-install with npx on Linux and macOS (Node 18+; resolves the prebuilt
-platform binary). **Windows is not available through npm** — use the release
-zip below:
+Zero-install with npx (Node 18+): Linux and macOS resolve the prebuilt
+platform binary from npm; Windows x64 downloads the matching release binary on
+first use (SHA-256 verified against the release `checksums.txt`, cached under
+`%LOCALAPPDATA%\do-harness`). The `do-harness-win32-x64` platform package is
+blocked by npm's name screening, so the wrapper fetches the release zip
+instead — see
+[docs/adoption.md](https://github.com/d-o-hub/do-harness/blob/main/docs/adoption.md#windows)
+for details.
 
 <!-- example: id=npx_quickstart classification=illustrative reason="npx runner invocation" -->
 ```bash
@@ -21,10 +26,12 @@ npx do-harness verify --set verification --changed --strict
 Prebuilt binaries for Linux (x86_64/aarch64, static musl), macOS
 (x86_64/arm64), and Windows (x86_64, zip; included starting with `v0.1.1`;
 `v0.1.0` shipped Linux/macOS only) are published as GitHub Releases
-with SHA-256 checksums. The Windows zip is the only supported Windows
-install path, because npm rejects the `do-harness-win32-x64` package name
-(HTTP 403, "Package name triggered spam detection"); see
-[docs/adoption.md](https://github.com/d-o-hub/do-harness/blob/main/docs/adoption.md#windows) for details.
+with SHA-256 checksums. Windows npx installs fetch this zip automatically
+(see above); the zip remains the canonical Windows artifact because npm
+rejects the `do-harness-win32-x64` package name (HTTP 403, "Package name
+triggered spam detection"). See
+[docs/adoption.md](https://github.com/d-o-hub/do-harness/blob/main/docs/adoption.md#windows)
+for details.
 
 <!-- example: id=install_script classification=executable fixture=installer_local_artifact -->
 ```bash
