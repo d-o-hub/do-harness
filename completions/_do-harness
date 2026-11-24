@@ -59,7 +59,8 @@ junit\:"\`JUnit\` XML\: one \`<testcase>\` per sensor for CI test tabs and annot
 '--since=[Run only sensors applicable to the committed range \`merge-base(<REF>, HEAD)..HEAD\`; combine with \`--changed\` to union committed and uncommitted paths]:REF:_default' \
 '*--only=[Run only the named sensor (repeatable or comma-separated)]:SENSOR:_default' \
 '*--exclude=[Exclude named sensors from the run]:SENSOR:_default' \
-'--jobs=[Maximum sensors in flight (overrides \`jobs\` in do-harness.toml)]:N:_default' \
+'--jobs=[Maximum workspace concurrency with \`--workspaces\`; otherwise the maximum sensors in flight (overrides \`jobs\` in do-harness.toml)]:N:_default' \
+'--workspaces=[Select workspace directories or configs matching this root-relative glob]:GLOB:_default' \
 '--unchanged=[Reuse recorded passing beats for sensors whose declared inputs are unchanged\: \`warn\` (default) executes and advises, \`skip\` reuses without executing (requires --record), \`run\` always executes]:MODE:((warn\:"Execute the sensor, but print an advisory when a recorded pass is eligible for reuse (the conservative default\: evidence stays fresh)"
 skip\:"Reuse the eligible recorded pass without executing the sensor"
 run\:"Execute unconditionally; no reuse lookup at all"))' \
@@ -94,7 +95,8 @@ junit\:"\`JUnit\` XML\: one \`<testcase>\` per sensor for CI test tabs and annot
 '--since=[Run only sensors applicable to the committed range \`merge-base(<REF>, HEAD)..HEAD\`; combine with \`--changed\` to union committed and uncommitted paths]:REF:_default' \
 '*--only=[Run only the named sensor (repeatable or comma-separated)]:SENSOR:_default' \
 '*--exclude=[Exclude named sensors from the run]:SENSOR:_default' \
-'--jobs=[Maximum sensors in flight (overrides \`jobs\` in do-harness.toml)]:N:_default' \
+'--jobs=[Maximum workspace concurrency with \`--workspaces\`; otherwise the maximum sensors in flight (overrides \`jobs\` in do-harness.toml)]:N:_default' \
+'--workspaces=[Select workspace directories or configs matching this root-relative glob]:GLOB:_default' \
 '--unchanged=[Reuse recorded passing beats for sensors whose declared inputs are unchanged\: \`warn\` (default) executes and advises, \`skip\` reuses without executing (requires --record), \`run\` always executes]:MODE:((warn\:"Execute the sensor, but print an advisory when a recorded pass is eligible for reuse (the conservative default\: evidence stays fresh)"
 skip\:"Reuse the eligible recorded pass without executing the sensor"
 run\:"Execute unconditionally; no reuse lookup at all"))' \

@@ -245,7 +245,7 @@ export PATH="$HOME/.local/bin:$PATH"
 | Command | Description |
 | --- | --- |
 | `version [OPTIONS]` | Print CLI version information — flags: `--format <FORMAT>` |
-| `verify [OPTIONS]` | Run computational sensors (alias: `check`) — flags: `--fail-fast`, `--format <FORMAT>`, `--simulate`, `--set <SET>`, `--changed`, `--since <REF>`, `--only <SENSOR>`, `--exclude <SENSOR>`, `--jobs <N>`, `--unchanged <MODE>`, `--record`, `--task <ID>`, `--global`, `--evidence <FILE>`, `--strict`, `--bless`, `--approver <NAME>` |
+| `verify [OPTIONS]` | Run computational sensors (alias: `check`) — flags: `--fail-fast`, `--format <FORMAT>`, `--simulate`, `--set <SET>`, `--changed`, `--since <REF>`, `--only <SENSOR>`, `--exclude <SENSOR>`, `--jobs <N>`, `--workspaces <GLOB>`, `--unchanged <MODE>`, `--record`, `--task <ID>`, `--global`, `--evidence <FILE>`, `--strict`, `--bless`, `--approver <NAME>` |
 | `migrate [OPTIONS]` | Migrate do-harness.toml to the current configuration schema — flags: `--diff`, `--write`, `--format <FORMAT>` |
 | `list [OPTIONS]` | List sensor names (alias: `ls`) — flags: `--sets`, `--format <FORMAT>` |
 | `explain [OPTIONS]` | Explain which sensors the current change selects, without running them — flags: `--set <SET>`, `--changed`, `--since <REF>`, `--format <FORMAT>` |
