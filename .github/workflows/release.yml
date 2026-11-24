@@ -847,3 +847,53 @@ jobs:
           fi
           cat "$facts"
           bash scripts/verify-published.sh --tag "$TAG" --dir "$work/assets" --facts "$facts" --require-immutable
+
+  verify-windows-npm:
+    # The wrapper needs both the registry package and the same-version release
+    # assets. Run after both are available, including on tagged recovery.
+    needs: [release, npm-publish]
+    if: github.event_name == 'push' || inputs.tag
+    runs-on: windows-latest
+    timeout-minutes: 12
+    permissions:
+      contents: read
+    steps:
+      # actions/checkout@v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          persist-credentials: false
+      # actions/setup-node@v7.0.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: "24"
+      - name: Run the published Windows npm wrapper
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          if (-not (Test-Path "integrations/npm/lib/win32-download.js")) {
+            Write-Output "Historical tag predates the Windows npm wrapper."
+            exit 0
+          }
+          $version = $env:RELEASE_TAG.TrimStart("v")
+          $package = "do-harness@$version"
+          $work = New-Item -ItemType Directory -Path (Join-Path $env:RUNNER_TEMP "windows-npm-smoke")
+          $env:npm_config_cache = Join-Path $work.FullName "npm-cache"
+          $env:DO_HARNESS_CACHE_DIR = Join-Path $work.FullName "binary-cache"
+          Set-Location $work.FullName
+          for ($attempt = 0; $attempt -lt 20; $attempt++) {
+            $published = npm.cmd view $package version --loglevel=silent
+            if ($LASTEXITCODE -eq 0 -and $published -eq $version) { break }
+            Start-Sleep -Seconds 15
+          }
+          if ($published -ne $version) { throw "npm did not expose $package" }
+          $output = npm.cmd exec --yes --package=$package -- do-harness version
+          if ($LASTEXITCODE -ne 0) { throw "Windows npm wrapper failed" }
+          $output | Write-Output
+          if (($output -join "`n") -notmatch [regex]::Escape($version)) {
+            throw "Windows npm wrapper reported an unexpected version"
+          }
+          if (-not (Test-Path (Join-Path $env:DO_HARNESS_CACHE_DIR "do-harness/v$version/do-harness.exe"))) {
+            throw "Windows release binary was not downloaded"
+          }
