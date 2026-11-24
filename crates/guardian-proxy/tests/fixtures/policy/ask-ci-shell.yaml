@@ -1,0 +1,5 @@
+name: ask-ci-shell
+request:
+  tool: shell.exec
+  caller: ci
+expected: ask

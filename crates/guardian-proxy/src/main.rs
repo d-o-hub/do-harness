@@ -29,6 +29,33 @@ struct Cli {
     /// Verify a hash-chained audit log and exit (fail-closed: tamper exits non-zero).
     #[arg(long, value_name = "PATH")]
     verify_audit: Option<PathBuf>,
+    #[command(subcommand)]
+    command: Option<Command>,
+}
+
+#[derive(Debug, clap::Subcommand)]
+enum Command {
+    /// Declarative policy operations.
+    Policy(PolicyArgs),
+}
+
+#[derive(Debug, clap::Args)]
+struct PolicyArgs {
+    #[command(subcommand)]
+    cmd: PolicyCmd,
+}
+
+#[derive(Debug, clap::Subcommand)]
+enum PolicyCmd {
+    /// Evaluates allow/deny/ask fixture cases against a policy offline.
+    Test {
+        /// Path to the policy file (YAML, schema version 1).
+        #[arg(long)]
+        policy: PathBuf,
+        /// Directory containing fixture files (JSON or YAML).
+        #[arg(long)]
+        fixtures: PathBuf,
+    },
 }
 
 /// Loads proxy config from JSON or TOML.
@@ -46,6 +73,38 @@ fn load_config(path: &std::path::Path) -> Result<ProxyConfig> {
     Ok(cfg)
 }
 
+/// Runs a `policy` subcommand.
+///
+/// # Errors
+///
+/// Returns an error when the policy file or the fixture directory cannot be
+/// read, or when any fixture mismatches (so the process exits non-zero).
+fn run_command(command: &Command) -> Result<()> {
+    match command {
+        Command::Policy(PolicyArgs {
+            cmd: PolicyCmd::Test { policy, fixtures },
+        }) => {
+            let summary = guardian_proxy::run_fixtures(policy, fixtures)?;
+            println!(
+                "guardian-proxy: policy test: {}/{} fixtures passed",
+                summary.passed, summary.total
+            );
+            for failure in &summary.failures {
+                eprintln!("guardian-proxy: policy test: FAIL: {failure}");
+            }
+            if summary.failures.is_empty() {
+                Ok(())
+            } else {
+                anyhow::bail!(
+                    "{} of {} fixtures failed",
+                    summary.failures.len(),
+                    summary.total
+                )
+            }
+        }
+    }
+}
+
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
@@ -53,6 +112,9 @@ async fn main() -> Result<()> {
         AuditLog::verify(path)?;
         println!("guardian-proxy: audit log {} verified", path.display());
         return Ok(());
+    }
+    if let Some(command) = &cli.command {
+        return run_command(command);
     }
     let config = load_config(&cli.config)?;
     let bind = config.bind.clone();

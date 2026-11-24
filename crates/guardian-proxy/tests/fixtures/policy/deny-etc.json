@@ -1,0 +1,5 @@
+{
+  "name": "deny-etc",
+  "request": {"tool": "fs.remove", "params": {"path": "/etc/passwd"}},
+  "expected": "deny"
+}
