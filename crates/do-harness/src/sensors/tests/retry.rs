@@ -24,6 +24,7 @@ fn retries_failing_sensor_until_success() {
         language: None,
         hooks: HooksConfig::default(),
         signal_sets: BTreeMap::new(),
+        env: BTreeMap::new(),
         sensors: vec![SensorSpec {
             kind: None,
             fix: None,
@@ -82,6 +83,7 @@ fn times_out_hanging_sensor() {
         language: None,
         hooks: HooksConfig::default(),
         signal_sets: BTreeMap::new(),
+        env: BTreeMap::new(),
         sensors: vec![SensorSpec {
             kind: None,
             fix: None,
@@ -144,6 +146,7 @@ fn transient_exit_codes_restricts_retries() {
         language: None,
         hooks: HooksConfig::default(),
         signal_sets: BTreeMap::new(),
+        env: BTreeMap::new(),
         sensors: vec![SensorSpec {
             kind: None,
             fix: None,

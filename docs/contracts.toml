@@ -15,6 +15,11 @@ classification = "maintained"
 reason = "Repository-wide agent instructions and guidelines."
 
 [[rules]]
+path = "CONTRIBUTING.md"
+classification = "maintained"
+reason = "Root contributor guide; its links and examples are maintained artifacts."
+
+[[rules]]
 path = "SECURITY.md"
 classification = "maintained"
 reason = "Security disclosure and contact policy."

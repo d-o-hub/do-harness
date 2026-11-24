@@ -733,6 +733,72 @@ json\:"Machine-readable JSON output"))' \
 '--version[Print version]' \
 && ret=0
 ;;
+(setup)
+_arguments "${_arguments_options[@]}" : \
+'--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
+'--config=[Explicit path to do-harness.toml]:FILE:_files' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
+'--dry-run[Dry run without side effects]' \
+'-h[Print help]' \
+'--help[Print help]' \
+'-V[Print version]' \
+'--version[Print version]' \
+":: :_do-harness__subcmd__setup_commands" \
+"*::: :->setup" \
+&& ret=0
+
+    case $state in
+    (setup)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:do-harness-setup-command-$line[1]:"
+        case $line[1] in
+            (web)
+_arguments "${_arguments_options[@]}" : \
+'--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
+'--config=[Explicit path to do-harness.toml]:FILE:_files' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
+'-y[Skip the interactive install prompt and install missing dependencies]' \
+'--yes[Skip the interactive install prompt and install missing dependencies]' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
+'--dry-run[Dry run without side effects]' \
+'-h[Print help]' \
+'--help[Print help]' \
+'-V[Print version]' \
+'--version[Print version]' \
+&& ret=0
+;;
+(help)
+_arguments "${_arguments_options[@]}" : \
+":: :_do-harness__subcmd__setup__subcmd__help_commands" \
+"*::: :->help" \
+&& ret=0
+
+    case $state in
+    (help)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:do-harness-setup-help-command-$line[1]:"
+        case $line[1] in
+            (web)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(help)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+        esac
+    ;;
+esac
+;;
+        esac
+    ;;
+esac
+;;
 (task)
 _arguments "${_arguments_options[@]}" : \
 '--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
@@ -2190,6 +2256,26 @@ _arguments "${_arguments_options[@]}" : \
 _arguments "${_arguments_options[@]}" : \
 && ret=0
 ;;
+(setup)
+_arguments "${_arguments_options[@]}" : \
+":: :_do-harness__subcmd__help__subcmd__setup_commands" \
+"*::: :->setup" \
+&& ret=0
+
+    case $state in
+    (setup)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:do-harness-help-setup-command-$line[1]:"
+        case $line[1] in
+            (web)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+        esac
+    ;;
+esac
+;;
 (task)
 _arguments "${_arguments_options[@]}" : \
 ":: :_do-harness__subcmd__help__subcmd__task_commands" \
@@ -2538,6 +2624,7 @@ _do-harness_commands() {
 'init-db:Apply pending database migrations' \
 'seed:Seed invariants from plans/invariants.json' \
 'init:Scaffold a harness workspace in a target directory' \
+'setup:Configure optional web pack dependencies and environment after \`init\`' \
 'task:Inspect and export task state' \
 'trace:Record and list interaction traces' \
 'distill:Extract a heuristic from a resolved trace into a skill. Review output against the anti-AI-slop checklist (.agents/skills/skill-creator/references/anti_ai_slop.md)' \
@@ -2769,6 +2856,7 @@ _do-harness__subcmd__help_commands() {
 'init-db:Apply pending database migrations' \
 'seed:Seed invariants from plans/invariants.json' \
 'init:Scaffold a harness workspace in a target directory' \
+'setup:Configure optional web pack dependencies and environment after \`init\`' \
 'task:Inspect and export task state' \
 'trace:Record and list interaction traces' \
 'distill:Extract a heuristic from a resolved trace into a skill. Review output against the anti-AI-slop checklist (.agents/skills/skill-creator/references/anti_ai_slop.md)' \
@@ -3098,6 +3186,18 @@ _do-harness__subcmd__help__subcmd__sensor_commands() {
 _do-harness__subcmd__help__subcmd__sensor__subcmd__new_commands() {
     local commands; commands=()
     _describe -t commands 'do-harness help sensor new commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__help__subcmd__setup_commands] )) ||
+_do-harness__subcmd__help__subcmd__setup_commands() {
+    local commands; commands=(
+'web:Bootstrap the web audit pack\: check the playwright/@axe-core/playwright/ lighthouse peer dependencies, install what is missing, and patch \`do-harness.toml\` with the \`WEB_AUDIT_*\` environment block' \
+    )
+    _describe -t commands 'do-harness help setup commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__help__subcmd__setup__subcmd__web_commands] )) ||
+_do-harness__subcmd__help__subcmd__setup__subcmd__web_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness help setup web commands' commands "$@"
 }
 (( $+functions[_do-harness__subcmd__help__subcmd__skills_commands] )) ||
 _do-harness__subcmd__help__subcmd__skills_commands() {
@@ -3598,6 +3698,37 @@ _do-harness__subcmd__sensor__subcmd__help__subcmd__new_commands() {
 _do-harness__subcmd__sensor__subcmd__new_commands() {
     local commands; commands=()
     _describe -t commands 'do-harness sensor new commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__setup_commands] )) ||
+_do-harness__subcmd__setup_commands() {
+    local commands; commands=(
+'web:Bootstrap the web audit pack\: check the playwright/@axe-core/playwright/ lighthouse peer dependencies, install what is missing, and patch \`do-harness.toml\` with the \`WEB_AUDIT_*\` environment block' \
+'help:Print this message or the help of the given subcommand(s)' \
+    )
+    _describe -t commands 'do-harness setup commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__setup__subcmd__help_commands] )) ||
+_do-harness__subcmd__setup__subcmd__help_commands() {
+    local commands; commands=(
+'web:Bootstrap the web audit pack\: check the playwright/@axe-core/playwright/ lighthouse peer dependencies, install what is missing, and patch \`do-harness.toml\` with the \`WEB_AUDIT_*\` environment block' \
+'help:Print this message or the help of the given subcommand(s)' \
+    )
+    _describe -t commands 'do-harness setup help commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__setup__subcmd__help__subcmd__help_commands] )) ||
+_do-harness__subcmd__setup__subcmd__help__subcmd__help_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness setup help help commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__setup__subcmd__help__subcmd__web_commands] )) ||
+_do-harness__subcmd__setup__subcmd__help__subcmd__web_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness setup help web commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__setup__subcmd__web_commands] )) ||
+_do-harness__subcmd__setup__subcmd__web_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness setup web commands' commands "$@"
 }
 (( $+functions[_do-harness__subcmd__skills_commands] )) ||
 _do-harness__subcmd__skills_commands() {
