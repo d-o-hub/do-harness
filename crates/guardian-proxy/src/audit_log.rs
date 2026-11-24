@@ -31,6 +31,11 @@ pub struct AuditRecord {
     pub decision: String,
     /// Human-readable reason on deny.
     pub reason: Option<String>,
+    /// SHA-256 digest of the policy file in force when this decision was
+    /// taken; `None` when no declarative policy was loaded. Binding the
+    /// digest into the chain proves which policy produced the decision.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub policy_sha256: Option<String>,
 }
 
 impl AuditRecord {
@@ -39,6 +44,7 @@ impl AuditRecord {
         prev_hash: String,
         call: &McpLikeToolCall,
         decision: &ForwardDecision,
+        policy_sha256: Option<&str>,
     ) -> Result<Self> {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -47,13 +53,13 @@ impl AuditRecord {
             ForwardDecision::Allow => ("allow".to_string(), None),
             ForwardDecision::Deny { reason } => ("deny".to_string(), Some(reason.clone())),
         };
-        // Build canonical payload for hashing: decision + tool + params.
-        let payload_for_hash = serde_json::json!({
-            "tool": call.tool,
-            "params": call.params,
-            "decision": decision_str,
-            "reason": reason,
-        });
+        let payload_for_hash = decision_payload(
+            &call.tool,
+            call.params.as_ref(),
+            &decision_str,
+            reason.as_deref(),
+            policy_sha256,
+        );
         let canonical = canonical_value(&payload_for_hash)?;
         let hash = chain_hash(Some(&prev_hash), &canonical);
         Ok(Self {
@@ -65,8 +71,49 @@ impl AuditRecord {
             params: call.params.clone(),
             decision: decision_str,
             reason,
+            policy_sha256: policy_sha256.map(str::to_string),
         })
     }
+}
+
+/// Builds the canonical payload binding a decision to its tool call and,
+/// when present, the policy digest.
+///
+/// The `policy_sha256` key is omitted when the digest is `None`, so records
+/// written before policy binding keep verifying unchanged.
+fn decision_payload(
+    tool: &str,
+    params: Option<&serde_json::Value>,
+    decision: &str,
+    reason: Option<&str>,
+    policy_sha256: Option<&str>,
+) -> serde_json::Value {
+    let mut payload = serde_json::Map::new();
+    payload.insert(
+        "tool".to_string(),
+        serde_json::Value::String(tool.to_string()),
+    );
+    payload.insert(
+        "params".to_string(),
+        params.cloned().unwrap_or(serde_json::Value::Null),
+    );
+    payload.insert(
+        "decision".to_string(),
+        serde_json::Value::String(decision.to_string()),
+    );
+    payload.insert(
+        "reason".to_string(),
+        reason.map_or(serde_json::Value::Null, |r| {
+            serde_json::Value::String(r.to_string())
+        }),
+    );
+    if let Some(digest) = policy_sha256 {
+        payload.insert(
+            "policy_sha256".to_string(),
+            serde_json::Value::String(digest.to_string()),
+        );
+    }
+    serde_json::Value::Object(payload)
 }
 
 /// Returns the last record's `(next_seq, chain_hash)`, or genesis, from
@@ -127,12 +174,13 @@ impl AuditLog {
             for line in content.lines().filter(|l| !l.trim().is_empty()) {
                 let record: AuditRecord = serde_json::from_str(line)?;
                 // Verify chain while loading.
-                let payload_for_hash = serde_json::json!({
-                    "tool": record.tool,
-                    "params": record.params,
-                    "decision": record.decision,
-                    "reason": record.reason,
-                });
+                let payload_for_hash = decision_payload(
+                    &record.tool,
+                    record.params.as_ref(),
+                    &record.decision,
+                    record.reason.as_deref(),
+                    record.policy_sha256.as_deref(),
+                );
                 let canonical = canonical_value(&payload_for_hash)?;
                 let expected = chain_hash(Some(&prev), &canonical);
                 let seq_i64 = i64::try_from(record.seq).unwrap_or(i64::MAX);
@@ -180,6 +228,7 @@ impl AuditLog {
         &mut self,
         call: &McpLikeToolCall,
         decision: &ForwardDecision,
+        policy_sha256: Option<&str>,
     ) -> Result<AuditRecord> {
         use fs2::FileExt as _;
 
@@ -206,7 +255,7 @@ impl AuditLog {
                 return Err(err);
             }
         };
-        let record = AuditRecord::new(seq, prev_hash, call, decision)?;
+        let record = AuditRecord::new(seq, prev_hash, call, decision, policy_sha256)?;
         let line = serde_json::to_string(&record)?;
         let write_result = writeln!(file, "{line}")
             .and_then(|()| file.sync_all())
@@ -257,7 +306,9 @@ mod tests {
         assert_eq!(log.next_seq(), 1);
 
         let call = McpLikeToolCall::new("data.read", Some(json!({"path":"/tmp/x"})));
-        let r1 = log.append(&call, &ForwardDecision::Allow).expect("append");
+        let r1 = log
+            .append(&call, &ForwardDecision::Allow, None)
+            .expect("append");
         assert_eq!(r1.seq, 1);
         assert_eq!(r1.prev_hash, "GENESIS");
 
@@ -268,6 +319,7 @@ mod tests {
                 &ForwardDecision::Deny {
                     reason: "denied".to_string(),
                 },
+                None,
             )
             .expect("append");
         assert_eq!(r2.seq, 2);
@@ -294,7 +346,8 @@ mod tests {
         let path = dir.path().join("audit.jsonl");
         let mut log = AuditLog::open(&path).expect("open");
         let call = McpLikeToolCall::new("data.read", Some(json!({"path":"/tmp/x"})));
-        log.append(&call, &ForwardDecision::Allow).expect("append");
+        log.append(&call, &ForwardDecision::Allow, None)
+            .expect("append");
 
         // Tamper file.
         let mut content = std::fs::read_to_string(&path).expect("read");
@@ -325,10 +378,10 @@ mod tests {
         let call = McpLikeToolCall::new("data.read", None);
 
         let r1 = first
-            .append(&call, &ForwardDecision::Allow)
+            .append(&call, &ForwardDecision::Allow, None)
             .expect("append");
         let r2 = second
-            .append(&call, &ForwardDecision::Allow)
+            .append(&call, &ForwardDecision::Allow, None)
             .expect("append");
         assert_eq!(r1.seq, 1);
         assert_eq!(r2.seq, 2);
@@ -337,5 +390,56 @@ mod tests {
         AuditLog::verify(&path).expect("chain intact");
         let reopened = AuditLog::open(&path).expect("reopen");
         assert_eq!(reopened.next_seq(), 3);
+    }
+
+    /// Policy digest binding: records carry the digest and verify; the
+    /// chain binds to it, so altering the recorded digest breaks it.
+    #[test]
+    fn test_audit_binds_policy_digest() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("audit.jsonl");
+        let mut log = AuditLog::open(&path).expect("open");
+        let call = McpLikeToolCall::new("data.read", None);
+        let record = log
+            .append(&call, &ForwardDecision::Allow, Some("abc123"))
+            .expect("append");
+        assert_eq!(record.policy_sha256.as_deref(), Some("abc123"));
+        assert!(
+            std::fs::read_to_string(&path)
+                .expect("read")
+                .contains("policy_sha256")
+        );
+        AuditLog::verify(&path).expect("verify");
+
+        let content = std::fs::read_to_string(&path)
+            .expect("read")
+            .replace("abc123", "def456");
+        std::fs::write(&path, content).expect("write");
+        let err = AuditLog::open(&path).expect_err("tampered digest");
+        assert!(err.to_string().contains("tamper"));
+    }
+
+    /// Records written before policy binding (no `policy_sha256` field)
+    /// keep verifying unchanged: the digest key is omitted from the hash
+    /// payload, not emitted as null.
+    #[test]
+    fn test_audit_legacy_records_verify_without_digest() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("audit.jsonl");
+        let payload = serde_json::json!({
+            "tool": "t",
+            "params": null,
+            "decision": "allow",
+            "reason": null,
+        });
+        let canonical = canonical_value(&payload).expect("canonical");
+        let hash = chain_hash(Some("GENESIS"), &canonical);
+        let line = format!(
+            r#"{{"seq":1,"prev_hash":"GENESIS","chain_hash":"{hash}","created_at":0,"tool":"t","params":null,"decision":"allow","reason":null}}"#
+        );
+        std::fs::write(&path, format!("{line}\n")).expect("write");
+        AuditLog::verify(&path).expect("legacy chain verifies");
+        let log = AuditLog::open(&path).expect("open");
+        assert_eq!(log.next_seq(), 2);
     }
 }

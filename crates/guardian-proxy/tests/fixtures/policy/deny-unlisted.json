@@ -1,0 +1,5 @@
+{
+  "name": "deny-unlisted",
+  "request": {"tool": "some.unlisted.tool"},
+  "expected": "deny"
+}

@@ -59,3 +59,46 @@ The route is the documented ingress for adapters built before `mcp-surface`
 existed, and it is exercised by the conformance fixtures. Removing it in a
 minor release would break those clients without a migration window; the
 deprecation notice, the successor link, and this guide are that window.
+
+## Migrating from code-embedded policy to declarative policy
+
+Before the declarative policy layer, governance lived in Rust: the default
+build permitted well-formed calls (stub), and the `agt-governance` build
+delegated to the external AGT agent mesh. Policy changes required a Rust
+change, a rebuild, and a redeploy. A versioned YAML policy file
+(`ProxyConfig.policy_file`) externalizes the same decision surface for review,
+test, and shipping alongside application code.
+
+### What changes
+
+- **Startup:** when `policy_file` is set, `ProxyMediator` loads and validates
+  the policy before serving; a missing or unparseable file fails mediator
+  construction and the proxy serves degraded (`/health` 503, all calls
+  denied). With no `policy_file`, the previous code-embedded defaults apply
+  unchanged.
+- **Decisions:** a loaded policy is evaluated first. Only an explicit policy
+  `allow` reaches the governance gate (AGT when `agt-governance` is built,
+  the well-formed-params check otherwise); `deny` stops, and `ask` maps to a
+  deny (no interactive approval channel exists in the proxy). A call matching
+  no rule is denied.
+- **Evidence:** every audit record carries the policy file's SHA-256 digest
+  (`policy_sha256`), bound into the chain hash, so a ledger proves which
+  policy produced each decision.
+
+### Migrating
+
+1. Author a policy file from the schema reference in the crate README; start
+   from `crates/guardian-proxy/guardian-policy.example.yaml`.
+2. Set `policy_file` in the proxy config to the policy path.
+3. Test the policy offline before deploying:
+   `guardian-proxy policy test --policy <file> --fixtures <dir>` — fixture
+   cases cover allow/deny/ask and exit non-zero on any mismatch.
+4. Deploy the policy file alongside the service and ship changes to it like
+   any other reviewed artifact; the audit ledger records its digest per
+   decision.
+
+Caller-based rules (`caller` patterns) rely on the
+`X-Do-Harness-Caller-Id` request header on the deprecated flat transport,
+which is client-supplied: run the proxy behind an authenticating gateway that
+strips untrusted caller headers. The MCP surface does not currently set a
+caller identity, so caller-specific rules treat MCP calls as unnamed.

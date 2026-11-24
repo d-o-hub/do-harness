@@ -18,6 +18,7 @@ fn test_mediator_with_upstream(upstream: &str) -> Arc<ProxyMediator> {
         allow_private_upstreams: true,
         metrics_token: None,
         ingress_token: None,
+        policy_file: None,
         allowed_origins: vec![],
     };
     Arc::new(ProxyMediator::new(cfg).expect("mediator"))
@@ -438,6 +439,8 @@ async fn test_legacy_route_advertises_deprecation() {
         Some("</mcp>; rel=\"successor-version\"")
     );
 }
+
+mod policy_tests;
 
 mod auth;
 
