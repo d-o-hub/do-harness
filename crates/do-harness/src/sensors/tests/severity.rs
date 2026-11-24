@@ -20,6 +20,7 @@ fn severity_config(name: &str, argv: &[&str], severity: SensorSeverity) -> Confi
         language: None,
         hooks: HooksConfig::default(),
         signal_sets,
+        env: BTreeMap::new(),
         sensors: vec![SensorSpec {
             kind: None,
             fix: None,

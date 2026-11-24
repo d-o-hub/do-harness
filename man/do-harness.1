@@ -1,6 +1,6 @@
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
-.TH do-harness 1  "do-harness 0.4.8 (e2222b2-dirty 2026-11-21)" 
+.TH do-harness 1  "do-harness 0.4.8 (aeca832 2026-11-23)" 
 .SH NAME
 do\-harness \- do\-harness agent execution harness CLI
 .SH SYNOPSIS
@@ -69,6 +69,9 @@ Seed invariants from plans/invariants.json
 .TP
 do\-harness init
 Scaffold a harness workspace in a target directory
+.TP
+do\-harness setup
+Configure optional web pack dependencies and environment after `init`
 .TP
 do\-harness task
 Inspect and export task state
@@ -159,4 +162,4 @@ Exit Codes:
   1  Verification or check failure
   2  Usage, configuration, or environment error
 .SH VERSION
-v0.4.8 (e2222b2\-dirty 2026\-11\-21)
+v0.4.8 (ff64d8cc\-dirty 2026\-11\-24)

@@ -1,0 +1,27 @@
+{
+  "protocol_version": 1,
+  "experiment": "fresh-context-review-decision-v1",
+  "corpus_version": "fresh-context-decision-v1",
+  "canonical_doc": "plans/fresh-context-review-decision-protocol.md",
+  "status": "unpinned",
+  "status_note": "Numeric thresholds are placeholders until the #498 pilot feasibility data pins them. Held-out evaluation runs are NOT collected until thresholds are pinned. A pinned copy of this file must record pinned_at and pinned_from (the #498 pilot record or PR), and the pin must precede any held-out run.",
+  "limits": {
+    "per_review_timeout_s": 300,
+    "max_findings_per_review": 5,
+    "max_output_bytes_per_review": 65536,
+    "max_packet_bytes": 1048576
+  },
+  "sample": {
+    "repeated_runs_per_design_per_arm": null,
+    "min_complete_designs": null,
+    "design_count": 7
+  },
+  "thresholds": {
+    "mwi_advantage_rate": null,
+    "false_positive_tolerance_per_design": null,
+    "regression_tolerance_rate": null,
+    "max_review_time_minutes": null,
+    "max_usage_cost_usd": null,
+    "require_isolation_evidence": true
+  }
+}

@@ -11,7 +11,8 @@ mod command;
 mod learn;
 pub use actions::{
     DoctorAction, ErrorsAction, FeedbackAction, HelpersAction, HookAction, JobAction,
-    MetricsAction, NewSensorArgs, PrAction, SensorAction, SkillsAction, TaskAction, TraceAction,
+    MetricsAction, NewSensorArgs, PrAction, SensorAction, SetupAction, SkillsAction, TaskAction,
+    TraceAction,
 };
 pub use command::Command;
 pub use learn::LearnArgs;

@@ -121,6 +121,9 @@ _do__harness() {
             do__harness,sensor)
                 cmd="do__harness__subcmd__sensor"
                 ;;
+            do__harness,setup)
+                cmd="do__harness__subcmd__setup"
+                ;;
             do__harness,skills)
                 cmd="do__harness__subcmd__skills"
                 ;;
@@ -298,6 +301,9 @@ _do__harness() {
             do__harness__subcmd__help,sensor)
                 cmd="do__harness__subcmd__help__subcmd__sensor"
                 ;;
+            do__harness__subcmd__help,setup)
+                cmd="do__harness__subcmd__help__subcmd__setup"
+                ;;
             do__harness__subcmd__help,skills)
                 cmd="do__harness__subcmd__help__subcmd__skills"
                 ;;
@@ -402,6 +408,9 @@ _do__harness() {
                 ;;
             do__harness__subcmd__help__subcmd__sensor,new)
                 cmd="do__harness__subcmd__help__subcmd__sensor__subcmd__new"
+                ;;
+            do__harness__subcmd__help__subcmd__setup,web)
+                cmd="do__harness__subcmd__help__subcmd__setup__subcmd__web"
                 ;;
             do__harness__subcmd__help__subcmd__skills,drift)
                 cmd="do__harness__subcmd__help__subcmd__skills__subcmd__drift"
@@ -613,6 +622,18 @@ _do__harness() {
             do__harness__subcmd__sensor__subcmd__help,new)
                 cmd="do__harness__subcmd__sensor__subcmd__help__subcmd__new"
                 ;;
+            do__harness__subcmd__setup,help)
+                cmd="do__harness__subcmd__setup__subcmd__help"
+                ;;
+            do__harness__subcmd__setup,web)
+                cmd="do__harness__subcmd__setup__subcmd__web"
+                ;;
+            do__harness__subcmd__setup__subcmd__help,help)
+                cmd="do__harness__subcmd__setup__subcmd__help__subcmd__help"
+                ;;
+            do__harness__subcmd__setup__subcmd__help,web)
+                cmd="do__harness__subcmd__setup__subcmd__help__subcmd__web"
+                ;;
             do__harness__subcmd__skills,drift)
                 cmd="do__harness__subcmd__skills__subcmd__drift"
                 ;;
@@ -734,7 +755,7 @@ _do__harness() {
 
     case "${cmd}" in
         do__harness)
-            opts="-q -h -V --root --config --quiet --output --dry-run --help --version version verify check migrate list ls explain lint status sync latest-main pr skills init-db seed init task trace distill errors loc split helpers eval hook doctor metrics report sensor learn overlap maintenance cleanup compliance audit-chain dora ci-explain ci completions man feedback job help"
+            opts="-q -h -V --root --config --quiet --output --dry-run --help --version version verify check migrate list ls explain lint status sync latest-main pr skills init-db seed init setup task trace distill errors loc split helpers eval hook doctor metrics report sensor learn overlap maintenance cleanup compliance audit-chain dora ci-explain ci completions man feedback job help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 1 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -2183,7 +2204,7 @@ _do__harness() {
             return 0
             ;;
         do__subcmd__harness__subcmd__help)
-            opts="version verify migrate list explain lint status sync pr skills init-db seed init task trace distill errors loc split helpers eval hook doctor metrics report sensor learn overlap maintenance cleanup compliance audit-chain dora ci-explain completions man feedback job help"
+            opts="version verify migrate list explain lint status sync pr skills init-db seed init setup task trace distill errors loc split helpers eval hook doctor metrics report sensor learn overlap maintenance cleanup compliance audit-chain dora ci-explain completions man feedback job help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -2995,6 +3016,34 @@ _do__harness() {
             return 0
             ;;
         do__subcmd__harness__subcmd__help__subcmd__sensor__subcmd__new)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        do__subcmd__harness__subcmd__help__subcmd__setup)
+            opts="web"
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        do__subcmd__harness__subcmd__help__subcmd__setup__subcmd__web)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -6103,6 +6152,150 @@ _do__harness() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
+        do__subcmd__harness__subcmd__setup)
+            opts="-q -h -V --root --config --quiet --output --dry-run --help --version web help"
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                --root)
+                    COMPREPLY=()
+                    if [[ "${BASH_VERSINFO[0]}" -ge 4 ]]; then
+                        compopt -o plusdirs
+                    fi
+                    return 0
+                    ;;
+                --config)
+                    local oldifs
+                    if [ -n "${IFS+x}" ]; then
+                        oldifs="$IFS"
+                    fi
+                    IFS=$'\n'
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    if [ -n "${oldifs+x}" ]; then
+                        IFS="$oldifs"
+                    fi
+                    if [[ "${BASH_VERSINFO[0]}" -ge 4 ]]; then
+                        compopt -o filenames
+                    fi
+                    return 0
+                    ;;
+                --output)
+                    local oldifs
+                    if [ -n "${IFS+x}" ]; then
+                        oldifs="$IFS"
+                    fi
+                    IFS=$'\n'
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    if [ -n "${oldifs+x}" ]; then
+                        IFS="$oldifs"
+                    fi
+                    if [[ "${BASH_VERSINFO[0]}" -ge 4 ]]; then
+                        compopt -o filenames
+                    fi
+                    return 0
+                    ;;
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        do__subcmd__harness__subcmd__setup__subcmd__help)
+            opts="web help"
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        do__subcmd__harness__subcmd__setup__subcmd__help__subcmd__help)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        do__subcmd__harness__subcmd__setup__subcmd__help__subcmd__web)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        do__subcmd__harness__subcmd__setup__subcmd__web)
+            opts="-y -q -h -V --yes --root --config --quiet --output --dry-run --help --version"
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                --root)
+                    COMPREPLY=()
+                    if [[ "${BASH_VERSINFO[0]}" -ge 4 ]]; then
+                        compopt -o plusdirs
+                    fi
+                    return 0
+                    ;;
+                --config)
+                    local oldifs
+                    if [ -n "${IFS+x}" ]; then
+                        oldifs="$IFS"
+                    fi
+                    IFS=$'\n'
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    if [ -n "${oldifs+x}" ]; then
+                        IFS="$oldifs"
+                    fi
+                    if [[ "${BASH_VERSINFO[0]}" -ge 4 ]]; then
+                        compopt -o filenames
+                    fi
+                    return 0
+                    ;;
+                --output)
+                    local oldifs
+                    if [ -n "${IFS+x}" ]; then
+                        oldifs="$IFS"
+                    fi
+                    IFS=$'\n'
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    if [ -n "${oldifs+x}" ]; then
+                        IFS="$oldifs"
+                    fi
+                    if [[ "${BASH_VERSINFO[0]}" -ge 4 ]]; then
+                        compopt -o filenames
+                    fi
+                    return 0
+                    ;;
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
         do__subcmd__harness__subcmd__skills)
             opts="-q -h -V --root --config --quiet --output --dry-run --help --version suggest drift refresh-validator help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
@@ -7706,7 +7899,7 @@ _do__harness() {
             return 0
             ;;
         do__subcmd__harness__subcmd__verify)
-            opts="-q -h -V --fail-fast --format --simulate --set --changed --since --only --exclude --jobs --unchanged --record --task --global --evidence --strict --bless --approver --root --config --quiet --output --dry-run --help --version"
+            opts="-q -h -V --fail-fast --format --simulate --set --changed --since --only --exclude --jobs --workspaces --unchanged --record --task --global --evidence --strict --bless --approver --root --config --quiet --output --dry-run --help --version"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -7733,6 +7926,10 @@ _do__harness() {
                     return 0
                     ;;
                 --jobs)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --workspaces)
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;

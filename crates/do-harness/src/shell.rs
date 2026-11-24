@@ -92,7 +92,7 @@ pub fn resolve_program(program: &str) -> PathBuf {
             return bash;
         }
     }
-    if stem == "do-harness" {
+    if program == "do-harness" || (cfg!(windows) && program == "do-harness.exe") {
         // A sensor argv naming the harness itself resolves to the running
         // binary, so `["do-harness", "loc"]` works in a dev checkout where
         // the binary is not on `PATH`.

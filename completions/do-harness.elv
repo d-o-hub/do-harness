@@ -44,6 +44,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand init-db 'Apply pending database migrations'
             cand seed 'Seed invariants from plans/invariants.json'
             cand init 'Scaffold a harness workspace in a target directory'
+            cand setup 'Configure optional web pack dependencies and environment after `init`'
             cand task 'Inspect and export task state'
             cand trace 'Record and list interaction traces'
             cand distill 'Extract a heuristic from a resolved trace into a skill. Review output against the anti-AI-slop checklist (.agents/skills/skill-creator/references/anti_ai_slop.md)'
@@ -91,7 +92,8 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand --since 'Run only sensors applicable to the committed range `merge-base(<REF>, HEAD)..HEAD`; combine with `--changed` to union committed and uncommitted paths'
             cand --only 'Run only the named sensor (repeatable or comma-separated)'
             cand --exclude 'Exclude named sensors from the run'
-            cand --jobs 'Maximum sensors in flight (overrides `jobs` in do-harness.toml)'
+            cand --jobs 'Maximum workspace concurrency with `--workspaces`; otherwise the maximum sensors in flight (overrides `jobs` in do-harness.toml)'
+            cand --workspaces 'Select workspace directories or configs matching this root-relative glob'
             cand --unchanged 'Reuse recorded passing beats for sensors whose declared inputs are unchanged: `warn` (default) executes and advises, `skip` reuses without executing (requires --record), `run` always executes'
             cand --task 'Scope records and fail-fast strikes to this task id (or ''global'')'
             cand --evidence 'Write a machine-readable evidence artifact to path'
@@ -120,7 +122,8 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand --since 'Run only sensors applicable to the committed range `merge-base(<REF>, HEAD)..HEAD`; combine with `--changed` to union committed and uncommitted paths'
             cand --only 'Run only the named sensor (repeatable or comma-separated)'
             cand --exclude 'Exclude named sensors from the run'
-            cand --jobs 'Maximum sensors in flight (overrides `jobs` in do-harness.toml)'
+            cand --jobs 'Maximum workspace concurrency with `--workspaces`; otherwise the maximum sensors in flight (overrides `jobs` in do-harness.toml)'
+            cand --workspaces 'Select workspace directories or configs matching this root-relative glob'
             cand --unchanged 'Reuse recorded passing beats for sensors whose declared inputs are unchanged: `warn` (default) executes and advises, `skip` reuses without executing (requires --record), `run` always executes'
             cand --task 'Scope records and fail-fast strikes to this task id (or ''global'')'
             cand --evidence 'Write a machine-readable evidence artifact to path'
@@ -609,6 +612,42 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand --help 'Print help (see more with ''--help'')'
             cand -V 'Print version'
             cand --version 'Print version'
+        }
+        &'do-harness;setup'= {
+            cand --root 'Workspace root override (default: walk up from cwd)'
+            cand --config 'Explicit path to do-harness.toml'
+            cand --output 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)'
+            cand -q 'Suppress PASS/WARN verdict lines and the success footer'
+            cand --quiet 'Suppress PASS/WARN verdict lines and the success footer'
+            cand --dry-run 'Dry run without side effects'
+            cand -h 'Print help'
+            cand --help 'Print help'
+            cand -V 'Print version'
+            cand --version 'Print version'
+            cand web 'Bootstrap the web audit pack: check the playwright/@axe-core/playwright/ lighthouse peer dependencies, install what is missing, and patch `do-harness.toml` with the `WEB_AUDIT_*` environment block'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'do-harness;setup;web'= {
+            cand --root 'Workspace root override (default: walk up from cwd)'
+            cand --config 'Explicit path to do-harness.toml'
+            cand --output 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)'
+            cand -y 'Skip the interactive install prompt and install missing dependencies'
+            cand --yes 'Skip the interactive install prompt and install missing dependencies'
+            cand -q 'Suppress PASS/WARN verdict lines and the success footer'
+            cand --quiet 'Suppress PASS/WARN verdict lines and the success footer'
+            cand --dry-run 'Dry run without side effects'
+            cand -h 'Print help'
+            cand --help 'Print help'
+            cand -V 'Print version'
+            cand --version 'Print version'
+        }
+        &'do-harness;setup;help'= {
+            cand web 'Bootstrap the web audit pack: check the playwright/@axe-core/playwright/ lighthouse peer dependencies, install what is missing, and patch `do-harness.toml` with the `WEB_AUDIT_*` environment block'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'do-harness;setup;help;web'= {
+        }
+        &'do-harness;setup;help;help'= {
         }
         &'do-harness;task'= {
             cand --root 'Workspace root override (default: walk up from cwd)'
@@ -1629,6 +1668,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand init-db 'Apply pending database migrations'
             cand seed 'Seed invariants from plans/invariants.json'
             cand init 'Scaffold a harness workspace in a target directory'
+            cand setup 'Configure optional web pack dependencies and environment after `init`'
             cand task 'Inspect and export task state'
             cand trace 'Record and list interaction traces'
             cand distill 'Extract a heuristic from a resolved trace into a skill. Review output against the anti-AI-slop checklist (.agents/skills/skill-creator/references/anti_ai_slop.md)'
@@ -1717,6 +1757,11 @@ set edit:completion:arg-completer[do-harness] = {|@words|
         &'do-harness;help;seed'= {
         }
         &'do-harness;help;init'= {
+        }
+        &'do-harness;help;setup'= {
+            cand web 'Bootstrap the web audit pack: check the playwright/@axe-core/playwright/ lighthouse peer dependencies, install what is missing, and patch `do-harness.toml` with the `WEB_AUDIT_*` environment block'
+        }
+        &'do-harness;help;setup;web'= {
         }
         &'do-harness;help;task'= {
             cand export 'Write the task list to plans/tasks.json or specified output'

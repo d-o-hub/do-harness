@@ -75,6 +75,7 @@ mod reports;
 mod sensor_inputs;
 mod sensor_new;
 mod sensors;
+mod setup;
 mod shell;
 mod signals;
 mod simulate;
@@ -89,7 +90,11 @@ mod telemetry;
 mod trace;
 mod util;
 mod verify;
+mod verify_dispatch;
 mod version;
+mod workspace_discovery;
+mod workspace_report;
+mod workspace_verify;
 
 /// Classified CLI failure carrying its process exit code.
 pub enum CliError {

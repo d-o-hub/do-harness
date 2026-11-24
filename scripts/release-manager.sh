@@ -10,6 +10,8 @@
 #         major|minor|patch  the commits since the last tag warrant a release
 #         pending            main carries a version with no tag: the missing
 #                            step is a tag, not another bump
+#         held-rename        a rename of a shipped surface since the last tag
+#                            waits for human confirmation (see "Bump policy")
 #         none               nothing releasable landed
 #
 #   eligible <release-worthy-count> <bump> [--force]
@@ -45,25 +47,26 @@
 # in docs/releasing.md ("Cutting a release"):
 #
 #   breaking                 -> major at >=1.0, minor at 0.x, patch at 0.0.x
-#   feat                     -> minor at >=1.0, patch at 0.x
+#   feat                     -> minor, patch at 0.0.x
 #   fix, perf                -> patch
 #   another conventional type (docs, chore, test, refactor, style, ci, build)
 #                            -> nothing on its own
 #   not a conventional subject -> patch
+#   a rename of a shipped surface with no `!`/breaking marker and no
+#                            `Rename-Confirmed:` trailer in the range
+#                            -> held-rename: blocks auto-release until a human
+#                            confirms; once confirmed it is breaking (major at
+#                            >=1.0, minor at 0.x)
+#   an internal rename (tests, docs, plans, examples, scripts, vendor)
+#                            -> nothing on its own
 #
-# Mirrored from `next_version`, the crate release-plz uses
-# (<https://docs.rs/next_version>), rather than invented here. Pre-1.0 it takes a
-# breaking change as the *minor* because "the bump from 0.x.y to 0.(x+1).0
-# indicates a breaking change", and SemVer §4 is what permits the choice ("Major
-# version zero (0.y.z) is for initial development. Anything MAY change at any
-# time.") — a feature-driven minor would make breaking changes invisible. It
-# takes a patch for a subject that is not a conventional commit, because a missed
-# release is the failure this pipeline exists to prevent. `feat` -> minor and
-# `fix` -> patch otherwise follow Conventional Commits, and §15's case rule is
-# honoured: the type is matched case-insensitively while the `BREAKING CHANGE`
-# footer token stays uppercase (§16's BREAKING-CHANGE synonym included). Merge
-# commits are excluded — their subject is git's ("Merge branch 'x'"), so counting
-# it would cut a release per merge.
+# SemVer §4 leaves pre-1.0 compatibility policy to the project. At 0.y.z
+# (y > 0), both features and breaking changes take the minor. The report
+# carries a separate breaking flag so reviewers can identify migration work.
+# At 0.0.x, advancing to 0.1.0 is a deliberate decision. Non-conventional
+# subjects take a patch so an unclassified change can still ship. Conventional
+# Commit types are case-insensitive (§15), with uppercase BREAKING CHANGE and
+# BREAKING-CHANGE footer tokens (§15–16). Merge commits are excluded.
 #
 # Tagging is deliberately not here: `main` requires pull requests, so the bump
 # lands as a reviewed PR and the tag is created by
@@ -106,6 +109,7 @@ PUBLISHED_KNOWN=false
 # FIX, NONCONVENTIONAL, BUMP, NEXT.
 CURRENT="" BASIS="" COMMITS=0 BREAKING=false FEATURE=false FIX=false
 RELEASE_WORTHY=0 NONCONVENTIONAL=false BUMP="" NEXT=""
+RENAME_UNCONFIRMED=false RENAME_TRAILER=false RENAME_PATH=""
 
 # The self-test's sandbox. A global, because the EXIT trap runs after that
 # function has returned and a `local` would already be out of scope.
@@ -240,6 +244,7 @@ classify() {
     FIX=false
     RELEASE_WORTHY=0
     NONCONVENTIONAL=false
+    RENAME_TRAILER=false
     if ! records="$(git -C "$ROOT" log --no-merges --format='%s%x1f%b%x1e' "$range")"; then
         die "cannot read commit subjects and bodies in range '$range' in $ROOT"
     fi
@@ -273,6 +278,13 @@ classify() {
                     BREAKING=true
                     release_worthy=true
                     ;;
+                # The rename confirmation trailer (issue #606): a `Rename-Confirmed:`
+                # trailer anywhere in the range turns an otherwise ambiguous rename
+                # into a deliberate breaking change. It is read here, not by the
+                # rename scanner, because it lives in the commit body.
+                'Rename-Confirmed:'*)
+                    RENAME_TRAILER=true
+                    ;;
             esac
         done <<<"$body"
         if [ "$release_worthy" = true ]; then
@@ -281,12 +293,81 @@ classify() {
     done <<<"$records"
 }
 
+# A path is internal when it can never carry shipped surface: test fixtures,
+# docs, plans, skill/tooling files, or vendored code. Renames of these never
+# trigger the rename hold — they are invisible to consumers.
+is_internal_path() {
+    local path="$1" root
+    case "$path" in
+        *.md) return 0 ;;
+    esac
+    for root in tests docs plans .agents .claude .github scripts examples vendor; do
+        [ "${path#"$root"/}" != "$path" ] && return 0
+    done
+    return 1
+}
+
+# The shipped-surface list, from issue #606: paths whose rename can silently
+# break a consumer contract. Exported CLI commands live in
+# crates/do-harness/src/{commands,cli}; sensor names and config keys live in
+# the root do-harness.toml and the schema crate crates/types; published
+# artifacts are the workspace and member manifests, the npm integration tree,
+# the man page, and the installed completions. Everything else (library
+# internals, db code, build configuration) is not a consumer contract, so its
+# renames do not hold a release.
+shipped_surface_path() {
+    local path="$1" root
+    case "$path" in
+        'Cargo.toml' | crates/*/Cargo.toml | 'do-harness.toml' | 'man/do-harness.1')
+            return 0
+            ;;
+    esac
+    for root in crates/do-harness/src/commands crates/do-harness/src/cli \
+        crates/types integrations/npm completions; do
+        [ "${path#"$root"/}" != "$path" ] && return 0
+    done
+    return 1
+}
+
+# Scans the renames git detects (-M) in <range> and records whether any moved
+# a shipped surface in or out without a confirmation marker. Reads with the
+# same fail-closed discipline as classify: a range git refuses fails the run,
+# it cannot read as "no renames". Internal-file renames never register. The
+# confirmation marker is range-level, deliberately: a `Rename-Confirmed:`
+# trailer in a follow-up review commit is the natural way a human approves a
+# rename, and a rename commit that carries its own `!` breaking marker is
+# already counted as breaking by classify.
+detect_renames() {
+    local range="$1" out line old new
+    RENAME_UNCONFIRMED=false
+    RENAME_PATH=""
+    if ! out="$(git -C "$ROOT" log --no-merges --format='%H' --name-status -M "$range")"; then
+        die "cannot read rename status in range '$range' in $ROOT"
+    fi
+    while IFS= read -r line; do
+        case "$line" in
+            R*$'\t'*)
+                old="${line#*$'\t'}"
+                old="${old%%$'\t'*}"
+                new="${line##*$'\t'}"
+                if is_internal_path "$old" && is_internal_path "$new"; then
+                    continue
+                fi
+                if shipped_surface_path "$old" || shipped_surface_path "$new"; then
+                    RENAME_UNCONFIRMED=true
+                    [ -n "$RENAME_PATH" ] || RENAME_PATH="$old -> $new"
+                fi
+                ;;
+        esac
+    done <<<"$out"
+}
+
 decide_bump() {
     local current="$1" major minor
     major="${current%%.*}"
     minor="${current#*.}"
     minor="${minor%%.*}"
-    # `0.0.x` is the pre-API phase: next_version keeps it on patches so that the
+    # `0.0.x` is the pre-API phase: keep it on patches so that the
     # step to 0.1.0 stays a decision rather than an automatic side effect.
     if [ "$major" -eq 0 ] && [ "$minor" -eq 0 ]; then
         printf 'patch'
@@ -301,11 +382,7 @@ decide_bump() {
         return 0
     fi
     if [ "$FEATURE" = true ]; then
-        if [ "$major" -ge 1 ]; then
-            printf 'minor'
-        else
-            printf 'patch'
-        fi
+        printf 'minor'
         return 0
     fi
     if [ "$FIX" = true ] || [ "$NONCONVENTIONAL" = true ]; then
@@ -377,6 +454,7 @@ derive() {
     range="$(range_for "$ref")"
     COMMITS="$(commit_count "$range")"
     classify "$range"
+    detect_renames "$range"
     # A manifest behind the newest release tag derives a bump from the wrong
     # baseline, so refuse the inconsistency instead of reporting a plausible
     # number: the version has to be applied before the tag, never after.
@@ -397,6 +475,29 @@ derive() {
         BUMP="pending"
     fi
     NEXT="$(next_version "$CURRENT" "$BUMP")"
+    # A `Rename-Confirmed:` trailer anywhere in the range turns an ambiguous
+    # rename into a deliberate breaking change: it counts as release-worthy and
+    # forces the breaking bump below, exactly as a `!` subject would have. The
+    # hold below then has nothing to hold. `decide_bump` ran above before this
+    # flag was known, so a promoted rename re-derives the bump (unless the
+    # version is untagged: `pending` means the missing step is a tag, not a
+    # bump).
+    if [ "$RENAME_UNCONFIRMED" = true ] && [ "$RENAME_TRAILER" = true ]; then
+        BREAKING=true
+        RELEASE_WORTHY=$((RELEASE_WORTHY + 1))
+        if [ "$BUMP" != "pending" ]; then
+            BUMP="$(decide_bump "$CURRENT")"
+            NEXT="$(next_version "$CURRENT" "$BUMP")"
+        fi
+    fi
+    # An unconfirmed rename of a shipped surface is a contract break nobody has
+    # signed off on: hold the release instead of letting it slip out as a patch.
+    # A range that already derives as breaking ships the rename under that
+    # breaking bump, so only non-breaking derivations are held.
+    if [ "$RENAME_UNCONFIRMED" = true ] && [ "$BREAKING" = false ]; then
+        BUMP="held-rename"
+        NEXT="$CURRENT"
+    fi
     # A tag is not a finished release. `ship` creates it as soon as the release
     # commit is on `main`, and crates.io, npm and the GitHub Release follow in
     # `release.yml` — which is why `v0.3.2` was once proposed while `v0.3.1` had
@@ -421,15 +522,15 @@ derive() {
 }
 
 print_plain() {
-    printf 'current=%s\nbasis=%s\ncommits=%s\nrelease_worthy=%s\nbreaking=%s\nfeature=%s\nfix=%s\nnonconventional=%s\nbump=%s\nnext=%s\n' \
+    printf 'current=%s\nbasis=%s\ncommits=%s\nrelease_worthy=%s\nbreaking=%s\nfeature=%s\nfix=%s\nnonconventional=%s\nrename_unconfirmed=%s\nrename_path=%s\nbump=%s\nnext=%s\n' \
         "$CURRENT" "${BASIS:-none}" "$COMMITS" "$RELEASE_WORTHY" "$BREAKING" "$FEATURE" "$FIX" \
-        "$NONCONVENTIONAL" "$BUMP" "$NEXT"
+        "$NONCONVENTIONAL" "$RENAME_UNCONFIRMED" "${RENAME_PATH:-}" "$BUMP" "$NEXT"
 }
 
 print_json() {
-    printf '{"current":"%s","basis":"%s","commits":%s,"release_worthy":%s,"breaking":%s,"feature":%s,"fix":%s,"nonconventional":%s,"bump":"%s","next":"%s"}\n' \
+    printf '{"current":"%s","basis":"%s","commits":%s,"release_worthy":%s,"breaking":%s,"feature":%s,"fix":%s,"nonconventional":%s,"rename_unconfirmed":%s,"rename_path":"%s","bump":"%s","next":"%s"}\n' \
         "$CURRENT" "${BASIS:-none}" "$COMMITS" "$RELEASE_WORTHY" "$BREAKING" "$FEATURE" "$FIX" \
-        "$NONCONVENTIONAL" "$BUMP" "$NEXT"
+        "$NONCONVENTIONAL" "$RENAME_UNCONFIRMED" "${RENAME_PATH:-}" "$BUMP" "$NEXT"
 }
 
 # Rewrites one file through sed, then moves it into place: `sed -i` takes a
@@ -910,29 +1011,31 @@ EOF
     release 0.3.1
 
     commit 'feat(cli): add a status command'
-    expect patch 0.3.2 'pre-1.0 a feature cuts a patch, not the minor'
-    release 0.3.2
+    expect minor 0.4.0 'a feature in a 0.y.z release cuts the minor'
+    commit 'fix(cli): handle an empty status'
+    expect minor 0.4.0 'a feature and a fix together cut the minor'
+    release 0.4.0
 
     commit 'perf(core): drop a full-tree scan'
-    expect patch 0.3.3 'perf cuts a patch'
-    release 0.3.3
+    expect patch 0.4.1 'perf cuts a patch'
+    release 0.4.1
 
     commit 'Revert "feat(cli): add a status command"'
-    expect patch 0.3.4 'a non-conventional subject cuts a patch'
-    release 0.3.4
+    expect patch 0.4.2 'a non-conventional subject cuts a patch'
+    release 0.4.2
 
     commit 'FIX(core): mixed-case types still count'
-    expect patch 0.3.5 'the type is case-insensitive (spec §15)'
-    release 0.3.5
+    expect patch 0.4.3 'the type is case-insensitive (spec §15)'
+    release 0.4.3
 
     commit 'docs: another note'
-    expect none 0.3.5 'a conventional non-bumping type still cuts nothing'
+    expect none 0.4.3 'a conventional non-bumping type still cuts nothing'
 
     # The gate must not invent a state of its own: with nothing releasable the
     # answer stays `none`, and a version already on `main` stays `pending`.
     PUBLISHED="v9.9.9"
     PUBLISHED_KNOWN=true
-    expect none 0.3.5 'nothing releasable stays none, even with an unpublished basis'
+    expect none 0.4.3 'nothing releasable stays none, even with an unpublished basis'
     PUBLISHED=""
     PUBLISHED_KNOWN=false
 
@@ -941,16 +1044,16 @@ EOF
     commit 'docs: side note'
     git -C "$repo" checkout -q main
     git -C "$repo" merge -q --no-ff -m "Merge branch 'side'" side
-    expect none 0.3.5 'a merge commit is not a release change'
+    expect none 0.4.3 'a merge commit is not a release change'
 
     commit 'refactor(core)!: drop the legacy payload'
-    expect minor 0.4.0 'pre-1.0 breaking cuts the minor, not the major'
-    release 0.4.0
+    expect minor 0.5.0 'a breaking change in a 0.y.z release cuts the minor'
+    release 0.5.0
 
     commit 'fix(core): repair the payload decoder'
     commit "$(printf 'fix(core): tighten the decoder\n\nBREAKING CHANGE: the decoder rejects truncated payloads')"
-    expect minor 0.5.0 'a BREAKING CHANGE footer is breaking'
-    release 0.5.0
+    expect minor 0.6.0 'a BREAKING CHANGE footer is breaking'
+    release 0.6.0
 
     release 1.2.3
     commit 'feat(core): add a payload format'
@@ -984,12 +1087,35 @@ EOF
     expect pending 2.1.0 'the gate leaves a pending tag alone'
     PUBLISHED=""
     PUBLISHED_KNOWN=false
+    # The rename policy (issue #606). A rename of a shipped surface with no
+    # confirmation marker must hold the release: shipping it as a patch would
+    # silently break consumers. Confirmation comes either from a `!` breaking
+    # marker (already covered above) or from a `Rename-Confirmed:` trailer
+    # anywhere in the range; internal renames never register.
+    release 2.1.0
+    mkdir -p "$repo/crates/do-harness/src/commands" "$repo/tests"
+    printf 'pub fn status() {}\n' >"$repo/crates/do-harness/src/commands/status.rs"
+    printf '#[test] fn sample() {}\n' >"$repo/tests/sample.rs"
+    git -C "$repo" add -A
+    git -C "$repo" commit -qm 'chore: seed rename fixtures'
+    git -C "$repo" mv crates/do-harness/src/commands/status.rs \
+        crates/do-harness/src/commands/info.rs
+    git -C "$repo" commit -qm 'refactor(cli): rename the status command to info'
+    expect held-rename 2.1.0 'an unconfirmed surface rename holds the release'
+    commit "$(printf 'chore(ci): confirm the rename\n\nRename-Confirmed: reviewed by a maintainer')"
+    expect major 3.0.0 'a confirmed rename cuts a breaking bump'
+    release 3.0.0
+    git -C "$repo" mv tests/sample.rs tests/case.rs
+    git -C "$repo" commit -qm 'refactor(tests): rename a fixture file'
+    expect none 3.0.0 'an internal rename never triggers the hold'
+    commit 'fix(core): tighten the payload check'
+    expect patch 3.0.1 'normal release derivation resumes after an internal rename'
 
     # A manifest behind the newest tag is an inconsistency, not a bump.
-    substitute 's/^version *= *"2\.1\.0"/version = "1.2.0"/' "$repo/Cargo.toml"
+    substitute 's/^version *= *"3\.0\.0"/version = "1.2.0"/' "$repo/Cargo.toml"
     expect_die 'behind the newest release tag' \
         'a manifest behind the newest tag fails closed' derive HEAD
-    substitute 's/^version *= *"1\.2\.0"/version = "2.1.0"/' "$repo/Cargo.toml"
+    substitute 's/^version *= *"1\.2\.0"/version = "3.0.0"/' "$repo/Cargo.toml"
 
     # A fake cargo stands in for the real one: the fast self-test must not build
     # anything. It logs its argv — that log is what proves `prepare` really
@@ -1007,7 +1133,7 @@ printf '%s\n' "$*" >>"$FAKE_CARGO_LOG"
 # `cargo run ... -- man man` has the CLI write man/do-harness.1 itself.
 if [ "${1:-}" = run ]; then
     mkdir -p man
-    printf '.TH do-harness 1 "do-harness 2.1.1"\n' >man/do-harness.1
+    printf '.TH do-harness 1 "do-harness 3.0.1"\n' >man/do-harness.1
 fi
 EOF
     chmod +x "$fakebin/cargo"
@@ -1019,14 +1145,14 @@ EOF
     # the assertion below has to fail for a mode change, not for a umask.
     chmod 644 "$repo/Cargo.toml"
     modes_before="$(manifest_modes "$repo")"
-    cmd_prepare 2.1.1 >/dev/null
-    wrote "$repo/Cargo.toml" 'version = "2.1.1"'
-    wrote "$repo/integrations/npm/package.json" '"version": "2.1.1"'
+    cmd_prepare 3.0.1 >/dev/null
+    wrote "$repo/Cargo.toml" 'version = "3.0.1"'
+    wrote "$repo/integrations/npm/package.json" '"version": "3.0.1"'
     # Every platform manifest and every pin, discovered rather than listed: a new
     # platform directory enters the fixture above and is asserted on here.
     for name in "${platforms[@]}"; do
-        wrote "$repo/integrations/npm/package.json" "\"do-harness-$name\": \"2.1.1\""
-        wrote "$repo/integrations/npm/platforms/$name/package.json" '"version": "2.1.1"'
+        wrote "$repo/integrations/npm/package.json" "\"do-harness-$name\": \"3.0.1\""
+        wrote "$repo/integrations/npm/platforms/$name/package.json" '"version": "3.0.1"'
     done
     if grep -qF '"0.3.0"' "$repo/integrations/npm/package.json"; then
         printf 'FAIL prepare left a stale version in the npm meta manifest\n' >&2
@@ -1036,7 +1162,7 @@ EOF
     fi
     # The member pin is rewritten; the vendored alias on the next line is not.
     wrote "$repo/crates/do-harness/Cargo.toml" \
-        'do-harness-types = { path = "../types", version = "2.1.1" }'
+        'do-harness-types = { path = "../types", version = "3.0.1" }'
     wrote "$repo/crates/do-harness/Cargo.toml" \
         'libsql = { package = "do-harness-libsql", version = "0.9.30" }'
     # The lock and the man page were part of the run: each invocation exactly
@@ -1078,7 +1204,7 @@ EOF
     # Idempotent: a retried job must not fail on its own earlier work. The lock
     # and man steps are switched off in a subshell, so this stays an assertion
     # about the version comparison rather than about re-running cargo.
-    if [ "$(DO_LOCK=false DO_MAN=false; cmd_prepare 2.1.1)" = "workspace is already at 2.1.1" ]; then
+    if [ "$(DO_LOCK=false DO_MAN=false; cmd_prepare 3.0.1)" = "workspace is already at 3.0.1" ]; then
         printf 'ok   prepare is idempotent for an already-applied version\n'
     else
         printf 'FAIL prepare is not idempotent\n' >&2
@@ -1103,10 +1229,10 @@ EOF
     done
     # A malformed value already in the manifest must stop the run too, rather
     # than be read as its numeric prefix.
-    substitute 's/^version *= *"2\.1\.1"/version = "2.1.0-beta"/' "$repo/Cargo.toml"
+    substitute 's/^version *= *"3\.0\.1"/version = "3.0.0-beta"/' "$repo/Cargo.toml"
     expect_die 'is not a MAJOR.MINOR.PATCH version' \
         'a malformed [workspace.package].version is refused' derive HEAD
-    substitute 's/^version *= *"2\.1\.0-beta"/version = "2.1.1"/' "$repo/Cargo.toml"
+    substitute 's/^version *= *"3\.0\.0-beta"/version = "3.0.1"/' "$repo/Cargo.toml"
 
     # An unresolvable ref used to read as "nothing since nothing".
     for bad in no-such-ref 'HEAD^{tree}'; do

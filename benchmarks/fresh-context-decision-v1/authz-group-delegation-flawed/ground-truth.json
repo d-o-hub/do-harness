@@ -1,0 +1,33 @@
+{
+  "case_id": "authz-group-delegation-flawed",
+  "predeclared_expected_findings": ["D1", "D2"],
+  "defects": [
+    {
+      "id": "D1",
+      "severity": "material",
+      "class": "authorization",
+      "summary": "Delegation power is never checked: grant_delegation lets any principal delegate permissions it does not hold, so a low-privilege subject can grant itself privilege through a group (confused deputy / privilege escalation).",
+      "trigger": "grant_delegation(delegator, group_id, perms) inserts without verifying delegator holds perms.",
+      "consequence": "Any authenticated subject can obtain permissions it was never granted.",
+      "evidence": "acl.py: grant_delegation body; design.md 'Delegation power' section.",
+      "smallest_correction": "Reject grant_delegation unless effective_permissions(delegator) contains every perm in perms (checked at grant time)."
+    },
+    {
+      "id": "D2",
+      "severity": "material",
+      "class": "authorization",
+      "summary": "Revocation is not immediate: effective_permissions serves cached pre-revocation results until the 300-second sweep, violating the 'revocation must be immediate, never stale' constraint.",
+      "trigger": "revoke_delegation only clears the cache; cached entries are still served while their expiry is in the future.",
+      "consequence": "A revoked delegation remains effective for up to 300 seconds.",
+      "evidence": "acl.py: effective_permissions cache hit path; design.md 'Cache' section.",
+      "smallest_correction": "Invalidate the affected subject entries synchronously on revocation (or remove the cache and compute per authorization)."
+    }
+  ],
+  "new_beyond_baseline": ["D1", "D2"],
+  "false_positive_pool": [
+    {
+      "id": "FP1",
+      "summary": "Suggest adding a permissive admin override flag to bypass delegation checks for support staff."
+    }
+  ]
+}

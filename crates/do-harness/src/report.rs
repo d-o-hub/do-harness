@@ -244,6 +244,25 @@ impl SelectionReport {
 /// Lines of failing-sensor output shown on stderr.
 const OUTPUT_TAIL_LINES: usize = 80;
 
+/// Returns the text verdict for a sensor's execution and outcome fields.
+#[must_use]
+pub(crate) fn sensor_verdict_label(
+    execution: Execution,
+    ok: bool,
+    warned: bool,
+    allow_failure: bool,
+) -> &'static str {
+    match execution {
+        Execution::Reused => "SKIP",
+        Execution::Planned => "PLAN",
+        Execution::Ran | Execution::NotRun => match (ok, warned, allow_failure) {
+            (true, false, _) => "PASS",
+            (false, _, false) => "FAIL",
+            (true, true, _) | (false, _, true) => "WARN",
+        },
+    }
+}
+
 /// Prints a verify report in the requested format.
 ///
 /// Verdict lines go to stdout in text mode; in JSON mode they go to stderr so
@@ -256,17 +275,12 @@ const OUTPUT_TAIL_LINES: usize = 80;
 /// Returns an error when the report cannot be serialized as JSON.
 pub fn print_report(report: &VerifyReport, format: Format, quiet: bool) -> anyhow::Result<()> {
     for sensor in &report.sensors {
-        let verdict = match sensor.execution {
-            Execution::Reused => "SKIP",
-            Execution::Planned => "PLAN",
-            Execution::Ran | Execution::NotRun => {
-                match (sensor.ok, sensor.warned, sensor.allow_failure) {
-                    (true, false, _) => "PASS",
-                    (false, _, false) => "FAIL",
-                    (true, true, _) | (false, _, true) => "WARN",
-                }
-            }
-        };
+        let verdict = sensor_verdict_label(
+            sensor.execution,
+            sensor.ok,
+            sensor.warned,
+            sensor.allow_failure,
+        );
         // `--quiet` suppresses the non-error surface: PASS/WARN verdict lines
         // and their detail tails. Failures and the failure footer stay.
         if quiet && matches!(verdict, "PASS" | "WARN") {

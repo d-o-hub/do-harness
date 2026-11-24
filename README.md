@@ -8,9 +8,14 @@ observations. A passing fixture alone never proves client mediation.
 
 ## Install
 
-Zero-install with npx on Linux and macOS (Node 18+; resolves the prebuilt
-platform binary). **Windows is not available through npm** — use the release
-zip below:
+Zero-install with npx (Node 18+): Linux and macOS resolve the prebuilt
+platform binary from npm; Windows x64 downloads the matching release binary on
+first use (SHA-256 verified against the release `checksums.txt`, cached under
+`%LOCALAPPDATA%\do-harness`). The `do-harness-win32-x64` platform package is
+blocked by npm's name screening, so the wrapper fetches the release zip
+instead — see
+[docs/adoption.md](https://github.com/d-o-hub/do-harness/blob/main/docs/adoption.md#windows)
+for details.
 
 <!-- example: id=npx_quickstart classification=illustrative reason="npx runner invocation" -->
 ```bash
@@ -21,10 +26,12 @@ npx do-harness verify --set verification --changed --strict
 Prebuilt binaries for Linux (x86_64/aarch64, static musl), macOS
 (x86_64/arm64), and Windows (x86_64, zip; included starting with `v0.1.1`;
 `v0.1.0` shipped Linux/macOS only) are published as GitHub Releases
-with SHA-256 checksums. The Windows zip is the only supported Windows
-install path, because npm rejects the `do-harness-win32-x64` package name
-(HTTP 403, "Package name triggered spam detection"); see
-[docs/adoption.md](https://github.com/d-o-hub/do-harness/blob/main/docs/adoption.md#windows) for details.
+with SHA-256 checksums. Windows npx installs fetch this zip automatically
+(see above); the zip remains the canonical Windows artifact because npm
+rejects the `do-harness-win32-x64` package name (HTTP 403, "Package name
+triggered spam detection"). See
+[docs/adoption.md](https://github.com/d-o-hub/do-harness/blob/main/docs/adoption.md#windows)
+for details.
 
 <!-- example: id=install_script classification=executable fixture=installer_local_artifact -->
 ```bash
@@ -240,7 +247,7 @@ export PATH="$HOME/.local/bin:$PATH"
 | Command | Description |
 | --- | --- |
 | `version [OPTIONS]` | Print CLI version information — flags: `--format <FORMAT>` |
-| `verify [OPTIONS]` | Run computational sensors (alias: `check`) — flags: `--fail-fast`, `--format <FORMAT>`, `--simulate`, `--set <SET>`, `--changed`, `--since <REF>`, `--only <SENSOR>`, `--exclude <SENSOR>`, `--jobs <N>`, `--unchanged <MODE>`, `--record`, `--task <ID>`, `--global`, `--evidence <FILE>`, `--strict`, `--bless`, `--approver <NAME>` |
+| `verify [OPTIONS]` | Run computational sensors (alias: `check`) — flags: `--fail-fast`, `--format <FORMAT>`, `--simulate`, `--set <SET>`, `--changed`, `--since <REF>`, `--only <SENSOR>`, `--exclude <SENSOR>`, `--jobs <N>`, `--workspaces <GLOB>`, `--unchanged <MODE>`, `--record`, `--task <ID>`, `--global`, `--evidence <FILE>`, `--strict`, `--bless`, `--approver <NAME>` |
 | `migrate [OPTIONS]` | Migrate do-harness.toml to the current configuration schema — flags: `--diff`, `--write`, `--format <FORMAT>` |
 | `list [OPTIONS]` | List sensor names (alias: `ls`) — flags: `--sets`, `--format <FORMAT>` |
 | `explain [OPTIONS]` | Explain which sensors the current change selects, without running them — flags: `--set <SET>`, `--changed`, `--since <REF>`, `--format <FORMAT>` |
@@ -262,6 +269,7 @@ export PATH="$HOME/.local/bin:$PATH"
 | `init-db [OPTIONS]` | Apply pending database migrations — flags: `--check`, `-y, --yes` |
 | `seed [OPTIONS]` | Seed invariants from plans/invariants.json — flags: `--prune` |
 | `init [OPTIONS]` | Scaffold a harness workspace in a target directory — flags: `--language <LANG>`, `--force`, `--format <FORMAT>`, `--no-seed`, `--minimal`, `--no-gitignore`, `--inspect` |
+| `setup web [OPTIONS]` | Bootstrap the web audit pack: check the playwright/@axe-core/playwright/ lighthouse peer dependencies, install what is missing, and patch `do-harness.toml` with the `WEB_AUDIT_*` environment block — flags: `-y, --yes` |
 | `task export [OPTIONS]` | Write the task list to plans/tasks.json or specified output — flags: `--stdout`, `--format <FORMAT>` |
 | `task import [OPTIONS]` | Validate plans/tasks.json against the state database — flags: `--file <FILE>`, `--check` |
 | `task list [OPTIONS]` | Print tasks from the state database — flags: `--status <STATUS>`, `--method <METHOD>`, `--parent <ID>`, `--format <FORMAT>` |
@@ -483,6 +491,14 @@ environment allowlist. Local commands retain the caller's permissions.
   `verification`/`release` mean the full list and `feedback` is rejected.
 
 When no config is found, the CLI falls back to the built-in Rust sensor pack. The config file is also the workspace-root marker used for discovery.
+
+## Contributing
+
+Contributions follow an issue-first workflow: open or claim a triaged issue
+before opening a PR, link the issue from the PR, and follow the documented
+branch and commit conventions. See
+[CONTRIBUTING.md](https://github.com/d-o-hub/do-harness/blob/main/CONTRIBUTING.md)
+for the full guide, including sensor expectations and what maintainers gate on.
 
 ## License
 
