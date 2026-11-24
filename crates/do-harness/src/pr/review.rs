@@ -2,7 +2,7 @@
 
 use std::path::Path;
 
-use anyhow::{Context, Result, bail};
+use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
@@ -13,6 +13,9 @@ use super::gh;
 use super::no_effect;
 use super::proof::{self, GatePolicy, ProofRules};
 use crate::changes::git_command;
+mod local;
+
+use local::{local_diff, local_pr_refs};
 
 /// Stable review report schema version.
 ///
@@ -338,48 +341,6 @@ fn cached_report(
     }
 }
 
-/// Resolves merge base, current base tip, and head for a PR from the local
-/// clone, when present.
-fn local_pr_refs(root: &Path, view: &gh::PrView) -> Option<(String, String, String)> {
-    if !no_effect::rev_exists(root, &view.head_ref_oid) {
-        return None;
-    }
-    for candidate in no_effect::base_refs(&view.base_ref_name) {
-        if !no_effect::rev_exists(root, &candidate) {
-            continue;
-        }
-        if let Ok(merge_base) = no_effect::merge_base(root, &candidate, &view.head_ref_oid) {
-            if let Ok(base_sha) = no_effect::commit_sha(root, &candidate) {
-                return Some((merge_base, base_sha, view.head_ref_oid.clone()));
-            }
-        }
-    }
-    None
-}
-
-/// Runs `git diff` for the merge-base..head pair.
-fn local_diff(root: &Path, base: &str, head: &str) -> Result<String> {
-    let output = git_command(root)
-        .args([
-            "diff",
-            "--no-color",
-            "--find-renames",
-            "--unified=3",
-            base,
-            head,
-            "--",
-        ])
-        .output()
-        .context("failed to run git diff")?;
-    if !output.status.success() {
-        bail!(
-            "git diff {base} {head} failed: {}",
-            String::from_utf8_lossy(&output.stderr).trim()
-        );
-    }
-    Ok(String::from_utf8_lossy(&output.stdout).into_owned())
-}
-
 /// Reads and validates the policy from `rev`, never from the PR head.
 fn probe_policy(root: &Path, rev: &str) -> (Policy, Option<String>) {
     let output = git_command(root)
@@ -462,22 +423,6 @@ fn measure(t_raw: usize, t_res: usize) -> Measurement {
         verdict,
     }
 }
-
 #[cfg(test)]
-mod tests {
-    #![allow(clippy::unwrap_used, clippy::expect_used)]
-
-    use super::*;
-
-    #[test]
-    fn measure_reduces_and_reports_no_go() {
-        let reduced = measure(100, 50);
-        assert_eq!(reduced.verdict, Reduction::Reduced);
-        assert!((reduced.ratio - 0.5).abs() < 1e-9);
-        let no_go = measure(100, 100);
-        assert_eq!(no_go.verdict, Reduction::NoGo);
-        let empty = measure(0, 0);
-        assert_eq!(empty.verdict, Reduction::NoGo);
-        assert!(empty.ratio.abs() < 1e-9);
-    }
-}
+#[path = "review_tests.rs"]
+mod tests;
