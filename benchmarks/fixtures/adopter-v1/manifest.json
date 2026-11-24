@@ -1,0 +1,8 @@
+{
+  "manifest_sha256": "81b2dccc6e0109b9d149c660d1fc8b237c504da8f78ad7521d232e051a3d58d9",
+  "repos": {
+    "pinned-api-router": "651a732fb3e10e17c6cac1a9a67e291e6958c3271e48db7babbe48b67fd300b6",
+    "pinned-logger": "c7ce5066b5d4302bee45eed5831bfd5d789bee00c63abed844b62df5a80f6593"
+  },
+  "seed": 4581
+}
