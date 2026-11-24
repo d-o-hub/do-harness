@@ -34,70 +34,7 @@ pub enum Command {
     /// mixed run stays 1; the JSON report lists unrunnable sensors in a
     /// top-level `unrunnable` array beside `failed`.
     #[command(visible_alias = "check")]
-    Verify {
-        /// Halt at the first failing sensor.
-        #[arg(long)]
-        fail_fast: bool,
-        /// Output format.
-        #[arg(long, value_enum, default_value_t = crate::report::VerifyFormat::Text)]
-        format: crate::report::VerifyFormat,
-        /// Print the execution plan and exit without spawning a sensor or
-        /// writing evidence (a pre-flight for agents and CI cost checks).
-        #[arg(long, conflicts_with_all = ["record", "bless", "evidence"])]
-        simulate: bool,
-        /// Run only the sensors in this development signal set.
-        #[arg(long, value_name = "SET")]
-        set: Option<String>,
-        /// Run only sensors applicable to the working-tree change.
-        #[arg(long)]
-        changed: bool,
-        /// Run only sensors applicable to the committed range
-        /// `merge-base(<REF>, HEAD)..HEAD`; combine with `--changed` to union
-        /// committed and uncommitted paths.
-        #[arg(long, value_name = "REF")]
-        since: Option<String>,
-        /// Run only the named sensor (repeatable or comma-separated).
-        #[arg(long = "only", action = ArgAction::Append, value_name = "SENSOR")]
-        only: Vec<String>,
-        /// Exclude named sensors from the run.
-        #[arg(long = "exclude", action = ArgAction::Append, value_name = "SENSOR")]
-        exclude: Vec<String>,
-        /// Maximum workspace concurrency with `--workspaces`; otherwise the
-        /// maximum sensors in flight (overrides `jobs` in do-harness.toml).
-        #[arg(long, value_name = "N")]
-        jobs: Option<usize>,
-        /// Select workspace directories or configs matching this root-relative glob.
-        #[arg(long, value_name = "GLOB")]
-        workspaces: Option<String>,
-        /// Reuse recorded passing beats for sensors whose declared inputs are
-        /// unchanged: `warn` (default) executes and advises, `skip` reuses
-        /// without executing (requires --record), `run` always executes.
-        #[arg(long, value_enum, value_name = "MODE", default_value_t = crate::sensors::UnchangedMode::Warn)]
-        unchanged: crate::sensors::UnchangedMode,
-        /// Persist beats and error signatures into the state database.
-        #[arg(long)]
-        record: bool,
-        /// Scope records and fail-fast strikes to this task id (or 'global').
-        #[arg(long, requires = "record", value_name = "ID")]
-        task: Option<String>,
-        /// Record unscoped beats in the global namespace.
-        #[arg(long, requires = "record", conflicts_with = "task")]
-        global: bool,
-        /// Write a machine-readable evidence artifact to path.
-        #[arg(long, value_hint = ValueHint::FilePath, value_name = "FILE")]
-        evidence: Option<PathBuf>,
-        /// Enforce strong evidence: exit non-zero on skips or missing timing/exit codes.
-        #[arg(long)]
-        strict: bool,
-        /// Lower or initialize blessed findings baselines from this run
-        /// (requires --record; a bless never raises a baseline).
-        #[arg(long, requires = "record")]
-        bless: bool,
-        /// Approver identity recorded with `--bless` (defaults to
-        /// `DO_HARNESS_APPROVER` or the git user email).
-        #[arg(long, requires = "bless", value_name = "NAME")]
-        approver: Option<String>,
-    },
+    Verify(#[command(flatten)] super::actions::VerifyArgs),
     /// Migrate do-harness.toml to the current configuration schema.
     Migrate(#[command(flatten)] super::actions::MigrateArgs),
     /// List sensor names.

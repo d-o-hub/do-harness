@@ -1,38 +1,9 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use super::*;
+mod helpers;
 
-/// Creates a fake repository layout (`<root>/.git/hooks`) and returns the
-/// `.git` directory path; the owning `TempDir` keeps the layout alive.
-fn fake_git_dir() -> (tempfile::TempDir, PathBuf) {
-    let temp = tempfile::tempdir().unwrap();
-    let root = temp.path();
-    let init_status = crate::changes::git_command(root)
-        .args(["init", "-q"])
-        .status()
-        .unwrap();
-    assert!(init_status.success());
-    let cfg_status = crate::changes::git_command(root)
-        .args(["config", "core.hooksPath", ".git/hooks"])
-        .status()
-        .unwrap();
-    assert!(cfg_status.success());
-    let git_dir = root.join(".git");
-    fs::create_dir_all(git_dir.join("hooks")).unwrap();
-    (temp, git_dir)
-}
-
-fn hook_path(git_dir: &Path, name: &str) -> PathBuf {
-    git_dir.join("hooks").join(name)
-}
-
-fn read(path: &Path) -> String {
-    fs::read_to_string(path).unwrap()
-}
-
-fn write(path: &Path, content: &str) {
-    fs::write(path, content).unwrap();
-}
+use helpers::*;
 
 #[test]
 fn install_writes_both_hooks_with_expected_arguments() {
@@ -151,44 +122,6 @@ fn find_git_dir_discovers_git_root_from_nested_directory() {
     let git_dir = find_git_dir(&nested).unwrap();
 
     assert_eq!(git_dir, fs::canonicalize(temp.path().join(".git")).unwrap());
-}
-
-fn create_linked_worktree(temp: &Path) -> (PathBuf, PathBuf) {
-    let parent = temp.join("parent");
-    let linked = temp.join("linked");
-    assert!(
-        crate::changes::git_command(temp)
-            .args(["init", "-q", "parent"])
-            .status()
-            .unwrap()
-            .success()
-    );
-    assert!(
-        crate::changes::git_command(&parent)
-            .args(["config", "core.hooksPath", ".git/hooks"])
-            .status()
-            .unwrap()
-            .success()
-    );
-    assert!(
-        crate::changes::git_command(&parent)
-            .args(["commit", "--allow-empty", "-m", "initial", "-q"])
-            .env("GIT_AUTHOR_NAME", "t")
-            .env("GIT_AUTHOR_EMAIL", "t@t")
-            .env("GIT_COMMITTER_NAME", "t")
-            .env("GIT_COMMITTER_EMAIL", "t@t")
-            .status()
-            .unwrap()
-            .success()
-    );
-    assert!(
-        crate::changes::git_command(&parent)
-            .args(["worktree", "add", "-b", "fixture", linked.to_str().unwrap()])
-            .status()
-            .unwrap()
-            .success()
-    );
-    (parent, linked)
 }
 
 #[test]
@@ -320,27 +253,6 @@ fn install_targets_configured_core_hookspath() {
     assert!(read(&custom_hooks.join("pre-commit")).contains(MARKER));
     assert!(read(&custom_hooks.join("pre-push")).contains(MARKER));
     assert!(read(&custom_hooks.join("commit-msg")).contains(MARKER));
-}
-
-fn assert_install_preserves_default_hooks_alias(root: &Path, git_dir: &Path, alias: &str) {
-    let git_status = crate::changes::git_command(root)
-        .args(["config", "core.hooksPath", alias])
-        .status()
-        .unwrap();
-    assert!(git_status.success());
-
-    for _ in 0..2 {
-        let installed_path = install(git_dir, root, &[], &[], false).unwrap();
-        assert_eq!(installed_path, root.join(alias));
-        for name in ["pre-commit", "pre-push", "commit-msg"] {
-            assert!(read(&hook_path(git_dir, name)).contains(MARKER));
-            assert_eq!(
-                read(&installed_path.join(name)),
-                read(&hook_path(git_dir, name))
-            );
-        }
-        assert!(status(git_dir, root).is_all_satisfied());
-    }
 }
 
 #[test]
