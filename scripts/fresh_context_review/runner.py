@@ -275,7 +275,7 @@ def run_smoke(repo):
         ),
         "usage": {
             "currency_cost_usd": None,
-            "token_count": None,
+            "token_count": None,  # nosec B105 - usage metric name, not a credential
             "note": "no model or token usage in stub mode",
         },
         "results": results,

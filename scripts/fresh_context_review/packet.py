@@ -13,7 +13,7 @@ dropped input.
 
 import hashlib
 import json
-import subprocess
+import subprocess  # nosec B404 - fixed git argv only, never a shell
 
 SCHEMA_VERSION = 1
 DEFAULT_TIMEOUT_S = 300
@@ -46,7 +46,10 @@ def sha256_hex(raw):
 
 
 def git_output(repo, args):
-    proc = subprocess.run(
+    # The argv is a fixed `git -C <repo>` list with no shell; `repo` and
+    # `args` come from this repository's own pinned revision lookups.
+    # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit.dangerous-subprocess-use-audit
+    proc = subprocess.run(  # nosec B603 - fixed git argv, no shell
         ["git", "-C", repo, *args],
         capture_output=True,
         text=True,

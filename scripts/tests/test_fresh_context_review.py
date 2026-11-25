@@ -9,7 +9,6 @@ reviewer runs use the deterministic stub fixture.
 """
 import argparse
 import json
-import os
 import sys
 import tempfile
 import unittest
@@ -22,7 +21,6 @@ sys.path.insert(0, str(SCRIPT_ROOT))
 import fresh_context_review.packet as packet_mod  # noqa: E402
 import fresh_context_review.reviewer as reviewer_mod  # noqa: E402
 import fresh_context_review.runner as runner_mod  # noqa: E402
-import fresh_context_review.stub_reviewer as stub_mod  # noqa: E402
 
 STUB_SCENARIOS = ("flawed", "sound", "fail", "timeout", "unavailable",
                   "leak", "huge")
@@ -98,7 +96,7 @@ class FreshContextReviewTests(unittest.TestCase):
         fake = {
             "PATH": "/usr/bin",
             "HOME": "/home/x",
-            "SSH_AUTH_SOCK": "/tmp/agent.sock",
+            "SSH_AUTH_SOCK": "/tmp/agent.sock",  # nosec B108 - fixture value, not a temp file
             "OPENAI_API_KEY": "secret",
             "SESSION_TALK": "1",
         }

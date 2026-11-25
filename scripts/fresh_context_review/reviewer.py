@@ -24,7 +24,7 @@ An unavailable or unverified capability is never a success.
 import hashlib
 import json
 import os
-import subprocess
+import subprocess  # nosec B404 - operator-selected reviewer command, never a shell
 import time
 
 # Environment keys a fresh reviewer may inherit. Everything else — session,
@@ -109,8 +109,12 @@ def run_reviewer(cmd, packet_json, *, repo, timeout_s, max_output_bytes,
     spawn_time = time.time()
     started = time.monotonic()
     launch_failed = False
+    partial = partial_err = ""
     try:
-        proc = subprocess.run(
+        # The reviewer command is operator-selected by design; the packet, not
+        # the command, is untrusted input. No shell is involved.
+        # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit.dangerous-subprocess-use-audit
+        proc = subprocess.run(  # nosec B603 - operator-selected reviewer, no shell
             cmd,
             input=packet_json.encode("utf-8"),
             capture_output=True,
