@@ -571,5 +571,5 @@ when-changed = ["integrations/sdk-python/**", "integrations/sdk-ts/**", "scripts
 # fail-closed guards around them (an empty range or an unresolvable ref fails
 # closed, and a sensor-pack-only change touches only the packs row).
 name = "release-impact-matrix"
-argv = ["bash", "scripts/release-impact-matrix.sh", "scripts/release-impact-matrix-self-test.sh", "--self-test"]
+argv = ["bash", "scripts/release-impact-matrix.sh", "--self-test"]
 when-changed = [".github/workflows/release.yml", "docs/releasing.md", "scripts/release-impact-matrix.sh", "scripts/release-impact-matrix-self-test.sh", "scripts/release-notes.sh", "scripts/lib.sh"]
