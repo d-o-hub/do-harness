@@ -27,6 +27,9 @@ pub struct AuditRecord {
     pub tool: String,
     /// Optional params.
     pub params: Option<serde_json::Value>,
+    /// Caller attribute the transport supplied for policy evaluation.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub caller: Option<String>,
     /// Decision outcome.
     pub decision: String,
     /// Human-readable reason on deny.
@@ -56,6 +59,7 @@ impl AuditRecord {
         let payload_for_hash = decision_payload(
             &call.tool,
             call.params.as_ref(),
+            call.caller.as_deref(),
             &decision_str,
             reason.as_deref(),
             policy_sha256,
@@ -69,6 +73,7 @@ impl AuditRecord {
             created_at: now,
             tool: call.tool.clone(),
             params: call.params.clone(),
+            caller: call.caller.clone(),
             decision: decision_str,
             reason,
             policy_sha256: policy_sha256.map(str::to_string),
@@ -84,6 +89,7 @@ impl AuditRecord {
 fn decision_payload(
     tool: &str,
     params: Option<&serde_json::Value>,
+    caller: Option<&str>,
     decision: &str,
     reason: Option<&str>,
     policy_sha256: Option<&str>,
@@ -107,6 +113,12 @@ fn decision_payload(
             serde_json::Value::String(r.to_string())
         }),
     );
+    if let Some(caller) = caller {
+        payload.insert(
+            "caller".to_string(),
+            serde_json::Value::String(caller.to_string()),
+        );
+    }
     if let Some(digest) = policy_sha256 {
         payload.insert(
             "policy_sha256".to_string(),
@@ -177,6 +189,7 @@ impl AuditLog {
                 let payload_for_hash = decision_payload(
                     &record.tool,
                     record.params.as_ref(),
+                    record.caller.as_deref(),
                     &record.decision,
                     record.reason.as_deref(),
                     record.policy_sha256.as_deref(),
@@ -417,6 +430,24 @@ mod tests {
         std::fs::write(&path, content).expect("write");
         let err = AuditLog::open(&path).expect_err("tampered digest");
         assert!(err.to_string().contains("tamper"));
+    }
+
+    #[test]
+    fn test_audit_binds_policy_caller() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("audit.jsonl");
+        let mut log = AuditLog::open(&path).expect("open");
+        let call = McpLikeToolCall::new("data.read", None).with_caller(Some("ci-runner".into()));
+        let record = log
+            .append(&call, &ForwardDecision::Allow, Some("abc123"))
+            .expect("append");
+        assert_eq!(record.caller.as_deref(), Some("ci-runner"));
+        AuditLog::verify(&path).expect("verify");
+        let content = std::fs::read_to_string(&path)
+            .expect("read")
+            .replace("ci-runner", "operator");
+        std::fs::write(&path, content).expect("write");
+        assert!(AuditLog::verify(&path).is_err());
     }
 
     /// Records written before policy binding (no `policy_sha256` field)
