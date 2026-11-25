@@ -101,6 +101,7 @@ fn run_sensor(script: &Path, fail_times: usize, lock_cargo_home: bool) -> Run {
     let output = Command::new("bash")
         .arg(script)
         .env("PATH", path)
+        .env("DO_HARNESS_BIN", env!("CARGO_BIN_EXE_do-harness"))
         .env("CARGO_HOME", &cargo_home)
         .env("AUDIT_RETRY_DELAY_SECONDS", "0")
         .env_remove("CI")
