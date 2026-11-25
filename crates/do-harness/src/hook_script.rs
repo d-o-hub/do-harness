@@ -134,25 +134,19 @@ mod tests {
     #![allow(clippy::unwrap_used, clippy::expect_used)]
 
     use super::*;
-    use std::path::{Path, PathBuf};
+    use std::path::Path;
 
-    /// Absolute path to the repo's commitlint wrapper script, reached from the
-    /// test crate directory (`crates/do-harness`).
-    fn commitlint_script() -> PathBuf {
-        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../scripts/check-commitlint.sh")
-    }
-
-    /// Runs the real commitlint script in `--message` mode against `content`.
+    /// Runs the native commitlint message mode against `content` — the same
+    /// code path the delegating wrapper reaches, without needing the built
+    /// binary on PATH (the wrapper parity is covered by tests/native_helpers).
     fn lint_message(content: &str) -> bool {
         let msg = tempfile::NamedTempFile::new().unwrap();
         std::fs::write(msg.path(), content).unwrap();
-        let status = crate::shell::bash()
-            .arg(commitlint_script())
-            .args(["--message"])
-            .arg(msg.path())
-            .status()
-            .unwrap();
-        status.success()
+        match crate::helpers::commitlint::run(Path::new("."), Some(msg.path()), None, None) {
+            Ok(()) => true,
+            Err(crate::helpers::HelperError::Violation(_)) => false,
+            Err(other) => panic!("unexpected helper error: {other}"),
+        }
     }
 
     #[test]
