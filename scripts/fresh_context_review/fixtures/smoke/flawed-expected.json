@@ -1,0 +1,25 @@
+{
+  "design": "flawed-design.md",
+  "planted_defect": "revocation of a delegated permission is never reflected in delegation_delegation_snapshot, so a revoked delegation keeps authorizing requests until the snapshot TTL expires",
+  "findings": [
+    {
+      "id": "F1",
+      "contract_or_path": "flawed-design.md §Proposed contract — revoke_delegation / effective_permissions",
+      "trigger": "revoke_delegation is called for a group whose members hold entries in delegation_snapshot",
+      "consequence": "revoked administrators retain effective delegated permissions until the snapshot is refreshed; the revocation contract is violated",
+      "evidence": "flawed-design.md: effective_permissions consults delegation_snapshot and falls back to a graph walk only when the snapshot is absent; revoke_delegation is not specified to invalidate the snapshot",
+      "smallest_correction": "specify that revoke_delegation invalidates every snapshot entry whose grant chain includes the revoked delegation, and make the graph walk the source of truth"
+    },
+    {
+      "id": "F2",
+      "contract_or_path": "flawed-design.md §Proposed contract — grant_delegation",
+      "trigger": "grant_delegation adds an edge below an already-cached subject",
+      "consequence": "effective_permissions can report a stale set for cached subjects, omitting newly granted permissions until TTL expiry",
+      "evidence": "flawed-design.md: delegation_snapshot is populated at grant time and no invalidation is specified for grants affecting descendant cache entries",
+      "smallest_correction": "specify a snapshot epoch bumped on every graph mutation, compared by effective_permissions before serving cache contents"
+    }
+  ],
+  "expected_outcome": "success_with_findings",
+  "expected_findings": 2,
+  "expected_finding_ids": ["F1", "F2"]
+}

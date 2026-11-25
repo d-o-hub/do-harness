@@ -5,7 +5,7 @@ language = "rust"
 pre-commit = ["fmt", "loc"]
 # Bounded to ordinary checks (matching signal-sets.verification) so heavy
 # scheduled checks (`coverage`, `powerset`) and release preflights never execute on local push.
-pre-push = ["fmt", "check", "clippy", "deps", "machete", "audit", "test", "doctest", "loc", "skills", "skills-docs", "shell", "markdownlint", "docs-sync", "docs-examples", "docs-links", "docs-pins", "yamllint", "actionlint", "action-pins", "workflow-shell", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "release-manager", "release-impact-matrix", "verify-published", "commitlint", "contract-first", "ci-concurrency-guardrails", "workflow-benchmark", "workflow-adopter-benchmark", "fresh-context-decision", "ci-workflow-costs", "repo-links", "latest-main-guardrails", "token-usage", "sdk-python-test", "sdk-ts-test", "sdk-pack"]
+pre-push = ["fmt", "check", "clippy", "deps", "machete", "audit", "test", "doctest", "loc", "skills", "skills-docs", "shell", "markdownlint", "docs-sync", "docs-examples", "docs-links", "docs-pins", "yamllint", "actionlint", "action-pins", "workflow-shell", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "release-manager", "release-impact-matrix", "verify-published", "commitlint", "contract-first", "ci-concurrency-guardrails", "workflow-benchmark", "workflow-adopter-benchmark", "fresh-context-decision", "fresh-context-review", "ci-workflow-costs", "repo-links", "latest-main-guardrails", "token-usage", "sdk-python-test", "sdk-ts-test", "sdk-pack"]
 
 [signal-sets]
 # `feedback` is the fast loop, so it names the sensors the generated pre-commit
@@ -22,13 +22,13 @@ feedback = ["fmt", "check", "clippy", "loc"]
 # contract (`docs/documentation-contract.md`). Each one reads only git, the
 # working tree, and the local toolchain, and each fails closed on an empty
 # inventory, so the trio belongs to the PR-time set as well as `release`.
-verification = ["fmt", "check", "clippy", "deps", "machete", "audit", "test", "doctest", "loc", "skills", "skills-docs", "shell", "markdownlint", "docs-sync", "docs-examples", "docs-links", "docs-pins", "yamllint", "actionlint", "action-pins", "workflow-shell", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "release-manager", "release-impact-matrix", "verify-published", "commitlint", "contract-first", "ci-concurrency-guardrails", "workflow-benchmark", "workflow-adopter-benchmark", "fresh-context-decision", "ci-workflow-costs", "repo-links", "latest-main-guardrails", "token-usage", "sdk-python-test", "sdk-ts-test", "sdk-pack"]
+verification = ["fmt", "check", "clippy", "deps", "machete", "audit", "test", "doctest", "loc", "skills", "skills-docs", "shell", "markdownlint", "docs-sync", "docs-examples", "docs-links", "docs-pins", "yamllint", "actionlint", "action-pins", "workflow-shell", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "release-manager", "release-impact-matrix", "verify-published", "commitlint", "contract-first", "ci-concurrency-guardrails", "workflow-benchmark", "workflow-adopter-benchmark", "fresh-context-decision", "fresh-context-review", "ci-workflow-costs", "repo-links", "latest-main-guardrails", "token-usage", "sdk-python-test", "sdk-ts-test", "sdk-pack"]
 # `main` is the post-merge release gate. It is the strict ordinary verification
 # surface, named separately so release automation consumes one green result for
 # one exact main commit. The expensive coverage and feature-powerset checks run
 # in `scheduled` and the final `release` gate rather than charging every push.
-main = ["fmt", "check", "clippy", "deps", "machete", "audit", "test", "doctest", "loc", "skills", "skills-docs", "shell", "markdownlint", "docs-sync", "docs-examples", "docs-links", "docs-pins", "yamllint", "actionlint", "action-pins", "workflow-shell", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "release-manager", "release-impact-matrix", "verify-published", "commitlint", "contract-first", "ci-concurrency-guardrails", "workflow-benchmark", "workflow-adopter-benchmark", "fresh-context-decision", "ci-workflow-costs", "repo-links", "latest-main-guardrails", "token-usage", "sdk-python-test", "sdk-ts-test", "sdk-pack"]
-release = ["fmt", "check", "clippy", "deps", "audit", "test", "doctest", "coverage", "powerset", "loc", "skills", "skills-docs", "shell", "markdownlint", "docs-sync", "docs-examples", "docs-links", "docs-pins", "yamllint", "actionlint", "action-pins", "workflow-shell", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "release-manager", "release-impact-matrix", "release-manager-e2e", "publish-npm", "verify-published", "commitlint", "contract-first", "ci-concurrency-guardrails", "workflow-benchmark", "workflow-adopter-benchmark", "fresh-context-decision", "ci-workflow-costs", "repo-links", "latest-main-guardrails", "token-usage", "sdk-python-test", "sdk-ts-test", "sdk-pack"]
+main = ["fmt", "check", "clippy", "deps", "machete", "audit", "test", "doctest", "loc", "skills", "skills-docs", "shell", "markdownlint", "docs-sync", "docs-examples", "docs-links", "docs-pins", "yamllint", "actionlint", "action-pins", "workflow-shell", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "release-manager", "release-impact-matrix", "verify-published", "commitlint", "contract-first", "ci-concurrency-guardrails", "workflow-benchmark", "workflow-adopter-benchmark", "fresh-context-decision", "fresh-context-review", "ci-workflow-costs", "repo-links", "latest-main-guardrails", "token-usage", "sdk-python-test", "sdk-ts-test", "sdk-pack"]
+release = ["fmt", "check", "clippy", "deps", "audit", "test", "doctest", "coverage", "powerset", "loc", "skills", "skills-docs", "shell", "markdownlint", "docs-sync", "docs-examples", "docs-links", "docs-pins", "yamllint", "actionlint", "action-pins", "workflow-shell", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "release-manager", "release-impact-matrix", "release-manager-e2e", "publish-npm", "verify-published", "commitlint", "contract-first", "ci-concurrency-guardrails", "workflow-benchmark", "workflow-adopter-benchmark", "fresh-context-decision", "fresh-context-review", "ci-workflow-costs", "repo-links", "latest-main-guardrails", "token-usage", "sdk-python-test", "sdk-ts-test", "sdk-pack"]
 # DORA gets its own set so its evidence is addressable (`status --set metrics`)
 # without joining the gating sets. A no-`--set` status check compares against
 # every configured sensor, so a dora-only run's artifact would report
@@ -562,6 +562,15 @@ when-changed = ["integrations/sdk-ts/**"]
 name = "sdk-pack"
 argv = ["bash", "scripts/check-sdk-pack.sh"]
 when-changed = ["integrations/sdk-python/**", "integrations/sdk-ts/**", "scripts/check-sdk-pack.sh", "do-harness.toml"]
+
+[[sensors]]
+# Hermetic self-tests for the fresh-context review adapter (packet assembly,
+# hash stability, revision pinning, failure-path handling, sanitized
+# records). Never launches a reviewer or model; runs only deterministic
+# stub fixtures, so it is safe in CI.
+name = "fresh-context-review"
+argv = ["python3", "scripts/tests/test_fresh_context_review.py"]
+when-changed = ["scripts/fresh-context-review.py", "scripts/fresh_context_review/**", "scripts/tests/test_fresh_context_review.py", "do-harness.toml"]
 
 [[sensors]]
 # Executable half of the consumer-impact contract: every release body carries a
