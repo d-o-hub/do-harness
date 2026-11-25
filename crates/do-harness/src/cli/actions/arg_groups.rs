@@ -6,7 +6,7 @@
 
 use std::path::PathBuf;
 
-use clap::{Subcommand, ValueHint};
+use clap::{ArgAction, Subcommand, ValueHint};
 
 use crate::report::Format;
 
@@ -110,4 +110,72 @@ pub struct ListArgs {
     /// Output format.
     #[arg(long, value_enum, default_value_t = Format::Text)]
     pub format: Format,
+}
+
+/// Arguments for `verify` (flattened into the `verify` subcommand).
+#[derive(Debug, clap::Args)]
+#[allow(clippy::struct_excessive_bools)] // independent CLI flags, not a state machine
+pub struct VerifyArgs {
+    /// Halt at the first failing sensor.
+    #[arg(long)]
+    pub fail_fast: bool,
+    /// Output format.
+    #[arg(long, value_enum, default_value_t = crate::report::VerifyFormat::Text)]
+    pub format: crate::report::VerifyFormat,
+    /// Print the execution plan and exit without spawning a sensor or
+    /// writing evidence (a pre-flight for agents and CI cost checks).
+    #[arg(long, conflicts_with_all = ["record", "bless", "evidence"])]
+    pub simulate: bool,
+    /// Run only the sensors in this development signal set.
+    #[arg(long, value_name = "SET")]
+    pub set: Option<String>,
+    /// Run only sensors applicable to the working-tree change.
+    #[arg(long)]
+    pub changed: bool,
+    /// Run only sensors applicable to the committed range
+    /// `merge-base(<REF>, HEAD)..HEAD`; combine with `--changed` to union
+    /// committed and uncommitted paths.
+    #[arg(long, value_name = "REF")]
+    pub since: Option<String>,
+    /// Run only the named sensor (repeatable or comma-separated).
+    #[arg(long = "only", action = ArgAction::Append, value_name = "SENSOR")]
+    pub only: Vec<String>,
+    /// Exclude named sensors from the run.
+    #[arg(long = "exclude", action = ArgAction::Append, value_name = "SENSOR")]
+    pub exclude: Vec<String>,
+    /// Maximum workspace concurrency with `--workspaces`; otherwise the
+    /// maximum sensors in flight (overrides `jobs` in do-harness.toml).
+    #[arg(long, value_name = "N")]
+    pub jobs: Option<usize>,
+    /// Select workspace directories or configs matching this root-relative glob.
+    #[arg(long, value_name = "GLOB")]
+    pub workspaces: Option<String>,
+    /// Reuse recorded passing beats for sensors whose declared inputs are
+    /// unchanged: `warn` (default) executes and advises, `skip` reuses
+    /// without executing (requires --record), `run` always executes.
+    #[arg(long, value_enum, value_name = "MODE", default_value_t = crate::sensors::UnchangedMode::Warn)]
+    pub unchanged: crate::sensors::UnchangedMode,
+    /// Persist beats and error signatures into the state database.
+    #[arg(long)]
+    pub record: bool,
+    /// Scope records and fail-fast strikes to this task id (or 'global').
+    #[arg(long, requires = "record", value_name = "ID")]
+    pub task: Option<String>,
+    /// Record unscoped beats in the global namespace.
+    #[arg(long, requires = "record", conflicts_with = "task")]
+    pub global: bool,
+    /// Write a machine-readable evidence artifact to path.
+    #[arg(long, value_hint = ValueHint::FilePath, value_name = "FILE")]
+    pub evidence: Option<PathBuf>,
+    /// Enforce strong evidence: exit non-zero on skips or missing timing/exit codes.
+    #[arg(long)]
+    pub strict: bool,
+    /// Lower or initialize blessed findings baselines from this run
+    /// (requires --record; a bless never raises a baseline).
+    #[arg(long, requires = "record")]
+    pub bless: bool,
+    /// Approver identity recorded with `--bless` (defaults to
+    /// `DO_HARNESS_APPROVER` or the git user email).
+    #[arg(long, requires = "bless", value_name = "NAME")]
+    pub approver: Option<String>,
 }

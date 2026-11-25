@@ -177,11 +177,11 @@ async fn route(root: &Path, config_path: Option<PathBuf>, cli: Cli) -> Result<()
                 crate::setup::web::run(root, yes, cli.dry_run).map_err(CliError::Usage)
             }
         },
-        verify_command @ Command::Verify { .. } => {
+        Command::Verify(args) => {
             crate::verify_dispatch::run(
                 root,
                 config_path,
-                verify_command,
+                args,
                 cli.dry_run,
                 cli.quiet,
                 cli.output,

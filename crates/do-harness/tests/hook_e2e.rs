@@ -3,80 +3,12 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-use std::path::Path;
-use std::process::{Command, Output};
-
 mod support;
 
-use support::git_command;
+#[path = "hook_e2e/helpers.rs"]
+mod helpers;
 
-fn harness() -> Command {
-    let mut cmd = Command::new(env!("CARGO_BIN_EXE_do-harness"));
-    support::isolate_command(&mut cmd);
-    cmd
-}
-
-fn run(cmd: &mut Command) -> Output {
-    let out = cmd.output().expect("spawn");
-    assert!(
-        out.status.success(),
-        "command failed: {:?}\nstdout: {}\nstderr: {}",
-        cmd,
-        String::from_utf8_lossy(&out.stdout),
-        String::from_utf8_lossy(&out.stderr)
-    );
-    out
-}
-
-fn git(dir: &Path, args: &[&str]) -> Output {
-    git_command(dir).args(args).output().expect("spawn git")
-}
-
-fn git_ok(dir: &Path, args: &[&str]) {
-    let out = git(dir, args);
-    assert!(
-        out.status.success(),
-        "git {args:?} failed: {}",
-        String::from_utf8_lossy(&out.stderr)
-    );
-}
-
-/// A hook-running git command: pinned to the binary under test and isolated
-/// from the cargo session that started the hook.
-///
-/// The managed hooks run `do-harness verify`, which re-enters the cargo session
-/// that started the hook: under `cargo llvm-cov` the scaffold's `coverage`
-/// sensor runs a second `cargo llvm-cov nextest` and the inherited
-/// `RUSTC_WRAPPER`/target dir make it rebuild into the outer instrumented
-/// workspace, exhausting memory (measured 2026-10-20: anonymous memory passed
-/// 7 GB within seconds). Isolate the hook exactly as `harness()` does.
-fn git_with_bin(dir: &Path, bin: &str) -> Command {
-    let mut command = git_command(dir);
-    support::isolate_command(&mut command);
-    command.env("DO_HARNESS_BIN", bin);
-    command
-}
-
-/// Runs git with the harness binary pinned, so the managed hooks execute the
-/// binary under test instead of building a release one.
-fn git_ok_with_bin(dir: &Path, args: &[&str], bin: &str) {
-    let out = git_with_bin(dir, bin)
-        .args(args)
-        .output()
-        .expect("spawn git");
-    assert!(
-        out.status.success(),
-        "git {args:?} failed: {}",
-        String::from_utf8_lossy(&out.stderr)
-    );
-}
-
-fn push_with_bin(dir: &Path, bin: &str) -> Output {
-    git_with_bin(dir, bin)
-        .args(["push", "origin", "HEAD:refs/heads/main"])
-        .output()
-        .expect("spawn git push")
-}
+use helpers::*;
 
 /// `hook install` with a config containing a dangling hook sensor reference
 /// must exit non-zero (exit 2) and leave all hook files unwritten.
