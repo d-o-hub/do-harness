@@ -5,7 +5,7 @@
 
 use std::path::PathBuf;
 
-use clap::{ArgAction, Subcommand, ValueHint};
+use clap::{Subcommand, ValueHint};
 
 use crate::init;
 use crate::report::Format;

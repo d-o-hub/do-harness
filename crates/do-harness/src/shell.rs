@@ -96,6 +96,10 @@ pub fn resolve_program(program: &str) -> PathBuf {
         // A sensor argv naming the harness itself resolves to the running
         // binary, so `["do-harness", "loc"]` works in a dev checkout where
         // the binary is not on `PATH`.
+        // Resolving our own binary to run ourselves (e.g. `["do-harness",
+        // "loc"]`) is not a security boundary: the caller already executes
+        // this binary, and the path only names the child to spawn.
+        // nosemgrep: rust.lang.security.current-exe.current-exe
         if let Ok(exe) = std::env::current_exe() {
             if exe.is_file() {
                 return exe;
