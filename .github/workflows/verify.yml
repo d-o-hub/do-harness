@@ -616,6 +616,8 @@ jobs:
           git -C (Join-Path $env:RUNNER_TEMP "dh-hookexec") commit -q --allow-empty -m "chore: seed"
           & ./target/release/do-harness.exe --root (Join-Path $env:RUNNER_TEMP "dh-hookexec") init
           if ($LASTEXITCODE -ne 0) { throw "init failed" }
+          & ./target/release/do-harness.exe --root (Join-Path $env:RUNNER_TEMP "dh-hookexec") hook install
+          if ($LASTEXITCODE -ne 0) { throw "hook install failed" }
           git -C (Join-Path $env:RUNNER_TEMP "dh-hookexec") commit -q --allow-empty -m "Bad: Subject" 2>$null
           if ($LASTEXITCODE -eq 0) { throw "commit-msg hook did not block a non-conventional subject" }
           git -C (Join-Path $env:RUNNER_TEMP "dh-hookexec") commit -q --allow-empty -m "fix: typo"
