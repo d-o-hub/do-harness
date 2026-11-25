@@ -13,6 +13,7 @@ dropped input.
 
 import hashlib
 import json
+import shutil
 import subprocess  # nosec B404 - fixed git argv only, never a shell
 
 SCHEMA_VERSION = 1
@@ -47,10 +48,14 @@ def sha256_hex(raw):
 
 def git_output(repo, args):
     # The argv is a fixed `git -C <repo>` list with no shell; `repo` and
-    # `args` come from this repository's own pinned revision lookups.
+    # `args` come from this repository's own pinned revision lookups. git is
+    # resolved to an absolute path so no partial executable path is spawned.
+    git = shutil.which("git")
+    if git is None:
+        raise ValueError("git executable not found on PATH")
     # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit.dangerous-subprocess-use-audit
     proc = subprocess.run(  # nosec B603 - fixed git argv, no shell
-        ["git", "-C", repo, *args],
+        [git, "-C", repo, *args],
         capture_output=True,
         text=True,
     )
