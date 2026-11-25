@@ -315,9 +315,34 @@ fn rust_fixture_passes_then_fails() {
     );
     assert_eq!(code, Some(0), "rust init failed:\n{stderr}");
     assert_eq!(report["language"], serde_json::json!("rust"));
+    scope_verification_to_tool_free_sensors(root);
     assert_green_then_defect(root, &|| {
         write(root, "src/lib.rs", "pub fn answer() -> u32 {\n    0\n}\n");
     });
+}
+
+/// Restricts the scaffolded verification set to sensors that need no optional
+/// external tool. The cargo-deny/cargo-audit sensors skip when those tools are
+/// absent, and a skip warns, which the strict gate correctly rejects — so a
+/// bare runner would fail the green half of this fixture for a reason it does
+/// not test.
+fn scope_verification_to_tool_free_sensors(root: &Path) {
+    const TOOL_FREE: &str =
+        "\"fmt\", \"check\", \"clippy\", \"test\", \"doctest\", \"loc\", \"commitlint\"";
+    let path = root.join("do-harness.toml");
+    let text = std::fs::read_to_string(&path).unwrap();
+    let scoped = text
+        .lines()
+        .map(|line| {
+            if line.starts_with("verification = [") {
+                format!("verification = [{TOOL_FREE}]")
+            } else {
+                line.to_owned()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    std::fs::write(&path, scoped).unwrap();
 }
 
 #[test]

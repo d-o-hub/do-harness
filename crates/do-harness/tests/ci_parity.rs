@@ -70,6 +70,9 @@ fn path_utility(name: &str) -> PathBuf {
 #[cfg(unix)]
 fn sensor_env(cmd: &mut Command, bin: &std::path::Path, ci: bool, require_tools: bool) {
     cmd.env("PATH", bin);
+    // The wrapper scripts delegate to `do-harness helpers <sensor>`; hand them
+    // the binary built for this test run rather than relying on PATH.
+    cmd.env("DO_HARNESS_BIN", env!("CARGO_BIN_EXE_do-harness"));
     cmd.env_remove("BASH_ENV");
     cmd.env_remove("ENV");
     cmd.env_remove("CI");

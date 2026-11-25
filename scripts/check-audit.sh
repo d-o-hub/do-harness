@@ -2,112 +2,32 @@
 # check-audit.sh — scans dependencies against the RustSec advisory DB.
 #
 # Sensor: scripts/check-audit.sh
-# Enforcement policy (fail-open locally, fail-closed on demand):
-#   - cargo-audit missing AND (CI=true OR DO_HARNESS_REQUIRE_TOOLS=1) -> FAIL.
-#   - cargo-audit missing otherwise -> SKIP (keeps offline
-#     `do-harness verify --fail-fast` usable; advisory scanning is still
-#     enforced by the CI pipeline).
-# NOTE: a SKIP exits 0 and is flagged by the runner as a warned sensor (the
-# evidence artifact records it as `warn`, so `--strict` and `status` reject
-# it). Set DO_HARNESS_REQUIRE_TOOLS=1 in any context where a skip must not
-# masquerade as green (pre-push, release gates). CI sets it explicitly in
-# .github/workflows/verify.yml alongside CI=true.
-# Note: cargo-deny (deps sensor) also checks advisories; this sensor is the
-# independent second gate using cargo-audit's own DB handling.
+# Thin delegating wrapper: the implementation is the native
+# `do-harness helpers audit` subcommand. The wrapper keeps sensor argv rows
+# like ["bash", "scripts/check-audit.sh"] working in existing adopter configs
+# and resolves the same binary the managed hooks do (DO_HARNESS_BIN, then
+# PATH, then target/release/do-harness[.exe]).
+#
+# Exit codes match the native command: 0 pass, 1 the scan found issues, 2
+# usage/environment errors.
 
 set -euo pipefail
 
-# Fail-closed when the caller demands real gates (CI or an explicit opt-in);
-# scripts/lib.sh owns that predicate, this script owns the SKIP/FAIL message.
-# shellcheck disable=SC1091 # resolved at runtime from this script's directory
-source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib.sh"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-ROOT="$(dh_repo_root)"
-cd "$ROOT"
-
-if ! cargo audit --version >/dev/null 2>&1; then
-    if dh_require_tools; then
-        echo "FAIL: cargo-audit is required when CI=true or DO_HARNESS_REQUIRE_TOOLS=1."
-        exit 1
-    fi
-    echo "SKIP: cargo-audit not installed; skipping RustSec scan (cargo install cargo-audit --locked)."
-    exit 0
+BIN="${DO_HARNESS_BIN:-}"
+if [[ -z "$BIN" ]]; then
+    BIN="$(command -v do-harness 2>/dev/null || true)"
 fi
-
-# Ignore RUSTSEC-2026-0097 (rand 0.8.5 unsound: `thread_rng` aliasing, only
-# triggerable with a custom logger calling back into ThreadRng during reseed;
-# advisory: https://rustsec.org/advisories/RUSTSEC-2026-0097, alias
-# GHSA-cq8v-f236-94qc, patched in rand >= 0.8.6).
-# Scope justification: rand 0.8.5 is pulled ONLY by the optional, pre-GA
-# agent-governance dep (verified via Cargo.lock reverse-deps), never by
-# first-party code. Machine-readable decision: plans/invariants.json
-# (supply-chain, seeded to libSQL). NOTE: upstream renamed this crate to
-# `agentmesh`; this repo still pins the retired 3.2.x line deliberately (the
-# live 4.x line is a breaking API change, tracked by chore-agt-promotion).
-# Revisit when the SDK moves past 3.2.2
-# (`cargo update -p agent-governance --precise <ver>`) or at GA promotion
-# (plans/agt-governance-epic.md), when the pin — and this ignore — go away.
-# Expiry: event-driven, not dated — this flag dies with the 3.2.x pin at
-# chore-agt-promotion. (cargo-audit's `--ignore` takes a bare advisory ID, so
-# the reason and expiry live here in comments; the deny.toml entry for
-# RUSTSEC-2024-0449 below carries the `{ id, reason }` table form cargo-deny
-# supports.)
-# Advisory-DB pin decision: intentionally unpinned. RustSec advisories are the
-# point of the scan, and a pinned snapshot would hide post-pin disclosures;
-# reproducibility comes from Cargo.lock (deps) and `cargo audit --deny warnings`.
-# Ignore RUSTSEC-2024-0449 (unsafe-libyaml 0.2.11 unmaintained: upstream
-# dtolnay/unsafe-libyaml is archived; advisory:
-# https://rustsec.org/advisories/RUSTSEC-2024-0449).
-# Ignore RUSTSEC-2026-0543 (chrono 0.4.45 unmaintained: advisory 2026-09-14;
-# https://rustsec.org/advisories/RUSTSEC-2026-0543). Scope justification:
-# chrono is reachable ONLY through rmcp's schemars support in the optional
-# `mcp-surface` feature of guardian-proxy; no transport v1 or default build
-# links it. Retire by upgrading rmcp to a release that drops chrono, tracked in
-# plans/dependency-checkpoints.md (revisit 2027-03-25, same checkpoint as the
-# serde_yaml advisory).
-# Scope justification: unsafe-libyaml is reachable ONLY transitively via
-# serde_yaml 0.9, which parses skill frontmatter and the optional pre-GA AGT
-# policy parameters; the advisory records maintenance status, not a reported
-# vulnerability. Machine-readable decision: plans/invariants.json
-# (supply-chain). The migration that retires this ignore — replacing
-# serde_yaml with a maintained YAML crate — is tracked in
-# plans/serde-yaml-migration.md.
-# Expiry: revisit by 2027-03-25 (a machine-readable expiry is unreleased in
-# cargo-deny 0.20.2, so the date lives here and in deny.toml comments). Delete
-# this flag in the same PR that deletes the deny.toml entry, when
-# plans/serde-yaml-migration.md lands.
-run_audit() {
-    cargo audit --deny warnings \
-        --ignore RUSTSEC-2026-0097 \
-        --ignore RUSTSEC-2024-0449 \
-        --ignore RUSTSEC-2026-0543 "$@"
-}
-
-if ! run_audit "$@"; then
-    # Retry once before clearing anything: the advisory-db under CARGO_HOME is
-    # shared with any other sandbox verify running at the same time (parallel
-    # dogfood runs update the same database), so a lock or contention failure
-    # need not mean the cache is unusable, and clearing it would sabotage a
-    # sibling process.
-    sleep "${AUDIT_RETRY_DELAY_SECONDS:-2}"
-    if ! run_audit "$@"; then
-        # Fall back to the original recovery for a corrupted or truncated
-        # advisory-db: clear the cache and retry once more.
-        CARGO_HOME_DIR="${CARGO_HOME:-${HOME:-/tmp}/.cargo}"
-        if [ -d "$CARGO_HOME_DIR/advisory-db" ]; then
-            echo "WARN: cargo audit failed twice; clearing advisory-db and retrying..."
-            # Best effort by design: files can be locked or read-only while
-            # another sandbox verify uses the database, and under
-            # `set -euo pipefail` a failing `rm -rf` would abort the retry this
-            # branch exists to run (measured twice on the Windows runner, where
-            # the pack's own copy of this block killed the sensor before the
-            # retry). tests/audit_recovery.rs pins the retry, the bound, and
-            # this cleanup.
-            chmod -R u+w "$CARGO_HOME_DIR/advisory-db" 2>/dev/null || true
-            rm -rf "$CARGO_HOME_DIR/advisory-db" || true
-            run_audit "$@"
-        else
-            exit 1
-        fi
+if [[ -z "$BIN" ]]; then
+    BIN="$ROOT/target/release/do-harness"
+    if [[ ! -x "$BIN" && -x "$BIN.exe" ]]; then
+        BIN="$BIN.exe"
+    fi
+    if [[ ! -x "$BIN" ]]; then
+        echo "check-audit: do-harness binary not found. Set DO_HARNESS_BIN, add do-harness to PATH, or build with: cargo build --release -p do-harness" >&2
+        exit 2
     fi
 fi
+
+exec "$BIN" --root "$ROOT" helpers audit "$@"

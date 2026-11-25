@@ -15,7 +15,7 @@ use crate::report::Format;
 mod checks;
 mod client_profile;
 
-use checks::{check_sensor_argv, check_task_export, config_schema, hook_line};
+use checks::{check_sensor_argv, check_task_export, config_schema, helper_portability, hook_line};
 
 /// Outcome of the event-chain tamper audit, computed once so both output
 /// formats report it. Before this existed the audit ran only in the text
@@ -125,16 +125,10 @@ pub(crate) async fn run_with_status(
         );
     }
 
-    // The managed commit-msg hook execs `scripts/check-commitlint.sh` and
-    // blocks the commit when it is absent, so an installed hook without its
-    // script is a broken gate, not a healthy one.
-    let commitlint_missing =
-        status.commit_msg && !root.join("scripts/check-commitlint.sh").is_file();
-    if commitlint_missing {
-        failures.push(
-            "commit-msg hook requires scripts/check-commitlint.sh, which is missing".to_owned(),
-        );
-    }
+    // Helper portability is advisory (no failure): the shipped helpers all
+    // have native implementations, and the report shows whether the effective
+    // config still routes one through its POSIX-shell wrapper.
+    let helper_status = helper_portability(root).await;
 
     // A sensor whose argv names a missing file can still exit 0, so the gate
     // goes green over an unmeasured tree.
@@ -269,6 +263,15 @@ pub(crate) async fn run_with_status(
                     "commit_msg": status.ownership.commit_msg.as_str()
                 }
             },
+            "helpers": helper_status
+                .iter()
+                .map(|helper| serde_json::json!({
+                    "name": helper.name,
+                    "native": helper.native,
+                    "shell": helper.shell,
+                    "argv": helper.argv
+                }))
+                .collect::<Vec<_>>(),
             "database_ok": db_ok,
             "event_chain": chain.to_json(),
             "client_capability": client_report
@@ -336,18 +339,25 @@ pub(crate) async fn run_with_status(
                     owner,
                     shadowed,
                     status.core_hooks_path.as_deref(),
-                    commitlint_missing,
                     pre_commit_config,
                 )
             );
         }
 
-        for missing in &sensor_argv_missing {
-            let mark = if strict { "FAIL" } else { "WARN" };
-            println!(
-                "  [{mark}] sensor '{}' argv path missing: {}",
-                missing.sensor, missing.arg
-            );
+        for helper in &helper_status {
+            let argv = helper.argv.join(" ");
+            if helper.shell {
+                let wrapper = helper.argv.last().map_or("(none)", String::as_str);
+                println!(
+                    "  [WARN] helper portability: {} configured to run POSIX shell {}; native: do-harness {argv}",
+                    helper.name, wrapper
+                );
+            } else {
+                println!(
+                    "  [OK] helper portability: {} native (do-harness {argv})",
+                    helper.name
+                );
+            }
         }
 
         match &db_res {

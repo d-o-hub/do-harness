@@ -71,6 +71,7 @@ fn lint_env(root: &Path, args: &[&str], env: &[(&str, &OsStr)]) -> (bool, String
         .arg(root.join("scripts/check-commitlint.sh"))
         .args(args)
         .current_dir(root)
+        .env("DO_HARNESS_BIN", env!("CARGO_BIN_EXE_do-harness"))
         .env_remove("DO_HARNESS_COMMITLINT_COUNT");
     for (key, value) in env {
         command.env(key, value);
@@ -158,6 +159,7 @@ fn commitlint_empty_history_validates_arguments_and_messages() {
             .arg(root.join("scripts/check-commitlint.sh"))
             .args(*args)
             .current_dir(&root)
+            .env("DO_HARNESS_BIN", env!("CARGO_BIN_EXE_do-harness"))
             .env_remove("DO_HARNESS_COMMITLINT_COUNT")
             .output()
             .unwrap();

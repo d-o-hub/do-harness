@@ -1365,6 +1365,44 @@ the tool cannot make compile are refused with a reason.
   item.
 - `--dry-run`: Print the plan without writing files.
 
+### `helpers`
+<!-- BEGIN GENERATED: cli-contract helpers -->
+`do-harness helpers [OPTIONS] <COMMAND>`
+
+Subcommands: `commitlint`, `deps`, `audit`.
+<!-- END GENERATED: cli-contract helpers -->
+Run the shipped helper sensors natively (commitlint/deps/audit). Pure-Rust
+subcommands; the POSIX shell scripts remain as thin delegating wrappers for
+backward compatibility.
+
+#### `helpers commitlint`
+<!-- BEGIN GENERATED: cli-contract helpers commitlint -->
+`do-harness helpers commitlint [OPTIONS]`
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `--message <FILE>` | no | — | — | Lint the single subject in FILE (git commit-msg hook) |
+| `--count <N>` | no | — | — | History window size (default 1; env: `DO_HARNESS_COMMITLINT_COUNT`) |
+| `--range <REV-RANGE>` | no | — | — | Lint every subject in a git rev-list range |
+<!-- END GENERATED: cli-contract helpers commitlint -->
+Enforce conventional commits with lowercase subjects (commitlint sensor).
+
+#### `helpers deps`
+<!-- BEGIN GENERATED: cli-contract helpers deps -->
+`do-harness helpers deps [OPTIONS]`
+<!-- END GENERATED: cli-contract helpers deps -->
+Dependency-direction and cargo-deny gate (deps sensor).
+
+#### `helpers audit`
+<!-- BEGIN GENERATED: cli-contract helpers audit -->
+`do-harness helpers audit [OPTIONS] [-- <ARGS>...]`
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `[ARGS]` (repeatable) | no | — | — | Extra arguments passed through to cargo audit |
+<!-- END GENERATED: cli-contract helpers audit -->
+RustSec advisory scan with retry and advisory-db cache recovery (audit
+sensor).
 ### `maintenance`
 <!-- BEGIN GENERATED: cli-contract maintenance -->
 `do-harness maintenance [OPTIONS]`

@@ -5,15 +5,15 @@
 
 use std::path::PathBuf;
 
-use clap::{ArgAction, Subcommand, ValueHint};
+use clap::{Subcommand, ValueHint};
 
 use crate::init;
 use crate::report::Format;
 
 use super::LearnArgs;
 use super::actions::{
-    CleanupArgs, DoctorAction, ErrorsAction, FeedbackAction, HookAction, JobAction, MetricsAction,
-    PrAction, SetupAction, SkillsAction, TaskAction, TraceAction,
+    CleanupArgs, DoctorAction, ErrorsAction, FeedbackAction, HelpersAction, HookAction, JobAction,
+    MetricsAction, PrAction, SetupAction, SkillsAction, TaskAction, TraceAction,
 };
 
 /// Available subcommands.
@@ -174,34 +174,13 @@ pub enum Command {
         action: ErrorsAction,
     },
     /// Report line-of-code state for the 500-LOC invariant.
-    Loc {
-        /// Scan directory, relative to workspace root (repeatable or comma-separated).
-        #[arg(long = "dir", value_name = "DIR", action = ArgAction::Append)]
-        dir: Vec<String>,
-        /// Scan extension (repeatable or comma-separated, e.g. rs, ts, tsx).
-        #[arg(long = "ext", value_name = "EXT", action = ArgAction::Append)]
-        ext: Vec<String>,
-        /// Output format.
-        #[arg(long, value_enum, default_value_t = Format::Text)]
-        format: Format,
-        /// Show only files at or above the 450-line decomposition threshold.
-        #[arg(long)]
-        warn: bool,
-        /// Files or directories to measure (default: scan workspace roots).
-        #[arg(value_hint = ValueHint::AnyPath, value_name = "PATH")]
-        paths: Vec<PathBuf>,
-    },
+    Loc(#[command(flatten)] super::actions::LocArgs),
     /// Extract a large top-level item into a sibling module.
-    Split {
-        /// Source file to decompose.
-        #[arg(value_hint = ValueHint::FilePath, value_name = "FILE")]
-        file: PathBuf,
-        /// Print the plan without writing files.
-        #[arg(long)]
-        dry_run: bool,
-        /// Name the sibling module instead of deriving it from the item.
-        #[arg(long, value_name = "NAME")]
-        target: Option<String>,
+    Split(#[command(flatten)] super::actions::SplitArgs),
+    /// Run the shipped helper sensors natively (commitlint/deps/audit).
+    Helpers {
+        #[command(subcommand)]
+        action: HelpersAction,
     },
     /// Validate skill structure and benchmark skill evals.
     Eval {

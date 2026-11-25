@@ -51,6 +51,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand errors 'Inspect and clear fail-fast error signatures'
             cand loc 'Report line-of-code state for the 500-LOC invariant'
             cand split 'Extract a large top-level item into a sibling module'
+            cand helpers 'Run the shipped helper sensors natively (commitlint/deps/audit)'
             cand eval 'Validate skill structure and benchmark skill evals'
             cand hook 'Manage git hooks that run `do-harness verify`'
             cand doctor 'Run diagnostic checks on binary resolution and git hook health'
@@ -1022,6 +1023,75 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand -V 'Print version'
             cand --version 'Print version'
         }
+        &'do-harness;helpers'= {
+            cand --root 'Workspace root override (default: walk up from cwd)'
+            cand --config 'Explicit path to do-harness.toml'
+            cand --output 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)'
+            cand -q 'Suppress PASS/WARN verdict lines and the success footer'
+            cand --quiet 'Suppress PASS/WARN verdict lines and the success footer'
+            cand --dry-run 'Dry run without side effects'
+            cand -h 'Print help'
+            cand --help 'Print help'
+            cand -V 'Print version'
+            cand --version 'Print version'
+            cand commitlint 'Enforce conventional commits with lowercase subjects (commitlint sensor)'
+            cand deps 'Dependency-direction and cargo-deny gate (deps sensor)'
+            cand audit '`RustSec` advisory scan via cargo-audit (audit sensor)'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'do-harness;helpers;commitlint'= {
+            cand --message 'Lint the single subject in FILE (git commit-msg hook)'
+            cand --count 'History window size (default 1; env: `DO_HARNESS_COMMITLINT_COUNT`)'
+            cand --range 'Lint every subject in a git rev-list range'
+            cand --root 'Workspace root override (default: walk up from cwd)'
+            cand --config 'Explicit path to do-harness.toml'
+            cand --output 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)'
+            cand -q 'Suppress PASS/WARN verdict lines and the success footer'
+            cand --quiet 'Suppress PASS/WARN verdict lines and the success footer'
+            cand --dry-run 'Dry run without side effects'
+            cand -h 'Print help'
+            cand --help 'Print help'
+            cand -V 'Print version'
+            cand --version 'Print version'
+        }
+        &'do-harness;helpers;deps'= {
+            cand --root 'Workspace root override (default: walk up from cwd)'
+            cand --config 'Explicit path to do-harness.toml'
+            cand --output 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)'
+            cand -q 'Suppress PASS/WARN verdict lines and the success footer'
+            cand --quiet 'Suppress PASS/WARN verdict lines and the success footer'
+            cand --dry-run 'Dry run without side effects'
+            cand -h 'Print help'
+            cand --help 'Print help'
+            cand -V 'Print version'
+            cand --version 'Print version'
+        }
+        &'do-harness;helpers;audit'= {
+            cand --root 'Workspace root override (default: walk up from cwd)'
+            cand --config 'Explicit path to do-harness.toml'
+            cand --output 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)'
+            cand -q 'Suppress PASS/WARN verdict lines and the success footer'
+            cand --quiet 'Suppress PASS/WARN verdict lines and the success footer'
+            cand --dry-run 'Dry run without side effects'
+            cand -h 'Print help'
+            cand --help 'Print help'
+            cand -V 'Print version'
+            cand --version 'Print version'
+        }
+        &'do-harness;helpers;help'= {
+            cand commitlint 'Enforce conventional commits with lowercase subjects (commitlint sensor)'
+            cand deps 'Dependency-direction and cargo-deny gate (deps sensor)'
+            cand audit '`RustSec` advisory scan via cargo-audit (audit sensor)'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'do-harness;helpers;help;commitlint'= {
+        }
+        &'do-harness;helpers;help;deps'= {
+        }
+        &'do-harness;helpers;help;audit'= {
+        }
+        &'do-harness;helpers;help;help'= {
+        }
         &'do-harness;eval'= {
             cand --skill 'Restrict evaluation to this skill directory name'
             cand --format 'Output format'
@@ -1605,6 +1675,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand errors 'Inspect and clear fail-fast error signatures'
             cand loc 'Report line-of-code state for the 500-LOC invariant'
             cand split 'Extract a large top-level item into a sibling module'
+            cand helpers 'Run the shipped helper sensors natively (commitlint/deps/audit)'
             cand eval 'Validate skill structure and benchmark skill evals'
             cand hook 'Manage git hooks that run `do-harness verify`'
             cand doctor 'Run diagnostic checks on binary resolution and git hook health'
@@ -1748,6 +1819,17 @@ set edit:completion:arg-completer[do-harness] = {|@words|
         &'do-harness;help;loc'= {
         }
         &'do-harness;help;split'= {
+        }
+        &'do-harness;help;helpers'= {
+            cand commitlint 'Enforce conventional commits with lowercase subjects (commitlint sensor)'
+            cand deps 'Dependency-direction and cargo-deny gate (deps sensor)'
+            cand audit '`RustSec` advisory scan via cargo-audit (audit sensor)'
+        }
+        &'do-harness;help;helpers;commitlint'= {
+        }
+        &'do-harness;help;helpers;deps'= {
+        }
+        &'do-harness;help;helpers;audit'= {
         }
         &'do-harness;help;eval'= {
         }

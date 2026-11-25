@@ -197,4 +197,17 @@ fn parses_sensor_argv_roots_and_exts() {
     let (roots, exts) = parse_sensor_argv(&argv);
     assert_eq!(roots, vec!["web", "src", "crates"]);
     assert_eq!(exts, vec!["rs", "ts", "tsx"]);
+
+    // The native sensor argv (do-harness loc ...) parses the same flags.
+    let argv = vec![
+        "do-harness".to_owned(),
+        "loc".to_owned(),
+        "--root".to_owned(),
+        "web,src,crates".to_owned(),
+        "--ext".to_owned(),
+        "rs,ts,tsx".to_owned(),
+    ];
+    let (roots, exts) = parse_sensor_argv(&argv);
+    assert_eq!(roots, vec!["web", "src", "crates"]);
+    assert_eq!(exts, vec!["rs", "ts", "tsx"]);
 }

@@ -214,27 +214,26 @@ async fn route(root: &Path, config_path: Option<PathBuf>, cli: Cli) -> Result<()
             since,
             format,
         } => status::run(root, config_path.as_deref(), set, evidence, format, since).await,
-        Command::Loc {
-            dir: dir_args,
-            ext: ext_args,
-            format,
-            warn,
-            paths,
-        } => loc::run(
+        Command::Loc(args) => loc::run(
             root,
             config_path.as_deref(),
-            format,
-            warn,
-            &dir_args,
-            &ext_args,
-            &paths,
+            args.format,
+            args.warn,
+            &args.dir,
+            &args.ext,
+            &args.paths,
         )
         .map_err(CliError::Usage),
-        Command::Split {
-            file,
-            dry_run,
-            target,
-        } => split::run(root, &file, dry_run, target.as_deref()).map_err(CliError::Usage),
+        Command::Split(args) => split::run(root, &args.file, args.dry_run, args.target.as_deref())
+            .map_err(CliError::Usage),
+        Command::Helpers { action } => crate::helpers::run(root, action).map_err(|err| match err {
+            crate::helpers::HelperError::Violation(message) => {
+                CliError::Verify(anyhow::anyhow!(message))
+            }
+            crate::helpers::HelperError::Usage(message) => {
+                CliError::Usage(anyhow::anyhow!(message))
+            }
+        }),
         Command::InitDb {
             check,
             dry_run,

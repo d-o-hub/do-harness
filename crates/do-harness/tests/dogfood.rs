@@ -34,6 +34,27 @@ fn run(cmd: &mut Command) -> (bool, String) {
     )
 }
 
+/// Sensors that need no optional external tool (cargo-deny, cargo-audit), so
+/// the strict evidence tests stay deterministic on a bare runner. A skipped
+/// tool-backed sensor warns, and the strict gate correctly rejects that; this
+/// test proves the strict evidence path, not optional-tool availability.
+const STRICT_CORE: &[&str] = &[
+    "fmt",
+    "check",
+    "clippy",
+    "test",
+    "doctest",
+    "loc",
+    "commitlint",
+];
+
+fn only_core_sensors(cmd: &mut Command) -> &mut Command {
+    for name in STRICT_CORE {
+        cmd.arg("--only").arg(name);
+    }
+    cmd
+}
+
 /// Runs `verify --format json` (which must exit 0) and parses the report.
 fn verify_json(root: &Path) -> Value {
     let (ok, stdout) = run(harness(root).arg("verify").arg("--format").arg("json"));
@@ -283,11 +304,13 @@ fn rust_verify_with_evidence_writes_artifact() {
     assert!(ok, "init failed:\n{out}");
 
     let evidence_path = dir.path().join("evidence.json");
-    let (ok, _out) = run(harness(dir.path())
+    let mut verify = harness(dir.path());
+    verify
         .arg("verify")
         .arg("--evidence")
         .arg(&evidence_path)
-        .arg("--strict"));
+        .arg("--strict");
+    let (ok, out) = run(only_core_sensors(&mut verify));
     assert!(ok, "verify --evidence --strict failed:\n{out}");
     assert!(evidence_path.exists(), "evidence file was not created");
 
@@ -334,7 +357,9 @@ fn rust_verify_strict_default_path() {
     let (ok, out) = run(harness(dir.path()).arg("init"));
     assert!(ok, "init failed:\n{out}");
 
-    let (ok, out) = run(harness(dir.path()).arg("verify").arg("--strict"));
+    let mut verify = harness(dir.path());
+    verify.arg("verify").arg("--strict");
+    let (ok, out) = run(only_core_sensors(&mut verify));
     assert!(ok, "verify --strict failed:\n{out}");
 
     let default_path = dir.path().join(".do-harness/evidence.json");
