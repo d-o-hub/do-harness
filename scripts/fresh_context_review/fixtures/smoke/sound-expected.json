@@ -1,0 +1,7 @@
+{
+  "design": "sound-design.md",
+  "expected_outcome": "success_zero_findings",
+  "expected_findings": 0,
+  "expected_finding_ids": [],
+  "note": "Independently checked sound design: additive nullable column, idempotent bounded backfill, explicit rollback posture. No material defect is expected."
+}
