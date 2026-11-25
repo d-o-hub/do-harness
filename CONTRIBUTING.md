@@ -22,9 +22,8 @@ what your PR is expected to carry, and what maintainers gate on.
 
 - Every PR must reference an issue that maintainers have triaged. A PR that
   does not link an issue is blocked by the `issue-link-check` CI gate.
-  writing code. Bug reports and small documentation fixes still get an issue —
-  the template takes minutes, and it lets maintainers set priority and avoid
-  duplicate work.
+  Maintainers check triage during review. Bug reports and small documentation
+  fixes also use the issue templates.
 - To claim an issue, leave a comment. Maintainers may assign it to you.
 - Link the issue in the PR body with a trailer:
 

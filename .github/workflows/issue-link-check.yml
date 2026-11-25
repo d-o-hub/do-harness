@@ -1,8 +1,7 @@
 name: issue-link-check
 
-# Gate pull requests on the issue-first workflow: every PR must reference a
-# triaged issue, and external (fork) PR branches must follow the documented
-# naming conventions. This is deliberately a separate lightweight workflow
+# Gate pull requests on issue references and external (fork) branch naming.
+# Maintainers confirm issue triage during review. This is deliberately a separate lightweight workflow
 # rather than part of the heavy `verify` pipeline: it reads PR metadata only,
 # needs no checkout, and answers in seconds. It uses no external actions, so
 # there are no action pins to keep immutable.
