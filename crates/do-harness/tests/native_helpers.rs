@@ -31,6 +31,7 @@ fn run_shell(root: &Path, script: &str, args: &[&str]) -> (Option<i32>, String, 
         .arg(root.join("scripts").join(script))
         .args(args)
         .current_dir(root)
+        .env("DO_HARNESS_BIN", harness())
         .env_remove("DO_HARNESS_COMMITLINT_COUNT");
     let output = command.output().expect("run shell helper");
     (
