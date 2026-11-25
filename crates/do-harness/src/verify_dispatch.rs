@@ -2,18 +2,18 @@
 
 use std::path::{Path, PathBuf};
 
-use crate::{CliError, cli::Command, sensors::VerifyOpts, verify, workspace_verify};
+use crate::{CliError, cli::VerifyArgs, sensors::VerifyOpts, verify, workspace_verify};
 
 pub(crate) async fn run(
     root: &Path,
     config_path: Option<PathBuf>,
-    command: Command,
+    args: VerifyArgs,
     dry_run: bool,
     quiet: bool,
     output: Option<PathBuf>,
     explicit_config: bool,
 ) -> Result<(), CliError> {
-    let Command::Verify {
+    let VerifyArgs {
         fail_fast,
         format,
         simulate,
@@ -32,12 +32,7 @@ pub(crate) async fn run(
         strict,
         bless,
         approver,
-    } = command
-    else {
-        return Err(CliError::Usage(anyhow::anyhow!(
-            "verify dispatcher received a different command"
-        )));
-    };
+    } = args;
 
     let (task_id, raw_task) = match task.as_deref() {
         Some("global") => (None, Some("global".to_string())),

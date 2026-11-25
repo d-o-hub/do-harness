@@ -12,7 +12,7 @@ use crate::report::Format;
 #[test]
 fn visible_aliases_parse_correctly() {
     let check = Cli::try_parse_from(["do-harness", "check"]).expect("check alias");
-    assert!(matches!(check.command, Command::Verify { .. }));
+    assert!(matches!(check.command, Command::Verify(_)));
 
     let ls = Cli::try_parse_from(["do-harness", "ls"]).expect("ls alias");
     assert!(matches!(ls.command, Command::List(_)));
@@ -26,27 +26,27 @@ fn verify_task_flag_requires_record() {
 
     let ok = Cli::try_parse_from(["do-harness", "verify", "--record", "--task", "42"])
         .expect("task with record must pass");
-    if let Command::Verify { task, record, .. } = ok.command {
-        assert_eq!(task.as_deref(), Some("42"));
-        assert!(record);
+    if let Command::Verify(args) = ok.command {
+        assert_eq!(args.task.as_deref(), Some("42"));
+        assert!(args.record);
     } else {
         panic!("expected Command::Verify");
     }
 
     let global_opt = Cli::try_parse_from(["do-harness", "verify", "--record", "--global"])
         .expect("--global with record must pass");
-    if let Command::Verify { global, record, .. } = global_opt.command {
-        assert!(global);
-        assert!(record);
+    if let Command::Verify(args) = global_opt.command {
+        assert!(args.global);
+        assert!(args.record);
     } else {
         panic!("expected Command::Verify");
     }
 
     let task_global = Cli::try_parse_from(["do-harness", "verify", "--record", "--task", "global"])
         .expect("--task global with record must pass");
-    if let Command::Verify { task, record, .. } = task_global.command {
-        assert_eq!(task.as_deref(), Some("global"));
-        assert!(record);
+    if let Command::Verify(args) = task_global.command {
+        assert_eq!(args.task.as_deref(), Some("global"));
+        assert!(args.record);
     } else {
         panic!("expected Command::Verify");
     }

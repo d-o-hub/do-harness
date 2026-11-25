@@ -2,6 +2,13 @@
 
 <!-- One sentence: what changed and why. -->
 
+## Consumer impact
+
+List any required upgrade steps. Add one line per action as
+`Consumer-Impact: <group> | <action>`. Groups are `cli`, `npm`, `packs`,
+`guides`, and `contract`. For example, use
+`Consumer-Impact: contract | Run do-harness migrate --write`.
+
 ## Verification
 
 <!-- Evidence: sensor names and results, or a manual reproduction. -->
