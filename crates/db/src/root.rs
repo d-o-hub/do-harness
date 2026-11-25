@@ -1,6 +1,7 @@
 //! Harness workspace root discovery.
 
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 use crate::error::{DbError, Result};
 
@@ -55,6 +56,33 @@ pub fn db_path(root: &Path) -> PathBuf {
     root.join(STATE_DIR).join("agent_state.db")
 }
 
+/// Retries for `symlink_metadata` on a database sidecar (`-wal`, `-shm`).
+///
+/// Windows reports `ERROR_ACCESS_DENIED` while another process holds the
+/// sidecar open for the WAL lock, so a concurrent `verify --record` writer can
+/// see a transient access-denied on a file whose metadata is perfectly valid.
+/// The window is the lifetime of the competing handle; a bounded retry with a
+/// short backoff closes it without weakening the symlink guard, which still
+/// fails closed after the budget.
+const SIDECAR_METADATA_RETRIES: u32 = 40;
+const SIDECAR_METADATA_DELAY: Duration = Duration::from_millis(25);
+
+fn sidecar_metadata(path: &Path) -> std::io::Result<std::fs::Metadata> {
+    let mut attempt = 0;
+    loop {
+        match std::fs::symlink_metadata(path) {
+            Err(err) if err.kind() == std::io::ErrorKind::PermissionDenied => {
+                attempt += 1;
+                if attempt >= SIDECAR_METADATA_RETRIES {
+                    return Err(err);
+                }
+                std::thread::sleep(SIDECAR_METADATA_DELAY);
+            }
+            other => return other,
+        }
+    }
+}
+
 /// Check managed database/state paths before opening or writing any of them.
 /// This requires a stable worktree; it does not isolate hostile concurrent renames.
 ///
@@ -75,7 +103,7 @@ pub fn validate_state_paths(root: &Path) -> Result<()> {
         root.join(STATE_DIR).join("agent_state.db.bak.tmp"),
     ];
     for path in paths {
-        match std::fs::symlink_metadata(&path) {
+        match sidecar_metadata(&path) {
             Ok(meta)
                 if meta.file_type().is_symlink()
                     || (path == root.join(STATE_DIR) && !meta.is_dir())
