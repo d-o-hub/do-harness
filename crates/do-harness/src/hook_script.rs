@@ -138,7 +138,7 @@ mod tests {
 
     /// Runs the native commitlint message mode against `content` — the same
     /// code path the delegating wrapper reaches, without needing the built
-    /// binary on PATH (the wrapper parity is covered by tests/native_helpers).
+    /// binary on PATH (the wrapper parity is covered by `tests/native_helpers`).
     fn lint_message(content: &str) -> bool {
         let msg = tempfile::NamedTempFile::new().unwrap();
         std::fs::write(msg.path(), content).unwrap();

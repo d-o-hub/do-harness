@@ -14,6 +14,11 @@
 //! network, no advisory database, and no real audit.
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
+// The fake `cargo` is a POSIX shell script on PATH. The native helper spawns
+// `cargo` through CreateProcess on Windows, which only resolves `cargo.exe`,
+// so a stub script cannot intercept the audit there. The retry and cleanup
+// logic is platform-independent and stays covered on the unix runners.
+#![cfg(unix)]
 
 use std::fs;
 use std::path::{Path, PathBuf};
