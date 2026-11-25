@@ -90,3 +90,6 @@ This page currently describes the single adoption-contract version. Issue 603 (m
 contract, sensor packs, guides. When that lands, the `schema-version` field
 gains a stable alias or sibling `contract_version` used by `release.yml` for
 release notes, and this table is the canonical bump-rule reference for it.
+
+See the [Consumer Impact Matrix](releasing.md#consumer-impact-matrix) for how
+release notes report changes and required upgrade steps.

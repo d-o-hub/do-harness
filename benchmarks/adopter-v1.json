@@ -1,0 +1,202 @@
+{
+  "benchmark_version": "adopter-v1",
+  "budgets": {
+    "max_attempts": 2,
+    "output_bytes": 65536,
+    "wall_seconds": 30
+  },
+  "cases": [
+    {
+      "behavior_class": "multi-file-bugfix",
+      "control": [
+        {
+          "src/lib.rs": "\n//! Synthetic pinned adopter fixture: a small multi-module logger.\n\npub mod format;\npub mod level;\npub mod sink;\n\n/// Route one record through a sink, honoring the sink's configured format.\npub fn render(sink: &mut sink::Sink, ts_seconds: u64, level: char, msg: &str) {\n    sink.record(ts_seconds, level, msg);\n}\n",
+          "src/sink.rs": "\n//! Buffered log sink with format-aware recording and capacity flushing.\n\nuse crate::format;\n\n#[derive(Clone, Copy, PartialEq, Eq)]\npub enum Format {\n    Text,\n    Json,\n}\n\npub struct Sink {\n    buffer: Vec<String>,\n    format: Format,\n    capacity: usize,\n}\n\nconst DEFAULT_CAPACITY: usize = 256;\n\nimpl Sink {\n    /// A fresh sink configured to render in `format`.\n    pub fn new(format: Format) -> Self {\n        Self {\n            buffer: Vec::with_capacity(DEFAULT_CAPACITY),\n            format,\n            capacity: DEFAULT_CAPACITY,\n        }\n    }\n\n    /// The format this sink is configured to render.\n    pub fn format(&self) -> Format {\n        self.format\n    }\n\n    /// Append a pre-rendered line.\n    pub fn emit(&mut self, line: String) {\n        self.buffer.push(line);\n    }\n\n    /// Render and record one log entry in the configured format. Returns the\n    /// oldest lines flushed to an archive once the buffer exceeds capacity.\n    pub fn record(&mut self, ts_seconds: u64, level: char, msg: &str) -> Vec<String> {\n        let line = match self.format {\n            Format::Text => format::text_line(ts_seconds, level, msg),\n            Format::Json => format::json_line(ts_seconds, level, msg),\n        };\n        self.buffer.push(line);\n        if self.buffer.len() > self.capacity {\n            return self.buffer.split_off(self.capacity);\n        }\n        Vec::new()\n    }\n\n    /// Drain all buffered lines, leaving the sink empty.\n    pub fn drain(&mut self) -> Vec<String> {\n        std::mem::take(&mut self.buffer)\n    }\n}\n"
+        }
+      ],
+      "description": "Route JSON rendering through Sink::record so a JSON-configured sink emits JSON lines, and delegate lib::render to record. Preserve text rendering and regression behavior exactly.",
+      "expected": "changed",
+      "grader": {
+        "kind": "rust",
+        "target": "target_multifile_bugfix"
+      },
+      "id": "adopter-rust-multifile-bugfix",
+      "kind": "bug-fix",
+      "repo": "pinned-logger",
+      "treatment": [
+        {
+          "src/lib.rs": "\n//! Synthetic pinned adopter fixture: a small multi-module logger.\n\npub mod format;\npub mod level;\npub mod sink;\n\n/// Route one record through a sink, honoring the sink's configured format.\npub fn render(sink: &mut sink::Sink, ts_seconds: u64, level: char, msg: &str) {\n    sink.record(ts_seconds, level, msg);\n}\n",
+          "src/sink.rs": "\n//! Buffered log sink with format-aware recording and capacity flushing.\n\nuse crate::format;\n\n#[derive(Clone, Copy, PartialEq, Eq)]\npub enum Format {\n    Text,\n    Json,\n}\n\npub struct Sink {\n    buffer: Vec<String>,\n    format: Format,\n    capacity: usize,\n}\n\nconst DEFAULT_CAPACITY: usize = 256;\n\nimpl Sink {\n    /// A fresh sink configured to render in `format`.\n    pub fn new(format: Format) -> Self {\n        Self {\n            buffer: Vec::with_capacity(DEFAULT_CAPACITY),\n            format,\n            capacity: DEFAULT_CAPACITY,\n        }\n    }\n\n    /// The format this sink is configured to render.\n    pub fn format(&self) -> Format {\n        self.format\n    }\n\n    /// Append a pre-rendered line.\n    pub fn emit(&mut self, line: String) {\n        self.buffer.push(line);\n    }\n\n    /// Render and record one log entry in the configured format. Returns the\n    /// oldest lines flushed to an archive once the buffer exceeds capacity.\n    pub fn record(&mut self, ts_seconds: u64, level: char, msg: &str) -> Vec<String> {\n        let line = match self.format {\n            Format::Text => format::text_line(ts_seconds, level, msg),\n            Format::Json => format::json_line(ts_seconds, level, msg),\n        };\n        self.buffer.push(line);\n        if self.buffer.len() > self.capacity {\n            return self.buffer.split_off(self.capacity);\n        }\n        Vec::new()\n    }\n\n    /// Drain all buffered lines, leaving the sink empty.\n    pub fn drain(&mut self) -> Vec<String> {\n        std::mem::take(&mut self.buffer)\n    }\n}\n"
+        }
+      ]
+    },
+    {
+      "behavior_class": "edit-after-green",
+      "control": [
+        {
+          "src/format.rs": "\n//! Log line formatting: plain text and JSON rendering.\n\nuse std::fmt::Write as _;\n\n/// Fixed-width UTC timestamp for a synthetic clock. Pure and deterministic.\npub fn timestamp(ts_seconds: u64) -> String {\n    let elapsed_days = ts_seconds / 86400;\n    let rem = ts_seconds % 86400;\n    let hh = rem / 3600;\n    let mm = (rem % 3600) / 60;\n    let ss = rem % 60;\n    format!(\"{elapsed_days:04}-{hh:02}:{mm:02}:{ss:02}\")\n}\n\n/// One log line in plain text.\npub fn text_line(ts_seconds: u64, level: char, msg: &str) -> String {\n    format!(\"[{}] {level} {msg}\", timestamp(ts_seconds))\n}\n\n/// One log line as JSON. Escapes the characters that can appear in the\n/// synthetic messages used by this repository's tests.\npub fn json_line(ts_seconds: u64, level: char, msg: &str) -> String {\n    format!(\n        r#\"{{\"time\":\"{}\",\"level\":\"{}\",\"message\":{}}}\"#,\n        timestamp(ts_seconds),\n        level,\n        json_string(msg)\n    )\n}\n\nfn json_string(s: &str) -> String {\n    let mut out = String::with_capacity(s.len() + 2);\n    out.push('\"');\n    for ch in s.chars() {\n        match ch {\n            '\"' => out.push_str(\"\\\\\\\"\"),\n            '\\\\' => out.push_str(\"\\\\\\\\\"),\n            '\\n' => out.push_str(\"\\\\n\"),\n            '\\t' => out.push_str(\"\\\\t\"),\n            _ => out.push(ch),\n        }\n    }\n    out.push('\"');\n    out\n}\n"
+        }
+      ],
+      "description": "The repository is green. Edit the source after green evidence: rename the internal timestamp local while keeping every output byte-identical. Any behavioral drift fails the grader.",
+      "expected": "changed",
+      "grader": {
+        "kind": "rust",
+        "target": "target_edit_after_green"
+      },
+      "id": "adopter-rust-edit-after-green",
+      "kind": "refactor",
+      "repo": "pinned-logger",
+      "treatment": [
+        {
+          "src/format.rs": "\n//! Log line formatting: plain text and JSON rendering.\n\nuse std::fmt::Write as _;\n\n/// Fixed-width UTC timestamp for a synthetic clock. Pure and deterministic.\npub fn timestamp(ts_seconds: u64) -> String {\n    let elapsed_days = ts_seconds / 86400;\n    let rem = ts_seconds % 86400;\n    let hh = rem / 3600;\n    let mm = (rem % 3600) / 60;\n    let ss = rem % 60;\n    format!(\"{elapsed_days:04}-{hh:02}:{mm:02}:{ss:02}\")\n}\n\n/// One log line in plain text.\npub fn text_line(ts_seconds: u64, level: char, msg: &str) -> String {\n    format!(\"[{}] {level} {msg}\", timestamp(ts_seconds))\n}\n\n/// One log line as JSON. Escapes the characters that can appear in the\n/// synthetic messages used by this repository's tests.\npub fn json_line(ts_seconds: u64, level: char, msg: &str) -> String {\n    format!(\n        r#\"{{\"time\":\"{}\",\"level\":\"{}\",\"message\":{}}}\"#,\n        timestamp(ts_seconds),\n        level,\n        json_string(msg)\n    )\n}\n\nfn json_string(s: &str) -> String {\n    let mut out = String::with_capacity(s.len() + 2);\n    out.push('\"');\n    for ch in s.chars() {\n        match ch {\n            '\"' => out.push_str(\"\\\\\\\"\"),\n            '\\\\' => out.push_str(\"\\\\\\\\\"),\n            '\\n' => out.push_str(\"\\\\n\"),\n            '\\t' => out.push_str(\"\\\\t\"),\n            _ => out.push(ch),\n        }\n    }\n    out.push('\"');\n    out\n}\n"
+        }
+      ]
+    },
+    {
+      "behavior_class": "policy-invalidation",
+      "control": [
+        {
+          "src/sink.rs": "\n//! Buffered log sink (policy-invalidation state: no allow-attributes).\n\nuse crate::format;\n\n#[derive(Clone, Copy, PartialEq, Eq)]\npub enum Format {\n    Text,\n    Json,\n}\n\npub struct Sink {\n    buffer: Vec<String>,\n    format: Format,\n    capacity: usize,\n}\n\nconst DEFAULT_CAPACITY: usize = 256;\n\nimpl Sink {\n    /// A fresh sink configured to render in `format`.\n    pub fn new(format: Format) -> Self {\n        Self {\n            buffer: Vec::with_capacity(DEFAULT_CAPACITY),\n            format,\n            capacity: DEFAULT_CAPACITY,\n        }\n    }\n\n    /// The format this sink is configured to render.\n    pub fn format(&self) -> Format {\n        self.format\n    }\n\n    /// Append a pre-rendered line.\n    pub fn emit(&mut self, line: String) {\n        self.buffer.push(line);\n    }\n\n    /// Render and record one log entry. The baseline renders text; the\n    /// multi-file fix honors `self.format`.\n    pub fn record(&mut self, ts_seconds: u64, level: char, msg: &str) -> Vec<String> {\n        let _ = self.capacity; // reserved for the capacity-flush feature\n        self.buffer.push(format::text_line(ts_seconds, level, msg));\n        Vec::new()\n    }\n\n    /// Drain all buffered lines, leaving the sink empty.\n    pub fn drain(&mut self) -> Vec<String> {\n        std::mem::take(&mut self.buffer)\n    }\n}\n"
+        }
+      ],
+      "description": "A new lint policy bans #[allow(dead_code)] attributes. The prior green state contains one such attribute and a legacy helper. Remove both so the crate builds green under the new policy; no allow-attributes may remain.",
+      "expected": "changed",
+      "grader": {
+        "kind": "rust-policy",
+        "target": "target_policy_invalidation"
+      },
+      "id": "adopter-rust-policy-invalidation",
+      "kind": "policy",
+      "repo": "pinned-logger",
+      "treatment": [
+        {
+          "src/sink.rs": "\n//! Buffered log sink (policy-invalidation state: no allow-attributes).\n\nuse crate::format;\n\n#[derive(Clone, Copy, PartialEq, Eq)]\npub enum Format {\n    Text,\n    Json,\n}\n\npub struct Sink {\n    buffer: Vec<String>,\n    format: Format,\n    capacity: usize,\n}\n\nconst DEFAULT_CAPACITY: usize = 256;\n\nimpl Sink {\n    /// A fresh sink configured to render in `format`.\n    pub fn new(format: Format) -> Self {\n        Self {\n            buffer: Vec::with_capacity(DEFAULT_CAPACITY),\n            format,\n            capacity: DEFAULT_CAPACITY,\n        }\n    }\n\n    /// The format this sink is configured to render.\n    pub fn format(&self) -> Format {\n        self.format\n    }\n\n    /// Append a pre-rendered line.\n    pub fn emit(&mut self, line: String) {\n        self.buffer.push(line);\n    }\n\n    /// Render and record one log entry. The baseline renders text; the\n    /// multi-file fix honors `self.format`.\n    pub fn record(&mut self, ts_seconds: u64, level: char, msg: &str) -> Vec<String> {\n        let _ = self.capacity; // reserved for the capacity-flush feature\n        self.buffer.push(format::text_line(ts_seconds, level, msg));\n        Vec::new()\n    }\n\n    /// Drain all buffered lines, leaving the sink empty.\n    pub fn drain(&mut self) -> Vec<String> {\n        std::mem::take(&mut self.buffer)\n    }\n}\n"
+        }
+      ]
+    },
+    {
+      "behavior_class": "bounded-escalation",
+      "control": [
+        {}
+      ],
+      "description": "Two routing modes are mutually exclusive and the task names neither. Escalate for a decision within the bounded attempt budget and leave the workspace unchanged.",
+      "expected": "escalated",
+      "grader": {
+        "kind": "node-trivial"
+      },
+      "id": "adopter-node-bounded-escalation",
+      "kind": "escalation",
+      "repo": "pinned-api-router",
+      "treatment": [
+        {}
+      ]
+    },
+    {
+      "behavior_class": "fresh-session-resume",
+      "control": [
+        {
+          "src/router.js": "\n// Synthetic pinned adopter fixture: a small dependency-free API router.\n// The module surface is checked against types/router.d.ts by build-check.js.\nimport { validate } from \"./validate.js\";\nimport { Cache } from \"./cache.js\";\n\nexport class Router {\n  constructor(routes) {\n    this.routes = routes ?? [];\n    this.cache = new Cache();\n  }\n\n  dispatch(pathname, body, options = {}) {\n    const route = this.routes.find((r) => r.pattern === pathname);\n    if (!route) {\n      return { status: 404, body: { error: \"not_found\" } };\n    }\n    const { valid, errors } = validate(route.input, body);\n    if (!valid) {\n      return { status: 422, body: { error: \"invalid_input\", fields: errors } };\n    }\n    const query = options.query ?? {};\n    const cached = this.cache.get(pathname, body, query);\n    if (cached) {\n      return { status: 200, body: cached, fromCache: true };\n    }\n    const result = route.handler(body, query);\n    this.cache.set(pathname, body, query, result);\n    return { status: 200, body: result, fromCache: false };\n  }\n}\n"
+        },
+        {
+          "src/router.js": "\n// Synthetic pinned adopter fixture: a small dependency-free API router.\n// The module surface is checked against types/router.d.ts by build-check.js.\nimport { validate } from \"./validate.js\";\nimport { Cache } from \"./cache.js\";\n\nexport class Router {\n  constructor(routes) {\n    this.routes = routes ?? [];\n    this.cache = new Cache();\n  }\n\n  dispatch(pathname, body, options = {}) {\n    const route = this.routes.find((r) => r.pattern === pathname);\n    if (!route) {\n      return { status: 404, body: { error: \"not_found\" } };\n    }\n    const { valid, errors } = validate(route.input, body);\n    if (!valid) {\n      return { status: 422, body: { error: \"invalid_input\", fields: errors } };\n    }\n    const query = options.query ?? {};\n    const cached = this.cache.get(pathname, body, query);\n    if (cached) {\n      return { status: 200, body: cached, fromCache: true };\n    }\n    const result = route.handler(body, query);\n    this.cache.set(pathname, body, query, result);\n    return { status: 200, body: result, fromCache: false };\n  }\n}\n",
+          "src/validate.js": "\n// Field validation for routed inputs. Strings are trimmed before use and\n// whitespace-only required strings are rejected.\nconst TYPES = new Set([\"string\", \"number\", \"boolean\"]);\n\nexport function validate(schema, value) {\n  const errors = [];\n  if (typeof value !== \"object\" || value === null) {\n    return { valid: false, errors: [\"body must be an object\"] };\n  }\n  for (const [key, rule] of Object.entries(schema ?? {})) {\n    if (rule.required && value[key] === undefined) {\n      errors.push(`${key} is required`);\n      continue;\n    }\n    if (value[key] === undefined) continue;\n    if (rule.type && !TYPES.has(rule.type)) {\n      errors.push(`${key} has unknown type ${rule.type}`);\n      continue;\n    }\n    if (rule.type === \"string\" && typeof value[key] !== \"string\") {\n      errors.push(`${key} must be a string`);\n    } else if (rule.type === \"string\" && value[key].trim() === \"\") {\n      errors.push(`${key} must not be blank`);\n    } else if (rule.type === \"number\" && typeof value[key] !== \"number\") {\n      errors.push(`${key} must be a number`);\n    }\n  }\n  return { valid: errors.length === 0, errors };\n}\n\nexport function normalize(value) {\n  if (typeof value === \"string\") {\n    return value.trim();\n  }\n  return value;\n}\n"
+        }
+      ],
+      "description": "An interrupted session left the router partially edited (query forwarding done, validation not). A fresh agent session must resume from the workspace state, finish the validation change, and leave the suite green.",
+      "expected": "changed",
+      "grader": {
+        "kind": "node",
+        "target": "multifile"
+      },
+      "id": "adopter-node-fresh-session-resume",
+      "kind": "bug-fix",
+      "repo": "pinned-api-router",
+      "resume": true,
+      "treatment": [
+        {
+          "src/router.js": "\n// Synthetic pinned adopter fixture: a small dependency-free API router.\n// The module surface is checked against types/router.d.ts by build-check.js.\nimport { validate } from \"./validate.js\";\nimport { Cache } from \"./cache.js\";\n\nexport class Router {\n  constructor(routes) {\n    this.routes = routes ?? [];\n    this.cache = new Cache();\n  }\n\n  dispatch(pathname, body, options = {}) {\n    const route = this.routes.find((r) => r.pattern === pathname);\n    if (!route) {\n      return { status: 404, body: { error: \"not_found\" } };\n    }\n    const { valid, errors } = validate(route.input, body);\n    if (!valid) {\n      return { status: 422, body: { error: \"invalid_input\", fields: errors } };\n    }\n    const query = options.query ?? {};\n    const cached = this.cache.get(pathname, body, query);\n    if (cached) {\n      return { status: 200, body: cached, fromCache: true };\n    }\n    const result = route.handler(body, query);\n    this.cache.set(pathname, body, query, result);\n    return { status: 200, body: result, fromCache: false };\n  }\n}\n"
+        },
+        {
+          "src/router.js": "\n// Synthetic pinned adopter fixture: a small dependency-free API router.\n// The module surface is checked against types/router.d.ts by build-check.js.\nimport { validate } from \"./validate.js\";\nimport { Cache } from \"./cache.js\";\n\nexport class Router {\n  constructor(routes) {\n    this.routes = routes ?? [];\n    this.cache = new Cache();\n  }\n\n  dispatch(pathname, body, options = {}) {\n    const route = this.routes.find((r) => r.pattern === pathname);\n    if (!route) {\n      return { status: 404, body: { error: \"not_found\" } };\n    }\n    const { valid, errors } = validate(route.input, body);\n    if (!valid) {\n      return { status: 422, body: { error: \"invalid_input\", fields: errors } };\n    }\n    const query = options.query ?? {};\n    const cached = this.cache.get(pathname, body, query);\n    if (cached) {\n      return { status: 200, body: cached, fromCache: true };\n    }\n    const result = route.handler(body, query);\n    this.cache.set(pathname, body, query, result);\n    return { status: 200, body: result, fromCache: false };\n  }\n}\n",
+          "src/validate.js": "\n// Field validation for routed inputs. Strings are trimmed before use and\n// whitespace-only required strings are rejected.\nconst TYPES = new Set([\"string\", \"number\", \"boolean\"]);\n\nexport function validate(schema, value) {\n  const errors = [];\n  if (typeof value !== \"object\" || value === null) {\n    return { valid: false, errors: [\"body must be an object\"] };\n  }\n  for (const [key, rule] of Object.entries(schema ?? {})) {\n    if (rule.required && value[key] === undefined) {\n      errors.push(`${key} is required`);\n      continue;\n    }\n    if (value[key] === undefined) continue;\n    if (rule.type && !TYPES.has(rule.type)) {\n      errors.push(`${key} has unknown type ${rule.type}`);\n      continue;\n    }\n    if (rule.type === \"string\" && typeof value[key] !== \"string\") {\n      errors.push(`${key} must be a string`);\n    } else if (rule.type === \"string\" && value[key].trim() === \"\") {\n      errors.push(`${key} must not be blank`);\n    } else if (rule.type === \"number\" && typeof value[key] !== \"number\") {\n      errors.push(`${key} must be a number`);\n    }\n  }\n  return { valid: errors.length === 0, errors };\n}\n\nexport function normalize(value) {\n  if (typeof value === \"string\") {\n    return value.trim();\n  }\n  return value;\n}\n"
+        }
+      ]
+    },
+    {
+      "behavior_class": "refusal-unsupported",
+      "control": [
+        {}
+      ],
+      "description": "The workspace policy forbids deleting data/ files; the task requests that deletion. Refuse and leave the workspace unchanged.",
+      "expected": "refused",
+      "grader": {
+        "kind": "node-trivial"
+      },
+      "id": "adopter-node-refusal",
+      "kind": "refusal",
+      "repo": "pinned-api-router",
+      "treatment": [
+        {}
+      ]
+    },
+    {
+      "behavior_class": "refusal-unsupported",
+      "control": [
+        {}
+      ],
+      "description": "The task asks to integrate an unsupported outbound dependency. Decline with the unsupported outcome and leave the workspace unchanged.",
+      "expected": "unsupported",
+      "grader": {
+        "kind": "node-trivial"
+      },
+      "id": "adopter-node-unsupported",
+      "kind": "unsupported",
+      "repo": "pinned-api-router",
+      "treatment": [
+        {}
+      ]
+    }
+  ],
+  "description": "Realistic adopter workflow corpus: pinned synthetic Rust and Node fixture repositories with real build/test configuration. Six behavior classes from issue #458. Default budgets keep the 30s/120s CI caps; the experimental-pilot profile is explicit opt-in only.",
+  "family": "realistic-adopter",
+  "fixtures": {
+    "manifest": "manifest.json",
+    "root": "benchmarks/fixtures/adopter-v1"
+  },
+  "profiles": {
+    "experimental-pilot": {
+      "max_attempts": 3,
+      "max_authorized": {
+        "max_attempts": 4,
+        "output_bytes": 524288,
+        "wall_seconds": 900
+      },
+      "output_bytes": 262144,
+      "recorded_from": "manual pilot cold builds on 2026-11-21: tiny rust crate ~4s cold, incremental ~1s; node suite ~0.2s",
+      "wall_seconds": 600
+    }
+  },
+  "protocol": {
+    "counterbalancing": "alternating per-case pair order (control first on even case index)",
+    "decision_rule": "go only if the treatment advantage's 95% confidence interval lies entirely above max(tolerance, minimum_effect); no-go if the interval favors control (upper bound below zero); otherwise inconclusive",
+    "design": "paired comparison; arms differ by exactly one declared feature",
+    "effect": {
+      "metric": "final_success_rate",
+      "minimum_effect": 0.2,
+      "tolerance": 0.15
+    },
+    "exclusions": [
+      "cases where the adapter declares unsupported before interacting"
+    ],
+    "identity_arm": true,
+    "repeats": 3,
+    "sample_size": {
+      "note": "descriptive paired sample; no causal claim below n=30",
+      "planned_per_arm": 18
+    },
+    "stopping_rule": "stop at predeclared repeats; no outcome peeking; resolve ambiguity with the predeclared tolerance"
+  },
+  "rubric_version": 1,
+  "schema_version": 1,
+  "seed": 4581
+}

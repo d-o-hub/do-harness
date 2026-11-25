@@ -523,9 +523,10 @@ Preview the body without publishing:
 <!-- example: id=releasing_generate_notes classification=illustrative reason="Release notes generation script commands" -->
 ```bash
 gh api --method POST repos/d-o-hub/do-harness/releases/generate-notes \
-  -f tag_name=v0.2.1 -f target_commitish=main \
+  -f tag_name=v0.2.1 -f previous_tag_name=v0.2.0 -f target_commitish=main \
   -f configuration_file_path=.github/release.yml --jq .body > generated-notes.md
-bash scripts/release-notes.sh compose v0.2.1 generated-notes.md release-notes.md
+bash scripts/release-impact-matrix.sh matrix v0.2.1 --previous v0.2.0 --out impact-matrix.md
+bash scripts/release-notes.sh compose v0.2.1 generated-notes.md release-notes.md "" impact-matrix.md
 bash scripts/release-notes.sh check v0.2.1 release-notes.md
 bash scripts/release-notes.sh --self-test
 ```
@@ -880,3 +881,31 @@ turned out wrong. Everything else is superseded, never rewritten:
 Each recovery ends with a new version, so the fix follows "Cutting a release"
 from step 1. A yanked or deprecated version stays installable for anyone who
 already pinned it, which is why the superseding release is the real fix.
+
+## Consumer Impact Matrix
+
+Every GitHub Release body carries a **Consumer Impact Matrix**: a table that
+tells each consumer group what the release does to it. The release job derives
+it automatically with `scripts/release-impact-matrix.sh matrix <tag>` and
+`release-notes.sh compose` places it between the curated header and the change
+list, so no manual paste is involved and a release cannot ship without one
+(`release-notes.sh check` refuses a body whose `## Consumer Impact` section is
+missing or empty).
+
+The matrix uses the same previous tag as the changelog. Changed paths can
+affect several consumer groups. The adoption contract includes the config
+parser, migrations, doctor checks, and scaffolded config templates. It uses
+the definitions in [Versioning](versioning.md#contract-bump-rules).
+Changes to the dependency lockfile feed the shipped binary and npm rows.
+Documentation-only commits can mark the guides row as updated.
+
+Include one line per required action in the pull request body. Use
+`Consumer-Impact: <group> | <action>`, where the group is `cli`, `npm`,
+`packs`, `guides`, or `contract`. For example, an adoption change can use
+`Consumer-Impact: contract | Run do-harness migrate --write`. The release
+workflow reads the PR bodies and includes these instructions in the **Action
+required** column. Path and commit classification supplies the default wording
+when a PR supplies no action.
+
+Release recovery uses the composition script from the tagged tree. Tags cut
+before the matrix was introduced retain their original notes format.

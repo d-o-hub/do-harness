@@ -11,6 +11,13 @@ in the PR body:
 - `Refs #<n>` — this PR partially addresses the issue; the remaining step is
   tracked in the issue.
 
+## Consumer impact
+
+List any required upgrade steps. Add one line per action as
+`Consumer-Impact: <group> | <action>`. Groups are `cli`, `npm`, `packs`,
+`guides`, and `contract`. For example, use
+`Consumer-Impact: contract | Run do-harness migrate --write`.
+
 ## Verification
 
 List the evidence that your change passes the project sensors:
