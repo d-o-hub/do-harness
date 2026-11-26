@@ -153,10 +153,13 @@ jobs:
         # workflow lint. PyYAML backs the `action-pins` sensor, which parses
         # every workflow to prove its action references are immutable; the
         # release set includes that sensor, so the parser must be present
-        # before the set runs.
+        # before the set runs. The SDK's `test` extra carries pytest, which the
+        # `sdk-python-test` sensor needs; every Python requirement this
+        # workflow installs must also be installed by `verify.yml`, and
+        # scripts/tests/test_release_tooling_parity.py enforces that parity.
         run: |
-          python3 -m pip install --disable-pip-version-check yamllint -r scripts/requirements-docs.txt -r .agents/skills/skill-creator/scripts/requirements.txt
-          npm install -g markdownlint-cli2
+          python3 -m pip install --disable-pip-version-check yamllint -r scripts/requirements-docs.txt -r .agents/skills/skill-creator/scripts/requirements.txt -e 'integrations/sdk-python[test]'
+          npm install -g markdownlint-cli2 pnpm@10
       - name: Check Rust public API compatibility
         run: bash scripts/check-rust-api-compatibility.sh
       - name: Upload API compatibility report on failure
