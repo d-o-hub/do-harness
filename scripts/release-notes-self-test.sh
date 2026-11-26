@@ -25,18 +25,18 @@ EOF
 
 ## What's Changed
 ### Other changes
-* feat(cli): add a status command by @d-o-hub in https://github.com/d-o-hub/do-harness/pull/1
-* fix(db): close the write lock by @d-o-hub in https://github.com/d-o-hub/do-harness/pull/2
-* docs: explain the release gate by @d-o-hub in https://github.com/d-o-hub/do-harness/pull/3
-* refactor: split the notes composer by @d-o-hub in https://github.com/d-o-hub/do-harness/pull/4
-* chore(deps): bump sha2 by @d-o-hub in https://github.com/d-o-hub/do-harness/pull/5
-* feat(api)!: drop the legacy sensor name by @d-o-hub in https://github.com/d-o-hub/do-harness/pull/6
-* Merge branch 'main' into topic by @d-o-hub in https://github.com/d-o-hub/do-harness/pull/7
+* feat(cli): add a status command by @contributor in https://github.com/acme/widget/pull/1
+* fix(db): close the write lock by @contributor in https://github.com/acme/widget/pull/2
+* docs: explain the release gate by @contributor in https://github.com/acme/widget/pull/3
+* refactor: split the notes composer by @contributor in https://github.com/acme/widget/pull/4
+* chore(deps): bump sha2 by @contributor in https://github.com/acme/widget/pull/5
+* feat(api)!: drop the legacy sensor name by @contributor in https://github.com/acme/widget/pull/6
+* Merge branch 'main' into topic by @contributor in https://github.com/acme/widget/pull/7
 
 ## New Contributors
-* @newcomer made their first contribution in https://github.com/d-o-hub/do-harness/pull/8
+* @newcomer made their first contribution in https://github.com/acme/widget/pull/8
 
-**Full Changelog**: https://github.com/d-o-hub/do-harness/compare/v0.1.2...v0.1.3
+**Full Changelog**: https://github.com/acme/widget/compare/v0.1.2...v0.1.3
 EOF
 
     compose "v0.1.3" "$generated" "$composed" "" "$WORK/impact.md"
@@ -78,7 +78,7 @@ EOF
     if (( artifacts_at >= changes_at )); then
         fail "self-test: the artifacts section follows the change list"
     fi
-    grep -q '^\* feat(api)!: drop the legacy sensor name by @d-o-hub' "$composed" ||
+    grep -q '^\* feat(api)!: drop the legacy sensor name by @contributor' "$composed" ||
         fail "self-test: a breaking bullet lost its title, author, or link"
     if awk '/^### Features$/,/^$/' "$composed" | grep -q 'api)!'; then
         fail "self-test: a breaking change was also listed under its type section"
