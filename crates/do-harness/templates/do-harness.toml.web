@@ -13,6 +13,7 @@
 # .do-harness/visual) and re-blesses changed cells with WEB_VISUAL_UPDATE=1.
 schema-version = 1
 language = "web"
+contract_version = "0.1.0"
 
 [hooks]
 pre-commit = []

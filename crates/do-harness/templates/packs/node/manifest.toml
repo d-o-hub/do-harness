@@ -1,0 +1,9 @@
+# Sensor-pack manifest: the machine-readable version of the node sensor pack.
+#
+# Bump `version` (plain MAJOR.MINOR.PATCH semver) in the same change that
+# alters this pack's shipped files (the generated node config and its sensor
+# recipes); scripts/check-artifact-versions.sh enforces it against the merge
+# base. Bump rules live in docs/versioning.md.
+name = "node"
+description = "Node sensor pack (typecheck/lint/test) scaffolded by `do-harness init --language node`."
+version = "0.1.0"

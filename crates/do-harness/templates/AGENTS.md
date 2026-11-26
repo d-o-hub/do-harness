@@ -1,3 +1,7 @@
+---
+version: 0.1.0
+---
+
 # Development contract
 
 This repository uses do-harness for computational verification.

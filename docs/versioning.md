@@ -1,13 +1,25 @@
 # Versioning
 
-This page documents how the repository versions its artifacts and what a
-version number means to consumers. Today the only artifact that carries its
-own version is the **adoption contract** — the `do-harness.toml` schema. The
-CLI itself is released via git tags (`vX.Y.Z`; see
-[releasing.md](releasing.md)). Multi-artifact versioning (per-pack sensor
-versions, guide frontmatter versions) is tracked in
-[do-harness#603](https://github.com/d-o-hub/do-harness/issues/603); this page
-is the adopted home for its bump-rule table.
+`do-harness` is a multi-component system whose parts change at different rates
+and impact different consumers. This repository versions each artifact
+independently. Pack and guide versions are separate from the CLI's tag; the
+existing release manager continues to derive CLI tag bumps from conventional
+commits. Adopters can pin the contract they parse against, and guide changes
+that alter expected agent behavior carry their own version signal.
+
+## Artifacts and version sources
+
+| Artifact | Consumer | Version source | Version file |
+| :--- | :--- | :--- | :--- |
+| CLI binary | end users, CI pipelines | git tag `vX.Y.Z` (existing release flow) | `Cargo.toml` `[workspace.package].version`; cut by `scripts/release-manager.sh` |
+| Adoption contract | adopting repositories | `schema-version` (hard gate) + `contract_version` (pin-able semver) | `do-harness.toml` at the repository root; scaffolded copies under `crates/do-harness/templates/do-harness.toml.generic` and `.../do-harness.toml.web` |
+| Sensor packs | sensor authors | per-pack `version` (TOML key) | `crates/do-harness/templates/packs/<lang>/manifest.toml` for `rust`, `generic`, `web`, `node`, `python`, `go` |
+| Guides | agent operators | frontmatter `version` (YAML key) | `AGENTS.md` (root and template), `crates/do-harness/templates/USE_RESTRICTIONS.md` |
+
+Every version except `schema-version` is a plain `MAJOR.MINOR.PATCH` semver —
+the same shape the release pipeline accepts for the CLI. Shared CLI
+implementation that is not part of a versioned pack follows the CLI tag;
+pack-owned generators and shipped files are listed in the gate's owner map.
 
 ## The adoption-contract version
 
@@ -38,6 +50,15 @@ Semantics of a declared version:
 - An absent `schema-version` is version 0, the pre-versioning schema;
   `migrate` adds the key.
 
+Alongside the integer gate, the contract carries the optional
+`contract_version` semver key: an independent, pin-able version adopters can
+reference without the CLI release. Absent means the pre-versioning contract
+and parses as `0.0.0` (backward compatible); when present it must be
+well-formed plain semver or config loading fails (the same shape the release
+pipeline accepts). A contract change bumps `schema-version` per the rules
+below **and** `contract_version` analogously (the semver bump follows the
+consumer-centric rows in the bump-rule table).
+
 ## Contract bump rules
 
 A change to the contract is any edit to a contract-definition file:
@@ -49,7 +70,7 @@ A change to the contract is any edit to a contract-definition file:
 
 | Change | Version bump |
 | --- | --- |
-| Add a new key/field a config file may carry | required |
+| Add a new key/field a config file may carry | required, or the explicit additive-only annotation |
 | Rename or remove a key/field | required |
 | Change the meaning of an existing key/field | required |
 | Change requiredness or defaults | required |
@@ -60,7 +81,12 @@ Reasoning: the parser is fail-closed on unknown keys, so even a purely
 additive key changes what an old binary accepts; a new version is the only
 signal an adopter can rely on. The one exception is a change that is purely
 additive and explicitly annotated (below), reserved for non-breaking edits
-such as documenting existing behavior.
+such as documenting existing behavior or introducing an optional,
+default-valued key.
+The initial optional, defaulted `contract_version` key uses the documented
+`Contract-schema: additive-only` trailer; existing configs that omit it
+continue to parse. The semver contract version still bumps for the new
+contract field.
 
 ## The contract-first workflow
 
@@ -85,11 +111,49 @@ The repository's own `do-harness.toml` is an instance of the contract, not a
 definition: editing it (for example, adding a sensor) does not require a bump.
 The sensor still checks that its `schema-version` agrees with the constant.
 
-## Integration point: multi-artifact versioning (#603)
-This page currently describes the single adoption-contract version. Issue 603 (multi-artifact versioning) introduces per-artifact versions — adoption
-contract, sensor packs, guides. When that lands, the `schema-version` field
-gains a stable alias or sibling `contract_version` used by `release.yml` for
-release notes, and this table is the canonical bump-rule reference for it.
+## Bump rules for packs and guides
+
+A version bump is required whenever the artifact's shipped files change. The
+rule table below is consumer-centric: it says when a bump is *major*, *minor*,
+or *patch* for the people who consume that artifact.
+
+| Artifact | Major | Minor | Patch |
+| :--- | :--- | :--- | :--- |
+| Sensor packs | a pack's emitted sensor commands or output contracts change incompatibly | a sensor is added to the pack | fixes that change no sensor behavior |
+| Guides | agent-facing behavior changes incompatibly | a new guidance section or requirement is added | editorial fixes |
+
+Pre-1.0, the minor is the major bump for the contract, packs, and guides, the
+same convention the release derivation applies to the CLI.
+
+## Enforcement
+
+Two sensors enforce the version gates:
+
+- `contract-first` (scripts/check-contract-first.sh) gates the adoption
+  contract per the workflow above.
+- `artifact-versions` (scripts/check-artifact-versions.sh) fails when a pack
+  or guide's shipped files changed since the merge base without a strict
+  increase in that artifact's version field. Its base resolution is
+  `$CHECK_ARTIFACT_VERSIONS_BASE` if set, else `origin/main`, else `main`, else
+  `HEAD~1`; it diffs the merge base of HEAD and that ref, sees committed
+  changes since the merge base *and* uncommitted working-tree changes to the
+  artifact's owner paths, and fails closed (exit 2) on unreadable git state or
+  a missing/malformed version file — it never passes vacuously. `--self-test`
+  proves both directions hermetically.
+
+Satisfy the gate by bumping the artifact's version field in the same change
+that touches its shipped files. The version fields are also read at release
+time: the GitHub Release body's `## Artifacts` table lists every artifact
+version (see [releasing.md](releasing.md), "Release notes").
+
+## Relationship to the single-version flow
+
+The existing single-version consumers are unaffected. `scripts/release-manager.sh`
+still derives and cuts the CLI tag exactly as before; `contract_version` is
+optional and absent files parse as before; the release workflow still requires
+the tag to match `[workspace.package].version`. The release notes now *also*
+carry the independent artifact versions, so a release body shows exactly which
+contract, pack, and guide versions ship with a given CLI.
 
 See the [Consumer Impact Matrix](releasing.md#consumer-impact-matrix) for how
 release notes report changes and required upgrade steps.

@@ -399,6 +399,7 @@ pub fn generate_node_config(sensors: &[SensorSpec]) -> Result<String> {
 
     let cfg = Config {
         schema_version: crate::config::CONFIG_SCHEMA_VERSION,
+        contract_version: Some(crate::config::INITIAL_CONTRACT_VERSION.to_owned()),
         language: Some("node".to_owned()),
         hooks: HooksConfig {
             pre_commit,

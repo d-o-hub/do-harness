@@ -241,6 +241,7 @@ mod tests {
     fn config_with(sensors: Vec<SensorSpec>, sets: &[(&str, &[&str])]) -> Config {
         Config {
             schema_version: crate::config::CONFIG_SCHEMA_VERSION,
+            contract_version: None,
             language: None,
             hooks: HooksConfig {
                 pre_commit: vec![],

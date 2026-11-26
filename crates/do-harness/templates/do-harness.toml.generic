@@ -1,6 +1,7 @@
 # do-harness.toml — sensor pack for this workspace.
 schema-version = 1
 language = "generic"
+contract_version = "0.1.0"
 
 [hooks]
 pre-commit = []

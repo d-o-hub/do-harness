@@ -1,0 +1,9 @@
+# Sensor-pack manifest: the machine-readable version of the generic sensor pack.
+#
+# Bump `version` (plain MAJOR.MINOR.PATCH semver) in the same change that
+# alters this pack's shipped files (the generic config template);
+# scripts/check-artifact-versions.sh enforces it against the merge base.
+# Bump rules live in docs/versioning.md.
+name = "generic"
+description = "Generic sensor pack (empty sensor list, manual recipes) scaffolded by `do-harness init`."
+version = "0.1.0"

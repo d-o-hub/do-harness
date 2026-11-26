@@ -12,6 +12,9 @@ impl Config {
                 anyhow::bail!("jobs must be at least 1 (got 0)");
             }
         }
+        if let Some(contract_version) = &self.contract_version {
+            validate_contract_version(contract_version)?;
+        }
         if let Some(language) = &self.language {
             if !SUPPORTED_LANGUAGES.contains(&language.as_str()) {
                 anyhow::bail!(
@@ -100,6 +103,23 @@ impl Config {
         validate_hook_references("hooks.pre-push", &self.hooks.pre_push, &known)?;
         Ok(())
     }
+}
+
+/// Rejects a declared `contract_version` that is not a plain
+/// `MAJOR.MINOR.PATCH` semver — the same shape the release pipeline accepts.
+///
+/// Absent is valid (`None` parses as `0.0.0`); present must be well-formed, so
+/// an adopter cannot pin a contract version the tool cannot compare.
+fn validate_contract_version(version: &str) -> Result<()> {
+    let parts: Vec<&str> = version.split('.').collect();
+    if parts.len() != 3
+        || parts
+            .iter()
+            .any(|part| part.is_empty() || !part.bytes().all(|byte| byte.is_ascii_digit()))
+    {
+        anyhow::bail!("contract_version must be MAJOR.MINOR.PATCH (got '{version}')");
+    }
+    Ok(())
 }
 
 /// Validates project-policy mechanical repairs against the known sensors.

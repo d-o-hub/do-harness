@@ -1,0 +1,9 @@
+# Sensor-pack manifest: the machine-readable version of the python sensor pack.
+#
+# Bump `version` (plain MAJOR.MINOR.PATCH semver) in the same change that
+# alters this pack's shipped files (the generated python config and the
+# check-python-test.sh helper); scripts/check-artifact-versions.sh enforces it
+# against the merge base. Bump rules live in docs/versioning.md.
+name = "python"
+description = "Python sensor pack (format/lint/test) scaffolded by `do-harness init --language python`."
+version = "0.1.0"
