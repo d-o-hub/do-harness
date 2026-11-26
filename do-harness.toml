@@ -348,7 +348,21 @@ when-changed = ["crates/**/*.rs", "crates/do-harness/templates/**", "scripts/*.s
 # reads as green. See docs/versioning.md.
 name = "artifact-versions"
 argv = ["bash", "scripts/check-artifact-versions.sh"]
-when-changed = ["do-harness.toml", "AGENTS.md", "crates/do-harness/templates/**", "crates/do-harness/src/config/**", "scripts/check-artifact-versions.sh", "docs/versioning.md"]
+when-changed = [
+    "do-harness.toml",
+    "AGENTS.md",
+    "crates/do-harness/templates/**",
+    "crates/do-harness/src/config/**",
+    "crates/do-harness/src/init.rs",
+    "crates/do-harness/src/init/**",
+    "crates/do-harness/src/helpers/**",
+    "crates/do-harness/src/migrate.rs",
+    "crates/do-harness/src/doctor/checks.rs",
+    "scripts/check-artifact-versions.sh",
+    "scripts/check-artifact-versions-self-test.sh",
+    "scripts/lib.sh",
+    "docs/versioning.md",
+]
 
 [[sensors]]
 # Executable half of the release-note contract: a published body carries the
@@ -358,7 +372,7 @@ when-changed = ["do-harness.toml", "AGENTS.md", "crates/do-harness/templates/**"
 # placeholder, an emptied section, a lost pull request).
 name = "release-notes"
 argv = ["bash", "scripts/release-notes.sh", "--self-test"]
-when-changed = [".github/release-notes-template.md", ".github/release.yml", ".github/workflows/release.yml", ".github/workflows/auto-release.yml", "docs/releases/**", "scripts/release-notes.sh", "scripts/lib.sh"]
+when-changed = [".github/release-notes-template.md", ".github/release.yml", ".github/workflows/release.yml", ".github/workflows/auto-release.yml", "docs/releases/**", "scripts/release-notes.sh", "scripts/release-notes-self-test.sh", "scripts/release-artifacts.sh", "scripts/lib.sh"]
 
 [[sensors]]
 # Executable half of the release-derivation contract: the version a merge cuts

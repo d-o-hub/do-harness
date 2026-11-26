@@ -6,4 +6,4 @@
 # base. Bump rules live in docs/versioning.md.
 name = "rust"
 description = "Rust sensor pack (fmt/check/clippy/test/loc) scaffolded by `do-harness init --language rust`."
-version = "0.1.0"
+version = "0.1.1"

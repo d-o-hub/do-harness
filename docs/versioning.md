@@ -2,10 +2,10 @@
 
 `do-harness` is a multi-component system whose parts change at different rates
 and impact different consumers. This repository versions each artifact
-independently instead of forcing one version on all of them: a patch to the
-Python sensor pack does not bump the CLI release, adopters can pin the
-adoption contract they parse against, and a guide change that alters expected
-agent behavior carries its own version signal.
+independently. Pack and guide versions are separate from the CLI's tag; the
+existing release manager continues to derive CLI tag bumps from conventional
+commits. Adopters can pin the contract they parse against, and guide changes
+that alter expected agent behavior carry their own version signal.
 
 ## Artifacts and version sources
 
@@ -17,9 +17,9 @@ agent behavior carries its own version signal.
 | Guides | agent operators | frontmatter `version` (YAML key) | `AGENTS.md` (root and template), `crates/do-harness/templates/USE_RESTRICTIONS.md` |
 
 Every version except `schema-version` is a plain `MAJOR.MINOR.PATCH` semver —
-the same shape the release pipeline accepts for the CLI. Shared scaffold files
-that are not a versioned artifact (e.g. `templates/scripts/check-commitlint.sh`)
-track the CLI and are not independently versioned.
+the same shape the release pipeline accepts for the CLI. Shared CLI
+implementation that is not part of a versioned pack follows the CLI tag;
+pack-owned generators and shipped files are listed in the gate's owner map.
 
 ## The adoption-contract version
 
@@ -83,6 +83,10 @@ signal an adopter can rely on. The one exception is a change that is purely
 additive and explicitly annotated (below), reserved for non-breaking edits
 such as documenting existing behavior or introducing an optional,
 default-valued key.
+The initial optional, defaulted `contract_version` key uses the documented
+`Contract-schema: additive-only` trailer; existing configs that omit it
+continue to parse. The semver contract version still bumps for the new
+contract field.
 
 ## The contract-first workflow
 

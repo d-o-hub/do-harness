@@ -167,16 +167,14 @@ check_artifact() {
 
     head_version="$(version_from_file "$ROOT/$vfile" "$mode" "$key")"
     if [[ -z "$head_version" ]]; then
-        echo "FAIL: $name has no readable version at HEAD ($vfile)" >&2
-        FAIL=$((FAIL + 1))
-        return 1
+        fail_closed "$name has no readable version at HEAD ($vfile)"
+    fi
+    if ! cmp="$(ver_cmp "$head_version" "$head_version")"; then
+        fail_closed "$name version '$head_version' is malformed (want MAJOR.MINOR.PATCH)"
     fi
 
     if ! changed="$(git -C "$ROOT" diff --name-only "$BASE_COMMIT" HEAD -- "${owners[@]}" 2>&1)"; then
-        echo "FAIL: git diff failed while checking $name" >&2
-        echo "$changed" >&2
-        FAIL=$((FAIL + 1))
-        return 1
+        fail_closed "git diff failed while checking $name: $changed"
     fi
     # Uncommitted edits are part of the gate too: a working-tree change to an
     # owner path without a version bump must fail the same way a committed one
@@ -184,10 +182,7 @@ check_artifact() {
     # changes (including new files) for exactly the owner paths.
     local status_changes
     if ! status_changes="$(git -C "$ROOT" status --porcelain -- "${owners[@]}" 2>&1)"; then
-        echo "FAIL: git status failed while checking $name" >&2
-        echo "$status_changes" >&2
-        FAIL=$((FAIL + 1))
-        return 1
+        fail_closed "git status failed while checking $name: $status_changes"
     fi
     changed="${changed}${status_changes:+$'\n'$status_changes}"
     if [[ -z "$changed" ]]; then
@@ -199,20 +194,20 @@ check_artifact() {
     case $? in
         0) ;;
         1) base_version="" ;;
-        2) FAIL=$((FAIL + 1)); return 1 ;;
+        2) fail_closed "cannot read base version for $name ($vfile)" ;;
     esac
     if [[ -z "$base_version" ]]; then
         base_version="0.0.0"
     fi
 
     if ! cmp="$(ver_cmp "$head_version" "$base_version")"; then
-        echo "FAIL: $name version '${head_version}' is malformed (want MAJOR.MINOR.PATCH)" >&2
-        FAIL=$((FAIL + 1))
-        return 1
+        fail_closed "$name base version '$base_version' is malformed (want MAJOR.MINOR.PATCH)"
     fi
     if [[ "$cmp" != "1" ]]; then
         echo "FAIL: $name changed without a version bump ($base_version -> $head_version)" >&2
-        echo "$changed" | sed 's/^/  changed: /' >&2
+        while IFS= read -r path; do
+            printf '  changed: %s\n' "$path" >&2
+        done <<< "$changed"
         FAIL=$((FAIL + 1))
         return 1
     fi
@@ -222,20 +217,25 @@ check_artifact() {
 # run_checks — the artifact registry. Owner paths are the shipped surface of
 # each artifact; version files are the machine-readable location of its version.
 run_checks() {
-    # Adoption contract: the parsing surface of do-harness.toml. The config
-    # schema files are the contract's definition; the config tests are not.
+    # Adoption-contract definitions. The repository's own do-harness.toml is
+    # only an instance: adding a sensor there does not require a contract bump.
     check_artifact "adoption contract" "do-harness.toml" toml contract_version \
-        "do-harness.toml" \
+        "crates/do-harness/src/config" \
+        "crates/do-harness/src/migrate.rs" \
+        "crates/do-harness/src/doctor/checks.rs" \
+        "crates/do-harness/src/init.rs" \
         "crates/do-harness/templates/do-harness.toml.generic" \
-        "crates/do-harness/templates/do-harness.toml.web" \
-        "crates/do-harness/src/config/mod.rs" \
-        "crates/do-harness/src/config/validate.rs" || true
-    # Sensor packs: each pack's manifest is its version file; the owner paths
-    # are the template files `init` ships for that pack.
+        "crates/do-harness/templates/do-harness.toml.web" || true
+
+    # Each pack manifest versions the matching shipped payload and its
+    # pack-specific generator; shared CLI plumbing follows the CLI tag.
     check_artifact "sensor pack: rust" \
         "crates/do-harness/templates/packs/rust/manifest.toml" toml version \
         "crates/do-harness/templates/packs/rust/manifest.toml" \
         "crates/do-harness/templates/crate/**" \
+        "crates/do-harness/src/init.rs" \
+        "crates/do-harness/src/helpers/**" \
+        "crates/do-harness/templates/scripts/check-commitlint.sh" \
         "crates/do-harness/templates/scripts/check-loc.sh" \
         "crates/do-harness/templates/scripts/check-deps.sh" \
         "crates/do-harness/templates/scripts/check-audit.sh" \
@@ -250,6 +250,8 @@ run_checks() {
         "crates/do-harness/templates/packs/web/manifest.toml" toml version \
         "crates/do-harness/templates/packs/web/manifest.toml" \
         "crates/do-harness/templates/do-harness.toml.web" \
+        "crates/do-harness/src/init/node.rs" \
+        "crates/do-harness/src/init/node_manifest.rs" \
         "crates/do-harness/templates/scripts/web-ui/**" \
         "crates/do-harness/templates/scripts/viewport-audit.mjs" \
         "crates/do-harness/templates/scripts/a11y-audit.mjs" \
@@ -259,17 +261,23 @@ run_checks() {
         "crates/do-harness/templates/scripts/i18n-audit.mjs" || true
     check_artifact "sensor pack: node" \
         "crates/do-harness/templates/packs/node/manifest.toml" toml version \
-        "crates/do-harness/templates/packs/node/manifest.toml" || true
+        "crates/do-harness/templates/packs/node/manifest.toml" \
+        "crates/do-harness/src/init/node.rs" \
+        "crates/do-harness/src/init/node_manifest.rs" || true
     check_artifact "sensor pack: python" \
         "crates/do-harness/templates/packs/python/manifest.toml" toml version \
         "crates/do-harness/templates/packs/python/manifest.toml" \
+        "crates/do-harness/src/init/python.rs" \
         "crates/do-harness/templates/scripts/check-python-test.sh" || true
     check_artifact "sensor pack: go" \
         "crates/do-harness/templates/packs/go/manifest.toml" toml version \
         "crates/do-harness/templates/packs/go/manifest.toml" \
+        "crates/do-harness/src/init/go.rs" \
+        "crates/do-harness/src/init/go_manifest.rs" \
         "crates/do-harness/templates/scripts/check-go-vet.sh" \
         "crates/do-harness/templates/scripts/check-go-test.sh" \
         "crates/do-harness/templates/scripts/check-go-staticcheck.sh" || true
+
     # Guides: each guide's frontmatter is its version file.
     check_artifact "guide AGENTS.md (root)" "AGENTS.md" frontmatter "" \
         "AGENTS.md" || true
@@ -281,152 +289,17 @@ run_checks() {
         "crates/do-harness/templates/USE_RESTRICTIONS.md" || true
 }
 
-# run_self_test — hermetic cannot-fail proof: red/green both directions, a
-# malformed version, a missing version file, an artifact introduced with a
-# version, and fail-closed on an unreadable git state.
-run_self_test() {
-    local work failures=0
-    work="$(mktemp -d)"
-    trap 'rm -rf "$work"' RETURN
-    git -C "$work" init -q
-    git -C "$work" config user.email test@example.com
-    git -C "$work" config user.name test
-    mkdir -p "$work/crates/do-harness/templates/packs/rust" \
-        "$work/crates/do-harness/templates/packs/generic" \
-        "$work/crates/do-harness/templates/packs/web" \
-        "$work/crates/do-harness/templates/packs/node" \
-        "$work/crates/do-harness/templates/packs/python" \
-        "$work/crates/do-harness/templates/packs/go" \
-        "$work/crates/do-harness/templates/scripts" \
-        "$work/crates/do-harness/templates"
-    cat >"$work/do-harness.toml" <<'EOF'
-contract_version = "0.1.0"
-EOF
-    cat >"$work/crates/do-harness/templates/packs/rust/manifest.toml" <<'EOF'
-name = "rust"
-version = "0.1.0"
-EOF
-    cat >"$work/crates/do-harness/templates/packs/generic/manifest.toml" <<'EOF'
-name = "generic"
-version = "0.1.0"
-EOF
-    cat >"$work/crates/do-harness/templates/packs/web/manifest.toml" <<'EOF'
-name = "web"
-version = "0.1.0"
-EOF
-    cat >"$work/crates/do-harness/templates/packs/node/manifest.toml" <<'EOF'
-name = "node"
-version = "0.1.0"
-EOF
-    cat >"$work/crates/do-harness/templates/packs/python/manifest.toml" <<'EOF'
-name = "python"
-version = "0.1.0"
-EOF
-    cat >"$work/crates/do-harness/templates/packs/go/manifest.toml" <<'EOF'
-name = "go"
-version = "0.1.0"
-EOF
-    cat >"$work/crates/do-harness/templates/scripts/check-loc.sh" <<'EOF'
-# rust pack helper
-EOF
-    cat >"$work/crates/do-harness/templates/AGENTS.md" <<'EOF'
----
-version: 0.1.0
----
-EOF
-    cat >"$work/crates/do-harness/templates/USE_RESTRICTIONS.md" <<'EOF'
----
-version: 0.1.0
----
-EOF
-    cat >"$work/AGENTS.md" <<'EOF'
----
-version: 0.1.0
----
-EOF
-    git -C "$work" add -A
-    git -C "$work" commit -qm base
-    git -C "$work" branch base
 
-    self_check() { # <expect-exit-code> <label>
-        local expected="$1" label="$2" actual=0
-        env CHECK_ARTIFACT_VERSIONS_ROOT="$work" \
-            CHECK_ARTIFACT_VERSIONS_BASE=base \
-            bash "${BASH_SOURCE[0]}" >/dev/null 2>&1 || actual=$?
-        if [[ "$actual" != "$expected" ]]; then
-            echo "self-test: $label exited $actual, expected $expected" >&2
-            failures=$((failures + 1))
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+    if ((SELF_TEST)); then
+        bash "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/check-artifact-versions-self-test.sh"
+    else
+        BASE_COMMIT="$(resolve_base)"
+        run_checks
+        if ((FAIL > 0)); then
+            echo "check-artifact-versions FAIL: $FAIL artifact(s) changed without a version bump" >&2
+            exit 1
         fi
-    }
-
-    # 1. Red: an uncommitted owner change without a version bump fails too —
-    # the gate judges the working tree, not only committed history.
-    printf '# helper v2\n' >>"$work/crates/do-harness/templates/scripts/check-loc.sh"
-    self_check 1 "an uncommitted owner change without a version bump was NOT rejected"
-    git -C "$work" checkout -q -- crates/do-harness/templates/scripts/check-loc.sh
-
-    # 2. Red: an owner file changed (committed) without a version bump.
-    printf '# helper v2\n' >>"$work/crates/do-harness/templates/scripts/check-loc.sh"
-    git -C "$work" add -A
-    git -C "$work" commit -qm no-bump
-    self_check 1 "a changed artifact without a version bump was NOT rejected"
-
-    # 3. Green: the same change ships with a bumped manifest version.
-    sed -i 's/version = "0.1.0"/version = "0.1.1"/' \
-        "$work/crates/do-harness/templates/packs/rust/manifest.toml"
-    git -C "$work" add -A
-    git -C "$work" commit -qm bump
-    self_check 0 "a bumped artifact was rejected"
-
-    # 4. Red: a malformed version is rejected even without further changes.
-    sed -i 's/version = "0.1.1"/version = "1.2"/' \
-        "$work/crates/do-harness/templates/packs/rust/manifest.toml"
-    git -C "$work" add -A
-    git -C "$work" commit -qm bad-version
-    self_check 1 "a malformed version was NOT rejected"
-
-    # 5. Red: a version file that disappears from HEAD fails closed.
-    git -C "$work" rm -q crates/do-harness/templates/packs/rust/manifest.toml
-    git -C "$work" commit -qm removed-manifest
-    self_check 1 "a missing version file at HEAD was NOT rejected"
-
-    # 6. Green: restoring a version file with a higher version passes — an
-    # absent version at the base reads as 0.0.0, so introducing (or
-    # re-introducing) a versioned artifact is itself a bump.
-    mkdir -p "$work/crates/do-harness/templates/packs/rust"
-    cat >"$work/crates/do-harness/templates/packs/rust/manifest.toml" <<'EOF'
-name = "rust"
-version = "0.1.1"
-EOF
-    git -C "$work" add -A
-    git -C "$work" commit -qm restore-manifest
-    self_check 0 "a restored artifact with a bumped version was rejected"
-
-    # 7. Fail closed: an unreadable git state exits 2, never a vacuous pass.
-    local unsigned
-    unsigned="$(mktemp -d)"
-    if env CHECK_ARTIFACT_VERSIONS_ROOT="$unsigned" \
-        bash "${BASH_SOURCE[0]}" >/dev/null 2>&1; then
-        echo "self-test: a non-git root passed instead of failing closed" >&2
-        failures=$((failures + 1))
+        echo "check-artifact-versions OK: every changed artifact raised its version"
     fi
-    rm -rf "$unsigned"
-
-    if ((failures > 0)); then
-        echo "check-artifact-versions: self-test FAILED" >&2
-        return 1
-    fi
-    echo "check-artifact-versions: self-test passed (red/green, malformed, missing, new artifact, fail-closed)"
-}
-
-if ((SELF_TEST)); then
-    run_self_test
-else
-    BASE_COMMIT="$(resolve_base)"
-    run_checks
-    if ((FAIL > 0)); then
-        echo "check-artifact-versions FAIL: $FAIL artifact(s) changed without a version bump" >&2
-        exit 1
-    fi
-    echo "check-artifact-versions OK: every changed artifact raised its version"
 fi
