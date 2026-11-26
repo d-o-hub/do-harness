@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 pub const CONFIG_SCHEMA_VERSION: u32 = 1;
 /// Initial adoption-contract version (`contract_version`) written by `init`
 /// and shipped in this repository's own `do-harness.toml`.
-pub const INITIAL_CONTRACT_VERSION: &str = "0.1.0";
+pub const INITIAL_CONTRACT_VERSION: &str = "0.1.1";
 /// `skip_serializing_if` predicate for the schema version (0 means absent).
 // serde's predicate takes `&T` by contract, and `u32` is trivially copyable.
 #[allow(clippy::trivially_copy_pass_by_ref)]
