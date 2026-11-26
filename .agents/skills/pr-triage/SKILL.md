@@ -210,6 +210,15 @@ Run these steps in order. Stop the sweep on any escalation and report it.
     sweep, and report; exit 2 (pending/none at the deadline) means report
     unverified runs and halt the sweep. Record the outcome with
     `scripts/state.sh set PR HEAD_SHA BASE_SHA merged` (or `reverted`).
+    Then reclaim the branch's checkout: a squash merge leaves the linked
+    worktree behind, and nothing removes it automatically because only the
+    author knows whether it still holds work in progress. Run
+    `scripts/prune-worktrees.sh` (dry run) and, when it reports that this PR's
+    worktree is landed, `--apply` it. The script refuses the repository's own
+    checkout, any worktree with uncommitted changes, and any work that is not
+    provably landed (merged PR, zero commits ahead of `origin/main`, a tree
+    identical to it, or every commit patch-equivalent upstream); it never
+    force-removes and always keeps the branch ref.
 13. **Report.** After the sweep, print one line per PR: number, decision
     (merged, closed, fixed, skipped, escalated), head SHA, and reason. Include
     the review `measurement` (`t_raw`, `t_res`, `ratio`, `verdict`) and routing
