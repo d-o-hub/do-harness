@@ -73,8 +73,13 @@ severity = "warn"
 when-changed = ["**/*.rs", "Cargo.toml", "**/Cargo.toml", "Cargo.lock", "rust-toolchain.toml", ".config/nextest.toml", "scripts/check-coverage.sh"]
 
 [[sensors]]
+# The sensor must run the gate, not the query: `do-harness loc` always reports
+# and exits 0 (it defers the verdict to this sensor), so wiring it here let a
+# 535-line `cli/actions.rs` pass every release preflight. `check-loc.sh` fails
+# on any file over the ceiling and prints `FINDINGS: <n>` for the ratchet.
+# No `when-changed`: the ceiling applies to every change.
 name = "loc"
-argv = ["do-harness", "loc"]
+argv = ["bash", "scripts/check-loc.sh"]
 
 [[sensors]]
 name = "skills"
