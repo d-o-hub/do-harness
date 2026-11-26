@@ -29,6 +29,7 @@ fn check_summary(verdict: &str) -> CheckSummary {
             verdict: Verdict::Pass,
             reason: None,
             rerun_command: None,
+            superseded: false,
             url: None,
         }],
         blockers: Vec::new(),

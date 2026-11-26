@@ -5,6 +5,11 @@
 use super::*;
 use crate::pr::gh::{CheckApp, CheckRun, CommitStatus};
 
+// The parent module is loaded with `#[path]`, so a child module resolves from
+// this file's directory only when the path is stated here too.
+#[path = "checks_tests/superseded_runs.rs"]
+mod superseded_runs;
+
 fn run(name: &str, status: &str, conclusion: Option<&str>) -> CheckRun {
     CheckRun {
         id: None,
