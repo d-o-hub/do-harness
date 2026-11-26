@@ -13,7 +13,9 @@ use serde::{Deserialize, Serialize};
 /// `doctor` recommends it when the file is older. A *newer* declared version
 /// fails closed: the binary cannot know what a future key means.
 pub const CONFIG_SCHEMA_VERSION: u32 = 1;
-
+/// Initial adoption-contract version (`contract_version`) written by `init`
+/// and shipped in this repository's own `do-harness.toml`.
+pub const INITIAL_CONTRACT_VERSION: &str = "0.1.0";
 /// `skip_serializing_if` predicate for the schema version (0 means absent).
 // serde's predicate takes `&T` by contract, and `u32` is trivially copyable.
 #[allow(clippy::trivially_copy_pass_by_ref)]
@@ -35,6 +37,18 @@ pub struct Config {
         skip_serializing_if = "schema_version_is_zero"
     )]
     pub schema_version: u32,
+    /// Independent semantic version of the adoption contract (`contract_version`).
+    ///
+    /// Declared by the repository's `do-harness.toml` and every scaffolded
+    /// copy so adopters can pin a contract version independent of the CLI
+    /// release. Absent means the pre-versioning contract, read as `0.0.0`
+    /// (backward compatible). Bump rules live in `docs/versioning.md`.
+    #[serde(
+        default,
+        rename = "contract_version",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub contract_version: Option<String>,
     /// Optional host language tag (informational; reserved for language packs).
     pub language: Option<String>,
     /// Environment variables applied to every sensor process (a top-level
@@ -303,6 +317,7 @@ pub fn rust_default() -> Config {
     signal_sets.insert("release".to_owned(), names);
     Config {
         schema_version: crate::config::CONFIG_SCHEMA_VERSION,
+        contract_version: None,
         language: None,
         hooks: HooksConfig {
             pre_commit: vec!["fmt".to_owned(), "loc".to_owned()],

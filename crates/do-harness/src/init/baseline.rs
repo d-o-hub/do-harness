@@ -123,6 +123,7 @@ mod tests {
     fn config(sensors: Vec<crate::config::SensorSpec>) -> Config {
         Config {
             schema_version: crate::config::CONFIG_SCHEMA_VERSION,
+            contract_version: None,
             pr: crate::pr::author_policy::PrConfig::default(),
             language: Some("generic".to_owned()),
             hooks: crate::config::HooksConfig::default(),

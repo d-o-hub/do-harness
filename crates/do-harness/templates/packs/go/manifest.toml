@@ -1,0 +1,9 @@
+# Sensor-pack manifest: the machine-readable version of the go sensor pack.
+#
+# Bump `version` (plain MAJOR.MINOR.PATCH semver) in the same change that
+# alters this pack's shipped files (the generated go config and the go helper
+# scripts); scripts/check-artifact-versions.sh enforces it against the merge
+# base. Bump rules live in docs/versioning.md.
+name = "go"
+description = "Go sensor pack (fmt/vet/test/staticcheck) scaffolded by `do-harness init --language go`."
+version = "0.1.0"

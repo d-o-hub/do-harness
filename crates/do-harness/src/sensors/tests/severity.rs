@@ -16,6 +16,7 @@ fn severity_config(name: &str, argv: &[&str], severity: SensorSeverity) -> Confi
     signal_sets.insert("feedback".to_owned(), vec![name.to_owned()]);
     Config {
         schema_version: crate::config::CONFIG_SCHEMA_VERSION,
+        contract_version: None,
         pr: crate::pr::author_policy::PrConfig::default(),
         language: None,
         hooks: HooksConfig::default(),

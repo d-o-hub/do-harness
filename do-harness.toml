@@ -1,11 +1,12 @@
 schema-version = 1
 language = "rust"
+contract_version = "0.1.0"
 
 [hooks]
 pre-commit = ["fmt", "loc"]
 # Bounded to ordinary checks (matching signal-sets.verification) so heavy
 # scheduled checks (`coverage`, `powerset`) and release preflights never execute on local push.
-pre-push = ["fmt", "check", "clippy", "deps", "machete", "audit", "test", "doctest", "loc", "skills", "skills-docs", "shell", "markdownlint", "docs-sync", "docs-examples", "docs-links", "docs-pins", "yamllint", "actionlint", "action-pins", "workflow-shell", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "release-manager", "release-impact-matrix", "verify-published", "commitlint", "contract-first", "ci-concurrency-guardrails", "workflow-benchmark", "workflow-adopter-benchmark", "fresh-context-decision", "fresh-context-review", "ci-workflow-costs", "repo-links", "latest-main-guardrails", "token-usage", "sdk-python-test", "sdk-ts-test", "sdk-pack", "release-tooling-parity"]
+pre-push = ["fmt", "check", "clippy", "deps", "machete", "audit", "test", "doctest", "loc", "skills", "skills-docs", "shell", "markdownlint", "docs-sync", "docs-examples", "docs-links", "docs-pins", "yamllint", "actionlint", "action-pins", "workflow-shell", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "release-manager", "release-impact-matrix", "verify-published", "commitlint", "contract-first", "ci-concurrency-guardrails", "workflow-benchmark", "workflow-adopter-benchmark", "fresh-context-decision", "fresh-context-review", "ci-workflow-costs", "repo-links", "latest-main-guardrails", "token-usage", "sdk-python-test", "sdk-ts-test", "sdk-pack", "release-tooling-parity", "artifact-versions"]
 
 [signal-sets]
 # `feedback` is the fast loop, so it names the sensors the generated pre-commit
@@ -22,13 +23,13 @@ feedback = ["fmt", "check", "clippy", "loc"]
 # contract (`docs/documentation-contract.md`). Each one reads only git, the
 # working tree, and the local toolchain, and each fails closed on an empty
 # inventory, so the trio belongs to the PR-time set as well as `release`.
-verification = ["fmt", "check", "clippy", "deps", "machete", "audit", "test", "doctest", "loc", "skills", "skills-docs", "shell", "markdownlint", "docs-sync", "docs-examples", "docs-links", "docs-pins", "yamllint", "actionlint", "action-pins", "workflow-shell", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "release-manager", "release-impact-matrix", "verify-published", "commitlint", "contract-first", "ci-concurrency-guardrails", "workflow-benchmark", "workflow-adopter-benchmark", "fresh-context-decision", "fresh-context-review", "ci-workflow-costs", "repo-links", "latest-main-guardrails", "token-usage", "sdk-python-test", "sdk-ts-test", "sdk-pack", "release-tooling-parity"]
+verification = ["fmt", "check", "clippy", "deps", "machete", "audit", "test", "doctest", "loc", "skills", "skills-docs", "shell", "markdownlint", "docs-sync", "docs-examples", "docs-links", "docs-pins", "yamllint", "actionlint", "action-pins", "workflow-shell", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "release-manager", "release-impact-matrix", "verify-published", "commitlint", "contract-first", "ci-concurrency-guardrails", "workflow-benchmark", "workflow-adopter-benchmark", "fresh-context-decision", "fresh-context-review", "ci-workflow-costs", "repo-links", "latest-main-guardrails", "token-usage", "sdk-python-test", "sdk-ts-test", "sdk-pack", "release-tooling-parity", "artifact-versions"]
 # `main` is the post-merge release gate. It is the strict ordinary verification
 # surface, named separately so release automation consumes one green result for
 # one exact main commit. The expensive coverage and feature-powerset checks run
 # in `scheduled` and the final `release` gate rather than charging every push.
-main = ["fmt", "check", "clippy", "deps", "machete", "audit", "test", "doctest", "loc", "skills", "skills-docs", "shell", "markdownlint", "docs-sync", "docs-examples", "docs-links", "docs-pins", "yamllint", "actionlint", "action-pins", "workflow-shell", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "release-manager", "release-impact-matrix", "verify-published", "commitlint", "contract-first", "ci-concurrency-guardrails", "workflow-benchmark", "workflow-adopter-benchmark", "fresh-context-decision", "fresh-context-review", "ci-workflow-costs", "repo-links", "latest-main-guardrails", "token-usage", "sdk-python-test", "sdk-ts-test", "sdk-pack", "release-tooling-parity"]
-release = ["fmt", "check", "clippy", "deps", "audit", "test", "doctest", "coverage", "powerset", "loc", "skills", "skills-docs", "shell", "markdownlint", "docs-sync", "docs-examples", "docs-links", "docs-pins", "yamllint", "actionlint", "action-pins", "workflow-shell", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "release-manager", "release-impact-matrix", "release-manager-e2e", "publish-npm", "verify-published", "commitlint", "contract-first", "ci-concurrency-guardrails", "workflow-benchmark", "workflow-adopter-benchmark", "fresh-context-decision", "fresh-context-review", "ci-workflow-costs", "repo-links", "latest-main-guardrails", "token-usage", "sdk-python-test", "sdk-ts-test", "sdk-pack", "release-tooling-parity"]
+main = ["fmt", "check", "clippy", "deps", "machete", "audit", "test", "doctest", "loc", "skills", "skills-docs", "shell", "markdownlint", "docs-sync", "docs-examples", "docs-links", "docs-pins", "yamllint", "actionlint", "action-pins", "workflow-shell", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "release-manager", "release-impact-matrix", "verify-published", "commitlint", "contract-first", "ci-concurrency-guardrails", "workflow-benchmark", "workflow-adopter-benchmark", "fresh-context-decision", "fresh-context-review", "ci-workflow-costs", "repo-links", "latest-main-guardrails", "token-usage", "sdk-python-test", "sdk-ts-test", "sdk-pack", "release-tooling-parity", "artifact-versions"]
+release = ["fmt", "check", "clippy", "deps", "audit", "test", "doctest", "coverage", "powerset", "loc", "skills", "skills-docs", "shell", "markdownlint", "docs-sync", "docs-examples", "docs-links", "docs-pins", "yamllint", "actionlint", "action-pins", "workflow-shell", "check-agt", "check-mcp", "check-invariants", "check-promotions", "untrusted-ingest", "privacy", "release-notes", "release-manager", "release-impact-matrix", "release-manager-e2e", "publish-npm", "verify-published", "commitlint", "contract-first", "ci-concurrency-guardrails", "workflow-benchmark", "workflow-adopter-benchmark", "fresh-context-decision", "fresh-context-review", "ci-workflow-costs", "repo-links", "latest-main-guardrails", "token-usage", "sdk-python-test", "sdk-ts-test", "sdk-pack", "release-tooling-parity", "artifact-versions"]
 # DORA gets its own set so its evidence is addressable (`status --set metrics`)
 # without joining the gating sets. A no-`--set` status check compares against
 # every configured sensor, so a dora-only run's artifact would report
@@ -340,6 +341,30 @@ argv = ["bash", "scripts/check-repo-links.sh"]
 when-changed = ["crates/**/*.rs", "crates/do-harness/templates/**", "scripts/*.sh"]
 
 [[sensors]]
+# Multi-artifact version discipline: an independently-versioned artifact
+# (adoption contract, sensor packs, guides) whose shipped files changed since
+# the merge base must raise its version field in the same change. The script
+# fails closed when the git state is unreadable, so a broken checkout never
+# reads as green. See docs/versioning.md.
+name = "artifact-versions"
+argv = ["bash", "scripts/check-artifact-versions.sh"]
+when-changed = [
+    "do-harness.toml",
+    "AGENTS.md",
+    "crates/do-harness/templates/**",
+    "crates/do-harness/src/config/**",
+    "crates/do-harness/src/init.rs",
+    "crates/do-harness/src/init/**",
+    "crates/do-harness/src/helpers/**",
+    "crates/do-harness/src/migrate.rs",
+    "crates/do-harness/src/doctor/checks.rs",
+    "scripts/check-artifact-versions.sh",
+    "scripts/check-artifact-versions-self-test.sh",
+    "scripts/lib.sh",
+    "docs/versioning.md",
+]
+
+[[sensors]]
 # Executable half of the release-note contract: a published body carries the
 # sections a reader needs. The release job runs `release-notes.sh compose` and
 # `check` against the real body; this entry runs the hermetic controls, which
@@ -347,7 +372,7 @@ when-changed = ["crates/**/*.rs", "crates/do-harness/templates/**", "scripts/*.s
 # placeholder, an emptied section, a lost pull request).
 name = "release-notes"
 argv = ["bash", "scripts/release-notes.sh", "--self-test"]
-when-changed = [".github/release-notes-template.md", ".github/release.yml", ".github/workflows/release.yml", ".github/workflows/auto-release.yml", "docs/releases/**", "scripts/release-notes.sh", "scripts/lib.sh"]
+when-changed = [".github/release-notes-template.md", ".github/release.yml", ".github/workflows/release.yml", ".github/workflows/auto-release.yml", "docs/releases/**", "scripts/release-notes.sh", "scripts/release-notes-self-test.sh", "scripts/release-artifacts.sh", "scripts/lib.sh"]
 
 [[sensors]]
 # Executable half of the release-derivation contract: the version a merge cuts

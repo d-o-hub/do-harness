@@ -15,6 +15,7 @@ mod vacuous_gate;
 fn config_with(specs: &[(&str, &[&str])]) -> Config {
     Config {
         schema_version: crate::config::CONFIG_SCHEMA_VERSION,
+        contract_version: None,
         pr: crate::pr::author_policy::PrConfig::default(),
         language: None,
         hooks: HooksConfig {

@@ -1,3 +1,7 @@
+---
+version: 0.1.0
+---
+
 # Agent Use Restrictions & Safety Policy
 
 This policy establishes operational boundaries, high-risk operational limits, and human approval requirements for AI agents operating within this repository across any language or stack (for example Rust, Node/TypeScript, Python, Go, web, and generic projects).

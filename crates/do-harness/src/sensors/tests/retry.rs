@@ -20,6 +20,7 @@ fn retries_failing_sensor_until_success() {
     );
     let cfg = Config {
         schema_version: crate::config::CONFIG_SCHEMA_VERSION,
+        contract_version: None,
         pr: crate::pr::author_policy::PrConfig::default(),
         language: None,
         hooks: HooksConfig::default(),
@@ -79,6 +80,7 @@ fn times_out_hanging_sensor() {
     let dir = tempfile::tempdir().expect("tempdir");
     let cfg = Config {
         schema_version: crate::config::CONFIG_SCHEMA_VERSION,
+        contract_version: None,
         pr: crate::pr::author_policy::PrConfig::default(),
         language: None,
         hooks: HooksConfig::default(),
@@ -142,6 +144,7 @@ fn transient_exit_codes_restricts_retries() {
     );
     let cfg = Config {
         schema_version: crate::config::CONFIG_SCHEMA_VERSION,
+        contract_version: None,
         pr: crate::pr::author_policy::PrConfig::default(),
         language: None,
         hooks: HooksConfig::default(),
