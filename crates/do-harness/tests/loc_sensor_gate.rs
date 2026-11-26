@@ -12,6 +12,12 @@
 //! 2. wiring — the `loc` sensor runs that script and is part of the
 //!    `verification`, `main`, and `release` signal sets, so the gate runs where
 //!    a regression could otherwise reach a release.
+//!
+//! The behaviour half runs a POSIX shell, so it is `unix`-only: on a Windows
+//! host `bash` resolves to the WSL launcher, which fails with "Windows
+//! Subsystem for Linux has no installed distributions" unless a distribution is
+//! installed. The gate itself still runs on the Linux `verify` job, and the
+//! wiring and baseline assertions below stay cross-platform.
 
 // A test asserts; a panic is the failure signal, and a fixture that cannot be
 // created has no meaningful alternative result.
@@ -19,6 +25,7 @@
 
 use std::fs;
 use std::path::{Path, PathBuf};
+#[cfg(unix)]
 use std::process::Command;
 
 fn workspace_root() -> PathBuf {
@@ -32,10 +39,12 @@ fn workspace_root() -> PathBuf {
 /// A scratch scope inside the workspace, because `--root` resolves relative to
 /// the repository root. `target/` is gitignored, so the fixture never becomes a
 /// tracked file.
+#[cfg(unix)]
 struct Fixture {
     relative: String,
 }
 
+#[cfg(unix)]
 impl Fixture {
     fn new(name: &str) -> Self {
         let relative = format!("target/loc-gate-{name}-{}", std::process::id());
@@ -50,12 +59,14 @@ impl Fixture {
     }
 }
 
+#[cfg(unix)]
 impl Drop for Fixture {
     fn drop(&mut self) {
         let _ = fs::remove_dir_all(workspace_root().join(&self.relative));
     }
 }
 
+#[cfg(unix)]
 fn run_gate(scope: &str) -> std::process::Output {
     Command::new("bash")
         .arg("scripts/check-loc.sh")
@@ -67,6 +78,7 @@ fn run_gate(scope: &str) -> std::process::Output {
 }
 
 /// A Rust source body with exactly `count` function lines.
+#[cfg(unix)]
 fn source_lines(count: usize) -> String {
     use std::fmt::Write as _;
 
@@ -77,6 +89,7 @@ fn source_lines(count: usize) -> String {
     body
 }
 
+#[cfg(unix)]
 #[test]
 fn the_loc_gate_fails_and_names_an_over_limit_file() {
     let fixture = Fixture::new("over");
@@ -103,6 +116,7 @@ fn the_loc_gate_fails_and_names_an_over_limit_file() {
     );
 }
 
+#[cfg(unix)]
 #[test]
 fn the_loc_gate_accepts_a_file_under_the_ceiling() {
     let fixture = Fixture::new("under");
