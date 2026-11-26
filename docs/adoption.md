@@ -80,14 +80,20 @@ resolves to MSVC, not coreutils `/usr/bin/link` (which fails with a confusing
 "extra operand" error) — check with `command -v link` / `where link`.
 
 Sensor portability: the shipped rust-pack helpers (`loc`, `deps`, `audit`,
-`commitlint`) are native `do-harness` subcommands (`do-harness loc`,
-`do-harness helpers deps|audit|commitlint`) — they run without Git Bash or
-WSL on Windows. The `scripts/check-*.sh` files remain as thin delegating
-wrappers so existing `[[sensors]]` argv rows keep working. Managed git hooks
-are POSIX `sh` bodies (no bash-isms) that call the `do-harness` binary
-directly; git-for-windows executes hooks through its bundled MSYS `sh`, so
-the hooks themselves need no Git Bash user shell (the binary resolves via
-`DO_HARNESS_BIN`, `PATH`, then `target/release/do-harness[.exe]`).
+`commitlint`) are native `do-harness` subcommands — `do-harness loc --strict`
+for the ceiling gate and `do-harness helpers deps|audit|commitlint` for the
+dependency, audit, and commit-message checks — so they run without Git Bash or
+WSL on Windows. **Wire the native command as the sensor argv; do not name
+`scripts/check-*.sh`.** Those files remain as thin delegating wrappers so an
+existing config keeps working, but they are a POSIX-shell dependency: on a host
+whose only `bash` is the WSL launcher the wrapper fails before the check runs.
+`do-harness doctor` reports a shell-routed helper and prints the native command
+to switch to; treat that warning as a defect in the adoption, not as advice.
+Managed git hooks are POSIX `sh` bodies (no bash-isms) that call the
+`do-harness` binary directly; git-for-windows executes hooks through its
+bundled MSYS `sh`, so the hooks themselves need no Git Bash user shell (the
+binary resolves via `DO_HARNESS_BIN`, `PATH`, then
+`target/release/do-harness[.exe]`).
 
 Rust toolchains can fetch the prebuilt release artifact:
 
@@ -551,12 +557,14 @@ when-changed = ["**/*.rs", "Cargo.toml", "**/Cargo.toml", "Cargo.lock"]
 ```toml
 [[sensors]]
 name = "loc"
-argv = ["bash", "scripts/check-loc.sh", "--root", "web,src,crates", "--ext", "rs,ts,tsx"]
+argv = ["do-harness", "loc", "--strict", "--dir", "web,src,crates", "--ext", "rs,ts,tsx"]
 when-changed = ["**/*.rs", "web/**/*.ts", "web/**/*.tsx"]
 ```
 
-`--root`/`--ext` accept repeats or comma-separated lists, `--max`/`--warn` move
-the ceiling (500) and the split threshold (450), generated trees
+Run the native gate, never `scripts/check-loc.sh`: the shell wrapper is a
+POSIX dependency, and a host whose only `bash` is the WSL launcher fails before
+measuring anything. `--dir`/`--ext` accept repeats or comma-separated lists,
+the ceiling stays 500 and the decomposition threshold 450, generated trees
 (`node_modules`, `target`, `dist`, `build`, …) are always pruned, and a
 configured root that does not exist fails the run instead of passing vacuously. See
 `docs/cli.md` for the full flag list; the `FINDINGS: <n>` contract that

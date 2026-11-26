@@ -10,7 +10,7 @@
 //! The shell skill calls this module through `do-harness pr checks`; it does
 //! not keep a second parser.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
 
@@ -101,6 +101,13 @@ pub struct CheckEntry {
     pub reason: Option<String>,
     /// Exact rerun command for a cancelled check.
     pub rerun_command: Option<String>,
+    /// Whether a newer run of the same name and app decided this head.
+    ///
+    /// A re-triggered workflow leaves its earlier run in the payload, and
+    /// `GitHub` gates the head on the newest one. The run is still reported so
+    /// the payload stays readable, but a superseded verdict never blocks.
+    #[serde(default)]
+    pub superseded: bool,
     /// Check-run or status target URL.
     pub url: Option<String>,
 }
@@ -177,9 +184,20 @@ pub fn classify(
     }
 }
 
+/// The identity that decides whether two check runs are the same context.
+type CheckKey = (String, Option<u64>);
+
+/// One classified run, kept with the identity needed to tell current from
+/// superseded after every run has been read.
+struct OrderedRun {
+    key: CheckKey,
+    id: Option<u64>,
+    entry: CheckEntry,
+}
+
 fn classify_runs(check_runs: Vec<CheckRun>, policy: &ChecksPolicy) -> Vec<CheckEntry> {
-    let mut entries = Vec::new();
     let mut seen_ids = BTreeSet::new();
+    let mut ordered: Vec<OrderedRun> = Vec::new();
     for run in check_runs {
         if let Some(id) = run.id {
             if !seen_ids.insert(id) {
@@ -193,7 +211,7 @@ fn classify_runs(check_runs: Vec<CheckRun>, policy: &ChecksPolicy) -> Vec<CheckE
             .and_then(|app| app.slug.clone())
             .unwrap_or_else(|| "unknown".to_owned());
         let app_id = run.app.as_ref().and_then(|app| app.id);
-        entries.push(CheckEntry {
+        let entry = CheckEntry {
             name: run.name.clone(),
             source,
             app_id,
@@ -205,10 +223,43 @@ fn classify_runs(check_runs: Vec<CheckRun>, policy: &ChecksPolicy) -> Vec<CheckE
             rerun_command: (verdict == Verdict::Fail
                 && run.conclusion.as_deref() == Some("cancelled"))
             .then(|| run.rerun_command()),
+            superseded: false,
             url: run.html_url.clone(),
+        };
+        ordered.push(OrderedRun {
+            key: (run.name, app_id),
+            id: run.id,
+            entry,
         });
     }
-    entries
+    // Which run of a name and app is current: the greatest run id, because a
+    // page is not a reliable recency order — one payload can carry several
+    // live runs of one name, and a re-triggered workflow adds another. Without
+    // ids the first entry stays current, matching the API's newest-first order.
+    let mut current: BTreeMap<CheckKey, usize> = BTreeMap::new();
+    for (index, run) in ordered.iter().enumerate() {
+        match current.get(&run.key) {
+            None => {
+                current.insert(run.key.clone(), index);
+            }
+            Some(&best) => {
+                let newer =
+                    matches!((run.id, ordered[best].id), (Some(new), Some(old)) if new > old);
+                if newer {
+                    current.insert(run.key.clone(), index);
+                }
+            }
+        }
+    }
+    ordered
+        .into_iter()
+        .enumerate()
+        .map(|(index, run)| {
+            let mut entry = run.entry;
+            entry.superseded = current.get(&run.key).is_some_and(|&best| best != index);
+            entry
+        })
+        .collect()
 }
 
 fn classify_statuses(statuses: Vec<CommitStatus>, policy: &ChecksPolicy) -> Vec<CheckEntry> {
@@ -234,6 +285,7 @@ fn classify_statuses(statuses: Vec<CommitStatus>, policy: &ChecksPolicy) -> Vec<
             verdict,
             reason,
             rerun_command: None,
+            superseded: false,
             url: status.target_url.clone(),
         });
     }
@@ -247,7 +299,10 @@ fn apply_policy(
     conflicts: bool,
 ) -> (Verdict, Vec<CheckBlocker>) {
     let mut verdict = Verdict::Pass;
-    for entry in entries {
+    // A superseded run still appears in the report, so the payload stays
+    // readable, but only current runs decide the head.
+    let current: Vec<&CheckEntry> = entries.iter().filter(|entry| !entry.superseded).collect();
+    for entry in &current {
         verdict = verdict.merge(entry.verdict);
     }
 
@@ -267,8 +322,9 @@ fn apply_policy(
     }
 
     for required in &policy.required {
-        let matching: Vec<&CheckEntry> = entries
+        let matching: Vec<&CheckEntry> = current
             .iter()
+            .copied()
             .filter(|entry| entry.name == *required)
             .collect();
         if matching.iter().any(|entry| entry.verdict == Verdict::Pass) {

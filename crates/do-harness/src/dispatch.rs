@@ -214,16 +214,25 @@ async fn route(root: &Path, config_path: Option<PathBuf>, cli: Cli) -> Result<()
             since,
             format,
         } => status::run(root, config_path.as_deref(), set, evidence, format, since).await,
-        Command::Loc(args) => loc::run(
-            root,
-            config_path.as_deref(),
-            args.format,
-            args.warn,
-            &args.dir,
-            &args.ext,
-            &args.paths,
-        )
-        .map_err(CliError::Usage),
+        Command::Loc(args) => {
+            let over = loc::run(
+                root,
+                config_path.as_deref(),
+                args.format,
+                args.warn,
+                &args.dir,
+                &args.ext,
+                &args.paths,
+            )
+            .map_err(CliError::Usage)?;
+            if args.strict && over > 0 {
+                return Err(CliError::Verify(anyhow::anyhow!(
+                    "{over} file(s) exceed the {}-line ceiling",
+                    loc::MAX_LINES
+                )));
+            }
+            Ok(())
+        }
         Command::Split(args) => split::run(root, &args.file, args.dry_run, args.target.as_deref())
             .map_err(CliError::Usage),
         Command::Helpers { action } => crate::helpers::run(root, action).map_err(|err| match err {

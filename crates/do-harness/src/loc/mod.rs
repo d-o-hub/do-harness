@@ -256,15 +256,21 @@ pub fn collect_paths(root: &Path, paths: &[PathBuf], exts: &[String]) -> Result<
 
 /// Runs `do-harness loc`.
 ///
-/// The command is a query: it always reports and never fails on an over-limit
-/// file, because the `loc` sensor owns that gate. With no arguments it
-/// measures the whole workspace scope; with `--warn` it narrows to the
-/// decomposition band, and with explicit paths it reports exactly those.
+/// The command reports by default: it never fails on an over-limit file, so a
+/// query loop keeps working. `--strict` turns it into the ceiling gate — the
+/// caller fails when the returned over-limit count is non-zero — which is how
+/// the `loc` sensor runs it: natively, so no POSIX shell is needed on any host.
+/// With no arguments it measures the whole workspace scope; with `--warn` it
+/// narrows to the decomposition band, and with explicit paths it reports
+/// exactly those.
 ///
 /// # Errors
 ///
 /// Returns an error when the scope cannot be read (see [`scan`] and
 /// [`collect_paths`]).
+///
+/// Returns the number of measured files over the ceiling, before any `--warn`
+/// filtering.
 pub fn run(
     root: &Path,
     config_path: Option<&Path>,
@@ -273,14 +279,19 @@ pub fn run(
     cli_roots: &[String],
     cli_exts: &[String],
     paths: &[PathBuf],
-) -> Result<()> {
+) -> Result<usize> {
     let scope = LocScope::resolve(root, config_path, cli_roots, cli_exts);
-    let mut infos = if paths.is_empty() {
+    let all = if paths.is_empty() {
         scan(root, &scope)?
     } else {
         collect_paths(root, paths, &scope.exts)?
     };
-    let scanned = infos.len();
+    let scanned = all.len();
+    let over_limit = all
+        .iter()
+        .filter(|info| info.status == LocStatus::Fail)
+        .count();
+    let mut infos = all;
     if warn_only {
         infos.retain(|info| info.status != LocStatus::Ok);
     }
@@ -304,10 +315,13 @@ pub fn run(
             if warn_only && infos.is_empty() {
                 println!("OK: no file at or above {WARN_THRESHOLD} lines ({scanned} scanned).");
             }
+            // The ratchet reads this marker; keep it on the text format only so
+            // `--format json` stays one parseable value.
+            println!("FINDINGS: {over_limit}");
         }
         Format::Json => println!("{}", serde_json::to_string(&infos)?),
     }
-    Ok(())
+    Ok(over_limit)
 }
 
 #[cfg(test)]

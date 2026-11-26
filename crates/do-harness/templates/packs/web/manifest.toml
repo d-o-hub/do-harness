@@ -7,4 +7,4 @@
 # Bump rules live in docs/versioning.md.
 name = "web"
 description = "Web sensor pack (viewport/a11y/console/perf/visual/i18n audits) scaffolded by `do-harness init --language web`."
-version = "0.1.0"
+version = "0.1.1"

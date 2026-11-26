@@ -1,5 +1,5 @@
 ---
-version: 0.1.0
+version: 0.2.0
 ---
 
 # Development contract
@@ -82,9 +82,10 @@ Release and post-publication checks exist.
   `do-harness explain --set verification --changed` to see which sensors apply
   to the current change and why.
 - If this repository adopts a per-file line ceiling, the Rust pack seeds the
-  `loc` sensor over `*.rs`; widen it with `--root`/`--ext` in `do-harness.toml`
+  `loc` sensor over `*.rs`; widen it with `--dir`/`--ext` in `do-harness.toml`
   (and the matching `when-changed` globs) for other sources, or remove it.
-  Other packs do not ship `loc` by default.
+  Other packs do not ship `loc` by default. Wire the native gate
+  `["do-harness", "loc", "--strict"]`: plain `loc` reports and exits 0.
 - Beats from `verify --record` scope to the current git branch by default, to
   `--task <id>` when passed, or `--global`. `metrics` filters by that workstream
   so branches do not mix.
@@ -96,7 +97,13 @@ Release and post-publication checks exist.
 ## Adoption notes
 
 - `do-harness init` writes this file non-destructively; `--force` overwrites.
-- Sensors wrap the repository's own scripts to keep local evidence and CI identical.
+- Sensors wrap the repository's own scripts to keep local evidence and CI
+  identical, but a gate the harness ships runs **natively**: `do-harness loc
+  --strict` and `do-harness helpers <name>` (`commitlint`, `deps`, `audit`) need no POSIX shell,
+  so they work on Windows where `bash` may be only the WSL launcher. A config
+  that names `scripts/check-*.sh` still works (the scripts delegate), and
+  `do-harness doctor` reports it as a portability warning with the native
+  command to switch to.
 - The generic pack ships zero sensors: its pass is vacuous, not evidence.
 - Seeded policy, not a universal prerequisite: the 500-LOC `loc` sensor and the
   `scripts/check-commitlint.sh` commit-message check are defaults you may keep,

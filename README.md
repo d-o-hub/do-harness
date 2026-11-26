@@ -286,7 +286,7 @@ export PATH="$HOME/.local/bin:$PATH"
 | `distill [OPTIONS]` | Extract a heuristic from a resolved trace into a skill. Review output against the anti-AI-slop checklist (.agents/skills/skill-creator/references/anti_ai_slop.md) — flags: `--skill <SKILL>`, `--pattern <PATTERN>`, `--description <DESCRIPTION>`, `--from-trace <ID>`, `--from-strikes`, `--min-strikes <N>`, `--task <ID>`, `--to-fixture`, `--format <FORMAT>` |
 | `errors list [OPTIONS]` | List fail-fast error signatures (prefixed with `sensor:`) — flags: `--task <ID>`, `--scope <SCOPE>`, `--format <FORMAT>` |
 | `errors clear [OPTIONS]` | Clear fail-fast error signatures (`--sensor sensor:<name>`) — flags: `--sensor <SENSOR>`, `--task <ID>`, `--scope <SCOPE>`, `--force` |
-| `loc [OPTIONS] [PATH]...` | Report line-of-code state for the 500-LOC invariant — flags: `--dir <DIR>`, `--ext <EXT>`, `--format <FORMAT>`, `--warn` |
+| `loc [OPTIONS] [PATH]...` | Report line-of-code state for the 500-LOC invariant — flags: `--dir <DIR>`, `--ext <EXT>`, `--format <FORMAT>`, `--warn`, `--strict` |
 | `split [OPTIONS] <FILE>` | Extract a large top-level item into a sibling module — flags: `--target <NAME>` |
 | `helpers commitlint [OPTIONS]` | Enforce conventional commits with lowercase subjects (commitlint sensor) — flags: `--message <FILE>`, `--count <N>`, `--range <REV-RANGE>` |
 | `helpers deps [OPTIONS]` | Dependency-direction and cargo-deny gate (deps sensor) |
