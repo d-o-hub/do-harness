@@ -75,9 +75,13 @@ PY
 
 node - "$TMP/npm.json" <<'JS'
 const fs = require("fs");
-const packages = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
-if (!Array.isArray(packages) || packages.length !== 1) {
-  throw new Error("pack result must contain exactly one package");
+const raw = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+// npm >= 12 prints the `--json` report keyed by package name; npm <= 11
+// printed a one-element array. Accept both, so that a locally upgraded npm
+// reads as a tooling difference rather than a packaging failure.
+const packages = Array.isArray(raw) ? raw : Object.values(raw);
+if (packages.length !== 1) {
+  throw new Error(`pack result must contain exactly one package (got ${packages.length})`);
 }
 const [pkg] = packages;
 if (pkg.name !== "do-harness-sdk") throw new Error(`unexpected package: ${pkg.name}`);
