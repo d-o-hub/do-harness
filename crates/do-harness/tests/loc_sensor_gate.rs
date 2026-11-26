@@ -66,15 +66,21 @@ fn run_gate(scope: &str) -> std::process::Output {
         .expect("run scripts/check-loc.sh")
 }
 
+/// A Rust source body with exactly `count` function lines.
+fn source_lines(count: usize) -> String {
+    use std::fmt::Write as _;
+
+    let mut body = String::new();
+    for line in 0..count {
+        writeln!(body, "pub fn f{line}() {{}}").expect("write to a String cannot fail");
+    }
+    body
+}
+
 #[test]
 fn the_loc_gate_fails_and_names_an_over_limit_file() {
     let fixture = Fixture::new("over");
-    fixture.write(
-        "src/big.rs",
-        &(0..600)
-            .map(|line| format!("pub fn f{line}() {{}}\n"))
-            .collect::<String>(),
-    );
+    fixture.write("src/big.rs", &source_lines(600));
 
     let output = run_gate(&fixture.relative);
     let combined = format!(
@@ -100,12 +106,7 @@ fn the_loc_gate_fails_and_names_an_over_limit_file() {
 #[test]
 fn the_loc_gate_accepts_a_file_under_the_ceiling() {
     let fixture = Fixture::new("under");
-    fixture.write(
-        "src/small.rs",
-        &(0..10)
-            .map(|line| format!("pub fn f{line}() {{}}\n"))
-            .collect::<String>(),
-    );
+    fixture.write("src/small.rs", &source_lines(10));
 
     let output = run_gate(&fixture.relative);
     assert!(
@@ -161,4 +162,25 @@ fn the_loc_sensor_runs_the_gate_in_every_gating_set() {
              reach that gate's verdict"
         );
     }
+}
+
+#[test]
+fn the_loc_baseline_cannot_grandfather_an_over_limit_file() {
+    let root = workspace_root();
+    let raw = fs::read_to_string(root.join("plans/baselines.json")).expect("read baselines");
+    let document: serde_json::Value = serde_json::from_str(&raw).expect("parse baselines");
+
+    let count = document
+        .get("sensors")
+        .and_then(serde_json::Value::as_object)
+        .and_then(|sensors| sensors.get("loc"))
+        .and_then(serde_json::Value::as_u64)
+        .unwrap_or(0);
+
+    assert_eq!(
+        count, 0,
+        "plans/baselines.json grandfathers {count} over-limit file(s) for the loc sensor; \
+         the ceiling is not a ratchet — a blessed count would let the release gate pass an \
+         over-limit tree again"
+    );
 }
