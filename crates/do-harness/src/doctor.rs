@@ -349,14 +349,13 @@ pub(crate) async fn run_with_status(
             if helper.shell {
                 let wrapper = helper.argv.last().map_or("(none)", String::as_str);
                 println!(
-                    "  [WARN] helper portability: {} configured to run POSIX shell {}; native: do-harness {argv}",
-                    helper.name, wrapper
+                    "  [WARN] helper portability: {} configured to run POSIX shell {}; use the native command: {}",
+                    helper.name,
+                    wrapper,
+                    helper.native_argv.join(" ")
                 );
             } else {
-                println!(
-                    "  [OK] helper portability: {} native (do-harness {argv})",
-                    helper.name
-                );
+                println!("  [OK] helper portability: {} native ({argv})", helper.name);
             }
         }
 

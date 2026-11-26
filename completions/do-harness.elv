@@ -1002,6 +1002,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand --config 'Explicit path to do-harness.toml'
             cand --output 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)'
             cand --warn 'Show only files at or above the 450-line decomposition threshold'
+            cand --strict 'Fail (exit 1) when any measured file exceeds the 500-line ceiling. This is the gate the `loc` sensor runs; without it the command only reports'
             cand -q 'Suppress PASS/WARN verdict lines and the success footer'
             cand --quiet 'Suppress PASS/WARN verdict lines and the success footer'
             cand --dry-run 'Dry run without side effects'

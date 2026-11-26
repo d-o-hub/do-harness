@@ -74,13 +74,18 @@ severity = "warn"
 when-changed = ["**/*.rs", "Cargo.toml", "**/Cargo.toml", "Cargo.lock", "rust-toolchain.toml", ".config/nextest.toml", "scripts/check-coverage.sh"]
 
 [[sensors]]
-# The sensor must run the gate, not the query: `do-harness loc` always reports
-# and exits 0 (it defers the verdict to this sensor), so wiring it here let a
-# 535-line `cli/actions.rs` pass every release preflight. `check-loc.sh` fails
-# on any file over the ceiling and prints `FINDINGS: <n>` for the ratchet.
+# The sensor must run the gate, not the query: `do-harness loc` reports and
+# exits 0 unless `--strict` is passed, so wiring the query let a 535-line
+# `cli/actions.rs` pass every release preflight. `--strict` exits 1 on any file
+# over the ceiling and prints `FINDINGS: <n>` for the ratchet.
+#
+# It runs the native subcommand rather than `scripts/check-loc.sh` because this
+# repository's own gate must work on every host the CLI supports: a Windows
+# adopter whose only `bash` is the WSL launcher cannot run the shell script,
+# and `doctor` warns against exactly that wiring.
 # No `when-changed`: the ceiling applies to every change.
 name = "loc"
-argv = ["bash", "scripts/check-loc.sh"]
+argv = ["do-harness", "loc", "--strict"]
 
 [[sensors]]
 name = "skills"

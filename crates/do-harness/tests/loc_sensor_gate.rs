@@ -1,23 +1,22 @@
 //! The `loc` sensor must be the ceiling *gate*, not the report-only query.
 //!
-//! `do-harness loc` always exits 0 by design: it reports and defers the verdict
-//! to the sensor. Wiring it as the sensor therefore made the ceiling advisory
-//! in every run, including the release preflight — `main` shipped a 535-line
-//! `crates/do-harness/src/cli/actions.rs` while `loc` reported PASS, and the
-//! tag preflight only failed on an unrelated sensor.
+//! `do-harness loc` reports and exits 0 unless `--strict` is given — the query
+//! behaviour that keeps agent loops usable. The `loc` sensor therefore ran a
+//! command that could not fail: `main` shipped a 535-line
+//! `crates/do-harness/src/cli/actions.rs` through every gate, and the v0.5.0
+//! release preflight printed `PASS loc` over an over-limit tree.
 //!
-//! Two independent facts are pinned here:
-//! 1. behaviour — `scripts/check-loc.sh --root <fixture>` exits non-zero for an
-//!    over-limit file and names it, and exits 0 for a small one;
-//! 2. wiring — the `loc` sensor runs that script and is part of the
-//!    `verification`, `main`, and `release` signal sets, so the gate runs where
-//!    a regression could otherwise reach a release.
+//! The gate is the native command with `--strict`, so it runs on every host
+//! without a POSIX shell: a Windows adopter whose only `bash` is the WSL
+//! launcher must still be able to run the harness's own sensors.
 //!
-//! The behaviour half runs a POSIX shell, so it is `unix`-only: on a Windows
-//! host `bash` resolves to the WSL launcher, which fails with "Windows
-//! Subsystem for Linux has no installed distributions" unless a distribution is
-//! installed. The gate itself still runs on the Linux `verify` job, and the
-//! wiring and baseline assertions below stay cross-platform.
+//! Three facts are pinned here:
+//! 1. behaviour — `loc --strict` exits 1 and names an over-limit file, exits 0
+//!    under the ceiling, and the report-only default still exits 0;
+//! 2. wiring — the `loc` sensor runs that command and is part of the
+//!    `verification`, `main`, and `release` signal sets;
+//! 3. no grandfathering — `plans/baselines.json` carries no `loc` count, so a
+//!    blessed finding cannot let the gate pass an over-limit tree again.
 
 // A test asserts; a panic is the failure signal, and a fixture that cannot be
 // created has no meaningful alternative result.
@@ -25,7 +24,6 @@
 
 use std::fs;
 use std::path::{Path, PathBuf};
-#[cfg(unix)]
 use std::process::Command;
 
 fn workspace_root() -> PathBuf {
@@ -36,75 +34,62 @@ fn workspace_root() -> PathBuf {
         .to_path_buf()
 }
 
-/// A scratch scope inside the workspace, because `--root` resolves relative to
-/// the repository root. `target/` is gitignored, so the fixture never becomes a
-/// tracked file.
-#[cfg(unix)]
+/// A scratch workspace root for one case. `target/` is gitignored, so the
+/// fixture never becomes a tracked file.
 struct Fixture {
-    relative: String,
+    root: PathBuf,
 }
 
-#[cfg(unix)]
 impl Fixture {
     fn new(name: &str) -> Self {
-        let relative = format!("target/loc-gate-{name}-{}", std::process::id());
-        let dir = workspace_root().join(&relative);
-        let _ = fs::remove_dir_all(&dir);
-        fs::create_dir_all(dir.join("src")).expect("create fixture scope");
-        Self { relative }
+        let root = workspace_root().join(format!("target/loc-gate-{name}-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(root.join("src")).expect("create fixture scope");
+        Self { root }
     }
 
-    fn write(&self, file: &str, body: &str) {
-        fs::write(workspace_root().join(&self.relative).join(file), body).expect("write fixture");
+    fn write(&self, file: &str, lines: usize) {
+        use std::fmt::Write as _;
+
+        let mut body = String::new();
+        for line in 0..lines {
+            writeln!(body, "pub fn f{line}() {{}}").expect("write to a String cannot fail");
+        }
+        fs::write(self.root.join(file), body).expect("write fixture");
+    }
+
+    fn run(&self, strict: bool) -> std::process::Output {
+        let mut command = Command::new(env!("CARGO_BIN_EXE_do-harness"));
+        command.arg("--root").arg(&self.root).arg("loc");
+        if strict {
+            command.arg("--strict");
+        }
+        command.output().expect("run do-harness loc")
     }
 }
 
-#[cfg(unix)]
 impl Drop for Fixture {
     fn drop(&mut self) {
-        let _ = fs::remove_dir_all(workspace_root().join(&self.relative));
+        let _ = fs::remove_dir_all(&self.root);
     }
 }
 
-#[cfg(unix)]
-fn run_gate(scope: &str) -> std::process::Output {
-    Command::new("bash")
-        .arg("scripts/check-loc.sh")
-        .arg("--root")
-        .arg(scope)
-        .current_dir(workspace_root())
-        .output()
-        .expect("run scripts/check-loc.sh")
-}
-
-/// A Rust source body with exactly `count` function lines.
-#[cfg(unix)]
-fn source_lines(count: usize) -> String {
-    use std::fmt::Write as _;
-
-    let mut body = String::new();
-    for line in 0..count {
-        writeln!(body, "pub fn f{line}() {{}}").expect("write to a String cannot fail");
-    }
-    body
-}
-
-#[cfg(unix)]
 #[test]
-fn the_loc_gate_fails_and_names_an_over_limit_file() {
+fn the_strict_gate_fails_and_names_an_over_limit_file() {
     let fixture = Fixture::new("over");
-    fixture.write("src/big.rs", &source_lines(600));
+    fixture.write("src/big.rs", 600);
 
-    let output = run_gate(&fixture.relative);
+    let output = fixture.run(true);
     let combined = format!(
         "{}{}",
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)
     );
 
-    assert!(
-        !output.status.success(),
-        "the loc gate accepted a 600-line file; stdout+stderr:\n{combined}"
+    assert_eq!(
+        output.status.code(),
+        Some(1),
+        "loc --strict must exit 1 on an over-limit file; stdout+stderr:\n{combined}"
     );
     assert!(
         combined.contains("src/big.rs") && combined.contains("600"),
@@ -116,23 +101,40 @@ fn the_loc_gate_fails_and_names_an_over_limit_file() {
     );
 }
 
-#[cfg(unix)]
 #[test]
-fn the_loc_gate_accepts_a_file_under_the_ceiling() {
+fn the_strict_gate_accepts_a_file_under_the_ceiling() {
     let fixture = Fixture::new("under");
-    fixture.write("src/small.rs", &source_lines(10));
+    fixture.write("src/small.rs", 10);
 
-    let output = run_gate(&fixture.relative);
+    let output = fixture.run(true);
     assert!(
         output.status.success(),
-        "the loc gate rejected a 10-line file; stdout+stderr:\n{}{}",
+        "loc --strict rejected a 10-line file; stdout+stderr:\n{}{}",
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)
     );
 }
 
 #[test]
-fn the_loc_sensor_runs_the_gate_in_every_gating_set() {
+fn the_report_only_query_still_exits_zero() {
+    let fixture = Fixture::new("query");
+    fixture.write("src/big.rs", 600);
+
+    let output = fixture.run(false);
+    assert!(
+        output.status.success(),
+        "plain `loc` must stay a query and exit 0; stdout+stderr:\n{}{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        String::from_utf8_lossy(&output.stdout).contains("FINDINGS: 1"),
+        "the query must still report the finding for the ratchet"
+    );
+}
+
+#[test]
+fn the_loc_sensor_runs_the_native_gate_in_every_gating_set() {
     let root = workspace_root();
     let content = fs::read_to_string(root.join("do-harness.toml")).expect("read do-harness.toml");
     let document: toml::Value = toml::from_str(&content).expect("parse do-harness.toml");
@@ -153,9 +155,18 @@ fn the_loc_sensor_runs_the_gate_in_every_gating_set() {
         .filter_map(toml::Value::as_str)
         .collect();
     assert!(
-        argv.contains(&"scripts/check-loc.sh"),
-        "the loc sensor must run scripts/check-loc.sh (the gate), not a report-only \
-         command; got {argv:?}"
+        argv.contains(&"--strict"),
+        "the loc sensor must run the failing gate (`--strict`), not the report-only \
+         query; got {argv:?}"
+    );
+    assert!(
+        !argv.iter().any(|arg| {
+            *arg == "bash"
+                || Path::new(arg)
+                    .extension()
+                    .is_some_and(|ext| ext.eq_ignore_ascii_case("sh"))
+        }),
+        "the loc gate must not require a POSIX shell — it runs on every host; got {argv:?}"
     );
 
     let sets = document

@@ -715,6 +715,7 @@ complete -c do-harness -n "__fish_do_harness_using_subcommand loc" -l root -d 'W
 complete -c do-harness -n "__fish_do_harness_using_subcommand loc" -l config -d 'Explicit path to do-harness.toml' -r -F
 complete -c do-harness -n "__fish_do_harness_using_subcommand loc" -l output -d 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)' -r -F
 complete -c do-harness -n "__fish_do_harness_using_subcommand loc" -l warn -d 'Show only files at or above the 450-line decomposition threshold'
+complete -c do-harness -n "__fish_do_harness_using_subcommand loc" -l strict -d 'Fail (exit 1) when any measured file exceeds the 500-line ceiling. This is the gate the `loc` sensor runs; without it the command only reports'
 complete -c do-harness -n "__fish_do_harness_using_subcommand loc" -s q -l quiet -d 'Suppress PASS/WARN verdict lines and the success footer'
 complete -c do-harness -n "__fish_do_harness_using_subcommand loc" -l dry-run -d 'Dry run without side effects'
 complete -c do-harness -n "__fish_do_harness_using_subcommand loc" -s h -l help -d 'Print help (see more with \'--help\')'
