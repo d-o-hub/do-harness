@@ -6,4 +6,4 @@
 # Bump rules live in docs/versioning.md.
 name = "generic"
 description = "Generic sensor pack (empty sensor list, manual recipes) scaffolded by `do-harness init`."
-version = "0.1.0"
+version = "0.1.1"

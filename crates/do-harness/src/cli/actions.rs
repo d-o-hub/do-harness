@@ -326,6 +326,10 @@ pub struct LocArgs {
     /// Show only files at or above the 450-line decomposition threshold.
     #[arg(long)]
     pub warn: bool,
+    /// Fail (exit 1) when any measured file exceeds the 500-line ceiling. This
+    /// is the gate the `loc` sensor runs; without it the command only reports.
+    #[arg(long)]
+    pub strict: bool,
     /// Files or directories to measure (default: scan workspace roots).
     #[arg(value_hint = ValueHint::AnyPath, value_name = "PATH")]
     pub paths: Vec<PathBuf>,

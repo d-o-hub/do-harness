@@ -1310,6 +1310,7 @@ prints the block without writing.
 | `--ext <EXT>` (repeatable) | no | — | — | Scan extension (repeatable or comma-separated, e.g. rs, ts, tsx) |
 | `--format <FORMAT>` | no | `text` | `text`, `json` | Output format |
 | `--warn` | no | — | — | Show only files at or above the 450-line decomposition threshold |
+| `--strict` | no | — | — | Fail (exit 1) when any measured file exceeds the 500-line ceiling. This is the gate the `loc` sensor runs; without it the command only reports |
 | `[PATH]` (repeatable) | no | — | — | Files or directories to measure (default: scan workspace roots) |
 <!-- END GENERATED: cli-contract loc -->
 Report line-of-code state against the 500-line invariant: one line per file with
@@ -1321,31 +1322,40 @@ threshold, `FAIL` above the ceiling), and the code/test split when an inline
 - `--dir <DIR>`: Scan this directory, relative to the workspace root (repeatable or comma-separated).
 - `--ext <EXT>`: Scan this extension (repeatable or comma-separated, e.g. rs, ts, tsx).
 - `--warn`: Show only files at or above the decomposition threshold.
+- `--strict`: Exit 1 when any measured file exceeds the ceiling (the sensor gate).
 - `--format <Format>`: Output format (`text` or `json`).
 
 By default, source discovery follows the workspace `language` declared in `do-harness.toml`
-(`generic`/`node`/`web` scan conventional `packages/`, `apps/`, `src/`, `crates/` roots for `ts`, `tsx`, `js`, `jsx`, `rs` files; `rust` scans `src/` and `crates/` for `rs`). Configured `--root` and `--ext` options in the `loc` sensor's `argv` or passed on the CLI override these defaults.
+(`generic`/`node`/`web` scan conventional `packages/`, `apps/`, `src/`, `crates/` roots for `ts`, `tsx`, `js`, `jsx`, `rs` files; `rust` scans `src/` and `crates/` for `rs`). Configured `--dir` and `--ext` options in the `loc` sensor's `argv`, or the same flags passed on the CLI, override these defaults.
 The `CODE:`/`TEST:` split and item density hints are emitted for Rust files (`*.rs`).
-The `loc` *sensor* (`scripts/check-loc.sh`) is the part that carries the ceiling to other trees, so
-a repository with a front-end scopes it from `do-harness.toml` instead of
-forking the script:
+The `loc` *sensor* is what carries the ceiling to other trees, and it must run
+the **native gate**: plain `do-harness loc` reports and exits 0, while
+`do-harness loc --strict` exits 1 when any scanned file is over the ceiling.
+A repository with a front-end scopes the scan from `do-harness.toml`:
 
 <!-- example: id=cli_loc_toml classification=parser-check-only reason="Sample loc sensor TOML snippet" -->
 ```toml
 [[sensors]]
 name = "loc"
-argv = ["bash", "scripts/check-loc.sh", "--root", "web,src,crates", "--ext", "rs,ts,tsx"]
+argv = ["do-harness", "loc", "--strict", "--dir", "web,src,crates", "--ext", "rs,ts,tsx"]
 when-changed = ["**/*.rs", "web/**/*.ts", "web/**/*.tsx"]
 ```
 
-`--root` and `--ext` repeat, or take one comma-separated value; `--max` and
-`--warn` move the ceiling (500) and the decomposition threshold (450). A
-configured `--root` that does not exist fails the run (exit 2) rather than
-reporting an empty, vacuous green; the default roots stay optional. Generated
-trees — `node_modules`, `target`, `dist`, `build`, `coverage`, `vendor`,
-`.next`, `out`, `.git` — are always pruned. The output contract is unchanged:
-`FAIL:`/`WARN:` lines plus a trailing `FINDINGS: <n>`, which stays the ratchet's
-input; `SPAN:`/`CODE:`/`TEST:` hints are emitted for Rust files only.
+Do not wire `scripts/check-loc.sh` here. The shipped script still exists for
+adopters who already use it, but it is a POSIX-shell wrapper: on a host whose
+only `bash` is the WSL launcher it fails before measuring anything, and
+`doctor` reports such a wiring as a helper-portability warning.
+
+`--dir` and `--ext` repeat, or take one comma-separated value. The ceiling is
+fixed at 500 lines and the decomposition threshold at 450; `--warn` narrows the
+*output* to the band, it does not move either number. A configured `--dir` that
+does not exist fails the run (exit 2) rather than reporting an empty, vacuous
+green; the default roots stay optional. Generated trees — `node_modules`,
+`target`, `dist`, `build`, `coverage`, `vendor`, `.next`, `out`, `.git` — are
+always pruned. The text output is `FAIL:`/`WARN:`-bearing rows followed by a
+trailing `FINDINGS: <n>`, which stays the ratchet's input; `--format json`
+stays one parseable value (no marker line), and `SPAN:`/`CODE:`/`TEST:` hints
+are emitted for Rust files only.
 
 ### `split`
 <!-- BEGIN GENERATED: cli-contract split -->

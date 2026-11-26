@@ -1097,6 +1097,7 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Explicit path to do-harness.toml')
             [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)')
             [CompletionResult]::new('--warn', '--warn', [CompletionResultType]::ParameterName, 'Show only files at or above the 450-line decomposition threshold')
+            [CompletionResult]::new('--strict', '--strict', [CompletionResultType]::ParameterName, 'Fail (exit 1) when any measured file exceeds the 500-line ceiling. This is the gate the `loc` sensor runs; without it the command only reports')
             [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Suppress PASS/WARN verdict lines and the success footer')
             [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Suppress PASS/WARN verdict lines and the success footer')
             [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Dry run without side effects')

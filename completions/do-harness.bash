@@ -4553,7 +4553,7 @@ _do__harness() {
             return 0
             ;;
         do__subcmd__harness__subcmd__loc)
-            opts="-q -h -V --dir --ext --format --warn --root --config --quiet --output --dry-run --help --version"
+            opts="-q -h -V --dir --ext --format --warn --strict --root --config --quiet --output --dry-run --help --version"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0

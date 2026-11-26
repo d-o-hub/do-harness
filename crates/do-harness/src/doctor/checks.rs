@@ -56,15 +56,25 @@ pub struct HelperStatus {
     pub shell: bool,
     /// The effective sensor argv (defaults when no config declares the sensor).
     pub argv: Vec<String>,
+    /// The native argv that replaces a POSIX shell wrapper, so the warning
+    /// names the command to switch to instead of echoing the shell one.
+    pub native_argv: Vec<String>,
 }
 
 /// The shipped helpers with native implementations.
 const NATIVE_HELPERS: [&str; 4] = ["commitlint", "deps", "audit", "loc"];
 
-/// Default native argv for a helper when no config declares it.
+/// Default native argv for a helper when no config declares it. `loc` is the
+/// ceiling gate, so its native form is the strict one: the report-only default
+/// would pass an over-limit tree, which is exactly how `main` shipped a
+/// 535-line file through every gate.
 fn default_native_argv(name: &str) -> Vec<String> {
     if name == "loc" {
-        return vec!["do-harness".to_owned(), "loc".to_owned()];
+        return vec![
+            "do-harness".to_owned(),
+            "loc".to_owned(),
+            "--strict".to_owned(),
+        ];
     }
     vec![
         "do-harness".to_owned(),
@@ -91,12 +101,14 @@ pub(super) async fn helper_portability(root: &Path) -> Vec<HelperStatus> {
                     native: true,
                     shell: spec.argv.first().is_some_and(|program| program == "bash"),
                     argv: spec.argv.clone(),
+                    native_argv: default_native_argv(name),
                 },
                 None => HelperStatus {
                     name: (*name).to_owned(),
                     native: true,
                     shell: false,
                     argv: default_native_argv(name),
+                    native_argv: default_native_argv(name),
                 },
             }
         })

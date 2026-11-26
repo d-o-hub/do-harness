@@ -3168,6 +3168,22 @@
           "index": null
         },
         {
+          "id": "strict",
+          "kind": "option",
+          "short": null,
+          "long": "strict",
+          "value_names": [
+            "STRICT"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": false,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Fail (exit 1) when any measured file exceeds the 500-line ceiling. This is the gate the `loc` sensor runs; without it the command only reports",
+          "index": null
+        },
+        {
           "id": "paths",
           "kind": "positional",
           "short": null,

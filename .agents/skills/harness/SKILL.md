@@ -77,7 +77,7 @@ time on unrelated sensors.
 | `do-harness verify --set verification --strict --record --task <id>` | before calling work done; the recorded beats satisfy the `task done` gate |
 | `do-harness verify --set release` | pre-release, on the whole pack |
 | `do-harness status --set verification` | evidence freshness; runs nothing |
-| `do-harness loc` | file size against the 500-LOC ceiling (Rust pack default; other packs opt in) |
+| `do-harness loc --strict` | file size against the 500-LOC ceiling (Rust pack default; other packs opt in). Plain `loc` is a query and exits 0 |
 | `do-harness seed --prune` | after editing `plans/invariants.json` |
 | `do-harness init-db --check` | when the state database may be behind |
 | `do-harness hook install` | wire pre-commit, commit-msg, and pre-push |
@@ -197,3 +197,4 @@ command.
 - An empty sensor suite passes vacuously; that is not evidence.
 - A gate that runs zero checks is a failed gate, not a pass: a test runner reporting `0 passed` proves nothing — add a real test (for example a Rust doc-test on a public API) before claiming the sensor green.
 - Never read every `SKILL.md` to decide which skill applies; rank metadata first.
+- A sensor whose argv starts with `bash`/`sh` is a portability defect, not a detail: it needs Git Bash or WSL on Windows, so a host with the WSL launcher alone fails before the check runs. Gate the same check with its native subcommand (`do-harness loc --strict`, `do-harness helpers <name>` (`commitlint`, `deps`, `audit`)); `do-harness doctor` names the replacement, and its helper-portability warning is a defect to fix.
