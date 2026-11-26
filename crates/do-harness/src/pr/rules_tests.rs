@@ -152,6 +152,7 @@ fn entry(name: &str, app_id: Option<u64>) -> crate::pr::checks::CheckEntry {
         verdict: crate::pr::checks::Verdict::Pass,
         reason: None,
         rerun_command: None,
+        superseded: false,
         url: None,
     }
 }
