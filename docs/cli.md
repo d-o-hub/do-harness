@@ -1238,10 +1238,20 @@ usage error (`2`).
 <!-- END GENERATED: cli-contract report -->
 Export the recorded sensor executions (`verify --record` beats) as a historical
 series: one row per run with its status, exit code, start/finish timestamps, and
-derived `duration_ms`, oldest first. The window (`--since`, `--until`) is in
+`duration_ms`, oldest first. The window (`--since`, `--until`) is in
 inclusive Unix seconds and composes with `--sensor` and the same scope selectors
 `metrics` uses (`--scope`, `--task`, `--branch`, `--all`). An inverted window is
 a usage error (`2`).
+
+`duration_ms` is the wall-clock time the sensor runner measured, persisted with
+the beat by `verify --record`. `started_at` and `completed_at` are Unix seconds;
+when a beat carries only the recording time, both fields hold that recording
+stamp rather than the run's actual start and finish. Rows recorded before the
+duration was persisted (or otherwise written without one) fall back to deriving
+`duration_ms` from `completed_at - started_at`; a row stamped only with the
+recording time exports `duration_ms: null`, rendered as `-` in `--format text`,
+and contributes nothing to `do_harness_sensor_duration_seconds_total`. A
+measured duration of zero is a real measurement and exports as `0`.
 
 `--format json` emits a versioned document:
 
@@ -1253,7 +1263,7 @@ a usage error (`2`).
   "window": {"since": 1760000000, "until": null},
   "executions": [
     {"id": 7, "sensor": "test", "scope": "branch:main", "status": "ok",
-     "exit_code": 0, "started_at": 1760000010, "completed_at": 1760000032,
+     "exit_code": 0, "started_at": 1760000032, "completed_at": 1760000032,
      "duration_ms": 22000}
   ]
 }

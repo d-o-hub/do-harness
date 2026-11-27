@@ -28,6 +28,7 @@ async fn record_verify_batch_persists_input_digest_on_the_beat() {
                 sensor_name: Some("probe"),
                 started_at: 1,
                 completed_at: Some(1),
+                duration_ms: None,
             },
             ok: true,
             message: None,
@@ -43,6 +44,7 @@ async fn record_verify_batch_persists_input_digest_on_the_beat() {
                 sensor_name: Some("plain"),
                 started_at: 1,
                 completed_at: Some(1),
+                duration_ms: None,
             },
             ok: true,
             message: None,
@@ -93,6 +95,7 @@ fn probe_beat(
         sensor_name: Some("probe"),
         started_at: 1,
         completed_at: Some(1),
+        duration_ms: None,
     }
 }
 

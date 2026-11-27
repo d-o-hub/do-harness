@@ -187,6 +187,7 @@ async fn advance_rechecks_sensor_gate_inside_transaction() {
             sensor_name: Some("check"),
             started_at: 1,
             completed_at: Some(1),
+            duration_ms: None,
         },
         true,
         None,

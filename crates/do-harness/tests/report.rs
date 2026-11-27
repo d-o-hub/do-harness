@@ -165,3 +165,99 @@ fn an_unknown_branch_scope_reports_nothing() {
         serde_json::json!("branch:some-other-branch")
     );
 }
+
+/// A timed sensor whose failure is advisory, so the recording run still exits
+/// green while both a passing and a failing outcome are recorded.
+const TIMED_CONFIG: &str = r#"
+[signal-sets]
+all = ["slow", "broken"]
+
+[[sensors]]
+name = "slow"
+argv = ["sh", "-c", "sleep 0.3"]
+
+[[sensors]]
+name = "broken"
+argv = ["sh", "-c", "sleep 0.2; exit 1"]
+severity = "warn"
+"#;
+
+fn timed_fixture() -> (tempfile::TempDir, std::path::PathBuf) {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path().to_path_buf();
+    std::fs::write(root.join("do-harness.toml"), TIMED_CONFIG).unwrap();
+    (dir, root)
+}
+
+/// End-to-end #646: the runner's measured duration reaches the live JSON, the
+/// saved evidence, and the historical export — for a passing and a failing
+/// sensor alike — and the timestamp fields carry the recording stamp.
+#[test]
+fn a_recorded_sensor_exports_its_measured_duration_everywhere() {
+    let (_dir, root) = timed_fixture();
+    let (code, stdout, stderr) = run(harness(&root)
+        .arg("verify")
+        .arg("--set")
+        .arg("all")
+        .arg("--record")
+        .arg("--global")
+        .arg("--format")
+        .arg("json")
+        .arg("--evidence")
+        .arg(".do-harness/evidence.json"));
+    assert_eq!(
+        code,
+        Some(0),
+        "recording run must pass:\n{stdout}\n{stderr}"
+    );
+    let live: Value = serde_json::from_str(&stdout).expect("verify json");
+    let evidence: Value = serde_json::from_slice(
+        &std::fs::read(root.join(".do-harness/evidence.json")).expect("evidence file"),
+    )
+    .expect("evidence json");
+
+    let (code, stdout, stderr) = run(harness(&root)
+        .arg("report")
+        .arg("--format")
+        .arg("json")
+        .arg("--all"));
+    assert_eq!(code, Some(0), "{stderr}");
+    let history: Value = serde_json::from_str(&stdout).expect("report json");
+
+    for (sensor, status) in [("slow", "ok"), ("broken", "warn")] {
+        let live_ms = live["sensors"]
+            .as_array()
+            .expect("live sensors")
+            .iter()
+            .find(|row| row["name"] == sensor)
+            .unwrap_or_else(|| panic!("live row for {sensor}"))["duration_ms"]
+            .as_u64()
+            .unwrap_or_else(|| panic!("live duration for {sensor}"));
+        assert!(live_ms > 0, "{sensor} slept, so the measurement is real");
+        let evidence_ms = evidence["sensors"]
+            .as_array()
+            .expect("evidence sensors")
+            .iter()
+            .find(|row| row["name"] == sensor)
+            .unwrap_or_else(|| panic!("evidence row for {sensor}"))["duration_ms"]
+            .as_u64()
+            .unwrap_or_else(|| panic!("evidence duration for {sensor}"));
+        assert_eq!(evidence_ms, live_ms, "evidence agrees with the live run");
+        let row = history["executions"]
+            .as_array()
+            .expect("executions")
+            .iter()
+            .find(|row| row["sensor"] == sensor)
+            .unwrap_or_else(|| panic!("history row for {sensor}"));
+        assert_eq!(row["status"], serde_json::json!(status));
+        assert_eq!(
+            row["duration_ms"].as_u64(),
+            Some(live_ms),
+            "history exports the runner's measurement, not 0 ms: {row}"
+        );
+        assert_eq!(
+            row["started_at"], row["completed_at"],
+            "both stamps are the recording time; the measurement carries the elapsed time"
+        );
+    }
+}

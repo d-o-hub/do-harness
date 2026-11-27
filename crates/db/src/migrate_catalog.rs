@@ -140,4 +140,9 @@ pub const MIGRATIONS: &[Migration] = &[
         name: "heuristics_skill_index",
         sql: include_str!("../migrations/0023_heuristics_skill_index.sql"),
     },
+    Migration {
+        version: 24,
+        name: "beat_duration",
+        sql: include_str!("../migrations/0024_beat_duration.sql"),
+    },
 ];

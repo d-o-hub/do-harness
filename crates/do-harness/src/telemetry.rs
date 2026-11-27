@@ -82,6 +82,10 @@ pub fn resolve_scope(root: &Path, task: Option<&str>, global: bool) -> BeatScope
 /// that identity on the beat, making the pass eligible for a later
 /// `--unchanged=skip` reuse.
 ///
+/// Each beat carries the wall-clock milliseconds the runner measured for that
+/// sensor, so `report` can export real durations instead of deriving 0 ms from
+/// the shared post-run recording stamp.
+///
 /// # Errors
 ///
 /// Returns an error when the state database cannot be initialized or written.
@@ -141,6 +145,7 @@ pub async fn record_verify(
                 sensor_name: Some(&sensor.name),
                 started_at: now,
                 completed_at: Some(now),
+                duration_ms: i64::try_from(sensor.duration_ms).ok(),
             },
             ok: sensor.ok,
             message: Some(message),

@@ -42,6 +42,7 @@ async fn seed_ok_beat(root: &Path) {
             sensor_name: Some("check"),
             started_at: 1,
             completed_at: Some(1),
+            duration_ms: None,
         },
         true,
         None,

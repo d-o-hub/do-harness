@@ -56,9 +56,10 @@ pub async fn sensor_stats(
 
 /// One recorded sensor execution, as exported by `do-harness report`.
 ///
-/// A beat keeps its timestamps; the duration is derived here so every consumer
-/// (JSON, Prometheus, dashboards) computes it the same way instead of each
-/// re-deriving seconds from two columns.
+/// A beat keeps its timestamps; when it carries no runner measurement the
+/// duration is derived here from them, so every consumer (JSON, Prometheus,
+/// dashboards) resolves the duration the same way instead of each re-deriving
+/// seconds from two columns.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct SensorExecution {
     /// Beat primary key.
@@ -72,10 +73,16 @@ pub struct SensorExecution {
     /// Exit code recorded for the run, when the sensor started.
     pub exit_code: Option<i32>,
     /// Unix timestamp when the run started.
+    ///
+    /// For beats recorded by `verify --record` this is the recording time; the
+    /// run's actual elapsed time lives in `duration_ms` when it was measured.
     pub started_at: i64,
     /// Unix timestamp when the run completed, when known.
     pub completed_at: Option<i64>,
-    /// Wall-clock duration in milliseconds, when both timestamps exist.
+    /// Wall-clock duration in milliseconds: the value the runner measured and
+    /// `verify --record` persisted, derived from the timestamps on legacy rows
+    /// that carry no measurement, and unknown for rows stamped only with the
+    /// recording time (identical placeholder stamps with no measurement).
     pub duration_ms: Option<i64>,
 }
 
@@ -99,7 +106,8 @@ pub async fn sensor_executions(
 ) -> Result<Vec<SensorExecution>> {
     let mut rows = conn
         .query(
-            "SELECT id, sensor_name, scope, status, sensor_exit_code, started_at, completed_at \
+            "SELECT id, sensor_name, scope, status, sensor_exit_code, started_at, completed_at, \
+             duration_ms \
              FROM beats WHERE beat_type = ?1 AND sensor_name IS NOT NULL \
              AND (?2 IS NULL OR started_at >= ?2) \
              AND (?3 IS NULL OR started_at <= ?3) \
@@ -113,6 +121,7 @@ pub async fn sensor_executions(
     while let Some(row) = rows.next().await? {
         let started_at: i64 = row.get(5)?;
         let completed_at: Option<i64> = row.get(6)?;
+        let measured: Option<i64> = row.get(7)?;
         executions.push(SensorExecution {
             id: row.get(0)?,
             sensor: row.get(1)?,
@@ -121,7 +130,11 @@ pub async fn sensor_executions(
             exit_code: row.get(4)?,
             started_at,
             completed_at,
-            duration_ms: completed_at.map(|completed| completed.saturating_sub(started_at) * 1000),
+            duration_ms: measured.or_else(|| {
+                completed_at
+                    .filter(|completed| *completed != started_at)
+                    .map(|completed| completed.saturating_sub(started_at) * 1000)
+            }),
         });
     }
     Ok(executions)
