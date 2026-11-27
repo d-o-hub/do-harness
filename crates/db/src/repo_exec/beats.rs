@@ -30,6 +30,9 @@ pub struct NewBeat<'a> {
     pub started_at: i64,
     /// Unix timestamp when the beat completed.
     pub completed_at: Option<i64>,
+    /// Wall-clock duration of the run in milliseconds, when the runner
+    /// measured it; `None` on rows that only carry the recording timestamps.
+    pub duration_ms: Option<i64>,
 }
 
 /// Inserts a beat and returns its id.
@@ -64,8 +67,8 @@ pub(crate) async fn insert_beat_with_digest(
     let mut rows = conn
         .query(
             "INSERT INTO beats (task_id, scope, beat_type, status, sensor_exit_code, sensor_name, \
-             started_at, completed_at, input_digest) \
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9) \
+             started_at, completed_at, duration_ms, input_digest) \
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10) \
              RETURNING id",
             params!(
                 beat.task_id,
@@ -76,6 +79,7 @@ pub(crate) async fn insert_beat_with_digest(
                 beat.sensor_name,
                 beat.started_at,
                 beat.completed_at,
+                beat.duration_ms,
                 input_digest
             ),
         )
@@ -134,6 +138,7 @@ fn beat_from_row(row: &libsql::Row) -> Result<Beat> {
         sensor_name: row.get(6)?,
         started_at: row.get(7)?,
         completed_at: row.get(8)?,
+        duration_ms: row.get(9)?,
     })
 }
 
@@ -161,7 +166,7 @@ pub async fn list_beats_page(
         Some(id) => {
             conn.query(
                 "SELECT id, task_id, scope, beat_type, status, sensor_exit_code, sensor_name, \
-                 started_at, completed_at FROM beats WHERE task_id = ?1 ORDER BY id \
+                 started_at, completed_at, duration_ms FROM beats WHERE task_id = ?1 ORDER BY id \
                  LIMIT ?2 OFFSET ?3",
                 params!(id, crate::bind_limit(limit), i64::from(offset)),
             )
@@ -170,7 +175,7 @@ pub async fn list_beats_page(
         None => {
             conn.query(
                 "SELECT id, task_id, scope, beat_type, status, sensor_exit_code, sensor_name, \
-                 started_at, completed_at FROM beats ORDER BY id LIMIT ?1 OFFSET ?2",
+                 started_at, completed_at, duration_ms FROM beats ORDER BY id LIMIT ?1 OFFSET ?2",
                 params!(crate::bind_limit(limit), i64::from(offset)),
             )
             .await?
@@ -192,7 +197,7 @@ pub async fn list_beats_by_scope(conn: &Connection, scope: &str) -> Result<Vec<B
     let mut rows = conn
         .query(
             "SELECT id, task_id, scope, beat_type, status, sensor_exit_code, sensor_name, \
-             started_at, completed_at FROM beats WHERE scope = ?1 ORDER BY id",
+             started_at, completed_at, duration_ms FROM beats WHERE scope = ?1 ORDER BY id",
             params!(scope),
         )
         .await?;

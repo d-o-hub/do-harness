@@ -154,6 +154,7 @@ async fn db_assertion_valid_identifiers_grade_against_real_db() {
             sensor_name: Some("hardening-test"),
             started_at: 0,
             completed_at: Some(1),
+            duration_ms: None,
         },
         true,
         None,

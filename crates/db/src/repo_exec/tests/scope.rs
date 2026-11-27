@@ -24,6 +24,7 @@ async fn beats_scope_isolates_workstreams_and_filters_stats() {
             sensor_name: Some("fmt"),
             started_at: 10,
             completed_at: Some(11),
+            duration_ms: None,
         },
     )
     .await
@@ -41,6 +42,7 @@ async fn beats_scope_isolates_workstreams_and_filters_stats() {
             sensor_name: Some("fmt"),
             started_at: 20,
             completed_at: Some(21),
+            duration_ms: None,
         },
     )
     .await

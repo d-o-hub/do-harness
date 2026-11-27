@@ -25,6 +25,7 @@ async fn beat(
             sensor_name,
             started_at,
             completed_at: Some(started_at + 1),
+            duration_ms: None,
         },
     )
     .await
@@ -125,6 +126,7 @@ async fn sensor_stats_groups_counts_and_ignores_non_sensor_beats() {
             sensor_name: None,
             started_at: 600,
             completed_at: Some(601),
+            duration_ms: None,
         },
     )
     .await;
@@ -195,8 +197,69 @@ async fn has_ok_beat_reflects_the_status_column() {
     );
 }
 
-/// The export keeps every execution in the window, oldest first, and derives
-/// the duration from the two timestamps; filters compose instead of widening.
+/// The export prefers the duration the runner measured and `verify --record`
+/// persisted; legacy rows without a measurement fall back to the timestamp
+/// difference; a row stamped only with the recording time reports an unknown
+/// duration; and a measured zero stays a zero, distinguishable from missing
+/// data.
+#[tokio::test(flavor = "current_thread")]
+async fn sensor_executions_prefers_the_measured_duration() {
+    let (_dir, conn) = open().await;
+    for (name, started_at, completed_at, duration_ms) in [
+        ("measured", 500, Some(500), Some(1250)),
+        ("legacy", 100, Some(102), None),
+        ("placeholder", 200, Some(200), None),
+        ("zero", 300, Some(300), Some(0)),
+    ] {
+        insert_beat(
+            &conn,
+            &NewBeat {
+                task_id: None,
+                scope: Some(BeatScope::Global),
+                beat_type: BeatType::Sensor,
+                status: BeatStatus::Ok,
+                sensor_exit_code: Some(0),
+                sensor_name: Some(name),
+                started_at,
+                completed_at,
+                duration_ms,
+            },
+        )
+        .await
+        .unwrap();
+    }
+
+    let executions = sensor_executions(&conn, None, None, None, None)
+        .await
+        .unwrap();
+    let duration = |sensor: &str| {
+        executions
+            .iter()
+            .find(|row| row.sensor == sensor)
+            .unwrap()
+            .duration_ms
+    };
+    assert_eq!(duration("measured"), Some(1250), "the measurement wins");
+    assert_eq!(
+        duration("legacy"),
+        Some(2000),
+        "no measurement: derived from the timestamps"
+    );
+    assert_eq!(
+        duration("placeholder"),
+        None,
+        "identical stamps without a measurement are unknown, not 0 ms"
+    );
+    assert_eq!(
+        duration("zero"),
+        Some(0),
+        "a measured zero is a real measurement"
+    );
+}
+
+/// The export keeps every execution in the window, oldest first, and resolves
+/// the duration for rows without a measurement from the two timestamps;
+/// filters compose instead of widening.
 #[tokio::test(flavor = "current_thread")]
 async fn sensor_executions_exports_the_window_oldest_first() {
     let (_dir, conn) = open().await;
@@ -212,6 +275,7 @@ async fn sensor_executions_exports_the_window_oldest_first() {
             sensor_name: Some("check"),
             started_at: 250,
             completed_at: Some(253),
+            duration_ms: None,
         },
     )
     .await

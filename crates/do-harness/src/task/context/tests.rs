@@ -161,6 +161,7 @@ async fn branch_and_global_observations_do_not_satisfy_the_task() {
                 sensor_name: Some("test"),
                 started_at: now,
                 completed_at: Some(now),
+                duration_ms: None,
             },
             ok: true,
             message: None,

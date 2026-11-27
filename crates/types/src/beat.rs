@@ -173,9 +173,18 @@ pub struct Beat {
     /// Name of the sensor that produced this beat, when it is a sensor beat.
     pub sensor_name: Option<String>,
     /// Unix timestamp when the beat started.
+    ///
+    /// For recorded sensor beats this is the recording time; the measured
+    /// `duration_ms` carries the run's actual elapsed time.
     pub started_at: i64,
     /// Unix timestamp when the beat completed, when known.
     pub completed_at: Option<i64>,
+    /// Wall-clock duration of the run in milliseconds, when the runner
+    /// measured it. `None` on legacy rows, where the export derives the
+    /// duration from the timestamps and reports unknown when only a single
+    /// recording stamp exists.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub duration_ms: Option<i64>,
 }
 
 impl Beat {
@@ -262,6 +271,7 @@ mod tests {
             sensor_name: Some("check".to_owned()),
             started_at: 1,
             completed_at: Some(2),
+            duration_ms: Some(1_000),
         };
         assert!(beat.is_sensor_beat_for("check"));
         assert!(!beat.is_sensor_beat_for("fmt"));
@@ -294,6 +304,7 @@ mod tests {
             sensor_name: Some("check".to_owned()),
             started_at: 1,
             completed_at: Some(1),
+            duration_ms: None,
         };
         let json = serde_json::to_string(&beat).expect("serialize");
         assert!(json.contains("\"scope\":\"global\""));
