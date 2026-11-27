@@ -20,7 +20,7 @@ workspace = true
 anyhow.workspace = true
 axum.workspace = true
 clap = { workspace = true, features = ["derive"] }
-do-harness-types = { path = "../types", version = "0.5.0" }
+do-harness-types = { path = "../types", version = "0.6.0" }
 fs2.workspace = true
 hex.workspace = true
 reqwest.workspace = true
