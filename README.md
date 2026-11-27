@@ -301,6 +301,7 @@ export PATH="$HOME/.local/bin:$PATH"
 | `metrics [OPTIONS] [COMMAND]` | Report harness trends: sensor stats, strikes, eval pass-rate history — flags: `--format <FORMAT>`, `--sensor <SENSOR>`, `--skill <SKILL>`, `--since <UNIX_SECONDS>`, `--scope <SCOPE>`, `--task <ID>`, `--branch <BRANCH>`, `--all` |
 | `metrics pr [OPTIONS] --repo <OWNER/NAME>` | PR-loop measures: time-to-green, pushes per green, waivers, comments, cancelled runs, reruns — flags: `--repo <OWNER/NAME>`, `--since <WINDOW>`, `--limit <N>`, `--recompute`, `--format <FORMAT>` |
 | `report [OPTIONS]` | Export recorded sensor executions (durations, exit codes, failures) — flags: `--format <FORMAT>`, `--sensor <SENSOR>`, `--since <UNIX_SECONDS>`, `--until <UNIX_SECONDS>`, `--scope <SCOPE>`, `--task <ID>`, `--branch <BRANCH>`, `--all` |
+| `timeline [OPTIONS] --evidence <FILE>` | Render an offline timeline of saved verification attempts (issue #647) — flags: `--evidence <FILE>`, `--status <FILE>`, `--out <FILE>`, `--format <FORMAT>` |
 | `sensor new [OPTIONS] --arg <ARG> <NAME>` | Add a validated `[[sensors]]` entry to do-harness.toml — flags: `--arg <ARG>`, `--when-changed <GLOB>`, `--set <SET>`, `--script <PATH>` |
 | `learn [OPTIONS] --draft` | Draft skill/guide updates from sensors that keep firing (never applies them) — flags: `--draft`, `--days <DAYS>`, `--min-fires <N>`, `--format <FORMAT>` |
 | `overlap [OPTIONS]` | Rank skill pairs by guidance overlap (Tier-2 distinctiveness advisory) — flags: `--threshold <THRESHOLD>`, `--format <FORMAT>` |

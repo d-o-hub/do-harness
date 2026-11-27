@@ -24,6 +24,27 @@ pub struct MigrateArgs {
     pub format: crate::report::Format,
 }
 
+/// Arguments for `timeline` (flattened into the `timeline` subcommand).
+#[derive(Debug, clap::Args)]
+pub struct TimelineArgs {
+    /// Saved evidence artifact, in attempt order (repeat once per attempt).
+    #[arg(long, value_name = "FILE", required = true, value_hint = ValueHint::FilePath)]
+    pub evidence: Vec<PathBuf>,
+    /// Captured `status --format json` snapshot (repeat once per observation).
+    #[arg(long, value_name = "FILE", value_hint = ValueHint::FilePath)]
+    pub status: Vec<PathBuf>,
+    /// Write the rendered timeline here; `-` writes to stdout (default:
+    /// timeline.html for HTML, stdout for JSON).
+    ///
+    /// Deliberately not `--output`: that flag is global and names a `verify`
+    /// evidence artifact, so reusing it here would silently swallow the path.
+    #[arg(long = "out", value_name = "FILE", value_hint = ValueHint::FilePath)]
+    pub out: Option<PathBuf>,
+    /// Output format.
+    #[arg(long, value_enum, default_value_t = crate::timeline::TimelineFormat::Html)]
+    pub format: crate::timeline::TimelineFormat,
+}
+
 /// Arguments for `report` (flattened into the `report` subcommand).
 #[derive(Debug, clap::Args)]
 pub struct ReportArgs {

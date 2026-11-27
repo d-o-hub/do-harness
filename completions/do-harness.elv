@@ -57,6 +57,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand doctor 'Run diagnostic checks on binary resolution and git hook health'
             cand metrics 'Report harness trends: sensor stats, strikes, eval pass-rate history'
             cand report 'Export recorded sensor executions (durations, exit codes, failures)'
+            cand timeline 'Render an offline timeline of saved verification attempts (issue #647)'
             cand sensor 'Scaffold and validate a new sensor entry'
             cand learn 'Draft skill/guide updates from sensors that keep firing (never applies them)'
             cand overlap 'Rank skill pairs by guidance overlap (Tier-2 distinctiveness advisory)'
@@ -1307,6 +1308,22 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand -V 'Print version'
             cand --version 'Print version'
         }
+        &'do-harness;timeline'= {
+            cand --evidence 'Saved evidence artifact, in attempt order (repeat once per attempt)'
+            cand --status 'Captured `status --format json` snapshot (repeat once per observation)'
+            cand --out 'Write the rendered timeline here; `-` writes to stdout (default: timeline.html for HTML, stdout for JSON)'
+            cand --format 'Output format'
+            cand --root 'Workspace root override (default: walk up from cwd)'
+            cand --config 'Explicit path to do-harness.toml'
+            cand --output 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)'
+            cand -q 'Suppress PASS/WARN verdict lines and the success footer'
+            cand --quiet 'Suppress PASS/WARN verdict lines and the success footer'
+            cand --dry-run 'Dry run without side effects'
+            cand -h 'Print help (see more with ''--help'')'
+            cand --help 'Print help (see more with ''--help'')'
+            cand -V 'Print version'
+            cand --version 'Print version'
+        }
         &'do-harness;sensor'= {
             cand --root 'Workspace root override (default: walk up from cwd)'
             cand --config 'Explicit path to do-harness.toml'
@@ -1774,6 +1791,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand doctor 'Run diagnostic checks on binary resolution and git hook health'
             cand metrics 'Report harness trends: sensor stats, strikes, eval pass-rate history'
             cand report 'Export recorded sensor executions (durations, exit codes, failures)'
+            cand timeline 'Render an offline timeline of saved verification attempts (issue #647)'
             cand sensor 'Scaffold and validate a new sensor entry'
             cand learn 'Draft skill/guide updates from sensors that keep firing (never applies them)'
             cand overlap 'Rank skill pairs by guidance overlap (Tier-2 distinctiveness advisory)'
@@ -1952,6 +1970,8 @@ set edit:completion:arg-completer[do-harness] = {|@words|
         &'do-harness;help;metrics;pr'= {
         }
         &'do-harness;help;report'= {
+        }
+        &'do-harness;help;timeline'= {
         }
         &'do-harness;help;sensor'= {
             cand new 'Add a validated `[[sensors]]` entry to do-harness.toml'

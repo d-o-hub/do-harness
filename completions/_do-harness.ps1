@@ -60,6 +60,7 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('doctor', 'doctor', [CompletionResultType]::ParameterValue, 'Run diagnostic checks on binary resolution and git hook health')
             [CompletionResult]::new('metrics', 'metrics', [CompletionResultType]::ParameterValue, 'Report harness trends: sensor stats, strikes, eval pass-rate history')
             [CompletionResult]::new('report', 'report', [CompletionResultType]::ParameterValue, 'Export recorded sensor executions (durations, exit codes, failures)')
+            [CompletionResult]::new('timeline', 'timeline', [CompletionResultType]::ParameterValue, 'Render an offline timeline of saved verification attempts (issue #647)')
             [CompletionResult]::new('sensor', 'sensor', [CompletionResultType]::ParameterValue, 'Scaffold and validate a new sensor entry')
             [CompletionResult]::new('learn', 'learn', [CompletionResultType]::ParameterValue, 'Draft skill/guide updates from sensors that keep firing (never applies them)')
             [CompletionResult]::new('overlap', 'overlap', [CompletionResultType]::ParameterValue, 'Rank skill pairs by guidance overlap (Tier-2 distinctiveness advisory)')
@@ -1436,6 +1437,23 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('--version', '--version', [CompletionResultType]::ParameterName, 'Print version')
             break
         }
+        'do-harness;timeline' {
+            [CompletionResult]::new('--evidence', '--evidence', [CompletionResultType]::ParameterName, 'Saved evidence artifact, in attempt order (repeat once per attempt)')
+            [CompletionResult]::new('--status', '--status', [CompletionResultType]::ParameterName, 'Captured `status --format json` snapshot (repeat once per observation)')
+            [CompletionResult]::new('--out', '--out', [CompletionResultType]::ParameterName, 'Write the rendered timeline here; `-` writes to stdout (default: timeline.html for HTML, stdout for JSON)')
+            [CompletionResult]::new('--format', '--format', [CompletionResultType]::ParameterName, 'Output format')
+            [CompletionResult]::new('--root', '--root', [CompletionResultType]::ParameterName, 'Workspace root override (default: walk up from cwd)')
+            [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Explicit path to do-harness.toml')
+            [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)')
+            [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Suppress PASS/WARN verdict lines and the success footer')
+            [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Suppress PASS/WARN verdict lines and the success footer')
+            [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Dry run without side effects')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            [CompletionResult]::new('-V', '-V ', [CompletionResultType]::ParameterName, 'Print version')
+            [CompletionResult]::new('--version', '--version', [CompletionResultType]::ParameterName, 'Print version')
+            break
+        }
         'do-harness;sensor' {
             [CompletionResult]::new('--root', '--root', [CompletionResultType]::ParameterName, 'Workspace root override (default: walk up from cwd)')
             [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Explicit path to do-harness.toml')
@@ -1946,6 +1964,7 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('doctor', 'doctor', [CompletionResultType]::ParameterValue, 'Run diagnostic checks on binary resolution and git hook health')
             [CompletionResult]::new('metrics', 'metrics', [CompletionResultType]::ParameterValue, 'Report harness trends: sensor stats, strikes, eval pass-rate history')
             [CompletionResult]::new('report', 'report', [CompletionResultType]::ParameterValue, 'Export recorded sensor executions (durations, exit codes, failures)')
+            [CompletionResult]::new('timeline', 'timeline', [CompletionResultType]::ParameterValue, 'Render an offline timeline of saved verification attempts (issue #647)')
             [CompletionResult]::new('sensor', 'sensor', [CompletionResultType]::ParameterValue, 'Scaffold and validate a new sensor entry')
             [CompletionResult]::new('learn', 'learn', [CompletionResultType]::ParameterValue, 'Draft skill/guide updates from sensors that keep firing (never applies them)')
             [CompletionResult]::new('overlap', 'overlap', [CompletionResultType]::ParameterValue, 'Rank skill pairs by guidance overlap (Tier-2 distinctiveness advisory)')
@@ -2187,6 +2206,9 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             break
         }
         'do-harness;help;report' {
+            break
+        }
+        'do-harness;help;timeline' {
             break
         }
         'do-harness;help;sensor' {
