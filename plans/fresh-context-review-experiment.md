@@ -1,7 +1,8 @@
 # Fresh-context review: opt-in pilot experiment (issue #498)
 
-Status: pilot in progress — feasibility smoke-test run, effectiveness and
-adoption undecided.
+Status: pilot complete — the deterministic suite passes continuously and one
+recorded live pass per fixture case exists below; effectiveness and
+adoption remain undecided (issue #499 owns that verdict).
 
 ## Purpose and hypothesis
 
@@ -355,40 +356,72 @@ its own handoff directory. The recorded packets pin every input; the
 committed records are `plans/fresh-context-review-live-flawed.json` and
 `plans/fresh-context-review-live-sound.json`.
 
+### Recorded live outcomes
+
+Run at commit `fe9c100` (the predeclared-protocol commit), reviewer = one
+fresh-context child agent of the operating host session per case (no parent
+conversation), through the native command with its own bridge as the
+reviewer process:
+
+| Case | Outcome | Findings | Marker probe | Elapsed |
+| --- | --- | --- | --- | --- |
+| `live-flawed` | `success_with_findings` | 5, not truncated: F1 is exactly the planted revocation-cache defect (revoke never invalidates `delegation_snapshot`); F2–F5 are further concrete defects of the same frozen design (membership-mutation invalidation, provenance-free snapshot union, missing delegator authorization precondition, no-new-schema contradiction) | `false` (clean) | 199.5 s |
+| `live-sound` | `success_zero_findings` | 0 — no false positives | `false` (clean) | 43.0 s |
+
+Both cases met their predeclared expectations. Dispositions: all five
+`live-flawed` findings are `confirmed` (detection adjudication only — the
+design is synthetic, so no production correction follows); the sound case
+has no findings to disposition. Usage provenance: the host exposes no
+per-reviewer token meter, so token/currency usage is recorded as
+`unavailable` for that reason — elapsed time is never converted into a
+usage claim. The marker value appears nowhere committed; the records carry
+only the probe booleans.
+
 ## Observations and limitations
 
-Filled in from the committed smoke record after the stub run (see the record
-for exact numbers). Local stub smoke on this branch (commit
-`f529824f0ea1c1946c0bc0a38e92c4dcd2ceaa57`, the snapshot that produced the
-committed record) passed all six predeclared
-design returned zero findings; fail/timeout/unavailable/leak paths produced
-`failure`/`timeout`/`not_run`/`failure` (leak) as declared. Elapsed per case
-is subsecond to a few seconds (the timeout case burns its 2 s budget).
-Stub runs use no network, model, or tokens: currency cost and token usage
-are recorded as unavailable.
+Stage 1 (the retired Python stub suite, commit
+`f529824f0ea1c1946c0bc0a38e92c4dcd2ceaa57`): all six predeclared stub
+expectations passed — the flawed design produced F1+F2, the sound design
+returned zero findings, and the fail/timeout/unavailable/leak paths produced
+`failure`/`timeout`/`not_run`/`failure` (leak) as declared; per-case elapsed
+is subsecond to a few seconds, with zero model/token usage. Those outcome
+classes are now pinned continuously by the native integration suite.
+
+Stage 2 (the recorded live pass, above): both fixture cases met their
+predeclared expectations on the first and only pass — the planted defect
+was detected with four further concrete findings, and the sound design
+produced zero false positives. Marker probes were negative in both cases,
+so no parent-conversation content reached either reviewer.
 
 Limitations:
 
+- One pass per case, one reviewer (the operating session's own fresh
+  child agents), two synthetic fixture designs, a single host: this is
+  feasibility evidence only. It does **not** establish comparative
+  defect-detection benefit or adoption value; issue #499 owns that
+  measurement and verdict.
 - The deterministic suite proves command mechanics **only**: frozen
   packets, fresh process launch, scrubbed environment, bounded capture,
-  outcome classification, sanitized records. It does not prove model
-  context isolation or defect-detection benefit — that requires a real
-  reviewer run with the parent-only marker probe, recorded as the next
-  opt-in step.
-- A real reviewer run is opt-in and consumes no paid budget in this pilot.
-  The next step is to run one recorded real pass through
-  `do-harness design-review run` with the host bridge (or a provider
-  reviewer with explicit budget) and record its findings, elapsed, and
-  usage with provenance.
-- Host/client/model versions are recorded only when supplied via `--meta`.
+  outcome classification, sanitized records.
+- Isolation evidence is the negative marker probe per case, plus the
+  native launch record (fresh process, scrubbed environment key list).
+  The reviewer child inherits host-injected instructions (its system
+  prompt, the repository's AGENTS.md, and the skills catalog) that cannot
+  be excluded, and it has host tool access — this host offers no
+  read-only reviewer capability, so the instructions confine it to the
+  packet and the documents it lists. Both facts are limitations, not
+  proof.
+- Usage provenance: the host exposes no per-reviewer token meter, so
+  usage is recorded as `unavailable` with that reason; host/client/model
+  identity is recorded only when supplied via `--meta`.
 
 ## Handoff to #499
 
 Issue #499 owns repeated-effectiveness measurement and the adoption
 decision. This pilot supplies: the packet/finding formats, the native
 `do-harness design-review` command, the deterministic fixtures and
-integration suite, the stage-1 smoke record, and the isolation-evidence
-rules.
+integration suite, the stage-1 smoke record, the recorded live outcomes,
+and the isolation-evidence rules.
 Issue #499 should reuse the paired-run protocol from `docs/workflow-benchmarks.md`
 (identical inputs, alternating order, predeclared tolerance and sample size)
 to measure whether a fresh-context reviewer reduces unresolved assumptions
@@ -401,8 +434,8 @@ states that comparative value and adoption remain undecided.
 - [x] The reviewer receives no parent conversation; inherited host instructions and isolation-evidence limits are documented.
 - [x] Success, zero findings, failure, timeout, and unverified isolation are distinct outcomes.
 - [x] Findings meet the concrete-impact contract and receive evidence-backed dispositions.
-- [x] The flawed and sound design smoke cases have recorded outcomes, including misses and false positives (predeclared expectations checked).
-- [x] Runtime/output/usage limits and actual pilot cost are recorded (stub: zero usage; per-case elapsed in the smoke record).
+- [x] The flawed and sound design smoke cases have recorded outcomes, including misses and false positives (predeclared expectations checked deterministically; the live pass recorded both cases matching their predeclared expectations — defect detected, zero false positives).
+- [x] Runtime/output/usage limits and actual pilot cost are recorded (stage 1: zero stub usage; live pass: predeclared 600 s/5/64 KiB limits, 199.5 s and 43.0 s elapsed, usage `unavailable` because the host exposes no per-reviewer token meter).
 - [x] Existing computational completion and merge requirements remain mandatory (unchanged: `verify`, evidence-freshness, PR review).
 - [x] No full EGM installation, multi-stage swarm, default CI model run, or permanent workflow gate is introduced.
 - [x] The experiment record states that comparative value and adoption remain undecided.
