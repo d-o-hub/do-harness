@@ -18,7 +18,7 @@ use serde_json::json;
 
 #[test]
 fn design_review_flawed_design_yields_findings_with_clean_marker_probe() {
-    let handoff = temp_dir("flawed-handoff");
+    let (_keep_dir, handoff) = temp_dir("flawed-handoff");
     // The reviewer response is pre-placed from the fixture expectations.
     place_fixture_findings(&handoff, "flawed-expected.json");
     let record = run_flawed_review(
@@ -62,7 +62,7 @@ fn design_review_flawed_design_yields_findings_with_clean_marker_probe() {
 
 #[test]
 fn design_review_sound_design_yields_zero_findings() {
-    let handoff = temp_dir("sound-handoff");
+    let (_keep_dir, handoff) = temp_dir("sound-handoff");
     // The sound fixture's expectation is zero findings: the sound reviewer
     // response is an empty findings array (the committed fixture records the
     // expectation, not a response body).
@@ -82,7 +82,7 @@ fn design_review_sound_design_yields_zero_findings() {
 
 #[test]
 fn design_review_success_without_marker_is_unverified() {
-    let handoff = temp_dir("unverified-handoff");
+    let (_keep_dir, handoff) = temp_dir("unverified-handoff");
     place_findings(&handoff, "{\"findings\":[]}");
     let record = run_flawed_review(
         "unverified",
@@ -97,7 +97,7 @@ fn design_review_success_without_marker_is_unverified() {
 
 #[test]
 fn design_review_unavailable_reviewer_is_not_run() {
-    let handoff = temp_dir("unavailable");
+    let (_keep_dir, handoff) = temp_dir("unavailable");
     let record = run_flawed_review(
         "unavailable",
         &[
@@ -116,7 +116,7 @@ fn design_review_unavailable_reviewer_is_not_run() {
 
 #[test]
 fn design_review_timeout_is_a_distinct_outcome() {
-    let handoff = temp_dir("timeout");
+    let (_keep_dir, handoff) = temp_dir("timeout");
     let record = run_flawed_review(
         "timeout",
         &[
@@ -136,7 +136,7 @@ fn design_review_timeout_is_a_distinct_outcome() {
 
 #[test]
 fn design_review_marker_leak_fails_isolation() {
-    let handoff = temp_dir("leak-handoff");
+    let (_keep_dir, handoff) = temp_dir("leak-handoff");
     let marker = fixture("leak-marker.txt");
     let marker = marker.trim();
     place_findings(
@@ -159,7 +159,7 @@ fn design_review_marker_leak_fails_isolation() {
 
 #[test]
 fn design_review_oversized_output_is_failure() {
-    let handoff = temp_dir("huge-handoff");
+    let (_keep_dir, handoff) = temp_dir("huge-handoff");
     let pad = "x".repeat(512);
     place_findings(&handoff, &format!("{{\"findings\":[],\"pad\":\"{pad}\"}}"));
     let record = run_flawed_review(
@@ -180,7 +180,7 @@ fn design_review_oversized_output_is_failure() {
 
 #[test]
 fn design_review_invalid_reviewer_json_is_failure() {
-    let handoff = temp_dir("invalid-json-handoff");
+    let (_keep_dir, handoff) = temp_dir("invalid-json-handoff");
     place_findings(&handoff, "{\"findings\": [");
     let record = run_flawed_review(
         "invalid-json",
@@ -195,7 +195,7 @@ fn design_review_invalid_reviewer_json_is_failure() {
 
 #[test]
 fn design_review_missing_findings_array_is_failure() {
-    let handoff = temp_dir("no-findings-handoff");
+    let (_keep_dir, handoff) = temp_dir("no-findings-handoff");
     place_findings(&handoff, "{\"other\":1}");
     let record = run_flawed_review(
         "no-findings",
@@ -213,7 +213,7 @@ fn design_review_missing_findings_array_is_failure() {
 
 #[test]
 fn design_review_invalid_finding_fields_are_failure() {
-    let handoff = temp_dir("bad-finding-handoff");
+    let (_keep_dir, handoff) = temp_dir("bad-finding-handoff");
     place_findings(&handoff, "{\"findings\":[{\"id\":\"F1\"}]}");
     let record = run_flawed_review(
         "bad-finding",
@@ -233,7 +233,7 @@ fn design_review_invalid_finding_fields_are_failure() {
 
 #[test]
 fn design_review_truncates_over_limit_findings() {
-    let handoff = temp_dir("truncated-handoff");
+    let (_keep_dir, handoff) = temp_dir("truncated-handoff");
     let finding = json!({
         "contract_or_path": "p", "trigger": "t", "consequence": "c",
         "evidence": "e", "smallest_correction": "s",

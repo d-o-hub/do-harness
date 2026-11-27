@@ -18,7 +18,7 @@ use serde_json::{Value, json};
 
 #[test]
 fn design_review_packet_assembles_not_run_and_pins_provenance() {
-    let tmp = temp_dir("packet");
+    let (_keep_dir, tmp) = temp_dir("packet");
     let packet_out = tmp.join("packet.json");
     let record_out = tmp.join("record.json");
     let args = vec![
@@ -75,7 +75,7 @@ fn design_review_packet_assembles_not_run_and_pins_provenance() {
 
 #[test]
 fn design_review_revision_pinning_fails_closed() {
-    let tmp = temp_dir("pinning");
+    let (_keep_dir, tmp) = temp_dir("pinning");
     let record_out = tmp.join("record.json");
     let args = vec![
         "design-review".to_owned(),
@@ -102,7 +102,7 @@ fn design_review_revision_pinning_fails_closed() {
 
 #[test]
 fn design_review_packet_hash_is_stable_and_sensitive() {
-    let tmp = temp_dir("hash");
+    let (_keep_dir, tmp) = temp_dir("hash");
     let review = |objective: &str, name: &str| {
         let record_out = tmp.join(name);
         let args = vec![
@@ -132,9 +132,9 @@ fn design_review_packet_hash_is_stable_and_sensitive() {
 
 #[test]
 fn design_review_disposition_workflow() {
-    let tmp = temp_dir("dispose");
+    let (_keep_dir, tmp) = temp_dir("dispose");
     let record_out = tmp.join("record.json");
-    let handoff = temp_dir("dispose-handoff");
+    let (_keep_dir, handoff) = temp_dir("dispose-handoff");
     place_fixture_findings(&handoff, "flawed-expected.json");
     let mut args = run_args("dispose", &record_out);
     args.extend_from_slice(&[

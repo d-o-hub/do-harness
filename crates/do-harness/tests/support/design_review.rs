@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use serde_json::{Value, json};
+use tempfile::TempDir;
 
 pub const FIXTURES: &str = "crates/do-harness/tests/fixtures/design-review";
 
@@ -55,14 +56,16 @@ pub fn fixture(name: &str) -> String {
         .unwrap_or_else(|_| panic!("missing fixture {name}"))
 }
 
-pub fn temp_dir(tag: &str) -> PathBuf {
-    let dir = std::env::temp_dir().join(format!(
-        "do-harness-design-review-{tag}-{}",
-        std::process::id()
-    ));
-    let _ = std::fs::remove_dir_all(&dir);
-    std::fs::create_dir_all(&dir).expect("temp dir");
-    dir
+/// A scratch directory scoped to one test, returned with the guard that
+/// removes it: `tempfile` names it uniquely so parallel test binaries cannot
+/// collide, and the caller keeps the guard alive for the test body.
+pub fn temp_dir(tag: &str) -> (TempDir, PathBuf) {
+    let dir = tempfile::Builder::new()
+        .prefix(&format!("do-harness-design-review-{tag}-"))
+        .tempdir()
+        .expect("temp dir");
+    let path = dir.path().to_path_buf();
+    (dir, path)
 }
 
 pub fn record_of(path: &Path) -> Value {
@@ -113,7 +116,7 @@ pub fn run_args(tag: &str, record_out: &Path) -> Vec<String> {
 /// Runs `design-review run` against the flawed fixture design with the
 /// supplied extra argv and returns the parsed record.
 pub fn run_flawed_review(tag: &str, extra: &[String]) -> Value {
-    let tmp = temp_dir(tag);
+    let (_keep_dir, tmp) = temp_dir(tag);
     let record_out = tmp.join("record.json");
     let mut args = run_args(tag, &record_out);
     args.extend_from_slice(extra);

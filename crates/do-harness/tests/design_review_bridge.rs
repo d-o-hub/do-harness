@@ -10,6 +10,7 @@ use std::process::{Command, Stdio};
 use std::time::Duration;
 
 use serde_json::Value;
+use tempfile::TempDir;
 
 fn repo_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -23,14 +24,16 @@ fn binary() -> &'static str {
     env!("CARGO_BIN_EXE_do-harness")
 }
 
-fn temp_dir(tag: &str) -> PathBuf {
-    let dir = std::env::temp_dir().join(format!(
-        "do-harness-design-review-bridge-{tag}-{}",
-        std::process::id()
-    ));
-    let _ = std::fs::remove_dir_all(&dir);
-    std::fs::create_dir_all(&dir).expect("temp dir");
-    dir
+/// A handoff directory scoped to one test, returned with the guard that
+/// removes it: `tempfile` names it uniquely so parallel tests cannot collide,
+/// and the caller keeps the guard alive for the test body.
+fn temp_dir(tag: &str) -> (TempDir, PathBuf) {
+    let dir = tempfile::Builder::new()
+        .prefix(&format!("do-harness-design-review-bridge-{tag}-"))
+        .tempdir()
+        .expect("temp dir");
+    let path = dir.path().to_path_buf();
+    (dir, path)
 }
 
 fn handoff_str(handoff: &Path) -> String {
@@ -70,7 +73,7 @@ fn run_bridge(handoff: &Path, max_wait_s: &str, packet: &str) -> (Option<i32>, S
 
 #[test]
 fn design_review_bridge_relays_packet_and_findings() {
-    let handoff = temp_dir("relay");
+    let (_keep_dir, handoff) = temp_dir("relay");
     let findings = "{\"findings\":[]}\n";
     std::fs::write(handoff.join("findings.json"), findings.as_bytes()).expect("place findings");
     let packet = "{\"review_id\":\"ut-bridge\",\"limits\":{\"timeout_s\":600}}";
@@ -85,7 +88,7 @@ fn design_review_bridge_relays_packet_and_findings() {
 
 #[test]
 fn design_review_bridge_waits_for_a_growing_findings_file() {
-    let handoff = temp_dir("grow");
+    let (_keep_dir, handoff) = temp_dir("grow");
     std::fs::write(handoff.join("findings.json"), b"{\"findings\": [").expect("partial");
     let findings = "{\"findings\":[{\"contract_or_path\":\"p\",\"trigger\":\"t\",\"consequence\":\"c\",\"evidence\":\"e\",\"smallest_correction\":\"s\"}]}\n";
     let path = handoff.join("findings.json");
@@ -103,7 +106,7 @@ fn design_review_bridge_waits_for_a_growing_findings_file() {
 
 #[test]
 fn design_review_bridge_relays_unparsable_response_at_the_deadline() {
-    let handoff = temp_dir("unparsable");
+    let (_keep_dir, handoff) = temp_dir("unparsable");
     std::fs::write(handoff.join("findings.json"), b"not json").expect("place invalid response");
     let (code, stdout, stderr) = run_bridge(&handoff, "0.6", "{\"review_id\":\"ut-raw\"}");
     assert_eq!(code, Some(0), "bridge failed: {stderr}");
@@ -115,7 +118,7 @@ fn design_review_bridge_relays_unparsable_response_at_the_deadline() {
 
 #[test]
 fn design_review_bridge_unavailable_is_exit_nine() {
-    let handoff = temp_dir("none");
+    let (_keep_dir, handoff) = temp_dir("none");
     let (code, _stdout, stderr) = run_bridge(&handoff, "0.5", "{\"review_id\":\"ut-none\"}");
     assert_eq!(code, Some(9));
     assert!(stderr.contains("capability unavailable"));
@@ -123,7 +126,7 @@ fn design_review_bridge_unavailable_is_exit_nine() {
 
 #[test]
 fn design_review_bridge_rejects_a_non_object_packet() {
-    let handoff = temp_dir("bad");
+    let (_keep_dir, handoff) = temp_dir("bad");
     let (code, _stdout, stderr) = run_bridge(&handoff, "30", "[]");
     assert_eq!(code, Some(2));
     assert!(stderr.contains("packet must be a JSON object"));
