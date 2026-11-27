@@ -126,7 +126,8 @@
       "completions",
       "man",
       "feedback",
-      "job"
+      "job",
+      "design-review"
     ],
     "invocable": false
   },
@@ -5279,6 +5280,459 @@
             "json"
           ],
           "help": "Output format",
+          "index": null
+        }
+      ],
+      "subcommands": [],
+      "invocable": true
+    },
+    {
+      "path": "design-review",
+      "about": "Run an opt-in fresh-context design review (works in any git repository)",
+      "usage": "do-harness design-review [OPTIONS] <COMMAND>",
+      "aliases": [],
+      "args": [],
+      "subcommands": [
+        "run",
+        "dispose",
+        "bridge"
+      ],
+      "invocable": false
+    },
+    {
+      "path": "design-review run",
+      "about": "Assemble a frozen packet from a design document, launch one fresh reviewer process, and record the sanitized outcome",
+      "usage": "do-harness design-review run [OPTIONS] --design-doc <FILE> --record-out <FILE> --objective <TEXT> --proposed-contract <TEXT>",
+      "aliases": [],
+      "args": [
+        {
+          "id": "design_doc",
+          "kind": "option",
+          "short": null,
+          "long": "design-doc",
+          "value_names": [
+            "FILE"
+          ],
+          "required": true,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Frozen design document (repository-relative path)",
+          "index": null
+        },
+        {
+          "id": "revision",
+          "kind": "option",
+          "short": null,
+          "long": "revision",
+          "value_names": [
+            "REV"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [
+            "HEAD"
+          ],
+          "possible_values": [],
+          "help": "Revision every packet path is pinned to",
+          "index": null
+        },
+        {
+          "id": "record_out",
+          "kind": "option",
+          "short": null,
+          "long": "record-out",
+          "value_names": [
+            "FILE"
+          ],
+          "required": true,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Write the sanitized record here (canonical JSON)",
+          "index": null
+        },
+        {
+          "id": "review_id",
+          "kind": "option",
+          "short": null,
+          "long": "review-id",
+          "value_names": [
+            "ID"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Opaque review identifier (default: record-out file stem)",
+          "index": null
+        },
+        {
+          "id": "packet_out",
+          "kind": "option",
+          "short": null,
+          "long": "packet-out",
+          "value_names": [
+            "FILE"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Write the assembled packet here (canonical JSON)",
+          "index": null
+        },
+        {
+          "id": "objective",
+          "kind": "option",
+          "short": null,
+          "long": "objective",
+          "value_names": [
+            "TEXT"
+          ],
+          "required": true,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "The concrete design risk in one or two sentences",
+          "index": null
+        },
+        {
+          "id": "intended_behavior",
+          "kind": "option",
+          "short": null,
+          "long": "intended-behavior",
+          "value_names": [
+            "TEXT"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Expected observable behavior",
+          "index": null
+        },
+        {
+          "id": "constraint",
+          "kind": "option",
+          "short": null,
+          "long": "constraint",
+          "value_names": [
+            "TEXT"
+          ],
+          "required": false,
+          "repeatable": true,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Explicit constraint (repeatable)",
+          "index": null
+        },
+        {
+          "id": "proposed_contract",
+          "kind": "option",
+          "short": null,
+          "long": "proposed-contract",
+          "value_names": [
+            "TEXT"
+          ],
+          "required": true,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "The candidate contract (signatures, schemas, semantics)",
+          "index": null
+        },
+        {
+          "id": "open_question",
+          "kind": "option",
+          "short": null,
+          "long": "open-question",
+          "value_names": [
+            "TEXT"
+          ],
+          "required": false,
+          "repeatable": true,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Open question the author has genuinely not decided (repeatable)",
+          "index": null
+        },
+        {
+          "id": "source_path",
+          "kind": "option",
+          "short": null,
+          "long": "source-path",
+          "value_names": [
+            "PATH"
+          ],
+          "required": false,
+          "repeatable": true,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Repository-relative source path (repeatable)",
+          "index": null
+        },
+        {
+          "id": "test_path",
+          "kind": "option",
+          "short": null,
+          "long": "test-path",
+          "value_names": [
+            "PATH"
+          ],
+          "required": false,
+          "repeatable": true,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Repository-relative test path (repeatable)",
+          "index": null
+        },
+        {
+          "id": "doc_path",
+          "kind": "option",
+          "short": null,
+          "long": "doc-path",
+          "value_names": [
+            "PATH"
+          ],
+          "required": false,
+          "repeatable": true,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Repository-relative document path (repeatable)",
+          "index": null
+        },
+        {
+          "id": "reviewer_command_json",
+          "kind": "option",
+          "short": null,
+          "long": "reviewer-command-json",
+          "value_names": [
+            "JSON"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Reviewer process argv (JSON string array) that receives the packet on stdin. Explicit opt-in: without it nothing launches and the record says `not_run`",
+          "index": null
+        },
+        {
+          "id": "parent_marker",
+          "kind": "option",
+          "short": null,
+          "long": "parent-marker",
+          "value_names": [
+            "MARKER"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Parent-only isolation marker probed in the captured reviewer output; a leaked marker fails the review",
+          "index": null
+        },
+        {
+          "id": "limit_timeout",
+          "kind": "option",
+          "short": null,
+          "long": "limit-timeout",
+          "value_names": [
+            "SECS"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Reviewer deadline in seconds (default 300)",
+          "index": null
+        },
+        {
+          "id": "limit_findings",
+          "kind": "option",
+          "short": null,
+          "long": "limit-findings",
+          "value_names": [
+            "N"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Material-findings cap (default 5)",
+          "index": null
+        },
+        {
+          "id": "limit_output",
+          "kind": "option",
+          "short": null,
+          "long": "limit-output",
+          "value_names": [
+            "BYTES"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Reviewer output cap in bytes (default 65536)",
+          "index": null
+        },
+        {
+          "id": "meta",
+          "kind": "option",
+          "short": null,
+          "long": "meta",
+          "value_names": [
+            "JSON"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [
+            "{}"
+          ],
+          "possible_values": [],
+          "help": "Host/client/model provenance recorded with the record (JSON object)",
+          "index": null
+        }
+      ],
+      "subcommands": [],
+      "invocable": true
+    },
+    {
+      "path": "design-review dispose",
+      "about": "Disposition a recorded finding as confirmed, rejected, or unresolved",
+      "usage": "do-harness design-review dispose [OPTIONS] --record <FILE> --finding-id <ID> --status <STATUS>",
+      "aliases": [],
+      "args": [
+        {
+          "id": "record",
+          "kind": "option",
+          "short": null,
+          "long": "record",
+          "value_names": [
+            "FILE"
+          ],
+          "required": true,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Record file to update",
+          "index": null
+        },
+        {
+          "id": "finding_id",
+          "kind": "option",
+          "short": null,
+          "long": "finding-id",
+          "value_names": [
+            "ID"
+          ],
+          "required": true,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Finding id to disposition",
+          "index": null
+        },
+        {
+          "id": "status",
+          "kind": "option",
+          "short": null,
+          "long": "status",
+          "value_names": [
+            "STATUS"
+          ],
+          "required": true,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [
+            "confirmed",
+            "rejected",
+            "unresolved"
+          ],
+          "help": "Disposition verdict",
+          "index": null
+        },
+        {
+          "id": "note",
+          "kind": "option",
+          "short": null,
+          "long": "note",
+          "value_names": [
+            "TEXT"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Evidence-backed note recorded with the disposition",
+          "index": null
+        }
+      ],
+      "subcommands": [],
+      "invocable": true
+    },
+    {
+      "path": "design-review bridge",
+      "about": "Act as a host file-handoff reviewer bridge: packet on stdin, findings on stdout. Exit 9 with `capability unavailable` on stderr when no findings file appears within the wait",
+      "usage": "do-harness design-review bridge [OPTIONS] --handoff-dir <DIR>",
+      "aliases": [],
+      "args": [
+        {
+          "id": "handoff_dir",
+          "kind": "option",
+          "short": null,
+          "long": "handoff-dir",
+          "value_names": [
+            "DIR"
+          ],
+          "required": true,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Handoff directory for `packet.json` and `findings.json`",
+          "index": null
+        },
+        {
+          "id": "max_wait_s",
+          "kind": "option",
+          "short": null,
+          "long": "max-wait-s",
+          "value_names": [
+            "SECS"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [
+            "570"
+          ],
+          "possible_values": [],
+          "help": "Seconds to wait for the findings file before reporting the capability unavailable",
           "index": null
         }
       ],

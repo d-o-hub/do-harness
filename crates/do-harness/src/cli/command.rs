@@ -12,8 +12,9 @@ use crate::report::Format;
 
 use super::LearnArgs;
 use super::actions::{
-    CleanupArgs, DoctorAction, ErrorsAction, FeedbackAction, HelpersAction, HookAction, JobAction,
-    MetricsAction, PrAction, SetupAction, SkillsAction, TaskAction, TraceAction,
+    CleanupArgs, DesignReviewAction, DoctorAction, ErrorsAction, FeedbackAction, HelpersAction,
+    HookAction, JobAction, MetricsAction, PrAction, SetupAction, SkillsAction, TaskAction,
+    TraceAction,
 };
 
 /// Available subcommands.
@@ -383,5 +384,18 @@ pub enum Command {
     Job {
         #[command(subcommand)]
         action: JobAction,
+    },
+    /// Run an opt-in fresh-context design review (works in any git
+    /// repository).
+    ///
+    /// Assembles a frozen packet from a pinned design document, launches one
+    /// fresh reviewer process with a scrubbed environment, and records a
+    /// sanitized outcome (`success_with_findings`, `success_zero_findings`,
+    /// `failure`, `timeout`, `not_run`, or `unverified`). Explicit opt-in: a
+    /// reviewer runs only when `--reviewer-command-json` names its argv, and
+    /// no model is launched by default.
+    DesignReview {
+        #[command(subcommand)]
+        action: DesignReviewAction,
     },
 }

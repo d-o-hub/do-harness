@@ -614,13 +614,15 @@ argv = ["bash", "scripts/check-sdk-pack.sh"]
 when-changed = ["integrations/sdk-python/**", "integrations/sdk-ts/**", "scripts/check-sdk-pack.sh", "do-harness.toml"]
 
 [[sensors]]
-# Hermetic self-tests for the fresh-context review adapter (packet assembly,
-# hash stability, revision pinning, failure-path handling, sanitized
-# records). Never launches a reviewer or model; runs only deterministic
-# stub fixtures, so it is safe in CI.
+# Hermetic integration tests for the native design-review command (packet
+# assembly, hash stability, revision pinning, outcome taxonomy, marker
+# probe, dispositions, and the host bridge). Never launches a reviewer or
+# model; every reviewer response is a pre-placed findings file, so it is
+# safe in CI. The capability itself is the native `do-harness
+# design-review` subcommand, portable to any repository.
 name = "fresh-context-review"
-argv = ["python3", "scripts/tests/test_fresh_context_review.py"]
-when-changed = ["scripts/fresh-context-review.py", "scripts/fresh_context_review/**", "scripts/tests/test_fresh_context_review.py", "do-harness.toml"]
+argv = ["cargo", "test", "-p", "do-harness", "--test", "design_review", "--test", "design_review_outcomes", "--test", "design_review_bridge"]
+when-changed = ["crates/do-harness/src/design_review/**", "crates/do-harness/tests/design_review.rs", "crates/do-harness/tests/design_review_outcomes.rs", "crates/do-harness/tests/design_review_bridge.rs", "crates/do-harness/tests/support/design_review.rs", "crates/do-harness/tests/fixtures/design-review/**", "do-harness.toml"]
 
 [[sensors]]
 # Executable half of the consumer-impact contract: every release body carries a

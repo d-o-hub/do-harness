@@ -185,18 +185,25 @@ recorded in the review record.
 
 ## Adapter and invocation recipe
 
-Implementation: `scripts/fresh-context-review.py` (+ package under
-`scripts/fresh_context_review/`). It is an explicit opt-in manual command.
-It is **never wired into sensors, hooks, or CI**; the only CI-wired entry
-is the hermetic self-test suite (`scripts/tests/test_fresh_context_review.py`).
+Implementation: the native `do-harness design-review` command
+(`crates/do-harness/src/design_review/`). It is an explicit opt-in manual
+command usable in any git repository; it is **never wired into sensors,
+hooks, or CI**, and the only CI-wired entry is the hermetic integration
+suite (`crates/do-harness/tests/design_review.rs` and
+`design_review_bridge.rs`, the `fresh-context-review` sensor). The pilot
+first landed as repository-local Python (`scripts/fresh-context-review.py`);
+it moved into the CLI so every adopting codebase can run design reviews,
+per the Repository-Agnostic Capability Contract in AGENTS.md — a capability
+that only works in this checkout is a defect, not a feature.
 
 Assemble and launch a real review:
 
-<!-- example: id=fresh_context_review_invocation classification=parser-check-only reason="Explicit opt-in adapter example; no model or network runs in documentation tests" -->
+<!-- example: id=fresh_context_review_invocation classification=parser-check-only reason="Explicit opt-in native command example; no model or network runs in documentation tests" -->
 ```bash
-python3 scripts/fresh-context-review.py \
+do-harness design-review run \
   --design-doc docs/designs/authz-delegation.md \
   --revision <frozen-commit> \
+  --review-id issue-498-authz \
   --objective "Delegated authorization revocation timing" \
   --proposed-contract "revoke_delegation(...) invalidates cached grants" \
   --source-path crates/authz/src/delegation.rs \
@@ -209,46 +216,144 @@ python3 scripts/fresh-context-review.py \
 
 Notes:
 
-- `--reviewer-command-json` is the explicit opt-in; without it or
-  `--stub` the adapter records `not_run` and launches nothing.
+- `--reviewer-command-json` is the explicit opt-in; without it the command
+  records `not_run` and launches nothing.
 - `--parent-marker` seeds the probe; the operator places the same marker in
   their own conversation only.
 - `--limit-timeout`, `--limit-findings`, `--limit-output` override the
-  predeclared defaults; `--meta` records host/client/model versions.
+  predeclared defaults; `--meta` records host/client/model provenance.
 - Outcomes are recorded to `--record-out` (sanitized: fixed reason codes
-  and structured findings; no raw transcripts). Packet assembly or adapter
-  errors exit 2 without a record; all valid outcomes exit 0.
-- Disposition: `python3 scripts/fresh-context-review.py --dispose RECORD
+  and structured findings; no raw transcripts). Packet assembly errors
+  (unresolvable revision, pinned path missing at that revision, invalid
+  JSON arguments) exit 2 without a record; every recorded outcome —
+  success, failure, timeout, `not_run`, `unverified` — exits 0, because
+  the record carries the verdict.
+- Disposition: `do-harness design-review dispose --record RECORD
   --finding-id F1 --status confirmed --note "..."`.
 
-## Smoke fixtures and predeclared expectations
+### Host file-handoff bridge
 
-Deterministic stub fixture mode (`--stub`): `scripts/fresh_context_review/
-stub_reviewer.py` answers from committed expectation files. Expectations are
-predeclared in `scripts/fresh_context_review/fixtures/smoke/`:
+`do-harness design-review bridge` adapts a host-side reviewer — an
+operator-driven fresh agent session — to the reviewer process contract. It
+receives the packet on stdin, writes it verbatim to
+`<handoff-dir>/packet.json`, and waits for the host to place
+`<handoff-dir>/findings.json`, relaying that file verbatim on stdout. It
+waits out partial writes: the file is accepted once it parses as JSON, and
+a response that never parses is relayed at the deadline so the adapter
+classifies the invalid reviewer output as a failure. No findings file
+within `--max-wait-s` exits 9 with `capability unavailable` on stderr — the
+adapter's `not_run` contract, never a success. The bridge launches no model
+and echoes neither the packet nor any host context; its hermetic tests live
+in `crates/do-harness/tests/design_review_bridge.rs` (the
+`fresh-context-review` sensor).
 
-| Case | Scenario | Predeclared expectation |
-| --- | --- | --- |
-| `smoke-flawed` | `flawed` | `success_with_findings`, exactly F1+F2 (planted revocation-cache defect). |
-| `smoke-sound` | `sound` | `success_zero_findings` (independently checked sound migration design). |
-| `smoke-fail` | `fail` | `failure` (reviewer exit 17). |
-| `smoke-timeout` | `timeout` | `timeout` (deadline enforced; stub sleeps). |
-| `smoke-unavailable` | `unavailable` | `not_run` (reviewer declares capability unavailable). |
-| `smoke-leak` | `leak` | `failure` with `marker_leaked: true` (parent-only marker appears in reviewer output). |
+## Deterministic fixtures and predeclared expectations
+
+The frozen fixture designs and their predeclared expectations are committed
+at `crates/do-harness/tests/fixtures/design-review/`:
+
+| File | Predeclared expectation |
+| --- | --- |
+| `flawed-design.md` + `flawed-expected.json` | The planted revocation-cache defect yields exactly findings F1+F2. |
+| `sound-design.md` + `sound-expected.json` | The independently checked sound migration design yields zero findings. |
+| `leak-marker.txt` | The parent-only marker appearing in reviewer output is `failure` with `marker_leaked: true`. |
 
 A missed planted defect is a recorded negative result; a successful run does
 not prove general effectiveness.
 
-The smoke suite runs `python3 scripts/fresh-context-review.py --smoke`, which
-executes all six cases against the stub and writes the committed record
-`plans/fresh-context-review-smoke-record.json`. It exits nonzero if any case
-misses its predeclared expectation.
+The deterministic mechanical proof is the hermetic integration suite
+(`cargo test -p do-harness --test design_review --test
+design_review_bridge`, the `fresh-context-review` sensor): the reviewer
+process is the CLI's own bridge action with pre-placed findings files, so
+every outcome class — success with findings, zero findings, failure
+(nonzero exit, invalid JSON, missing fields, oversized output), timeout,
+`not_run`, marker leak, `unverified` — is exercised in CI without ever
+launching a model. The retired Python stub smoke suite produced the
+committed stage-1 record below.
 
 ## Smoke-test record
 
-Committed at `plans/fresh-context-review-smoke-record.json`. It contains per-
-case outcome, expectation, finding ids, marker probe result, and elapsed
-time, plus the suite-level usage note (zero model/token usage in stub mode).
+Committed at `plans/fresh-context-review-smoke-record.json` (stage 1, the
+Python stub suite before the capability moved into the CLI). It contains
+per-case outcome, expectation, finding ids, marker probe result, and
+elapsed time, plus the suite-level usage note (zero model/token usage in
+stub mode). Its outcomes are now pinned continuously by the native
+integration suite instead of a record-regenerating smoke command.
+
+## Live reviewer pass (predeclared protocol)
+
+One recorded real reviewer pass per case, run through the adapter with the
+host file-handoff bridge. The protocol below was predeclared and committed
+before the runs; the recorded outcomes follow it.
+
+- **Reviewer**: one fresh-context child agent of the operating host session
+  per case, launched with its own role instructions and a first message
+  containing only the handoff paths. It inherits no parent conversation.
+- **Cases**: `live-flawed` and `live-sound`, the same frozen fixture designs
+  as the deterministic suite. The packet lists only the design document; the
+  committed `*-expected.json` files stay operator-side because they contain
+  the planted defect and expected findings (handing them to the reviewer
+  would leak the answer).
+- **Limits**: one review pass per case, no retries or convergence loop;
+  adapter timeout 600 s; bridge `--max-wait-s 570`; at most 5 findings;
+  64 KiB output cap.
+- **Marker probe**: a unique parent-only marker placed in the operator's
+  conversation only. Its value appears nowhere committed and is not given to
+  the reviewer; the committed recipe keeps a placeholder. Expected:
+  `marker_leaked: false`.
+- **Predeclared expectations**: `live-flawed` → `success_with_findings` with
+  at least one finding identifying the revocation/snapshot-invalidation
+  defect class (the planted defect); a miss is a recorded negative result.
+  `live-sound` → `success_zero_findings`; any finding is a recorded false
+  positive, dispositioned individually.
+- **Usage provenance**: the host does not expose a per-reviewer token meter;
+  usage is recorded as `unavailable` with that reason, never estimated and
+  never fabricated from elapsed time.
+- **Isolation evidence**: parent-conversation isolation is evidenced only by
+  the marker probe (a negative result per case). The child inherits
+  host-injected instructions (its system prompt, the repository's AGENTS.md,
+  and the skills catalog) that cannot be excluded, and it has host tool
+  access — this host offers no read-only reviewer capability, so the
+  instructions confine it to the packet and the documents it lists. Both
+  facts are recorded as limitations, not proof.
+- **Decision rule**: each finding is dispositioned `confirmed` / `rejected`
+  with evidence / `unresolved`. Both fixture designs are synthetic, so
+  dispositions adjudicate detection correctness only; no production
+  correction follows from either case.
+
+Invocation recipe (recorded; the same shape produced both committed live
+records, with `<pinned-commit>` resolved to the predeclared-protocol
+commit):
+
+<!-- example: id=fresh_context_review_live_invocation classification=parser-check-only reason="Explicit opt-in live-run example; no model or network runs in documentation tests" -->
+```bash
+HANDOFF=".do-harness/fresh-review-handoff-live-flawed"
+rm -rf "$HANDOFF" && mkdir -p "$HANDOFF"
+do-harness design-review run \
+  --design-doc crates/do-harness/tests/fixtures/design-review/flawed-design.md \
+  --revision <pinned-commit> \
+  --review-id live-flawed \
+  --record-out plans/fresh-context-review-live-flawed.json \
+  --objective "Delegated admin permissions apply transitively through group membership and must be revocable immediately." \
+  --intended-behavior "grant_delegation grants perms to a group and its transitive members; revoke_delegation withdraws them transitively; effective_permissions reflects both at authorization time." \
+  --constraint "revocation must be immediate, never stale" \
+  --constraint "cache use is allowed but must not serve stale data" \
+  --constraint "no new schema in scope" \
+  --proposed-contract "grant_delegation(delegator, group_id, perms); revoke_delegation(delegator, group_id, perms); effective_permissions(subject_id) -> set[perm]" \
+  --open-question "Is eventual consistency acceptable for revocation?" \
+  --open-question "Is the delegation snapshot invalidated on every graph mutation?" \
+  --doc-path crates/do-harness/tests/fixtures/design-review/flawed-design.md \
+  --reviewer-command-json "[\"do-harness\",\"design-review\",\"bridge\",\"--handoff-dir\",\"$HANDOFF\",\"--max-wait-s\",\"570\"]" \
+  --parent-marker "<unique-parent-only-marker>" \
+  --limit-timeout 600 \
+  --meta '{"reviewer_provenance":"operator-supplied fresh-context child agent"}'
+```
+
+The `live-sound` case is identical in shape with
+`sound-design.md`/`live-sound` names, the sound objective and contract, and
+its own handoff directory. The recorded packets pin every input; the
+committed records are `plans/fresh-context-review-live-flawed.json` and
+`plans/fresh-context-review-live-sound.json`.
 
 ## Observations and limitations
 
@@ -264,23 +369,26 @@ are recorded as unavailable.
 
 Limitations:
 
-- Stub smoke proves adapter mechanics **only**: frozen packets, fresh
-  process launch, bounded capture, outcome classification, sanitized
-  records. It does not prove model context isolation or defect-detection
-  benefit — that requires a real reviewer run with the parent-only marker
-  probe, recorded as the next opt-in step.
-- A real reviewer run is opt-in and consumes no budget in this pilot. The
-  next step is to run one recorded real pass (cheap local executor per the
-  `docs/workflow-benchmarks.md` adapter contract, or a provider adapter with
-  explicit budget) and record its findings, elapsed, and usage with
-  provenance.
+- The deterministic suite proves command mechanics **only**: frozen
+  packets, fresh process launch, scrubbed environment, bounded capture,
+  outcome classification, sanitized records. It does not prove model
+  context isolation or defect-detection benefit — that requires a real
+  reviewer run with the parent-only marker probe, recorded as the next
+  opt-in step.
+- A real reviewer run is opt-in and consumes no paid budget in this pilot.
+  The next step is to run one recorded real pass through
+  `do-harness design-review run` with the host bridge (or a provider
+  reviewer with explicit budget) and record its findings, elapsed, and
+  usage with provenance.
 - Host/client/model versions are recorded only when supplied via `--meta`.
 
 ## Handoff to #499
 
 Issue #499 owns repeated-effectiveness measurement and the adoption
-decision. This pilot supplies: the packet/finding formats, the adapter, the
-deterministic fixtures, the smoke record, and the isolation-evidence rules.
+decision. This pilot supplies: the packet/finding formats, the native
+`do-harness design-review` command, the deterministic fixtures and
+integration suite, the stage-1 smoke record, and the isolation-evidence
+rules.
 Issue #499 should reuse the paired-run protocol from `docs/workflow-benchmarks.md`
 (identical inputs, alternating order, predeclared tolerance and sample size)
 to measure whether a fresh-context reviewer reduces unresolved assumptions

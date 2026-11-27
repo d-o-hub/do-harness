@@ -2512,6 +2512,105 @@ and never renews it; a terminal job resumes as an idempotent no-op. The global
 <!-- END GENERATED: cli-contract job status -->
 Report durable receipts under `.do-harness/jobs/` without running anything.
 
+### `design-review`
+<!-- BEGIN GENERATED: cli-contract design-review -->
+`do-harness design-review [OPTIONS] <COMMAND>`
+
+Subcommands: `run`, `dispose`, `bridge`.
+<!-- END GENERATED: cli-contract design-review -->
+Run an opt-in fresh-context design review. Works in any git repository: the
+command resolves the repository root the same way `pr` does, so an adopter
+outside this checkout gets identical behavior. It assembles a frozen packet
+from a pinned design document, launches exactly one fresh reviewer process
+(a separate process with a scrubbed environment whose only input is the
+packet on stdin), and records a sanitized outcome. Nothing here is wired
+into sensors, hooks, or CI, and no model is launched by default: without
+`--reviewer-command-json` the command records `not_run` and launches
+nothing. Outcomes are distinct and exhaustive: `success_with_findings`,
+`success_zero_findings`, `failure`, `timeout`, `not_run`, and `unverified`
+— an unavailable or unverified capability is never a success, and every
+recorded outcome exits `0` because the record carries the verdict. Packet
+assembly problems (unresolvable revision, a pinned path missing at that
+revision, invalid JSON arguments) exit `2` without a record. A
+parent-only marker passed with `--parent-marker` is probed in the captured
+reviewer output; a leaked marker fails the review. The experiment protocol,
+packet format, and outcome semantics are documented in
+`plans/fresh-context-review-experiment.md`.
+
+#### `design-review run`
+<!-- BEGIN GENERATED: cli-contract design-review run -->
+`do-harness design-review run [OPTIONS] --design-doc <FILE> --record-out <FILE> --objective <TEXT> --proposed-contract <TEXT>`
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `--design-doc <FILE>` | yes | — | — | Frozen design document (repository-relative path) |
+| `--revision <REV>` | no | `HEAD` | — | Revision every packet path is pinned to |
+| `--record-out <FILE>` | yes | — | — | Write the sanitized record here (canonical JSON) |
+| `--review-id <ID>` | no | — | — | Opaque review identifier (default: record-out file stem) |
+| `--packet-out <FILE>` | no | — | — | Write the assembled packet here (canonical JSON) |
+| `--objective <TEXT>` | yes | — | — | The concrete design risk in one or two sentences |
+| `--intended-behavior <TEXT>` | no | — | — | Expected observable behavior |
+| `--constraint <TEXT>` (repeatable) | no | — | — | Explicit constraint (repeatable) |
+| `--proposed-contract <TEXT>` | yes | — | — | The candidate contract (signatures, schemas, semantics) |
+| `--open-question <TEXT>` (repeatable) | no | — | — | Open question the author has genuinely not decided (repeatable) |
+| `--source-path <PATH>` (repeatable) | no | — | — | Repository-relative source path (repeatable) |
+| `--test-path <PATH>` (repeatable) | no | — | — | Repository-relative test path (repeatable) |
+| `--doc-path <PATH>` (repeatable) | no | — | — | Repository-relative document path (repeatable) |
+| `--reviewer-command-json <JSON>` | no | — | — | Reviewer process argv (JSON string array) that receives the packet on stdin. Explicit opt-in: without it nothing launches and the record says `not_run` |
+| `--parent-marker <MARKER>` | no | — | — | Parent-only isolation marker probed in the captured reviewer output; a leaked marker fails the review |
+| `--limit-timeout <SECS>` | no | — | — | Reviewer deadline in seconds (default 300) |
+| `--limit-findings <N>` | no | — | — | Material-findings cap (default 5) |
+| `--limit-output <BYTES>` | no | — | — | Reviewer output cap in bytes (default 65536) |
+| `--meta <JSON>` | no | `{}` | — | Host/client/model provenance recorded with the record (JSON object) |
+<!-- END GENERATED: cli-contract design-review run -->
+Assemble the packet, launch one fresh reviewer, and write the sanitized
+record to `--record-out` (canonical JSON: fixed reason codes and
+structured findings; raw reviewer output never enters the record). The
+reviewer argv is the explicit opt-in: a JSON string array naming a process
+that receives the packet on stdin and prints a findings JSON object
+(`{"findings": [...]}`, each finding with `contract_or_path`, `trigger`,
+`consequence`, `evidence`, and `smallest_correction`) on stdout. `--meta`
+records host/client/model provenance verbatim. The packet lists
+repository-relative paths pinned to `--revision` (default `HEAD`); every
+listed path must exist at that revision or assembly fails closed.
+
+#### `design-review dispose`
+<!-- BEGIN GENERATED: cli-contract design-review dispose -->
+`do-harness design-review dispose [OPTIONS] --record <FILE> --finding-id <ID> --status <STATUS>`
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `--record <FILE>` | yes | — | — | Record file to update |
+| `--finding-id <ID>` | yes | — | — | Finding id to disposition |
+| `--status <STATUS>` | yes | — | `confirmed`, `rejected`, `unresolved` | Disposition verdict |
+| `--note <TEXT>` | no | — | — | Evidence-backed note recorded with the disposition |
+<!-- END GENERATED: cli-contract design-review dispose -->
+Dispositions a recorded finding as `confirmed`, `rejected` (with the
+evidence in `--note`), or `unresolved`. Dispositions are recorded in the
+record's `dispositions` array; re-dispositioning the same finding replaces
+its entry, and a finding id that is not in the record is a usage error.
+
+#### `design-review bridge`
+<!-- BEGIN GENERATED: cli-contract design-review bridge -->
+`do-harness design-review bridge [OPTIONS] --handoff-dir <DIR>`
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `--handoff-dir <DIR>` | yes | — | — | Handoff directory for `packet.json` and `findings.json` |
+| `--max-wait-s <SECS>` | no | `570` | — | Seconds to wait for the findings file before reporting the capability unavailable |
+<!-- END GENERATED: cli-contract design-review bridge -->
+Act as a host file-handoff reviewer: receive the packet on stdin, write it
+verbatim to `<handoff-dir>/packet.json`, and wait for the host to place
+`<handoff-dir>/findings.json`, relaying that file verbatim on stdout. This
+is how an operator-driven fresh agent session (which cannot be spawned as
+a subprocess) satisfies the reviewer process contract. A findings file
+that is still growing is waited out (accepted once it parses as JSON); a
+response that never parses is relayed verbatim at the deadline so the
+adapter classifies the invalid reviewer output as a failure. No findings
+file within `--max-wait-s` is an unavailable capability: exit `9` with
+`capability unavailable` on stderr, the `not_run` contract. An invalid
+packet on stdin is a usage error (exit `2`).
+
 ## Exit Codes
 
 | Exit Code | Classification | Meaning |
