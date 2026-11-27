@@ -1277,6 +1277,68 @@ measured duration of zero is a real measurement and exports as `0`.
 window resets them; scrape without a window for monotonic totals. The command is
 read-only: it never runs a sensor and never writes state.
 
+### `timeline`
+
+<!-- BEGIN GENERATED: cli-contract timeline -->
+`do-harness timeline [OPTIONS] --evidence <FILE>`
+
+| Argument | Required | Default | Possible values | Description |
+| --- | --- | --- | --- | --- |
+| `--evidence <FILE>` (repeatable) | yes | — | — | Saved evidence artifact, in attempt order (repeat once per attempt) |
+| `--status <FILE>` (repeatable) | no | — | — | Captured `status --format json` snapshot (repeat once per observation) |
+| `--out <FILE>` | no | — | — | Write the rendered timeline here; `-` writes to stdout (default: timeline.html for HTML, stdout for JSON) |
+| `--format <FORMAT>` | no | `html` | `html`, `json` | Output format |
+<!-- END GENERATED: cli-contract timeline -->
+
+Render saved verification attempts as one local page: the order the caller
+supplied, each attempt's revision and signal set, per-sensor verdicts, and the
+wall-clock duration that run measured (`EvidenceSensor.duration_ms`). Each
+attempt links to its own saved artifact, so the page never becomes the source of
+truth — the evidence stays authoritative and the reviewer can open the file the
+page describes.
+
+Capture one artifact per attempt, because the default evidence destination holds
+only the latest run for its signal set:
+
+<!-- example: id=cli_timeline_capture classification=illustrative reason="Timeline capture workflow" -->
+```bash
+do-harness verify --set verification --record --evidence .do-harness/attempt1.json
+do-harness status --set verification --evidence .do-harness/attempt1.json \
+  --format json > status1.json
+# edit the workspace until `status` reports stale, then fix and rerun
+do-harness verify --set verification --record --evidence .do-harness/attempt2.json
+do-harness status --set verification --evidence .do-harness/attempt2.json \
+  --format json > status2.json
+do-harness timeline \
+  --evidence .do-harness/attempt1.json --evidence .do-harness/attempt2.json \
+  --status status1.json --status status2.json --out timeline.html
+```
+
+Every attempt carries its verdict, so `fail`, `warn`, `skip`, and missing
+evidence stay distinguishable, and reused checks keep the disposition the
+evidence contract recorded for them. Between consecutive attempts the page shows
+what moved (revision, workspace, policy, config, signal set, sensor input
+identity) and reports an evidence chain break as a coverage gap instead of
+implying continuity.
+
+Freshness is a *sequence*, not a single value: the same artifact is red when it
+was just recorded, stale after an edit, and green again once a rerun passes.
+Each captured `status --format json` snapshot records the digest of the artifact
+it judged (`evidence.artifact`), so the timeline binds every observation to the
+exact bytes it saw and renders them in supplied order with the observation time.
+A snapshot from a binary that predates that field falls back to the recorded
+fingerprints and says so; a snapshot that matches no supplied attempt is reported
+as a coverage gap rather than assigned to one. An attempt with no observation
+renders `freshness: unknown`.
+
+Order is supplied order by design: independently saved artifacts have no reliable
+total order, and inventing one from timestamps would misreport two runs in the
+same second. The page is self-contained — inline stylesheet, escaped text, local
+links only — so it opens offline with no network request. An artifact outside the
+supported evidence schema window, an unparsable snapshot, or attempts recorded
+against different workspaces are usage errors (`2`) that name the offending file
+and the remedy (`verify --record`).
+
 ### `sensor`
 <!-- BEGIN GENERATED: cli-contract sensor -->
 `do-harness sensor [OPTIONS] <COMMAND>`

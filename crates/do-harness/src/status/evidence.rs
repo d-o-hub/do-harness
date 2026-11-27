@@ -1,7 +1,10 @@
-use super::EvidenceSide;
+use super::{EvidenceArtifactRef, EvidenceSide};
 use crate::evidence::EvidenceDocument;
 
-pub(super) fn evidence_side(document: &EvidenceDocument) -> EvidenceSide {
+pub(super) fn evidence_side(
+    document: &EvidenceDocument,
+    artifact: Option<&EvidenceArtifactRef>,
+) -> EvidenceSide {
     let mut failed = Vec::new();
     let mut warned = Vec::new();
     let mut skipped = Vec::new();
@@ -21,5 +24,6 @@ pub(super) fn evidence_side(document: &EvidenceDocument) -> EvidenceSide {
         failed,
         warned,
         skipped,
+        artifact: artifact.cloned(),
     }
 }

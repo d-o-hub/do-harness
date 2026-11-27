@@ -442,6 +442,14 @@ async fn route(root: &Path, config_path: Option<PathBuf>, cli: Cli) -> Result<()
             };
             crate::reports::run(root, &filter, args.format).await
         }
+        Command::Timeline(args) => crate::timeline::run(
+            root,
+            &args.evidence,
+            &args.status,
+            args.format,
+            args.out.as_deref(),
+        )
+        .map_err(CliError::Usage),
         Command::Sensor(args) => match args.action {
             crate::cli::SensorAction::New(args) => {
                 crate::sensor_new::run(root, config_path.as_deref(), &args, cli.dry_run).await

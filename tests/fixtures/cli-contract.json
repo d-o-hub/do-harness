@@ -114,6 +114,7 @@
       "doctor",
       "metrics",
       "report",
+      "timeline",
       "sensor",
       "learn",
       "overlap",
@@ -4128,6 +4129,85 @@
           "default_values": [],
           "possible_values": [],
           "help": "Aggregate across all workstreams and scopes",
+          "index": null
+        }
+      ],
+      "subcommands": [],
+      "invocable": true
+    },
+    {
+      "path": "timeline",
+      "about": "Render an offline timeline of saved verification attempts (issue #647)",
+      "usage": "do-harness timeline [OPTIONS] --evidence <FILE>",
+      "aliases": [],
+      "args": [
+        {
+          "id": "evidence",
+          "kind": "option",
+          "short": null,
+          "long": "evidence",
+          "value_names": [
+            "FILE"
+          ],
+          "required": true,
+          "repeatable": true,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Saved evidence artifact, in attempt order (repeat once per attempt)",
+          "index": null
+        },
+        {
+          "id": "status",
+          "kind": "option",
+          "short": null,
+          "long": "status",
+          "value_names": [
+            "FILE"
+          ],
+          "required": false,
+          "repeatable": true,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Captured `status --format json` snapshot (repeat once per observation)",
+          "index": null
+        },
+        {
+          "id": "out",
+          "kind": "option",
+          "short": null,
+          "long": "out",
+          "value_names": [
+            "FILE"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [],
+          "possible_values": [],
+          "help": "Write the rendered timeline here; `-` writes to stdout (default: timeline.html for HTML, stdout for JSON)",
+          "index": null
+        },
+        {
+          "id": "format",
+          "kind": "option",
+          "short": null,
+          "long": "format",
+          "value_names": [
+            "FORMAT"
+          ],
+          "required": false,
+          "repeatable": false,
+          "takes_value": true,
+          "default_values": [
+            "html"
+          ],
+          "possible_values": [
+            "html",
+            "json"
+          ],
+          "help": "Output format",
           "index": null
         }
       ],

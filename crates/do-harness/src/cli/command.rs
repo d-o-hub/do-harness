@@ -288,6 +288,8 @@ pub enum Command {
     },
     /// Export recorded sensor executions (durations, exit codes, failures).
     Report(#[command(flatten)] super::actions::ReportArgs),
+    /// Render an offline timeline of saved verification attempts (issue #647).
+    Timeline(#[command(flatten)] super::actions::TimelineArgs),
     /// Scaffold and validate a new sensor entry.
     Sensor(#[command(flatten)] super::actions::SensorArgs),
     /// Draft skill/guide updates from sensors that keep firing (never applies them).

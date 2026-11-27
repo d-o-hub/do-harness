@@ -88,6 +88,7 @@ mod stdout;
 mod sync;
 mod task;
 mod telemetry;
+mod timeline;
 mod trace;
 mod util;
 mod verify;

@@ -5,6 +5,28 @@ use std::path::{Path, PathBuf};
 use crate::evidence::EvidenceDocument;
 use crate::status::default_path_for_set;
 
+/// The artifact a status snapshot was computed from, bound by content digest.
+pub(super) struct LocatedArtifact {
+    /// Resolved path of the artifact.
+    pub(super) path: PathBuf,
+    /// SHA-256 of the artifact bytes (`sha256:…`).
+    pub(super) sha256: String,
+}
+
+/// Describes `bytes` at `path` as the artifact a snapshot observed.
+///
+/// The digest lets a later report bind an observation to the exact artifact
+/// bytes it judged: two attempts can record identical input fingerprints (a
+/// clean tree hashes the same however its files changed), so the artifact
+/// content is the only stable identity.
+pub(super) fn located(path: &Path, bytes: &[u8]) -> LocatedArtifact {
+    use sha2::{Digest, Sha256};
+    LocatedArtifact {
+        path: path.to_path_buf(),
+        sha256: format!("sha256:{}", hex::encode(Sha256::digest(bytes))),
+    }
+}
+
 /// How the evidence search resolved.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum Coverage {
@@ -47,7 +69,7 @@ pub(super) fn find_covering_evidence(
     paths: &[PathBuf],
     set: Option<&str>,
     required: &[String],
-) -> (Option<EvidenceDocument>, Coverage) {
+) -> (Option<EvidenceDocument>, Coverage, Option<LocatedArtifact>) {
     let mut coverage = Coverage::None;
     for path in paths {
         let Ok(bytes) = crate::managed_path::read_evidence(path) else {
@@ -56,7 +78,7 @@ pub(super) fn find_covering_evidence(
         match serde_json::from_slice::<EvidenceDocument>(&bytes) {
             Ok(document) => {
                 if qualifies(&document, set, required) {
-                    return (Some(document), Coverage::Found);
+                    return (Some(document), Coverage::Found, Some(located(path, &bytes)));
                 }
                 coverage = Coverage::SetMismatch;
             }
@@ -68,14 +90,14 @@ pub(super) fn find_covering_evidence(
         }
     }
     if set.is_none() {
-        return (None, coverage);
+        return (None, coverage, None);
     }
     // Fallback: a stronger per-set artifact can satisfy a weaker contract.
     let Some(dir) = paths[0].parent() else {
-        return (None, coverage);
+        return (None, coverage, None);
     };
     let Ok(entries) = std::fs::read_dir(dir) else {
-        return (None, coverage);
+        return (None, coverage, None);
     };
     let mut siblings: Vec<PathBuf> = entries
         .filter_map(|entry| entry.ok().map(|e| e.path()))
@@ -94,11 +116,15 @@ pub(super) fn find_covering_evidence(
         };
         if let Ok(document) = serde_json::from_slice::<EvidenceDocument>(&bytes) {
             if qualifies(&document, set, required) {
-                return (Some(document), Coverage::Found);
+                return (
+                    Some(document),
+                    Coverage::Found,
+                    Some(located(&path, &bytes)),
+                );
             }
         }
     }
-    (None, coverage)
+    (None, coverage, None)
 }
 
 /// Whether `document` can satisfy `set`: exact set match, or a config-share

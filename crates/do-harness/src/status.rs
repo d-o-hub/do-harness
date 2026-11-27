@@ -67,6 +67,24 @@ pub struct EvidenceSide {
     /// Non-fresh sensor names (`skip` verdict).
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub skipped: Vec<String>,
+    /// Artifact this snapshot was computed from, bound by content digest.
+    ///
+    /// A later report binds an observation to the exact bytes it judged: the
+    /// recorded input fingerprints cannot do that, because a clean tree hashes
+    /// the same however its files changed.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub artifact: Option<EvidenceArtifactRef>,
+}
+
+/// The evidence artifact a status snapshot was computed from.
+#[derive(Debug, Clone, Serialize)]
+pub struct EvidenceArtifactRef {
+    /// Resolved path of the artifact.
+    pub path: String,
+    /// SHA-256 of the artifact bytes (`sha256:…`).
+    pub sha256: String,
+    /// Unix seconds when the snapshot was computed.
+    pub observed_at: i64,
 }
 
 /// Current side of the status comparison.
@@ -156,9 +174,21 @@ pub fn status_report(
     {
         running_report(set, facts.side, running)
     } else {
-        let (document, covering) = find_covering_evidence(&paths, set, &facts.required);
+        let (document, covering, artifact) = find_covering_evidence(&paths, set, &facts.required);
         if let Some(document) = document {
-            decide(set, &facts, &document)
+            decide(
+                set,
+                &facts,
+                &document,
+                artifact
+                    .as_ref()
+                    .map(|located| EvidenceArtifactRef {
+                        path: located.path.to_string_lossy().into_owned(),
+                        sha256: located.sha256.clone(),
+                        observed_at: do_harness_db::unix_now(),
+                    })
+                    .as_ref(),
+            )
         } else {
             missing_report(set, &paths, covering, facts.side)
         }
@@ -281,9 +311,14 @@ fn current_input_side(facts: &CurrentFacts, document: &EvidenceDocument) -> Curr
 /// stronger cross-set evidence decides green when it shares the config
 /// fingerprint and covers every required sensor — even when sensors outside
 /// the requested contract failed.
-fn decide(set: Option<&str>, facts: &CurrentFacts, document: &EvidenceDocument) -> StatusReport {
+fn decide(
+    set: Option<&str>,
+    facts: &CurrentFacts,
+    document: &EvidenceDocument,
+    artifact: Option<&EvidenceArtifactRef>,
+) -> StatusReport {
     let current_side = current_input_side(facts, document);
-    let evidence = evidence_side(document);
+    let evidence = evidence_side(document, artifact);
     let (passed, executed) = recorded_sensors(document);
     let same_set = document.signal_set.as_deref() == set;
     let covers = covers(facts, same_set, &executed, &passed);
