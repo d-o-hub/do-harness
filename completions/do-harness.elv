@@ -71,6 +71,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand man 'Generate man page documentation'
             cand feedback 'Manage impact-gated feedback and issue proposals'
             cand job 'Run and inspect explicitly invoked unattended jobs'
+            cand design-review 'Run an opt-in fresh-context design review (works in any git repository)'
             cand help 'Print this message or the help of the given subcommand(s)'
         }
         &'do-harness;version'= {
@@ -1655,6 +1656,97 @@ set edit:completion:arg-completer[do-harness] = {|@words|
         }
         &'do-harness;job;help;help'= {
         }
+        &'do-harness;design-review'= {
+            cand --root 'Workspace root override (default: walk up from cwd)'
+            cand --config 'Explicit path to do-harness.toml'
+            cand --output 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)'
+            cand -q 'Suppress PASS/WARN verdict lines and the success footer'
+            cand --quiet 'Suppress PASS/WARN verdict lines and the success footer'
+            cand --dry-run 'Dry run without side effects'
+            cand -h 'Print help (see more with ''--help'')'
+            cand --help 'Print help (see more with ''--help'')'
+            cand -V 'Print version'
+            cand --version 'Print version'
+            cand run 'Assemble a frozen packet from a design document, launch one fresh reviewer process, and record the sanitized outcome'
+            cand dispose 'Disposition a recorded finding as confirmed, rejected, or unresolved'
+            cand bridge 'Act as a host file-handoff reviewer bridge: packet on stdin, findings on stdout. Exit 9 with `capability unavailable` on stderr when no findings file appears within the wait'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'do-harness;design-review;run'= {
+            cand --design-doc 'Frozen design document (repository-relative path)'
+            cand --revision 'Revision every packet path is pinned to'
+            cand --record-out 'Write the sanitized record here (canonical JSON)'
+            cand --review-id 'Opaque review identifier (default: record-out file stem)'
+            cand --packet-out 'Write the assembled packet here (canonical JSON)'
+            cand --objective 'The concrete design risk in one or two sentences'
+            cand --intended-behavior 'Expected observable behavior'
+            cand --constraint 'Explicit constraint (repeatable)'
+            cand --proposed-contract 'The candidate contract (signatures, schemas, semantics)'
+            cand --open-question 'Open question the author has genuinely not decided (repeatable)'
+            cand --source-path 'Repository-relative source path (repeatable)'
+            cand --test-path 'Repository-relative test path (repeatable)'
+            cand --doc-path 'Repository-relative document path (repeatable)'
+            cand --reviewer-command-json 'Reviewer process argv (JSON string array) that receives the packet on stdin. Explicit opt-in: without it nothing launches and the record says `not_run`'
+            cand --parent-marker 'Parent-only isolation marker probed in the captured reviewer output; a leaked marker fails the review'
+            cand --limit-timeout 'Reviewer deadline in seconds (default 300)'
+            cand --limit-findings 'Material-findings cap (default 5)'
+            cand --limit-output 'Reviewer output cap in bytes (default 65536)'
+            cand --meta 'Host/client/model provenance recorded with the record (JSON object)'
+            cand --root 'Workspace root override (default: walk up from cwd)'
+            cand --config 'Explicit path to do-harness.toml'
+            cand --output 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)'
+            cand -q 'Suppress PASS/WARN verdict lines and the success footer'
+            cand --quiet 'Suppress PASS/WARN verdict lines and the success footer'
+            cand --dry-run 'Dry run without side effects'
+            cand -h 'Print help'
+            cand --help 'Print help'
+            cand -V 'Print version'
+            cand --version 'Print version'
+        }
+        &'do-harness;design-review;dispose'= {
+            cand --record 'Record file to update'
+            cand --finding-id 'Finding id to disposition'
+            cand --status 'Disposition verdict'
+            cand --note 'Evidence-backed note recorded with the disposition'
+            cand --root 'Workspace root override (default: walk up from cwd)'
+            cand --config 'Explicit path to do-harness.toml'
+            cand --output 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)'
+            cand -q 'Suppress PASS/WARN verdict lines and the success footer'
+            cand --quiet 'Suppress PASS/WARN verdict lines and the success footer'
+            cand --dry-run 'Dry run without side effects'
+            cand -h 'Print help (see more with ''--help'')'
+            cand --help 'Print help (see more with ''--help'')'
+            cand -V 'Print version'
+            cand --version 'Print version'
+        }
+        &'do-harness;design-review;bridge'= {
+            cand --handoff-dir 'Handoff directory for `packet.json` and `findings.json`'
+            cand --max-wait-s 'Seconds to wait for the findings file before reporting the capability unavailable'
+            cand --root 'Workspace root override (default: walk up from cwd)'
+            cand --config 'Explicit path to do-harness.toml'
+            cand --output 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)'
+            cand -q 'Suppress PASS/WARN verdict lines and the success footer'
+            cand --quiet 'Suppress PASS/WARN verdict lines and the success footer'
+            cand --dry-run 'Dry run without side effects'
+            cand -h 'Print help'
+            cand --help 'Print help'
+            cand -V 'Print version'
+            cand --version 'Print version'
+        }
+        &'do-harness;design-review;help'= {
+            cand run 'Assemble a frozen packet from a design document, launch one fresh reviewer process, and record the sanitized outcome'
+            cand dispose 'Disposition a recorded finding as confirmed, rejected, or unresolved'
+            cand bridge 'Act as a host file-handoff reviewer bridge: packet on stdin, findings on stdout. Exit 9 with `capability unavailable` on stderr when no findings file appears within the wait'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'do-harness;design-review;help;run'= {
+        }
+        &'do-harness;design-review;help;dispose'= {
+        }
+        &'do-harness;design-review;help;bridge'= {
+        }
+        &'do-harness;design-review;help;help'= {
+        }
         &'do-harness;help'= {
             cand version 'Print CLI version information'
             cand verify 'Run computational sensors'
@@ -1695,6 +1787,7 @@ set edit:completion:arg-completer[do-harness] = {|@words|
             cand man 'Generate man page documentation'
             cand feedback 'Manage impact-gated feedback and issue proposals'
             cand job 'Run and inspect explicitly invoked unattended jobs'
+            cand design-review 'Run an opt-in fresh-context design review (works in any git repository)'
             cand help 'Print this message or the help of the given subcommand(s)'
         }
         &'do-harness;help;version'= {
@@ -1906,6 +1999,17 @@ set edit:completion:arg-completer[do-harness] = {|@words|
         &'do-harness;help;job;run'= {
         }
         &'do-harness;help;job;status'= {
+        }
+        &'do-harness;help;design-review'= {
+            cand run 'Assemble a frozen packet from a design document, launch one fresh reviewer process, and record the sanitized outcome'
+            cand dispose 'Disposition a recorded finding as confirmed, rejected, or unresolved'
+            cand bridge 'Act as a host file-handoff reviewer bridge: packet on stdin, findings on stdout. Exit 9 with `capability unavailable` on stderr when no findings file appears within the wait'
+        }
+        &'do-harness;help;design-review;run'= {
+        }
+        &'do-harness;help;design-review;dispose'= {
+        }
+        &'do-harness;help;design-review;bridge'= {
         }
         &'do-harness;help;help'= {
         }
