@@ -59,7 +59,6 @@ pub(super) async fn insert_ok_beat(root: &Path, task_id: i64, sensor: &str) {
                 sensor_name: Some(sensor),
                 started_at: now,
                 completed_at: Some(now),
-                duration_ms: None,
             },
             ok: true,
             message: None,

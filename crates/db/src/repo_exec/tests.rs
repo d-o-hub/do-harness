@@ -37,7 +37,6 @@ async fn insert_beat_roundtrips_and_filters_by_task() {
             sensor_name: Some("check"),
             started_at: 1,
             completed_at: Some(2),
-            duration_ms: None,
         },
     )
     .await
@@ -73,7 +72,6 @@ async fn insert_beat_rejects_missing_task_fk() {
             sensor_name: Some("check"),
             started_at: 1,
             completed_at: Some(2),
-            duration_ms: None,
         },
     )
     .await;
@@ -210,7 +208,6 @@ async fn record_sensor_outcome_is_atomic_beat_plus_strike() {
         sensor_name: Some("atomic"),
         started_at: 1,
         completed_at: Some(2),
-        duration_ms: None,
     };
     record_sensor_outcome(&conn, &beat(BeatStatus::Failed), false, Some("boom"))
         .await
@@ -292,7 +289,6 @@ async fn record_verify_batch_rolls_back_everything_on_failure() {
                 sensor_name: Some("check"),
                 started_at: 1,
                 completed_at: Some(1),
-                duration_ms: None,
             },
             ok: true,
             message: None,
@@ -309,7 +305,6 @@ async fn record_verify_batch_rolls_back_everything_on_failure() {
                 sensor_name: Some("test"),
                 started_at: 1,
                 completed_at: Some(1),
-                duration_ms: None,
             },
             ok: false,
             message: Some("boom"),
@@ -352,7 +347,6 @@ async fn prune_beats_keeps_newest_per_task() {
                 sensor_name: Some("check"),
                 started_at: i64::from(index),
                 completed_at: Some(i64::from(index)),
-                duration_ms: None,
             },
         )
         .await
@@ -389,7 +383,6 @@ async fn list_beats_page_windows_and_treats_none_as_unbounded() {
                 sensor_name: Some("check"),
                 started_at: i64::from(index),
                 completed_at: Some(i64::from(index)),
-                duration_ms: None,
             },
         )
         .await

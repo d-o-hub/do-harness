@@ -1,7 +1,9 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use super::*;
-use crate::repo_exec::{NewBeat, insert_beat};
+use crate::repo_exec::{
+    NewBeat, SensorOutcome, TimedSensorOutcome, insert_beat, record_verify_batch_timed,
+};
 use do_harness_types::{BeatScope, BeatStatus, BeatType};
 
 /// Seeds one beat. Every test below cares about what the aggregate sees rather
@@ -25,7 +27,6 @@ async fn beat(
             sensor_name,
             started_at,
             completed_at: Some(started_at + 1),
-            duration_ms: None,
         },
     )
     .await
@@ -126,7 +127,6 @@ async fn sensor_stats_groups_counts_and_ignores_non_sensor_beats() {
             sensor_name: None,
             started_at: 600,
             completed_at: Some(601),
-            duration_ms: None,
         },
     )
     .await;
@@ -205,29 +205,38 @@ async fn has_ok_beat_reflects_the_status_column() {
 #[tokio::test(flavor = "current_thread")]
 async fn sensor_executions_prefers_the_measured_duration() {
     let (_dir, conn) = open().await;
-    for (name, started_at, completed_at, duration_ms) in [
+    // Recorded through the verify batch, the only writer that persists a
+    // runner measurement, so the test exercises the real recording path.
+    let recorded = [
         ("measured", 500, Some(500), Some(1250)),
         ("legacy", 100, Some(102), None),
         ("placeholder", 200, Some(200), None),
         ("zero", 300, Some(300), Some(0)),
-    ] {
-        insert_beat(
-            &conn,
-            &NewBeat {
-                task_id: None,
-                scope: Some(BeatScope::Global),
-                beat_type: BeatType::Sensor,
-                status: BeatStatus::Ok,
-                sensor_exit_code: Some(0),
-                sensor_name: Some(name),
-                started_at,
-                completed_at,
+    ];
+    let outcomes: Vec<TimedSensorOutcome<'_>> = recorded
+        .into_iter()
+        .map(
+            |(name, started_at, completed_at, duration_ms)| TimedSensorOutcome {
+                outcome: SensorOutcome {
+                    beat: NewBeat {
+                        task_id: None,
+                        scope: Some(BeatScope::Global),
+                        beat_type: BeatType::Sensor,
+                        status: BeatStatus::Ok,
+                        sensor_exit_code: Some(0),
+                        sensor_name: Some(name),
+                        started_at,
+                        completed_at,
+                    },
+                    ok: true,
+                    message: None,
+                    input_digest: None,
+                },
                 duration_ms,
             },
         )
-        .await
-        .unwrap();
-    }
+        .collect();
+    record_verify_batch_timed(&conn, &outcomes).await.unwrap();
 
     let executions = sensor_executions(&conn, None, None, None, None)
         .await
@@ -275,7 +284,6 @@ async fn sensor_executions_exports_the_window_oldest_first() {
             sensor_name: Some("check"),
             started_at: 250,
             completed_at: Some(253),
-            duration_ms: None,
         },
     )
     .await

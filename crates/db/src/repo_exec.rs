@@ -133,6 +133,44 @@ pub struct SensorOutcome<'a> {
 /// Returns an error when the transaction, a beat insert, or a signature
 /// update fails; nothing is committed unless every outcome succeeds.
 pub async fn record_verify_batch(conn: &Connection, outcomes: &[SensorOutcome<'_>]) -> Result<()> {
+    let timed: Vec<TimedSensorOutcome<'_>> = outcomes
+        .iter()
+        .cloned()
+        .map(|outcome| TimedSensorOutcome {
+            outcome,
+            duration_ms: None,
+        })
+        .collect();
+    record_verify_batch_timed(conn, &timed).await
+}
+
+/// One sensor outcome paired with the wall-clock duration its run measured.
+///
+/// A wrapper rather than an extra field on [`SensorOutcome`]: that struct is
+/// part of the published `do-harness-db` API, and a new field breaks every
+/// downstream exhaustive literal (`constructible_struct_adds_field`).
+#[derive(Debug, Clone)]
+pub struct TimedSensorOutcome<'a> {
+    /// Outcome to persist.
+    pub outcome: SensorOutcome<'a>,
+    /// Wall-clock milliseconds the sensor runner measured, when it measured
+    /// one; `None` leaves the row without a measurement, so `report` derives
+    /// the duration from the timestamps.
+    pub duration_ms: Option<i64>,
+}
+
+/// [`record_verify_batch`] variant that also persists each sensor's measured
+/// duration on its beat, so `report` exports real durations instead of deriving
+/// 0 ms from a beat whose timestamps share one post-run recording stamp.
+///
+/// # Errors
+///
+/// Returns an error when the transaction, a beat insert, or a signature
+/// update fails; nothing is committed unless every outcome succeeds.
+pub async fn record_verify_batch_timed(
+    conn: &Connection,
+    outcomes: &[TimedSensorOutcome<'_>],
+) -> Result<()> {
     const MAX_BUSY_ATTEMPTS: usize = 3;
 
     crate::error::retry_on_busy(MAX_BUSY_ATTEMPTS, move || {
@@ -143,11 +181,16 @@ pub async fn record_verify_batch(conn: &Connection, outcomes: &[SensorOutcome<'_
     .await
 }
 
-/// Transaction body for [`record_verify_batch`], retried as a unit on busy.
-async fn record_verify_batch_once(conn: &Connection, outcomes: &[SensorOutcome<'_>]) -> Result<()> {
+/// Transaction body for [`record_verify_batch_timed`], retried as a unit on
+/// busy.
+async fn record_verify_batch_once(
+    conn: &Connection,
+    outcomes: &[TimedSensorOutcome<'_>],
+) -> Result<()> {
     let tx = crate::tx::begin_immediate(conn).await?;
-    for outcome in outcomes {
-        insert_beat_with_digest(&tx, &outcome.beat, outcome.input_digest).await?;
+    for timed in outcomes {
+        let outcome = &timed.outcome;
+        insert_beat_measured(&tx, &outcome.beat, outcome.input_digest, timed.duration_ms).await?;
         let signature = format!("sensor:{}", outcome.beat.sensor_name.unwrap_or("unknown"));
         let scope = resolved_scope(&outcome.beat)?.key();
         if outcome.ok {
