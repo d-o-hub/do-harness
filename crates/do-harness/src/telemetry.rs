@@ -127,7 +127,7 @@ pub async fn record_verify(
             )
         })
         .collect();
-    let outcomes: Vec<do_harness_db::SensorOutcome<'_>> = report
+    let outcomes: Vec<do_harness_db::TimedSensorOutcome<'_>> = report
         .sensors
         .iter()
         .zip(&messages)
@@ -135,24 +135,31 @@ pub async fn record_verify(
         .filter(|((sensor, _), _)| {
             sensor.execution == crate::report::Execution::Ran && !skipped.contains(&sensor.name)
         })
-        .map(|((sensor, message), digest)| do_harness_db::SensorOutcome {
-            beat: do_harness_db::NewBeat {
-                task_id,
-                scope: Some(scope.clone()),
-                beat_type: do_harness_types::BeatType::Sensor,
-                status: do_harness_types::BeatStatus::for_outcome(sensor.ok, sensor.allow_failure),
-                sensor_exit_code: sensor.exit_code,
-                sensor_name: Some(&sensor.name),
-                started_at: now,
-                completed_at: Some(now),
+        .map(
+            |((sensor, message), digest)| do_harness_db::TimedSensorOutcome {
+                outcome: do_harness_db::SensorOutcome {
+                    beat: do_harness_db::NewBeat {
+                        task_id,
+                        scope: Some(scope.clone()),
+                        beat_type: do_harness_types::BeatType::Sensor,
+                        status: do_harness_types::BeatStatus::for_outcome(
+                            sensor.ok,
+                            sensor.allow_failure,
+                        ),
+                        sensor_exit_code: sensor.exit_code,
+                        sensor_name: Some(&sensor.name),
+                        started_at: now,
+                        completed_at: Some(now),
+                    },
+                    ok: sensor.ok,
+                    message: Some(message),
+                    input_digest: digest.as_deref(),
+                },
                 duration_ms: i64::try_from(sensor.duration_ms).ok(),
             },
-            ok: sensor.ok,
-            message: Some(message),
-            input_digest: digest.as_deref(),
-        })
+        )
         .collect();
-    do_harness_db::record_verify_batch(&conn, &outcomes).await?;
+    do_harness_db::record_verify_batch_timed(&conn, &outcomes).await?;
 
     for sensor in &report.sensors {
         if sensor.execution != crate::report::Execution::Ran || skipped.contains(&sensor.name) {
