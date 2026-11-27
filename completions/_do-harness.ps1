@@ -74,6 +74,7 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('man', 'man', [CompletionResultType]::ParameterValue, 'Generate man page documentation')
             [CompletionResult]::new('feedback', 'feedback', [CompletionResultType]::ParameterValue, 'Manage impact-gated feedback and issue proposals')
             [CompletionResult]::new('job', 'job', [CompletionResultType]::ParameterValue, 'Run and inspect explicitly invoked unattended jobs')
+            [CompletionResult]::new('design-review', 'design-review', [CompletionResultType]::ParameterValue, 'Run an opt-in fresh-context design review (works in any git repository)')
             [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
             break
         }
@@ -1818,6 +1819,106 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
         'do-harness;job;help;help' {
             break
         }
+        'do-harness;design-review' {
+            [CompletionResult]::new('--root', '--root', [CompletionResultType]::ParameterName, 'Workspace root override (default: walk up from cwd)')
+            [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Explicit path to do-harness.toml')
+            [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)')
+            [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Suppress PASS/WARN verdict lines and the success footer')
+            [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Suppress PASS/WARN verdict lines and the success footer')
+            [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Dry run without side effects')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            [CompletionResult]::new('-V', '-V ', [CompletionResultType]::ParameterName, 'Print version')
+            [CompletionResult]::new('--version', '--version', [CompletionResultType]::ParameterName, 'Print version')
+            [CompletionResult]::new('run', 'run', [CompletionResultType]::ParameterValue, 'Assemble a frozen packet from a design document, launch one fresh reviewer process, and record the sanitized outcome')
+            [CompletionResult]::new('dispose', 'dispose', [CompletionResultType]::ParameterValue, 'Disposition a recorded finding as confirmed, rejected, or unresolved')
+            [CompletionResult]::new('bridge', 'bridge', [CompletionResultType]::ParameterValue, 'Act as a host file-handoff reviewer bridge: packet on stdin, findings on stdout. Exit 9 with `capability unavailable` on stderr when no findings file appears within the wait')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'do-harness;design-review;run' {
+            [CompletionResult]::new('--design-doc', '--design-doc', [CompletionResultType]::ParameterName, 'Frozen design document (repository-relative path)')
+            [CompletionResult]::new('--revision', '--revision', [CompletionResultType]::ParameterName, 'Revision every packet path is pinned to')
+            [CompletionResult]::new('--record-out', '--record-out', [CompletionResultType]::ParameterName, 'Write the sanitized record here (canonical JSON)')
+            [CompletionResult]::new('--review-id', '--review-id', [CompletionResultType]::ParameterName, 'Opaque review identifier (default: record-out file stem)')
+            [CompletionResult]::new('--packet-out', '--packet-out', [CompletionResultType]::ParameterName, 'Write the assembled packet here (canonical JSON)')
+            [CompletionResult]::new('--objective', '--objective', [CompletionResultType]::ParameterName, 'The concrete design risk in one or two sentences')
+            [CompletionResult]::new('--intended-behavior', '--intended-behavior', [CompletionResultType]::ParameterName, 'Expected observable behavior')
+            [CompletionResult]::new('--constraint', '--constraint', [CompletionResultType]::ParameterName, 'Explicit constraint (repeatable)')
+            [CompletionResult]::new('--proposed-contract', '--proposed-contract', [CompletionResultType]::ParameterName, 'The candidate contract (signatures, schemas, semantics)')
+            [CompletionResult]::new('--open-question', '--open-question', [CompletionResultType]::ParameterName, 'Open question the author has genuinely not decided (repeatable)')
+            [CompletionResult]::new('--source-path', '--source-path', [CompletionResultType]::ParameterName, 'Repository-relative source path (repeatable)')
+            [CompletionResult]::new('--test-path', '--test-path', [CompletionResultType]::ParameterName, 'Repository-relative test path (repeatable)')
+            [CompletionResult]::new('--doc-path', '--doc-path', [CompletionResultType]::ParameterName, 'Repository-relative document path (repeatable)')
+            [CompletionResult]::new('--reviewer-command-json', '--reviewer-command-json', [CompletionResultType]::ParameterName, 'Reviewer process argv (JSON string array) that receives the packet on stdin. Explicit opt-in: without it nothing launches and the record says `not_run`')
+            [CompletionResult]::new('--parent-marker', '--parent-marker', [CompletionResultType]::ParameterName, 'Parent-only isolation marker probed in the captured reviewer output; a leaked marker fails the review')
+            [CompletionResult]::new('--limit-timeout', '--limit-timeout', [CompletionResultType]::ParameterName, 'Reviewer deadline in seconds (default 300)')
+            [CompletionResult]::new('--limit-findings', '--limit-findings', [CompletionResultType]::ParameterName, 'Material-findings cap (default 5)')
+            [CompletionResult]::new('--limit-output', '--limit-output', [CompletionResultType]::ParameterName, 'Reviewer output cap in bytes (default 65536)')
+            [CompletionResult]::new('--meta', '--meta', [CompletionResultType]::ParameterName, 'Host/client/model provenance recorded with the record (JSON object)')
+            [CompletionResult]::new('--root', '--root', [CompletionResultType]::ParameterName, 'Workspace root override (default: walk up from cwd)')
+            [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Explicit path to do-harness.toml')
+            [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)')
+            [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Suppress PASS/WARN verdict lines and the success footer')
+            [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Suppress PASS/WARN verdict lines and the success footer')
+            [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Dry run without side effects')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('-V', '-V ', [CompletionResultType]::ParameterName, 'Print version')
+            [CompletionResult]::new('--version', '--version', [CompletionResultType]::ParameterName, 'Print version')
+            break
+        }
+        'do-harness;design-review;dispose' {
+            [CompletionResult]::new('--record', '--record', [CompletionResultType]::ParameterName, 'Record file to update')
+            [CompletionResult]::new('--finding-id', '--finding-id', [CompletionResultType]::ParameterName, 'Finding id to disposition')
+            [CompletionResult]::new('--status', '--status', [CompletionResultType]::ParameterName, 'Disposition verdict')
+            [CompletionResult]::new('--note', '--note', [CompletionResultType]::ParameterName, 'Evidence-backed note recorded with the disposition')
+            [CompletionResult]::new('--root', '--root', [CompletionResultType]::ParameterName, 'Workspace root override (default: walk up from cwd)')
+            [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Explicit path to do-harness.toml')
+            [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)')
+            [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Suppress PASS/WARN verdict lines and the success footer')
+            [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Suppress PASS/WARN verdict lines and the success footer')
+            [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Dry run without side effects')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            [CompletionResult]::new('-V', '-V ', [CompletionResultType]::ParameterName, 'Print version')
+            [CompletionResult]::new('--version', '--version', [CompletionResultType]::ParameterName, 'Print version')
+            break
+        }
+        'do-harness;design-review;bridge' {
+            [CompletionResult]::new('--handoff-dir', '--handoff-dir', [CompletionResultType]::ParameterName, 'Handoff directory for `packet.json` and `findings.json`')
+            [CompletionResult]::new('--max-wait-s', '--max-wait-s', [CompletionResultType]::ParameterName, 'Seconds to wait for the findings file before reporting the capability unavailable')
+            [CompletionResult]::new('--root', '--root', [CompletionResultType]::ParameterName, 'Workspace root override (default: walk up from cwd)')
+            [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Explicit path to do-harness.toml')
+            [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)')
+            [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Suppress PASS/WARN verdict lines and the success footer')
+            [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Suppress PASS/WARN verdict lines and the success footer')
+            [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Dry run without side effects')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('-V', '-V ', [CompletionResultType]::ParameterName, 'Print version')
+            [CompletionResult]::new('--version', '--version', [CompletionResultType]::ParameterName, 'Print version')
+            break
+        }
+        'do-harness;design-review;help' {
+            [CompletionResult]::new('run', 'run', [CompletionResultType]::ParameterValue, 'Assemble a frozen packet from a design document, launch one fresh reviewer process, and record the sanitized outcome')
+            [CompletionResult]::new('dispose', 'dispose', [CompletionResultType]::ParameterValue, 'Disposition a recorded finding as confirmed, rejected, or unresolved')
+            [CompletionResult]::new('bridge', 'bridge', [CompletionResultType]::ParameterValue, 'Act as a host file-handoff reviewer bridge: packet on stdin, findings on stdout. Exit 9 with `capability unavailable` on stderr when no findings file appears within the wait')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'do-harness;design-review;help;run' {
+            break
+        }
+        'do-harness;design-review;help;dispose' {
+            break
+        }
+        'do-harness;design-review;help;bridge' {
+            break
+        }
+        'do-harness;design-review;help;help' {
+            break
+        }
         'do-harness;help' {
             [CompletionResult]::new('version', 'version', [CompletionResultType]::ParameterValue, 'Print CLI version information')
             [CompletionResult]::new('verify', 'verify', [CompletionResultType]::ParameterValue, 'Run computational sensors')
@@ -1858,6 +1959,7 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             [CompletionResult]::new('man', 'man', [CompletionResultType]::ParameterValue, 'Generate man page documentation')
             [CompletionResult]::new('feedback', 'feedback', [CompletionResultType]::ParameterValue, 'Manage impact-gated feedback and issue proposals')
             [CompletionResult]::new('job', 'job', [CompletionResultType]::ParameterValue, 'Run and inspect explicitly invoked unattended jobs')
+            [CompletionResult]::new('design-review', 'design-review', [CompletionResultType]::ParameterValue, 'Run an opt-in fresh-context design review (works in any git repository)')
             [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
             break
         }
@@ -2152,6 +2254,21 @@ Register-ArgumentCompleter -Native -CommandName 'do-harness' -ScriptBlock {
             break
         }
         'do-harness;help;job;status' {
+            break
+        }
+        'do-harness;help;design-review' {
+            [CompletionResult]::new('run', 'run', [CompletionResultType]::ParameterValue, 'Assemble a frozen packet from a design document, launch one fresh reviewer process, and record the sanitized outcome')
+            [CompletionResult]::new('dispose', 'dispose', [CompletionResultType]::ParameterValue, 'Disposition a recorded finding as confirmed, rejected, or unresolved')
+            [CompletionResult]::new('bridge', 'bridge', [CompletionResultType]::ParameterValue, 'Act as a host file-handoff reviewer bridge: packet on stdin, findings on stdout. Exit 9 with `capability unavailable` on stderr when no findings file appears within the wait')
+            break
+        }
+        'do-harness;help;design-review;run' {
+            break
+        }
+        'do-harness;help;design-review;dispose' {
+            break
+        }
+        'do-harness;help;design-review;bridge' {
             break
         }
         'do-harness;help;help' {

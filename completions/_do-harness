@@ -2225,6 +2225,133 @@ esac
     ;;
 esac
 ;;
+(design-review)
+_arguments "${_arguments_options[@]}" : \
+'--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
+'--config=[Explicit path to do-harness.toml]:FILE:_files' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
+'--dry-run[Dry run without side effects]' \
+'-h[Print help (see more with '\''--help'\'')]' \
+'--help[Print help (see more with '\''--help'\'')]' \
+'-V[Print version]' \
+'--version[Print version]' \
+":: :_do-harness__subcmd__design-review_commands" \
+"*::: :->design-review" \
+&& ret=0
+
+    case $state in
+    (design-review)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:do-harness-design-review-command-$line[1]:"
+        case $line[1] in
+            (run)
+_arguments "${_arguments_options[@]}" : \
+'--design-doc=[Frozen design document (repository-relative path)]:FILE:_files' \
+'--revision=[Revision every packet path is pinned to]:REV:_default' \
+'--record-out=[Write the sanitized record here (canonical JSON)]:FILE:_files' \
+'--review-id=[Opaque review identifier (default\: record-out file stem)]:ID:_default' \
+'--packet-out=[Write the assembled packet here (canonical JSON)]:FILE:_files' \
+'--objective=[The concrete design risk in one or two sentences]:TEXT:_default' \
+'--intended-behavior=[Expected observable behavior]:TEXT:_default' \
+'*--constraint=[Explicit constraint (repeatable)]:TEXT:_default' \
+'--proposed-contract=[The candidate contract (signatures, schemas, semantics)]:TEXT:_default' \
+'*--open-question=[Open question the author has genuinely not decided (repeatable)]:TEXT:_default' \
+'*--source-path=[Repository-relative source path (repeatable)]:PATH:_default' \
+'*--test-path=[Repository-relative test path (repeatable)]:PATH:_default' \
+'*--doc-path=[Repository-relative document path (repeatable)]:PATH:_default' \
+'--reviewer-command-json=[Reviewer process argv (JSON string array) that receives the packet on stdin. Explicit opt-in\: without it nothing launches and the record says \`not_run\`]:JSON:_default' \
+'--parent-marker=[Parent-only isolation marker probed in the captured reviewer output; a leaked marker fails the review]:MARKER:_default' \
+'--limit-timeout=[Reviewer deadline in seconds (default 300)]:SECS:_default' \
+'--limit-findings=[Material-findings cap (default 5)]:N:_default' \
+'--limit-output=[Reviewer output cap in bytes (default 65536)]:BYTES:_default' \
+'--meta=[Host/client/model provenance recorded with the record (JSON object)]:JSON:_default' \
+'--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
+'--config=[Explicit path to do-harness.toml]:FILE:_files' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
+'--dry-run[Dry run without side effects]' \
+'-h[Print help]' \
+'--help[Print help]' \
+'-V[Print version]' \
+'--version[Print version]' \
+&& ret=0
+;;
+(dispose)
+_arguments "${_arguments_options[@]}" : \
+'--record=[Record file to update]:FILE:_files' \
+'--finding-id=[Finding id to disposition]:ID:_default' \
+'--status=[Disposition verdict]:STATUS:((confirmed\:"The finding is real; apply the smallest correction through the normal implementation and verification workflow"
+rejected\:"The finding does not apply; the note carries the evidence"
+unresolved\:"Remains an explicit, recorded decision"))' \
+'--note=[Evidence-backed note recorded with the disposition]:TEXT:_default' \
+'--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
+'--config=[Explicit path to do-harness.toml]:FILE:_files' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
+'--dry-run[Dry run without side effects]' \
+'-h[Print help (see more with '\''--help'\'')]' \
+'--help[Print help (see more with '\''--help'\'')]' \
+'-V[Print version]' \
+'--version[Print version]' \
+&& ret=0
+;;
+(bridge)
+_arguments "${_arguments_options[@]}" : \
+'--handoff-dir=[Handoff directory for \`packet.json\` and \`findings.json\`]:DIR:_files -/' \
+'--max-wait-s=[Seconds to wait for the findings file before reporting the capability unavailable]:SECS:_default' \
+'--root=[Workspace root override (default\: walk up from cwd)]:DIR:_files -/' \
+'--config=[Explicit path to do-harness.toml]:FILE:_files' \
+'--output=[Default evidence artifact path for verify (overrides the --set default; an explicit --evidence still wins)]:FILE:_files' \
+'-q[Suppress PASS/WARN verdict lines and the success footer]' \
+'--quiet[Suppress PASS/WARN verdict lines and the success footer]' \
+'--dry-run[Dry run without side effects]' \
+'-h[Print help]' \
+'--help[Print help]' \
+'-V[Print version]' \
+'--version[Print version]' \
+&& ret=0
+;;
+(help)
+_arguments "${_arguments_options[@]}" : \
+":: :_do-harness__subcmd__design-review__subcmd__help_commands" \
+"*::: :->help" \
+&& ret=0
+
+    case $state in
+    (help)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:do-harness-design-review-help-command-$line[1]:"
+        case $line[1] in
+            (run)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(dispose)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(bridge)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(help)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+        esac
+    ;;
+esac
+;;
+        esac
+    ;;
+esac
+;;
 (help)
 _arguments "${_arguments_options[@]}" : \
 ":: :_do-harness__subcmd__help_commands" \
@@ -2725,6 +2852,34 @@ _arguments "${_arguments_options[@]}" : \
     ;;
 esac
 ;;
+(design-review)
+_arguments "${_arguments_options[@]}" : \
+":: :_do-harness__subcmd__help__subcmd__design-review_commands" \
+"*::: :->design-review" \
+&& ret=0
+
+    case $state in
+    (design-review)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:do-harness-help-design-review-command-$line[1]:"
+        case $line[1] in
+            (run)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(dispose)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(bridge)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+        esac
+    ;;
+esac
+;;
 (help)
 _arguments "${_arguments_options[@]}" : \
 && ret=0
@@ -2784,6 +2939,7 @@ _do-harness_commands() {
 'man:Generate man page documentation' \
 'feedback:Manage impact-gated feedback and issue proposals' \
 'job:Run and inspect explicitly invoked unattended jobs' \
+'design-review:Run an opt-in fresh-context design review (works in any git repository)' \
 'help:Print this message or the help of the given subcommand(s)' \
     )
     _describe -t commands 'do-harness commands' commands "$@"
@@ -2812,6 +2968,61 @@ _do-harness__subcmd__completions_commands() {
 _do-harness__subcmd__compliance_commands() {
     local commands; commands=()
     _describe -t commands 'do-harness compliance commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__design-review_commands] )) ||
+_do-harness__subcmd__design-review_commands() {
+    local commands; commands=(
+'run:Assemble a frozen packet from a design document, launch one fresh reviewer process, and record the sanitized outcome' \
+'dispose:Disposition a recorded finding as confirmed, rejected, or unresolved' \
+'bridge:Act as a host file-handoff reviewer bridge\: packet on stdin, findings on stdout. Exit 9 with \`capability unavailable\` on stderr when no findings file appears within the wait' \
+'help:Print this message or the help of the given subcommand(s)' \
+    )
+    _describe -t commands 'do-harness design-review commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__design-review__subcmd__bridge_commands] )) ||
+_do-harness__subcmd__design-review__subcmd__bridge_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness design-review bridge commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__design-review__subcmd__dispose_commands] )) ||
+_do-harness__subcmd__design-review__subcmd__dispose_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness design-review dispose commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__design-review__subcmd__help_commands] )) ||
+_do-harness__subcmd__design-review__subcmd__help_commands() {
+    local commands; commands=(
+'run:Assemble a frozen packet from a design document, launch one fresh reviewer process, and record the sanitized outcome' \
+'dispose:Disposition a recorded finding as confirmed, rejected, or unresolved' \
+'bridge:Act as a host file-handoff reviewer bridge\: packet on stdin, findings on stdout. Exit 9 with \`capability unavailable\` on stderr when no findings file appears within the wait' \
+'help:Print this message or the help of the given subcommand(s)' \
+    )
+    _describe -t commands 'do-harness design-review help commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__design-review__subcmd__help__subcmd__bridge_commands] )) ||
+_do-harness__subcmd__design-review__subcmd__help__subcmd__bridge_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness design-review help bridge commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__design-review__subcmd__help__subcmd__dispose_commands] )) ||
+_do-harness__subcmd__design-review__subcmd__help__subcmd__dispose_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness design-review help dispose commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__design-review__subcmd__help__subcmd__help_commands] )) ||
+_do-harness__subcmd__design-review__subcmd__help__subcmd__help_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness design-review help help commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__design-review__subcmd__help__subcmd__run_commands] )) ||
+_do-harness__subcmd__design-review__subcmd__help__subcmd__run_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness design-review help run commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__design-review__subcmd__run_commands] )) ||
+_do-harness__subcmd__design-review__subcmd__run_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness design-review run commands' commands "$@"
 }
 (( $+functions[_do-harness__subcmd__distill_commands] )) ||
 _do-harness__subcmd__distill_commands() {
@@ -3016,6 +3227,7 @@ _do-harness__subcmd__help_commands() {
 'man:Generate man page documentation' \
 'feedback:Manage impact-gated feedback and issue proposals' \
 'job:Run and inspect explicitly invoked unattended jobs' \
+'design-review:Run an opt-in fresh-context design review (works in any git repository)' \
 'help:Print this message or the help of the given subcommand(s)' \
     )
     _describe -t commands 'do-harness help commands' commands "$@"
@@ -3044,6 +3256,30 @@ _do-harness__subcmd__help__subcmd__completions_commands() {
 _do-harness__subcmd__help__subcmd__compliance_commands() {
     local commands; commands=()
     _describe -t commands 'do-harness help compliance commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__help__subcmd__design-review_commands] )) ||
+_do-harness__subcmd__help__subcmd__design-review_commands() {
+    local commands; commands=(
+'run:Assemble a frozen packet from a design document, launch one fresh reviewer process, and record the sanitized outcome' \
+'dispose:Disposition a recorded finding as confirmed, rejected, or unresolved' \
+'bridge:Act as a host file-handoff reviewer bridge\: packet on stdin, findings on stdout. Exit 9 with \`capability unavailable\` on stderr when no findings file appears within the wait' \
+    )
+    _describe -t commands 'do-harness help design-review commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__help__subcmd__design-review__subcmd__bridge_commands] )) ||
+_do-harness__subcmd__help__subcmd__design-review__subcmd__bridge_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness help design-review bridge commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__help__subcmd__design-review__subcmd__dispose_commands] )) ||
+_do-harness__subcmd__help__subcmd__design-review__subcmd__dispose_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness help design-review dispose commands' commands "$@"
+}
+(( $+functions[_do-harness__subcmd__help__subcmd__design-review__subcmd__run_commands] )) ||
+_do-harness__subcmd__help__subcmd__design-review__subcmd__run_commands() {
+    local commands; commands=()
+    _describe -t commands 'do-harness help design-review run commands' commands "$@"
 }
 (( $+functions[_do-harness__subcmd__help__subcmd__distill_commands] )) ||
 _do-harness__subcmd__help__subcmd__distill_commands() {

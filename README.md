@@ -318,6 +318,9 @@ export PATH="$HOME/.local/bin:$PATH"
 | `feedback report [OPTIONS] --error <TEXT>` | File a defect report against the tool's own repository — flags: `--repo <OWNER/REPO>`, `--error <TEXT>`, `--log <FILE>`, `--warning`, `--yes`, `--format <FORMAT>` |
 | `job run [OPTIONS] --spec <FILE>` | Run an explicitly authorized unattended job from a spec — flags: `--spec <FILE>`, `--resume`, `--format <FORMAT>` |
 | `job status [OPTIONS]` | Report durable job receipts without running anything — flags: `--id <ID>`, `--format <FORMAT>` |
+| `design-review run [OPTIONS] --design-doc <FILE> --record-out <FILE> --objective <TEXT> --proposed-contract <TEXT>` | Assemble a frozen packet from a design document, launch one fresh reviewer process, and record the sanitized outcome — flags: `--design-doc <FILE>`, `--revision <REV>`, `--record-out <FILE>`, `--review-id <ID>`, `--packet-out <FILE>`, `--objective <TEXT>`, `--intended-behavior <TEXT>`, `--constraint <TEXT>`, `--proposed-contract <TEXT>`, `--open-question <TEXT>`, `--source-path <PATH>`, `--test-path <PATH>`, `--doc-path <PATH>`, `--reviewer-command-json <JSON>`, `--parent-marker <MARKER>`, `--limit-timeout <SECS>`, `--limit-findings <N>`, `--limit-output <BYTES>`, `--meta <JSON>` |
+| `design-review dispose [OPTIONS] --record <FILE> --finding-id <ID> --status <STATUS>` | Disposition a recorded finding as confirmed, rejected, or unresolved — flags: `--record <FILE>`, `--finding-id <ID>`, `--status <STATUS>`, `--note <TEXT>` |
+| `design-review bridge [OPTIONS] --handoff-dir <DIR>` | Act as a host file-handoff reviewer bridge: packet on stdin, findings on stdout. Exit 9 with `capability unavailable` on stderr when no findings file appears within the wait — flags: `--handoff-dir <DIR>`, `--max-wait-s <SECS>` |
 
 Global flags: `--root <DIR>`, `--config <FILE>`, `-q, --quiet`, `--output <FILE>`, `--dry-run`.
 <!-- END GENERATED: cli-commands -->

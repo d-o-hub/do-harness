@@ -1,6 +1,6 @@
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
-.TH do-harness 1  "do-harness 0.6.0 (9526c3c-dirty 2026-11-26)" 
+.TH do-harness 1  "do-harness 0.6.0 (e3b18c9 2026-11-27)" 
 .SH NAME
 do\-harness \- do\-harness agent execution harness CLI
 .SH SYNOPSIS
@@ -148,6 +148,9 @@ Manage impact\-gated feedback and issue proposals
 do\-harness job
 Run and inspect explicitly invoked unattended jobs
 .TP
+do\-harness design-review
+Run an opt\-in fresh\-context design review (works in any git repository)
+.TP
 do\-harness help
 Print this message or the help of the given subcommand(s)
 .SH EXTRA
@@ -162,4 +165,4 @@ Exit Codes:
   1  Verification or check failure
   2  Usage, configuration, or environment error
 .SH VERSION
-v0.6.0 (9526c3c\-dirty 2026\-11\-26)
+v0.6.0 (e3b18c9 2026\-11\-27)

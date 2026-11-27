@@ -11,9 +11,9 @@ use clap::CommandFactory;
 
 use crate::cli::{Cli, Command, DoctorAction};
 use crate::{
-    CliError, ci_explain, commands, config, distill, distill_strikes, doctor, dora, eval, exit,
-    explain, feedback, init, learn, loc, man, metrics, overlap, pr, report, skills, split, status,
-    telemetry,
+    CliError, ci_explain, commands, config, design_review, distill, distill_strikes, doctor, dora,
+    eval, exit, explain, feedback, init, learn, loc, man, metrics, overlap, pr, report, skills,
+    split, status, telemetry,
 };
 
 /// Executes the parsed CLI, classifying every failure into an exit code.
@@ -60,7 +60,10 @@ pub async fn run(cli: Cli) -> Result<(), CliError> {
 fn resolve_root(cli: &Cli) -> Result<PathBuf, CliError> {
     let resolved = match &cli.command {
         Command::Init { .. } => commands::init_target(cli.root.as_deref()).map_err(CliError::Usage),
-        Command::Pr { .. } | Command::CiExplain { .. } | Command::Sync { .. } => {
+        Command::Pr { .. }
+        | Command::CiExplain { .. }
+        | Command::Sync { .. }
+        | Command::DesignReview { .. } => {
             pr::command::resolve_root(cli.root.as_deref()).map_err(CliError::Usage)
         }
         _ => commands::resolve_root(cli.root.as_deref()).map_err(CliError::Usage),
@@ -81,6 +84,9 @@ async fn route(root: &Path, config_path: Option<PathBuf>, cli: Cli) -> Result<()
         | Command::Completions { .. }
         | Command::Man { .. } => unreachable!("version/compliance/completions/man handled above"),
         Command::Pr { action } => pr::command::run(root, action, cli.dry_run),
+        Command::DesignReview { action } => {
+            design_review::run(root, action).map_err(CliError::Usage)
+        }
         Command::Sync {
             switch,
             read_only,

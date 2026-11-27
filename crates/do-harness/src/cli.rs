@@ -11,9 +11,9 @@ mod command;
 mod learn;
 pub use actions::VerifyArgs;
 pub use actions::{
-    DoctorAction, ErrorsAction, FeedbackAction, HelpersAction, HookAction, JobAction,
-    MetricsAction, NewSensorArgs, PrAction, SensorAction, SetupAction, SkillsAction, TaskAction,
-    TraceAction,
+    DesignReviewAction, DesignReviewRunArgs, DispositionStatus, DoctorAction, ErrorsAction,
+    FeedbackAction, HelpersAction, HookAction, JobAction, MetricsAction, NewSensorArgs, PrAction,
+    SensorAction, SetupAction, SkillsAction, TaskAction, TraceAction,
 };
 pub use command::Command;
 pub use learn::LearnArgs;

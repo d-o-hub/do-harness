@@ -30,6 +30,7 @@ mod cli;
 mod commands;
 mod config;
 mod dbcheck;
+mod design_review;
 mod diag;
 mod dispatch;
 mod distill;

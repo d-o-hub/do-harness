@@ -74,6 +74,10 @@ pub use task_action::TaskAction;
 mod pr_actions;
 pub use pr_actions::PrAction;
 
+#[path = "design_review_action.rs"]
+mod design_review_action;
+pub use design_review_action::{DesignReviewAction, DesignReviewRunArgs, DispositionStatus};
+
 /// Available `metrics` report scopes.
 #[derive(Debug, Subcommand)]
 pub enum MetricsAction {
