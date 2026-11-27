@@ -457,7 +457,7 @@
   },
   {
     "invariant": "A workflow `run:` step binds every value it reads as a shell variable; writing a field to `$GITHUB_OUTPUT` publishes it to later steps and does not define it in the step that wrote it",
-    "rationale": "`$GITHUB_OUTPUT` is a file the runner reads, not a shell variable, so a step that publishes `commits=<n>` and then prints `$commits` fails under `set -u` — run 41814288853 died that way one statement after a correct derivation — and `actionlint` excludes shellcheck's SC2154 for embedded scripts, so no other workflow sensor could see it",
+    "rationale": "`$GITHUB_OUTPUT` is a file the runner reads, not a shell variable, so a step that publishes `commits=<n>` and then prints `$commits` fails under `set -u` \u2014 run 41814288853 died that way one statement after a correct derivation \u2014 and `actionlint` excludes shellcheck's SC2154 for embedded scripts, so no other workflow sensor could see it",
     "sensor": "scripts/check-workflow-shell.py: SC2154 over every `run:` block after declaring its workflow-, job- and step-level `env:` keys, with `--self-test` proving both directions",
     "category": "ci"
   },
@@ -489,6 +489,12 @@
     "invariant": "A merge-impact or ancestry proof that needs commits the clone does not have may fetch them, but only into refs/remotes/pr-triage/*, only bounded, and only enough to make the two commits connected: no branch, tag, worktree, index, or HEAD is written, and an unproven pair stays UNKNOWN",
     "rationale": "A shallow or fresh clone has neither the reported base nor refs/pull/*/head, so every local proof degraded to UNKNOWN with a manual fetch as its remediation, which made the no-effect closure path unusable and a dry run vacuous. Naively fetching the two objects is not enough: a shallow clone grafts its tip as a root, so an object fetched by id arrives as its own root and git refuses with 'unrelated histories' even though both commits exist. The prefetch therefore checks ancestry and deepens a finite, compounding number of commits until a merge base exists, and never unshallows. Because this runs inside a path that can close a pull request, the only permitted write is the pr-triage remote-tracking namespace; a fetch able to create a branch or move the checked-out ref would make the proof describe a commit other than the reviewed one. A base that moves mid-fetch, an unreachable remote, a timeout, or an exhausted deepening all leave the verdict UNKNOWN with the exact next command, never a pass, and --no-fetch restores the prior behaviour so an operator can keep the clone untouched",
     "sensor": "cargo test -p do-harness --test pr_fetch && cargo test -p do-harness --test pr_fetch_safety && cargo test -p do-harness --bin do-harness fetch::tests && cargo test -p do-harness --bin do-harness impact::tests",
+    "category": "architecture"
+  },
+  {
+    "invariant": "Every capability the harness ships is a native `do-harness` CLI subcommand portable to any git repository on Linux, macOS and Windows; repository-local scripts/** are development tooling for this repository and never a capability's delivery surface",
+    "rationale": "do-harness is a harness for every codebase, not this repository: an adopter outside this checkout must get identical behavior with no dependency on this repository's scripts, Python, or a POSIX shell. The loc gate and helpers set the pattern (native subcommand, shell wrapper demoted to delegation), and design-review follows it: the fresh-context design-review pilot landed first as repository-local Python, then moved into the CLI so every adopting codebase can run design reviews. A capability that only works in this checkout is a defect, not a feature",
+    "sensor": "do-harness design-review (native command; fresh-context-review sensor) + doctor helper-portability warnings + repo-links sensor",
     "category": "architecture"
   }
 ]
