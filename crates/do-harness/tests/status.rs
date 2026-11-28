@@ -405,9 +405,21 @@ fn status_is_deterministic() {
     let (_dir, root) = fixture_repo();
 
     verify(&root, "verification", 0);
-    let (_, first) = status(&root, "verification");
-    let (_, second) = status(&root, "verification");
+    let capture = || {
+        let (code, stdout, stderr) =
+            run(harness(&root).args(["status", "--set", "verification", "--format", "json"]));
+        assert_eq!(code, Some(0), "{stderr}");
+        stdout
+    };
+    let first = capture();
+    let second = capture();
     assert_eq!(first, second, "status output must be deterministic");
+
+    let document: Value = serde_json::from_str(&first).expect("status JSON");
+    let artifact = document["evidence"]["artifact"].as_object().unwrap();
+    assert_eq!(artifact.len(), 2, "artifact reference must be immutable");
+    assert!(artifact["path"].is_string());
+    assert!(artifact["sha256"].is_string());
 }
 
 /// Evidence carries workspace/policy fingerprints and schema v3.

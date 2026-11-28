@@ -169,11 +169,15 @@ pub async fn preview_advance(root: &Path, id: i64) -> Result<()> {
 pub async fn advance_task(root: &Path, id: i64) -> Result<(i64, WorkflowEvent)> {
     let gate = advance_gate(root, id).await?;
     let sensors: Vec<String> = gate.sensor.iter().cloned().collect();
-    do_harness_db::transition_with_freshness(
+    do_harness_db::transition_with_guards(
         &gate.conn, id, do_harness_db::FreshTransition::Advance,
         || super::freshness::snapshot(root, &gate.task, &sensors, false),
     )
         .await
+        .map(|(index, event, decisions)| {
+            super::guards::print_advisory(&decisions);
+            (index, event)
+        })
         .map_err(|err| match err {
             do_harness_db::DbError::GateUnsatisfied { sensor, .. } => anyhow::anyhow!(
                 "cannot advance task {id}: subtask '{}' requires sensor '{sensor}' to pass (run: do-harness verify --record --task {id})",
@@ -255,12 +259,15 @@ pub async fn preview_done(root: &Path, id: i64) -> Result<()> {
 /// Marks a task as done once all sensor-gated subtasks have passed.
 pub async fn done_task(root: &Path, id: i64) -> Result<WorkflowEvent> {
     let gate = done_gate(root, id).await?;
-    do_harness_db::transition_with_freshness(
+    do_harness_db::transition_with_guards(
         &gate.conn, id, do_harness_db::FreshTransition::Complete,
         || super::freshness::snapshot(root, &gate.task, &gate.required_sensors, true),
     )
     .await
-    .map(|(_, event)| event)
+    .map(|(_, event, decisions)| {
+        super::guards::print_advisory(&decisions);
+        event
+    })
     .map_err(|err| match err {
         do_harness_db::DbError::GateUnsatisfied { sensor, .. } => anyhow::anyhow!(
             "cannot mark task {id} done: sensor '{sensor}' has no fresh passing beat (run: do-harness verify --record --task {id})"
