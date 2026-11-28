@@ -17,6 +17,7 @@ use serde_json::{Value, json};
 use sha2::Digest as _;
 
 mod render;
+mod session;
 #[cfg(test)]
 mod tests;
 
@@ -45,6 +46,8 @@ pub(super) struct Attempt {
     pub(super) sha256: String,
     /// Parsed artifact.
     pub(super) document: crate::evidence::EvidenceDocument,
+    /// Explicit capture-time session attribution, when available.
+    session: Option<session::SessionBinding>,
 }
 
 /// A captured `status --format json` observation.
@@ -111,6 +114,7 @@ pub fn run(
         .map(|path| load_attempt(&resolve(root, path)))
         .collect::<Result<Vec<_>>>()?;
     check_one_workspace(&attempts)?;
+    session::check_attempt_ids(&attempts)?;
     let snapshots: Vec<Snapshot> = snapshots
         .iter()
         .map(|path| load_snapshot(&resolve(root, path)))
@@ -176,10 +180,13 @@ fn load_attempt(path: &Path) -> Result<Attempt> {
             document.schema_version
         );
     }
+    let sha256 = format!("sha256:{}", hex::encode(sha2::Sha256::digest(&bytes)));
+    let session = session::read(path, &sha256, &document)?;
     Ok(Attempt {
         path: path.to_path_buf(),
-        sha256: format!("sha256:{}", hex::encode(sha2::Sha256::digest(&bytes))),
+        sha256,
         document,
+        session,
     })
 }
 
