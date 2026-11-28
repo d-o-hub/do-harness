@@ -1326,6 +1326,8 @@ was just recorded, stale after an edit, and green again once a rerun passes.
 Each captured `status --format json` snapshot records the digest of the artifact
 it judged (`evidence.artifact`), so the timeline binds every observation to the
 exact bytes it saw and renders them in supplied order with the observation time.
+The timeline uses the snapshot file's modification time for new captures and
+preserves the embedded observation time from older snapshots that recorded one.
 A snapshot from a binary that predates that field falls back to the recorded
 fingerprints and says so; a snapshot that matches no supplied attempt is reported
 as a coverage gap rather than assigned to one. An attempt with no observation

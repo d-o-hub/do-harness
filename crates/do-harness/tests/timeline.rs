@@ -194,11 +194,21 @@ fn a_failed_attempt_a_stale_edit_and_a_green_rerun_render_as_one_timeline() {
     let red = status(root, &first);
     assert_eq!(red["state"], "red", "{red}");
     std::fs::write(&red_snapshot, red.to_string()).unwrap();
+    let saved_at = 1_760_000_000;
+    let saved_time = std::time::UNIX_EPOCH + std::time::Duration::from_secs(saved_at);
+    std::fs::File::options()
+        .write(true)
+        .open(&red_snapshot)
+        .unwrap()
+        .set_times(std::fs::FileTimes::new().set_modified(saved_time))
+        .unwrap();
 
     // A source edit makes that evidence stale — the middle of the timeline.
     std::fs::write(root.join("src/lib.rs"), EDITED).unwrap();
-    let stale = status(root, &first);
+    let mut stale = status(root, &first);
     assert_eq!(stale["state"], "stale", "{stale}");
+    let recorded_at = saved_at + 1;
+    stale["evidence"]["artifact"]["observed_at"] = recorded_at.into();
     std::fs::write(&stale_snapshot, stale.to_string()).unwrap();
 
     // Attempt 2: the same sensor now passes, on a clean tree.
@@ -245,10 +255,8 @@ fn a_failed_attempt_a_stale_edit_and_a_green_rerun_render_as_one_timeline() {
     );
     assert_eq!(first_freshness[0]["state"], "red");
     assert_eq!(first_freshness[1]["state"], "stale");
-    assert!(
-        first_freshness[0]["observed_at"].as_i64().unwrap_or(0) > 0,
-        "an observation records when it was captured"
-    );
+    assert_eq!(first_freshness[0]["observed_at"], saved_at);
+    assert_eq!(first_freshness[1]["observed_at"], recorded_at);
     assert_eq!(attempts[1]["freshness"][0]["state"], "green");
 
     // The HTML page is self-contained and links each artifact locally.

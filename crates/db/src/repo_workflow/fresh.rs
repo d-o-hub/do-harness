@@ -2,6 +2,7 @@
 use do_harness_types::{TaskAdvanced, TaskCompleted, TaskState, WorkflowEvent};
 use libsql::Connection;
 
+use super::guards::{TaskGuardDecision, TaskGuardInput, check_task_guards};
 use crate::{DbError, Result};
 
 /// Prefix for an observed identity that must never authorize cached reuse.
@@ -35,18 +36,39 @@ pub async fn transition_with_freshness<F>(
 where
     F: Fn() -> Result<FreshTaskInputs>,
 {
+    transition_with_guards(conn, id, transition, || Ok((snapshot()?, Vec::new())))
+        .await
+        .map(|(index, event, _)| (index, event))
+}
+
+/// Check optional guards inside the same transaction as the existing gates.
+///
+/// # Errors
+/// Returns an error when guard evaluation, freshness validation, or the task
+/// mutation fails. The task and its event are rolled back together.
+pub async fn transition_with_guards<F>(
+    conn: &Connection,
+    id: i64,
+    transition: FreshTransition,
+    snapshot: F,
+) -> Result<(i64, WorkflowEvent, Vec<TaskGuardDecision>)>
+where
+    F: Fn() -> Result<(FreshTaskInputs, Vec<TaskGuardInput>)>,
+{
     crate::retry_on_busy(BUSY_RETRIES, || async {
         let tx = crate::tx::begin_immediate(conn).await?;
         let before = snapshot()?;
+        let (inputs, guards) = &before;
         let task = crate::get_task(&tx, id)
             .await?
             .ok_or_else(|| DbError::NotFound(format!("task {id} not found")))?;
-        if task.method != before.method || task.subtask_index != before.subtask_index {
+        if task.method != inputs.method || task.subtask_index != inputs.subtask_index {
             return Err(DbError::InvalidTaskTransition(
                 "task changed during validation".into(),
             ));
         }
-        for (sensor, digest) in &before.sensors {
+        let decisions = check_task_guards(&tx, id, guards).await?;
+        for (sensor, digest) in &inputs.sensors {
             let beat = crate::latest_sensor_beat(&tx, sensor, &format!("task:{id}")).await?;
             if !beat.is_some_and(|b| {
                 b.status.is_ok()
@@ -90,7 +112,7 @@ where
             ));
         }
         tx.commit().await?;
-        Ok((index, event))
+        Ok((index, event, decisions))
     })
     .await
 }
