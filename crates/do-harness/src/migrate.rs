@@ -99,7 +99,7 @@ pub async fn run(
         let migrated = apply(&original, &plan).map_err(CliError::Usage)?;
         // Never leave a file this binary cannot parse: validate before writing
         // and restore byte for byte if anything fails afterwards.
-        let parsed = crate::config::parse_str(&migrated).map_err(CliError::Usage)?;
+        let parsed = crate::config::parse_at(root, &migrated).map_err(CliError::Usage)?;
         if parsed.schema_version != CONFIG_SCHEMA_VERSION {
             let _ = std::fs::write(&path, &original);
             return Err(CliError::Usage(anyhow::anyhow!(

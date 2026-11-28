@@ -249,6 +249,22 @@ pub fn parse_str(text: &str) -> Result<Config> {
     Ok(cfg)
 }
 
+mod plugins;
+
+pub(crate) fn parse_at(root: &Path, text: &str) -> Result<Config> {
+    let original_error = match parse_str(text) {
+        Ok(cfg) => return Ok(cfg),
+        Err(error) => error,
+    };
+    let mut document: toml::Value = toml::from_str(text)?;
+    if !plugins::resolve(root, &mut document)? {
+        return Err(original_error);
+    }
+    let cfg: Config = document.try_into()?;
+    cfg.validate()?;
+    Ok(cfg)
+}
+
 /// Loads the workspace configuration without entering a runtime.
 ///
 /// `pr` subcommands are dispatched *inside* the async runtime, so a nested
@@ -264,10 +280,7 @@ pub fn load_sync(root: &Path) -> Result<Config> {
     let Ok(text) = std::fs::read_to_string(&path) else {
         return Ok(rust_default());
     };
-    let cfg: Config =
-        toml::from_str(&text).with_context(|| format!("invalid config file {}", path.display()))?;
-    cfg.validate()?;
-    Ok(cfg)
+    parse_at(root, &text).with_context(|| format!("invalid config file {}", path.display()))
 }
 
 /// Loads configuration plus the raw file bytes for policy fingerprinting.
@@ -292,9 +305,8 @@ pub async fn load_raw(root: &Path, explicit: Option<&Path>) -> Result<(Config, O
     let text = tokio::fs::read_to_string(&path)
         .await
         .with_context(|| format!("failed to read config file {}", path.display()))?;
-    let cfg: Config =
-        toml::from_str(&text).with_context(|| format!("invalid config file {}", path.display()))?;
-    cfg.validate()?;
+    let cfg =
+        parse_at(root, &text).with_context(|| format!("invalid config file {}", path.display()))?;
     Ok((cfg, Some(text.into_bytes())))
 }
 

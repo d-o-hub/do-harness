@@ -15,7 +15,8 @@ pub(super) fn snapshot(
         Err(_) => return Err(DbError::Invariant("cannot read verification policy".into())),
     };
     let cfg = if let Some(bytes) = &bytes {
-        toml::from_str::<crate::config::Config>(
+        crate::config::parse_at(
+            root,
             std::str::from_utf8(bytes)
                 .map_err(|_| DbError::Invariant("invalid verification policy encoding".into()))?,
         )
@@ -23,8 +24,6 @@ pub(super) fn snapshot(
     } else {
         crate::config::rust_default()
     };
-    cfg.validate()
-        .map_err(|_| DbError::Invariant("invalid verification policy".into()))?;
     let methods = crate::methods::load_methods_sync(root)
         .map_err(|_| DbError::Invariant("cannot establish current method policy".into()))?;
     if let Some(name) = &task.method {
