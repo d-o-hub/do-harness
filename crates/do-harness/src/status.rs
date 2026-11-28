@@ -17,7 +17,7 @@ use std::path::{Path, PathBuf};
 
 use serde::Serialize;
 
-use crate::evidence::{EvidenceDocument, ScenarioOutcome};
+use crate::evidence::EvidenceDocument;
 use crate::report::Format;
 use crate::{CliError, config};
 
@@ -25,6 +25,7 @@ mod evidence;
 mod inflight;
 mod locate;
 mod present;
+mod scenarios;
 mod selection;
 
 use evidence::evidence_side;
@@ -86,8 +87,6 @@ pub struct EvidenceArtifactRef {
     pub path: String,
     /// SHA-256 of the artifact bytes (`sha256:…`).
     pub sha256: String,
-    /// Unix seconds when the snapshot was computed.
-    pub observed_at: i64,
 }
 
 /// Current side of the status comparison.
@@ -190,31 +189,17 @@ pub fn status_report(
                     .map(|located| EvidenceArtifactRef {
                         path: located.path.to_string_lossy().into_owned(),
                         sha256: located.sha256.clone(),
-                        observed_at: do_harness_db::unix_now(),
                     })
                     .as_ref(),
             );
-            if decision.state == EvidenceState::Green
-                && scenarios
+            scenarios::revise(
+                &mut decision,
+                scenarios
                     .as_ref()
-                    .is_some_and(crate::scenarios::Mapping::enforces)
-                && (document.signal_set.as_deref() != set || document.scenario_results.is_empty())
-            {
-                decision.state = EvidenceState::Missing;
-                decision.reason = "scenario_evidence_missing".to_owned();
-                decision.recovery = Some(recovery_command(set));
-            } else if decision.state == EvidenceState::Green
-                && scenarios
-                    .as_ref()
-                    .is_some_and(crate::scenarios::Mapping::enforces)
-                && document
-                    .scenario_results
-                    .iter()
-                    .any(|result| result.outcome != ScenarioOutcome::Passed)
-            {
-                decision.state = EvidenceState::Red;
-                decision.reason = "scenario_checks_failed".to_owned();
-            }
+                    .is_some_and(crate::scenarios::Mapping::enforces),
+                &document,
+                set,
+            );
             decision
         } else {
             missing_report(set, &paths, covering, facts.side)

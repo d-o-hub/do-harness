@@ -99,6 +99,37 @@ again before commit. Drift rolls back task and event together. Dry runs
 perform the same freshness comparison. Methodless tasks have no named gates;
 failing a task remains possible without passing evidence.
 
+### Optional task guards
+
+Place a versioned `plans/task-guards.json` beside the method catalog to guard
+specific advances or completion. For an advance, the binding names a method
+and subtask. A completion binding uses `"transition": "complete"` and applies
+to the method as a whole.
+
+<!-- example: id=task_fresh_pass_guard classification=illustrative reason="Optional task guard policy for an advance" -->
+```json
+{
+  "schema_version": 1,
+  "mode": "enforce",
+  "bindings": [{
+    "method": "vertical-event-slice",
+    "transition": "advance",
+    "subtask": "verify-sensors",
+    "all": [{"predicate": "sensor.fresh_pass", "sensor": "test"}],
+    "otherwise": "reject"
+  }]
+}
+```
+
+The predicate reads the latest beat recorded for the task and checks it against
+the current sensor inputs. A fresh nonzero exit rejects the predicate. Missing,
+unbound, or stale evidence yields an unknown result. Enforced bindings require
+every predicate to pass inside the task write transaction. `"mode": "advisory"`
+prints the same observations while the existing task gates decide the outcome.
+Dry runs evaluate the same bindings without advancing or completing the task.
+The current pilot uses local task evidence for advances and completion. Its
+policy file defines observations to require and grants no external authority.
+
 Passing observations unsuitable for reuse carry an `observed:` prefix in the
 existing opaque beat `input_digest` column. They satisfy fresh task gates but
 cannot authorize reused verification. Historical digests do not match the

@@ -117,7 +117,7 @@ pub(crate) fn configure(
         Ok(metadata) => ensure!(metadata.is_file(), "{MAPPING_PATH} must be a regular file"),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
         Err(error) => return Err(error).context(MAPPING_PATH),
-    };
+    }
     validate_path(&root.canonicalize()?, MAPPING_PATH)?;
     let bytes = std::fs::read(&path).context(MAPPING_PATH)?;
     let mut mapping: Mapping = serde_json::from_slice(&bytes).context(MAPPING_PATH)?;
@@ -254,7 +254,7 @@ impl Mapping {
                 .iter()
                 .any(|result| result.outcome != ScenarioOutcome::Passed)
         {
-            document.summary.verdict = "fail".to_owned();
+            "fail".clone_into(&mut document.summary.verdict);
         }
         document.scenario_results = results;
     }

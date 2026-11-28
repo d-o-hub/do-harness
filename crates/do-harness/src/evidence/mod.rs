@@ -388,7 +388,7 @@ impl EvidenceDocument {
     }
 }
 
-pub use crate::scenarios::{ScenarioOutcome, ScenarioResult};
+pub use crate::scenarios::ScenarioResult;
 
 /// Run metadata for [`EvidenceDocument::from_run`] beyond the report itself.
 #[derive(Debug, Clone)]
