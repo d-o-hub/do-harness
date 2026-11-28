@@ -185,6 +185,27 @@ shared wall budget is never renewed.
   decision. Until then, fixture replay is evidence of measurement mechanics
   only.
 
+### Reproducing the offline adopter run
+
+Graders inherit `PATH` through the scrubbed benchmark environment. When the
+local Rust toolchain uses a custom `RUSTUP_HOME`, put the selected toolchain's
+actual binary directory on `PATH` so the grader can find both `cargo` and
+`rustc` without inheriting the operator's Rustup or credential settings.
+
+<!-- example: id=adopter_benchmark_direct_toolchain classification=illustrative reason="Reproduce the offline benchmark using the already selected Rust toolchain" -->
+```bash
+cargo_binary=$(rustup which cargo)
+PATH="$(dirname "$cargo_binary"):$PATH" \
+  python3 scripts/workflow-benchmark.py --corpus benchmarks/adopter-v1.json
+```
+
+The offline run at `80f7b76` on Linux x86-64 with Rust 1.99.0 and Python
+3.12.14 passed all seven cases in each arm with no regressions. Each arm
+recorded eight attempts and 15 grader invocations. The fixture manifest
+digest was `81b2dccc6e0109b9d149c660d1fc8b237c504da8f78ad7521d232e051a3d58d9`.
+This rerun measures fixture reproducibility. The paired external-agent
+comparison remains open.
+
 ## Regression policy and adding cases
 
 Deterministic fixture or grader regressions block CI. External results are
