@@ -151,7 +151,7 @@ fn load_config_info(
     let Ok(text) = std::fs::read_to_string(&path) else {
         return (None, Vec::new(), Vec::new());
     };
-    let Ok(cfg) = toml::from_str::<crate::config::Config>(&text) else {
+    let Ok(cfg) = crate::config::parse_at(root, &text) else {
         return (None, Vec::new(), Vec::new());
     };
 

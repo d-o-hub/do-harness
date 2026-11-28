@@ -1,6 +1,6 @@
 schema-version = 1
 language = "rust"
-contract_version = "0.1.1"
+contract_version = "0.2.0"
 
 [hooks]
 pre-commit = ["fmt", "loc"]

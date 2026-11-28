@@ -570,6 +570,33 @@ configured root that does not exist fails the run instead of passing vacuously. 
 `docs/cli.md` for the full flag list; the `FINDINGS: <n>` contract that
 `verify --record --bless` pins is unchanged.
 
+### Installed sensor commands
+
+An installed sensor command can have a name shared across repositories. Place
+a regular `sensor-plugin.toml` file at the workspace root and register the
+commands available to that workspace. The [Ruff manifest](../integrations/sensor-plugins/ruff/sensor-plugin.toml)
+registers `python.ruff`, which runs the installed `ruff` executable.
+
+<!-- example: id=adoption_installed_sensor classification=illustrative reason="Sensor configuration referencing an installed Ruff command" -->
+```toml
+[[sensors]]
+name = "python-lint"
+plugin = "python.ruff"
+when-changed = ["**/*.py", "pyproject.toml"]
+```
+
+The workspace selects a registered command explicitly. Use either `plugin`
+or `argv` in a sensor entry. The manifest declares `schema-version = 1` and
+one `[[plugins]]` record per command, with a unique `name` and an `argv` array
+beginning with its program. The program uses the same executable lookup,
+process limits, result handling, and policy as an inline sensor. Install the
+referenced tool before running verification and review the manifest as part of
+trusted repository configuration. Manifest changes invalidate saved evidence
+for the sensors that use it.
+
+Existing inline sensor configurations continue to load as written. A
+configuration using `plugin` requires a CLI that supports installed sensors.
+
 ## Web pack configuration
 
 `init --language web` scaffolds the web UI audit pack (viewport text, axe
