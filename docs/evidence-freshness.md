@@ -45,6 +45,11 @@ insufficient coverage. `no_evidence`, `insufficient_coverage`, and
 Pre/post input changes invalidate verify. v3/v4 documents remain readable, but
 need regeneration before reporting green.
 
+By default `status` recomputes the working-tree and committed-range selection
+saved by `verify --changed` and `verify --since`. A new edit, revision, or
+unavailable input can make that evidence stale. An explicit `status --since`
+checks the evidence against the requested committed range.
+
 Each run locks its own marker file in a sibling `<evidence>.running/`
 directory for its whole duration and publishes its pid and start time there,
 so `status` can tell "running now" from "never run" and exits 3 for `running`.

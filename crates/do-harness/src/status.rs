@@ -157,15 +157,21 @@ pub fn status_report(
     // A range-selected artifact must be judged against the same range, not
     // the (usually empty) working tree of a clean committed checkout.
     let explicit_range = since.is_some();
-    let selected_since = since
-        .map(ToOwned::to_owned)
-        .or_else(|| selection::recorded_since(&paths));
+    let recorded = (!explicit_range)
+        .then(|| selection::recorded(&paths))
+        .flatten();
+    let selected_since = since.or_else(|| recorded.as_ref()?.since.as_deref());
+    let working_tree = recorded.as_ref().is_some_and(|saved| {
+        use crate::changes::SelectionMode::{WorkingTree, WorkingTreeAndRange};
+        saved.mode == WorkingTree.as_str() || saved.mode == WorkingTreeAndRange.as_str()
+    });
     let facts = CurrentFacts::compute(
         root,
         cfg,
         config_bytes,
         set,
-        selected_since.as_deref(),
+        selected_since,
+        working_tree,
         explicit_range,
     )?;
     let mut report = if let Some(running) = paths
