@@ -156,4 +156,7 @@ carry the independent artifact versions, so a release body shows exactly which
 contract, pack, and guide versions ship with a given CLI.
 
 See the [Consumer Impact Matrix](releasing.md#consumer-impact-matrix) for how
-release notes report changes and required upgrade steps.
+release notes report changes and required upgrade steps. A patch release can
+require an action, such as running a migration, even when the interface remains
+compatible. The [v0.6.0 release notes](https://github.com/d-o-hub/do-harness/releases/tag/v0.6.0)
+show the published artifact versions and Consumer Impact Matrix.
