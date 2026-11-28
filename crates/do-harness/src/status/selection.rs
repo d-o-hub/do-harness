@@ -7,15 +7,20 @@
 use std::path::{Path, PathBuf};
 
 use super::{CurrentFacts, CurrentSide};
-use crate::{config, evidence::EvidenceDocument};
+use crate::{
+    config,
+    evidence::{EvidenceDocument, EvidenceSelection},
+};
 
-/// `--since` ref recorded by the primary evidence artifact, when it used one.
-pub(super) fn recorded_since(paths: &[PathBuf]) -> Option<String> {
-    paths.iter().find_map(|path| {
-        let bytes = crate::managed_path::read_evidence(path).ok()?;
-        let document: EvidenceDocument = serde_json::from_slice(&bytes).ok()?;
-        document.selection.and_then(|selection| selection.since)
-    })
+/// Selection recorded by the primary evidence artifact, when it used one.
+pub(super) fn recorded(paths: &[PathBuf]) -> Option<EvidenceSelection> {
+    paths
+        .iter()
+        .find_map(|path| {
+            let bytes = crate::managed_path::read_evidence(path).ok()?;
+            serde_json::from_slice::<EvidenceDocument>(&bytes).ok()
+        })?
+        .selection
 }
 
 /// Whether the recorded selection revisions still describe the current input.
@@ -54,13 +59,14 @@ impl CurrentFacts {
         config_bytes: Option<&[u8]>,
         set: Option<&str>,
         since: Option<&str>,
+        working_tree: bool,
         explicit_range: bool,
     ) -> anyhow::Result<Self> {
         let candidates = crate::signals::candidate_specs(cfg, set)?;
         // Unfiltered evidence fingerprints the working tree, as it always
         // has; range evidence must be judged against the same range.
-        let selection = if let Some(since) = since {
-            crate::changes::discover_selection(root, false, Some(since))
+        let selection = if working_tree || since.is_some() {
+            crate::changes::discover_selection(root, working_tree, since)
         } else {
             let changed = crate::changes::discover(root);
             crate::changes::ChangeSelection {
