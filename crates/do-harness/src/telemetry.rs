@@ -124,6 +124,7 @@ pub async fn record_verify(
                 config_bytes,
                 pre_digests,
                 selection,
+                task_id.is_some(),
             )
         })
         .collect();
@@ -173,15 +174,15 @@ pub async fn record_verify(
     Ok(())
 }
 
-/// Input identity to store on a beat, or `None` when the sensor is not
-/// cache-eligible.
+/// Input identity to store on a beat, if the execution observed current inputs.
 ///
 /// Eligibility is deliberately narrow: the process ran and exited zero, no
 /// `SKIP:`/`COVERAGE:` marker or findings were reported, no artifact globs
 /// are declared (reuse would not re-produce outputs), the sensor declares
 /// `inputs`, the pre-execution identity is known, and the identity is
 /// unchanged after execution (a file that changed while the sensor ran
-/// invalidates the entry rather than pinning a stale digest).
+/// invalidates the entry rather than pinning a stale digest). A task-scoped
+/// nonzero exit records an observation only, which cannot authorize reuse.
 fn cache_digest(
     root: &Path,
     sensor: &crate::report::SensorResult,
@@ -189,15 +190,21 @@ fn cache_digest(
     config_bytes: Option<&[u8]>,
     pre_digests: &BTreeMap<String, String>,
     selection: Option<&crate::changes::ChangeSelection>,
+    task_scoped: bool,
 ) -> Option<String> {
     let spec = spec?;
-    if !sensor.ok || sensor.exit_code != Some(0) || sensor.warned {
+    let task_failure = task_scoped && !sensor.ok && sensor.exit_code.is_some_and(|code| code != 0);
+    if !task_failure && (!sensor.ok || sensor.exit_code != Some(0) || sensor.warned) {
         return None;
     }
-    if !spec.artifacts.is_empty() && crate::artifacts::resolve(root, &spec.artifacts).is_empty() {
+    if !task_failure
+        && !spec.artifacts.is_empty()
+        && crate::artifacts::resolve(root, &spec.artifacts).is_empty()
+    {
         return None;
     }
-    let observation_only = spec.inputs.is_empty()
+    let observation_only = task_failure
+        || spec.inputs.is_empty()
         || sensor.findings.is_some_and(|findings| findings > 0)
         || !spec.artifacts.is_empty()
         || sensor

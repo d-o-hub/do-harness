@@ -83,9 +83,6 @@ pub struct EvidenceArtifactRef {
     pub path: String,
     /// SHA-256 of the artifact bytes (`sha256:…`).
     pub sha256: String,
-    /// Unix seconds when the artifact was recorded (its `finished_at`), so
-    /// repeated `status` invocations against unchanged evidence agree.
-    pub observed_at: i64,
 }
 
 /// Current side of the status comparison.
@@ -186,7 +183,6 @@ pub fn status_report(
                     .map(|located| EvidenceArtifactRef {
                         path: located.path.to_string_lossy().into_owned(),
                         sha256: located.sha256.clone(),
-                        observed_at: document.finished_at,
                     })
                     .as_ref(),
             )
