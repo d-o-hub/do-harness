@@ -14,9 +14,12 @@ use do_harness_types::{
 use libsql::{Connection, params, params::Params};
 
 mod fresh;
+mod guards;
 pub use fresh::{
     FreshTaskInputs, FreshTransition, OBSERVATION_ONLY_PREFIX, transition_with_freshness,
+    transition_with_guards,
 };
+pub use guards::{TaskGuardDecision, TaskGuardInput, TaskGuardVerdict, check_task_guards};
 
 pub use do_harness_types::chain_hash;
 
