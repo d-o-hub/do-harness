@@ -425,8 +425,22 @@ and the isolation-evidence rules.
 Issue #499 should reuse the paired-run protocol from `docs/workflow-benchmarks.md`
 (identical inputs, alternating order, predeclared tolerance and sample size)
 to measure whether a fresh-context reviewer reduces unresolved assumptions
-before implementation, and then decide adoption. This record deliberately
-states that comparative value and adoption remain undecided.
+before implementation, and then decide adoption.
+
+### Evaluation checkpoint
+
+The [versioned decision protocol](fresh-context-review-decision-protocol.md)
+and its seven held-out designs are available. Running `aggregate` against an
+empty held-out record directory on 2026-11-28 produced `INCONCLUSIVE` with zero
+complete designs. The threshold state is `unpinned`, and neither arm has a
+held-out observation.
+
+The pilot's two live records contain review durations of 199.491 and 43.046
+seconds and negative parent-marker probes. They contain no observed usage cost
+and no paired baseline. Use them as feasibility observations. Apply the
+decision protocol once the cost and isolation evidence to pin the thresholds
+is available. Adoption remains undecided at this checkpoint.
+
 ## Acceptance mapping
 
 - [x] Eligibility rules keep the pilot optional and focused on consequential design choices.
