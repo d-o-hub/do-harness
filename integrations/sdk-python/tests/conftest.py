@@ -12,6 +12,7 @@ import json
 from pathlib import Path
 
 import pytest
+from do_harness_sdk import __version__
 
 from .fixtures_json import (
     ERRORS,
@@ -53,9 +54,14 @@ if scenario == "status-red":
 if scenario == "exit2-with-report":
     print('@VERIFY_FAIL@')
     sys.exit(2)
+if scenario == "version-current":
+    bad = json.loads('@VERSION@')
+    bad["version"] = @SDK_VERSION@
+    print(json.dumps(bad))
+    sys.exit(0)
 if scenario == "version-mismatch":
     bad = json.loads('@VERSION@')
-    bad["version"] = "0.5.0"
+    bad["version"] = "999.0.0"
     print(json.dumps(bad))
     sys.exit(0)
 
@@ -89,6 +95,7 @@ _STUB_PAYLOADS = {
     "@TASK_LIST@": TASK_LIST,
     "@TASK_EXPORT@": TASK_EXPORT,
     "@VERSION@": VERSION,
+    "@SDK_VERSION@": __version__,
 }
 
 

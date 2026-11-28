@@ -7,8 +7,11 @@
 // result. The package version mirrors the CLI release it targets.
 
 import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 
-export const SDK_VERSION = "0.4.8";
+export const SDK_VERSION = JSON.parse(
+  readFileSync(new URL("../package.json", import.meta.url), "utf8"),
+).version;
 export const SCHEMA_VERSION = 1;
 
 export class HarnessError extends Error {

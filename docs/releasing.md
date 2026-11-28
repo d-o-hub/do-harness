@@ -882,6 +882,29 @@ Each recovery ends with a new version, so the fix follows "Cutting a release"
 from step 1. A yanked or deprecated version stays installable for anyone who
 already pinned it, which is why the superseding release is the real fix.
 
+## SDK publishing
+
+The release manager bumps both `do-harness-sdk` versions with the CLI.
+`scripts/check-sdk-pack.sh --dist DIR` builds the Python wheel and source
+distribution under `DIR/python` and the npm tarball under `DIR/npm`. It checks
+that every package version matches the CLI before retaining the artifacts.
+
+Configure each registry before enabling its publish job in `release.yml`.
+
+1. For PyPI, create a pending trusted publisher for `do-harness-sdk` with the
+   repository owner and name, workflow `release.yml`, and environment
+   `sdk-pypi`. Set the repository Actions variable `PUBLISH_SDK_PYPI=true`.
+2. For npm, publish the first validated SDK tarball from an authorized maintainer
+   account. Then configure the package's trusted publisher for this repository,
+   workflow `release.yml`, and environment `sdk-npm`. Set the repository Actions
+   variable `PUBLISH_SDK_NPM=true`.
+
+The workflow builds the artifacts after the matching GitHub Release succeeds.
+Each registry job downloads those artifacts and authenticates through GitHub
+OIDC. A tagged recovery run can retry either registry after configuration. It
+skips versions already present, and an older npm recovery version uses the
+`backfill` dist-tag to preserve `latest`.
+
 ## Consumer Impact Matrix
 
 Every GitHub Release body carries a **Consumer Impact Matrix**: a table that

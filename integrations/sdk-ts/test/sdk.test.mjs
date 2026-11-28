@@ -46,9 +46,9 @@ if (scenario === "exit2-with-report") {
   print(@VERIFY_FAIL@);
   process.exit(2);
 }
-if (scenario === "version-mismatch") {
+if (scenario === "version-current" || scenario === "version-mismatch") {
   const bad = structuredClone(@VERSION@);
-  bad.version = "0.5.0";
+  bad.version = scenario === "version-current" ? @SDK_VERSION@ : "999.0.0";
   print(bad);
   process.exit(0);
 }
@@ -78,6 +78,7 @@ function buildStub() {
     "@TASK_LIST@": F.TASK_LIST,
     "@TASK_EXPORT@": F.TASK_EXPORT,
     "@VERSION@": F.VERSION,
+    "@SDK_VERSION@": SDK_VERSION,
   };
   for (const [token, payload] of Object.entries(payloads)) {
     script = script.split(token).join(JSON.stringify(payload));
@@ -121,7 +122,8 @@ function withSpy(fn) {
 }
 
 test("version constant mirrors CLI release", () => {
-  assert.equal(SDK_VERSION, "0.4.8");
+  const manifest = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
+  assert.equal(SDK_VERSION, manifest.version);
   assert.equal(SCHEMA_VERSION, 1);
 });
 
@@ -225,7 +227,9 @@ test("version parses", () => {
 });
 
 test("assertSchemaCompatible matches", () => {
-  assert.equal(client().assertSchemaCompatible().version, "0.4.8");
+  withScenario("version-current", () => {
+    assert.equal(client().assertSchemaCompatible().version, SDK_VERSION);
+  });
 });
 
 test("assertSchemaCompatible fails on mismatch", () => {
@@ -234,7 +238,7 @@ test("assertSchemaCompatible fails on mismatch", () => {
       () => client().assertSchemaCompatible(),
       (err) => {
         assert.ok(err instanceof CliError);
-        assert.match(err.message, /0.5.0/);
+        assert.match(err.message, /999\.0\.0/);
         return true;
       },
     );

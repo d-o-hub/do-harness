@@ -359,7 +359,7 @@ class HarnessClient:
     def assert_schema_compatible(self) -> CliVersion:
         """Fail closed when the installed CLI is from a different release line.
 
-        The SDK's package version mirrors the CLI release (``0.4.x``); a CLI
+        The SDK's package version mirrors the CLI release; a CLI
         whose reported version does not share that line may emit documents this
         SDK does not know, so a mismatch raises :class:`CliError` instead of
         risking a misparse.

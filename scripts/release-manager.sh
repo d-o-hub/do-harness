@@ -25,7 +25,7 @@
 #       in Cargo.toml, the intra-workspace requirement pins in the member
 #       manifests (`do-harness-* = { path = …, version = … }`), Cargo.lock
 #       (workspace members are pins in it), the six npm manifests (the meta
-#       version plus its five platform pins), and the generated man page, whose
+#       version plus its five platform pins), both SDK versions, and the generated man page, whose
 #       header announces the semver.
 #
 #   --self-test
@@ -615,6 +615,14 @@ prepare_npm() {
     done
 }
 
+prepare_sdks() {
+    local version="$1"
+    substitute "s/^__version__ = \"[^\"]*\"/__version__ = \"$version\"/" \
+        "$ROOT/integrations/sdk-python/do_harness_sdk/_version.py"
+    substitute "s/^\([[:space:]]*\"version\": \)\"[^\"]*\"/\1\"$version\"/" \
+        "$ROOT/integrations/sdk-ts/package.json"
+}
+
 prepare_lock() {
     # Workspace members are pins in Cargo.lock, and the release pipeline builds
     # with --locked, so a bump that leaves the lock stale fails the tag preflight.
@@ -659,6 +667,7 @@ cmd_prepare() {
         prepare_cargo "$version"
         prepare_pins "$version"
         prepare_npm "$version"
+        prepare_sdks "$version"
         prepare_docs_pins "$version"
         printf 'applied %s (was %s)\n' "$version" "$current"
     fi
@@ -757,6 +766,7 @@ cmd_e2e() {
     # expected to move.
     expected="$({
         printf '%s\n' Cargo.toml Cargo.lock integrations/npm/package.json
+        printf '%s\n' integrations/sdk-python/do_harness_sdk/_version.py integrations/sdk-ts/package.json
         for file in "$E2E_SCRATCH"/integrations/npm/platforms/*/package.json; do
             [ -f "$file" ] || continue
             printf '%s\n' "${file#"$E2E_SCRATCH"/}"
@@ -843,7 +853,10 @@ self_test() {
     expect_eligible true 1 minor true 'force bypasses the batch threshold'
     expect_eligible false 4 none false 'a non-release bump stays ineligible'
 
-    mkdir -p "$repo/integrations/npm/platforms"
+    mkdir -p "$repo/integrations/npm/platforms" \
+        "$repo/integrations/sdk-python/do_harness_sdk" "$repo/integrations/sdk-ts"
+    printf '%s\n' '__version__ = "0.3.0"' >"$repo/integrations/sdk-python/do_harness_sdk/_version.py"
+    printf '%s\n' '{' '  "version": "0.3.0"' '}' >"$repo/integrations/sdk-ts/package.json"
     cat >"$repo/Cargo.toml" <<'EOF'
 [workspace]
 members = ["crates/do-harness"]
@@ -1148,6 +1161,8 @@ EOF
     cmd_prepare 3.0.1 >/dev/null
     wrote "$repo/Cargo.toml" 'version = "3.0.1"'
     wrote "$repo/integrations/npm/package.json" '"version": "3.0.1"'
+    wrote "$repo/integrations/sdk-python/do_harness_sdk/_version.py" '__version__ = "3.0.1"'
+    wrote "$repo/integrations/sdk-ts/package.json" '"version": "3.0.1"'
     # Every platform manifest and every pin, discovered rather than listed: a new
     # platform directory enters the fixture above and is asserted on here.
     for name in "${platforms[@]}"; do

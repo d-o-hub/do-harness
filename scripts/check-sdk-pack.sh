@@ -8,17 +8,26 @@
 #   - Python (integrations/sdk-python/): builds an sdist and a wheel into a
 #     scratch directory (never in-tree), then verifies the wheel contains the
 #     package modules.
-#   - TypeScript (integrations/sdk-ts/): runs `npm pack --dry-run` and
+#   - TypeScript (integrations/sdk-ts/): runs `npm pack` into a scratch directory and
 #     verifies the packed manifest name/version and the shipped files.
 #
-# This is the offline half of the publish automation: the actual `pip
-# publish` / `npm publish` steps need registry credentials and stay out of
-# the repository (see docs/adoption.md, "SDK packages"). Exit code 0 means
-# both packages are ready to publish from the current tree.
+# Pass --dist DIR to keep the validated artifacts for the release workflow.
 
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck disable=SC1091 # resolved relative to the script
+source "$ROOT/scripts/lib.sh"
+VERSION="$(dh_workspace_version "$ROOT")"
+[[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "invalid CLI version" >&2; exit 1; }
+DIST=""
+if [[ $# -ne 0 ]]; then
+    if [[ $# -ne 2 || $1 != --dist || -z $2 ]]; then
+        echo "usage: check-sdk-pack.sh [--dist DIR]" >&2
+        exit 2
+    fi
+    DIST="$2"
+fi
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
@@ -48,11 +57,16 @@ SDIST="$(find "$PY_DIST" -maxdepth 1 -name '*.tar.gz' -print -quit)"
 [ -n "$WHEEL" ] || { echo "FINDINGS: 1 (python wheel missing)"; exit 1; }
 [ -n "$SDIST" ] || { echo "FINDINGS: 1 (python sdist missing)"; exit 1; }
 
-python3 - "$WHEEL" <<'PY'
+python3 - "$WHEEL" "$SDIST" "$VERSION" <<'PY'
 import sys
 import zipfile
+from pathlib import Path
 
-wheel = sys.argv[1]
+wheel, sdist, version = sys.argv[1:]
+if Path(wheel).name != f"do_harness_sdk-{version}-py3-none-any.whl":
+    raise SystemExit(f"Python wheel does not match CLI version {version}: {wheel}")
+if Path(sdist).name != f"do_harness_sdk-{version}.tar.gz":
+    raise SystemExit(f"Python sdist does not match CLI version {version}: {sdist}")
 with zipfile.ZipFile(wheel) as zf:
     names = zf.namelist()
 for required in (
@@ -66,14 +80,14 @@ for required in (
 print(f"python wheel ok: {wheel.split('/')[-1]} ({len(names)} files)")
 PY
 
-# --- TypeScript: npm pack --dry-run ---------------------------------------
+# --- TypeScript: package artifact ----------------------------------------
 
 (
     cd "$ROOT/integrations/sdk-ts"
-    npm pack --dry-run --json > "$TMP/npm.json"
+    npm pack --ignore-scripts --pack-destination "$TMP" --json > "$TMP/npm.json"
 )
 
-node - "$TMP/npm.json" <<'JS'
+node - "$TMP/npm.json" "$VERSION" <<'JS'
 const fs = require("fs");
 const raw = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
 // npm >= 12 prints the `--json` report keyed by package name; npm <= 11
@@ -85,12 +99,18 @@ if (packages.length !== 1) {
 }
 const [pkg] = packages;
 if (pkg.name !== "do-harness-sdk") throw new Error(`unexpected package: ${pkg.name}`);
-if (pkg.version !== "0.4.8") throw new Error(`unexpected version: ${pkg.version}`);
+if (pkg.version !== process.argv[3]) throw new Error(`unexpected version: ${pkg.version}`);
 const paths = pkg.files.map((f) => f.path);
 for (const file of ["lib/sdk.mjs", "index.d.ts", "README.md"]) {
   if (!paths.includes(file)) throw new Error(`packed file missing: ${file}`);
 }
 console.log(`npm pack ok: ${pkg.filename} (${pkg.size} bytes)`);
 JS
+
+if [[ -n "$DIST" ]]; then
+    mkdir -p "$DIST/python" "$DIST/npm"
+    cp "$WHEEL" "$SDIST" "$DIST/python/"
+    cp "$TMP/do-harness-sdk-$VERSION.tgz" "$DIST/npm/"
+fi
 
 echo "sdk pack validation passed"

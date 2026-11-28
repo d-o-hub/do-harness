@@ -4,8 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "do-harness-sdk"
-# Mirrors the do-harness CLI release this SDK targets (see README.md).
-version = "0.4.8"
+dynamic = ["version"]
 description = "Typed Python bindings for the do-harness agent harness CLI"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -38,6 +37,9 @@ Issues = "https://github.com/d-o-hub/do-harness/issues"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["do_harness_sdk*"]
+
+[tool.setuptools.dynamic]
+version = {attr = "do_harness_sdk._version.__version__"}
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

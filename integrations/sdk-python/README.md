@@ -88,16 +88,10 @@ failure instead of a false pass.
 
 ## Publishing
 
-The package version mirrors the CLI release it targets, and the offline gate
-`bash scripts/check-sdk-pack.sh` (from the repository root) builds the sdist
-and wheel before any publish. The publish itself needs PyPI credentials and
-runs outside the repository:
-
-<!-- example: id=sdk_python_publish classification=illustrative reason="Publishing steps for the Python SDK" -->
-```sh
-python3 -m build
-python3 -m twine upload dist/*
-```
+The package version mirrors the CLI release it targets. Run
+`bash scripts/check-sdk-pack.sh` from the repository root to validate the
+sdist and wheel. See [SDK publishing](../../docs/releasing.md#sdk-publishing)
+to configure the PyPI trusted publisher for tagged releases.
 
 ## Development
 

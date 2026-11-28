@@ -13,6 +13,7 @@ from do_harness_sdk import (
     ParseError,
     StatusNotGreen,
     VerifyFailed,
+    __version__,
 )
 from do_harness_sdk.client import SCHEMA_VERSION
 from do_harness_sdk.models import StatusResult, StrikeInfo, TaskList, VerifyResult
@@ -130,13 +131,14 @@ def test_version_parses(client: HarnessClient) -> None:
     assert info.dirty is False
 
 
-def test_schema_compatible_matches(fake_harness) -> None:
-    assert HarnessClient().assert_schema_compatible().version == "0.4.8"
+def test_schema_compatible_matches(fake_harness, monkeypatch) -> None:
+    monkeypatch.setenv("FAKE_SCENARIO", "version-current")
+    assert HarnessClient().assert_schema_compatible().version == __version__
 
 
 def test_schema_compatible_mismatch(fake_harness, monkeypatch) -> None:
     monkeypatch.setenv("FAKE_SCENARIO", "version-mismatch")
-    with pytest.raises(CliError, match="installed CLI reports 0.5.0"):
+    with pytest.raises(CliError, match=r"installed CLI reports 999\.0\.0"):
         HarnessClient().assert_schema_compatible()
 
 

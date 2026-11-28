@@ -89,15 +89,10 @@ const verifyTool = new DynamicStructuredTool({
 
 ## Publishing
 
-The package version mirrors the CLI release it targets, and the offline gate
-`bash scripts/check-sdk-pack.sh` (from the repository root) runs
-`npm pack --dry-run`. The publish itself needs npm registry credentials and
-runs outside the repository:
-
-<!-- example: id=sdk_ts_publish classification=illustrative reason="Publishing step for the TypeScript SDK" -->
-```sh
-npm publish
-```
+The package version mirrors the CLI release it targets. Run
+`bash scripts/check-sdk-pack.sh` from the repository root to validate the
+tarball. See [SDK publishing](../../docs/releasing.md#sdk-publishing) for
+the initial npm publication and trusted publisher setup.
 
 ## Development
 
