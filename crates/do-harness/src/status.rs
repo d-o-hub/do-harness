@@ -25,6 +25,7 @@ mod evidence;
 mod inflight;
 mod locate;
 mod present;
+mod scenarios;
 mod selection;
 
 use evidence::evidence_side;
@@ -55,6 +56,9 @@ pub struct EvidenceSide {
     pub signal_set: Option<String>,
     /// Aggregate verdict (`pass` | `fail`).
     pub verdict: String,
+    /// Recorded scenario outcomes for an opted-in verification set.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub scenario_results: Vec<crate::evidence::ScenarioResult>,
     /// Recorded workspace fingerprint.
     pub workspace_fingerprint: String,
     /// Recorded policy fingerprint.
@@ -151,6 +155,8 @@ pub fn status_report(
     evidence_override: Option<&Path>,
     since: Option<&str>,
 ) -> anyhow::Result<StatusReport> {
+    let mut configured = cfg.clone();
+    let scenarios = crate::scenarios::configure(root, &mut configured, set)?;
     let paths = evidence_paths(root, set, evidence_override);
     // A range-selected artifact must be judged against the same range, not
     // the (usually empty) working tree of a clean committed checkout.
@@ -160,7 +166,7 @@ pub fn status_report(
         .or_else(|| selection::recorded_since(&paths));
     let facts = CurrentFacts::compute(
         root,
-        cfg,
+        &configured,
         config_bytes,
         set,
         selected_since.as_deref(),
@@ -174,7 +180,7 @@ pub fn status_report(
     } else {
         let (document, covering, artifact) = find_covering_evidence(&paths, set, &facts.required);
         if let Some(document) = document {
-            decide(
+            let mut decision = decide(
                 set,
                 &facts,
                 &document,
@@ -185,7 +191,16 @@ pub fn status_report(
                         sha256: located.sha256.clone(),
                     })
                     .as_ref(),
-            )
+            );
+            scenarios::revise(
+                &mut decision,
+                scenarios
+                    .as_ref()
+                    .is_some_and(crate::scenarios::Mapping::enforces),
+                &document,
+                set,
+            );
+            decision
         } else {
             missing_report(set, &paths, covering, facts.side)
         }

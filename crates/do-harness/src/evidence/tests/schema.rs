@@ -37,6 +37,7 @@ fn serialization_matches_schema() {
         }],
         skipped: Vec::new(),
         coverage: std::collections::BTreeMap::new(),
+        scenario_results: Vec::new(),
         summary: EvidenceSummary {
             pass: 1,
             fail: 0,

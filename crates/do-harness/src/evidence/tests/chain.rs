@@ -27,6 +27,7 @@ fn seal_and_verify_chain() {
         sensors: vec![],
         skipped: Vec::new(),
         coverage: std::collections::BTreeMap::new(),
+        scenario_results: Vec::new(),
         summary: EvidenceSummary {
             pass: 0,
             fail: 0,

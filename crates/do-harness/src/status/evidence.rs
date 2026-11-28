@@ -19,6 +19,7 @@ pub(super) fn evidence_side(
     EvidenceSide {
         signal_set: document.signal_set.clone(),
         verdict: document.summary.verdict.clone(),
+        scenario_results: document.scenario_results.clone(),
         workspace_fingerprint: document.workspace_fingerprint.clone(),
         policy_fingerprint: document.policy_fingerprint.clone(),
         failed,

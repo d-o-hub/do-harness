@@ -163,6 +163,9 @@ pub struct EvidenceDocument {
     /// `COVERAGE: <json>` markers, keyed by sensor name.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub coverage: BTreeMap<String, serde_json::Value>,
+    /// Outcomes from an opted-in scenario mapping, sealed with the run.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub scenario_results: Vec<ScenarioResult>,
     pub summary: EvidenceSummary,
     /// Previous artifact's chain hash, when one existed in the same workspace.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -224,6 +227,9 @@ impl EvidenceDocument {
         }
         if let Some(manifest) = &self.input_manifest {
             payload["input_manifest"] = serde_json::to_value(manifest)?;
+        }
+        if !self.scenario_results.is_empty() {
+            payload["scenario_results"] = serde_json::to_value(&self.scenario_results)?;
         }
         let canonical = do_harness_types::canonical_value(&payload)?;
         self.chain_hash = do_harness_types::chain_hash(prev.as_deref(), &canonical);
@@ -369,6 +375,7 @@ impl EvidenceDocument {
             sensors,
             skipped: meta.skipped.clone(),
             coverage,
+            scenario_results: Vec::new(),
             summary: EvidenceSummary {
                 pass: pass_count,
                 fail: fail_count,
@@ -380,6 +387,8 @@ impl EvidenceDocument {
         }
     }
 }
+
+pub use crate::scenarios::ScenarioResult;
 
 /// Run metadata for [`EvidenceDocument::from_run`] beyond the report itself.
 #[derive(Debug, Clone)]
