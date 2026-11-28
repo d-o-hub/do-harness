@@ -611,7 +611,7 @@ when-changed = ["integrations/sdk-ts/**"]
 # PyPI/npm needs registry credentials and stays out of the repository.
 name = "sdk-pack"
 argv = ["bash", "scripts/check-sdk-pack.sh"]
-when-changed = ["integrations/sdk-python/**", "integrations/sdk-ts/**", "scripts/check-sdk-pack.sh", "do-harness.toml"]
+when-changed = ["integrations/sdk-python/**", "integrations/sdk-ts/**", "scripts/check-sdk-pack.sh", "scripts/lib.sh", "do-harness.toml"]
 
 [[sensors]]
 # Hermetic integration tests for the native design-review command (packet
