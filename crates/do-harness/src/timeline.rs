@@ -210,6 +210,7 @@ fn load_snapshot(path: &Path) -> Result<Snapshot> {
     let value: Value = serde_json::from_slice(&bytes)
         .with_context(|| format!("{} is not a status snapshot", path.display()))?;
     let recorded_artifact = value.get("evidence").and_then(|side| side.get("artifact"));
+    // Older binaries embedded the observation time in the artifact reference.
     let recorded_observed_at = recorded_artifact
         .and_then(|artifact| artifact.get("observed_at"))
         .and_then(Value::as_i64);
