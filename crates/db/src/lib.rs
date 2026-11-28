@@ -77,9 +77,10 @@ pub use repo_trace::{
     list_traces_page,
 };
 pub use repo_workflow::{
-    FreshTaskInputs, FreshTransition, OBSERVATION_ONLY_PREFIX, WorkflowEventRow,
-    advance_subtask_with_event, canonical_payload, chain_hash, count_tasks_without_added_event,
-    insert_task_with_event, list_all_events, list_events_ascending, transition_with_freshness,
+    FreshTaskInputs, FreshTransition, OBSERVATION_ONLY_PREFIX, TaskGuardDecision, TaskGuardInput,
+    TaskGuardVerdict, WorkflowEventRow, advance_subtask_with_event, canonical_payload, chain_hash,
+    check_task_guards, count_tasks_without_added_event, insert_task_with_event, list_all_events,
+    list_events_ascending, transition_with_freshness, transition_with_guards,
     update_task_status_with_event,
 };
 pub use root::{db_path, find_harness_root};

@@ -1,14 +1,14 @@
 //! Filesystem snapshot evaluated inside the task writer's database transaction.
 use std::path::Path;
 
-use do_harness_db::{DbError, FreshTaskInputs};
+use do_harness_db::{DbError, FreshTaskInputs, TaskGuardInput};
 
 pub(super) fn snapshot(
     root: &Path,
     task: &do_harness_types::TaskRecord,
     sensors: &[String],
     complete: bool,
-) -> do_harness_db::Result<FreshTaskInputs> {
+) -> do_harness_db::Result<(FreshTaskInputs, Vec<TaskGuardInput>)> {
     let bytes = match std::fs::read(root.join("do-harness.toml")) {
         Ok(bytes) => Some(bytes),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
@@ -58,8 +58,12 @@ pub(super) fn snapshot(
             ));
         }
     }
+    let (guard_digest, guards) =
+        super::guards::snapshot(root, task, complete, &methods, &cfg, bytes.as_deref())
+            .map_err(|error| DbError::Invariant(format!("invalid task guard policy: {error:#}")))?;
     let policy_fingerprint = crate::fingerprint::hash_canonical(&serde_json::json!({
         "config": crate::fingerprint::config_digest(bytes.as_deref()), "methods": methods,
+        "guards": guard_digest,
     }));
     let identities = sensors
         .iter()
@@ -76,12 +80,15 @@ pub(super) fn snapshot(
             Ok((sensor.clone(), digest))
         })
         .collect::<do_harness_db::Result<Vec<_>>>()?;
-    Ok(FreshTaskInputs {
-        method: task.method.clone(),
-        subtask_index: task.subtask_index,
-        policy_fingerprint,
-        sensors: identities,
-    })
+    Ok((
+        FreshTaskInputs {
+            method: task.method.clone(),
+            subtask_index: task.subtask_index,
+            policy_fingerprint,
+            sensors: identities,
+        },
+        guards,
+    ))
 }
 
 pub(super) async fn preview(
@@ -91,7 +98,9 @@ pub(super) async fn preview(
     sensors: &[String],
     complete: bool,
 ) -> anyhow::Result<()> {
-    let inputs = snapshot(root, task, sensors, complete)?;
+    let (inputs, guards) = snapshot(root, task, sensors, complete)?;
+    let decisions = do_harness_db::check_task_guards(conn, task.id, &guards).await?;
+    super::guards::print_advisory(&decisions);
     for (sensor, digest) in inputs.sensors {
         let beat =
             do_harness_db::latest_sensor_beat(conn, &sensor, &format!("task:{}", task.id)).await?;

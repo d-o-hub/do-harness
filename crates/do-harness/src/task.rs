@@ -291,6 +291,7 @@ pub async fn show_task(root: &Path, id: i64, format: Format) -> Result<()> {
 
 pub mod context;
 mod freshness;
+mod guards;
 mod mutations;
 
 // The lifecycle commands live in `mutations`; re-exported so `do-harness task`
