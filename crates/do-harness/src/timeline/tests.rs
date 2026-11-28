@@ -39,6 +39,7 @@ fn attempt(path: &str, overrides: &serde_json::Value) -> Attempt {
         }
     }
     Attempt {
+        session: None,
         path: PathBuf::from(path),
         sha256: format!("sha256:{}", path.replace('.', "-")),
         document: serde_json::from_value(document).expect("valid evidence document"),

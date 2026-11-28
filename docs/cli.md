@@ -1333,6 +1333,17 @@ fingerprints and says so; a snapshot that matches no supplied attempt is reporte
 as a coverage gap rather than assigned to one. An attempt with no observation
 renders `freshness: unknown`.
 
+For an explicitly instrumented agent session, use the
+[session capture helper](../integrations/verification-timeline/capture.py).
+Pass the client namespace and its opaque session ID at invocation time. The
+helper creates a new attempt directory, captures one verification and status
+observation, and records the attempt ID and exact evidence digest alongside
+them. Keep the directory name and files together when copying a capture.
+The timeline displays the association when it matches the capture, shows old
+or uninstrumented attempts as unlinked, and rejects conflicting bindings.
+Session metadata describes attribution. Verification and freshness continue
+to use the saved evidence contract.
+
 Order is supplied order by design: independently saved artifacts have no reliable
 total order, and inventing one from timestamps would misreport two runs in the
 same second. The page is self-contained — inline stylesheet, escaped text, local

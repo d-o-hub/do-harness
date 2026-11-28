@@ -40,6 +40,80 @@ impl Fixture {
     }
 }
 
+fn capture_session(root: &Path, client: &str, session: &str) -> PathBuf {
+    let helper = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../integrations/verification-timeline/capture.py");
+    let (code, stdout, stderr) = run(std::process::Command::new("python3")
+        .env("DO_HARNESS_BIN", env!("CARGO_BIN_EXE_do-harness"))
+        .arg(helper)
+        .args([
+            "--root",
+            arg(root),
+            "--client",
+            client,
+            "--session",
+            session,
+            "--set",
+            "gate",
+            "--task",
+            "1",
+        ]));
+    assert_eq!(code, Some(1), "{stdout}\n{stderr}");
+    let evidence = PathBuf::from(stdout.lines().last().unwrap());
+    assert!(evidence.is_file(), "{stdout}\n{stderr}");
+    evidence
+}
+
+#[test]
+fn timeline_links_explicit_sessions_to_their_exact_attempts() {
+    let fixture = fixture();
+    let root = &fixture.root;
+    let (code, stdout, stderr) = run(harness(root).args(["task", "add", "session example"]));
+    assert_eq!(code, Some(0), "{stdout}\n{stderr}");
+    let first = capture_session(root, "client-a", "session-original");
+    let second = capture_session(root, "client-a", "session-resumed");
+    let third = capture_session(root, "client-b", "session-resumed");
+    let args = [
+        "timeline",
+        "--evidence",
+        arg(&first),
+        "--evidence",
+        arg(&second),
+        "--evidence",
+        arg(&third),
+        "--format",
+        "json",
+    ];
+    let (code, stdout, stderr) = run(harness(root).args(args));
+    assert_eq!(code, Some(0), "{stdout}\n{stderr}");
+    let report: Value = serde_json::from_str(&stdout).unwrap();
+    let attempts = report["attempts"].as_array().unwrap();
+    for (item, path) in attempts.iter().zip([&first, &second, &third]) {
+        assert_eq!(item["path"], arg(path));
+        assert_eq!(item["task_id"], 1);
+        assert_eq!(item["verdict"], "fail");
+    }
+    assert_eq!(attempts[0]["session"]["session_id"], "session-original");
+    assert_eq!(attempts[1]["session"]["session_id"], "session-resumed");
+    assert_eq!(attempts[2]["session"]["client"], "client-b");
+    assert_ne!(
+        attempts[1]["session"]["attempt_id"],
+        attempts[2]["session"]["attempt_id"]
+    );
+
+    std::fs::copy(
+        first.with_extension("json.session.json"),
+        second.with_extension("json.session.json"),
+    )
+    .unwrap();
+    let (code, _, stderr) = run(harness(root).args(args));
+    assert_eq!(code, Some(2), "{stderr}");
+    assert!(
+        stderr.contains("conflicting session association"),
+        "{stderr}"
+    );
+}
+
 fn arg(path: &Path) -> &str {
     path.to_str().expect("utf-8 fixture path")
 }

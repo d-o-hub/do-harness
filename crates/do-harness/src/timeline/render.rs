@@ -84,6 +84,17 @@ fn attempt_html(timeline: &Timeline, index: usize, attempt: &super::Attempt) -> 
             .task_id
             .map_or_else(|| "none".to_owned(), |id| id.to_string())
     );
+    if let Some(session) = &attempt.session {
+        let _ = writeln!(
+            html,
+            "<p class=\"meta\">session: {} / {} · attempt ID: {}</p>",
+            escape(&session.client),
+            escape(&session.session_id),
+            escape(&session.attempt_id)
+        );
+    } else {
+        html.push_str("<p class=\"meta\">session: unlinked</p>\n");
+    }
     html.push_str(&freshness_html(timeline, index));
     html.push_str(&delta_html(timeline, index));
     html.push_str(&sensors_html(document));
@@ -236,6 +247,11 @@ pub(super) fn json(timeline: &Timeline) -> Result<String> {
                 "git_sha": document.git_sha,
                 "signal_set": document.signal_set,
                 "task_id": document.task_id,
+                "session": attempt.session.as_ref().map(|session| json!({
+                    "client": session.client,
+                    "session_id": session.session_id,
+                    "attempt_id": session.attempt_id,
+                })),
                 "started_at": document.started_at,
                 "finished_at": document.finished_at,
                 "invalidated_reason": document.invalidated_reason,
