@@ -873,6 +873,100 @@ jobs:
           cat "$facts"
           bash scripts/verify-published.sh --tag "$TAG" --dir "$work/assets" --facts "$facts" --require-immutable
 
+  sdk-package:
+    needs: release
+    if: vars.PUBLISH_SDK_NPM == 'true' || vars.PUBLISH_SDK_PYPI == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    outputs:
+      available: ${{ steps.pack.outputs.available }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: "24"
+      - name: Build and validate SDK packages
+        id: pack
+        run: |
+          set -euo pipefail
+          if ! grep -Fq -- '--dist DIR' scripts/check-sdk-pack.sh; then
+            echo 'Historical tag predates CLI-aligned SDK publishing.'
+            exit 0
+          fi
+          python3 -m pip install --disable-pip-version-check 'setuptools>=68' wheel
+          bash scripts/check-sdk-pack.sh --dist sdk-dist
+          echo 'available=true' >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: steps.pack.outputs.available == 'true'
+        with:
+          name: sdk-dist
+          path: sdk-dist
+          if-no-files-found: error
+
+  sdk-publish-pypi:
+    needs: sdk-package
+    if: needs.sdk-package.outputs.available == 'true' && vars.PUBLISH_SDK_PYPI == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: sdk-pypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: sdk-dist
+          path: sdk-dist
+      # pypa/gh-action-pypi-publish@v1.14.3
+      - uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086
+        with:
+          packages-dir: sdk-dist/python/
+          skip-existing: true
+
+  sdk-publish-npm:
+    needs: sdk-package
+    if: needs.sdk-package.outputs.available == 'true' && vars.PUBLISH_SDK_NPM == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: sdk-npm
+    concurrency:
+      group: sdk-npm-publish-${{ github.repository }}
+      queue: max
+      cancel-in-progress: false
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: sdk-dist
+          path: sdk-dist
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: "24"
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+      - name: Publish the validated SDK tarball
+        run: |
+          set -euo pipefail
+          version="${RELEASE_TAG#v}"
+          if [ "$(npm view "do-harness-sdk@$version" version)" = "$version" ]; then
+            echo "do-harness-sdk@$version is already published."
+            exit 0
+          fi
+          latest="$(npm view do-harness-sdk dist-tags.latest)"
+          channel=latest
+          if [ -n "$latest" ] && [ "$(printf '%s\n' "$version" "$latest" | sort -V | tail -n 1)" = "$latest" ]; then
+            channel=backfill
+          fi
+          npm publish "sdk-dist/npm/do-harness-sdk-$version.tgz" --ignore-scripts --access public --tag "$channel"
+
   verify-windows-npm:
     # The wrapper needs both the registry package and the same-version release
     # assets. Run after both are available, including on tagged recovery.

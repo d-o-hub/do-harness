@@ -1,6 +1,6 @@
 {
   "name": "do-harness-sdk",
-  "version": "0.4.8",
+  "version": "0.6.0",
   "description": "Typed TypeScript/JavaScript bindings for the do-harness agent harness CLI",
   "license": "MIT",
   "type": "module",

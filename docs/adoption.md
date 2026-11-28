@@ -394,15 +394,13 @@ Both SDKs share the same contract:
 - They fail closed: a missing binary, unparseable output, or a non-zero exit
   raises an SDK error (red `verify`/`status` runs raise typed errors that
   carry the parsed report).
-- Their package versions mirror the CLI release they target (`0.4.8` ↔ CLI
-  `0.4.x`); `HarnessClient.assert_schema_compatible()` / `assertSchemaCompatible()`
+- Their package versions mirror the CLI release they target.
+  `HarnessClient.assert_schema_compatible()` / `assertSchemaCompatible()`
   verify the installed CLI's release line.
 
-Publishing to PyPI/npm requires registry credentials and runs outside the
-repository. The offline gate `sdk-pack` (scripts/check-sdk-pack.sh) builds
-the Python sdist+wheel and runs `npm pack --dry-run` on every change to the
-SDK trees, so the packages are always publish-ready from a green tree. The
-exact publish steps are documented in each SDK README.
+The offline `sdk-pack` gate builds both SDKs and checks that their package
+versions match the CLI. The tagged release workflow can publish those same
+artifacts through [SDK trusted publishing](releasing.md#sdk-publishing).
 
 ## Onboarding outcomes
 
