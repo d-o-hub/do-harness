@@ -49,6 +49,7 @@ pub(super) fn write_evidence(
     started_at: i64,
     selection: &sensors::ResolvedSelection<'_>,
     invalidated_reason: Option<&str>,
+    scenario_mapping: Option<&crate::scenarios::Mapping>,
 ) -> std::result::Result<(), CliError> {
     let Some(path) = evidence_destination(root, opts) else {
         return Ok(());
@@ -108,9 +109,14 @@ pub(super) fn write_evidence(
     };
     let path = crate::managed_path::evidence_path(root, &path).map_err(CliError::Usage)?;
     let mut doc = evidence::EvidenceDocument::from_run(report, &meta);
+    if let Some(mapping) = scenario_mapping {
+        mapping.record(root, &mut doc);
+    }
     evidence::write_document(root, &path, &mut doc).map_err(CliError::Verify)?;
 
-    if opts.strict && !(doc.is_strict_clean() && doc.verify_chain(doc.prev_hash.as_deref())) {
+    if (opts.strict || scenario_mapping.is_some_and(crate::scenarios::Mapping::enforces))
+        && !(doc.is_strict_clean() && doc.verify_chain(doc.prev_hash.as_deref()))
+    {
         eprintln!(
             "strict evidence check failed; artifact at {}",
             path.display()

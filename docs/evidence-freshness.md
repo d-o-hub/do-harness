@@ -53,6 +53,45 @@ phantom state, and the next run of that artifact prunes the orphan. Per-run
 files rather than one shared file keep concurrent writers legal on Windows,
 which refuses to write a region another handle has locked.
 
+### Scenario traceability pilot
+
+Create `plans/verification-scenarios.json` to map specific requirements to
+executed tests for one named verification signal set. The schema names a
+repository-relative specification file, a unique requirement and scenario
+ID, a sensor in the set, an exact runner test ID, and the expected branch.
+
+<!-- example: id=evidence_scenario_mapping classification=illustrative reason="Versioned scenario mapping for an optional verification set" -->
+```json
+{
+  "schema_version": 1,
+  "signal_set": "verification",
+  "enforce": true,
+  "requirements": [{
+    "id": "task.advance",
+    "source": "plans/task-policy.md",
+    "scenarios": [{
+      "id": "task.advance.stale",
+      "expected": "reject",
+      "sensor": "task-contract",
+      "test_id": "task_contract::rejects_stale_evidence"
+    }]
+  }]
+}
+```
+
+Adapt the runner's actual results to a final `COVERAGE:` JSON line. Give it
+`scenario_schema_version` of `1` and a `tests` array. Each test record carries
+its `id`, observed `branch` (`accept` or `reject`), and `outcome` (`passed`,
+`failed`, or `skipped`). A passing sensor without the mapped test produces
+`not_run` or `unknown`. The evidence artifact and `status --format json`
+expose the recorded outcomes in `scenario_results`. A stale status means
+those outcomes describe an earlier input snapshot.
+
+`enforce` defaults to false. Turning it on requires every mapped scenario to
+pass for that set. Specification and mapping files contribute to freshness and
+change selection for the bound sensors. This reporting contract trusts the
+configured sensor process to report the actual test execution and outcome.
+
 Task advance and completion check current required named-sensor input
 identities, task method/index, and the latest task-scoped beat's status, exit
 code and digest inside one immediate database transaction. Inputs are checked

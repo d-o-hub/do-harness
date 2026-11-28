@@ -52,8 +52,10 @@ pub(crate) async fn run(root: &Path, mut opts: VerifyOpts) -> std::result::Resul
     let started_at = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_or(0, |d| i64::try_from(d.as_secs()).unwrap_or(i64::MAX));
-    let (cfg, config_bytes) = config::load_raw(root, opts.config.as_deref())
+    let (mut cfg, config_bytes) = config::load_raw(root, opts.config.as_deref())
         .await
+        .map_err(CliError::Usage)?;
+    let scenario_mapping = crate::scenarios::configure(root, &mut cfg, opts.set.as_deref())
         .map_err(CliError::Usage)?;
     let beat_scope = telemetry::resolve_scope(root, opts.raw_task.as_deref(), opts.global);
     if opts.task.is_none() {
@@ -221,6 +223,7 @@ pub(crate) async fn run(root: &Path, mut opts: VerifyOpts) -> std::result::Resul
                     started_at,
                     &selection,
                     invalidated_reason.as_deref(),
+                    scenario_mapping.as_ref(),
                 )?;
             }
 

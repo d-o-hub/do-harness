@@ -17,7 +17,7 @@ use std::path::{Path, PathBuf};
 
 use serde::Serialize;
 
-use crate::evidence::EvidenceDocument;
+use crate::evidence::{EvidenceDocument, ScenarioOutcome};
 use crate::report::Format;
 use crate::{CliError, config};
 
@@ -55,6 +55,9 @@ pub struct EvidenceSide {
     pub signal_set: Option<String>,
     /// Aggregate verdict (`pass` | `fail`).
     pub verdict: String,
+    /// Recorded scenario outcomes for an opted-in verification set.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub scenario_results: Vec<crate::evidence::ScenarioResult>,
     /// Recorded workspace fingerprint.
     pub workspace_fingerprint: String,
     /// Recorded policy fingerprint.
@@ -153,6 +156,8 @@ pub fn status_report(
     evidence_override: Option<&Path>,
     since: Option<&str>,
 ) -> anyhow::Result<StatusReport> {
+    let mut configured = cfg.clone();
+    let scenarios = crate::scenarios::configure(root, &mut configured, set)?;
     let paths = evidence_paths(root, set, evidence_override);
     // A range-selected artifact must be judged against the same range, not
     // the (usually empty) working tree of a clean committed checkout.
@@ -162,7 +167,7 @@ pub fn status_report(
         .or_else(|| selection::recorded_since(&paths));
     let facts = CurrentFacts::compute(
         root,
-        cfg,
+        &configured,
         config_bytes,
         set,
         selected_since.as_deref(),
@@ -176,7 +181,7 @@ pub fn status_report(
     } else {
         let (document, covering, artifact) = find_covering_evidence(&paths, set, &facts.required);
         if let Some(document) = document {
-            decide(
+            let mut decision = decide(
                 set,
                 &facts,
                 &document,
@@ -188,7 +193,29 @@ pub fn status_report(
                         observed_at: do_harness_db::unix_now(),
                     })
                     .as_ref(),
-            )
+            );
+            if decision.state == EvidenceState::Green
+                && scenarios
+                    .as_ref()
+                    .is_some_and(crate::scenarios::Mapping::enforces)
+                && (document.signal_set.as_deref() != set || document.scenario_results.is_empty())
+            {
+                decision.state = EvidenceState::Missing;
+                decision.reason = "scenario_evidence_missing".to_owned();
+                decision.recovery = Some(recovery_command(set));
+            } else if decision.state == EvidenceState::Green
+                && scenarios
+                    .as_ref()
+                    .is_some_and(crate::scenarios::Mapping::enforces)
+                && document
+                    .scenario_results
+                    .iter()
+                    .any(|result| result.outcome != ScenarioOutcome::Passed)
+            {
+                decision.state = EvidenceState::Red;
+                decision.reason = "scenario_checks_failed".to_owned();
+            }
+            decision
         } else {
             missing_report(set, &paths, covering, facts.side)
         }

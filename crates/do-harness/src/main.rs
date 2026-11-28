@@ -73,6 +73,7 @@ mod provenance;
 mod redaction;
 mod report;
 mod reports;
+mod scenarios;
 mod sensor_inputs;
 mod sensor_new;
 mod sensors;
